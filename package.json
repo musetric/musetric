@@ -27,7 +27,7 @@
     "check:translations": "yarn workspaces foreach --all --parallel --interlaced run check:translations",
     "check:translations:fix": "yarn workspaces foreach --all --parallel --interlaced run check:translations:fix",
     "check:format": "prettier --check .",
-    "check:format:fix": "prettier . --write",
+    "check:format:fix": "prettier . --write --list-different",
     "test": "yarn workspaces foreach --all --parallel --interlaced run test"
   },
   "devDependencies": {
