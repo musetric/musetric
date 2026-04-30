@@ -1,17 +1,17 @@
-import { Box, Drawer, Popover, type Theme, useMediaQuery } from '@mui/material';
+import { Box, Drawer, Popover, useMediaQuery } from '@mui/material';
 import { type FC } from 'react';
 import { useProjectStore } from '../store.js';
 import { TempoPickerContent } from './TempoPickerContent.js';
 
 export const TempoPicker: FC = () => {
-  const isDesktop = useMediaQuery((theme: Theme) => theme.breakpoints.up('sm'));
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
   const tempoAnchorEl = useProjectStore((state) => state.tempoAnchorEl);
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
 
   if (isDesktop) {
     return (
       <Popover
-        open={tempoAnchorEl !== undefined}
+        open={!!tempoAnchorEl}
         anchorEl={tempoAnchorEl}
         onClose={() => {
           setTempoAnchorEl(undefined);
@@ -35,7 +35,7 @@ export const TempoPicker: FC = () => {
   return (
     <Drawer
       anchor='bottom'
-      open={tempoAnchorEl !== undefined}
+      open={!!tempoAnchorEl}
       onClose={() => {
         setTempoAnchorEl(undefined);
       }}

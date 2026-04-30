@@ -1,20 +1,16 @@
-import { Skeleton, Stack } from '@mui/material';
+import { Box, Skeleton, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { useQuery } from '@tanstack/react-query';
-import { type FC } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { ViewError } from '../../../components/ViewError.js';
 import { getTrackProgress } from '../../../engine/state.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { useProjectStore } from '../store.js';
 import { SegmentLCurrent } from './SegmentLCurrent.js';
-import { SegmentNext } from './SegmentNext.js';
 
 type SubtitleLines = {
-  current?: api.subtitle.Segment;
-  next?: api.subtitle.Segment;
-  playbackTime: number;
+  currentIndex: number;
 };
 
 const getSegmentEnd = (segment: api.subtitle.Segment) => {
@@ -31,19 +27,44 @@ const getSubtitleLines = (
 ): SubtitleLines => {
   if (subtitle.length === 0) {
     return {
-      current: undefined,
-      next: undefined,
-      playbackTime: 0,
+      currentIndex: -1,
     };
   }
 
   const currentIndex = subtitle.findIndex(
     (segment) => playbackTime < getSegmentEnd(segment),
   );
-  const current = currentIndex === -1 ? undefined : subtitle[currentIndex];
-  const next = currentIndex === -1 ? undefined : subtitle[currentIndex + 1];
+  return { currentIndex };
+};
 
-  return { current, next, playbackTime };
+const useAutoScrollPause = () => {
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const timeoutRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (!timeoutRef.current) {
+        return;
+      }
+      window.clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  return {
+    autoScrollEnabled,
+    pauseAutoScroll: () => {
+      setAutoScrollEnabled(false);
+
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = window.setTimeout(() => {
+        setAutoScrollEnabled(true);
+        timeoutRef.current = undefined;
+      }, 5000);
+    },
+  };
 };
 
 export type SubtitleProps = {
@@ -53,16 +74,30 @@ export const Subtitle: FC<SubtitleProps> = (props) => {
   const { projectId } = props;
   const { t } = useTranslation();
   const subtitleQuery = useQuery(endpoints.subtitle.get(projectId));
-  const detailsMode = useProjectStore((state) => state.detailsMode);
+  const activeSegmentRef = useRef<HTMLDivElement>(null);
+  const initialScrollRef = useRef(true);
+  const { autoScrollEnabled, pauseAutoScroll } = useAutoScrollPause();
 
   const duration = useEngineStore((state) => state.duration);
   const trackProgress = useEngineStore(getTrackProgress);
   const playbackTime = duration * trackProgress;
 
-  const { current, next } = getSubtitleLines(
+  const { currentIndex } = getSubtitleLines(
     subtitleQuery.data ?? [],
     playbackTime,
   );
+
+  useEffect(() => {
+    if (!autoScrollEnabled) {
+      return;
+    }
+
+    activeSegmentRef.current?.scrollIntoView({
+      block: 'center',
+      behavior: initialScrollRef.current ? 'instant' : 'smooth',
+    });
+    initialScrollRef.current = false;
+  }, [autoScrollEnabled, currentIndex]);
 
   const getContent = () => {
     if (subtitleQuery.status === 'pending') {
@@ -79,24 +114,47 @@ export const Subtitle: FC<SubtitleProps> = (props) => {
     }
 
     return (
-      <>
-        <SegmentLCurrent segment={current} playbackTime={playbackTime} />
-        <SegmentNext segment={next} />
-      </>
+      <Stack
+        component='div'
+        height='100%'
+        width='100%'
+        overflow='auto'
+        tabIndex={0}
+        onWheel={pauseAutoScroll}
+        onTouchMove={pauseAutoScroll}
+        onPointerDown={pauseAutoScroll}
+        onKeyDown={pauseAutoScroll}
+        sx={{
+          scrollbarGutter: 'stable',
+          scrollBehavior: 'smooth',
+        }}
+      >
+        <Box height='calc(50% - 2em)' flexShrink={0} />
+        {subtitleQuery.data.map((segment, index) => (
+          <Box
+            key={`${segment.start}-${index}`}
+            ref={index === currentIndex ? activeSegmentRef : undefined}
+            py={1}
+          >
+            <SegmentLCurrent
+              active={index === currentIndex}
+              segment={segment}
+              playbackTime={playbackTime}
+            />
+          </Box>
+        ))}
+        <Box height='calc(50% - 2em)' flexShrink={0} />
+      </Stack>
     );
   };
-
-  if (detailsMode !== 'subtitles') {
-    return;
-  }
 
   return (
     <Stack
       alignItems='center'
-      gap={0}
       width='100%'
-      minHeight='3em'
-      maxHeight='3em'
+      height='100%'
+      minHeight={0}
+      overflow='hidden'
     >
       {getContent()}
     </Stack>

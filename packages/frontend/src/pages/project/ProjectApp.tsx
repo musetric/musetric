@@ -5,11 +5,10 @@ import { engine } from '../../engine/engine.js';
 import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { VisualizationModeToggle } from './buttons/VisualizationModeToggle.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
+import { ProjectContent } from './ProjectContent.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
-import { Subtitle } from './subtitle/Subtitle.js';
-import { ProjectMainContent } from './waveform/ProjectMainContent.js';
 
 export type ProjectAppProps = {
   project: api.project.Item;
@@ -32,17 +31,8 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         </>
       }
     >
-      <Stack
-        width='100%'
-        flexGrow={1}
-        minHeight={0}
-        gap={2}
-        sx={{
-          scrollbarGutter: 'stable',
-        }}
-      >
-        <ProjectMainContent projectId={project.id} />
-        <Subtitle projectId={project.id} />
+      <Stack width='100%' flexGrow={1} minHeight={0} gap={2}>
+        <ProjectContent projectId={project.id} />
         <PlaybackPanel />
       </Stack>
     </ProjectLayout>

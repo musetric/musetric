@@ -1,10 +1,10 @@
-import { Box, Drawer, Popover, type Theme, useMediaQuery } from '@mui/material';
+import { Box, Drawer, Popover, useMediaQuery } from '@mui/material';
 import { type FC } from 'react';
 import { useProjectStore } from '../store.js';
 import { TransposePickerContent } from './TransposePickerContent.js';
 
 export const TransposePicker: FC = () => {
-  const isDesktop = useMediaQuery((theme: Theme) => theme.breakpoints.up('sm'));
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
   const transposeAnchorEl = useProjectStore((state) => state.transposeAnchorEl);
   const setTransposeAnchorEl = useProjectStore(
     (state) => state.setTransposeAnchorEl,
