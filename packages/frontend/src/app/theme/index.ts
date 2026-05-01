@@ -59,6 +59,23 @@ export const appTheme = createTheme({
       defaultProps: {
         color: 'default',
       },
+      styleOverrides: {
+        root: (state) => {
+          const { theme } = state;
+
+          return {
+            boxSizing: 'border-box',
+            paddingLeft: theme.spacing(1.5),
+            paddingRight: theme.spacing(1.5),
+          };
+        },
+        thumb: {
+          '&::before, &::after': {
+            height: 20,
+            width: 20,
+          },
+        },
+      },
     },
     MuiTextField: {
       defaultProps: {
