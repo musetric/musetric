@@ -7,6 +7,7 @@ export type VisualizationMode = 'spectrogram' | 'waveform';
 export type ProjectState = {
   visualizationMode: VisualizationMode;
   detailsMode: DetailsMode;
+  trackListScrollTop: number;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
 };
@@ -14,11 +15,13 @@ export type ProjectState = {
 const initialState: ProjectState = {
   visualizationMode: 'spectrogram',
   detailsMode: 'mixer',
+  trackListScrollTop: 0,
 };
 
 export type ProjectActions = {
   setVisualizationMode: (value: VisualizationMode) => void;
   setDetailsMode: (value: DetailsMode) => void;
+  setTrackListScrollTop: (scrollTop: number) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
 };
@@ -31,6 +34,8 @@ export const useProjectStore = create<State>()(
       ...initialState,
       setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
       setDetailsMode: (detailsMode) => set({ detailsMode }),
+      setTrackListScrollTop: (trackListScrollTop) =>
+        set({ trackListScrollTop }),
       setTransposeAnchorEl: (transposeAnchorEl) =>
         set({
           transposeAnchorEl,
