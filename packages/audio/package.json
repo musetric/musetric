@@ -54,6 +54,12 @@
       "import": "./dist/spectrogram/worker/index.worker.js",
       "default": "./dist/spectrogram/worker/index.worker.js"
     },
+    "./timeline": {
+      "monorepo": "./src/timeline/index.ts",
+      "types": "./dist/timeline/index.d.ts",
+      "import": "./dist/timeline/index.js",
+      "default": "./dist/timeline/index.js"
+    },
     "./waveform": {
       "monorepo": "./src/waveform/index.ts",
       "types": "./dist/waveform/index.d.ts",
