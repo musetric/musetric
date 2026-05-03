@@ -17,6 +17,7 @@ export type EngineState = {
   duration: number;
   playing: boolean;
   frameIndex: number;
+  seekRevision: number;
   transposeSemitones: number;
   sourceTempoBpm: number;
   tempoBpm: number;

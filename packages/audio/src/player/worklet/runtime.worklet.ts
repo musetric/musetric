@@ -54,9 +54,6 @@ export const createPlayerRuntime = async (
         return;
       }
 
-      if (frameIndex >= frameCount) {
-        frameIndex = 0;
-      }
       playing = true;
       port.methods.setPlaying({ playing, frameIndex });
     },
@@ -69,7 +66,7 @@ export const createPlayerRuntime = async (
       frameIndex = message.frameIndex;
       frameIndexTracker.reset();
       timePitchProcessor.reset();
-      port.methods.setFrameIndex({ frameIndex });
+      port.methods.setFrameIndex({ frameIndex, positionJump: true });
     },
     setTransposeSemitones: (message) => {
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
@@ -128,7 +125,7 @@ export const createPlayerRuntime = async (
         playing = false;
         frameIndexTracker.reset();
         timePitchProcessor.reset();
-        port.methods.setPlaying({ playing, frameIndex });
+        port.methods.setPlaying({ playing, frameIndex, positionJump: true });
         return;
       }
 

@@ -16,8 +16,12 @@ export type PlayerOutboundMethods = {
 
 export type PlayerInboundMethods = {
   booted: () => void;
-  setPlaying: (message: { playing: boolean; frameIndex: number }) => void;
-  setFrameIndex: (message: { frameIndex: number }) => void;
+  setPlaying: (message: {
+    playing: boolean;
+    frameIndex: number;
+    positionJump?: true;
+  }) => void;
+  setFrameIndex: (message: { frameIndex: number; positionJump?: true }) => void;
 };
 
 export const playerChannel = createMessageChannel<

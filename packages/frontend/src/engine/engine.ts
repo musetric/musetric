@@ -31,6 +31,7 @@ const initialState: EngineState = {
   duration: 0,
   playing: false,
   frameIndex: 0,
+  seekRevision: 0,
   transposeSemitones: 0,
   sourceTempoBpm: 100,
   tempoBpm: 100,

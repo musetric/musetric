@@ -1,14 +1,16 @@
-import { engine } from '../../../engine/engine.js';
+import { type EngineState } from '../../../engine/state.js';
 
 const subtitleSeekLeadSeconds = 0.15;
 
-export const seekSubtitlePlaybackTime = (playbackTime: number) => {
-  const { duration, frameCount } = engine.store.get();
+export const getSubtitleSeekFrameIndex = (
+  playbackTime: number,
+  engineState: Pick<EngineState, 'duration' | 'frameCount'>,
+) => {
+  const { duration, frameCount } = engineState;
   if (!frameCount || duration <= 0) {
     return;
   }
 
   const seekTime = Math.max(0, playbackTime - subtitleSeekLeadSeconds);
-  const frameIndex = Math.floor((seekTime / duration) * frameCount);
-  engine.player.seek(frameIndex);
+  return Math.floor((seekTime / duration) * frameCount);
 };

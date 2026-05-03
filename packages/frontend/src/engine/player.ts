@@ -60,11 +60,17 @@ export const createEnginePlayer = async (
       store.update((state) => {
         state.playing = message.playing;
         state.frameIndex = message.frameIndex;
+        if (message.positionJump) {
+          state.seekRevision += 1;
+        }
       });
     },
     setFrameIndex: (message) => {
       store.update((state) => {
         state.frameIndex = message.frameIndex;
+        if (message.positionJump) {
+          state.seekRevision += 1;
+        }
       });
     },
   });
