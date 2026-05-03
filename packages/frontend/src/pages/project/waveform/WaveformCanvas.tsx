@@ -2,17 +2,18 @@ import { Box } from '@mui/material';
 import type { api } from '@musetric/api';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { routes } from '../../../app/router/routes.js';
 import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 export type WaveformCanvasProps = {
-  projectId: number;
   stemType: api.wavePeaks.StemType;
 };
 export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
-  const { projectId, stemType } = props;
+  const { stemType } = props;
+  const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
 
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>();

@@ -6,22 +6,40 @@ import { Subtitle } from './subtitle/Subtitle.js';
 import { TrackVolumeList } from './waveform/TrackVolumeList.js';
 import { WaveformList } from './waveform/WaveformList.js';
 
-export type ProjectContentProps = {
-  projectId: number;
+const ProjectDetails: FC = () => {
+  const detailsMode = useProjectStore((state) => state.detailsMode);
+
+  return (
+    <Box gridArea='details'>
+      {detailsMode === 'mixer' && <TrackVolumeList />}
+      {detailsMode === 'subtitles' && <Subtitle />}
+    </Box>
+  );
 };
 
-export const ProjectContent: FC<ProjectContentProps> = (props) => {
-  const { projectId } = props;
-  const detailsMode = useProjectStore((state) => state.detailsMode);
+const ProjectVisualization: FC = () => {
   const visualizationMode = useProjectStore((state) => state.visualizationMode);
 
+  return (
+    <Box gridArea='visualization'>
+      {visualizationMode === 'waveform' && <WaveformList />}
+      {visualizationMode === 'spectrogram' && (
+        <Box flexGrow={1} flexBasis={0} height='100%' overflow='hidden'>
+          <SpectrogramCanvas />
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+export const ProjectContent: FC = () => {
   return (
     <Box
       display='grid'
       width='100%'
       flexGrow={1}
       minHeight={0}
-      gap={2}
+      gap={1}
       overflow='hidden'
       gridTemplateColumns={{
         xs: 'minmax(0, 1fr)',
@@ -39,20 +57,8 @@ export const ProjectContent: FC<ProjectContentProps> = (props) => {
         md: '"visualization details"',
       }}
     >
-      <Box gridArea='details'>
-        {detailsMode === 'mixer' && <TrackVolumeList />}
-        {detailsMode === 'subtitles' && <Subtitle projectId={projectId} />}
-      </Box>
-      <Box gridArea='visualization'>
-        {visualizationMode === 'waveform' && (
-          <WaveformList projectId={projectId} />
-        )}
-        {visualizationMode === 'spectrogram' && (
-          <Box flexGrow={1} flexBasis={0} height='100%' overflow='hidden'>
-            <SpectrogramCanvas />
-          </Box>
-        )}
-      </Box>
+      <ProjectDetails />
+      <ProjectVisualization />
     </Box>
   );
 };

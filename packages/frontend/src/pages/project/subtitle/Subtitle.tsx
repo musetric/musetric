@@ -3,14 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
+import { routes } from '../../../app/router/routes.js';
 import { ViewError } from '../../../components/ViewError.js';
 import { SubtitleList } from './SubtitleList.js';
 
-export type SubtitleProps = {
-  projectId: number;
-};
-export const Subtitle: FC<SubtitleProps> = (props) => {
-  const { projectId } = props;
+export const Subtitle: FC = () => {
+  const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
   const subtitleQuery = useQuery(endpoints.subtitle.get(projectId));
 

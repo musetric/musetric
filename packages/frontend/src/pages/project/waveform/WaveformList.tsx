@@ -8,13 +8,7 @@ import {
 } from './useTrackListScroll.js';
 import { WaveformCanvas } from './WaveformCanvas.js';
 
-export type WaveformListProps = {
-  projectId: number;
-};
-
-export const WaveformList: FC<WaveformListProps> = (props) => {
-  const { projectId } = props;
-
+export const WaveformList: FC = () => {
   const listRef = useTrackListScroll();
   const detailsMode = useProjectStore((state) => state.detailsMode);
 
@@ -34,7 +28,7 @@ export const WaveformList: FC<WaveformListProps> = (props) => {
           height={100}
           flexShrink={0}
         >
-          <WaveformCanvas projectId={projectId} stemType={stemType} />
+          <WaveformCanvas stemType={stemType} />
         </Box>
       ))}
     </Stack>
