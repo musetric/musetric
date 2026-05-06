@@ -8,9 +8,9 @@
     "project:build": "vite build && cpx \"dist/**/*\" ../backend/storage/public --clean",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
-    "check:lint:fix": "eslint . --fix --cache",
+    "fix:lint": "eslint . --fix --cache",
     "check:translations": "i18next-cli extract --config ./i18next.config.ts --ci --dry-run",
-    "check:translations:fix": "i18next-cli extract --config ./i18next.config.ts"
+    "fix:translations": "i18next-cli extract --config ./i18next.config.ts"
   },
   "devDependencies": {
     "@alexanderolsen/libsamplerate-js": "catalog:",

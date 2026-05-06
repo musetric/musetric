@@ -20,14 +20,14 @@
     "docker:start:cuda": "yarn workspace @musetric/backend docker:start:cuda",
     "check:security": "yarn npm audit --all --recursive --severity high",
     "check:deps": "yarn constraints && yarn dedupe --check",
-    "check:deps:fix": "yarn constraints --fix && yarn && yarn dedupe",
+    "fix:deps": "yarn constraints --fix && yarn && yarn dedupe",
     "check:ts": "yarn workspaces foreach --all --parallel --interlaced run check:ts",
     "check:lint": "yarn workspaces foreach --all --parallel --interlaced run check:lint",
-    "check:lint:fix": "yarn workspaces foreach --all --parallel --interlaced run check:lint:fix",
+    "fix:lint": "yarn workspaces foreach --all --parallel --interlaced run fix:lint",
     "check:translations": "yarn workspaces foreach --all --parallel --interlaced run check:translations",
-    "check:translations:fix": "yarn workspaces foreach --all --parallel --interlaced run check:translations:fix",
+    "fix:translations": "yarn workspaces foreach --all --parallel --interlaced run fix:translations",
     "check:format": "prettier --check .",
-    "check:format:fix": "prettier . --write --list-different",
+    "fix:format": "prettier . --write --list-different",
     "test": "yarn workspaces foreach --all --parallel --interlaced run test"
   },
   "devDependencies": {

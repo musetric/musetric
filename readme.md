@@ -14,11 +14,11 @@ yarn dev
 ```bash
 yarn
 yarn check:security
-yarn check:deps:fix
+yarn fix:deps
 yarn check:ts
-yarn check:lint:fix
-yarn check:translations:fix
-yarn check:format:fix
+yarn fix:lint
+yarn fix:translations
+yarn fix:format
 yarn test
 ```
 
