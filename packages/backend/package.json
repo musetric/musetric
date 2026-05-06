@@ -14,7 +14,7 @@
     "docker:start:cuda": "docker compose -f docker-compose.cuda.yml up -d",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
-    "check:lint:fix": "eslint . --fix --cache"
+    "fix:lint": "eslint . --fix --cache"
   },
   "dependencies": {
     "@fastify/multipart": "catalog:",

@@ -72,7 +72,7 @@
     "project:build": "cpx \"src/**/*.wgsl\" dist --clean && tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
-    "check:lint:fix": "eslint . --fix --cache",
+    "fix:lint": "eslint . --fix --cache",
     "test": "vitest run"
   },
   "peerDependencies": {
