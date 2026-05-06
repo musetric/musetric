@@ -9,8 +9,8 @@ import { FourierModeField } from './FourierModeField.js';
 import { MaxFrequencyField } from './MaxFrequencyField.js';
 import { MinDecibelField } from './MinDecibelField.js';
 import { MinFrequencyField } from './MinFrequencyField.js';
-import { VisibleTimeAfterField } from './VisibleTimeAfterField.js';
-import { VisibleTimeBeforeField } from './VisibleTimeBeforeField.js';
+import { PlayheadRatioField } from './PlayheadRatioField.js';
+import { VisibleTimeField } from './VisibleTimeField.js';
 import { WindowNameField } from './WindowNameField.js';
 import { WindowSizeField } from './WindowSizeField.js';
 import { ZeroPaddingFactorField } from './ZeroPaddingFactorField.js';
@@ -48,8 +48,8 @@ export const ProjectSettings: FC = () => {
             <MinFrequencyField />
             <MaxFrequencyField />
             <MinDecibelField />
-            <VisibleTimeBeforeField />
-            <VisibleTimeAfterField />
+            <VisibleTimeField />
+            <PlayheadRatioField />
             <ZeroPaddingFactorField />
           </Stack>
         </Box>

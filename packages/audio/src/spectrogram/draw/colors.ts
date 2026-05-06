@@ -1,6 +1,6 @@
 import { createResourceCell } from '@musetric/resource-utils';
 import { parseHexColor } from '../../common/colors.es.js';
-import { type SpectrogramDrawConfig } from './index.js';
+import type { SpectrogramConfig } from '../config.cross.js';
 
 const toVec4 = (hex: string): [number, number, number, number] => {
   const { red, green, blue } = parseHexColor(hex);
@@ -12,7 +12,7 @@ export type StateColors = {
 };
 export const createColorsCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (config: SpectrogramDrawConfig): StateColors => {
+    create: (config: SpectrogramConfig): StateColors => {
       const array = new Float32Array(12);
       const { colors } = config;
       array.set([

@@ -25,15 +25,10 @@ export const createStateSamplesCell = (device: GPUDevice) =>
         buffer,
         array,
         write: (samples, trackProgress, config) => {
-          const {
-            windowSize,
-            sampleRate,
-            visibleTimeBefore,
-            visibleTimeAfter,
-          } = config;
-          const beforeSamples = visibleTimeBefore * sampleRate + windowSize;
-          const afterSamples = visibleTimeAfter * sampleRate;
-          const totalVisibleSamples = beforeSamples + afterSamples;
+          const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
+          const beforeSamples =
+            visibleTime * playheadRatio * sampleRate + windowSize;
+          const totalVisibleSamples = visibleTime * sampleRate + windowSize;
           const startIndex = Math.floor(
             trackProgress * samples.length - beforeSamples,
           );

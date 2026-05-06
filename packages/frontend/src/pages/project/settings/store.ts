@@ -13,8 +13,8 @@ export type SettingsState = Pick<
   SpectrogramConfig,
   | 'fourierMode'
   | 'windowSize'
-  | 'visibleTimeBefore'
-  | 'visibleTimeAfter'
+  | 'visibleTime'
+  | 'playheadRatio'
   | 'zeroPaddingFactor'
   | 'windowName'
   | 'minDecibel'
@@ -27,8 +27,8 @@ export type SettingsState = Pick<
 const initialState: SettingsState = {
   fourierMode: 'fftRadix4',
   windowSize: 1024 * 4,
-  visibleTimeBefore: 4,
-  visibleTimeAfter: 4,
+  visibleTime: 8,
+  playheadRatio: 0.5,
   zeroPaddingFactor: 2,
   windowName: 'hamming',
   minDecibel: -40,
@@ -44,8 +44,8 @@ export type SettingsActions = {
   setMinFrequency: (value: number) => void;
   setMaxFrequency: (value: number) => void;
   setMinDecibel: (value: number) => void;
-  setVisibleTimeBefore: (value: number) => void;
-  setVisibleTimeAfter: (value: number) => void;
+  setVisibleTime: (value: number) => void;
+  setPlayheadRatio: (value: number) => void;
   setZeroPaddingFactor: (value: SpectrogramZeroPaddingFactor) => void;
   setOpen: (value: boolean) => void;
 };
@@ -61,8 +61,8 @@ export const useSettingsStore = create<State>()(
       setMinFrequency: (minFrequency) => set({ minFrequency }),
       setMaxFrequency: (maxFrequency) => set({ maxFrequency }),
       setMinDecibel: (minDecibel) => set({ minDecibel }),
-      setVisibleTimeBefore: (visibleTimeBefore) => set({ visibleTimeBefore }),
-      setVisibleTimeAfter: (visibleTimeAfter) => set({ visibleTimeAfter }),
+      setVisibleTime: (visibleTime) => set({ visibleTime }),
+      setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
       setZeroPaddingFactor: (zeroPaddingFactor) => set({ zeroPaddingFactor }),
       setOpen: (open) => set({ open }),
     };

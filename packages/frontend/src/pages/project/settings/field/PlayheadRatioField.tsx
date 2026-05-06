@@ -3,22 +3,22 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';
 
-export const VisibleTimeAfterField: FC = () => {
+export const PlayheadRatioField: FC = () => {
   const { t } = useTranslation();
-  const visibleTimeAfter = useSettingsStore((s) => s.visibleTimeAfter);
-  const setVisibleTimeAfter = useSettingsStore((s) => s.setVisibleTimeAfter);
+  const playheadRatio = useSettingsStore((s) => s.playheadRatio);
+  const setPlayheadRatio = useSettingsStore((s) => s.setPlayheadRatio);
 
   return (
     <TextField
-      key={visibleTimeAfter}
+      key={playheadRatio}
       size='small'
       type='number'
-      label={t('pages.project.settings.fields.visibleTimeAfter.label')}
-      defaultValue={visibleTimeAfter}
+      label={t('pages.project.settings.fields.playheadRatio.label')}
+      defaultValue={playheadRatio}
       onBlur={(event) => {
         const value = Number(event.target.value);
         if (Number.isNaN(value)) return;
-        setVisibleTimeAfter(Math.max(0, Math.min(value, 30)));
+        setPlayheadRatio(Math.max(0, Math.min(value, 1)));
       }}
       slotProps={{
         input: {

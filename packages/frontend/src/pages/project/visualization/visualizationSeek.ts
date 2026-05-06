@@ -25,11 +25,9 @@ const getSpectrogramFrameIndex = (event: MouseEvent) => {
   const { frameCount, frameIndex } = engine.store.get();
   if (!frameCount) return undefined;
 
-  const { visibleTimeBefore, visibleTimeAfter } = useSettingsStore.getState();
+  const { visibleTime, playheadRatio } = useSettingsStore.getState();
   const clickRatio = getClickRatio(event);
   const { sampleRate } = engine.context;
-  const visibleTime = visibleTimeBefore + visibleTimeAfter;
-  const playheadRatio = visibleTimeBefore / visibleTime;
   const clickOffsetRatio = clickRatio - playheadRatio;
   const frameOffset = visibleTime * sampleRate * clickOffsetRatio;
 

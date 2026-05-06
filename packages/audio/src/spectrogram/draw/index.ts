@@ -6,18 +6,13 @@ import { createCanvasCell } from './canvas.js';
 import { createColorsCell } from './colors.js';
 import { createStatePlayheadRatioCell } from './playheadRatio.js';
 
-export type SpectrogramDrawConfig = Pick<
-  SpectrogramConfig,
-  'canvas' | 'viewSize' | 'visibleTimeBefore' | 'visibleTimeAfter' | 'colors'
->;
-
 export type SpectrogramDraw = {
   run: (encoder: GPUCommandEncoder) => void;
 };
 
 export type SpectrogramDrawArg = {
   view: GPUTextureView;
-  config: SpectrogramDrawConfig;
+  config: SpectrogramConfig;
 };
 
 export const createSpectrogramDrawCell = (

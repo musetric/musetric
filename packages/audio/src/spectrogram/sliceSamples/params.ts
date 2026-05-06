@@ -14,14 +14,11 @@ const toParams = (config: ExtSpectrogramConfig): SliceSamplesParams => {
     windowSize,
     windowCount,
     sampleRate,
-    visibleTimeBefore,
-    visibleTimeAfter,
+    visibleTime,
     zeroPaddingFactor,
   } = config;
   const paddedWindowSize = windowSize * zeroPaddingFactor;
-  const beforeSamples = visibleTimeBefore * sampleRate + windowSize;
-  const afterSamples = visibleTimeAfter * sampleRate;
-  const visibleSamples = Math.ceil(beforeSamples + afterSamples);
+  const visibleSamples = Math.ceil(visibleTime * sampleRate + windowSize);
   const step = (visibleSamples - windowSize) / (windowCount - 1);
   return {
     windowSize,
@@ -67,7 +64,6 @@ export const createParamsCell = (device: GPUDevice) =>
       current.windowSize === next.windowSize &&
       current.windowCount === next.windowCount &&
       current.sampleRate === next.sampleRate &&
-      current.visibleTimeBefore === next.visibleTimeBefore &&
-      current.visibleTimeAfter === next.visibleTimeAfter &&
+      current.visibleTime === next.visibleTime &&
       current.zeroPaddingFactor === next.zeroPaddingFactor,
   });

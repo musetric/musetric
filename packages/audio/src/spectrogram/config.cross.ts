@@ -27,8 +27,8 @@ export type SpectrogramConfig = {
   fourierMode: FourierMode;
   windowSize: number;
   sampleRate: number;
-  visibleTimeBefore: number;
-  visibleTimeAfter: number;
+  visibleTime: number;
+  playheadRatio: number;
   zeroPaddingFactor: SpectrogramZeroPaddingFactor;
   windowName: SpectrogramWindowName;
   minDecibel: number;
@@ -42,8 +42,8 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'fourierMode',
   'windowSize',
   'sampleRate',
-  'visibleTimeBefore',
-  'visibleTimeAfter',
+  'visibleTime',
+  'playheadRatio',
   'zeroPaddingFactor',
   'windowName',
   'minDecibel',

@@ -3,22 +3,22 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';
 
-export const VisibleTimeBeforeField: FC = () => {
+export const VisibleTimeField: FC = () => {
   const { t } = useTranslation();
-  const visibleTimeBefore = useSettingsStore((s) => s.visibleTimeBefore);
-  const setVisibleTimeBefore = useSettingsStore((s) => s.setVisibleTimeBefore);
+  const visibleTime = useSettingsStore((s) => s.visibleTime);
+  const setVisibleTime = useSettingsStore((s) => s.setVisibleTime);
 
   return (
     <TextField
-      key={visibleTimeBefore}
+      key={visibleTime}
       size='small'
       type='number'
-      label={t('pages.project.settings.fields.visibleTimeBefore.label')}
-      defaultValue={visibleTimeBefore}
+      label={t('pages.project.settings.fields.visibleTime.label')}
+      defaultValue={visibleTime}
       onBlur={(event) => {
         const value = Number(event.target.value);
         if (Number.isNaN(value)) return;
-        setVisibleTimeBefore(Math.max(0, Math.min(value, 30)));
+        setVisibleTime(Math.max(0.1, Math.min(value, 60)));
       }}
       slotProps={{
         input: {

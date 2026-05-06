@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import { type SpectrogramDrawConfig } from './index.js';
+import type { SpectrogramConfig } from '../config.cross.js';
 
 export type StatePlayheadRatio = {
   buffer: GPUBuffer;
@@ -7,12 +7,9 @@ export type StatePlayheadRatio = {
 
 export const createStatePlayheadRatioCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (config: SpectrogramDrawConfig): StatePlayheadRatio => {
+    create: (config: SpectrogramConfig): StatePlayheadRatio => {
       const array = new Float32Array([1]);
-      const { visibleTimeBefore, visibleTimeAfter } = config;
-      const playheadRatio =
-        visibleTimeBefore / (visibleTimeBefore + visibleTimeAfter);
-      array[0] = playheadRatio;
+      array[0] = config.playheadRatio;
       const buffer = device.createBuffer({
         label: 'pipeline-playhead-ratio-buffer',
         size: array.byteLength,
@@ -27,7 +24,5 @@ export const createStatePlayheadRatioCell = (device: GPUDevice) =>
     dispose: (state) => {
       state.buffer.destroy();
     },
-    equals: (current, next) =>
-      current.visibleTimeBefore === next.visibleTimeBefore &&
-      current.visibleTimeAfter === next.visibleTimeAfter,
+    equals: (current, next) => current.playheadRatio === next.playheadRatio,
   });
