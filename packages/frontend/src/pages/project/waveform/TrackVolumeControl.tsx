@@ -1,16 +1,9 @@
 import { Paper, Slider, Stack, Typography } from '@mui/material';
 import { type StemType } from '@musetric/audio';
-import type { TFunction } from 'i18next';
 import { type FC } from 'react';
-import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-
-const stemLabels: Record<StemType, (t: TFunction) => string> = {
-  lead: (t) => t('pages.project.waveform.stemType.lead'),
-  backing: (t) => t('pages.project.waveform.stemType.backing'),
-  instrumental: (t) => t('pages.project.waveform.stemType.instrumental'),
-};
+import { TrackStemLabel } from './TrackStemLabel.js';
 
 export type TrackVolumeControlProps = {
   stemType: StemType;
@@ -18,7 +11,6 @@ export type TrackVolumeControlProps = {
 
 export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
   const { stemType } = props;
-  const { t } = useTranslation();
   const trackVolume = useEngineStore((state) => state.trackVolumes[stemType]);
   const volumePercent = Math.round(trackVolume * 100);
 
@@ -28,31 +20,26 @@ export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
       elevation={3}
       height='100%'
       justifyContent='center'
-      p={4}
+      p={2.5}
+      position='relative'
     >
-      <Stack
-        direction='row'
-        alignItems='center'
-        justifyContent='space-between'
-        gap={1}
-        minWidth={0}
-      >
-        <Typography variant='subtitle2' fontWeight='bold'>
-          {stemLabels[stemType](t)}
+      <TrackStemLabel stemType={stemType} />
+      <Stack direction='row' alignItems='center' gap={3}>
+        <Slider
+          size='small'
+          min={0}
+          max={100}
+          value={volumePercent}
+          onChange={(_, value) => {
+            engine.store.update((state) => {
+              state.trackVolumes[stemType] = value / 100;
+            });
+          }}
+        />
+        <Typography variant='caption' minWidth='4ch' textAlign='right'>
+          {`${volumePercent}%`}
         </Typography>
-        <Typography variant='caption'>{`${volumePercent}%`}</Typography>
       </Stack>
-      <Slider
-        size='small'
-        min={0}
-        max={100}
-        value={volumePercent}
-        onChange={(_, value) => {
-          engine.store.update((state) => {
-            state.trackVolumes[stemType] = value / 100;
-          });
-        }}
-      />
     </Stack>
   );
 };

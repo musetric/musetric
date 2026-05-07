@@ -11,7 +11,7 @@ export const WaveformList: FC = () => {
           key={stemType}
           component={Paper}
           elevation={3}
-          height={100}
+          height={80}
           flexShrink={0}
         >
           <WaveformCanvas stemType={stemType} />

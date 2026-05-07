@@ -17,7 +17,7 @@ export const TrackVolumeList: FC = () => {
       pb={`${timelineHeight}px`}
     >
       {stemTypes.map((stemType) => (
-        <Stack key={stemType} height={100} flexShrink={0}>
+        <Stack key={stemType} height={80} flexShrink={0}>
           <TrackVolumeControl stemType={stemType} />
         </Stack>
       ))}

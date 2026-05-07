@@ -7,6 +7,7 @@ import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { TrackStemLabel } from './TrackStemLabel.js';
 
 export type WaveformCanvasProps = {
   stemType: api.wavePeaks.StemType;
@@ -29,11 +30,12 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
   }, [canvas, projectId, stemType]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <canvas
+    <Box position='relative' width='100%' height='100%'>
+      <Box
+        component='canvas'
         ref={setCanvas}
         key={`${projectId}-${stemType}`}
-        style={{
+        sx={{
           height: '100%',
           width: '100%',
           display: 'block',
@@ -50,6 +52,7 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
           <ViewError message={t('pages.project.progress.error.waveform')} />
         </Box>
       )}
-    </div>
+      <TrackStemLabel stemType={stemType} />
+    </Box>
   );
 };

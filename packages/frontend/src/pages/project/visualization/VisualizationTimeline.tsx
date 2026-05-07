@@ -80,15 +80,17 @@ export const VisualizationTimeline: FC = () => {
       height={timelineHeight}
       bgcolor='background.default'
     >
-      <canvas
+      <Box
+        component='canvas'
         ref={canvasRef}
         height={timelineHeight}
-        style={{
+        sx={{
           display: 'block',
           width: '100%',
           height: timelineHeight,
           flexShrink: 0,
-          borderTop: `1px solid ${theme.palette.divider}`,
+          borderTop: 1,
+          borderColor: 'divider',
           boxSizing: 'border-box',
         }}
       />
