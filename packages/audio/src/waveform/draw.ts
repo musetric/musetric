@@ -8,6 +8,54 @@ export type WaveformDraw = {
     colors: ViewColors,
   ) => void;
 };
+
+const drawWaveform = (
+  context: OffscreenCanvasRenderingContext2D,
+  segments: WaveformSegment[],
+  width: number,
+  height: number,
+  color: string,
+) => {
+  context.strokeStyle = color;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(0, height / 2);
+  context.lineTo(width, height / 2);
+  context.stroke();
+
+  context.fillStyle = color;
+  const lastIndex = segments.length - 1;
+  if (!lastIndex) {
+    const segment = segments[0];
+    const yStart = height * ((1 - segment.max) / 2);
+    const yEnd = height * ((1 - segment.min) / 2);
+    context.beginPath();
+    context.rect(0, yStart, width, yEnd - yStart);
+    context.fill();
+    return;
+  }
+
+  const getX = (index: number) => (width * index) / lastIndex;
+
+  context.beginPath();
+  for (let i = 0; i < segments.length; i++) {
+    const x = getX(i);
+    const y = height * ((1 - segments[i].max) / 2);
+    if (i === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  for (let i = lastIndex; i >= 0; i--) {
+    const x = getX(i);
+    const y = height * ((1 - segments[i].min) / 2);
+    context.lineTo(x, y);
+  }
+  context.closePath();
+  context.fill();
+};
+
 export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
   const context = canvas.getContext('2d');
   if (!context) {
@@ -21,31 +69,21 @@ export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
 
       context.clearRect(0, 0, width, height);
 
+      if (!segments.length) {
+        return;
+      }
+
       const clampedTrackProgress = Math.max(0, Math.min(trackProgress, 1));
-      const playedCount = Math.floor(clampedTrackProgress * segments.length);
+      const playedWidth = width * clampedTrackProgress;
 
-      const segmentWidth = width / segments.length;
-      const barWidth = segmentWidth * 0.9;
+      drawWaveform(context, segments, width, height, colors.unplayed);
 
-      context.fillStyle = colors.unplayed;
-      for (let i = 0; i < segments.length; i++) {
-        const { min, max } = segments[i];
-        const x = i * segmentWidth;
-        const yStart = height * ((1 - max) / 2);
-        const yEnd = height * ((1 - min) / 2);
-        const barHeight = yEnd - yStart;
-        context.fillRect(x, yStart, barWidth, barHeight);
-      }
-
-      context.fillStyle = colors.played;
-      for (let i = 0; i < playedCount; i++) {
-        const { min, max } = segments[i];
-        const x = i * segmentWidth;
-        const yStart = height * ((1 - max) / 2);
-        const yEnd = height * ((1 - min) / 2);
-        const barHeight = yEnd - yStart;
-        context.fillRect(x, yStart, barWidth, barHeight);
-      }
+      context.save();
+      context.beginPath();
+      context.rect(0, 0, playedWidth, height);
+      context.clip();
+      drawWaveform(context, segments, width, height, colors.played);
+      context.restore();
     },
   };
   return ref;
