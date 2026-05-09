@@ -4,7 +4,6 @@ import { type SpectrogramConfig } from '../config.cross.js';
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';
 import { createColorsCell } from './colors.js';
-import { createStatePlayheadRatioCell } from './playheadRatio.js';
 
 export type SpectrogramDraw = {
   run: (encoder: GPUCommandEncoder) => void;
@@ -20,7 +19,6 @@ export const createSpectrogramDrawCell = (
   marker?: GPUComputePassTimestampWrites,
 ): ResourceCell<SpectrogramDrawArg, SpectrogramDraw> => {
   const canvasCell = createCanvasCell(device);
-  const playheadRatioCell = createStatePlayheadRatioCell(device);
   const colorsCell = createColorsCell(device);
   const sampler = device.createSampler({
     label: 'draw-sampler',
@@ -34,12 +32,10 @@ export const createSpectrogramDrawCell = (
       const { view, config } = arg;
       const canvas = canvasCell.get(config.canvas);
       setOffscreenCanvasSize(config.canvas, config.viewSize);
-      const playheadRatio = playheadRatioCell.get(config);
       const colors = colorsCell.get(config);
       const bindGroup = bindGroupCell.get({
         view,
         colors: colors.buffer,
-        playheadRatio: playheadRatio.buffer,
         layout: canvas.pipeline.getBindGroupLayout(0),
       });
 
@@ -71,7 +67,6 @@ export const createSpectrogramDrawCell = (
       canvasCell.dispose();
       bindGroupCell.dispose();
       colorsCell.dispose();
-      playheadRatioCell.dispose();
     },
   };
 };

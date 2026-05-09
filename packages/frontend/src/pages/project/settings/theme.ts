@@ -8,8 +8,7 @@ export const useThemeViewColors = () => {
 
   useLayoutEffect(() => {
     const colors: ViewColors = {
-      played: theme.palette.primary.main,
-      unplayed: theme.palette.default.main,
+      foreground: theme.palette.default.main,
       background: theme.palette.background.default,
     };
     engine.store.update((state) => {

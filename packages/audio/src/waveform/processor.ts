@@ -4,7 +4,7 @@ import { generateWaveformSegments } from './generateSegments.js';
 
 export type WaveformProcessor = {
   setColors: (colors: ViewColors) => void;
-  render: (wavePeaks: Float32Array, trackProgress: number) => void;
+  render: (wavePeaks: Float32Array) => void;
 };
 
 export const createWaveformProcessor = (
@@ -18,10 +18,10 @@ export const createWaveformProcessor = (
     setColors: (nextColors) => {
       colors = nextColors;
     },
-    render: (wavePeaks, trackProgress) => {
+    render: (wavePeaks) => {
       const segmentCount = Math.floor(wavePeaks.length / 2);
       const segments = generateWaveformSegments(wavePeaks, segmentCount);
-      draw.run(segments, trackProgress, colors);
+      draw.run(segments, colors);
     },
   };
 };

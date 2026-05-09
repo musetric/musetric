@@ -2,11 +2,7 @@ import { type ViewColors } from '../common/colors.es.js';
 import { type WaveformSegment } from './generateSegments.js';
 
 export type WaveformDraw = {
-  run: (
-    segments: WaveformSegment[],
-    trackProgress: number,
-    colors: ViewColors,
-  ) => void;
+  run: (segments: WaveformSegment[], colors: ViewColors) => void;
 };
 
 const drawWaveform = (
@@ -63,7 +59,7 @@ export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
   }
 
   const ref: WaveformDraw = {
-    run: (segments, trackProgress, colors) => {
+    run: (segments, colors) => {
       const width = canvas.width;
       const height = canvas.height;
 
@@ -73,17 +69,7 @@ export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
         return;
       }
 
-      const clampedTrackProgress = Math.max(0, Math.min(trackProgress, 1));
-      const playedWidth = width * clampedTrackProgress;
-
-      drawWaveform(context, segments, width, height, colors.unplayed);
-
-      context.save();
-      context.beginPath();
-      context.rect(0, 0, playedWidth, height);
-      context.clip();
-      drawWaveform(context, segments, width, height, colors.played);
-      context.restore();
+      drawWaveform(context, segments, width, height, colors.foreground);
     },
   };
   return ref;

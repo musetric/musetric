@@ -8,13 +8,11 @@ export type WaveformOutboundMethods = {
   mount: (message: {
     projectId: number;
     stemType: StemType;
-    trackProgress: number;
     canvas: OffscreenCanvas;
     colors: ViewColors;
     viewSize: ViewSize;
   }) => void;
   unmount: (message: { stemType: StemType }) => void;
-  setTrackProgress: (message: { trackProgress: number }) => void;
   setColors: (message: { colors: ViewColors }) => void;
   resize: (message: { stemType: StemType; viewSize: ViewSize }) => void;
 };
@@ -35,14 +33,7 @@ export const waveformChannel = createMessageChannel<
     keys: ['booted', 'setState'],
   },
   outbound: {
-    keys: [
-      'boot',
-      'mount',
-      'unmount',
-      'setTrackProgress',
-      'setColors',
-      'resize',
-    ],
+    keys: ['boot', 'mount', 'unmount', 'setColors', 'resize'],
     transfers: {
       mount: (message) => [message.canvas],
     },
