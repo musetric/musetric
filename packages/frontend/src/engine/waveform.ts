@@ -9,7 +9,7 @@ import {
   subscribeResizeObserver,
 } from '@musetric/resource-utils/dom';
 import type { Store } from '../common/store.js';
-import { type EngineState, getTrackProgress } from './state.js';
+import { type EngineState } from './state.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
 type Unmount = () => void;
@@ -52,12 +52,6 @@ export const createEngineWaveform = (
     },
   });
 
-  store.subscribe(getTrackProgress, (trackProgress) => {
-    port.methods.setTrackProgress({
-      trackProgress,
-    });
-  });
-
   store.subscribe(
     (state) => state.colors,
     (colors) => {
@@ -84,7 +78,6 @@ export const createEngineWaveform = (
       port.methods.mount({
         projectId,
         stemType,
-        trackProgress: getTrackProgress(store.get()),
         canvas: offscreenCanvas,
         colors: store.get().colors,
         viewSize,

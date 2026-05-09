@@ -26,7 +26,6 @@ export const createWaveformRuntime = (
 ) => {
   const { port, getWavePeaks } = options;
 
-  let trackProgress = 0;
   const waveformItems: Partial<Record<StemType, WaveformItem>> = {};
 
   const render = (stemType: StemType): boolean => {
@@ -35,7 +34,7 @@ export const createWaveformRuntime = (
       return false;
     }
 
-    item.processor.render(item.wavePeaks, trackProgress);
+    item.processor.render(item.wavePeaks);
     return true;
   };
 
@@ -48,7 +47,6 @@ export const createWaveformRuntime = (
   port.bindHandlers({
     mount: async (message) => {
       try {
-        trackProgress = message.trackProgress;
         setOffscreenCanvasSize(message.canvas, message.viewSize);
         const item: WaveformItem = {
           canvas: message.canvas,
@@ -75,10 +73,6 @@ export const createWaveformRuntime = (
     },
     unmount: (message) => {
       waveformItems[message.stemType] = undefined;
-    },
-    setTrackProgress: (message) => {
-      trackProgress = message.trackProgress;
-      renderAll();
     },
     setColors: (message) => {
       for (const stemType of stemTypes) {

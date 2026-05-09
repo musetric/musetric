@@ -25,8 +25,7 @@ const initialState: EngineState = {
   },
   colors: {
     background: '#000000',
-    played: '#ffffff',
-    unplayed: '#888888',
+    foreground: '#888888',
   },
   duration: 0,
   playing: false,
