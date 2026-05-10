@@ -1,4 +1,5 @@
 import { TextField } from '@mui/material';
+import { normalizeSpectrogramMaxFrequency } from '@musetric/audio';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';
@@ -18,7 +19,13 @@ export const MaxFrequencyField: FC = () => {
       onBlur={(event) => {
         const value = Number(event.target.value);
         if (Number.isNaN(value)) return;
-        setMaxFrequency(Math.max(value, 0));
+
+        const { minFrequency } = useSettingsStore.getState();
+        const nextMaxFrequency = normalizeSpectrogramMaxFrequency(
+          value,
+          minFrequency,
+        );
+        setMaxFrequency(nextMaxFrequency);
       }}
       slotProps={{
         input: {
