@@ -21,7 +21,7 @@ export const createGpuBufferReader = (
   options: CreateGpuBufferReaderOptions,
 ): GpuBufferReader => {
   const { device, typeSize } = options;
-  let size = options.size;
+  let { size } = options;
   let buffer = createGpuBuffer(device, size * typeSize);
 
   return {
@@ -48,7 +48,7 @@ export const createComplexGpuBufferReader = (
   options: CreateGpuBufferReaderOptions,
 ): ComplexGpuBufferReader => {
   const { device, typeSize } = options;
-  let size = options.size;
+  let { size } = options;
   let buffer = createComplexGpuBuffer(device, size * typeSize);
 
   return {

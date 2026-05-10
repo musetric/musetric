@@ -3,7 +3,7 @@ import { type api } from '@musetric/api';
 export type SubtitleSegmentStatus = 'active' | 'future' | 'past';
 
 export const getSubtitleSegmentEndTime = (segment: api.subtitle.Segment) => {
-  const words = segment.words;
+  const { words } = segment;
   if (words.length > 0) {
     return words[words.length - 1].end;
   }

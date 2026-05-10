@@ -44,7 +44,7 @@ export const App: FC = () => {
     return { total, done, progress };
   }, [toDo]);
 
-  const task = toDo[0];
+  const [task] = toDo;
 
   return (
     <Box

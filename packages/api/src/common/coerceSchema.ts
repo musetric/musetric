@@ -58,7 +58,7 @@ export const coerceSchema = <T>(schema: T): T => {
   if (!(schema instanceof z.ZodObject)) {
     return schema;
   }
-  const shape = schema.def.shape;
+  const { shape } = schema.def;
 
   const result = z.preprocess((object) => {
     if (typeof object !== 'object' || !object) {

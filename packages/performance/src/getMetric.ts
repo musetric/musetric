@@ -27,6 +27,6 @@ export const getMetric = (
 
   const metricData = showFirst ? data.first : data.average;
   const value = metricData[metric];
-  const total = metricData.total;
+  const { total } = metricData;
   return showPercent ? toPercent(value, total) : value;
 };

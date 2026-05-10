@@ -22,7 +22,7 @@ const drawWaveform = (
   context.fillStyle = color;
   const lastIndex = segments.length - 1;
   if (!lastIndex) {
-    const segment = segments[0];
+    const [segment] = segments;
     const yStart = height * ((1 - segment.max) / 2);
     const yEnd = height * ((1 - segment.min) / 2);
     context.beginPath();
@@ -60,8 +60,7 @@ export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
 
   const ref: WaveformDraw = {
     run: (segments, colors) => {
-      const width = canvas.width;
-      const height = canvas.height;
+      const { width, height } = canvas;
 
       context.clearRect(0, 0, width, height);
 

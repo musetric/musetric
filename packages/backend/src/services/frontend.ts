@@ -14,7 +14,7 @@ const isApiPath = (path: string) =>
 
 const isFrontendRequest = (request: FastifyRequest) => {
   const method = request.raw.method ?? 'GET';
-  const pathname = String(request.raw.url ?? '/').split('?')[0];
+  const [pathname] = String(request.raw.url ?? '/').split('?');
   const isGet = method === 'GET' || method === 'HEAD';
   const isAsset = pathname.includes('.');
   const isApi = isApiPath(pathname);

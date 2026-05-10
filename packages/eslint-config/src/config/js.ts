@@ -150,5 +150,21 @@ export const jsConfig: Linter.Config = {
     'object-shorthand': ['error', 'always'],
     'simple-import-sort/exports': 'error',
     'no-nested-ternary': 'error',
+    'prefer-destructuring': [
+      'error',
+      {
+        AssignmentExpression: {
+          array: false,
+          object: false,
+        },
+        VariableDeclarator: {
+          array: true,
+          object: true,
+        },
+      },
+      {
+        enforceForRenamedProperties: false,
+      },
+    ],
   },
 };

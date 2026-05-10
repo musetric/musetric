@@ -1,7 +1,7 @@
 export type NativeParams = Record<string, string>;
 
 export const getLocationHash = (): string => {
-  const hash = window.location.hash;
+  const { hash } = window.location;
   const urlWithoutHash = hash.startsWith('#') ? hash.slice(1) : hash;
   const [urlWithoutSearch] = urlWithoutHash.split('?');
   return urlWithoutSearch;

@@ -34,7 +34,7 @@ const createMethods = <Methods extends PortMethods>(
 
   for (const type of methodKeys) {
     methods[type] = (...args: Parameters<Methods[typeof type]>) => {
-      const payload = args[0];
+      const [payload] = args;
       const transfer = transfers[type]?.(payload);
       instance.postMessage({ type, payload }, transfer);
     };

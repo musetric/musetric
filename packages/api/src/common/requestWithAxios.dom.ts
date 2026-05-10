@@ -29,8 +29,8 @@ export const requestWithAxios = async <
   options: RequestWithAxiosOptions<ParamsSchema, RequestSchema>,
 ) => {
   const arrayConstructor = getArrayBufferViewConstructor(route.responseSchema);
-  const params = (options as { params: z.infer<ParamsSchema> }).params;
-  const data = (options as { data: z.infer<RequestSchema> }).data;
+  const { params } = options as { params: z.infer<ParamsSchema> };
+  const { data } = options as { data: z.infer<RequestSchema> };
   const requestData = route.isMultipart
     ? apiMultipart.data(data as object)
     : data;
