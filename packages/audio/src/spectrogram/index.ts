@@ -1,5 +1,6 @@
 export * from './common/complexArray.js';
 export * from './common/extConfig.js';
+export * from './common/frequencyRange.js';
 export * from './common/gpuBufferReader/index.js';
 export * from './common/gpuContext.js';
 export * from './common/gpuDevice.js';
