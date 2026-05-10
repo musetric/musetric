@@ -5,11 +5,13 @@ export type RemapParams = {
   halfSize: number;
   width: number;
   height: number;
-  minBin: number;
-  maxBin: number;
-  logMin: number;
-  logRange: number;
+  windowSize: number;
+  sampleRate: number;
+  logMinFrequency: number;
+  logFrequencyRange: number;
 };
+
+const minimumLogFrequency = 1;
 
 const toParams = (config: SpectrogramConfig): RemapParams => {
   const {
@@ -22,24 +24,18 @@ const toParams = (config: SpectrogramConfig): RemapParams => {
   const { width, height } = viewSize;
   const windowSize = config.windowSize * zeroPaddingFactor;
   const halfSize = windowSize / 2;
-  const maxBin = Math.min(
-    Math.floor((maxFrequency / sampleRate) * windowSize),
-    halfSize,
-  );
-  const minBin = Math.max(
-    Math.floor((minFrequency / sampleRate) * windowSize),
-    0,
-  );
-  const logMin = Math.log(minBin + 1);
-  const logRange = Math.log(maxBin + 1) - logMin;
+  const minLogFrequency = Math.max(minFrequency, minimumLogFrequency);
+  const maxLogFrequency = Math.max(maxFrequency, minLogFrequency);
+  const logMinFrequency = Math.log(minLogFrequency);
+  const logFrequencyRange = Math.log(maxLogFrequency) - logMinFrequency;
   return {
     halfSize,
     width,
     height,
-    minBin,
-    maxBin,
-    logMin,
-    logRange,
+    windowSize,
+    sampleRate,
+    logMinFrequency,
+    logFrequencyRange,
   };
 };
 
@@ -56,10 +52,10 @@ export const createParamsCell = (device: GPUDevice) =>
       array.setUint32(0, value.halfSize, true);
       array.setUint32(4, value.width, true);
       array.setUint32(8, value.height, true);
-      array.setUint32(12, value.minBin, true);
-      array.setUint32(16, value.maxBin, true);
-      array.setFloat32(20, value.logMin, true);
-      array.setFloat32(24, value.logRange, true);
+      array.setUint32(12, value.windowSize, true);
+      array.setFloat32(16, value.sampleRate, true);
+      array.setFloat32(20, value.logMinFrequency, true);
+      array.setFloat32(24, value.logFrequencyRange, true);
 
       const buffer = device.createBuffer({
         label: 'remap-params-buffer',
