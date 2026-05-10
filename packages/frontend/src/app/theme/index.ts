@@ -11,6 +11,9 @@ export const appTheme = createTheme({
     mode: 'dark',
     neutral: neutralPalette,
     default: defaultPalette,
+    secondary: {
+      main: '#d6b85a',
+    },
   },
   typography: themeTypography,
   components: {

@@ -2,6 +2,7 @@ import { Box } from '@mui/material';
 import { type FC, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
+import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
 import { useProjectStore } from '../store.js';
 import {
   useVisualizationScrollbarWidth,
@@ -65,6 +66,7 @@ export const ProjectVisualization: FC = () => {
         zIndex={1}
         sx={{ pointerEvents: 'none' }}
       >
+        {visualizationMode === 'spectrogram' && <SpectrogramNoteScale />}
         <VisualizationCursor />
         <VisualizationTimeline />
       </Box>

@@ -11,8 +11,6 @@ export type RemapParams = {
   logFrequencyRange: number;
 };
 
-const minimumLogFrequency = 1;
-
 const toParams = (config: SpectrogramConfig): RemapParams => {
   const {
     sampleRate,
@@ -24,10 +22,8 @@ const toParams = (config: SpectrogramConfig): RemapParams => {
   const { width, height } = viewSize;
   const windowSize = config.windowSize * zeroPaddingFactor;
   const halfSize = windowSize / 2;
-  const minLogFrequency = Math.max(minFrequency, minimumLogFrequency);
-  const maxLogFrequency = Math.max(maxFrequency, minLogFrequency);
-  const logMinFrequency = Math.log(minLogFrequency);
-  const logFrequencyRange = Math.log(maxLogFrequency) - logMinFrequency;
+  const logMinFrequency = Math.log(minFrequency);
+  const logFrequencyRange = Math.log(maxFrequency) - logMinFrequency;
   return {
     halfSize,
     width,
