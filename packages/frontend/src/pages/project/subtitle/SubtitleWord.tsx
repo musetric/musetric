@@ -41,8 +41,6 @@ export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
             : 'inherit',
         cursor: 'pointer',
         display: 'inline-block',
-        margin: '-0.12em -0.08em',
-        padding: '0.12em 0.08em',
         transition: 'color 120ms linear',
       }}
     >
