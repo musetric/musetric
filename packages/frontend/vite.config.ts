@@ -36,6 +36,7 @@ export default defineConfig({
         target: 'https://localhost:3000/',
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
     },
   },

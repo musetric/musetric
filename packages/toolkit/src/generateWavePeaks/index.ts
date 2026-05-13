@@ -4,7 +4,14 @@ import { type Logger } from '@musetric/resource-utils';
 import { getAudioFrameCount } from '../getAudioFrameCount.js';
 import { readPcm } from './readPcm.js';
 
-const wavePeakCount = 3840;
+export const wavePeakCount = 3840;
+export const wavePeakBufferByteLength =
+  wavePeakCount * 2 * Float32Array.BYTES_PER_ELEMENT;
+
+export const emptyWavePeaksBuffer = Buffer.alloc(wavePeakBufferByteLength);
+
+export const createEmptyWavePeaksBuffer = (): Buffer =>
+  Buffer.from(emptyWavePeaksBuffer);
 
 export type GenerateWavePeaksOptions = {
   fromPath: string;

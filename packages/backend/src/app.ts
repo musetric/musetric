@@ -1,3 +1,4 @@
+import websocket from '@fastify/websocket';
 import { fastify, type FastifyInstance } from 'fastify';
 import { FastifySSEPlugin } from 'fastify-sse-v2';
 import { registerRouters } from './routers/index.js';
@@ -30,6 +31,7 @@ export const createServerApp = async (): Promise<FastifyInstance> => {
   registerProcessingWorker(app);
   registerMultipart(app);
   app.register(FastifySSEPlugin);
+  await app.register(websocket);
   registerSchemaCompiler(app);
   registerSwagger(app);
   registerFrontend(app);

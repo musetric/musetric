@@ -21,6 +21,7 @@
     "@fastify/static": "catalog:",
     "@fastify/swagger": "catalog:",
     "@fastify/swagger-ui": "catalog:",
+    "@fastify/websocket": "catalog:",
     "@musetric/api": "workspace:*",
     "@musetric/backend-db": "workspace:*",
     "@musetric/resource-utils": "workspace:*",

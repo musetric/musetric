@@ -1,10 +1,19 @@
+import { Readable } from 'node:stream';
 import { api } from '@musetric/api';
 import { fastifyRoute } from '@musetric/api/node';
-import { flacAudioOutput, fmp4AudioOutput } from '@musetric/toolkit';
+import {
+  emptyWavePeaksBuffer,
+  flacAudioOutput,
+  fmp4AudioOutput,
+} from '@musetric/toolkit';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
 import { handleCachedFile } from '../common/cachedFile.js';
+import {
+  createEmptyWavBuffer,
+  wavContentType,
+} from '../services/recordingWav.js';
 
 type SendCachedBlobArg = {
   request: FastifyRequest;
@@ -105,6 +114,65 @@ export const audioRouter: FastifyPluginCallbackZod = (app) => {
         filename: 'waveform.bin',
         contentType: 'application/octet-stream',
       });
+    },
+  });
+
+  app.route({
+    ...fastifyRoute(api.audio.recordingContent.base),
+    handler: async (request, reply) => {
+      const { projectId } = request.params;
+      const recording = await app.db.recording.get(projectId);
+      if (!recording) {
+        reply.headers({
+          'Content-Type': wavContentType,
+          'Cache-Control': 'no-store',
+        });
+        return reply.send(Readable.from([createEmptyWavBuffer()]));
+      }
+      const audioAsset = await app.db.audioAsset.get(recording.audioAssetId);
+      assertFound(
+        audioAsset,
+        `Recording audio asset for id ${recording.audioAssetId} not found`,
+      );
+
+      const stat = await app.blobStorage.getStat(audioAsset.blobId);
+      assertFound(
+        stat,
+        `Recording audio blob for id ${audioAsset.blobId} not found`,
+      );
+      reply.headers({
+        'Content-Type': wavContentType,
+        'Content-Length': stat.size,
+        'Cache-Control': 'no-store',
+      });
+      return reply.send(app.blobStorage.getStream(audioAsset.blobId));
+    },
+  });
+
+  app.route({
+    ...fastifyRoute(api.audio.recordingWave.base),
+    handler: async (request, reply) => {
+      const { projectId } = request.params;
+      const recording = await app.db.recording.get(projectId);
+      if (!recording) {
+        reply.headers({
+          'Content-Type': 'application/octet-stream',
+          'Cache-Control': 'no-store',
+        });
+        return reply.send(Readable.from([emptyWavePeaksBuffer]));
+      }
+
+      const stat = await app.blobStorage.getStat(recording.waveBlobId);
+      assertFound(
+        stat,
+        `Recording wave blob for id ${recording.waveBlobId} not found`,
+      );
+      reply.headers({
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Cache-Control': 'no-store',
+      });
+      return reply.send(app.blobStorage.getStream(recording.waveBlobId));
     },
   });
 };

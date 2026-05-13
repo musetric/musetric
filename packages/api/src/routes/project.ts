@@ -100,6 +100,19 @@ export namespace status {
   export type Event = z.infer<typeof event.schema>;
 }
 
+export namespace realtime {
+  export const base = createApiRoute({
+    method: 'get',
+    path: '/api/project/:projectId/realtime',
+    paramsSchema: z.object({ projectId: z.coerce.number() }),
+    requestSchema: z.void(),
+    responseSchema: z.void(),
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
 export namespace create {
   export const base = createApiRoute({
     method: 'post',
