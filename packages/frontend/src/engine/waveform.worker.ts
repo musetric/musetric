@@ -23,9 +23,13 @@ port.bindBoot(() => {
   createWaveformRuntime({
     port,
     getWavePeaks: async (projectId, stemType) => {
-      const wavePeaks = await requestWithAxios(axios, api.wavePeaks.get.base, {
-        params: { projectId, stemType },
-      });
+      const wavePeaks = await requestWithAxios(
+        axios,
+        api.audio.deliveryWave.base,
+        {
+          params: { projectId, stemType },
+        },
+      );
       return wavePeaks;
     },
   });

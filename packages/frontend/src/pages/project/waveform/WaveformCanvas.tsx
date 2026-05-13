@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import type { api } from '@musetric/api';
+import { type StemType } from '@musetric/audio/es';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
@@ -10,7 +10,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { TrackStemLabel } from './TrackStemLabel.js';
 
 export type WaveformCanvasProps = {
-  stemType: api.wavePeaks.StemType;
+  stemType: StemType;
 };
 export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
   const { stemType } = props;

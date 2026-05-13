@@ -3,7 +3,10 @@ import { table } from '../../schema/index.js';
 
 export const pendingValidation = (database: DatabaseSync) => {
   const statement = database.prepare(
-    `SELECT * FROM AudioMaster WHERE type = 'rawSource'`,
+    `SELECT AudioMaster.id, AudioMaster.projectId, AudioMaster.type, AudioMaster.audioAssetId, AudioAsset.blobId
+     FROM AudioMaster
+     INNER JOIN AudioAsset ON AudioAsset.id = AudioMaster.audioAssetId
+     WHERE AudioMaster.type = 'rawSource'`,
   );
 
   return async (): Promise<table.audioMaster.Item | undefined> => {

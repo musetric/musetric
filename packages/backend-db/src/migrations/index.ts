@@ -10,13 +10,33 @@ const createProject = `
   );
 `;
 
+const createAudioAsset = `
+  CREATE TABLE IF NOT EXISTS AudioAsset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL,
+    blobId TEXT NOT NULL UNIQUE,
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+`;
+
+const createAudioWavePeaks = `
+  CREATE TABLE IF NOT EXISTS AudioWavePeaks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audioAssetId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
+    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
+  );
+`;
+
 const createAudioMaster = `
   CREATE TABLE IF NOT EXISTS AudioMaster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('rawSource', 'source', 'lead', 'backing', 'instrumental')),
-    blobId TEXT NOT NULL UNIQUE,
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+    audioAssetId INTEGER NOT NULL UNIQUE,
+    UNIQUE(projectId, type),
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
+    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
   );
 `;
 
@@ -29,27 +49,15 @@ const createAudioDelivery = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
     stemType TEXT NOT NULL CHECK (stemType IN ('lead', 'backing', 'instrumental')),
-    blobId TEXT NOT NULL UNIQUE,
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+    audioAssetId INTEGER NOT NULL UNIQUE,
+    UNIQUE(projectId, stemType),
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
+    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
   );
 `;
 
 const createAudioDeliveryIndex = `
   CREATE INDEX IF NOT EXISTS AudioDelivery_projectId_stemType_index ON AudioDelivery (projectId, stemType);
-`;
-
-const createWave = `
-  CREATE TABLE IF NOT EXISTS Wave (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projectId INTEGER NOT NULL,
-    stemType TEXT NOT NULL CHECK (stemType IN ('lead', 'backing', 'instrumental')),
-    blobId TEXT NOT NULL UNIQUE,
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
-  );
-`;
-
-const createWaveIndex = `
-  CREATE INDEX IF NOT EXISTS Wave_projectId_stemType_index ON Wave (projectId, stemType);
 `;
 
 const createPreview = `
@@ -74,12 +82,12 @@ const createSubtitle = `
 
 const creationStatements = [
   createProject,
+  createAudioAsset,
+  createAudioWavePeaks,
   createAudioMaster,
   createAudioMasterIndex,
   createAudioDelivery,
   createAudioDeliveryIndex,
-  createWave,
-  createWaveIndex,
   createPreview,
   createSubtitle,
 ] as const;

@@ -25,7 +25,7 @@ port.bindBoot((message) => {
     getEncodedBuffer: async (projectId, stemType) => {
       const encodedBuffer = await requestWithAxios(
         axios,
-        api.audioDelivery.get.base,
+        api.audio.deliveryContent.base,
         {
           params: {
             projectId,

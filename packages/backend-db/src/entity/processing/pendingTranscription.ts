@@ -3,8 +3,9 @@ import { table } from '../../schema/index.js';
 
 export const pendingTranscription = (database: DatabaseSync) => {
   const statement = database.prepare(
-    `SELECT Lead.*
+    `SELECT Lead.id, Lead.projectId, Lead.type, Lead.audioAssetId, AudioAsset.blobId
      FROM AudioMaster AS Lead
+     INNER JOIN AudioAsset ON AudioAsset.id = Lead.audioAssetId
      LEFT JOIN Subtitle
        ON Subtitle.projectId = Lead.projectId
      WHERE Lead.type = 'lead' AND Subtitle.id IS NULL
