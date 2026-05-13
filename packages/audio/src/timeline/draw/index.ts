@@ -2,8 +2,7 @@ import { type TimelineConfig } from '../config.js';
 import { createCanvasCell } from './canvas.js';
 import { getTimelineMarkers } from './markers.js';
 
-const labelOffset = 6;
-const labelTop = 18;
+const labelOffset = 4;
 
 export type TimelineDraw = {
   run: (config: TimelineConfig) => void;
@@ -43,8 +42,8 @@ export const createTimelineDraw = (): TimelineDraw => {
       const pixelRatio = window.devicePixelRatio;
       resizeCanvas(canvas, pixelRatio);
 
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
+      const width = canvas.width / pixelRatio;
+      const height = canvas.height / pixelRatio;
       const markers = getTimelineMarkers(config, width);
 
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -69,7 +68,7 @@ export const createTimelineDraw = (): TimelineDraw => {
 
       context.fillStyle = config.labelColor;
       context.font = config.font;
-      context.textBaseline = 'top';
+      context.textBaseline = 'alphabetic';
 
       for (const marker of markers) {
         if (!marker.isMajor) {
@@ -78,12 +77,17 @@ export const createTimelineDraw = (): TimelineDraw => {
 
         const label = formatTime(marker.time);
         const labelX = marker.ratio * width + labelOffset;
+        const labelMetrics = context.measureText(label);
 
-        if (labelX + context.measureText(label).width < 0 || labelX > width) {
+        if (labelX + labelMetrics.width < 0 || labelX > width) {
           continue;
         }
 
-        context.fillText(label, labelX, labelTop);
+        context.fillText(
+          label,
+          labelX,
+          height - labelMetrics.actualBoundingBoxDescent,
+        );
       }
     },
     dispose: () => {

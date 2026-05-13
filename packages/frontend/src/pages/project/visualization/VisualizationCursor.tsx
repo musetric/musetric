@@ -6,7 +6,7 @@ import { useProjectStore } from '../store.js';
 import { timelineHeight } from './VisualizationTimeline.js';
 
 const cursorWidth = 2;
-const cursorHandleSize = 9;
+const cursorHandleSize = 6;
 const engineRenderKeys = ['frameCount', 'frameIndex'] as const;
 const projectRenderKeys = ['visualizationMode'] as const;
 const settingsRenderKeys = ['playheadRatio'] as const;

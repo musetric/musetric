@@ -7,7 +7,7 @@ import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
 import { useProjectStore } from '../store.js';
 
-export const timelineHeight = 32;
+export const timelineHeight = 16;
 
 const engineRenderKeys = ['duration', 'frameCount', 'frameIndex'] as const;
 const projectRenderKeys = ['visualizationMode'] as const;
