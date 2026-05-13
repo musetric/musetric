@@ -1,9 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close';
-import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProjectStore } from '../../store.js';
 import { useSettingsStore } from '../store.js';
 import { FourierModeField } from './FourierModeField.js';
 import { MaxFrequencyField } from './MaxFrequencyField.js';
@@ -18,42 +16,32 @@ import { ZeroPaddingFactorField } from './ZeroPaddingFactorField.js';
 export const ProjectSettings: FC = () => {
   const { t } = useTranslation();
 
-  const visualizationMode = useProjectStore((state) => state.visualizationMode);
   const open = useSettingsStore((s) => s.open);
   const setOpen = useSettingsStore((s) => s.setOpen);
 
-  if (visualizationMode !== 'spectrogram') {
-    return;
-  }
-
   return (
-    <>
-      <IconButton size='small' onClick={() => setOpen(true)}>
-        <SettingsIcon />
-      </IconButton>
-      <Drawer anchor='left' open={open} onClose={() => setOpen(false)}>
-        <Box width={280} p={2} role='presentation'>
-          <Stack gap={4}>
-            <Stack direction='row' alignItems='center'>
-              <Typography variant='h6' sx={{ flexGrow: 1 }}>
-                {t('pages.project.settings.title')}
-              </Typography>
-              <IconButton size='small' onClick={() => setOpen(false)}>
-                <CloseIcon />
-              </IconButton>
-            </Stack>
-            <FourierModeField />
-            <WindowNameField />
-            <WindowSizeField />
-            <MinFrequencyField />
-            <MaxFrequencyField />
-            <MinDecibelField />
-            <VisibleTimeField />
-            <PlayheadRatioField />
-            <ZeroPaddingFactorField />
+    <Drawer anchor='right' open={open} onClose={() => setOpen(false)}>
+      <Box width={280} p={2} role='presentation'>
+        <Stack gap={4}>
+          <Stack direction='row' alignItems='center'>
+            <Typography variant='h6' sx={{ flexGrow: 1 }}>
+              {t('pages.project.settings.title')}
+            </Typography>
+            <IconButton size='small' onClick={() => setOpen(false)}>
+              <CloseIcon />
+            </IconButton>
           </Stack>
-        </Box>
-      </Drawer>
-    </>
+          <FourierModeField />
+          <WindowNameField />
+          <WindowSizeField />
+          <MinFrequencyField />
+          <MaxFrequencyField />
+          <MinDecibelField />
+          <VisibleTimeField />
+          <PlayheadRatioField />
+          <ZeroPaddingFactorField />
+        </Stack>
+      </Box>
+    </Drawer>
   );
 };

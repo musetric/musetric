@@ -3,7 +3,6 @@ import { type FC } from 'react';
 import { DetailsModeToggle } from '../buttons/detailsModeToggle/index.js';
 import { PlayPauseButton } from '../buttons/PlayPauseButton.js';
 import { VisualizationModeToggle } from '../buttons/visualizationModeToggle/index.js';
-import { ProjectSettings } from '../settings/field/ProjectSettings.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
 export const PlaybackPanel: FC = () => {
@@ -18,7 +17,6 @@ export const PlaybackPanel: FC = () => {
       >
         <Stack gridColumn={1} direction='row' gap={1}>
           <VisualizationModeToggle />
-          <ProjectSettings />
         </Stack>
         <Box gridColumn={2}>
           <PlayPauseButton />

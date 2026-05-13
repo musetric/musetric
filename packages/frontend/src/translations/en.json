@@ -10,6 +10,8 @@
   "pages.notFound.title": "Page Not Found",
   "pages.project.detailsMode.mixer": "Mixer",
   "pages.project.detailsMode.subtitles": "Subtitles",
+  "pages.project.menu.spectrogramSettings": "Spectrogram settings",
+  "pages.project.menu.title": "Menu",
   "pages.project.player.controls.pause": "Pause",
   "pages.project.player.controls.play": "Play",
   "pages.project.player.controls.tempo": "Song tempo",
