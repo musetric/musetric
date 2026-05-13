@@ -95,3 +95,15 @@ export namespace subtitle {
   });
   export type Item = z.infer<typeof itemSchema>;
 }
+
+export namespace recording {
+  export const itemSchema = z.object({
+    id: numericIdSchema,
+    projectId: numericIdSchema,
+    audioAssetId: numericIdSchema,
+    waveBlobId: z.string(),
+    sampleRate: z.number().int().positive(),
+    frameCount: z.number().int().positive(),
+  });
+  export type Item = z.infer<typeof itemSchema>;
+}
