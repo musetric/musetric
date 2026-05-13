@@ -18,8 +18,11 @@ export class PlayerProcessor
         port,
         dataPort: playerDataChannel.inbound(message.dataPort),
       });
-      this.handleProcess = (output: Float32Array[]) => {
-        runtime.process(output);
+      this.handleProcess = (
+        inputs: Float32Array[][],
+        output: Float32Array[],
+      ) => {
+        runtime.process(inputs, output);
         return true;
       };
       port.methods.booted();
@@ -27,12 +30,12 @@ export class PlayerProcessor
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleProcess = (_output: Float32Array[]) => {
+  handleProcess = (_inputs: Float32Array[][], _output: Float32Array[]) => {
     return true;
   };
 
-  process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
-    return this.handleProcess(outputs[0]);
+  process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
+    return this.handleProcess(inputs, outputs[0]);
   }
 }
 

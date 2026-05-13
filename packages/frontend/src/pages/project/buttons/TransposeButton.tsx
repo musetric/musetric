@@ -9,6 +9,10 @@ import { formatTransposeSemitones } from './formatTransposeSemitones.js';
 export const TransposeButton: FC = () => {
   const { t } = useTranslation();
   const frameCount = useEngineStore((state) => state.frameCount);
+  const recording = useEngineStore((state) => state.recording);
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
@@ -19,7 +23,7 @@ export const TransposeButton: FC = () => {
   return (
     <IconButton
       color={transposeSemitones !== 0 ? 'primary' : 'inherit'}
-      disabled={!frameCount}
+      disabled={!frameCount || recording || realtimeFailed}
       sx={{
         borderRadius: 1,
         px: 1,

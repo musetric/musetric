@@ -7,34 +7,49 @@ import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { TrackStemLabel } from './TrackStemLabel.js';
+import { TrackLabel } from './TrackLabel.js';
 
-export type WaveformCanvasProps = {
-  stemType: StemType;
-};
+export type WaveformCanvasProps =
+  | {
+      kind: 'delivery';
+      stemType: StemType;
+    }
+  | {
+      kind: 'recording';
+      stemType?: undefined;
+    };
 export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
-  const { stemType } = props;
   const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
 
-  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>();
-  const status = useEngineStore((state) => state.statuses.waveform[stemType]);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement>();
+  const status = useEngineStore((state) =>
+    props.kind === 'recording'
+      ? state.statuses.waveform.recording
+      : state.statuses.waveform[props.stemType],
+  );
 
   useEffect(() => {
     if (!canvas) return;
-    return engine.waveform.mount({
+    if (props.kind === 'recording') {
+      return engine.waveform.mountRecording({
+        projectId,
+        canvas,
+      });
+    }
+    return engine.waveform.mountDelivery({
       projectId,
-      stemType,
+      stemType: props.stemType,
       canvas,
     });
-  }, [canvas, projectId, stemType]);
+  }, [canvas, projectId, props.kind, props.stemType]);
 
   return (
     <Box position='relative' width='100%' height='100%'>
+      <TrackLabel {...props} />
       <Box
-        component='canvas'
         ref={setCanvas}
-        key={`${projectId}-${stemType}`}
+        component='canvas'
         sx={{
           height: '100%',
           width: '100%',
@@ -52,7 +67,6 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
           <ViewError message={t('pages.project.progress.error.waveform')} />
         </Box>
       )}
-      <TrackStemLabel stemType={stemType} />
     </Box>
   );
 };

@@ -56,9 +56,12 @@ export const ProjectTracksVisualization: FC = () => {
               height={80}
               flexShrink={0}
             >
-              <WaveformCanvas stemType={stemType} />
+              <WaveformCanvas kind='delivery' stemType={stemType} />
             </Box>
           ))}
+          <Box component={Paper} elevation={3} height={80} flexShrink={0}>
+            <WaveformCanvas kind='recording' />
+          </Box>
           <VisualizationCursor />
         </Stack>
         <Box position='sticky' bottom={0} sx={{ pointerEvents: 'none' }}>
@@ -68,9 +71,12 @@ export const ProjectTracksVisualization: FC = () => {
       <Stack alignSelf='start' gap={1}>
         {stemTypes.map((stemType) => (
           <Stack key={stemType} height={80} flexShrink={0}>
-            <TrackVolumeControl stemType={stemType} />
+            <TrackVolumeControl kind='delivery' stemType={stemType} />
           </Stack>
         ))}
+        <Stack height={80} flexShrink={0}>
+          <TrackVolumeControl kind='recording' />
+        </Stack>
       </Stack>
     </Box>
   );

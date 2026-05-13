@@ -77,12 +77,9 @@
 
 ## Before Finishing
 
-If code was changed, run the relevant repository-root scripts before finishing, and when both check and fix scripts exist, use the `fix:*` script during development work.
+If code was changed, run the relevant repository-root scripts before finishing.
 
-- `yarn check:security`: dependency security audit.
-- `yarn fix:deps`: fix dependency constraints and dedupe issues.
 - `yarn check:ts`: TypeScript checks across the monorepo.
 - `yarn fix:lint`: lint checks with automatic fixes.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
-- `yarn test`: run automated tests.

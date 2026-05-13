@@ -17,11 +17,13 @@ import { createEngineWaveform, type EngineWaveform } from './waveform.js';
 const initialState: EngineState = {
   statuses: {
     decoder: 'pending',
+    realtime: 'pending',
     spectrogram: 'pending',
     waveform: {
       lead: 'pending',
       backing: 'pending',
       instrumental: 'pending',
+      recording: 'pending',
     },
   },
   colors: {
@@ -36,10 +38,14 @@ const initialState: EngineState = {
   transposeSemitones: 0,
   sourceTempoBpm: 100,
   tempoBpm: 100,
+  microphoneLatencyFrameCount: 0,
+  microphoneLatencyUserSet: false,
+  recordingGain: 1,
   trackVolumes: {
     lead: 1,
     backing: 1,
     instrumental: 1,
+    recording: 1,
   },
 };
 
@@ -74,11 +80,21 @@ export const createEngine = (): Engine => {
       sampleRate: context.sampleRate,
       playerPort: playerChannel.port1,
       spectrogramPort: spectrogramChannel.port1,
+      onRecordingPeaksChanged: (message) => {
+        ref.waveform.applyRecordingPeakPatch({
+          startPeakIndex: message.startPeakIndex,
+          peaks: message.peaks,
+        });
+      },
+      onRecordingStreamFailed: () => {
+        void ref.recorder.stop();
+      },
     }),
     player: createEngineStubPlayer(),
     recorder: createEngineRecorder({
       context,
       store,
+      getDecoder: () => ref.decoder,
       getPlayer: () => ref.player,
     }),
     boot: async () => {

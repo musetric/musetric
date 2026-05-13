@@ -2,7 +2,7 @@ import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { Box, IconButton } from '@mui/material';
-import { type FC, useState } from 'react';
+import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -19,17 +19,21 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
   const frameCount = useEngineStore((state) => state.frameCount);
   const playing = useEngineStore((state) => state.playing);
   const recording = useEngineStore((state) => state.recording);
-  const [pendingAction, setPendingAction] = useState(false);
-  const active = playing || recording || pendingAction;
-
-  const runAction = async (action: () => void | Promise<void>) => {
-    setPendingAction(true);
-    try {
-      await action();
-    } finally {
-      setPendingAction(false);
-    }
-  };
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
+  const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
+  const tempoBpm = useEngineStore((state) => state.tempoBpm);
+  const transposeSemitones = useEngineStore(
+    (state) => state.transposeSemitones,
+  );
+  const active = playing || recording;
+  const recordingDisabled =
+    !frameCount ||
+    realtimeFailed ||
+    tempoBpm !== sourceTempoBpm ||
+    transposeSemitones !== 0;
+  const playbackDisabled = !frameCount || realtimeFailed;
 
   const getBorderColor = () => {
     if (!frameCount) {
@@ -55,11 +59,9 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       {!active && (
         <IconButton
           color='error'
-          disabled={!frameCount}
+          disabled={recordingDisabled}
           onClick={() => {
-            void runAction(async () => {
-              await engine.recorder.start(projectId);
-            });
+            void engine.recorder.start(projectId);
           }}
           size='small'
           sx={{
@@ -83,9 +85,9 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       )}
       {!active && (
         <IconButton
-          disabled={!frameCount}
+          disabled={playbackDisabled}
           onClick={() => {
-            void runAction(engine.player.play);
+            void engine.player.play();
           }}
           size='small'
           sx={{
@@ -102,15 +104,13 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       {active && (
         <IconButton
           color={recording ? 'error' : undefined}
-          disabled={!frameCount}
+          disabled={playbackDisabled}
           onClick={() => {
-            void runAction(() => {
-              if (engine.recorder.isActive()) {
-                void engine.recorder.stop();
-                return;
-              }
-              engine.player.pause();
-            });
+            if (recording) {
+              void engine.recorder.stop();
+              return;
+            }
+            void engine.player.pause();
           }}
           size='small'
           sx={{

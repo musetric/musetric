@@ -1,6 +1,6 @@
+import { resampleChannel } from '../resample.js';
 import { decodeTrack } from './decode.js';
 import { withDemuxedTrack } from './demux.js';
-import { resampleChannel } from './resample.js';
 
 export type DecodedMp4 = {
   channels: Float32Array<SharedArrayBuffer>[];

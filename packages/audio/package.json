@@ -42,6 +42,18 @@
       "import": "./dist/player/worklet/index.worklet.js",
       "default": "./dist/player/worklet/index.worklet.js"
     },
+    "./recording": {
+      "monorepo": "./src/recording/index.ts",
+      "types": "./dist/recording/index.d.ts",
+      "import": "./dist/recording/index.js",
+      "default": "./dist/recording/index.js"
+    },
+    "./recording/worklet": {
+      "monorepo": "./src/recording/worklet/index.worklet.ts",
+      "types": "./dist/recording/worklet/index.worklet.d.ts",
+      "import": "./dist/recording/worklet/index.worklet.js",
+      "default": "./dist/recording/worklet/index.worklet.js"
+    },
     "./spectrogram": {
       "monorepo": "./src/spectrogram/index.ts",
       "types": "./dist/spectrogram/index.d.ts",

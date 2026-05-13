@@ -34,6 +34,7 @@ const getTransposeOptions = (
 
 export const TransposePickerContent: FC = () => {
   const { t } = useTranslation();
+  const recording = useEngineStore((state) => state.recording);
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
@@ -63,6 +64,9 @@ export const TransposePickerContent: FC = () => {
             options={getTransposeOptions(t)}
             visibleCount={16}
             onValueChange={(semitones) => {
+              if (recording) {
+                return;
+              }
               engine.store.update((state) => {
                 state.transposeSemitones = semitones;
               });
@@ -74,7 +78,7 @@ export const TransposePickerContent: FC = () => {
         size='large'
         variant='outlined'
         startIcon={<RestartAltIcon />}
-        disabled={transposeSemitones === 0}
+        disabled={recording || transposeSemitones === 0}
         onClick={() => {
           engine.store.update((state) => {
             state.transposeSemitones = 0;

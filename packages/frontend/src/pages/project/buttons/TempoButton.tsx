@@ -8,6 +8,10 @@ import { useProjectStore } from '../store.js';
 export const TempoButton: FC = () => {
   const { t } = useTranslation();
   const frameCount = useEngineStore((state) => state.frameCount);
+  const recording = useEngineStore((state) => state.recording);
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
   const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
   const tempoBpm = useEngineStore((state) => state.tempoBpm);
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
@@ -15,7 +19,7 @@ export const TempoButton: FC = () => {
   return (
     <IconButton
       color={tempoBpm !== sourceTempoBpm ? 'primary' : 'inherit'}
-      disabled={!frameCount}
+      disabled={!frameCount || recording || realtimeFailed}
       sx={{
         borderRadius: 1,
         px: 1,

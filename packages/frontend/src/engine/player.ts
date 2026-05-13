@@ -2,6 +2,7 @@ import {
   playerChannel,
   playerProcessorName,
   type StemType,
+  stemTypes,
 } from '@musetric/audio';
 import {
   type ControlledPromise,
@@ -14,8 +15,18 @@ import { type EngineState } from './state.js';
 export type EnginePlayer = {
   boot: () => Promise<void>;
   play: () => Promise<void>;
-  pause: () => void;
+  pause: () => Promise<number>;
   seek: (frameIndex: number) => void;
+  connectRecordingSource: (source: AudioNode) => () => void;
+  startRecording: (options: {
+    frameIndex: number;
+    latencyFrameCount: number;
+    samples: Float32Array<SharedArrayBuffer>;
+    metadata: Int32Array<SharedArrayBuffer>;
+    notificationPort: MessagePort;
+  }) => void;
+  seekRecording: (frameIndex: number) => void;
+  flushRecording: () => Promise<number>;
 };
 
 export const createEngineStubPlayer = (): EnginePlayer => ({
@@ -25,12 +36,22 @@ export const createEngineStubPlayer = (): EnginePlayer => ({
   play: async () => {
     // nothing
   },
-  pause: () => {
-    // nothing
-  },
+  pause: async () => Promise.resolve(0),
   seek: () => {
     // nothing
   },
+  connectRecordingSource: () => {
+    return () => {
+      // nothing
+    };
+  },
+  startRecording: () => {
+    // nothing
+  },
+  seekRecording: () => {
+    // nothing
+  },
+  flushRecording: async () => Promise.resolve(0),
 });
 
 export type CreateEnginePlayerOptions = {
@@ -45,16 +66,23 @@ export const createEnginePlayer = async (
   const { context, store, decoderPort } = options;
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
+    numberOfInputs: 1,
     numberOfOutputs: 1,
     outputChannelCount: [2],
   });
   node.connect(context.destination);
   const port = playerChannel.outbound(node.port);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
+  let pausePromise: ControlledPromise<number> | undefined = undefined;
+  let recordingFlushPromise: ControlledPromise<number> | undefined = undefined;
 
   port.bindHandlers({
     booted: () => {
       bootPromise.resolve();
+    },
+    recordingFlushed: (message) => {
+      recordingFlushPromise?.resolve(message.sequence);
+      recordingFlushPromise = undefined;
     },
     setPlaying: (message) => {
       store.update((state) => {
@@ -64,6 +92,10 @@ export const createEnginePlayer = async (
           state.seekRevision += 1;
         }
       });
+      if (!message.playing) {
+        pausePromise?.resolve(message.frameIndex);
+        pausePromise = undefined;
+      }
     },
     setFrameIndex: (message) => {
       store.update((state) => {
@@ -86,9 +118,17 @@ export const createEnginePlayer = async (
       },
     );
   };
-  subscribeTrackVolume('lead');
-  subscribeTrackVolume('backing');
-  subscribeTrackVolume('instrumental');
+  for (const stemType of stemTypes) {
+    subscribeTrackVolume(stemType);
+  }
+  store.subscribe(
+    (state) => state.trackVolumes.recording,
+    (volume) => {
+      port.methods.setRecordingVolume({
+        volume,
+      });
+    },
+  );
 
   store.subscribe(
     (state) => state.transposeSemitones,
@@ -123,13 +163,36 @@ export const createEnginePlayer = async (
       }
       port.methods.play();
     },
-    pause: () => {
+    pause: async () => {
+      pausePromise = createControlledPromise<number>();
+      const currentPromise = pausePromise;
       port.methods.pause();
+      return await currentPromise.promise;
     },
     seek: (nextFrameIndex) => {
       port.methods.seek({
         frameIndex: nextFrameIndex,
       });
+    },
+    connectRecordingSource: (source) => {
+      source.connect(node);
+      return () => {
+        source.disconnect(node);
+      };
+    },
+    startRecording: (recording) => {
+      port.methods.startRecording(recording);
+    },
+    seekRecording: (frameIndex) => {
+      port.methods.seekRecording({
+        frameIndex,
+      });
+    },
+    flushRecording: async () => {
+      recordingFlushPromise = createControlledPromise<number>();
+      const currentPromise = recordingFlushPromise;
+      port.methods.flushRecording();
+      return await currentPromise.promise;
     },
   };
 

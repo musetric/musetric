@@ -12,6 +12,16 @@ export type PlayerOutboundMethods = {
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
   setTrackVolume: (message: { stemType: StemType; volume: number }) => void;
+  setRecordingVolume: (message: { volume: number }) => void;
+  startRecording: (message: {
+    frameIndex: number;
+    latencyFrameCount: number;
+    samples: Float32Array<SharedArrayBuffer>;
+    metadata: Int32Array<SharedArrayBuffer>;
+    notificationPort: MessagePort;
+  }) => void;
+  seekRecording: (message: { frameIndex: number }) => void;
+  flushRecording: () => void;
 };
 
 export type PlayerInboundMethods = {
@@ -22,6 +32,7 @@ export type PlayerInboundMethods = {
     positionJump?: true;
   }) => void;
   setFrameIndex: (message: { frameIndex: number; positionJump?: true }) => void;
+  recordingFlushed: (message: { sequence: number }) => void;
 };
 
 export const playerChannel = createMessageChannel<
@@ -29,7 +40,7 @@ export const playerChannel = createMessageChannel<
   PlayerOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setPlaying', 'setFrameIndex'],
+    keys: ['booted', 'setPlaying', 'setFrameIndex', 'recordingFlushed'],
   },
   outbound: {
     keys: [
@@ -40,9 +51,14 @@ export const playerChannel = createMessageChannel<
       'setTransposeSemitones',
       'setTempoRatio',
       'setTrackVolume',
+      'setRecordingVolume',
+      'startRecording',
+      'seekRecording',
+      'flushRecording',
     ],
     transfers: {
       boot: (message) => [message.dataPort],
+      startRecording: (message) => [message.notificationPort],
     },
   },
 });
@@ -50,7 +66,11 @@ export const playerChannel = createMessageChannel<
 export type PlayerDataMethods = {
   mount: (message: {
     frameCount: number;
-    tracks: Record<StemType, Float32Array<SharedArrayBuffer>[]>;
+    tracks: Record<StemType | 'recording', Float32Array<SharedArrayBuffer>[]>;
+  }) => void;
+  patchRecordingTrack: (message: {
+    frameIndex: number;
+    channels: Float32Array<ArrayBuffer>[];
   }) => void;
   unmount: () => void;
 };
@@ -63,6 +83,6 @@ export const playerDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount'],
+    keys: ['mount', 'patchRecordingTrack', 'unmount'],
   },
 });

@@ -35,7 +35,7 @@ type ProjectRealtimeEvent =
   | {
       type: 'recording.chunkCommitted';
       frameIndex: number;
-      pcmBase64: string;
+      samplesBase64: string;
     }
   | {
       type: 'recording.peaksChanged';
@@ -88,11 +88,8 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
     assertFound(project, `Project with id ${projectId} not found`);
 
     const previousSessionId = projectSessionIds.get(projectId);
-    const previousSession = previousSessionId
-      ? sessions.get(previousSessionId)
-      : undefined;
-    if (previousSession) {
-      await finishSession(previousSession);
+    if (previousSessionId && sessions.has(previousSessionId)) {
+      throw new Error('Recording session is already active');
     }
 
     const existingRecording = await app.db.recording.get(projectId);
@@ -169,45 +166,42 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
   const writeSessionChunk = async (
     session: RecordingSession,
     frameIndex: number,
-    rawChunk: Buffer,
-  ): Promise<Buffer | undefined> => {
+    rawSamples: Float32Array,
+  ): Promise<Float32Array<ArrayBuffer> | undefined> => {
     if (frameIndex >= session.frameCount) {
       return undefined;
     }
 
-    const chunk = rawChunk.subarray(
-      0,
-      rawChunk.byteLength - (rawChunk.byteLength % wavBytesPerSample),
+    const frameLength = Math.min(
+      rawSamples.length,
+      session.frameCount - frameIndex,
     );
-    if (chunk.byteLength <= 0) {
+    if (frameLength <= 0) {
       return undefined;
     }
 
-    let writtenChunk: Buffer | undefined = undefined;
+    const samples = new Float32Array(frameLength);
+    samples.set(rawSamples.subarray(0, frameLength));
+    const chunk = Buffer.alloc(frameLength * wavBytesPerSample);
+    for (let index = 0; index < frameLength; index += 1) {
+      const sample = Math.max(-1, Math.min(1, samples[index]));
+      chunk.writeInt16LE(
+        sample < 0 ? sample * 0x8000 : sample * 0x7fff,
+        index * wavBytesPerSample,
+      );
+    }
+
     session.writePromise = session.writePromise.then(async () => {
       const startByteOffset = frameIndex * wavBytesPerSample;
-      const maxByteLength =
-        session.frameCount * wavBytesPerSample - startByteOffset;
-      if (maxByteLength <= 0) {
-        return;
-      }
-      const byteLength = Math.min(
-        chunk.byteLength,
-        maxByteLength - (maxByteLength % wavBytesPerSample),
-      );
-      if (byteLength <= 0) {
-        return;
-      }
-      writtenChunk = Buffer.from(chunk.subarray(0, byteLength));
       await session.file.write(
-        writtenChunk,
+        chunk,
         0,
-        byteLength,
+        chunk.byteLength,
         wavHeaderByteLength + startByteOffset,
       );
     });
     await session.writePromise;
-    return writtenChunk;
+    return samples;
   };
 
   const createPeakPatch = async (
@@ -284,7 +278,8 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
     }
 
     const frameIndex = packet.readUInt32LE(0);
-    const byteLength = packet.readUInt32LE(4);
+    const frameCount = packet.readUInt32LE(4);
+    const byteLength = frameCount * Float32Array.BYTES_PER_ELEMENT;
     if (byteLength > maxStreamPacketByteLength) {
       throw new Error(`Recording packet is too large: ${byteLength}`);
     }
@@ -294,20 +289,24 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
       throw new Error('Recording packet has invalid byte length');
     }
 
-    const chunk = await writeSessionChunk(
-      session,
-      frameIndex,
-      packet.subarray(streamPacketHeaderByteLength),
+    const view = new DataView(
+      packet.buffer,
+      packet.byteOffset + streamPacketHeaderByteLength,
+      byteLength,
     );
+    const samples = new Float32Array(frameCount);
+    for (let index = 0; index < frameCount; index += 1) {
+      samples[index] = view.getFloat32(
+        index * Float32Array.BYTES_PER_ELEMENT,
+        true,
+      );
+    }
+    const chunk = await writeSessionChunk(session, frameIndex, samples);
     if (!chunk) {
       return undefined;
     }
 
-    const peakPatch = await createPeakPatch(
-      session,
-      frameIndex,
-      chunk.byteLength / wavBytesPerSample,
-    );
+    const peakPatch = await createPeakPatch(session, frameIndex, chunk.length);
     return {
       frameIndex,
       chunk,
@@ -427,7 +426,8 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
         (data: ArrayBuffer | Buffer | Buffer[], isBinary: boolean) => {
           if (isBinary) {
             const packet = toBuffer(data);
-            if (!packet || !activeSession) {
+            const session = activeSession;
+            if (!packet || !session) {
               socket.close(
                 1003,
                 'Recording packet must follow recording start',
@@ -435,15 +435,24 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
               return;
             }
 
-            void processStreamPacket(activeSession, packet)
-              .then((result) => {
-                if (!result || !activeSession) {
+            enqueueSessionAction(
+              'Failed to write recording packet',
+              async () => {
+                if (activeSession !== session) {
+                  return;
+                }
+                const result = await processStreamPacket(session, packet);
+                if (!result) {
                   return;
                 }
                 broadcastRealtimeEvent(projectId, {
                   type: 'recording.chunkCommitted',
                   frameIndex: result.frameIndex,
-                  pcmBase64: result.chunk.toString('base64'),
+                  samplesBase64: Buffer.from(
+                    result.chunk.buffer,
+                    result.chunk.byteOffset,
+                    result.chunk.byteLength,
+                  ).toString('base64'),
                 });
                 if (result.peakPatch) {
                   broadcastRealtimeEvent(projectId, {
@@ -452,10 +461,8 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
                     peaks: Array.from(result.peakPatch.peaks),
                   });
                 }
-              })
-              .catch((error) => {
-                closeWithError(error, 'Failed to write recording packet');
-              });
+              },
+            );
             return;
           }
 
@@ -480,12 +487,20 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
               'frameCount' in message && typeof message.frameCount === 'number'
                 ? message.frameCount
                 : undefined;
+            const latencyFrameCount =
+              'latencyFrameCount' in message &&
+              typeof message.latencyFrameCount === 'number'
+                ? message.latencyFrameCount
+                : undefined;
             if (
               !sampleRate ||
               !Number.isInteger(sampleRate) ||
               frameCount === undefined ||
               !Number.isInteger(frameCount) ||
-              frameCount < 0
+              frameCount < 0 ||
+              latencyFrameCount === undefined ||
+              !Number.isInteger(latencyFrameCount) ||
+              latencyFrameCount < 0
             ) {
               socket.close(1008, 'Invalid recording start message');
               return;
@@ -531,21 +546,6 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
               },
             );
             return;
-          }
-
-          if (
-            isRealtimeMessage(message) &&
-            'type' in message &&
-            message.type === 'recording.abort'
-          ) {
-            enqueueSessionAction(
-              'Failed to abort recording session',
-              async () => {
-                const session = activeSession;
-                activeSession = undefined;
-                await finishRealtimeSession(projectId, session);
-              },
-            );
           }
         },
       );

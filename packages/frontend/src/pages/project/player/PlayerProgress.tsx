@@ -17,6 +17,9 @@ export const PlayerProgress: FC = () => {
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
   const progress = useEngineStore((state) => getTrackProgress(state));
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
 
   return (
     <Box position='relative'>
@@ -24,7 +27,7 @@ export const PlayerProgress: FC = () => {
         min={0}
         max={progressScale}
         value={Math.round(progress * progressScale)}
-        disabled={!frameCount}
+        disabled={!frameCount || realtimeFailed}
         size='small'
         sx={{
           '& .MuiSlider-thumb': {

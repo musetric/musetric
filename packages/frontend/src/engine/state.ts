@@ -2,10 +2,13 @@ import { type StemType, type ViewColors } from '@musetric/audio';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
-export type WaveformStatuses = Record<StemType, PortStatus>;
+export type WaveformStatuses = Record<StemType, PortStatus> & {
+  recording: PortStatus;
+};
 
 export type EngineStatuses = {
   decoder: PortStatus;
+  realtime: PortStatus;
   spectrogram: PortStatus;
   waveform: WaveformStatuses;
 };
@@ -22,7 +25,13 @@ export type EngineState = {
   transposeSemitones: number;
   sourceTempoBpm: number;
   tempoBpm: number;
-  trackVolumes: Record<StemType, number>;
+  microphoneDeviceId?: string;
+  microphoneLatencyFrameCount: number;
+  microphoneLatencyUserSet: boolean;
+  recordingGain: number;
+  trackVolumes: Record<StemType, number> & {
+    recording: number;
+  };
 };
 
 export const getTrackProgress = (

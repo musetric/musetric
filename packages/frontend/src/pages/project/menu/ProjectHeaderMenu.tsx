@@ -2,10 +2,15 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { IconButton, Menu, Tooltip } from '@mui/material';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { MicrophoneSettingsMenuItem } from './MicrophoneSettingsMenuItem.js';
 import { SpectrogramSettingsMenuItem } from './SpectrogramSettingsMenuItem.js';
 
 export const ProjectHeaderMenu: FC = () => {
   const { t } = useTranslation();
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement>();
 
   return (
@@ -13,6 +18,7 @@ export const ProjectHeaderMenu: FC = () => {
       <Tooltip title={t('pages.project.menu.title')}>
         <IconButton
           size='small'
+          disabled={realtimeFailed}
           aria-label={t('pages.project.menu.title')}
           onClick={(event) => {
             setAnchorEl(event.currentTarget);
@@ -28,6 +34,11 @@ export const ProjectHeaderMenu: FC = () => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
+        <MicrophoneSettingsMenuItem
+          closeMenu={() => {
+            setAnchorEl(undefined);
+          }}
+        />
         <SpectrogramSettingsMenuItem
           closeMenu={() => {
             setAnchorEl(undefined);

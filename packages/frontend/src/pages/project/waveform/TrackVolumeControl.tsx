@@ -3,15 +3,26 @@ import { type StemType } from '@musetric/audio';
 import { type FC } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { TrackStemLabel } from './TrackStemLabel.js';
+import { TrackLabel } from './TrackLabel.js';
 
-export type TrackVolumeControlProps = {
-  stemType: StemType;
-};
+export type TrackVolumeControlProps =
+  | {
+      kind: 'delivery';
+      stemType: StemType;
+    }
+  | {
+      kind: 'recording';
+    };
 
 export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
-  const { stemType } = props;
-  const trackVolume = useEngineStore((state) => state.trackVolumes[stemType]);
+  const trackVolume = useEngineStore((state) =>
+    props.kind === 'recording'
+      ? state.trackVolumes.recording
+      : state.trackVolumes[props.stemType],
+  );
+  const realtimeFailed = useEngineStore(
+    (state) => state.statuses.realtime === 'error',
+  );
   const volumePercent = Math.round(trackVolume * 100);
 
   return (
@@ -24,16 +35,21 @@ export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
       position='relative'
       sx={{ userSelect: 'none' }}
     >
-      <TrackStemLabel stemType={stemType} />
+      <TrackLabel {...props} />
       <Stack direction='row' alignItems='center' gap={3}>
         <Slider
           size='small'
+          disabled={realtimeFailed}
           min={0}
           max={100}
           value={volumePercent}
           onChange={(_, value) => {
             engine.store.update((state) => {
-              state.trackVolumes[stemType] = value / 100;
+              if (props.kind === 'recording') {
+                state.trackVolumes.recording = value / 100;
+                return;
+              }
+              state.trackVolumes[props.stemType] = value / 100;
             });
           }}
         />

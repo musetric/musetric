@@ -36,6 +36,7 @@ const getTempoOptions = (
 
 export const TempoPickerContent: FC = () => {
   const { t } = useTranslation();
+  const recording = useEngineStore((state) => state.recording);
   const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
   const tempoBpm = useEngineStore((state) => state.tempoBpm);
 
@@ -64,6 +65,9 @@ export const TempoPickerContent: FC = () => {
             options={getTempoOptions(sourceTempoBpm, t)}
             visibleCount={16}
             onValueChange={(nextTempoBpm) => {
+              if (recording) {
+                return;
+              }
               engine.store.update((state) => {
                 state.tempoBpm = nextTempoBpm;
               });
@@ -75,7 +79,7 @@ export const TempoPickerContent: FC = () => {
         size='large'
         variant='outlined'
         startIcon={<RestartAltIcon />}
-        disabled={tempoBpm === sourceTempoBpm}
+        disabled={recording || tempoBpm === sourceTempoBpm}
         onClick={() => {
           engine.store.update((state) => {
             state.tempoBpm = sourceTempoBpm;

@@ -3,6 +3,10 @@ export const resampleChannel = async (
   sourceSampleRate: number,
   targetSampleRate: number,
 ): Promise<Float32Array> => {
+  if (sourceSampleRate === targetSampleRate) {
+    return samples;
+  }
+
   const { ConverterType, create } =
     await import('@alexanderolsen/libsamplerate-js');
   const src = await create(1, sourceSampleRate, targetSampleRate, {
