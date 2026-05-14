@@ -12,33 +12,14 @@ const createProject = `
   );
 `;
 
-const createAudioAsset = `
-  CREATE TABLE IF NOT EXISTS AudioAsset (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projectId INTEGER NOT NULL,
-    blobId TEXT NOT NULL UNIQUE,
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
-  );
-`;
-
-const createAudioWavePeaks = `
-  CREATE TABLE IF NOT EXISTS AudioWavePeaks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    audioAssetId INTEGER NOT NULL UNIQUE,
-    blobId TEXT NOT NULL UNIQUE,
-    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
-  );
-`;
-
 const createAudioMaster = `
   CREATE TABLE IF NOT EXISTS AudioMaster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('source', 'lead', 'backing', 'instrumental')),
-    audioAssetId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
     UNIQUE(projectId, type),
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
-    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 `;
 
@@ -51,10 +32,10 @@ const createAudioDelivery = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
     stemType TEXT NOT NULL CHECK (stemType IN ('lead', 'backing', 'instrumental')),
-    audioAssetId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
+    waveBlobId TEXT NOT NULL UNIQUE,
     UNIQUE(projectId, stemType),
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
-    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 `;
 
@@ -86,19 +67,17 @@ const createRecording = `
   CREATE TABLE IF NOT EXISTS Recording (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
-    audioAssetId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
+    waveBlobId TEXT NOT NULL UNIQUE,
     sampleRate INTEGER NOT NULL,
     frameCount INTEGER NOT NULL,
     UNIQUE(projectId),
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
-    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 `;
 
 const creationStatements = [
   createProject,
-  createAudioAsset,
-  createAudioWavePeaks,
   createAudioMaster,
   createAudioMasterIndex,
   createAudioDelivery,

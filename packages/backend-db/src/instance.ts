@@ -2,7 +2,6 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
-  audioAsset,
   audioDelivery,
   audioMaster,
   blob,
@@ -33,7 +32,6 @@ export const createInstance = async (databasePath: string) => {
   return {
     project: project.createInstance(database),
     preview: preview.createInstance(database),
-    audioAsset: audioAsset.createInstance(database),
     audioMaster: audioMaster.createInstance(database),
     audioDelivery: audioDelivery.createInstance(database),
     wavePeaks: wavePeaks.createInstance(database),

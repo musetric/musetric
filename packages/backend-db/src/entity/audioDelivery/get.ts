@@ -3,10 +3,9 @@ import { table } from '../../schema/index.js';
 
 export const get = (database: DatabaseSync) => {
   const statement = database.prepare(
-    `SELECT AudioDelivery.id, AudioDelivery.projectId, AudioDelivery.stemType, AudioDelivery.audioAssetId, AudioAsset.blobId
+    `SELECT id, projectId, stemType, blobId, waveBlobId
      FROM AudioDelivery
-     INNER JOIN AudioAsset ON AudioAsset.id = AudioDelivery.audioAssetId
-     WHERE AudioDelivery.projectId = ? AND AudioDelivery.stemType = ?`,
+     WHERE projectId = ? AND stemType = ?`,
   );
 
   return async (

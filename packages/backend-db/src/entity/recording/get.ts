@@ -5,12 +5,11 @@ export const get = (database: DatabaseSync) => {
   const statement = database.prepare(
     `SELECT Recording.id,
             Recording.projectId,
-            Recording.audioAssetId,
-            AudioWavePeaks.blobId AS waveBlobId,
+            Recording.blobId,
+            Recording.waveBlobId,
             Recording.sampleRate,
             Recording.frameCount
      FROM Recording
-     INNER JOIN AudioWavePeaks ON AudioWavePeaks.audioAssetId = Recording.audioAssetId
      WHERE Recording.projectId = ?`,
   );
 

@@ -7,8 +7,11 @@ const blobRowSchema = z.object({
 
 export const list = (database: DatabaseSync) => {
   const statement = database.prepare(
-    `SELECT blobId FROM AudioAsset
-     UNION ALL SELECT blobId FROM AudioWavePeaks
+    `SELECT blobId FROM AudioMaster
+     UNION ALL SELECT blobId FROM AudioDelivery
+     UNION ALL SELECT waveBlobId AS blobId FROM AudioDelivery
+     UNION ALL SELECT blobId FROM Recording
+     UNION ALL SELECT waveBlobId AS blobId FROM Recording
      UNION ALL SELECT blobId FROM Preview
      UNION ALL SELECT blobId FROM Subtitle`,
   );

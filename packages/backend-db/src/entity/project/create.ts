@@ -22,11 +22,8 @@ export const create = (database: DatabaseSync) => {
   const insertProjectStatement = database.prepare(
     `INSERT INTO Project (name, sampleRate, frameCount) VALUES (?, ?, ?)`,
   );
-  const insertAudioAssetStatement = database.prepare(
-    `INSERT INTO AudioAsset (projectId, blobId) VALUES (?, ?)`,
-  );
   const insertAudioMasterStatement = database.prepare(
-    `INSERT INTO AudioMaster (projectId, type, audioAssetId) VALUES (?, ?, ?)`,
+    `INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?, ?, ?)`,
   );
   const insertPreviewStatement = database.prepare(
     `INSERT INTO Preview (projectId, blobId, filename, contentType) VALUES (?, ?, ?, ?)`,
@@ -45,15 +42,8 @@ export const create = (database: DatabaseSync) => {
         frameCount: arg.frameCount,
       });
 
-      const audioAssetResult = await Promise.resolve(
-        insertAudioAssetStatement.run(projectId, arg.song.blobId),
-      );
-      const audioAssetId = numericIdSchema.parse(
-        audioAssetResult.lastInsertRowid,
-      );
-
       await Promise.resolve(
-        insertAudioMasterStatement.run(projectId, 'source', audioAssetId),
+        insertAudioMasterStatement.run(projectId, 'source', arg.song.blobId),
       );
 
       if (!arg.preview) {

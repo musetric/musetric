@@ -129,23 +129,18 @@ export const audioRouter: FastifyPluginCallbackZod = (app) => {
         });
         return reply.send(Readable.from([createEmptyWavBuffer()]));
       }
-      const audioAsset = await app.db.audioAsset.get(recording.audioAssetId);
-      assertFound(
-        audioAsset,
-        `Recording audio asset for id ${recording.audioAssetId} not found`,
-      );
 
-      const stat = await app.blobStorage.getStat(audioAsset.blobId);
+      const stat = await app.blobStorage.getStat(recording.blobId);
       assertFound(
         stat,
-        `Recording audio blob for id ${audioAsset.blobId} not found`,
+        `Recording audio blob for id ${recording.blobId} not found`,
       );
       reply.headers({
         'Content-Type': wavContentType,
         'Content-Length': stat.size,
         'Cache-Control': 'no-store',
       });
-      return reply.send(app.blobStorage.getStream(audioAsset.blobId));
+      return reply.send(app.blobStorage.getStream(recording.blobId));
     },
   });
 

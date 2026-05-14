@@ -97,16 +97,9 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
 
     const existingRecording = await app.db.recording.get(projectId);
     if (existingRecording) {
-      const audioAsset = await app.db.audioAsset.get(
-        existingRecording.audioAssetId,
-      );
-      assertFound(
-        audioAsset,
-        `Recording audio asset for id ${existingRecording.audioAssetId} not found`,
-      );
       const audioBlob = {
-        blobId: audioAsset.blobId,
-        blobPath: app.blobStorage.getPath(audioAsset.blobId),
+        blobId: existingRecording.blobId,
+        blobPath: app.blobStorage.getPath(existingRecording.blobId),
       };
       const waveBlob = {
         blobId: existingRecording.waveBlobId,
@@ -148,13 +141,9 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
     });
     await mkdir(dirname(waveBlob.blobPath), { recursive: true });
     await writeFile(waveBlob.blobPath, emptyWavePeaksBuffer);
-    const audioAsset = await app.db.audioAsset.create({
-      projectId,
-      blobId: audioBlob.blobId,
-    });
     await app.db.recording.create({
       projectId,
-      audioAssetId: audioAsset.id,
+      blobId: audioBlob.blobId,
       waveBlobId: waveBlob.blobId,
       sampleRate,
       frameCount,

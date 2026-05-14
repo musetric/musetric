@@ -3,9 +3,8 @@ import { table } from '../../schema/index.js';
 
 export const pendingSeparation = (database: DatabaseSync) => {
   const statement = database.prepare(
-    `SELECT Source.id, Source.projectId, Source.type, Source.audioAssetId, AudioAsset.blobId
+    `SELECT Source.id, Source.projectId, Source.type, Source.blobId
      FROM AudioMaster AS Source
-     INNER JOIN AudioAsset ON AudioAsset.id = Source.audioAssetId
      WHERE Source.type = 'source'
        AND NOT EXISTS (
         SELECT 1 FROM AudioMaster AS Lead

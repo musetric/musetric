@@ -11,24 +11,6 @@ export namespace project {
   export type Item = z.infer<typeof itemSchema>;
 }
 
-export namespace audioAsset {
-  export const itemSchema = z.object({
-    id: numericIdSchema,
-    projectId: numericIdSchema,
-    blobId: z.string(),
-  });
-  export type Item = z.infer<typeof itemSchema>;
-}
-
-export namespace audioWavePeaks {
-  export const itemSchema = z.object({
-    id: numericIdSchema,
-    audioAssetId: numericIdSchema,
-    blobId: z.string(),
-  });
-  export type Item = z.infer<typeof itemSchema>;
-}
-
 export namespace audioMaster {
   export const typeSchema = z.enum([
     'source',
@@ -42,7 +24,6 @@ export namespace audioMaster {
     id: numericIdSchema,
     projectId: numericIdSchema,
     type: typeSchema,
-    audioAssetId: numericIdSchema,
     blobId: z.string(),
   });
   export type Item = z.infer<typeof itemSchema>;
@@ -56,8 +37,8 @@ export namespace audioDelivery {
     id: numericIdSchema,
     projectId: numericIdSchema,
     stemType: stemTypeSchema,
-    audioAssetId: numericIdSchema,
     blobId: z.string(),
+    waveBlobId: z.string(),
   });
   export type Item = z.infer<typeof itemSchema>;
 }
@@ -70,7 +51,6 @@ export namespace wavePeaks {
     id: numericIdSchema,
     projectId: numericIdSchema,
     stemType: stemTypeSchema,
-    audioAssetId: numericIdSchema,
     blobId: z.string(),
   });
   export type Item = z.infer<typeof itemSchema>;
@@ -100,7 +80,7 @@ export namespace recording {
   export const itemSchema = z.object({
     id: numericIdSchema,
     projectId: numericIdSchema,
-    audioAssetId: numericIdSchema,
+    blobId: z.string(),
     waveBlobId: z.string(),
     sampleRate: z.number().int().positive(),
     frameCount: z.number().int().positive(),
