@@ -13,6 +13,7 @@
   "pages.project.menu.title": "Menu",
   "pages.project.player.controls.pause": "Pause",
   "pages.project.player.controls.play": "Play",
+  "pages.project.player.controls.record": "Record vocal",
   "pages.project.player.controls.tempo": "Song tempo",
   "pages.project.player.controls.tempoReset": "Reset tempo",
   "pages.project.player.controls.tempoValue": "{{value}} BPM",

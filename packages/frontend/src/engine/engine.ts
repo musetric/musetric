@@ -6,6 +6,7 @@ import {
   createEngineStubPlayer,
   type EnginePlayer,
 } from './player.js';
+import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
@@ -29,6 +30,7 @@ const initialState: EngineState = {
   },
   duration: 0,
   playing: false,
+  recording: false,
   frameIndex: 0,
   seekRevision: 0,
   transposeSemitones: 0,
@@ -48,6 +50,7 @@ export type Engine = {
   spectrogram: EngineSpectrogram;
   waveform: EngineWaveform;
   player: EnginePlayer;
+  recorder: EngineRecorder;
   boot: () => Promise<void>;
 };
 
@@ -73,6 +76,11 @@ export const createEngine = (): Engine => {
       spectrogramPort: spectrogramChannel.port1,
     }),
     player: createEngineStubPlayer(),
+    recorder: createEngineRecorder({
+      context,
+      store,
+      getPlayer: () => ref.player,
+    }),
     boot: async () => {
       ref.player = await createEnginePlayer({
         context,

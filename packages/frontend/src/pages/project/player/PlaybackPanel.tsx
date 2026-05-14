@@ -1,10 +1,16 @@
 import { Box, Stack } from '@mui/material';
 import { type FC } from 'react';
-import { PlayPauseButton } from '../buttons/PlayPauseButton.js';
+import { PlaybackControlsButton } from '../buttons/PlaybackControlsButton.js';
 import { VisualizationModeToggle } from '../buttons/visualizationModeToggle/index.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
-export const PlaybackPanel: FC = () => {
+export type PlaybackPanelProps = {
+  projectId: number;
+};
+
+export const PlaybackPanel: FC<PlaybackPanelProps> = (props) => {
+  const { projectId } = props;
+
   return (
     <Stack width='100%'>
       <PlayerProgress />
@@ -15,7 +21,7 @@ export const PlaybackPanel: FC = () => {
         alignItems='center'
       >
         <Box gridColumn={2}>
-          <PlayPauseButton />
+          <PlaybackControlsButton projectId={projectId} />
         </Box>
         <Stack gridColumn={3} direction='row' justifyContent='flex-end'>
           <VisualizationModeToggle />
