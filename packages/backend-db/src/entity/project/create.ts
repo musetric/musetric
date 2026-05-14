@@ -13,12 +13,14 @@ export type CreateItem = z.infer<typeof createItemSchema>;
 export type CreateArg = {
   name: string;
   song: BlobFile;
+  sampleRate: number;
+  frameCount: number;
   preview?: BlobFile;
 };
 
 export const create = (database: DatabaseSync) => {
   const insertProjectStatement = database.prepare(
-    `INSERT INTO Project (name) VALUES (?)`,
+    `INSERT INTO Project (name, sampleRate, frameCount) VALUES (?, ?, ?)`,
   );
   const insertAudioAssetStatement = database.prepare(
     `INSERT INTO AudioAsset (projectId, blobId) VALUES (?, ?)`,
@@ -33,12 +35,14 @@ export const create = (database: DatabaseSync) => {
   return async (arg: CreateArg): Promise<CreateItem> => {
     return await transaction(database, async () => {
       const projectResult = await Promise.resolve(
-        insertProjectStatement.run(arg.name),
+        insertProjectStatement.run(arg.name, arg.sampleRate, arg.frameCount),
       );
       const projectId = numericIdSchema.parse(projectResult.lastInsertRowid);
       const project = table.project.itemSchema.parse({
         id: projectId,
         name: arg.name,
+        sampleRate: arg.sampleRate,
+        frameCount: arg.frameCount,
       });
 
       const audioAssetResult = await Promise.resolve(
@@ -49,7 +53,7 @@ export const create = (database: DatabaseSync) => {
       );
 
       await Promise.resolve(
-        insertAudioMasterStatement.run(projectId, 'rawSource', audioAssetId),
+        insertAudioMasterStatement.run(projectId, 'source', audioAssetId),
       );
 
       if (!arg.preview) {

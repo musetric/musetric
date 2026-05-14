@@ -1,12 +1,13 @@
 import { type Logger } from '@musetric/resource-utils';
 import { spawnScript } from '@musetric/resource-utils/node';
 
-export const getDurationSeconds = async (
+export const getAudioFrameCount = async (
   fromPath: string,
+  sampleRate: number,
   logger: Logger,
 ): Promise<number> => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  let duration = undefined as number | undefined;
+  let durationSeconds = undefined as number | undefined;
 
   await spawnScript({
     command: 'ffprobe',
@@ -25,18 +26,27 @@ export const getDurationSeconds = async (
       mode: 'text',
       onLine: (line) => {
         const trimmed = line.trim();
-        if (trimmed && !duration) {
-          duration = Number(trimmed);
+        if (trimmed && !durationSeconds) {
+          durationSeconds = Number(trimmed);
         }
       },
     },
     stderr: { mode: 'logText' },
     logger,
-    processName: 'generateWavePeaks.getDurationSeconds',
+    processName: 'getAudioFrameCount',
   });
 
-  if (!duration || !Number.isFinite(duration) || duration < 0) {
-    throw new Error('Invalid duration');
+  if (
+    !durationSeconds ||
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds < 0
+  ) {
+    throw new Error('Invalid audio duration');
   }
-  return duration;
+
+  const frameCount = Math.floor(durationSeconds * sampleRate);
+  if (!frameCount || !Number.isFinite(frameCount) || frameCount < 0) {
+    throw new Error('Invalid audio frame count');
+  }
+  return frameCount;
 };

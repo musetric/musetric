@@ -5,6 +5,8 @@ export namespace project {
   export const itemSchema = z.object({
     id: numericIdSchema,
     name: z.string(),
+    sampleRate: z.number().int().positive(),
+    frameCount: z.number().int().positive(),
   });
   export type Item = z.infer<typeof itemSchema>;
 }
@@ -29,7 +31,6 @@ export namespace audioWavePeaks {
 
 export namespace audioMaster {
   export const typeSchema = z.enum([
-    'rawSource',
     'source',
     'lead',
     'backing',

@@ -6,7 +6,9 @@ import type { DatabaseSync } from 'node:sqlite';
 const createProject = `
   CREATE TABLE IF NOT EXISTS Project (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    sampleRate INTEGER NOT NULL,
+    frameCount INTEGER NOT NULL
   );
 `;
 
@@ -32,7 +34,7 @@ const createAudioMaster = `
   CREATE TABLE IF NOT EXISTS AudioMaster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('rawSource', 'source', 'lead', 'backing', 'instrumental')),
+    type TEXT NOT NULL CHECK (type IN ('source', 'lead', 'backing', 'instrumental')),
     audioAssetId INTEGER NOT NULL UNIQUE,
     UNIQUE(projectId, type),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,

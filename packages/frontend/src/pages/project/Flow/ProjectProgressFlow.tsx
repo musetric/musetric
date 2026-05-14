@@ -30,10 +30,6 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
           </Typography>
           <Stack gap={2}>
             <FlowStep
-              title={t('pages.project.progress.steps.validation')}
-              step={project.processing.steps.validation}
-            />
-            <FlowStep
               title={t('pages.project.progress.steps.separation')}
               step={project.processing.steps.separation}
             />

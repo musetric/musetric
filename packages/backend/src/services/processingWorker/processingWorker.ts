@@ -13,7 +13,6 @@ import {
   type ProcessingWorkerProgressEvent,
 } from './processingSummary.js';
 import { createTranscriptionWorker } from './processingTranscription.js';
-import { createValidationWorker } from './processingValidation.js';
 
 export type ProcessingWorker = Scheduler & {
   emitter: EventEmitter<ProcessingWorkerEvent>;
@@ -27,7 +26,6 @@ export const createProcessingWorker = (
 ): ProcessingWorker => {
   const emitter = createEventEmitter<ProcessingWorkerEvent>();
   const logger = bindLogger(app.log, envs.logLevel);
-  const validationWorker = createValidationWorker(app, emitter, logger);
   const separationWorker = createSeparationWorker(app, emitter, logger);
   const transcriptionWorker = createTranscriptionWorker(app, emitter, logger);
 
@@ -43,11 +41,6 @@ export const createProcessingWorker = (
       if (separation) {
         await separationWorker.run(separation);
       }
-
-      const validation = await app.db.processing.pendingValidation();
-      if (validation) {
-        await validationWorker.run(validation);
-      }
     },
   });
 
@@ -57,8 +50,7 @@ export const createProcessingWorker = (
     getProcessingState: (projectId) => {
       return (
         transcriptionWorker.getState(projectId) ??
-        separationWorker.getState(projectId) ??
-        validationWorker.getState(projectId)
+        separationWorker.getState(projectId)
       );
     },
   };

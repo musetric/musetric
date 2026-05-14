@@ -34,7 +34,6 @@
   "pages.project.progress.status.processing": "In progress",
   "pages.project.progress.steps.separation": "Splits lead/back vocals and instrumental",
   "pages.project.progress.steps.transcription": "Transcribes lead vocals",
-  "pages.project.progress.steps.validation": "Checks the source file for correctness",
   "pages.project.progress.trackTitle": "Intelligent processing line",
   "pages.project.settings.fields.fourier.label": "Fourier",
   "pages.project.settings.fields.maxFrequency.label": "Max frequency",

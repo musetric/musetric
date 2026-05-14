@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { type Logger } from '@musetric/resource-utils';
-import { getDurationSeconds } from './getDuration.js';
+import { getAudioFrameCount } from '../getAudioFrameCount.js';
 import { readPcm } from './readPcm.js';
 
 const wavePeakCount = 3840;
@@ -21,8 +21,7 @@ export const generateWavePeaks = async (
 
   const wavePeaks = new Float32Array(wavePeakCount * 2);
 
-  const durationSeconds = await getDurationSeconds(fromPath, logger);
-  const totalSamples = Math.floor(durationSeconds * sampleRate);
+  const totalSamples = await getAudioFrameCount(fromPath, sampleRate, logger);
   const segmentStep = totalSamples / wavePeakCount;
 
   let lastSegmentIndex = -1;

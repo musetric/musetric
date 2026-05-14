@@ -1,11 +1,14 @@
 import { api } from '@musetric/api';
 import { fastifyRoute } from '@musetric/api/node';
+import { bindLogger } from '@musetric/resource-utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
+import { envs } from '../common/envs.js';
 import {
   resolveProcessing,
   resolveProcessingEvent,
 } from '../services/processingWorker/processingSummary.js';
+import { createProjectSource } from '../services/projectSource.js';
 
 export const projectRouter: FastifyPluginCallbackZod = (app) => {
   app.addHook('onRoute', (routeOptions) => {
@@ -76,7 +79,11 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
     handler: async (request) => {
       const { song, name, preview } = request.body;
 
-      const blobSong = await app.blobStorage.addFile(song);
+      const blobSong = await createProjectSource({
+        blobStorage: app.blobStorage,
+        file: song,
+        logger: bindLogger(app.log, envs.logLevel),
+      });
       const blobPreview = preview
         ? await app.blobStorage.addFile(preview)
         : undefined;
@@ -84,6 +91,8 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
       const created = await app.db.project.create({
         name,
         song: blobSong,
+        sampleRate: blobSong.sampleRate,
+        frameCount: blobSong.frameCount,
         preview: blobPreview,
       });
 

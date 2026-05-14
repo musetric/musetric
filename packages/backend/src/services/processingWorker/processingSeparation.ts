@@ -1,8 +1,4 @@
-import {
-  defaultSampleRate,
-  type EventEmitter,
-  type Logger,
-} from '@musetric/resource-utils';
+import { type EventEmitter, type Logger } from '@musetric/resource-utils';
 import {
   convertToFmp4,
   generateWavePeaks,
@@ -43,6 +39,11 @@ export const createSeparationWorker = (
         };
         emitter.emit(state);
 
+        const project = await app.db.project.get(task.projectId);
+        if (!project) {
+          throw new Error(`Project with id ${task.projectId} not found`);
+        }
+
         const masterSourcePath = app.blobStorage.getPath(task.blobId);
         const masterLead = app.blobStorage.createPath();
         const masterBacking = app.blobStorage.createPath();
@@ -53,7 +54,7 @@ export const createSeparationWorker = (
           leadPath: masterLead.blobPath,
           backingPath: masterBacking.blobPath,
           instrumentalPath: masterInstrumental.blobPath,
-          sampleRate: defaultSampleRate,
+          sampleRate: project.sampleRate,
           handlers: {
             progress: (message) => {
               if (!state) {
@@ -87,19 +88,19 @@ export const createSeparationWorker = (
           convertToFmp4({
             fromPath: masterLead.blobPath,
             toPath: deliveryLead.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
           convertToFmp4({
             fromPath: masterBacking.blobPath,
             toPath: deliveryBacking.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
           convertToFmp4({
             fromPath: masterInstrumental.blobPath,
             toPath: deliveryInstrumental.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
         ]);
@@ -111,19 +112,19 @@ export const createSeparationWorker = (
           generateWavePeaks({
             fromPath: masterLead.blobPath,
             toPath: wavePeaksLead.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
           generateWavePeaks({
             fromPath: masterBacking.blobPath,
             toPath: wavePeaksBacking.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
           generateWavePeaks({
             fromPath: masterInstrumental.blobPath,
             toPath: wavePeaksInstrumental.blobPath,
-            sampleRate: defaultSampleRate,
+            sampleRate: project.sampleRate,
             logger,
           }),
         ]);

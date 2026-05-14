@@ -32,7 +32,6 @@ export type ProcessingStep = z.infer<typeof processingStepSchema>;
 export const processingSchema = z.object({
   done: z.boolean().optional(),
   steps: z.object({
-    validation: processingStepSchema,
     separation: processingStepSchema,
     transcription: processingStepSchema,
   }),
@@ -42,6 +41,8 @@ export type Processing = z.infer<typeof processingSchema>;
 export const itemSchema = z.object({
   id: z.number(),
   name: z.string().min(3),
+  sampleRate: z.number().int().positive(),
+  frameCount: z.number().int().positive(),
   previewUrl: z.string().optional(),
   processing: processingSchema,
 });
