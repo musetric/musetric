@@ -82,6 +82,19 @@ const createSubtitle = `
   );
 `;
 
+const createRecording = `
+  CREATE TABLE IF NOT EXISTS Recording (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL,
+    audioAssetId INTEGER NOT NULL UNIQUE,
+    sampleRate INTEGER NOT NULL,
+    frameCount INTEGER NOT NULL,
+    UNIQUE(projectId),
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE,
+    FOREIGN KEY (audioAssetId) REFERENCES AudioAsset(id) ON DELETE CASCADE
+  );
+`;
+
 const creationStatements = [
   createProject,
   createAudioAsset,
@@ -92,6 +105,7 @@ const creationStatements = [
   createAudioDeliveryIndex,
   createPreview,
   createSubtitle,
+  createRecording,
 ] as const;
 
 export const createTables = async (database: DatabaseSync): Promise<void> => {

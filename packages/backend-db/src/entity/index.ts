@@ -1,8 +1,10 @@
+export * as audioAsset from './audioAsset/index.js';
 export * as audioDelivery from './audioDelivery/index.js';
 export * as audioMaster from './audioMaster/index.js';
 export * as blob from './blob/index.js';
 export * as preview from './preview/index.js';
 export * as processing from './processing/index.js';
 export * as project from './project/index.js';
+export * as recording from './recording/index.js';
 export * as subtitle from './subtitle/index.js';
 export * as wavePeaks from './wavePeaks/index.js';
