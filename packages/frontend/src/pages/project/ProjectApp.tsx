@@ -44,7 +44,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
     >
       <Stack width='100%' flexGrow={1} minHeight={0} gap={2}>
         <ProjectContent />
-        <PlaybackPanel />
+        <PlaybackPanel projectId={project.id} />
       </Stack>
       <ProjectSettings />
     </ProjectLayout>

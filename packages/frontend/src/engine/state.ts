@@ -16,6 +16,7 @@ export type EngineState = {
   colors: ViewColors;
   duration: number;
   playing: boolean;
+  recording: boolean;
   frameIndex: number;
   seekRevision: number;
   transposeSemitones: number;
