@@ -21,7 +21,8 @@ const clickDelaySeconds = 0.25;
 const clickCount = 5;
 const clickIntervalSeconds = 1;
 const clickTailSeconds = 1.1;
-const clickDurationSeconds = 0.03;
+const clickDurationSeconds = 0.08;
+const clickFrequencyHz = 1800;
 const peakThreshold = 0.02;
 const minimumLatencyMs = 0;
 const maximumLatencyMs = 1000;
@@ -36,10 +37,14 @@ export const createRecordingLatencyCalibrationClick = (
   const frameCount = Math.round(context.sampleRate * clickDurationSeconds);
   const buffer = context.createBuffer(1, frameCount, context.sampleRate);
   const channel = buffer.getChannelData(0);
-  channel[0] = 1;
-  channel[1] = -1;
-  channel[2] = 0.7;
-  channel[3] = -0.7;
+
+  for (let index = 0; index < channel.length; index += 1) {
+    const time = index / context.sampleRate;
+    const progress = index / channel.length;
+    const envelope = (1 - progress) * (1 - progress);
+    channel[index] = Math.sin(time * Math.PI * 2 * clickFrequencyHz) * envelope;
+  }
+
   return buffer;
 };
 
