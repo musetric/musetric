@@ -73,14 +73,12 @@ let finishInterruptedRecordingStream = (stream: RecordingStream) => {
 };
 
 const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return sanitizeLogMessage(message);
 };
 
 const sanitizeLogMessage = (message: string) =>
-  message.replace(/[\r\n\u2028\u2029]/g, ' ');
+  message.replace(/[\x00-\x1f\x7f\u2028\u2029]/g, ' ');
 
 const waitWithTimeout = async (
   promise: Promise<void>,
