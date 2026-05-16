@@ -32,6 +32,7 @@ const initialState: EngineState = {
   },
   duration: 0,
   playing: false,
+  frozen: false,
   recording: false,
   frameIndex: 0,
   seekRevision: 0,

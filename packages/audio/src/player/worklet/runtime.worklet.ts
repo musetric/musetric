@@ -39,6 +39,7 @@ export const createPlayerRuntime = async (
     undefined;
   let frameIndex = 0;
   let playing = false;
+  let frozen = false;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const frameIndexTracker = createFrameIndexTracker(sampleRate);
@@ -184,6 +185,11 @@ export const createPlayerRuntime = async (
       frameIndexTracker.reset();
       port.methods.setPlaying({ playing, frameIndex });
     },
+    setFrozen: (message) => {
+      frozen = message.frozen;
+      frameIndexTracker.reset();
+      timePitchProcessor.reset();
+    },
     seek: (message) => {
       frameIndex = message.frameIndex;
       if (recordingNotificationPort) {
@@ -246,7 +252,7 @@ export const createPlayerRuntime = async (
         output.fill(0);
       }
 
-      if (!tracks || !playing) {
+      if (!tracks || !playing || frozen) {
         return;
       }
 

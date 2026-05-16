@@ -107,6 +107,12 @@ export const jsConfig: Linter.Config = {
       },
       {
         selector:
+          ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression, TSDeclareFunction) > AssignmentPattern > :matches(ObjectPattern, ArrayPattern)',
+        message:
+          'Do not destructure function parameters inline; destructure inside the function body instead',
+      },
+      {
+        selector:
           ':matches(CallExpression[callee.type="FunctionExpression"], CallExpression[callee.type="ArrowFunctionExpression"])',
         message:
           'Do not invoke inline functions immediately; define the function separately instead',

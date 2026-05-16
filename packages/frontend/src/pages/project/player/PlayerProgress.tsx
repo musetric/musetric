@@ -1,5 +1,5 @@
 import { Box, Slider, Typography } from '@mui/material';
-import { type FC } from 'react';
+import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { getTrackProgress } from '../../../engine/state.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -14,6 +14,7 @@ const formatTime = (timeInSeconds: number) => {
 };
 
 export const PlayerProgress: FC = () => {
+  const ref = useRef<HTMLSpanElement>(null);
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
   const progress = useEngineStore((state) => getTrackProgress(state));
@@ -21,9 +22,56 @@ export const PlayerProgress: FC = () => {
     (state) => state.statuses.realtime === 'error',
   );
 
+  useEffect(() => {
+    const element = ref.current;
+
+    if (!element) {
+      return;
+    }
+
+    let sliderFrozen = false;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      if (!event.isPrimary) {
+        return;
+      }
+
+      sliderFrozen = true;
+      engine.player.setFrozen(true);
+    };
+
+    const handlePointerUp = () => {
+      if (!sliderFrozen) {
+        return;
+      }
+
+      sliderFrozen = false;
+      engine.player.setFrozen(false);
+    };
+
+    element.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      element.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerUp);
+
+      if (sliderFrozen) {
+        engine.player.setFrozen(false);
+      }
+    };
+  }, []);
+
   return (
     <Box position='relative'>
       <Slider
+        ref={ref}
         min={0}
         max={progressScale}
         value={Math.round(progress * progressScale)}
