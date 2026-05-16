@@ -20,7 +20,7 @@ import {
   maximumRecordingLatencyMs,
   minimumRecordingLatencyMs,
 } from '@musetric/audio/recording';
-import { type FC, useEffect, useState } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { runMicrophoneLatencyCalibration } from '../../../engine/microphoneLatencyCalibration.js';
@@ -57,6 +57,7 @@ export const MicrophoneSettings: FC = () => {
   );
   const recording = useEngineStore((state) => state.recording);
   const recordingGain = useEngineStore((state) => state.recordingGain);
+  const previewStreamRef = useRef<MediaStream | undefined>(undefined);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [level, setLevel] = useState(0);
   const [calibrating, setCalibrating] = useState(false);
@@ -64,9 +65,10 @@ export const MicrophoneSettings: FC = () => {
   const latencyMs = Math.round(
     (microphoneLatencyFrameCount / engine.context.sampleRate) * 1000,
   );
+  const gainedLevel = Math.min(1, level * recordingGain);
 
   useEffect(() => {
-    if (!open || calibrating) {
+    if (!open) {
       return undefined;
     }
 
@@ -117,6 +119,7 @@ export const MicrophoneSettings: FC = () => {
           return;
         }
 
+        previewStreamRef.current = stream;
         const audioDevices = await refreshDevices();
         const latencyFrameCount = getInitialMicrophoneLatencyFrameCount(
           engine.context,
@@ -157,11 +160,14 @@ export const MicrophoneSettings: FC = () => {
       source?.disconnect();
       analyser?.disconnect();
       if (stream) {
+        if (previewStreamRef.current === stream) {
+          previewStreamRef.current = undefined;
+        }
         stopStream(stream);
       }
       setLevel(0);
     };
-  }, [calibrating, microphoneDeviceId, open, t]);
+  }, [microphoneDeviceId, open, t]);
 
   const calibrate = async () => {
     try {
@@ -173,6 +179,7 @@ export const MicrophoneSettings: FC = () => {
       const calibrationResult = await runMicrophoneLatencyCalibration({
         context: engine.context,
         deviceId: microphoneDeviceId,
+        stream: previewStreamRef.current,
       });
       if (!calibrationResult) {
         setError(t('pages.project.microphoneSettings.calibrationFailed'));
@@ -285,7 +292,7 @@ export const MicrophoneSettings: FC = () => {
             <Typography variant='body2'>
               {t('pages.project.microphoneSettings.level')}
             </Typography>
-            <LinearProgress variant='determinate' value={level * 100} />
+            <LinearProgress variant='determinate' value={gainedLevel * 100} />
           </Stack>
           <Stack gap={1}>
             <Typography variant='body2'>

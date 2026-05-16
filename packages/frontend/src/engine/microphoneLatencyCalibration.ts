@@ -13,6 +13,7 @@ import microphoneCalibrationWorkletUrl from './microphoneCalibration.worklet.ts?
 export type RunMicrophoneLatencyCalibrationOptions = {
   context: AudioContext;
   deviceId?: string;
+  stream?: MediaStream;
 };
 
 export type MicrophoneLatencyCalibrationResult = {
@@ -92,12 +93,14 @@ export const runMicrophoneLatencyCalibration = async (
 
   try {
     await loadCalibrationWorklet(context);
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: createMicrophoneAudioConstraints({
-        deviceId,
-        sampleRate: context.sampleRate,
-      }),
-    });
+    stream =
+      options.stream ??
+      (await navigator.mediaDevices.getUserMedia({
+        audio: createMicrophoneAudioConstraints({
+          deviceId,
+          sampleRate: context.sampleRate,
+        }),
+      }));
     const calibrationSchedule = createRecordingLatencyCalibrationSchedule({
       context,
     });
@@ -156,7 +159,7 @@ export const runMicrophoneLatencyCalibration = async (
     calibrationNode?.disconnect();
     calibrationNode?.port.close();
     silentGain?.disconnect();
-    if (stream) {
+    if (stream && !options.stream) {
       stopStream(stream);
     }
   }
