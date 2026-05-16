@@ -8,6 +8,7 @@ export type PlayerOutboundMethods = {
   boot: (message: { dataPort: MessagePort }) => void;
   play: () => void;
   pause: () => void;
+  setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number }) => void;
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
@@ -48,6 +49,7 @@ export const playerChannel = createMessageChannel<
       'play',
       'seek',
       'pause',
+      'setFrozen',
       'setTransposeSemitones',
       'setTempoRatio',
       'setTrackVolume',

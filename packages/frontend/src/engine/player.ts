@@ -16,6 +16,7 @@ export type EnginePlayer = {
   boot: () => Promise<void>;
   play: () => Promise<void>;
   pause: () => Promise<number>;
+  setFrozen: (frozen: boolean) => void;
   seek: (frameIndex: number) => void;
   connectRecordingSource: (source: AudioNode) => () => void;
   startRecording: (options: {
@@ -37,6 +38,9 @@ export const createEngineStubPlayer = (): EnginePlayer => ({
     // nothing
   },
   pause: async () => Promise.resolve(0),
+  setFrozen: () => {
+    // nothing
+  },
   seek: () => {
     // nothing
   },
@@ -168,6 +172,12 @@ export const createEnginePlayer = async (
       const currentPromise = pausePromise;
       port.methods.pause();
       return await currentPromise.promise;
+    },
+    setFrozen: (frozen) => {
+      store.update((state) => {
+        state.frozen = frozen;
+      });
+      port.methods.setFrozen({ frozen });
     },
     seek: (nextFrameIndex) => {
       port.methods.seek({
