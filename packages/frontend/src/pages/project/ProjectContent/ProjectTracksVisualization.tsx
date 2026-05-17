@@ -1,14 +1,55 @@
 import { Box, Paper, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
-import { type FC } from 'react';
+import { createNumberLimit } from '@musetric/resource-utils';
+import { createSeekDrag } from '@musetric/resource-utils/dom';
+import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
-import { getWaveformFrameIndex } from '../visualization/visualizationSeek.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { TrackVolumeControl } from '../waveform/TrackVolumeControl.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
 
 export const ProjectTracksVisualization: FC = () => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+
+    if (!element) return;
+
+    let startFrameIndex = 0;
+
+    const drag = createSeekDrag({
+      element,
+      onStart: () => {
+        startFrameIndex = engine.store.get().frameIndex;
+      },
+      onUpdate: (event) => {
+        const { frameCount } = engine.store.get();
+        if (!frameCount) {
+          event.stop();
+          return;
+        }
+
+        const frameIndex =
+          event.pointerType === 'mouse'
+            ? event.ratio * frameCount
+            : startFrameIndex + event.offsetRatio * frameCount;
+        const frameLimit = createNumberLimit({
+          minimum: 0,
+          maximum: frameCount,
+        });
+        const newFrameIndex = frameLimit.clamp(Math.round(frameIndex));
+
+        engine.player.seek(newFrameIndex);
+      },
+    });
+
+    return () => {
+      drag.dispose();
+    };
+  }, []);
+
   return (
     <Box
       flex={{
@@ -28,24 +69,12 @@ export const ProjectTracksVisualization: FC = () => {
       sx={{ userSelect: 'none' }}
     >
       <Box
+        ref={ref}
         display='grid'
         gridTemplateRows='1fr auto'
         alignSelf='start'
         height='100%'
         position='relative'
-        onPointerDown={(event) => {
-          if (event.button !== 0) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          const newFrameIndex = getWaveformFrameIndex(event);
-          if (newFrameIndex === undefined) return;
-          engine.player.seek(newFrameIndex);
-        }}
-        onPointerMove={(event) => {
-          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-          const newFrameIndex = getWaveformFrameIndex(event);
-          if (newFrameIndex === undefined) return;
-          engine.player.seek(newFrameIndex);
-        }}
       >
         <Stack position='relative' gap={1}>
           {stemTypes.map((stemType) => (
