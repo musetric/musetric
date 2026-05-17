@@ -1,0 +1,8 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#F7F4EF"/>
+  <rect x="70" y="70" width="1060" height="490" rx="18" fill="#171614"/>
+  <path d="M128 374C177 296 214 433 263 348C308 270 350 416 392 330C437 238 479 398 524 310C565 230 606 394 650 316C695 238 736 398 780 316C824 235 864 393 908 316C954 236 1000 392 1072 292" stroke="#6FD6C5" stroke-width="20" stroke-linecap="round"/>
+  <path d="M128 454C190 394 236 494 294 430C344 374 390 480 440 424C492 366 546 468 598 410C650 350 702 458 754 404C810 346 858 458 912 402C966 346 1016 438 1072 386" stroke="#FF6B4A" stroke-width="20" stroke-linecap="round"/>
+  <text x="126" y="194" fill="#FFFAF2" font-family="Arial, sans-serif" font-size="104" font-weight="800">Musetric</text>
+  <text x="132" y="258" fill="#F2C94C" font-family="Arial, sans-serif" font-size="34" font-weight="700">music practice studio</text>
+</svg>

@@ -1500,6 +1500,28 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/landing@workspace:packages/landing":
+  version: 0.0.0-use.local
+  resolution: "@musetric/landing@workspace:packages/landing"
+  dependencies:
+    "@emotion/react": "catalog:"
+    "@emotion/styled": "catalog:"
+    "@mui/material": "catalog:"
+    "@musetric/eslint-config": "workspace:*"
+    "@types/react": "catalog:"
+    "@types/react-dom": "catalog:"
+    "@vitejs/plugin-react": "catalog:"
+    eslint: "catalog:"
+    i18next: "catalog:"
+    i18next-cli: "catalog:"
+    react: "catalog:"
+    react-dom: "catalog:"
+    react-i18next: "catalog:"
+    typescript: "catalog:"
+    vite: "catalog:"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/monorepo@workspace:.":
   version: 0.0.0-use.local
   resolution: "@musetric/monorepo@workspace:."
