@@ -58,7 +58,8 @@ export const ProjectTracksVisualization: FC = () => {
       }}
       display='grid'
       gridTemplateColumns={{
-        xs: 'minmax(0, 1fr) 200px',
+        xs: 'minmax(0, 1fr) 140px',
+        sm: 'minmax(0, 1fr) 200px',
         lg: 'minmax(0, 1fr) 280px',
       }}
       gridTemplateRows='100%'

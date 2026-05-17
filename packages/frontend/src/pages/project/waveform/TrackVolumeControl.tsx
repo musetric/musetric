@@ -36,27 +36,25 @@ export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
       sx={{ userSelect: 'none' }}
     >
       <TrackLabel {...props} />
-      <Stack direction='row' alignItems='center' gap={3}>
-        <Slider
-          size='small'
-          disabled={realtimeFailed}
-          min={0}
-          max={100}
-          value={volumePercent}
-          onChange={(_, value) => {
-            engine.store.update((state) => {
-              if (props.kind === 'recording') {
-                state.trackVolumes.recording = value / 100;
-                return;
-              }
-              state.trackVolumes[props.stemType] = value / 100;
-            });
-          }}
-        />
-        <Typography variant='caption' minWidth='4ch' textAlign='right'>
-          {`${volumePercent}%`}
-        </Typography>
-      </Stack>
+      <Slider
+        size='small'
+        disabled={realtimeFailed}
+        min={0}
+        max={100}
+        value={volumePercent}
+        onChange={(_, value) => {
+          engine.store.update((state) => {
+            if (props.kind === 'recording') {
+              state.trackVolumes.recording = value / 100;
+              return;
+            }
+            state.trackVolumes[props.stemType] = value / 100;
+          });
+        }}
+      />
+      <Typography position='absolute' top={8} right={8} variant='caption'>
+        {`${volumePercent}%`}
+      </Typography>
     </Stack>
   );
 };
