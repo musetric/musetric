@@ -20,10 +20,12 @@ export const ProjectSpectrogramVisualization: FC = () => {
     }
 
     let { frameIndex } = engine.store.get();
+    let releaseFrozenOnEnd = true;
 
     const drag = createInertialDrag({
       element,
       onStart: () => {
+        releaseFrozenOnEnd = true;
         engine.player.setFrozen(true);
         frameIndex = engine.store.get().frameIndex;
       },
@@ -47,7 +49,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
         const nextFrameIndex = frameLimit.clamp(rawFrameIndex);
 
         frameIndex = nextFrameIndex;
-        engine.player.seek(Math.round(nextFrameIndex));
+        engine.player.seek(
+          Math.round(nextFrameIndex),
+          'spectrogramVisualization',
+        );
 
         if (
           event.phase === 'inertia' &&
@@ -57,11 +62,27 @@ export const ProjectSpectrogramVisualization: FC = () => {
         }
       },
       onEnd: () => {
-        engine.player.setFrozen(false);
+        if (releaseFrozenOnEnd) {
+          engine.player.setFrozen(false);
+        }
+        releaseFrozenOnEnd = true;
       },
     });
+    const unsubscribeSeek = engine.store.subscribe(
+      (state) => state.seekEvent.revision,
+      () => {
+        const { seekEvent } = engine.store.get();
+        if (seekEvent.origin === 'spectrogramVisualization') {
+          return;
+        }
+
+        releaseFrozenOnEnd = false;
+        drag.stop();
+      },
+    );
 
     return () => {
+      unsubscribeSeek();
       drag.dispose();
       engine.player.setFrozen(false);
     };

@@ -1,12 +1,7 @@
 import { defaultSampleRate } from '@musetric/resource-utils';
 import { createStore, type Store } from '../common/store.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder.js';
-import {
-  createEnginePlayer,
-  createEngineStubPlayer,
-  type EnginePlayer,
-} from './player.js';
-import { createEngineRecorder, type EngineRecorder } from './recorder.js';
+import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
@@ -34,8 +29,13 @@ const initialState: EngineState = {
   playing: false,
   frozen: false,
   recording: false,
+  playerCommandPending: false,
   frameIndex: 0,
-  seekRevision: 0,
+  seekEvent: {
+    revision: 0,
+    frameIndex: 0,
+    origin: 'player',
+  },
   transposeSemitones: 0,
   sourceTempoBpm: 100,
   tempoBpm: 100,
@@ -57,7 +57,6 @@ export type Engine = {
   spectrogram: EngineSpectrogram;
   waveform: EngineWaveform;
   player: EnginePlayer;
-  recorder: EngineRecorder;
   boot: () => Promise<void>;
 };
 
@@ -88,22 +87,16 @@ export const createEngine = (): Engine => {
         });
       },
       onRecordingStreamFailed: () => {
-        void ref.recorder.stop();
+        void ref.player.stop();
       },
     }),
-    player: createEngineStubPlayer(),
-    recorder: createEngineRecorder({
+    player: createEnginePlayer({
       context,
       store,
+      decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,
-      getPlayer: () => ref.player,
     }),
     boot: async () => {
-      ref.player = await createEnginePlayer({
-        context,
-        store,
-        decoderPort: playerChannel.port2,
-      });
       await Promise.all([
         ref.player.boot(),
         ref.decoder.boot(),

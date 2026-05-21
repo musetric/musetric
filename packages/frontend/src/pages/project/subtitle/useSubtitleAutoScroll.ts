@@ -33,7 +33,7 @@ export const useSubtitleAutoScroll = (
     subtitleScrollHeldRef,
   } = options;
   const activeSegmentIndexRef = useRef(subtitleCursor.getActiveSegmentIndex());
-  const seekRevisionRef = useRef(engine.store.get().seekRevision);
+  const seekRevisionRef = useRef(engine.store.get().seekEvent.revision);
 
   useLayoutEffect(() => {
     const subtitleListElement = subtitleListRef.current;
@@ -53,7 +53,7 @@ export const useSubtitleAutoScroll = (
 
   useEffect(() => {
     return engine.store.subscribe(
-      (state) => state.seekRevision,
+      (state) => state.seekEvent.revision,
       (nextSeekRevision) => {
         seekRevisionRef.current = nextSeekRevision;
 
@@ -101,7 +101,7 @@ export const useSubtitleAutoScroll = (
     const unsubscribe = subtitleCursor.subscribeActiveSegmentIndex(() => {
       const nextActiveSegmentIndex = subtitleCursor.getActiveSegmentIndex();
       const activeChangeFromSeek =
-        engine.store.get().seekRevision !== seekRevisionRef.current;
+        engine.store.get().seekEvent.revision !== seekRevisionRef.current;
       const subtitleListElement = subtitleListRef.current;
 
       if (!subtitleListElement) {

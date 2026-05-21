@@ -2,10 +2,10 @@ import {
   createMicrophoneAudioConstraints,
   getInitialMicrophoneLatencyFrameCount,
 } from '@musetric/audio/recording';
-import type { Store } from '../common/store.js';
-import type { EngineDecoder } from './decoder.js';
-import type { EnginePlayer } from './player.js';
-import type { EngineState } from './state.js';
+import type { Store } from '../../common/store.js';
+import type { EngineDecoder } from '../decoder.js';
+import type { EngineState } from '../state.js';
+import type { EnginePlayback } from './playback.js';
 
 type RecordingSession = {
   projectId: number;
@@ -18,12 +18,11 @@ type RecordingSession = {
   stream?: MediaStream;
   disconnectPlayerInput?: () => void;
   unsubscribeRecordingGain?: () => void;
-  unsubscribeSeek?: () => void;
   unsubscribePlayback?: () => void;
 };
 
 export type EngineRecorder = {
-  start: (projectId: number) => Promise<void>;
+  record: (projectId: number) => Promise<void>;
   stop: () => Promise<void>;
 };
 
@@ -31,7 +30,7 @@ export type CreateEngineRecorderOptions = {
   context: AudioContext;
   store: Store<EngineState>;
   getDecoder: () => EngineDecoder;
-  getPlayer: () => EnginePlayer;
+  getEnginePlayback: () => EnginePlayback;
 };
 
 const recordingBufferSeconds = 10;
@@ -45,7 +44,7 @@ const stopMediaStream = (stream: MediaStream) => {
 export const createEngineRecorder = (
   options: CreateEngineRecorderOptions,
 ): EngineRecorder => {
-  const { context, store, getDecoder, getPlayer } = options;
+  const { context, store, getDecoder, getEnginePlayback } = options;
   let currentSession: RecordingSession | undefined = undefined;
 
   const setRecording = (recording: boolean) => {
@@ -61,8 +60,6 @@ export const createEngineRecorder = (
     session.disconnectPlayerInput = undefined;
     session.unsubscribeRecordingGain?.();
     session.unsubscribeRecordingGain = undefined;
-    session.unsubscribeSeek?.();
-    session.unsubscribeSeek = undefined;
     session.unsubscribePlayback?.();
     session.unsubscribePlayback = undefined;
     if (session.stream) {
@@ -80,7 +77,7 @@ export const createEngineRecorder = (
     }
     session.decoderStreamClosed = true;
     const sequence = session.playerStreamStarted
-      ? await getPlayer().flushRecording()
+      ? await getEnginePlayback().flushRecording()
       : 0;
     await getDecoder().finishRecordingStream(sequence);
   };
@@ -95,7 +92,7 @@ export const createEngineRecorder = (
   };
 
   const stopInitializedSession = async (session: RecordingSession) => {
-    const frameIndex = await getPlayer().pause();
+    const frameIndex = await getEnginePlayback().stop();
 
     if (!session.decoderStreamStarted) {
       return;
@@ -103,7 +100,7 @@ export const createEngineRecorder = (
 
     if (session.playerStreamStarted) {
       await closeDecoderStream(session);
-      getPlayer().seek(frameIndex);
+      getEnginePlayback().seek(frameIndex);
       return;
     }
 
@@ -196,8 +193,9 @@ export const createEngineRecorder = (
         port: recordingStreamChannel.port1,
       });
       session.decoderStreamStarted = true;
-      getPlayer().startRecording({
+      getEnginePlayback().startRecording({
         frameIndex: startFrameIndex,
+        revision: store.get().seekEvent.revision,
         latencyFrameCount,
         samples: recordingSamples,
         metadata: recordingMetadata,
@@ -205,12 +203,6 @@ export const createEngineRecorder = (
       });
       session.playerStreamStarted = true;
 
-      session.unsubscribeSeek = store.subscribe(
-        (state) => state.seekRevision,
-        () => {
-          getPlayer().seekRecording(store.get().frameIndex);
-        },
-      );
       session.unsubscribePlayback = store.subscribe(
         (state) => state.playing,
         (playing) => {
@@ -225,7 +217,8 @@ export const createEngineRecorder = (
           gain.gain.setValueAtTime(recordingGain, context.currentTime);
         },
       );
-      const disconnectPlayerInput = getPlayer().connectRecordingSource(gain);
+      const disconnectPlayerInput =
+        getEnginePlayback().connectRecordingSource(gain);
       session.disconnectPlayerInput = () => {
         disconnectPlayerInput();
         source.disconnect(gain);
@@ -236,7 +229,7 @@ export const createEngineRecorder = (
         return;
       }
 
-      await getPlayer().play();
+      await getEnginePlayback().play();
     } catch (error) {
       failSession(session);
       throw error;
@@ -256,14 +249,13 @@ export const createEngineRecorder = (
   };
 
   const ref: EngineRecorder = {
-    start: async (projectId) => {
+    record: async (projectId) => {
       if (currentSession) {
         return currentSession.initializePromise;
       }
 
       const session = createSession(projectId);
       currentSession = session;
-      setRecording(true);
       session.initializePromise = initializeSession(session);
 
       try {

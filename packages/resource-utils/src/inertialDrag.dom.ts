@@ -125,7 +125,20 @@ export const createInertialDrag = (
     inertiaFrame = undefined;
   };
 
+  const releasePointerCapture = (pointerId: number) => {
+    if (!element.hasPointerCapture(pointerId)) {
+      return;
+    }
+
+    element.releasePointerCapture(pointerId);
+  };
+
   const stop = () => {
+    const currentState = state;
+    if (currentState) {
+      releasePointerCapture(currentState.pointerId);
+    }
+
     stopInertia();
     state = undefined;
     finish();
@@ -255,14 +268,6 @@ export const createInertialDrag = (
     event.preventDefault();
   };
 
-  const releasePointerCapture = (event: PointerEvent) => {
-    if (!element.hasPointerCapture(event.pointerId)) {
-      return;
-    }
-
-    element.releasePointerCapture(event.pointerId);
-  };
-
   const handlePointerUp = (event: PointerEvent) => {
     const currentState = state;
 
@@ -270,7 +275,7 @@ export const createInertialDrag = (
       return;
     }
 
-    releasePointerCapture(event);
+    releasePointerCapture(event.pointerId);
     state = undefined;
 
     if (!currentState.dragStarted) {
@@ -294,7 +299,7 @@ export const createInertialDrag = (
       return;
     }
 
-    releasePointerCapture(event);
+    releasePointerCapture(event.pointerId);
     state = undefined;
     finish();
   };
