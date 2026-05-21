@@ -18,10 +18,13 @@ export const ProjectTracksVisualization: FC = () => {
     if (!element) return;
 
     let startFrameIndex = 0;
+    let releaseFrozenOnEnd = true;
 
     const drag = createSeekDrag({
       element,
       onStart: () => {
+        releaseFrozenOnEnd = true;
+        engine.player.setFrozen(true);
         startFrameIndex = engine.store.get().frameIndex;
       },
       onUpdate: (event) => {
@@ -43,10 +46,30 @@ export const ProjectTracksVisualization: FC = () => {
 
         engine.player.seek(newFrameIndex, 'tracksVisualization');
       },
+      onEnd: () => {
+        if (releaseFrozenOnEnd) {
+          engine.player.setFrozen(false);
+        }
+        releaseFrozenOnEnd = true;
+      },
     });
+    const unsubscribeSeek = engine.store.subscribe(
+      (state) => state.seekEvent.revision,
+      () => {
+        const { seekEvent } = engine.store.get();
+        if (seekEvent.origin === 'tracksVisualization') {
+          return;
+        }
+
+        releaseFrozenOnEnd = false;
+        drag.stop();
+      },
+    );
 
     return () => {
+      unsubscribeSeek();
       drag.dispose();
+      engine.player.setFrozen(false);
     };
   }, []);
 

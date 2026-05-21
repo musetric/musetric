@@ -20,14 +20,62 @@ export const ProjectSpectrogramVisualization: FC = () => {
     }
 
     let { frameIndex } = engine.store.get();
+    let pointerFrozen = false;
+    let dragStarted = false;
     let releaseFrozenOnEnd = true;
+
+    const freeze = () => {
+      if (pointerFrozen) {
+        return;
+      }
+
+      pointerFrozen = true;
+      engine.player.setFrozen(true);
+    };
+
+    const releaseFrozen = () => {
+      if (!pointerFrozen) {
+        return;
+      }
+
+      pointerFrozen = false;
+      engine.player.setFrozen(false);
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      if (!event.isPrimary) {
+        return;
+      }
+
+      releaseFrozenOnEnd = true;
+      dragStarted = false;
+      frameIndex = engine.store.get().frameIndex;
+      freeze();
+    };
+
+    const handlePointerEnd = () => {
+      if (dragStarted) {
+        return;
+      }
+
+      releaseFrozen();
+    };
+
+    element.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerEnd);
+    document.addEventListener('pointercancel', handlePointerEnd);
 
     const drag = createInertialDrag({
       element,
       onStart: () => {
+        dragStarted = true;
         releaseFrozenOnEnd = true;
-        engine.player.setFrozen(true);
         frameIndex = engine.store.get().frameIndex;
+        freeze();
       },
       onUpdate: (event) => {
         const { frameCount } = engine.store.get();
@@ -63,8 +111,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
       },
       onEnd: () => {
         if (releaseFrozenOnEnd) {
-          engine.player.setFrozen(false);
+          releaseFrozen();
         }
+        pointerFrozen = false;
+        dragStarted = false;
         releaseFrozenOnEnd = true;
       },
     });
@@ -77,14 +127,18 @@ export const ProjectSpectrogramVisualization: FC = () => {
         }
 
         releaseFrozenOnEnd = false;
+        pointerFrozen = false;
         drag.stop();
       },
     );
 
     return () => {
+      element.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerup', handlePointerEnd);
+      document.removeEventListener('pointercancel', handlePointerEnd);
       unsubscribeSeek();
       drag.dispose();
-      engine.player.setFrozen(false);
+      releaseFrozen();
     };
   }, []);
 

@@ -29,7 +29,10 @@ const initialState: EngineState = {
   playing: false,
   frozen: false,
   recording: false,
+  isSlave: false,
   playerCommandPending: false,
+  playerFrameIndexPending: false,
+  backendRevision: 0,
   frameIndex: 0,
   seekEvent: {
     revision: 0,
@@ -88,6 +91,33 @@ export const createEngine = (): Engine => {
       },
       onRecordingStreamFailed: () => {
         void ref.player.stop();
+      },
+      onPlayerPlayRequested: () => {
+        void ref.player.applyRemotePlayState({
+          playing: true,
+          recording: false,
+        });
+      },
+      onPlayerRecordRequested: () => {
+        void ref.player.applyRemotePlayState({
+          playing: true,
+          recording: true,
+        });
+      },
+      onPlayerStopRequested: () => {
+        void ref.player.applyRemoteStop();
+      },
+      onPlayerFrameIndexChanged: (frameIndex, frozen, revision, source) => {
+        ref.player.applyRemoteFrameIndex(frameIndex, frozen, revision, source);
+      },
+      onPlayerRevisionChanged: (revision) => {
+        store.update((state) => {
+          state.backendRevision = revision;
+          state.playerFrameIndexPending = false;
+        });
+      },
+      onPlayerSyncState: (syncState) => {
+        void ref.player.applyRemoteSyncState(syncState);
       },
     }),
     player: createEnginePlayer({

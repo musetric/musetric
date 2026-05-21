@@ -3,7 +3,7 @@ import { type FileHandle, mkdir, open, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { type WebSocket } from '@fastify/websocket';
 import { api } from '@musetric/api';
-import { bindLogger } from '@musetric/resource-utils';
+import { bindLogger, nextNumber } from '@musetric/resource-utils';
 import {
   emptyWavePeaksBuffer,
   generateWavePeaks,
@@ -30,6 +30,15 @@ type RecordingSession = {
   writePromise: Promise<void>;
 };
 
+type PlayerRuntimeState = {
+  masterSocket: WebSocket | undefined;
+  active: boolean;
+  recording: boolean;
+  frozen: boolean;
+  frameIndex: number;
+  revision: number;
+};
+
 type ProjectRealtimeEvent =
   | { type: 'recording.started' }
   | {
@@ -43,7 +52,26 @@ type ProjectRealtimeEvent =
       peaks: number[];
     }
   | { type: 'recording.finished' }
-  | { type: 'error'; error: string };
+  | { type: 'error'; error: string }
+  | { type: 'player.play' }
+  | { type: 'player.record' }
+  | { type: 'player.stop' }
+  | {
+      type: 'player.frameIndex';
+      frameIndex: number;
+      frozen: boolean;
+      revision: number;
+      source: 'playback' | 'user';
+    }
+  | { type: 'player.revision'; revision: number }
+  | {
+      type: 'player.sync.state';
+      active: boolean;
+      recording: boolean;
+      frozen: boolean;
+      frameIndex: number;
+      revision: number;
+    };
 
 const streamPacketHeaderByteLength = 8;
 const maxStreamPacketByteLength = 1024 * 1024;
@@ -52,6 +80,7 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
   const sessions = new Map<string, RecordingSession>();
   const projectSessionIds = new Map<number, string>();
   const projectRealtimeSockets = new Map<number, Set<WebSocket>>();
+  const projectPlayerStates = new Map<number, PlayerRuntimeState>();
   const recordingLogger = bindLogger(app.log, envs.logLevel);
 
   app.addHook('onRoute', (opts) => {
@@ -360,6 +389,112 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
     }
   };
 
+  const broadcastRealtimeEventExcluding = (
+    projectId: number,
+    event: ProjectRealtimeEvent,
+    excludeSocket: WebSocket,
+  ) => {
+    const sockets = projectRealtimeSockets.get(projectId);
+    if (!sockets) {
+      return;
+    }
+
+    for (const socket of sockets) {
+      if (socket !== excludeSocket) {
+        sendRealtimeEvent(socket, event);
+      }
+    }
+  };
+
+  const createPlayerState = (): PlayerRuntimeState => ({
+    masterSocket: undefined,
+    active: false,
+    recording: false,
+    frozen: false,
+    frameIndex: 0,
+    revision: 0,
+  });
+
+  const getProjectPlayerState = (projectId: number) => {
+    const existingState = projectPlayerStates.get(projectId);
+    if (existingState) {
+      return existingState;
+    }
+
+    const state = createPlayerState();
+    projectPlayerStates.set(projectId, state);
+    return state;
+  };
+
+  const sendPlayerSyncState = (
+    socket: WebSocket,
+    state: PlayerRuntimeState | undefined,
+  ) => {
+    sendRealtimeEvent(socket, {
+      type: 'player.sync.state',
+      active: state?.active ?? false,
+      recording: state?.recording ?? false,
+      frozen: state?.frozen ?? false,
+      frameIndex: state?.frameIndex ?? 0,
+      revision: state?.revision ?? 0,
+    });
+  };
+
+  const broadcastPlayerFrameIndex = (
+    projectId: number,
+    state: PlayerRuntimeState,
+    excludeSocket: WebSocket,
+    source: 'playback' | 'user',
+  ) => {
+    broadcastRealtimeEventExcluding(
+      projectId,
+      {
+        type: 'player.frameIndex',
+        frameIndex: state.frameIndex,
+        frozen: state.frozen,
+        revision: state.revision,
+        source,
+      },
+      excludeSocket,
+    );
+  };
+
+  const claimPlayerMaster = (
+    projectId: number,
+    socket: WebSocket,
+    recording: boolean,
+  ) => {
+    const state = getProjectPlayerState(projectId);
+    if (!state.active) {
+      state.masterSocket = socket;
+      state.active = true;
+      state.recording = recording;
+      broadcastRealtimeEventExcluding(
+        projectId,
+        { type: recording ? 'player.record' : 'player.play' },
+        socket,
+      );
+      return true;
+    }
+
+    if (state.masterSocket === socket && state.recording === recording) {
+      return true;
+    }
+
+    sendPlayerSyncState(socket, state);
+    return false;
+  };
+
+  const stopProjectPlayer = (projectId: number) => {
+    const state = projectPlayerStates.get(projectId);
+    if (state) {
+      state.masterSocket = undefined;
+      state.active = false;
+      state.recording = false;
+    }
+    broadcastRealtimeEvent(projectId, { type: 'player.stop' });
+  };
+
   const finishRealtimeSession = async (
     projectId: number,
     session: RecordingSession | undefined,
@@ -385,6 +520,7 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
       let activeSession: RecordingSession | undefined = undefined;
       let socketClosed = false;
       let sessionAction: Promise<void> = Promise.resolve();
+      let ignoringRecordingStream = false;
 
       const sockets = projectRealtimeSockets.get(projectId) ?? new Set();
       sockets.add(socket);
@@ -425,6 +561,10 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
         'message',
         (data: ArrayBuffer | Buffer | Buffer[], isBinary: boolean) => {
           if (isBinary) {
+            if (ignoringRecordingStream) {
+              return;
+            }
+
             const packet = toBuffer(data);
             const session = activeSession;
             if (!packet || !session) {
@@ -506,6 +646,15 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
               return;
             }
 
+            const recordingClaimed = claimPlayerMaster(projectId, socket, true);
+            if (!recordingClaimed) {
+              ignoringRecordingStream = true;
+              sendRealtimeEvent(socket, {
+                type: 'recording.finished',
+              });
+              return;
+            }
+
             enqueueSessionAction(
               'Failed to start recording session',
               async () => {
@@ -537,6 +686,14 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
             'type' in message &&
             message.type === 'recording.finish'
           ) {
+            if (ignoringRecordingStream) {
+              ignoringRecordingStream = false;
+              sendRealtimeEvent(socket, {
+                type: 'recording.finished',
+              });
+              return;
+            }
+
             enqueueSessionAction(
               'Failed to finish recording session',
               async () => {
@@ -547,6 +704,97 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
             );
             return;
           }
+
+          if (
+            isRealtimeMessage(message) &&
+            'type' in message &&
+            message.type === 'player.play'
+          ) {
+            claimPlayerMaster(projectId, socket, false);
+            return;
+          }
+
+          if (
+            isRealtimeMessage(message) &&
+            'type' in message &&
+            message.type === 'player.record'
+          ) {
+            claimPlayerMaster(projectId, socket, true);
+            return;
+          }
+
+          if (
+            isRealtimeMessage(message) &&
+            'type' in message &&
+            message.type === 'player.stop'
+          ) {
+            stopProjectPlayer(projectId);
+            return;
+          }
+
+          if (
+            isRealtimeMessage(message) &&
+            'type' in message &&
+            message.type === 'player.frameIndex'
+          ) {
+            const frameIndex =
+              'frameIndex' in message && typeof message.frameIndex === 'number'
+                ? message.frameIndex
+                : 0;
+            const frozen =
+              'frozen' in message && typeof message.frozen === 'boolean'
+                ? message.frozen
+                : false;
+            const revision =
+              'revision' in message && typeof message.revision === 'number'
+                ? message.revision
+                : 0;
+            const source =
+              'source' in message && message.source === 'user'
+                ? 'user'
+                : 'playback';
+            const playerState = getProjectPlayerState(projectId);
+
+            if (source === 'user') {
+              playerState.revision = nextNumber(playerState.revision);
+              playerState.frameIndex = frameIndex;
+              playerState.frozen = frozen;
+              sendRealtimeEvent(socket, {
+                type: 'player.revision',
+                revision: playerState.revision,
+              });
+              broadcastPlayerFrameIndex(projectId, playerState, socket, 'user');
+              return;
+            }
+
+            if (!playerState.active || playerState.masterSocket !== socket) {
+              sendPlayerSyncState(socket, playerState);
+              return;
+            }
+
+            if (revision !== playerState.revision) {
+              return;
+            }
+
+            playerState.frameIndex = frameIndex;
+            playerState.frozen = frozen;
+            broadcastPlayerFrameIndex(
+              projectId,
+              playerState,
+              socket,
+              'playback',
+            );
+            return;
+          }
+
+          if (
+            isRealtimeMessage(message) &&
+            'type' in message &&
+            message.type === 'player.sync.request'
+          ) {
+            sendPlayerSyncState(socket, projectPlayerStates.get(projectId));
+            return;
+          }
         },
       );
 
@@ -555,7 +803,14 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
         sockets.delete(socket);
         if (!sockets.size) {
           projectRealtimeSockets.delete(projectId);
+          projectPlayerStates.delete(projectId);
         }
+
+        const playerState = projectPlayerStates.get(projectId);
+        if (playerState && playerState.masterSocket === socket) {
+          stopProjectPlayer(projectId);
+        }
+
         enqueueSessionAction(
           'Failed to finish recording session after realtime disconnect',
           async () => {

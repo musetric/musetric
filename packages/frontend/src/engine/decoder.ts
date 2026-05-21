@@ -23,6 +23,16 @@ export type EngineDecoder = {
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;
+  sendPlayerPlay: () => void;
+  sendPlayerRecord: () => void;
+  sendPlayerStop: () => void;
+  sendPlayerFrameIndex: (message: {
+    frameIndex: number;
+    frozen: boolean;
+    revision: number;
+    source: 'playback' | 'user';
+  }) => void;
+  sendPlayerSyncRequest: () => void;
 };
 
 export type CreateEngineDecoderOptions = {
@@ -35,6 +45,24 @@ export type CreateEngineDecoderOptions = {
     peaks: Float32Array<ArrayBuffer>;
   }) => void;
   onRecordingStreamFailed: () => void;
+  onPlayerPlayRequested: () => void;
+  onPlayerRecordRequested: () => void;
+  onPlayerStopRequested: () => void;
+  onPlayerFrameIndexChanged: (
+    frameIndex: number,
+    frozen: boolean,
+    revision: number,
+    source: 'playback' | 'user',
+  ) => void;
+  onPlayerRevisionChanged: (revision: number) => void;
+  onPlayerSyncState: (state: {
+    isSlave: boolean;
+    playing: boolean;
+    recording: boolean;
+    frozen: boolean;
+    frameIndex: number;
+    revision: number;
+  }) => void;
 };
 
 const sanitizeLogMessage = (message: string) =>
@@ -49,6 +77,12 @@ export const createEngineDecoder = (
     spectrogramPort,
     onRecordingPeaksChanged,
     onRecordingStreamFailed,
+    onPlayerPlayRequested,
+    onPlayerRecordRequested,
+    onPlayerStopRequested,
+    onPlayerFrameIndexChanged,
+    onPlayerRevisionChanged,
+    onPlayerSyncState,
   } = options;
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
@@ -113,6 +147,21 @@ export const createEngineDecoder = (
       onRecordingStreamFailed();
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
+    playerPlayRequested: onPlayerPlayRequested,
+    playerRecordRequested: onPlayerRecordRequested,
+    playerStopRequested: onPlayerStopRequested,
+    playerFrameIndexChanged: (message) => {
+      onPlayerFrameIndexChanged(
+        message.frameIndex,
+        message.frozen,
+        message.revision,
+        message.source,
+      );
+    },
+    playerRevisionChanged: (message) => {
+      onPlayerRevisionChanged(message.revision);
+    },
+    playerSyncState: onPlayerSyncState,
   });
 
   return {
@@ -146,6 +195,21 @@ export const createEngineDecoder = (
       }
       port.methods.finishRecordingStream({ sequence });
       await recordingStreamPromise.promise;
+    },
+    sendPlayerPlay: () => {
+      port.methods.sendPlayerPlay();
+    },
+    sendPlayerRecord: () => {
+      port.methods.sendPlayerRecord();
+    },
+    sendPlayerStop: () => {
+      port.methods.sendPlayerStop();
+    },
+    sendPlayerFrameIndex: (message) => {
+      port.methods.sendPlayerFrameIndex(message);
+    },
+    sendPlayerSyncRequest: () => {
+      port.methods.sendPlayerSyncRequest();
     },
   };
 };

@@ -57,7 +57,26 @@ type ProjectRealtimeEvent =
     }
   | { type: 'recording.finished' }
   | { type: 'recording.started' }
-  | { type: 'error'; error: string };
+  | { type: 'error'; error: string }
+  | { type: 'player.play' }
+  | { type: 'player.record' }
+  | { type: 'player.stop' }
+  | {
+      type: 'player.frameIndex';
+      frameIndex: number;
+      frozen: boolean;
+      revision: number;
+      source: 'playback' | 'user';
+    }
+  | { type: 'player.revision'; revision: number }
+  | {
+      type: 'player.sync.state';
+      active: boolean;
+      recording: boolean;
+      frozen: boolean;
+      frameIndex: number;
+      revision: number;
+    };
 
 const recordingPacketHeaderByteLength = 8;
 
@@ -308,6 +327,50 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
     return;
   }
 
+  if (event.type === 'player.play') {
+    port.methods.playerPlayRequested();
+    return;
+  }
+
+  if (event.type === 'player.record') {
+    port.methods.playerRecordRequested();
+    return;
+  }
+
+  if (event.type === 'player.stop') {
+    port.methods.playerStopRequested();
+    return;
+  }
+
+  if (event.type === 'player.frameIndex') {
+    port.methods.playerFrameIndexChanged({
+      frameIndex: event.frameIndex,
+      frozen: event.frozen,
+      revision: event.revision,
+      source: event.source,
+    });
+    return;
+  }
+
+  if (event.type === 'player.revision') {
+    port.methods.playerRevisionChanged({
+      revision: event.revision,
+    });
+    return;
+  }
+
+  if (event.type === 'player.sync.state') {
+    port.methods.playerSyncState({
+      isSlave: event.active,
+      playing: event.active,
+      recording: event.recording,
+      frozen: event.frozen,
+      frameIndex: event.frameIndex,
+      revision: event.revision,
+    });
+    return;
+  }
+
   failRecordingStream(event.error);
 };
 
@@ -543,6 +606,37 @@ self.addEventListener('error', reportError);
 self.addEventListener('unhandledrejection', reportError);
 self.addEventListener('messageerror', reportError);
 
+const sendPlayerPlay = () => {
+  sendRealtimeJson({ type: 'player.play' });
+};
+
+const sendPlayerRecord = () => {
+  sendRealtimeJson({ type: 'player.record' });
+};
+
+const sendPlayerStop = () => {
+  sendRealtimeJson({ type: 'player.stop' });
+};
+
+const sendPlayerFrameIndex = (message: {
+  frameIndex: number;
+  frozen: boolean;
+  revision: number;
+  source: 'playback' | 'user';
+}) => {
+  sendRealtimeJson({
+    type: 'player.frameIndex',
+    frameIndex: message.frameIndex,
+    frozen: message.frozen,
+    revision: message.revision,
+    source: message.source,
+  });
+};
+
+const sendPlayerSyncRequest = () => {
+  sendRealtimeJson({ type: 'player.sync.request' });
+};
+
 const bindRuntimeHandlers = () => {
   port.bindHandlers({
     mount: async (message) => {
@@ -554,6 +648,7 @@ const bindRuntimeHandlers = () => {
         port.methods.mounted({
           frameCount: mounted?.frameCount ?? 0,
         });
+        sendPlayerSyncRequest();
       } catch (error) {
         console.error('Failed to load and decode project audio track', error);
         port.methods.setState({
@@ -568,6 +663,11 @@ const bindRuntimeHandlers = () => {
     },
     startRecordingStream,
     finishRecordingStream,
+    sendPlayerPlay,
+    sendPlayerRecord,
+    sendPlayerStop,
+    sendPlayerFrameIndex,
+    sendPlayerSyncRequest,
   });
 };
 

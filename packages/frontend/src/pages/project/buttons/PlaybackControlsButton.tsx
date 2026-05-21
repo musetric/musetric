@@ -19,6 +19,7 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
   const frameCount = useEngineStore((state) => state.frameCount);
   const playing = useEngineStore((state) => state.playing);
   const recording = useEngineStore((state) => state.recording);
+  const isSlave = useEngineStore((state) => state.isSlave);
   const playerCommandPending = useEngineStore(
     (state) => state.playerCommandPending,
   );
@@ -35,9 +36,11 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
     !frameCount ||
     realtimeFailed ||
     tempoBpm !== sourceTempoBpm ||
-    transposeSemitones !== 0;
-  const playbackDisabled =
-    !frameCount || realtimeFailed || playerCommandPending;
+    transposeSemitones !== 0 ||
+    isSlave;
+  const playDisabled =
+    !frameCount || realtimeFailed || playerCommandPending || isSlave;
+  const stopDisabled = !frameCount || realtimeFailed || playerCommandPending;
 
   const getBorderColor = () => {
     if (!frameCount) {
@@ -89,7 +92,7 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       )}
       {!active && (
         <IconButton
-          disabled={playbackDisabled}
+          disabled={playDisabled}
           onClick={() => {
             void engine.player.play();
           }}
@@ -108,7 +111,7 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       {active && (
         <IconButton
           color={recording ? 'error' : undefined}
-          disabled={playbackDisabled}
+          disabled={stopDisabled}
           onClick={() => {
             void engine.player.stop();
           }}

@@ -17,6 +17,7 @@ export type EngineSeekOrigin =
   | 'playbackEnd'
   | 'player'
   | 'playerProgress'
+  | 'remote'
   | 'spectrogramVisualization'
   | 'subtitle'
   | 'tracksVisualization';
@@ -35,7 +36,10 @@ export type EngineState = {
   playing: boolean;
   frozen: boolean;
   recording: boolean;
+  isSlave: boolean;
   playerCommandPending: boolean;
+  playerFrameIndexPending: boolean;
+  backendRevision: number;
   frameIndex: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
