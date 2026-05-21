@@ -35,6 +35,16 @@ export type EngineDecoderOutboundMethods = {
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;
+  sendPlayerPlay: () => void;
+  sendPlayerRecord: () => void;
+  sendPlayerStop: () => void;
+  sendPlayerFrameIndex: (message: {
+    frameIndex: number;
+    frozen: boolean;
+    revision: number;
+    source: 'playback' | 'user';
+  }) => void;
+  sendPlayerSyncRequest: () => void;
 };
 
 export type EngineDecoderInboundMethods = {
@@ -48,6 +58,24 @@ export type EngineDecoderInboundMethods = {
   recordingPeaksChanged: (message: {
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
+  }) => void;
+  playerPlayRequested: () => void;
+  playerRecordRequested: () => void;
+  playerStopRequested: () => void;
+  playerFrameIndexChanged: (message: {
+    frameIndex: number;
+    frozen: boolean;
+    revision: number;
+    source: 'playback' | 'user';
+  }) => void;
+  playerRevisionChanged: (message: { revision: number }) => void;
+  playerSyncState: (message: {
+    isSlave: boolean;
+    playing: boolean;
+    recording: boolean;
+    frozen: boolean;
+    frameIndex: number;
+    revision: number;
   }) => void;
 };
 
@@ -65,6 +93,12 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingStreamFinished',
       'recordingStreamFailed',
       'recordingPeaksChanged',
+      'playerPlayRequested',
+      'playerRecordRequested',
+      'playerStopRequested',
+      'playerFrameIndexChanged',
+      'playerRevisionChanged',
+      'playerSyncState',
     ],
   },
   outbound: {
@@ -74,6 +108,11 @@ export const engineDecoderChannel = createMessageChannel<
       'unmount',
       'startRecordingStream',
       'finishRecordingStream',
+      'sendPlayerPlay',
+      'sendPlayerRecord',
+      'sendPlayerStop',
+      'sendPlayerFrameIndex',
+      'sendPlayerSyncRequest',
     ],
     transfers: {
       boot: (message) => [message.playerPort, message.spectrogramPort],

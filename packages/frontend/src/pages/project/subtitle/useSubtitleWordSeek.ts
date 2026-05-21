@@ -71,8 +71,7 @@ export const useSubtitleWordSeek = (options: UseSubtitleWordSeekOptions) => {
 
       engine.player.seek(frameIndex, 'subtitle');
       skippedFollowScrollSegmentIndexRef.current = clickedSegmentIndex;
-      skippedSeekRevisionRef.current =
-        engine.store.get().seekEvent.revision + 1;
+      skippedSeekRevisionRef.current = engine.store.get().seekEvent.revision;
 
       if (
         !isSubtitleListPointerBelowCenter(subtitleListElement, event.clientY)

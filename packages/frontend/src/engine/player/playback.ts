@@ -7,6 +7,7 @@ import {
 import {
   type ControlledPromise,
   createControlledPromise,
+  nextNumber,
 } from '@musetric/resource-utils';
 import type { Store } from '../../common/store.js';
 import { type EngineState } from '../state.js';
@@ -59,6 +60,8 @@ export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   store: Store<EngineState>;
   decoderPort: MessagePort;
+  onFrameIndexChanged?: (frameIndex: number) => void;
+  onPlaybackEnded?: () => void;
 };
 
 type PlayingWaiter = {
@@ -69,7 +72,8 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, store, decoderPort } = options;
+  const { context, store, decoderPort, onFrameIndexChanged } = options;
+  const { onPlaybackEnded } = options;
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
     numberOfInputs: 1,
@@ -94,18 +98,22 @@ export const createEnginePlayback = async (
       recordingFlushPromise = undefined;
     },
     setPlaying: (message) => {
-      if (isCurrentRevision(message.revision)) {
+      const currentRevision = isCurrentRevision(message.revision);
+      if (currentRevision) {
         store.update((state) => {
           state.playing = message.playing;
           state.frameIndex = message.frameIndex;
           if (message.positionJump) {
             state.seekEvent = {
-              revision: state.seekEvent.revision + 1,
+              revision: nextNumber(state.seekEvent.revision),
               frameIndex: message.frameIndex,
               origin: 'playbackEnd',
             };
           }
         });
+      }
+      if (currentRevision && !message.playing && message.positionJump) {
+        onPlaybackEnded?.();
       }
       if (playingWaiter?.revision === message.revision) {
         playingWaiter.resolve(message.frameIndex);
@@ -120,6 +128,7 @@ export const createEnginePlayback = async (
       store.update((state) => {
         state.frameIndex = message.frameIndex;
       });
+      onFrameIndexChanged?.(message.frameIndex);
     },
   });
 
