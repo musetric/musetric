@@ -8,36 +8,36 @@ import {
   type ControlledPromise,
   createControlledPromise,
 } from '@musetric/resource-utils';
-import type { Store } from '../common/store.js';
+import type { Store } from '../../common/store.js';
+import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
-import { type EngineState } from './state.js';
 
-export type EnginePlayer = {
+export type EnginePlayback = {
   boot: () => Promise<void>;
   play: () => Promise<void>;
-  pause: () => Promise<number>;
+  stop: () => Promise<number>;
   setFrozen: (frozen: boolean) => void;
   seek: (frameIndex: number) => void;
   connectRecordingSource: (source: AudioNode) => () => void;
   startRecording: (options: {
     frameIndex: number;
+    revision: number;
     latencyFrameCount: number;
     samples: Float32Array<SharedArrayBuffer>;
     metadata: Int32Array<SharedArrayBuffer>;
     notificationPort: MessagePort;
   }) => void;
-  seekRecording: (frameIndex: number) => void;
   flushRecording: () => Promise<number>;
 };
 
-export const createEngineStubPlayer = (): EnginePlayer => ({
+export const createEngineStubPlayback = (): EnginePlayback => ({
   boot: async () => {
     // nothing
   },
   play: async () => {
     // nothing
   },
-  pause: async () => Promise.resolve(0),
+  stop: async () => Promise.resolve(0),
   setFrozen: () => {
     // nothing
   },
@@ -52,21 +52,23 @@ export const createEngineStubPlayer = (): EnginePlayer => ({
   startRecording: () => {
     // nothing
   },
-  seekRecording: () => {
-    // nothing
-  },
   flushRecording: async () => Promise.resolve(0),
 });
 
-export type CreateEnginePlayerOptions = {
+export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   store: Store<EngineState>;
   decoderPort: MessagePort;
 };
 
-export const createEnginePlayer = async (
-  options: CreateEnginePlayerOptions,
-): Promise<EnginePlayer> => {
+type PlayingWaiter = {
+  revision: number;
+  resolve: (frameIndex: number) => void;
+};
+
+export const createEnginePlayback = async (
+  options: CreateEnginePlaybackOptions,
+): Promise<EnginePlayback> => {
   const { context, store, decoderPort } = options;
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
@@ -77,8 +79,11 @@ export const createEnginePlayer = async (
   node.connect(context.destination);
   const port = playerChannel.outbound(node.port);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
-  let pausePromise: ControlledPromise<number> | undefined = undefined;
+  let playingWaiter: PlayingWaiter | undefined = undefined;
   let recordingFlushPromise: ControlledPromise<number> | undefined = undefined;
+
+  const isCurrentRevision = (revision: number) =>
+    store.get().seekEvent.revision === revision;
 
   port.bindHandlers({
     booted: () => {
@@ -89,24 +94,31 @@ export const createEnginePlayer = async (
       recordingFlushPromise = undefined;
     },
     setPlaying: (message) => {
-      store.update((state) => {
-        state.playing = message.playing;
-        state.frameIndex = message.frameIndex;
-        if (message.positionJump) {
-          state.seekRevision += 1;
-        }
-      });
-      if (!message.playing) {
-        pausePromise?.resolve(message.frameIndex);
-        pausePromise = undefined;
+      if (isCurrentRevision(message.revision)) {
+        store.update((state) => {
+          state.playing = message.playing;
+          state.frameIndex = message.frameIndex;
+          if (message.positionJump) {
+            state.seekEvent = {
+              revision: state.seekEvent.revision + 1,
+              frameIndex: message.frameIndex,
+              origin: 'playbackEnd',
+            };
+          }
+        });
+      }
+      if (playingWaiter?.revision === message.revision) {
+        playingWaiter.resolve(message.frameIndex);
+        playingWaiter = undefined;
       }
     },
     setFrameIndex: (message) => {
+      if (!isCurrentRevision(message.revision)) {
+        return;
+      }
+
       store.update((state) => {
         state.frameIndex = message.frameIndex;
-        if (message.positionJump) {
-          state.seekRevision += 1;
-        }
       });
     },
   });
@@ -153,7 +165,16 @@ export const createEnginePlayer = async (
     },
   );
 
-  const ref: EnginePlayer = {
+  const createPlayingPromise = async (revision: number) => {
+    const playingPromise = createControlledPromise<number>();
+    playingWaiter = {
+      revision,
+      resolve: playingPromise.resolve,
+    };
+    return playingPromise.promise;
+  };
+
+  const ref: EnginePlayback = {
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
@@ -165,13 +186,16 @@ export const createEnginePlayer = async (
       if (context.state === 'suspended') {
         await context.resume();
       }
-      port.methods.play();
+      const { revision } = store.get().seekEvent;
+      const playingPromise = createPlayingPromise(revision);
+      port.methods.play({ revision });
+      await playingPromise;
     },
-    pause: async () => {
-      pausePromise = createControlledPromise<number>();
-      const currentPromise = pausePromise;
-      port.methods.pause();
-      return await currentPromise.promise;
+    stop: async () => {
+      const { revision } = store.get().seekEvent;
+      const playingPromise = createPlayingPromise(revision);
+      port.methods.stop({ revision });
+      return await playingPromise;
     },
     setFrozen: (frozen) => {
       store.update((state) => {
@@ -180,8 +204,10 @@ export const createEnginePlayer = async (
       port.methods.setFrozen({ frozen });
     },
     seek: (nextFrameIndex) => {
+      const { revision } = store.get().seekEvent;
       port.methods.seek({
         frameIndex: nextFrameIndex,
+        revision,
       });
     },
     connectRecordingSource: (source) => {
@@ -192,11 +218,6 @@ export const createEnginePlayer = async (
     },
     startRecording: (recording) => {
       port.methods.startRecording(recording);
-    },
-    seekRecording: (frameIndex) => {
-      port.methods.seekRecording({
-        frameIndex,
-      });
     },
     flushRecording: async () => {
       recordingFlushPromise = createControlledPromise<number>();

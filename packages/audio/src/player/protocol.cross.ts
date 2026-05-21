@@ -6,22 +6,22 @@ export const playerProcessorName = 'player-processor';
 
 export type PlayerOutboundMethods = {
   boot: (message: { dataPort: MessagePort }) => void;
-  play: () => void;
-  pause: () => void;
+  play: (message: { revision: number }) => void;
+  stop: (message: { revision: number }) => void;
   setFrozen: (message: { frozen: boolean }) => void;
-  seek: (message: { frameIndex: number }) => void;
+  seek: (message: { frameIndex: number; revision: number }) => void;
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
   setTrackVolume: (message: { stemType: StemType; volume: number }) => void;
   setRecordingVolume: (message: { volume: number }) => void;
   startRecording: (message: {
     frameIndex: number;
+    revision: number;
     latencyFrameCount: number;
     samples: Float32Array<SharedArrayBuffer>;
     metadata: Int32Array<SharedArrayBuffer>;
     notificationPort: MessagePort;
   }) => void;
-  seekRecording: (message: { frameIndex: number }) => void;
   flushRecording: () => void;
 };
 
@@ -30,9 +30,14 @@ export type PlayerInboundMethods = {
   setPlaying: (message: {
     playing: boolean;
     frameIndex: number;
+    revision: number;
     positionJump?: true;
   }) => void;
-  setFrameIndex: (message: { frameIndex: number; positionJump?: true }) => void;
+  setFrameIndex: (message: {
+    frameIndex: number;
+    revision: number;
+    positionJump?: true;
+  }) => void;
   recordingFlushed: (message: { sequence: number }) => void;
 };
 
@@ -48,14 +53,13 @@ export const playerChannel = createMessageChannel<
       'boot',
       'play',
       'seek',
-      'pause',
+      'stop',
       'setFrozen',
       'setTransposeSemitones',
       'setTempoRatio',
       'setTrackVolume',
       'setRecordingVolume',
       'startRecording',
-      'seekRecording',
       'flushRecording',
     ],
     transfers: {

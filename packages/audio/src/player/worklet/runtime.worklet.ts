@@ -38,6 +38,7 @@ export const createPlayerRuntime = async (
   let tracks: Record<StemType | 'recording', Float32Array[]> | undefined =
     undefined;
   let frameIndex = 0;
+  let revision = 0;
   let playing = false;
   let frozen = false;
   const trackVolumes: Partial<Record<StemType, number>> = {};
@@ -131,7 +132,7 @@ export const createPlayerRuntime = async (
       tracks = message.tracks;
       frameIndex = 0;
       playing = false;
-      port.methods.setPlaying({ playing, frameIndex });
+      port.methods.setPlaying({ playing, frameIndex, revision });
     },
     patchRecordingTrack: (message) => {
       const track = tracks?.recording;
@@ -167,23 +168,26 @@ export const createPlayerRuntime = async (
       playing = false;
       frameIndexTracker.reset();
       timePitchProcessor.reset();
-      port.methods.setPlaying({ playing, frameIndex });
+      port.methods.setPlaying({ playing, frameIndex, revision });
     },
   });
 
   port.bindHandlers({
-    play: () => {
+    play: (message) => {
+      revision = message.revision;
       if (!tracks) {
+        port.methods.setPlaying({ playing, frameIndex, revision });
         return;
       }
 
       playing = true;
-      port.methods.setPlaying({ playing, frameIndex });
+      port.methods.setPlaying({ playing, frameIndex, revision });
     },
-    pause: () => {
+    stop: (message) => {
+      revision = message.revision;
       playing = false;
       frameIndexTracker.reset();
-      port.methods.setPlaying({ playing, frameIndex });
+      port.methods.setPlaying({ playing, frameIndex, revision });
     },
     setFrozen: (message) => {
       frozen = message.frozen;
@@ -191,6 +195,7 @@ export const createPlayerRuntime = async (
       timePitchProcessor.reset();
     },
     seek: (message) => {
+      revision = message.revision;
       frameIndex = message.frameIndex;
       if (recordingNotificationPort) {
         flushRecordingBuffer();
@@ -198,7 +203,6 @@ export const createPlayerRuntime = async (
       }
       frameIndexTracker.reset();
       timePitchProcessor.reset();
-      port.methods.setFrameIndex({ frameIndex, positionJump: true });
     },
     setTransposeSemitones: (message) => {
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
@@ -213,6 +217,7 @@ export const createPlayerRuntime = async (
       recordingVolume = message.volume;
     },
     startRecording: (message) => {
+      revision = message.revision;
       flushRecordingBuffer();
       recordingSamples = message.samples;
       recordingMetadata = message.metadata;
@@ -223,10 +228,6 @@ export const createPlayerRuntime = async (
       recordingSequence = 0;
       setRecordingWriteFrameIndex(message.frameIndex);
       Atomics.store(recordingMetadata, 0, recordingBufferFrameIndex);
-    },
-    seekRecording: (message) => {
-      flushRecordingBuffer();
-      setRecordingWriteFrameIndex(message.frameIndex);
     },
     flushRecording: () => {
       const sequence = flushRecordingBuffer() + 1;
@@ -315,12 +316,17 @@ export const createPlayerRuntime = async (
         playing = false;
         frameIndexTracker.reset();
         timePitchProcessor.reset();
-        port.methods.setPlaying({ playing, frameIndex, positionJump: true });
+        port.methods.setPlaying({
+          playing,
+          frameIndex,
+          revision,
+          positionJump: true,
+        });
         return;
       }
 
       if (frameIndexTracker.advance(outputs[0].length)) {
-        port.methods.setFrameIndex({ frameIndex });
+        port.methods.setFrameIndex({ frameIndex, revision });
       }
     },
   };

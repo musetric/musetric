@@ -41,7 +41,7 @@ export const ProjectTracksVisualization: FC = () => {
         });
         const newFrameIndex = frameLimit.clamp(Math.round(frameIndex));
 
-        engine.player.seek(newFrameIndex);
+        engine.player.seek(newFrameIndex, 'tracksVisualization');
       },
     });
 

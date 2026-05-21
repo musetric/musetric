@@ -88,7 +88,7 @@ export const PlayerProgress: FC = () => {
           }
 
           const frameIndex = Math.round((value / progressScale) * frameCount);
-          engine.player.seek(frameIndex);
+          engine.player.seek(frameIndex, 'playerProgress');
         }}
       />
       <Typography

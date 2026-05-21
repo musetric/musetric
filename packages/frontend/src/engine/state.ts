@@ -13,6 +13,20 @@ export type EngineStatuses = {
   waveform: WaveformStatuses;
 };
 
+export type EngineSeekOrigin =
+  | 'playbackEnd'
+  | 'player'
+  | 'playerProgress'
+  | 'spectrogramVisualization'
+  | 'subtitle'
+  | 'tracksVisualization';
+
+export type EngineSeekEvent = {
+  revision: number;
+  frameIndex: number;
+  origin: EngineSeekOrigin;
+};
+
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
@@ -21,8 +35,9 @@ export type EngineState = {
   playing: boolean;
   frozen: boolean;
   recording: boolean;
+  playerCommandPending: boolean;
   frameIndex: number;
-  seekRevision: number;
+  seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   sourceTempoBpm: number;
   tempoBpm: number;

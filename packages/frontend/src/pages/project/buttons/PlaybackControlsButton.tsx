@@ -1,6 +1,6 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
-import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import StopRoundedIcon from '@mui/icons-material/StopRounded';
 import { Box, IconButton } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,9 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
   const frameCount = useEngineStore((state) => state.frameCount);
   const playing = useEngineStore((state) => state.playing);
   const recording = useEngineStore((state) => state.recording);
+  const playerCommandPending = useEngineStore(
+    (state) => state.playerCommandPending,
+  );
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
@@ -33,7 +36,8 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
     realtimeFailed ||
     tempoBpm !== sourceTempoBpm ||
     transposeSemitones !== 0;
-  const playbackDisabled = !frameCount || realtimeFailed;
+  const playbackDisabled =
+    !frameCount || realtimeFailed || playerCommandPending;
 
   const getBorderColor = () => {
     if (!frameCount) {
@@ -59,9 +63,9 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
       {!active && (
         <IconButton
           color='error'
-          disabled={recordingDisabled}
+          disabled={recordingDisabled || playerCommandPending}
           onClick={() => {
-            void engine.recorder.start(projectId);
+            void engine.player.record(projectId);
           }}
           size='small'
           sx={{
@@ -106,11 +110,7 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
           color={recording ? 'error' : undefined}
           disabled={playbackDisabled}
           onClick={() => {
-            if (recording) {
-              void engine.recorder.stop();
-              return;
-            }
-            void engine.player.pause();
+            void engine.player.stop();
           }}
           size='small'
           sx={{
@@ -119,9 +119,9 @@ export const PlaybackControlsButton: FC<PlaybackControlsButtonProps> = (
             flex: 1,
             mx: -0.5,
           }}
-          title={t('pages.project.player.controls.pause')}
+          title={t('pages.project.player.controls.stop')}
         >
-          <PauseRoundedIcon />
+          <StopRoundedIcon />
         </IconButton>
       )}
     </Box>
