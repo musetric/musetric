@@ -13,9 +13,20 @@ export type StateColors = {
 export const createColorsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: SpectrogramConfig): StateColors => {
-      const array = new Float32Array(8);
+      const array = new Float32Array(16);
       const { colors } = config;
-      array.set([...toVec4(colors.foreground), ...toVec4(colors.background)]);
+      const frequencyMap = [
+        Math.log(config.minFrequency),
+        Math.log(config.maxFrequency) - Math.log(config.minFrequency),
+        0,
+        0,
+      ] as const;
+      array.set([
+        ...toVec4(colors.foreground),
+        ...toVec4(colors.background),
+        ...toVec4(colors.primary),
+        ...frequencyMap,
+      ]);
       const buffer = device.createBuffer({
         label: 'draw-colors-buffer',
         size: array.byteLength,
@@ -32,5 +43,8 @@ export const createColorsCell = (device: GPUDevice) =>
     },
     equals: (current, next) =>
       current.colors.foreground === next.colors.foreground &&
-      current.colors.background === next.colors.background,
+      current.colors.background === next.colors.background &&
+      current.colors.primary === next.colors.primary &&
+      current.minFrequency === next.minFrequency &&
+      current.maxFrequency === next.maxFrequency,
   });

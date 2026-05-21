@@ -52,6 +52,7 @@ export const createSpectrogramProcessor = (
     runtime.fourier.forward(encoder);
     runtime.magnitudify.run(encoder);
     runtime.decibelify.run(encoder);
+    runtime.fundamentalFrequency.run(encoder);
     runtime.remap.run(encoder);
     runtime.draw.run(encoder);
     timer.resolve(encoder);

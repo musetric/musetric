@@ -1,15 +1,15 @@
-import { type ViewColors } from '../common/colors.es.js';
+import { type WaveformColors } from '../common/colors.es.js';
 import { createWaveformDraw } from './draw.js';
 import { generateWaveformSegments } from './generateSegments.js';
 
 export type WaveformProcessor = {
-  setColors: (colors: ViewColors) => void;
+  setColors: (colors: WaveformColors) => void;
   render: (wavePeaks: Float32Array) => void;
 };
 
 export const createWaveformProcessor = (
   canvas: OffscreenCanvas,
-  presetColors: ViewColors,
+  presetColors: WaveformColors,
 ): WaveformProcessor => {
   const draw = createWaveformDraw(canvas);
   let colors = presetColors;
