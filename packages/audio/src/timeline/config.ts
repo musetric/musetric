@@ -11,6 +11,8 @@ export type TimelineConfig = {
   markerColor: string;
   labelColor: string;
   font: string;
+  paddingLeftFactor: number;
+  paddingRightFactor: number;
 };
 
 const requiredTimelineConfigKeys = [
@@ -23,6 +25,8 @@ const requiredTimelineConfigKeys = [
   'markerColor',
   'labelColor',
   'font',
+  'paddingLeftFactor',
+  'paddingRightFactor',
 ] as const;
 
 const isTimelineConfigComplete = (

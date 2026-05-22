@@ -83,9 +83,16 @@ export const createSpectrogramConfigurator = (
       return undefined;
     }
     draftConfig = undefined;
+    const totalFactor =
+      1 + baseConfig.paddingLeftFactor + baseConfig.paddingRightFactor;
+    const paddedViewSize = {
+      width: Math.round(baseConfig.viewSize.width * totalFactor),
+      height: baseConfig.viewSize.height,
+    };
     return {
       ...baseConfig,
-      windowCount: baseConfig.viewSize.width,
+      viewSize: paddedViewSize,
+      windowCount: paddedViewSize.width,
     };
   };
 

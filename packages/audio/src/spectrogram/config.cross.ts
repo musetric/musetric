@@ -36,6 +36,8 @@ export type SpectrogramConfig = {
   maxFrequency: number;
   viewSize: ViewSize;
   colors: ViewColors;
+  paddingLeftFactor: number;
+  paddingRightFactor: number;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
@@ -51,6 +53,8 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'maxFrequency',
   'viewSize',
   'colors',
+  'paddingLeftFactor',
+  'paddingRightFactor',
 ]);
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>

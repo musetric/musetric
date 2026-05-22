@@ -4,6 +4,8 @@ import {
   createControlledPromise,
 } from '@musetric/resource-utils';
 import {
+  createCanvasCache,
+  defaultCacheConfig,
   getCanvasSize,
   subscribeResizeObserver,
 } from '@musetric/resource-utils/dom';
@@ -17,7 +19,7 @@ export type EngineSpectrogram = {
   port: ReturnType<typeof spectrogramChannel.outbound<Worker>>;
   boot: () => Promise<void>;
   mount: (
-    canvas: HTMLCanvasElement,
+    container: HTMLElement,
     config: Partial<SpectrogramConfig>,
   ) => Unmount;
   setConfig: (patch: Partial<SpectrogramConfig>) => void;
@@ -42,6 +44,9 @@ export const createEngineSpectrogram = (
     });
   };
 
+  const cache = createCanvasCache(defaultCacheConfig);
+  let lastRenderedProgress = -1;
+
   port.bindHandlers({
     booted: () => {
       bootPromise.resolve();
@@ -50,13 +55,27 @@ export const createEngineSpectrogram = (
       store.update((state) => {
         state.statuses.spectrogram = message.status;
       });
+
+      if (message.status === 'success' && lastRenderedProgress >= 0) {
+        cache.updateCache(lastRenderedProgress);
+      }
     },
   });
 
+  let containerRef: HTMLElement | undefined = undefined;
+  let canvasRef: HTMLCanvasElement | undefined = undefined;
+
   store.subscribe(getTrackProgress, (trackProgress) => {
-    port.methods.setTrackProgress({
-      trackProgress,
-    });
+    if (!containerRef || !canvasRef) return;
+
+    if (cache.shouldRender(trackProgress)) {
+      lastRenderedProgress = trackProgress;
+      port.methods.setTrackProgress({
+        trackProgress,
+      });
+    }
+
+    cache.updateTransform(trackProgress, containerRef, canvasRef);
   });
 
   store.subscribe(
@@ -77,7 +96,16 @@ export const createEngineSpectrogram = (
 
       return bootPromise.promise;
     },
-    mount: (canvas, config) => {
+    mount: (container, config) => {
+      containerRef = container;
+      const canvas = container.querySelector('canvas');
+      if (!canvas) {
+        return () => {
+          containerRef = undefined;
+        };
+      }
+      canvasRef = canvas;
+
       const viewSize = getCanvasSize(canvas);
       const offscreenCanvas = canvas.transferControlToOffscreen();
 
@@ -88,19 +116,30 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: store.get().colors,
           sampleRate,
+          paddingLeftFactor: defaultCacheConfig.paddingLeftFactor,
+          paddingRightFactor: defaultCacheConfig.paddingRightFactor,
         },
         trackProgress: getTrackProgress(store.get()),
       });
 
-      const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
-        port.methods.updateConfig({
-          patch: { viewSize: getCanvasSize(canvas) },
-        });
-      });
+      lastRenderedProgress = getTrackProgress(store.get());
+
+      const unsubscribeResizeObserver = subscribeResizeObserver(
+        container,
+        () => {
+          cache.invalidate();
+          port.methods.updateConfig({
+            patch: { viewSize: getCanvasSize(canvas) },
+          });
+        },
+      );
 
       return () => {
         unsubscribeResizeObserver();
         port.methods.unmount();
+        cache.invalidate();
+        containerRef = undefined;
+        canvasRef = undefined;
         store.update((state) => {
           state.statuses.spectrogram = 'pending';
         });

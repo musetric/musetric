@@ -30,12 +30,15 @@ const getCurrentTime = (config: TimelineConfig) => {
 const getTimelineWindow = (config: TimelineConfig): TimelineWindow => {
   if (config.mode === 'spectrogram') {
     const currentTime = getCurrentTime(config);
-    const start = currentTime - config.visibleTime * config.playheadRatio;
+    const totalFactor =
+      1 + config.paddingLeftFactor + config.paddingRightFactor;
+    const paddedVisibleTime = config.visibleTime * totalFactor;
+    const start = currentTime - paddedVisibleTime * config.playheadRatio;
 
     return {
       start,
-      end: start + config.visibleTime,
-      duration: config.visibleTime,
+      end: start + paddedVisibleTime,
+      duration: paddedVisibleTime,
     };
   }
 
