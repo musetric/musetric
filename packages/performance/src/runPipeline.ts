@@ -37,6 +37,7 @@ export const runPipeline = async (
     colors: {
       background: '#000000',
       foreground: '#888888',
+      primary: '#1976d2',
     },
   };
   const processor = createSpectrogramProcessor({

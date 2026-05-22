@@ -1,4 +1,4 @@
-import { type StemType, type ViewColors } from '@musetric/audio';
+import { type SpectrogramColors, type StemType } from '@musetric/audio';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -31,7 +31,7 @@ export type EngineSeekEvent = {
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
-  colors: ViewColors;
+  colors: SpectrogramColors;
   duration: number;
   playing: boolean;
   frozen: boolean;

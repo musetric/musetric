@@ -4,9 +4,13 @@ export type Rgb = {
   blue: number;
 };
 
-export type ViewColors = {
+export type WaveformColors = {
   foreground: string;
   background: string;
+};
+
+export type SpectrogramColors = WaveformColors & {
+  primary: string;
 };
 
 export const parseHexColor = (hex: string): Rgb => {

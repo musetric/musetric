@@ -1,8 +1,8 @@
-import { type ViewColors } from '../common/colors.es.js';
+import { type WaveformColors } from '../common/colors.es.js';
 import { type WaveformSegment } from './generateSegments.js';
 
 export type WaveformDraw = {
-  run: (segments: WaveformSegment[], colors: ViewColors) => void;
+  run: (segments: WaveformSegment[], colors: WaveformColors) => void;
 };
 
 const drawWaveform = (

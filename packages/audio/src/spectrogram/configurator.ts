@@ -16,6 +16,10 @@ import {
 import { createFourierCell } from './fourier/cell.js';
 import type { Fourier } from './fourier/types.js';
 import {
+  createSpectrogramFundamentalFrequencyCell,
+  type SpectrogramFundamentalFrequency,
+} from './fundamentalFrequency/index.js';
+import {
   createSpectrogramMagnitudifyCell,
   type SpectrogramMagnitudify,
 } from './magnitudify/index.js';
@@ -43,6 +47,7 @@ export type SpectrogramRuntime = {
   fourier: Fourier;
   magnitudify: SpectrogramMagnitudify;
   decibelify: SpectrogramDecibelify;
+  fundamentalFrequency: SpectrogramFundamentalFrequency;
   remap: SpectrogramRemap;
   draw: SpectrogramDraw;
 };
@@ -73,6 +78,10 @@ export const createSpectrogramConfigurator = (
     }),
     magnitudify: createSpectrogramMagnitudifyCell(device, markers.magnitudify),
     decibelify: createSpectrogramDecibelifyCell(device, markers.decibelify),
+    fundamentalFrequency: createSpectrogramFundamentalFrequencyCell(
+      device,
+      markers.fundamentalFrequency,
+    ),
     remap: createSpectrogramRemapCell(device, markers.remap),
     draw: createSpectrogramDrawCell(device, markers.draw),
   };
@@ -112,7 +121,15 @@ export const createSpectrogramConfigurator = (
         texture: texture.view,
         config,
       });
-      const draw = cells.draw.get({ view: texture.view, config });
+      const fundamentalFrequency = cells.fundamentalFrequency.get({
+        signal: signal.real,
+        config,
+      });
+      const draw = cells.draw.get({
+        view: texture.view,
+        fundamentalFrequencies: fundamentalFrequency.buffer,
+        config,
+      });
 
       runtime = {
         state,
@@ -121,6 +138,7 @@ export const createSpectrogramConfigurator = (
         fourier,
         magnitudify,
         decibelify,
+        fundamentalFrequency,
         remap,
         draw,
       };
@@ -140,6 +158,7 @@ export const createSpectrogramConfigurator = (
       cells.fourier.dispose();
       cells.magnitudify.dispose();
       cells.decibelify.dispose();
+      cells.fundamentalFrequency.dispose();
       cells.remap.dispose();
       cells.draw.dispose();
     },

@@ -9,12 +9,12 @@ import { ViewPending } from '../../components/ViewPending.js';
 import { ProjectProgressFlow } from './Flow/ProjectProgressFlow.js';
 import { ProjectApp } from './ProjectApp.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
-import { useThemeViewColors } from './settings/theme.js';
+import { useThemeSpectrogramColors } from './settings/theme.js';
 
 export const ProjectPage: FC = () => {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  useThemeViewColors();
+  useThemeSpectrogramColors();
 
   const { projectId } = routes.project.useAssertMatch();
 

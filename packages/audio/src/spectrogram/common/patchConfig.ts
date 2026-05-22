@@ -16,6 +16,7 @@ export const applySpectrogramPatchConfig = (
         first.width === second.width && first.height === second.height,
       colors: (first, second) =>
         first.background === second.background &&
-        first.foreground === second.foreground,
+        first.foreground === second.foreground &&
+        first.primary === second.primary,
     },
   });

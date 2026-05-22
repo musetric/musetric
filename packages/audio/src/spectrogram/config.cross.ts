@@ -1,5 +1,5 @@
 import { createObjectKeys } from '@musetric/resource-utils';
-import { type ViewColors } from '../common/colors.es.js';
+import { type SpectrogramColors } from '../common/colors.es.js';
 import { extractConfig } from '../common/config.es.js';
 import { type ViewSize } from '../common/viewSize.es.js';
 
@@ -35,7 +35,7 @@ export type SpectrogramConfig = {
   minFrequency: number;
   maxFrequency: number;
   viewSize: ViewSize;
-  colors: ViewColors;
+  colors: SpectrogramColors;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
