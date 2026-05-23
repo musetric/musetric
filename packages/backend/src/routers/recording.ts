@@ -42,11 +42,6 @@ type PlayerRuntimeState = {
 type ProjectRealtimeEvent =
   | { type: 'recording.started' }
   | {
-      type: 'recording.chunkCommitted';
-      frameIndex: number;
-      samplesBase64: string;
-    }
-  | {
       type: 'recording.peaksChanged';
       startPeakIndex: number;
       peaks: number[];
@@ -75,6 +70,22 @@ type ProjectRealtimeEvent =
 
 const streamPacketHeaderByteLength = 8;
 const maxStreamPacketByteLength = 1024 * 1024;
+
+const createRecordingChunkPacket = (
+  frameIndex: number,
+  samples: Float32Array,
+) => {
+  const packet = Buffer.allocUnsafe(
+    streamPacketHeaderByteLength + samples.byteLength,
+  );
+  packet.writeUInt32LE(frameIndex, 0);
+  packet.writeUInt32LE(samples.length, 4);
+  Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength).copy(
+    packet,
+    streamPacketHeaderByteLength,
+  );
+  return packet;
+};
 
 export const recordingRouter: FastifyPluginCallbackZod = (app) => {
   const sessions = new Map<string, RecordingSession>();
@@ -375,6 +386,14 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
     socket.send(JSON.stringify(event));
   };
 
+  const sendRealtimePacket = (socket: WebSocket, packet: Buffer) => {
+    if (socket.readyState !== 1) {
+      return;
+    }
+
+    socket.send(packet);
+  };
+
   const broadcastRealtimeEvent = (
     projectId: number,
     event: ProjectRealtimeEvent,
@@ -386,6 +405,23 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
 
     for (const socket of sockets) {
       sendRealtimeEvent(socket, event);
+    }
+  };
+
+  const broadcastRealtimePacketExcluding = (
+    projectId: number,
+    packet: Buffer,
+    excludeSocket: WebSocket,
+  ) => {
+    const sockets = projectRealtimeSockets.get(projectId);
+    if (!sockets) {
+      return;
+    }
+
+    for (const socket of sockets) {
+      if (socket !== excludeSocket) {
+        sendRealtimePacket(socket, packet);
+      }
     }
   };
 
@@ -585,15 +621,11 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
                 if (!result) {
                   return;
                 }
-                broadcastRealtimeEvent(projectId, {
-                  type: 'recording.chunkCommitted',
-                  frameIndex: result.frameIndex,
-                  samplesBase64: Buffer.from(
-                    result.chunk.buffer,
-                    result.chunk.byteOffset,
-                    result.chunk.byteLength,
-                  ).toString('base64'),
-                });
+                broadcastRealtimePacketExcluding(
+                  projectId,
+                  createRecordingChunkPacket(result.frameIndex, result.chunk),
+                  socket,
+                );
                 if (result.peakPatch) {
                   broadcastRealtimeEvent(projectId, {
                     type: 'recording.peaksChanged',
