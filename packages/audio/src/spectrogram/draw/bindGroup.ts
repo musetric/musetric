@@ -1,9 +1,9 @@
 import { createResourceCell } from '@musetric/resource-utils';
 
 export type DrawBindGroupArg = {
-  view: GPUTextureView;
-  fundamentalFrequencies: GPUBuffer;
-  recordingFrequencies: GPUBuffer;
+  arrayView: GPUTextureView;
+  leadFundamentalFrequencies: GPUBuffer;
+  recordingFundamentalFrequencies: GPUBuffer;
   colors: GPUBuffer;
   layout: GPUBindGroupLayout;
 };
@@ -17,16 +17,20 @@ export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
         entries: [
           { binding: 0, resource: { buffer: arg.colors } },
           { binding: 1, resource: sampler },
-          { binding: 2, resource: arg.view },
-          { binding: 3, resource: { buffer: arg.fundamentalFrequencies } },
-          { binding: 4, resource: { buffer: arg.recordingFrequencies } },
+          { binding: 2, resource: arg.arrayView },
+          { binding: 3, resource: { buffer: arg.leadFundamentalFrequencies } },
+          {
+            binding: 4,
+            resource: { buffer: arg.recordingFundamentalFrequencies },
+          },
         ],
       }),
     dispose: () => undefined,
     equals: (current, next) =>
-      current.view === next.view &&
-      current.fundamentalFrequencies === next.fundamentalFrequencies &&
-      current.recordingFrequencies === next.recordingFrequencies &&
+      current.arrayView === next.arrayView &&
+      current.leadFundamentalFrequencies === next.leadFundamentalFrequencies &&
+      current.recordingFundamentalFrequencies ===
+        next.recordingFundamentalFrequencies &&
       current.colors === next.colors &&
       current.layout === next.layout,
   });

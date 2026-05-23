@@ -22,11 +22,17 @@ import {
   type SpectrogramState,
 } from './state/index.js';
 
+export type SpectrogramTrack = {
+  lane: SpectrogramLane;
+  remap: SpectrogramRemap;
+};
+
 export type SpectrogramRuntime = {
   state: SpectrogramState;
-  leadLane: SpectrogramLane;
-  recordingLane: SpectrogramLane;
-  remap: SpectrogramRemap;
+  tracks: {
+    lead: SpectrogramTrack;
+    recording: SpectrogramTrack;
+  };
   draw: SpectrogramDraw;
 };
 
@@ -63,7 +69,8 @@ export const createSpectrogramConfigurator = (
       label: 'recording',
       marker: markers.recordingFundamentalFrequency,
     }),
-    remap: createSpectrogramRemapCell(device, markers.remap),
+    leadRemap: createSpectrogramRemapCell(device, markers.remap),
+    recordingRemap: createSpectrogramRemapCell(device),
     draw: createSpectrogramDrawCell(device, markers.draw),
   };
 
@@ -94,23 +101,30 @@ export const createSpectrogramConfigurator = (
       const { texture } = state;
       const leadLane = cells.leadLane.get(config);
       const recordingLane = cells.recordingLane.get(config);
-      const remap = cells.remap.get({
+      const leadRemap = cells.leadRemap.get({
         signal: leadLane.signal.real,
-        texture: texture.view,
+        texture: texture.layerViews[0],
+        config,
+      });
+      const recordingRemap = cells.recordingRemap.get({
+        signal: recordingLane.signal.real,
+        texture: texture.layerViews[1],
         config,
       });
       const draw = cells.draw.get({
-        view: texture.view,
-        fundamentalFrequencies: leadLane.fundamentalFrequencyBuffer,
-        recordingFrequencies: recordingLane.fundamentalFrequencyBuffer,
+        arrayView: texture.arrayView,
+        leadFundamentalFrequencies: leadLane.fundamentalFrequencyBuffer,
+        recordingFundamentalFrequencies:
+          recordingLane.fundamentalFrequencyBuffer,
         config,
       });
 
       runtime = {
         state,
-        leadLane,
-        recordingLane,
-        remap,
+        tracks: {
+          lead: { lane: leadLane, remap: leadRemap },
+          recording: { lane: recordingLane, remap: recordingRemap },
+        },
         draw,
       };
       return runtime;
@@ -126,7 +140,8 @@ export const createSpectrogramConfigurator = (
       cells.state.dispose();
       cells.leadLane.dispose();
       cells.recordingLane.dispose();
-      cells.remap.dispose();
+      cells.leadRemap.dispose();
+      cells.recordingRemap.dispose();
       cells.draw.dispose();
     },
   };

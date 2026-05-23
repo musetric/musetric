@@ -91,6 +91,10 @@ export const createEngineSpectrogram = (
           recordingLineWidthCents: 35,
           recordingMatchThresholdCents: 15,
           recordingCloseThresholdCents: 50,
+          showLeadSpectrogram: true,
+          showRecordingSpectrogram: false,
+          showLeadFundamental: true,
+          showRecordingFundamental: true,
         },
         trackProgress: getTrackProgress(store.get()),
       });

@@ -7,8 +7,8 @@ import { type SpectrogramConfig } from './config.cross.js';
 import {
   createSpectrogramConfigurator,
   type SpectrogramRuntime,
+  type SpectrogramTrack,
 } from './configurator.js';
-import { type SpectrogramLane } from './lane/index.js';
 
 export type SpectrogramProcessor = {
   render: (
@@ -39,15 +39,15 @@ export const createSpectrogramProcessor = (
 
   const writeBuffers = markers.writeBuffers(
     (
-      leadLane: SpectrogramLane,
-      recordingLane: SpectrogramLane,
+      leadTrack: SpectrogramTrack,
+      recordingTrack: SpectrogramTrack,
       samples: Float32Array,
       trackProgress: number,
       recordingSamples: Float32Array | undefined,
     ) => {
-      leadLane.writeSamples(samples, trackProgress);
+      leadTrack.lane.writeSamples(samples, trackProgress);
       if (recordingSamples) {
-        recordingLane.writeSamples(recordingSamples, trackProgress);
+        recordingTrack.lane.writeSamples(recordingSamples, trackProgress);
       }
     },
   );
@@ -60,13 +60,17 @@ export const createSpectrogramProcessor = (
       const encoder = device.createCommandEncoder({
         label: 'processor-render-encoder',
       });
-      runtime.leadLane.run(encoder);
+      runtime.tracks.lead.lane.run(encoder);
+      runtime.tracks.lead.remap.run(encoder);
       if (hasRecordingSamples) {
-        runtime.recordingLane.run(encoder);
+        runtime.tracks.recording.lane.run(encoder);
       } else {
-        runtime.recordingLane.skip(encoder, shouldClearRecordingFrequencies);
+        runtime.tracks.recording.lane.skip(
+          encoder,
+          shouldClearRecordingFrequencies,
+        );
       }
-      runtime.remap.run(encoder);
+      runtime.tracks.recording.remap.run(encoder);
       runtime.draw.run(encoder);
       timer.resolve(encoder);
       return encoder.finish();
@@ -93,8 +97,8 @@ export const createSpectrogramProcessor = (
         return false;
       }
       writeBuffers(
-        runtime.leadLane,
-        runtime.recordingLane,
+        runtime.tracks.lead,
+        runtime.tracks.recording,
         samples,
         trackProgress,
         recordingSamples,
