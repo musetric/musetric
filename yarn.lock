@@ -1554,6 +1554,7 @@ __metadata:
     typescript: "catalog:"
     vite: "catalog:"
     vite-plugin-mkcert: "catalog:"
+    zustand: "catalog:"
   languageName: unknown
   linkType: soft
 

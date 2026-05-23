@@ -12,7 +12,7 @@ import { createSpectrogramSliceSamplesCell } from '../sliceSamples/index.js';
 import { createSignalBufferCell } from '../state/signal.js';
 import { createSpectrogramWindowingCell } from '../windowing/index.js';
 
-export type GranularLaneMarkers = {
+export type SpectrogramLaneMarkers = {
   sliceSamples?: GPUComputePassTimestampWrites;
   windowing?: GPUComputePassTimestampWrites;
   fourierReverse?: GPUComputePassTimestampWrites;
@@ -22,17 +22,10 @@ export type GranularLaneMarkers = {
   fundamentalFrequency?: GPUComputePassTimestampWrites;
 };
 
-export type SpectrogramLanePolicy =
-  | {
-      mode: 'granular';
-      label: string;
-      markers: GranularLaneMarkers;
-    }
-  | {
-      mode: 'bulk';
-      label: string;
-      marker?: GPUComputePassTimestampWrites;
-    };
+export type SpectrogramLaneOptions = {
+  label: string;
+  markers?: SpectrogramLaneMarkers;
+};
 
 export type SpectrogramLane = {
   signal: ComplexGpuBuffer;
@@ -49,36 +42,34 @@ export type SpectrogramLaneCell = ResourceCell<
 
 export const createSpectrogramLaneCell = (
   device: GPUDevice,
-  policy: SpectrogramLanePolicy,
+  options: SpectrogramLaneOptions,
 ): SpectrogramLaneCell => {
-  const granularMarkers: GranularLaneMarkers =
-    policy.mode === 'granular' ? policy.markers : {};
-  const bulkMarker = policy.mode === 'bulk' ? policy.marker : undefined;
+  const markers: SpectrogramLaneMarkers = options.markers ?? {};
 
   const signalCell = createSignalBufferCell(device);
   const sliceSamplesCell = createSpectrogramSliceSamplesCell(
     device,
-    granularMarkers.sliceSamples,
+    markers.sliceSamples,
   );
   const windowingCell = createSpectrogramWindowingCell(
     device,
-    granularMarkers.windowing,
+    markers.windowing,
   );
   const fourierCell = createFourierCell(device, {
-    reverse: granularMarkers.fourierReverse,
-    transform: granularMarkers.fourierTransform,
+    reverse: markers.fourierReverse,
+    transform: markers.fourierTransform,
   });
   const magnitudifyCell = createSpectrogramMagnitudifyCell(
     device,
-    granularMarkers.magnitudify,
+    markers.magnitudify,
   );
   const decibelifyCell = createSpectrogramDecibelifyCell(
     device,
-    granularMarkers.decibelify,
+    markers.decibelify,
   );
   const fundamentalFrequencyCell = createSpectrogramFundamentalFrequencyCell(
     device,
-    granularMarkers.fundamentalFrequency,
+    markers.fundamentalFrequency,
   );
 
   const laneCell = createResourceCell<ExtSpectrogramConfig, SpectrogramLane>({
@@ -100,7 +91,7 @@ export const createSpectrogramLaneCell = (
         config,
       });
 
-      const runGranular = (encoder: GPUCommandEncoder) => {
+      const run = (encoder: GPUCommandEncoder) => {
         sliceSamples.run(encoder);
         encoder.clearBuffer(signal.imag);
         windowing.run(encoder);
@@ -110,22 +101,7 @@ export const createSpectrogramLaneCell = (
         fundamentalFrequency.run(encoder);
       };
 
-      const runBulk = (encoder: GPUCommandEncoder) => {
-        encoder.clearBuffer(signal.imag);
-        const pass = encoder.beginComputePass({
-          label: `${policy.label}-lane-pass`,
-          timestampWrites: bulkMarker,
-        });
-        sliceSamples.dispatch(pass);
-        windowing.dispatch(pass);
-        fourier.forwardDispatch(pass);
-        magnitudify.dispatch(pass);
-        decibelify.dispatch(pass);
-        fundamentalFrequency.dispatch(pass);
-        pass.end();
-      };
-
-      const skipGranular = (encoder: GPUCommandEncoder, clear: boolean) => {
+      const skip = (encoder: GPUCommandEncoder, clear: boolean) => {
         if (clear) {
           encoder.clearBuffer(signal.real);
           encoder.clearBuffer(fundamentalFrequency.buffer);
@@ -135,39 +111,26 @@ export const createSpectrogramLaneCell = (
             return;
           }
           const pass = encoder.beginComputePass({
-            label: `${policy.label}-lane-skip-pass`,
+            label: `${options.label}-lane-skip-pass`,
             timestampWrites: marker,
           });
           pass.end();
         };
-        emit(granularMarkers.sliceSamples);
-        emit(granularMarkers.windowing);
-        emit(granularMarkers.fourierReverse);
-        emit(granularMarkers.fourierTransform);
-        emit(granularMarkers.magnitudify);
-        emit(granularMarkers.decibelify);
-        emit(granularMarkers.fundamentalFrequency);
-      };
-      const skipBulk = (encoder: GPUCommandEncoder, clear: boolean) => {
-        if (clear) {
-          encoder.clearBuffer(signal.real);
-          encoder.clearBuffer(fundamentalFrequency.buffer);
-        }
-        if (bulkMarker) {
-          const pass = encoder.beginComputePass({
-            label: `${policy.label}-lane-skip-pass`,
-            timestampWrites: bulkMarker,
-          });
-          pass.end();
-        }
+        emit(markers.sliceSamples);
+        emit(markers.windowing);
+        emit(markers.fourierReverse);
+        emit(markers.fourierTransform);
+        emit(markers.magnitudify);
+        emit(markers.decibelify);
+        emit(markers.fundamentalFrequency);
       };
 
       return {
         signal,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
         writeSamples: sliceSamples.write,
-        run: policy.mode === 'granular' ? runGranular : runBulk,
-        skip: policy.mode === 'granular' ? skipGranular : skipBulk,
+        run,
+        skip,
       };
     },
     dispose: () => undefined,

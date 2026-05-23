@@ -3,18 +3,22 @@ import {
   createSpectrogramProcessorTimer,
   type SpectrogramProcessorMetrics,
 } from './common/processorTimer.js';
-import { type SpectrogramConfig } from './config.cross.js';
+import {
+  allTrackKeys,
+  type SpectrogramConfig,
+  type TrackKey,
+} from './config.cross.js';
 import {
   createSpectrogramConfigurator,
   type SpectrogramRuntime,
-  type SpectrogramTrack,
 } from './configurator.js';
+
+export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
 
 export type SpectrogramProcessor = {
   render: (
-    samples: Float32Array,
+    samples: SpectrogramSamples,
     trackProgress: number,
-    recordingSamples?: Float32Array,
   ) => Promise<boolean>;
   updateConfig: (config: Partial<SpectrogramConfig>) => void;
   dispose: () => void;
@@ -25,6 +29,16 @@ export type CreateSpectrogramProcessorOptions = {
   config?: Partial<SpectrogramConfig>;
   onMetrics?: (metrics: SpectrogramProcessorMetrics) => void;
 };
+
+const createTrackFlags = (): Record<TrackKey, boolean> =>
+  allTrackKeys.reduce(
+    (acc, key) => {
+      acc[key] = false;
+      return acc;
+    },
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as Record<TrackKey, boolean>,
+  );
 
 export const createSpectrogramProcessor = (
   options: CreateSpectrogramProcessorOptions,
@@ -39,38 +53,36 @@ export const createSpectrogramProcessor = (
 
   const writeBuffers = markers.writeBuffers(
     (
-      leadTrack: SpectrogramTrack,
-      recordingTrack: SpectrogramTrack,
-      samples: Float32Array,
+      runtime: SpectrogramRuntime,
+      samples: SpectrogramSamples,
       trackProgress: number,
-      recordingSamples: Float32Array | undefined,
     ) => {
-      leadTrack.lane.writeSamples(samples, trackProgress);
-      if (recordingSamples) {
-        recordingTrack.lane.writeSamples(recordingSamples, trackProgress);
+      for (const key of allTrackKeys) {
+        const trackSamples = samples[key];
+        if (trackSamples) {
+          runtime.tracks[key].lane.writeSamples(trackSamples, trackProgress);
+        }
       }
     },
   );
   const createCommand = markers.createCommand(
     (
       runtime: SpectrogramRuntime,
-      hasRecordingSamples: boolean,
-      shouldClearRecordingFrequencies: boolean,
+      presence: Record<TrackKey, boolean>,
+      clearMissing: Record<TrackKey, boolean>,
     ) => {
       const encoder = device.createCommandEncoder({
         label: 'processor-render-encoder',
       });
-      runtime.tracks.lead.lane.run(encoder);
-      runtime.tracks.lead.remap.run(encoder);
-      if (hasRecordingSamples) {
-        runtime.tracks.recording.lane.run(encoder);
-      } else {
-        runtime.tracks.recording.lane.skip(
-          encoder,
-          shouldClearRecordingFrequencies,
-        );
+      for (const key of allTrackKeys) {
+        const track = runtime.tracks[key];
+        if (presence[key]) {
+          track.lane.run(encoder);
+        } else {
+          track.lane.skip(encoder, clearMissing[key]);
+        }
+        track.remap.run(encoder);
       }
-      runtime.tracks.recording.remap.run(encoder);
       runtime.draw.run(encoder);
       timer.resolve(encoder);
       return encoder.finish();
@@ -84,50 +96,40 @@ export const createSpectrogramProcessor = (
     },
   );
 
-  let hasRenderedRecordingFrequencies = false;
+  const lastRendered: Record<TrackKey, boolean> = createTrackFlags();
 
   const render = markers.total(
-    async (
-      samples: Float32Array,
-      trackProgress: number,
-      recordingSamples?: Float32Array,
-    ) => {
+    async (samples: SpectrogramSamples, trackProgress: number) => {
       const runtime = configurator.configure();
       if (!runtime) {
         return false;
       }
-      writeBuffers(
-        runtime.tracks.lead,
-        runtime.tracks.recording,
-        samples,
-        trackProgress,
-        recordingSamples,
-      );
-      const hasRecordingSamples = recordingSamples !== undefined;
-      const shouldClearRecordingFrequencies =
-        !hasRecordingSamples && hasRenderedRecordingFrequencies;
-      const command = createCommand(
-        runtime,
-        hasRecordingSamples,
-        shouldClearRecordingFrequencies,
-      );
+      writeBuffers(runtime, samples, trackProgress);
+      const presence: Record<TrackKey, boolean> = createTrackFlags();
+      const clearMissing: Record<TrackKey, boolean> = createTrackFlags();
+      for (const key of allTrackKeys) {
+        const has = samples[key] !== undefined;
+        presence[key] = has;
+        clearMissing[key] = !has && lastRendered[key];
+      }
+      const command = createCommand(runtime, presence, clearMissing);
       await submitCommand(command);
-      hasRenderedRecordingFrequencies = hasRecordingSamples;
+      for (const key of allTrackKeys) {
+        lastRendered[key] = presence[key];
+      }
       return true;
     },
   );
 
   return {
-    render: createCallLatest(
-      async (samples, trackProgress, recordingSamples?) => {
-        const ok = await render(samples, trackProgress, recordingSamples);
-        if (!ok) {
-          return false;
-        }
-        await timer.finish();
-        return true;
-      },
-    ),
+    render: createCallLatest(async (samples, trackProgress) => {
+      const ok = await render(samples, trackProgress);
+      if (!ok) {
+        return false;
+      }
+      await timer.finish();
+      return true;
+    }),
     updateConfig: configurator.updateConfig,
     dispose: () => {
       timer.dispose();

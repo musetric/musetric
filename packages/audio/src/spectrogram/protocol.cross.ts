@@ -1,6 +1,6 @@
 import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/resource-utils/cross/messagePort';
-import type { SpectrogramConfig } from './config.cross.js';
+import type { SpectrogramConfig, TrackKey } from './config.cross.js';
 
 export type SpectrogramOutboundMethods = {
   boot: (message: { dataPort: MessagePort }) => void;
@@ -35,13 +35,14 @@ export const spectrogramChannel = createMessageChannel<
   },
 });
 
+export type SpectrogramLaneSamples = Partial<
+  Record<TrackKey, Float32Array<SharedArrayBuffer>>
+>;
+
 export type SpectrogramDataMethods = {
-  mount: (message: {
-    samples: Float32Array<SharedArrayBuffer>;
-    recordingSamples: Float32Array<SharedArrayBuffer>;
-  }) => void;
+  mount: (message: { samples: SpectrogramLaneSamples }) => void;
   unmount: () => void;
-  recordingSamplesChanged: () => void;
+  samplesChanged: (message: { trackKey: TrackKey }) => void;
 };
 
 export const spectrogramDataChannel = createMessageChannel<
@@ -52,6 +53,6 @@ export const spectrogramDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount', 'recordingSamplesChanged'],
+    keys: ['mount', 'unmount', 'samplesChanged'],
   },
 });

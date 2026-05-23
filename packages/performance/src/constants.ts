@@ -1,11 +1,14 @@
+import {
+  type FourierMode,
+  type SpectrogramZeroPaddingFactor,
+} from '@musetric/audio/spectrogram';
 import { defaultSampleRate } from '@musetric/resource-utils';
+
+export const fourierModes: readonly FourierMode[] = ['fftRadix4', 'fftRadix2'];
 
 export const runs = 10;
 export const skipRuns = 10;
 export const progress = 0.5;
-
-export const canvasWidth = 1920;
-export const canvasHeight = 1080;
 
 const getWindowSizes = () => {
   const sizes: number[] = [];
@@ -15,6 +18,37 @@ const getWindowSizes = () => {
   return sizes;
 };
 export const windowSizes = getWindowSizes();
+
+export const viewSizePresets = {
+  '480p': { width: 854, height: 480 },
+  '720p': { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+} as const;
+export type ViewSizePresetKey = keyof typeof viewSizePresets;
+export const viewSizePresetKeys: readonly ViewSizePresetKey[] = [
+  '480p',
+  '720p',
+  '1080p',
+];
+
+export const visibleTimes = [1, 4, 16] as const;
+export type VisibleTime = (typeof visibleTimes)[number];
+
+export const zeroPaddingFactors = [
+  1, 2, 4,
+] as const satisfies readonly SpectrogramZeroPaddingFactor[];
+
+export type BenchmarkParams = {
+  viewSizeKey: ViewSizePresetKey;
+  visibleTime: VisibleTime;
+  zeroPaddingFactor: SpectrogramZeroPaddingFactor;
+};
+
+export const defaultBenchmarkParams: BenchmarkParams = {
+  viewSizeKey: '1080p',
+  visibleTime: 4,
+  zeroPaddingFactor: 1,
+};
 
 const createSamples = () => {
   const result = new Float32Array(defaultSampleRate * 60 * 3);

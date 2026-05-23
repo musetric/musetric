@@ -88,13 +88,24 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: store.get().colors,
           sampleRate,
-          recordingLineWidthCents: 35,
-          recordingMatchThresholdCents: 15,
-          recordingCloseThresholdCents: 50,
-          showLeadSpectrogram: true,
-          showRecordingSpectrogram: false,
-          showLeadFundamental: true,
-          showRecordingFundamental: true,
+          lanes: {
+            lead: {
+              showSpectrogram: true,
+              showFundamental: true,
+              lineWidthCents: 26,
+            },
+            recording: {
+              showSpectrogram: false,
+              showFundamental: true,
+              lineWidthCents: 35,
+            },
+          },
+          comparison: {
+            reference: 'lead',
+            target: 'recording',
+            matchThresholdCents: 15,
+            closeThresholdCents: 50,
+          },
         },
         trackProgress: getTrackProgress(store.get()),
       });

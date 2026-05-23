@@ -3,6 +3,9 @@ import { type SpectrogramColors } from '../common/colors.es.js';
 import { extractConfig } from '../common/config.es.js';
 import { type ViewSize } from '../common/viewSize.es.js';
 
+export const allTrackKeys = ['lead', 'recording'] as const;
+export type TrackKey = (typeof allTrackKeys)[number];
+
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
 export const allFourierModes = ['fftRadix2', 'fftRadix4'] as const;
@@ -22,6 +25,19 @@ export const allSpectrogramWindowNames = [
 ] as const;
 export type SpectrogramWindowName = (typeof allSpectrogramWindowNames)[number];
 
+export type SpectrogramLaneConfig = {
+  showSpectrogram: boolean;
+  showFundamental: boolean;
+  lineWidthCents: number;
+};
+
+export type SpectrogramComparison = {
+  reference: TrackKey;
+  target: TrackKey;
+  matchThresholdCents: number;
+  closeThresholdCents: number;
+};
+
 export type SpectrogramConfig = {
   canvas: OffscreenCanvas;
   fourierMode: FourierMode;
@@ -36,13 +52,8 @@ export type SpectrogramConfig = {
   maxFrequency: number;
   viewSize: ViewSize;
   colors: SpectrogramColors;
-  recordingLineWidthCents: number;
-  recordingMatchThresholdCents: number;
-  recordingCloseThresholdCents: number;
-  showLeadSpectrogram: boolean;
-  showRecordingSpectrogram: boolean;
-  showLeadFundamental: boolean;
-  showRecordingFundamental: boolean;
+  lanes: Record<TrackKey, SpectrogramLaneConfig>;
+  comparison: SpectrogramComparison;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
@@ -58,13 +69,8 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'maxFrequency',
   'viewSize',
   'colors',
-  'recordingLineWidthCents',
-  'recordingMatchThresholdCents',
-  'recordingCloseThresholdCents',
-  'showLeadSpectrogram',
-  'showRecordingSpectrogram',
-  'showLeadFundamental',
-  'showRecordingFundamental',
+  'lanes',
+  'comparison',
 ]);
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>

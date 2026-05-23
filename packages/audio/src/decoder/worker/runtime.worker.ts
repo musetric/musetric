@@ -68,7 +68,7 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
       return;
     }
 
-    spectrogramPort.methods.recordingSamplesChanged();
+    spectrogramPort.methods.samplesChanged({ trackKey: 'recording' });
   };
 
   const getRecordingFrameCount = (): number => {
@@ -156,8 +156,10 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
       });
       const [recordingLeft] = recordingChannels;
       spectrogramPort.methods.mount({
-        samples: lead.channels[0],
-        recordingSamples: recordingLeft,
+        samples: {
+          lead: lead.channels[0],
+          recording: recordingLeft,
+        },
       });
       return {
         frameCount,
