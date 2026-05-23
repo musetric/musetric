@@ -24,6 +24,10 @@ import {
   type SpectrogramMagnitudify,
 } from './magnitudify/index.js';
 import {
+  createRecordingFundamentalFrequencyCell,
+  type RecordingFundamentalFrequency,
+} from './recordingFrequency/index.js';
+import {
   createSpectrogramRemapCell,
   type SpectrogramRemap,
 } from './remap/index.js';
@@ -50,6 +54,7 @@ export type SpectrogramRuntime = {
   fundamentalFrequency: SpectrogramFundamentalFrequency;
   remap: SpectrogramRemap;
   draw: SpectrogramDraw;
+  recordingFundamentalFrequency: RecordingFundamentalFrequency;
 };
 
 export type SpectrogramConfigurator = {
@@ -81,6 +86,10 @@ export const createSpectrogramConfigurator = (
     fundamentalFrequency: createSpectrogramFundamentalFrequencyCell(
       device,
       markers.fundamentalFrequency,
+    ),
+    recordingFundamentalFrequency: createRecordingFundamentalFrequencyCell(
+      device,
+      markers.recordingFundamentalFrequency,
     ),
     remap: createSpectrogramRemapCell(device, markers.remap),
     draw: createSpectrogramDrawCell(device, markers.draw),
@@ -125,9 +134,14 @@ export const createSpectrogramConfigurator = (
         signal: signal.real,
         config,
       });
+
+      const recordingFundamentalFrequency =
+        cells.recordingFundamentalFrequency.get(config);
+
       const draw = cells.draw.get({
         view: texture.view,
         fundamentalFrequencies: fundamentalFrequency.buffer,
+        recordingFrequencies: recordingFundamentalFrequency.buffer,
         config,
       });
 
@@ -141,6 +155,7 @@ export const createSpectrogramConfigurator = (
         fundamentalFrequency,
         remap,
         draw,
+        recordingFundamentalFrequency,
       };
       return runtime;
     }),
@@ -159,6 +174,7 @@ export const createSpectrogramConfigurator = (
       cells.magnitudify.dispose();
       cells.decibelify.dispose();
       cells.fundamentalFrequency.dispose();
+      cells.recordingFundamentalFrequency.dispose();
       cells.remap.dispose();
       cells.draw.dispose();
     },

@@ -84,9 +84,6 @@ let decoderRuntime: DecoderRuntime | undefined = undefined;
 let projectRealtime: ProjectRealtime | undefined = undefined;
 let recordingStream: RecordingStream | undefined = undefined;
 let recordingReady = false;
-let playerPort:
-  | ReturnType<typeof playerDataChannel.outbound<MessagePort>>
-  | undefined = undefined;
 let finishInterruptedRecordingStream = (stream: RecordingStream) => {
   stream.finish.resolve();
 };
@@ -151,17 +148,6 @@ const decodeFloat32Base64 = (base64: string): Float32Array<ArrayBuffer> => {
   );
   samples.set(new Float32Array(bytes.buffer, bytes.byteOffset, samples.length));
   return samples;
-};
-
-const decodeCommittedSamples = (
-  base64: string,
-): Float32Array<ArrayBuffer>[] => {
-  const samples = decodeFloat32Base64(base64);
-  const left = new Float32Array(samples.length);
-  const right = new Float32Array(samples.length);
-  left.set(samples);
-  right.set(samples);
-  return [left, right];
 };
 
 const resolveFlushWaiters = (stream: RecordingStream) => {
@@ -296,9 +282,9 @@ const closeProjectRealtimeSocket = (realtime: ProjectRealtime) => {
 
 const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
   if (event.type === 'recording.chunkCommitted') {
-    playerPort?.methods.patchRecordingTrack({
+    decoderRuntime?.patchRecordingSamples({
       frameIndex: event.frameIndex,
-      channels: decodeCommittedSamples(event.samplesBase64),
+      samples: decodeFloat32Base64(event.samplesBase64),
     });
     return;
   }
@@ -672,10 +658,13 @@ const bindRuntimeHandlers = () => {
 };
 
 port.bindBoot((message) => {
-  playerPort = playerDataChannel.outbound(message.playerPort);
+  const playerPort = playerDataChannel.outbound(message.playerPort);
+  const spectrogramPort = spectrogramDataChannel.outbound(
+    message.spectrogramPort,
+  );
   decoderRuntime = createDecoderRuntime({
     playerPort,
-    spectrogramPort: spectrogramDataChannel.outbound(message.spectrogramPort),
+    spectrogramPort,
     getDeliveryEncodedBuffer: async (projectId, stemType) => {
       const encodedBuffer = await getDeliveryAudioContent(projectId, stemType);
       return encodedBuffer.buffer;

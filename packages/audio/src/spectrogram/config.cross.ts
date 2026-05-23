@@ -36,6 +36,9 @@ export type SpectrogramConfig = {
   maxFrequency: number;
   viewSize: ViewSize;
   colors: SpectrogramColors;
+  recordingLineWidthCents: number;
+  recordingMatchThresholdCents: number;
+  recordingCloseThresholdCents: number;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
@@ -51,6 +54,9 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'maxFrequency',
   'viewSize',
   'colors',
+  'recordingLineWidthCents',
+  'recordingMatchThresholdCents',
+  'recordingCloseThresholdCents',
 ]);
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>

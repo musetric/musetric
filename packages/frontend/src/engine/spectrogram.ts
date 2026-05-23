@@ -88,6 +88,9 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: store.get().colors,
           sampleRate,
+          recordingLineWidthCents: 35,
+          recordingMatchThresholdCents: 15,
+          recordingCloseThresholdCents: 50,
         },
         trackProgress: getTrackProgress(store.get()),
       });

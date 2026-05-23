@@ -11,6 +11,9 @@ export const useThemeSpectrogramColors = () => {
       foreground: theme.palette.default.main,
       background: theme.palette.background.default,
       primary: theme.palette.primary.dark,
+      recordingMatch: theme.palette.success.main,
+      recordingClose: theme.palette.warning.main,
+      recordingMiss: theme.palette.error.main,
     };
     engine.store.update((state) => {
       state.colors = colors;

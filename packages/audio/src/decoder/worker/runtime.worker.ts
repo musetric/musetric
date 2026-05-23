@@ -20,6 +20,10 @@ export type DecoderRuntime = {
   mount: (message: { projectId: number; sampleRate: number }) => Promise<{
     frameCount: number;
   }>;
+  patchRecordingSamples: (message: {
+    frameIndex: number;
+    samples: Float32Array;
+  }) => void;
   unmount: () => void;
 };
 
@@ -56,6 +60,64 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
     spectrogramPort,
   } = options;
 
+  let recordingChannels: Float32Array<SharedArrayBuffer>[] | undefined =
+    undefined;
+
+  const notifyRecordingSamplesChanged = (frameCount: number) => {
+    if (frameCount <= 0) {
+      return;
+    }
+
+    spectrogramPort.methods.recordingSamplesChanged();
+  };
+
+  const getRecordingFrameCount = (): number => {
+    const channels = recordingChannels;
+    if (!channels) {
+      return 0;
+    }
+
+    const [left] = channels;
+    return left.length;
+  };
+
+  const writeRecordingSamples = (
+    frameIndex: number,
+    samples: Float32Array,
+  ): number => {
+    const channels = recordingChannels;
+    if (!channels) {
+      return 0;
+    }
+
+    const recordingFrameCount = getRecordingFrameCount();
+    if (recordingFrameCount <= 0) {
+      return 0;
+    }
+
+    const skippedFrameCount = Math.max(0, -frameIndex);
+    const targetFrameIndex = Math.max(0, frameIndex);
+    if (
+      targetFrameIndex >= recordingFrameCount ||
+      skippedFrameCount >= samples.length
+    ) {
+      return 0;
+    }
+
+    const frameCount = Math.min(
+      samples.length - skippedFrameCount,
+      recordingFrameCount - targetFrameIndex,
+    );
+    const patch = samples.subarray(
+      skippedFrameCount,
+      skippedFrameCount + frameCount,
+    );
+    for (const channel of channels) {
+      channel.set(patch, targetFrameIndex);
+    }
+    return frameCount;
+  };
+
   return {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
@@ -79,23 +141,37 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
         instrumental.frameCount,
         recording.frameCount,
       );
+      recordingChannels = fitChannelsToFrameCount(
+        recording.channels,
+        frameCount,
+      );
       playerPort.methods.mount({
         frameCount,
         tracks: {
           lead: lead.channels,
           backing: backing.channels,
           instrumental: instrumental.channels,
-          recording: fitChannelsToFrameCount(recording.channels, frameCount),
+          recording: recordingChannels,
         },
       });
+      const [recordingLeft] = recordingChannels;
       spectrogramPort.methods.mount({
         samples: lead.channels[0],
+        recordingSamples: recordingLeft,
       });
       return {
         frameCount,
       };
     },
+    patchRecordingSamples: (message) => {
+      const frameCount = writeRecordingSamples(
+        message.frameIndex,
+        message.samples,
+      );
+      notifyRecordingSamplesChanged(frameCount);
+    },
     unmount: () => {
+      recordingChannels = undefined;
       playerPort.methods.unmount();
       spectrogramPort.methods.unmount();
     },

@@ -9,8 +9,13 @@ export type WaveformColors = {
   background: string;
 };
 
-export type SpectrogramColors = WaveformColors & {
+export type SpectrogramColors = {
+  foreground: string;
+  background: string;
   primary: string;
+  recordingMatch: string;
+  recordingClose: string;
+  recordingMiss: string;
 };
 
 export const parseHexColor = (hex: string): Rgb => {

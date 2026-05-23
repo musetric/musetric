@@ -134,33 +134,6 @@ export const createPlayerRuntime = async (
       playing = false;
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
-    patchRecordingTrack: (message) => {
-      const track = tracks?.recording;
-      if (!track) {
-        return;
-      }
-
-      if (message.frameIndex < 0) {
-        return;
-      }
-
-      for (
-        let channelIndex = 0;
-        channelIndex < message.channels.length;
-        channelIndex += 1
-      ) {
-        const samples = track[channelIndex];
-        const patch = message.channels[channelIndex];
-        if (message.frameIndex >= samples.length) {
-          continue;
-        }
-
-        samples.set(
-          patch.subarray(0, samples.length - message.frameIndex),
-          message.frameIndex,
-        );
-      }
-    },
     unmount: () => {
       frameCount = 0;
       tracks = undefined;

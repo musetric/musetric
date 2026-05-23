@@ -17,6 +17,9 @@ export const applySpectrogramPatchConfig = (
       colors: (first, second) =>
         first.background === second.background &&
         first.foreground === second.foreground &&
-        first.primary === second.primary,
+        first.primary === second.primary &&
+        first.recordingMatch === second.recordingMatch &&
+        first.recordingClose === second.recordingClose &&
+        first.recordingMiss === second.recordingMiss,
     },
   });
