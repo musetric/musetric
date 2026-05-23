@@ -14,8 +14,9 @@ struct FundamentalFrequencyParams {
 };
 
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> output: array<f32>;
-@group(0) @binding(2) var<uniform> params: FundamentalFrequencyParams;
+@group(0) @binding(1) var<storage, read_write> scores: array<f32>;
+@group(0) @binding(2) var<storage, read_write> rawOutput: array<f32>;
+@group(0) @binding(3) var<uniform> params: FundamentalFrequencyParams;
 
 const harmonicWeights = array<f32, 13>(
   0.0,
@@ -32,6 +33,11 @@ const harmonicWeights = array<f32, 13>(
   0.139977424,
   0.130338098,
 );
+
+fn frequencyAtCandidate(candidate: u32) -> f32 {
+  return params.minimumFrequency *
+    exp2(f32(candidate) * params.candidateStepCents / 1200.0);
+}
 
 fn sampleIntensity(windowIndex: u32, frequency: f32) -> f32 {
   let nyquistFrequency = params.sampleRate * 0.5;
@@ -349,55 +355,69 @@ fn correctedSubharmonicFrequency(
 }
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn scoreCandidates(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let totalThreads = params.windowCount * params.candidateCount;
+  let index = gid.x;
+  if (index >= totalThreads) {
+    return;
+  }
+
+  let windowIndex = index / params.candidateCount;
+  let candidate = index % params.candidateCount;
+  let frequency = frequencyAtCandidate(candidate);
+  scores[windowIndex * params.candidateCount + candidate] =
+    harmonicScore(windowIndex, frequency);
+}
+
+@compute @workgroup_size(64)
+fn pickBest(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowIndex = gid.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
 
-  var bestFrequency = 0.0;
+  let candidateCount = params.candidateCount;
+  let base = windowIndex * candidateCount;
+
   var bestScore = 0.0;
   var bestCandidate = 0u;
-  var frequency = params.minimumFrequency;
-  let candidateStepRatio = exp2(params.candidateStepCents / 1200.0);
-  let fineStepRatio = exp2(params.candidateStepCents * 0.5 / 1200.0);
-
-  for (var candidate = 0u; candidate < params.candidateCount; candidate += 1u) {
-    let score = harmonicScore(windowIndex, frequency);
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestFrequency = frequency;
-      bestCandidate = candidate;
+  for (var c = 0u; c < candidateCount; c += 1u) {
+    let candidateScore = scores[base + c];
+    if (candidateScore > bestScore) {
+      bestScore = candidateScore;
+      bestCandidate = c;
     }
-
-    frequency *= candidateStepRatio;
   }
 
-  if (bestScore > 0.0) {
-    let coarseBestFrequency = bestFrequency;
+  if (bestScore <= 0.0) {
+    rawOutput[windowIndex] = 0.0;
+    return;
+  }
 
-    if (bestCandidate > 0u) {
-      let previousFrequency = coarseBestFrequency / fineStepRatio;
-      let previousScore = harmonicScore(windowIndex, previousFrequency);
-      if (previousScore > bestScore) {
-        bestScore = previousScore;
-        bestFrequency = previousFrequency;
-      }
+  let fineStepRatio = exp2(params.candidateStepCents * 0.5 / 1200.0);
+  let coarseBestFrequency = frequencyAtCandidate(bestCandidate);
+  var bestFrequency = coarseBestFrequency;
+
+  if (bestCandidate > 0u) {
+    let previousFrequency = coarseBestFrequency / fineStepRatio;
+    let previousScore = harmonicScore(windowIndex, previousFrequency);
+    if (previousScore > bestScore) {
+      bestScore = previousScore;
+      bestFrequency = previousFrequency;
     }
+  }
 
-    if (bestCandidate + 1u < params.candidateCount) {
-      let nextFrequency = coarseBestFrequency * fineStepRatio;
-      let nextScore = harmonicScore(windowIndex, nextFrequency);
-      if (nextScore > bestScore) {
-        bestScore = nextScore;
-        bestFrequency = nextFrequency;
-      }
+  if (bestCandidate + 1u < candidateCount) {
+    let nextFrequency = coarseBestFrequency * fineStepRatio;
+    let nextScore = harmonicScore(windowIndex, nextFrequency);
+    if (nextScore > bestScore) {
+      bestScore = nextScore;
+      bestFrequency = nextFrequency;
     }
   }
 
   if (bestScore < params.minimumScore) {
-    output[windowIndex] = 0.0;
+    rawOutput[windowIndex] = 0.0;
     return;
   }
 
@@ -407,7 +427,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     bestScore,
   );
   var refinedFrequency = correctedFrequency;
-  if (bestCandidate > 0u && bestCandidate + 1u < params.candidateCount) {
+  if (bestCandidate > 0u && bestCandidate + 1u < candidateCount) {
     let centerScore = harmonicPatternScore(windowIndex, correctedFrequency);
     let previousScore = harmonicPatternScore(
       windowIndex, correctedFrequency / fineStepRatio,
@@ -427,5 +447,5 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
   }
 
-  output[windowIndex] = refinedFrequency;
+  rawOutput[windowIndex] = refinedFrequency;
 }

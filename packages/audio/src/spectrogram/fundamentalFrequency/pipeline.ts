@@ -2,7 +2,8 @@ import filterShaderCode from './filter.wgsl?raw';
 import shaderCode from './index.wgsl?raw';
 
 export type FundamentalFrequencyPipelines = {
-  detect: GPUComputePipeline;
+  scoreCandidates: GPUComputePipeline;
+  pickBest: GPUComputePipeline;
   filter: GPUComputePipeline;
 };
 
@@ -19,12 +20,20 @@ export const createPipelines = (
   });
 
   return {
-    detect: device.createComputePipeline({
-      label: 'fundamental-frequency-pipeline',
+    scoreCandidates: device.createComputePipeline({
+      label: 'fundamental-frequency-score-candidates-pipeline',
       layout: 'auto',
       compute: {
         module,
-        entryPoint: 'main',
+        entryPoint: 'scoreCandidates',
+      },
+    }),
+    pickBest: device.createComputePipeline({
+      label: 'fundamental-frequency-pick-best-pipeline',
+      layout: 'auto',
+      compute: {
+        module,
+        entryPoint: 'pickBest',
       },
     }),
     filter: device.createComputePipeline({
