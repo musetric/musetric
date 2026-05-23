@@ -51,6 +51,10 @@ export const runPipeline = async (
     recordingLineWidthCents: 35,
     recordingMatchThresholdCents: 15,
     recordingCloseThresholdCents: 50,
+    showLeadSpectrogram: true,
+    showRecordingSpectrogram: true,
+    showLeadFundamental: true,
+    showRecordingFundamental: true,
   };
   const processor = createSpectrogramProcessor({
     device,

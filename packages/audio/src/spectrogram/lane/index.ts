@@ -127,6 +127,7 @@ export const createSpectrogramLaneCell = (
 
       const skipGranular = (encoder: GPUCommandEncoder, clear: boolean) => {
         if (clear) {
+          encoder.clearBuffer(signal.real);
           encoder.clearBuffer(fundamentalFrequency.buffer);
         }
         const emit = (marker?: GPUComputePassTimestampWrites) => {
@@ -149,6 +150,7 @@ export const createSpectrogramLaneCell = (
       };
       const skipBulk = (encoder: GPUCommandEncoder, clear: boolean) => {
         if (clear) {
+          encoder.clearBuffer(signal.real);
           encoder.clearBuffer(fundamentalFrequency.buffer);
         }
         if (bulkMarker) {

@@ -39,6 +39,10 @@ export type SpectrogramConfig = {
   recordingLineWidthCents: number;
   recordingMatchThresholdCents: number;
   recordingCloseThresholdCents: number;
+  showLeadSpectrogram: boolean;
+  showRecordingSpectrogram: boolean;
+  showLeadFundamental: boolean;
+  showRecordingFundamental: boolean;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
@@ -57,6 +61,10 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'recordingLineWidthCents',
   'recordingMatchThresholdCents',
   'recordingCloseThresholdCents',
+  'showLeadSpectrogram',
+  'showRecordingSpectrogram',
+  'showLeadFundamental',
+  'showRecordingFundamental',
 ]);
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
