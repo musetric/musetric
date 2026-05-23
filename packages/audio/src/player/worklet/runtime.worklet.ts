@@ -27,7 +27,7 @@ type RecordingStreamMessage =
     }
   | { type: 'flush'; sequence: number };
 
-const chunkFrameCount = 1024;
+const chunkFrameCount = 256;
 
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
