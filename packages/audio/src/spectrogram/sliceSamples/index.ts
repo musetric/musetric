@@ -6,6 +6,7 @@ const workgroupSize = 64;
 
 export type SpectrogramSliceSamples = {
   run: (encoder: GPUCommandEncoder) => void;
+  dispatch: (pass: GPUComputePassEncoder) => void;
   write: (samples: Float32Array, trackProgress: number) => void;
 };
 
@@ -20,19 +21,24 @@ export const createSpectrogramSliceSamplesCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
+      const dispatch = (pass: GPUComputePassEncoder) => {
+        const { paddedWindowSize, windowCount } = state.params.value;
+        const xGroups = Math.ceil(paddedWindowSize / workgroupSize);
+        pass.setPipeline(state.pipeline);
+        pass.setBindGroup(0, state.bindGroup);
+        pass.dispatchWorkgroups(xGroups, windowCount);
+      };
+
       return {
         run: (encoder) => {
-          const { paddedWindowSize, windowCount } = state.params.value;
-          const xGroups = Math.ceil(paddedWindowSize / workgroupSize);
           const pass = encoder.beginComputePass({
             label: 'slice-samples-pass',
             timestampWrites: marker,
           });
-          pass.setPipeline(state.pipeline);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(xGroups, windowCount);
+          dispatch(pass);
           pass.end();
         },
+        dispatch,
         write: (samples, trackProgress) => {
           state.samples.write(samples, trackProgress, state.config);
         },

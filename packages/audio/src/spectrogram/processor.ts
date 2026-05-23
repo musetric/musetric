@@ -8,7 +8,7 @@ import {
   createSpectrogramConfigurator,
   type SpectrogramRuntime,
 } from './configurator.js';
-import { type SpectrogramSliceSamples } from './sliceSamples/index.js';
+import { type SpectrogramLane } from './lane/index.js';
 
 export type SpectrogramProcessor = {
   render: (
@@ -39,11 +39,16 @@ export const createSpectrogramProcessor = (
 
   const writeBuffers = markers.writeBuffers(
     (
-      sliceSamples: SpectrogramSliceSamples,
+      leadLane: SpectrogramLane,
+      recordingLane: SpectrogramLane,
       samples: Float32Array,
       trackProgress: number,
+      recordingSamples: Float32Array | undefined,
     ) => {
-      sliceSamples.write(samples, trackProgress);
+      leadLane.writeSamples(samples, trackProgress);
+      if (recordingSamples) {
+        recordingLane.writeSamples(recordingSamples, trackProgress);
+      }
     },
   );
   const createCommand = markers.createCommand(
@@ -55,20 +60,11 @@ export const createSpectrogramProcessor = (
       const encoder = device.createCommandEncoder({
         label: 'processor-render-encoder',
       });
-      runtime.sliceSamples.run(encoder);
-      runtime.state.zerofyImag(encoder);
-      runtime.windowing.run(encoder);
-      runtime.fourier.forward(encoder);
-      runtime.magnitudify.run(encoder);
-      runtime.decibelify.run(encoder);
-      runtime.fundamentalFrequency.run(encoder);
+      runtime.leadLane.run(encoder);
       if (hasRecordingSamples) {
-        runtime.recordingFundamentalFrequency.run(encoder);
+        runtime.recordingLane.run(encoder);
       } else {
-        runtime.recordingFundamentalFrequency.skip(
-          encoder,
-          shouldClearRecordingFrequencies,
-        );
+        runtime.recordingLane.skip(encoder, shouldClearRecordingFrequencies);
       }
       runtime.remap.run(encoder);
       runtime.draw.run(encoder);
@@ -96,13 +92,13 @@ export const createSpectrogramProcessor = (
       if (!runtime) {
         return false;
       }
-      writeBuffers(runtime.sliceSamples, samples, trackProgress);
-      if (recordingSamples) {
-        runtime.recordingFundamentalFrequency.writeSamples(
-          recordingSamples,
-          trackProgress,
-        );
-      }
+      writeBuffers(
+        runtime.leadLane,
+        runtime.recordingLane,
+        samples,
+        trackProgress,
+        recordingSamples,
+      );
       const hasRecordingSamples = recordingSamples !== undefined;
       const shouldClearRecordingFrequencies =
         !hasRecordingSamples && hasRenderedRecordingFrequencies;

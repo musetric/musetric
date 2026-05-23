@@ -9,6 +9,7 @@ export type FourierArg = {
 
 export type Fourier = {
   forward: (encoder: GPUCommandEncoder) => void;
+  forwardDispatch: (pass: GPUComputePassEncoder) => void;
 };
 
 export type FourierTimestampWrites = {

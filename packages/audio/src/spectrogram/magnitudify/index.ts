@@ -6,6 +6,7 @@ const workgroupSize = 64;
 
 export type SpectrogramMagnitudify = {
   run: (encoder: GPUCommandEncoder) => void;
+  dispatch: (pass: GPUComputePassEncoder) => void;
 };
 
 export const createSpectrogramMagnitudifyCell = (
@@ -19,27 +20,30 @@ export const createSpectrogramMagnitudifyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
+      const dispatch = (pass: GPUComputePassEncoder) => {
+        const { windowSize, windowCount } = state.params.value;
+        const halfSize = Math.ceil(windowSize / 2);
+        const xCount = Math.ceil(halfSize / workgroupSize);
+
+        pass.setPipeline(state.pipelines.run);
+        pass.setBindGroup(0, state.bindGroup);
+        pass.dispatchWorkgroups(xCount, windowCount);
+
+        pass.setPipeline(state.pipelines.move);
+        pass.setBindGroup(0, state.bindGroup);
+        pass.dispatchWorkgroups(xCount, windowCount);
+      };
+
       return {
         run: (encoder) => {
-          const { windowSize, windowCount } = state.params.value;
-          const halfSize = Math.ceil(windowSize / 2);
-          const xCount = Math.ceil(halfSize / workgroupSize);
-
           const pass = encoder.beginComputePass({
             label: 'magnitudify-pass',
             timestampWrites: marker,
           });
-
-          pass.setPipeline(state.pipelines.run);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(xCount, windowCount);
-
-          pass.setPipeline(state.pipelines.move);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(xCount, windowCount);
-
+          dispatch(pass);
           pass.end();
         },
+        dispatch,
       };
     },
     dispose: () => {
