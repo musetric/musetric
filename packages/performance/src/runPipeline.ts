@@ -4,7 +4,13 @@ import {
   type SpectrogramConfig,
 } from '@musetric/audio/spectrogram';
 import { defaultSampleRate } from '@musetric/resource-utils';
-import { progress, runs, samples, skipRuns } from './constants.js';
+import {
+  progress,
+  recordingSamples,
+  runs,
+  samples,
+  skipRuns,
+} from './constants.js';
 import { waitNextFrame } from './waitNextFrame.js';
 
 export const runPipeline = async (
@@ -38,7 +44,13 @@ export const runPipeline = async (
       background: '#000000',
       foreground: '#888888',
       primary: '#1976d2',
+      recordingMatch: '#4caf50',
+      recordingClose: '#ff9800',
+      recordingMiss: '#f44336',
     },
+    recordingLineWidthCents: 35,
+    recordingMatchThresholdCents: 15,
+    recordingCloseThresholdCents: 50,
   };
   const processor = createSpectrogramProcessor({
     device,
@@ -47,7 +59,7 @@ export const runPipeline = async (
   });
 
   for (let i = 0; i < skipRuns + runs; i++) {
-    await processor.render(samples, progress);
+    await processor.render(samples, progress, recordingSamples);
     await waitNextFrame(15);
   }
   processor.dispose();

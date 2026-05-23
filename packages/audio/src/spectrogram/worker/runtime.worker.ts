@@ -31,6 +31,7 @@ export const createSpectrogramRuntime = async (
 
   let processor = createProcessor();
   let samples: Float32Array<SharedArrayBuffer> | undefined = undefined;
+  let recordingSamples: Float32Array<SharedArrayBuffer> | undefined = undefined;
   let trackProgress = 0;
 
   const render = async () => {
@@ -38,7 +39,7 @@ export const createSpectrogramRuntime = async (
       return;
     }
 
-    const ok = await processor.render(samples, trackProgress);
+    const ok = await processor.render(samples, trackProgress, recordingSamples);
     if (!ok) {
       return;
     }
@@ -50,13 +51,18 @@ export const createSpectrogramRuntime = async (
   dataPort.bindHandlers({
     mount: async (message) => {
       samples = message.samples;
+      recordingSamples = message.recordingSamples;
       await render();
     },
     unmount: () => {
       samples = undefined;
+      recordingSamples = undefined;
       port.methods.setState({
         status: 'pending',
       });
+    },
+    recordingSamplesChanged: () => {
+      void render();
     },
   });
 
@@ -78,6 +84,7 @@ export const createSpectrogramRuntime = async (
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
+      recordingSamples = undefined;
       port.methods.setState({
         status: 'pending',
       });

@@ -36,8 +36,12 @@ export const spectrogramChannel = createMessageChannel<
 });
 
 export type SpectrogramDataMethods = {
-  mount: (message: { samples: Float32Array<SharedArrayBuffer> }) => void;
+  mount: (message: {
+    samples: Float32Array<SharedArrayBuffer>;
+    recordingSamples: Float32Array<SharedArrayBuffer>;
+  }) => void;
   unmount: () => void;
+  recordingSamplesChanged: () => void;
 };
 
 export const spectrogramDataChannel = createMessageChannel<
@@ -48,6 +52,6 @@ export const spectrogramDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount'],
+    keys: ['mount', 'unmount', 'recordingSamplesChanged'],
   },
 });

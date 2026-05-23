@@ -3,12 +3,17 @@ struct DrawParams {
   background : vec4f,
   primary : vec4f,
   frequencyMap : vec4f,
+  recordingMatchColor : vec4f,
+  recordingCloseColor : vec4f,
+  recordingMissColor : vec4f,
+  recordingThresholds : vec4f,
 };
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
 @group(0) @binding(1) var valueSampler : sampler;
 @group(0) @binding(2) var columnTexture : texture_2d<f32>;
 @group(0) @binding(3) var<storage, read> fundamentalFrequencies : array<f32>;
+@group(0) @binding(4) var<storage, read> recordingFrequencies : array<f32>;
 
 fn frequencyAtPixel(pixelY: u32) -> f32 {
   let height = f32(textureDimensions(columnTexture).y);
@@ -72,6 +77,24 @@ fn segmentLineMask(
   return exp(-0.5 * normalizedDistance * normalizedDistance);
 }
 
+fn recordingLineColor(referenceFreq: f32, recordedFreq: f32) -> vec3f {
+  let distance = centsDistance(referenceFreq, recordedFreq);
+  let matchThreshold = drawParams.recordingThresholds.x;
+  let closeThreshold = drawParams.recordingThresholds.y;
+  if (distance <= matchThreshold) {
+    return drawParams.recordingMatchColor.xyz;
+  }
+  if (distance >= closeThreshold) {
+    return drawParams.recordingMissColor.xyz;
+  }
+  let blend = (distance - matchThreshold) / (closeThreshold - matchThreshold);
+  return mix(
+    drawParams.recordingMatchColor.xyz,
+    drawParams.recordingCloseColor.xyz,
+    blend,
+  );
+}
+
 @fragment
 fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location(0) vec4f {
   let intensity = textureSample(columnTexture, valueSampler, vec2f(uv.x, 1.0 - uv.y)).r;
@@ -80,6 +103,9 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let x = min(u32(position.x), dimensions.x - 1u);
   let y = min(u32(position.y), dimensions.y - 1u);
   let frequency = frequencyAtPixel(y);
+  let recordingWidth = drawParams.recordingThresholds.z;
+
+  // Lead vocal line
   let centerFrequency = fundamentalFrequencies[x];
   let distance = centsDistance(frequency, centerFrequency);
   let normalizedDistance = distance / 26.0;
@@ -111,11 +137,54 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       26.0,
     );
   }
-  let lineColor = mix(drawParams.primary.xyz, vec3f(0.0), 0.12);
+  let leadLineColor = mix(drawParams.primary.xyz, vec3f(0.0), 0.12);
+  var leadMask = max(lineMask, max(previousMask, nextMask));
+
+  // Recording line
+  let recordingFreq = recordingFrequencies[x];
+  var recordingMask = 0.0;
+  var recColor = vec3f(0.0);
+  if (recordingFreq > 0.0) {
+    let recDistance = centsDistance(frequency, recordingFreq);
+    let recNormalized = recDistance / recordingWidth;
+    recordingMask = clamp(
+      exp(-0.5 * recNormalized * recNormalized) * 1.18,
+      0.0,
+      1.0,
+    );
+    if (x > 0u) {
+      let prevRec = recordingFrequencies[x - 1u];
+      if (prevRec > 0.0) {
+        recordingMask = max(
+          recordingMask,
+          segmentLineMask(point, x - 1u, prevRec, x, recordingFreq, recordingWidth),
+        );
+      }
+    }
+    if (x + 1u < dimensions.x) {
+      let nextRec = recordingFrequencies[x + 1u];
+      if (nextRec > 0.0) {
+        recordingMask = max(
+          recordingMask,
+          segmentLineMask(point, x, recordingFreq, x + 1u, nextRec, recordingWidth),
+        );
+      }
+    }
+    recColor = drawParams.recordingMissColor.xyz;
+    if (centerFrequency > 0.0) {
+      recColor = recordingLineColor(centerFrequency, recordingFreq);
+    }
+  }
+
   let color = mix(
     baseColor,
-    lineColor,
-    max(lineMask, max(previousMask, nextMask)),
+    leadLineColor,
+    leadMask,
   );
-  return vec4f(color, 1.0);
+  let finalColor = mix(
+    color,
+    recColor,
+    recordingMask,
+  );
+  return vec4f(finalColor, 1.0);
 }

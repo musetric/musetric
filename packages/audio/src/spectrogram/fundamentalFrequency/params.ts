@@ -16,7 +16,7 @@ export type FundamentalFrequencyParams = {
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
-const candidateStepCents = 10;
+const candidateStepCents = 20;
 const minimumFundamentalIntensity = 0.12;
 const minimumScore = 0.22;
 const harmonicCount = 12;

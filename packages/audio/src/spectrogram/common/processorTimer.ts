@@ -16,6 +16,7 @@ export const spectrogramTimerLabels = [
   'magnitudify',
   'decibelify',
   'fundamentalFrequency',
+  'recordingFundamentalFrequency',
   'remap',
   'draw',
   'other',
@@ -32,6 +33,7 @@ const gpuLabels = [
   'magnitudify',
   'decibelify',
   'fundamentalFrequency',
+  'recordingFundamentalFrequency',
   'remap',
   'draw',
 ] as const satisfies SpectrogramTimerLabel[];

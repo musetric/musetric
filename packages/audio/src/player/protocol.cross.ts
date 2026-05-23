@@ -74,10 +74,6 @@ export type PlayerDataMethods = {
     frameCount: number;
     tracks: Record<StemType | 'recording', Float32Array<SharedArrayBuffer>[]>;
   }) => void;
-  patchRecordingTrack: (message: {
-    frameIndex: number;
-    channels: Float32Array<ArrayBuffer>[];
-  }) => void;
   unmount: () => void;
 };
 
@@ -89,6 +85,6 @@ export const playerDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'patchRecordingTrack', 'unmount'],
+    keys: ['mount', 'unmount'],
   },
 });
