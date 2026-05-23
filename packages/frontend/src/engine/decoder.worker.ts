@@ -46,11 +46,6 @@ type RecordingStream = {
 
 type ProjectRealtimeEvent =
   | {
-      type: 'recording.chunkCommitted';
-      frameIndex: number;
-      samplesBase64: string;
-    }
-  | {
       type: 'recording.peaksChanged';
       startPeakIndex: number;
       peaks: number[];
@@ -130,24 +125,6 @@ const createWebSocketUrl = (path: string) => {
   const url = new URL(path, self.location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.href;
-};
-
-const decodeBase64Bytes = (base64: string): Uint8Array<ArrayBuffer> => {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-};
-
-const decodeFloat32Base64 = (base64: string): Float32Array<ArrayBuffer> => {
-  const bytes = decodeBase64Bytes(base64);
-  const samples = new Float32Array(
-    bytes.byteLength / Float32Array.BYTES_PER_ELEMENT,
-  );
-  samples.set(new Float32Array(bytes.buffer, bytes.byteOffset, samples.length));
-  return samples;
 };
 
 const resolveFlushWaiters = (stream: RecordingStream) => {
@@ -281,14 +258,6 @@ const closeProjectRealtimeSocket = (realtime: ProjectRealtime) => {
 };
 
 const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
-  if (event.type === 'recording.chunkCommitted') {
-    decoderRuntime?.patchRecordingSamples({
-      frameIndex: event.frameIndex,
-      samples: decodeFloat32Base64(event.samplesBase64),
-    });
-    return;
-  }
-
   if (event.type === 'recording.peaksChanged') {
     port.methods.recordingPeaksChanged({
       startPeakIndex: event.startPeakIndex,
@@ -360,6 +329,30 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
   failRecordingStream(event.error);
 };
 
+const handleProjectRealtimePacket = (data: ArrayBuffer) => {
+  if (data.byteLength < recordingPacketHeaderByteLength) {
+    throw new Error('Project realtime packet is missing a header');
+  }
+
+  const view = new DataView(data);
+  const frameIndex = view.getUint32(0, true);
+  const frameCount = view.getUint32(4, true);
+  const byteLength = frameCount * Float32Array.BYTES_PER_ELEMENT;
+  const packetByteLength = recordingPacketHeaderByteLength + byteLength;
+  if (data.byteLength !== packetByteLength) {
+    throw new Error('Project realtime packet has invalid byte length');
+  }
+
+  decoderRuntime?.patchRecordingSamples({
+    frameIndex,
+    samples: new Float32Array(
+      data,
+      recordingPacketHeaderByteLength,
+      frameCount,
+    ),
+  });
+};
+
 const closeProjectRealtime = () => {
   const realtime = projectRealtime;
   projectRealtime = undefined;
@@ -407,17 +400,25 @@ const openProjectRealtime = (message: { projectId: number }) => {
   };
 
   realtime.openPromise.catch(failProjectRealtime);
-  socket.addEventListener('message', (event: MessageEvent<string>) => {
-    if (typeof event.data !== 'string') {
-      return;
-    }
+  socket.addEventListener(
+    'message',
+    (event: MessageEvent<string | ArrayBuffer>) => {
+      if (typeof event.data !== 'string') {
+        try {
+          handleProjectRealtimePacket(event.data);
+        } catch (error) {
+          console.error('Failed to process project realtime packet', error);
+        }
+        return;
+      }
 
-    try {
-      handleProjectRealtimeEvent(JSON.parse(event.data));
-    } catch (error) {
-      console.error('Failed to process project realtime event', error);
-    }
-  });
+      try {
+        handleProjectRealtimeEvent(JSON.parse(event.data));
+      } catch (error) {
+        console.error('Failed to process project realtime event', error);
+      }
+    },
+  );
   socket.addEventListener('close', () => {
     if (projectRealtime === realtime) {
       projectRealtime = undefined;
@@ -489,6 +490,10 @@ const processRecordingChunk = (
   if (alignedSamples.length === 0) {
     return;
   }
+  decoderRuntime?.patchRecordingSamples({
+    frameIndex,
+    samples: alignedSamples,
+  });
   sendRealtimePacket(createRecordingPacket(frameIndex, alignedSamples));
 };
 

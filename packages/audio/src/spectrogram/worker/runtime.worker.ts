@@ -84,7 +84,6 @@ export const createSpectrogramRuntime = async (
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
-      recordingSamples = undefined;
       port.methods.setState({
         status: 'pending',
       });
