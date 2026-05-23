@@ -22,16 +22,25 @@ export const createSpectrogramFundamentalFrequencyCell = (
       const state = stateCell.get(arg);
 
       const dispatch = (pass: GPUComputePassEncoder) => {
-        const xGroups = Math.max(
+        const { windowCount, candidateCount } = state.params.value;
+        const scoreThreads = Math.max(1, windowCount * candidateCount);
+        const scoreGroups = Math.ceil(scoreThreads / workgroupSize);
+        const windowGroups = Math.max(
           1,
-          Math.ceil(state.params.value.windowCount / workgroupSize),
+          Math.ceil(windowCount / workgroupSize),
         );
-        pass.setPipeline(state.pipelines.detect);
-        pass.setBindGroup(0, state.bindGroups.detect);
-        pass.dispatchWorkgroups(xGroups);
+
+        pass.setPipeline(state.pipelines.scoreCandidates);
+        pass.setBindGroup(0, state.bindGroups.scoreCandidates);
+        pass.dispatchWorkgroups(scoreGroups);
+
+        pass.setPipeline(state.pipelines.pickBest);
+        pass.setBindGroup(0, state.bindGroups.pickBest);
+        pass.dispatchWorkgroups(windowGroups);
+
         pass.setPipeline(state.pipelines.filter);
         pass.setBindGroup(0, state.bindGroups.filter);
-        pass.dispatchWorkgroups(xGroups);
+        pass.dispatchWorkgroups(windowGroups);
       };
 
       return {
