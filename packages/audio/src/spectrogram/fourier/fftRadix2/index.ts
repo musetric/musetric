@@ -13,29 +13,35 @@ export const createFftRadix2: CreateFourier = (device, markers) => {
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const reverse = (encoder: GPUCommandEncoder) => {
+      const dispatchReverse = (pass: GPUComputePassEncoder) => {
         const { windowCount } = state.params.value;
+        pass.setPipeline(state.pipelines.reverse);
+        pass.setBindGroup(0, state.bindGroups.reverse);
+        pass.dispatchWorkgroups(windowCount);
+      };
 
+      const dispatchTransform = (pass: GPUComputePassEncoder) => {
+        const { windowCount } = state.params.value;
+        pass.setPipeline(state.pipelines.transform);
+        pass.setBindGroup(0, state.bindGroups.transform);
+        pass.dispatchWorkgroups(windowCount);
+      };
+
+      const reverse = (encoder: GPUCommandEncoder) => {
         const pass = encoder.beginComputePass({
           label: 'fft2-reverse-pass',
           timestampWrites: markers?.reverse,
         });
-        pass.setPipeline(state.pipelines.reverse);
-        pass.setBindGroup(0, state.bindGroups.reverse);
-        pass.dispatchWorkgroups(windowCount);
+        dispatchReverse(pass);
         pass.end();
       };
 
       const transform = (encoder: GPUCommandEncoder) => {
-        const { windowCount } = state.params.value;
-
         const pass = encoder.beginComputePass({
           label: 'fft2-transform-pass',
           timestampWrites: markers?.transform,
         });
-        pass.setPipeline(state.pipelines.transform);
-        pass.setBindGroup(0, state.bindGroups.transform);
-        pass.dispatchWorkgroups(windowCount);
+        dispatchTransform(pass);
         pass.end();
       };
 
@@ -43,6 +49,10 @@ export const createFftRadix2: CreateFourier = (device, markers) => {
         forward: (encoder) => {
           reverse(encoder);
           transform(encoder);
+        },
+        forwardDispatch: (pass) => {
+          dispatchReverse(pass);
+          dispatchTransform(pass);
         },
       };
 

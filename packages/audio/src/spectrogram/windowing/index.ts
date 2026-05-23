@@ -6,6 +6,7 @@ const workgroupSize = 64;
 
 export type SpectrogramWindowing = {
   run: (encoder: GPUCommandEncoder) => void;
+  dispatch: (pass: GPUComputePassEncoder) => void;
 };
 
 export const createSpectrogramWindowingCell = (
@@ -19,19 +20,24 @@ export const createSpectrogramWindowingCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
+      const dispatch = (pass: GPUComputePassEncoder) => {
+        const { windowSize, windowCount } = state.params.value;
+        const xCount = Math.ceil(windowSize / workgroupSize);
+        pass.setPipeline(state.pipeline);
+        pass.setBindGroup(0, state.bindGroup);
+        pass.dispatchWorkgroups(xCount, windowCount);
+      };
+
       return {
         run: (encoder) => {
-          const { windowSize, windowCount } = state.params.value;
-          const xCount = Math.ceil(windowSize / workgroupSize);
           const pass = encoder.beginComputePass({
             label: 'windowing-pass',
             timestampWrites: marker,
           });
-          pass.setPipeline(state.pipeline);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(xCount, windowCount);
+          dispatch(pass);
           pass.end();
         },
+        dispatch,
       };
     },
     dispose: () => {

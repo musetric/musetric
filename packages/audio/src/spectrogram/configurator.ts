@@ -6,55 +6,28 @@ import {
   type SpectrogramConfig,
 } from './config.cross.js';
 import {
-  createSpectrogramDecibelifyCell,
-  type SpectrogramDecibelify,
-} from './decibelify/index.js';
-import {
   createSpectrogramDrawCell,
   type SpectrogramDraw,
 } from './draw/index.js';
-import { createFourierCell } from './fourier/cell.js';
-import type { Fourier } from './fourier/types.js';
 import {
-  createSpectrogramFundamentalFrequencyCell,
-  type SpectrogramFundamentalFrequency,
-} from './fundamentalFrequency/index.js';
-import {
-  createSpectrogramMagnitudifyCell,
-  type SpectrogramMagnitudify,
-} from './magnitudify/index.js';
-import {
-  createRecordingFundamentalFrequencyCell,
-  type RecordingFundamentalFrequency,
-} from './recordingFrequency/index.js';
+  createSpectrogramLaneCell,
+  type SpectrogramLane,
+} from './lane/index.js';
 import {
   createSpectrogramRemapCell,
   type SpectrogramRemap,
 } from './remap/index.js';
 import {
-  createSpectrogramSliceSamplesCell,
-  type SpectrogramSliceSamples,
-} from './sliceSamples/index.js';
-import {
   createSpectrogramStateCell,
   type SpectrogramState,
 } from './state/index.js';
-import {
-  createSpectrogramWindowingCell,
-  type SpectrogramWindowing,
-} from './windowing/index.js';
 
 export type SpectrogramRuntime = {
   state: SpectrogramState;
-  sliceSamples: SpectrogramSliceSamples;
-  windowing: SpectrogramWindowing;
-  fourier: Fourier;
-  magnitudify: SpectrogramMagnitudify;
-  decibelify: SpectrogramDecibelify;
-  fundamentalFrequency: SpectrogramFundamentalFrequency;
+  leadLane: SpectrogramLane;
+  recordingLane: SpectrogramLane;
   remap: SpectrogramRemap;
   draw: SpectrogramDraw;
-  recordingFundamentalFrequency: RecordingFundamentalFrequency;
 };
 
 export type SpectrogramConfigurator = {
@@ -72,25 +45,24 @@ export const createSpectrogramConfigurator = (
 
   const cells = {
     state: createSpectrogramStateCell(device),
-    sliceSamples: createSpectrogramSliceSamplesCell(
-      device,
-      markers.sliceSamples,
-    ),
-    windowing: createSpectrogramWindowingCell(device, markers.windowing),
-    fourier: createFourierCell(device, {
-      reverse: markers.fourierReverse,
-      transform: markers.fourierTransform,
+    leadLane: createSpectrogramLaneCell(device, {
+      mode: 'granular',
+      label: 'lead',
+      markers: {
+        sliceSamples: markers.sliceSamples,
+        windowing: markers.windowing,
+        fourierReverse: markers.fourierReverse,
+        fourierTransform: markers.fourierTransform,
+        magnitudify: markers.magnitudify,
+        decibelify: markers.decibelify,
+        fundamentalFrequency: markers.fundamentalFrequency,
+      },
     }),
-    magnitudify: createSpectrogramMagnitudifyCell(device, markers.magnitudify),
-    decibelify: createSpectrogramDecibelifyCell(device, markers.decibelify),
-    fundamentalFrequency: createSpectrogramFundamentalFrequencyCell(
-      device,
-      markers.fundamentalFrequency,
-    ),
-    recordingFundamentalFrequency: createRecordingFundamentalFrequencyCell(
-      device,
-      markers.recordingFundamentalFrequency,
-    ),
+    recordingLane: createSpectrogramLaneCell(device, {
+      mode: 'bulk',
+      label: 'recording',
+      marker: markers.recordingFundamentalFrequency,
+    }),
     remap: createSpectrogramRemapCell(device, markers.remap),
     draw: createSpectrogramDrawCell(device, markers.draw),
   };
@@ -119,43 +91,27 @@ export const createSpectrogramConfigurator = (
       }
       draftConfig = undefined;
       const state = cells.state.get(config);
-      const { signal, texture } = state;
-      const sliceSamples = cells.sliceSamples.get({ out: signal.real, config });
-      const windowing = cells.windowing.get({ signal: signal.real, config });
-      const fourier = cells.fourier.get({ signal, config });
-      const magnitudify = cells.magnitudify.get({ signal, config });
-      const decibelify = cells.decibelify.get({ signal: signal.real, config });
+      const { texture } = state;
+      const leadLane = cells.leadLane.get(config);
+      const recordingLane = cells.recordingLane.get(config);
       const remap = cells.remap.get({
-        signal: signal.real,
+        signal: leadLane.signal.real,
         texture: texture.view,
         config,
       });
-      const fundamentalFrequency = cells.fundamentalFrequency.get({
-        signal: signal.real,
-        config,
-      });
-
-      const recordingFundamentalFrequency =
-        cells.recordingFundamentalFrequency.get(config);
-
       const draw = cells.draw.get({
         view: texture.view,
-        fundamentalFrequencies: fundamentalFrequency.buffer,
-        recordingFrequencies: recordingFundamentalFrequency.buffer,
+        fundamentalFrequencies: leadLane.fundamentalFrequencyBuffer,
+        recordingFrequencies: recordingLane.fundamentalFrequencyBuffer,
         config,
       });
 
       runtime = {
         state,
-        sliceSamples,
-        windowing,
-        fourier,
-        magnitudify,
-        decibelify,
-        fundamentalFrequency,
+        leadLane,
+        recordingLane,
         remap,
         draw,
-        recordingFundamentalFrequency,
       };
       return runtime;
     }),
@@ -168,13 +124,8 @@ export const createSpectrogramConfigurator = (
     },
     dispose: () => {
       cells.state.dispose();
-      cells.sliceSamples.dispose();
-      cells.windowing.dispose();
-      cells.fourier.dispose();
-      cells.magnitudify.dispose();
-      cells.decibelify.dispose();
-      cells.fundamentalFrequency.dispose();
-      cells.recordingFundamentalFrequency.dispose();
+      cells.leadLane.dispose();
+      cells.recordingLane.dispose();
       cells.remap.dispose();
       cells.draw.dispose();
     },
