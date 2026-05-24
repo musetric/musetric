@@ -10,6 +10,7 @@ export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
 export const allFourierModes = [
   'fftPrunedFourStepR2c',
+  'fftStockham',
   'fftRadix4',
   'fftRadix2',
 ] as const;
