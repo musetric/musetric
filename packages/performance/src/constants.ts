@@ -6,6 +6,7 @@ import { defaultSampleRate } from '@musetric/resource-utils';
 
 export const fourierModes: readonly FourierMode[] = [
   'fftPrunedFourStepR2c',
+  'fftStockham',
   'fftRadix4',
   'fftRadix2',
 ];
@@ -16,7 +17,7 @@ export const progress = 0.5;
 
 const getWindowSizes = () => {
   const sizes: number[] = [];
-  for (let size = 64; size <= 1024 * 16; size *= 2) {
+  for (let size = 64; size <= 1024 * 8; size *= 2) {
     sizes.push(size);
   }
   return sizes;
