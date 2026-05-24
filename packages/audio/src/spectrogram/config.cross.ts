@@ -12,7 +12,6 @@ export const allFourierModes = [
   'fftPrunedFourStepR2c',
   'fftStockham',
   'fftRadix4',
-  'fftRadix2',
 ] as const;
 export type FourierMode = (typeof allFourierModes)[number];
 
