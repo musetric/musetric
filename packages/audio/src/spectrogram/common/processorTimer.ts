@@ -1,14 +1,11 @@
+import { allTrackKeys, type TrackKey } from '../config.cross.js';
 import {
   createCpuTimer,
   createGpuTimer,
   roundDuration,
 } from './timer/index.js';
 
-export const spectrogramTimerLabels = [
-  'configure',
-  'writeBuffers',
-  'createCommand',
-  'submitCommand',
+export const spectrogramLaneStages = [
   'sliceSamples',
   'windowing',
   'fourierReverse',
@@ -16,39 +13,53 @@ export const spectrogramTimerLabels = [
   'magnitudify',
   'decibelify',
   'fundamentalFrequency',
-  'recordingFundamentalFrequency',
   'remap',
-  'draw',
-  'other',
+] as const;
+export type SpectrogramLaneStage = (typeof spectrogramLaneStages)[number];
+
+export type SpectrogramLaneTimerLabel = `${TrackKey}.${SpectrogramLaneStage}`;
+
+const cpuRootLabels = [
+  'configure',
+  'writeBuffers',
+  'createCommand',
+  'submitCommand',
   'total',
 ] as const;
-export type SpectrogramTimerLabel = (typeof spectrogramTimerLabels)[number];
+type CpuRootLabel = (typeof cpuRootLabels)[number];
+
+const gpuRootLabels = ['draw'] as const;
+type GpuRootLabel = (typeof gpuRootLabels)[number];
+
+type GpuLabel = GpuRootLabel | SpectrogramLaneTimerLabel;
+
+export type SpectrogramTimerLabel =
+  | CpuRootLabel
+  | GpuRootLabel
+  | SpectrogramLaneTimerLabel
+  | 'other';
+
 export type SpectrogramProcessorMetrics = Record<SpectrogramTimerLabel, number>;
 
-const gpuLabels = [
-  'sliceSamples',
-  'windowing',
-  'fourierReverse',
-  'fourierTransform',
-  'magnitudify',
-  'decibelify',
-  'fundamentalFrequency',
-  'recordingFundamentalFrequency',
-  'remap',
-  'draw',
-] as const satisfies SpectrogramTimerLabel[];
+const laneLabels: SpectrogramLaneTimerLabel[] = allTrackKeys.flatMap((key) =>
+  spectrogramLaneStages.map<SpectrogramLaneTimerLabel>(
+    (stage) => `${key}.${stage}`,
+  ),
+);
 
-const cpuLabels = [
-  'configure',
-  'writeBuffers',
-  'createCommand',
-  'submitCommand',
+const gpuLabels: readonly GpuLabel[] = [...gpuRootLabels, ...laneLabels];
+
+export const spectrogramTimerLabels: readonly SpectrogramTimerLabel[] = [
+  ...cpuRootLabels.filter((label) => label !== 'total'),
+  ...gpuRootLabels,
+  ...laneLabels,
+  'other',
   'total',
-] as const satisfies SpectrogramTimerLabel[];
+];
 
 const create = (device: GPUDevice) => ({
-  gpu: createGpuTimer(device, gpuLabels),
-  cpu: createCpuTimer(cpuLabels),
+  gpu: createGpuTimer<readonly GpuLabel[]>(device, gpuLabels),
+  cpu: createCpuTimer(cpuRootLabels),
 });
 
 type Timer = ReturnType<typeof create>;
@@ -69,7 +80,7 @@ export const createSpectrogramProcessorTimer = (
 ): SpectrogramProcessorTimer => {
   if (!onMetrics) {
     return {
-      markers: cpuLabels.reduce(
+      markers: cpuRootLabels.reduce(
         (acc, label) => {
           acc[label] = (fn) => fn;
           return acc;
@@ -109,7 +120,7 @@ export const createSpectrogramProcessorTimer = (
       const gpuSum = gpuLabels.reduce((acc, key) => acc + metrics[key], 0);
       metrics.submitCommand = roundDuration(metrics.submitCommand - gpuSum);
       const sum = spectrogramTimerLabels
-        .slice(0, -2)
+        .filter((label) => label !== 'other' && label !== 'total')
         .reduce((acc, key) => acc + metrics[key], 0);
       metrics.other = roundDuration(metrics.total - sum);
       const sortedMetrics =

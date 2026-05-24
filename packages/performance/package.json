@@ -28,6 +28,7 @@
     "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-mkcert": "catalog:"
+    "vite-plugin-mkcert": "catalog:",
+    "zustand": "catalog:"
   }
 }

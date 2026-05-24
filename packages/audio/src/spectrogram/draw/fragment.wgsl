@@ -6,7 +6,7 @@ struct DrawParams {
   recordingMatchColor : vec4f,
   recordingCloseColor : vec4f,
   recordingMissColor : vec4f,
-  recordingThresholds : vec4f,
+  comparisonThresholds : vec4f,
   visibility : vec4u,
   relation : vec4u,
 };
@@ -14,8 +14,8 @@ struct DrawParams {
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
 @group(0) @binding(1) var valueSampler : sampler;
 @group(0) @binding(2) var spectrogramTextures : texture_2d_array<f32>;
-@group(0) @binding(3) var<storage, read> leadFundamentalFrequencies : array<f32>;
-@group(0) @binding(4) var<storage, read> recordingFundamentalFrequencies : array<f32>;
+@group(0) @binding(3) var<storage, read> referenceFundamentalFrequencies : array<f32>;
+@group(0) @binding(4) var<storage, read> targetFundamentalFrequencies : array<f32>;
 
 fn frequencyAtPixel(pixelY: u32, height: f32) -> f32 {
   let ratio = 1.0 - f32(pixelY) / max(1.0, height - 1.0);
@@ -77,10 +77,10 @@ fn segmentLineMask(
   return exp(-0.5 * normalizedDistance * normalizedDistance);
 }
 
-fn recordingLineColor(referenceFreq: f32, recordedFreq: f32) -> vec3f {
-  let distance = centsDistance(referenceFreq, recordedFreq);
-  let matchThreshold = drawParams.recordingThresholds.x;
-  let closeThreshold = drawParams.recordingThresholds.y;
+fn targetLineColor(referenceFreq: f32, targetFreq: f32) -> vec3f {
+  let distance = centsDistance(referenceFreq, targetFreq);
+  let matchThreshold = drawParams.comparisonThresholds.x;
+  let closeThreshold = drawParams.comparisonThresholds.y;
   if (distance <= matchThreshold) {
     return drawParams.recordingMatchColor.xyz;
   }
@@ -175,68 +175,70 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     intensity,
   );
 
-  var leadMask = 0.0;
-  let leadVisible = drawParams.visibility.z != 0u;
-  if (leadVisible) {
-    let leadCenter = leadFundamentalFrequencies[x];
-    var leadPrev = 0.0;
+  let referenceLineWidthCents = drawParams.comparisonThresholds.w;
+  let targetLineWidthCents = drawParams.comparisonThresholds.z;
+
+  var referenceMask = 0.0;
+  let referenceVisible = drawParams.visibility.z != 0u;
+  if (referenceVisible) {
+    let referenceCenter = referenceFundamentalFrequencies[x];
+    var referencePrev = 0.0;
     if (x > 0u) {
-      leadPrev = leadFundamentalFrequencies[x - 1u];
+      referencePrev = referenceFundamentalFrequencies[x - 1u];
     }
-    var leadNext = 0.0;
+    var referenceNext = 0.0;
     if (x + 1u < width) {
-      leadNext = leadFundamentalFrequencies[x + 1u];
+      referenceNext = referenceFundamentalFrequencies[x + 1u];
     }
-    leadMask = lineMaskAtPixel(
+    referenceMask = lineMaskAtPixel(
       position.xy,
       width,
       height,
       x,
-      leadCenter,
-      leadPrev,
-      leadNext,
-      26.0,
+      referenceCenter,
+      referencePrev,
+      referenceNext,
+      referenceLineWidthCents,
     );
   }
 
-  var recordingMask = 0.0;
-  var recordingFreq = 0.0;
-  let recordingVisible = drawParams.visibility.w != 0u;
-  let recordingWidth = drawParams.recordingThresholds.z;
-  if (recordingVisible) {
-    recordingFreq = recordingFundamentalFrequencies[x];
-    var recordingPrev = 0.0;
+  var targetMask = 0.0;
+  var targetFreq = 0.0;
+  let targetVisible = drawParams.visibility.w != 0u;
+  if (targetVisible) {
+    targetFreq = targetFundamentalFrequencies[x];
+    var targetPrev = 0.0;
     if (x > 0u) {
-      recordingPrev = recordingFundamentalFrequencies[x - 1u];
+      targetPrev = targetFundamentalFrequencies[x - 1u];
     }
-    var recordingNext = 0.0;
+    var targetNext = 0.0;
     if (x + 1u < width) {
-      recordingNext = recordingFundamentalFrequencies[x + 1u];
+      targetNext = targetFundamentalFrequencies[x + 1u];
     }
-    recordingMask = lineMaskAtPixel(
+    targetMask = lineMaskAtPixel(
       position.xy,
       width,
       height,
       x,
-      recordingFreq,
-      recordingPrev,
-      recordingNext,
-      recordingWidth,
+      targetFreq,
+      targetPrev,
+      targetNext,
+      targetLineWidthCents,
     );
   }
 
-  let leadLineColor = mix(drawParams.primary.xyz, vec3f(0.0), 0.12);
-  var color = mix(baseColor, leadLineColor, leadMask);
+  let referenceLineColor = mix(drawParams.primary.xyz, vec3f(0.0), 0.12);
+  var color = mix(baseColor, referenceLineColor, referenceMask);
 
-  if (recordingMask > 0.0) {
-    var recColor = drawParams.recordingMissColor.xyz;
-    if (leadVisible) {
-      let referenceFreq = leadFundamentalFrequencies[x];
+  if (targetMask > 0.0) {
+    var targetColor = drawParams.recordingMissColor.xyz;
+    if (referenceVisible) {
+      let referenceFreq = referenceFundamentalFrequencies[x];
       if (referenceFreq > 0.0) {
-        recColor = recordingLineColor(referenceFreq, recordingFreq);
+        targetColor = targetLineColor(referenceFreq, targetFreq);
       }
     }
-    color = mix(color, recColor, recordingMask);
+    color = mix(color, targetColor, targetMask);
   }
 
   return vec4f(color, 1.0);

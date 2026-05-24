@@ -5,40 +5,49 @@ import {
 } from '@musetric/audio/spectrogram';
 import { defaultSampleRate } from '@musetric/resource-utils';
 import {
+  type BenchmarkParams,
   progress,
   recordingSamples,
   runs,
   samples,
   skipRuns,
+  viewSizePresets,
 } from './constants.js';
 import { waitNextFrame } from './waitNextFrame.js';
 
+export type RunPipelineOptions = {
+  device: GPUDevice;
+  canvas: OffscreenCanvas;
+  fourierMode: FourierMode;
+  windowSize: number;
+  params: BenchmarkParams;
+};
+
 export const runPipeline = async (
-  device: GPUDevice,
-  canvas: OffscreenCanvas,
-  fourierMode: FourierMode,
-  windowSize: number,
+  options: RunPipelineOptions,
 ): Promise<{
   first: Record<string, number>;
   average: Record<string, number>;
   maxDeviation: Record<string, { positive: number; negative: number }>;
 }> => {
+  const { device, canvas, fourierMode, windowSize, params } = options;
+  const viewSize = viewSizePresets[params.viewSizeKey];
   const metricsArray: Record<string, number>[] = [];
   const config: SpectrogramConfig = {
     canvas,
     fourierMode,
     windowSize,
     sampleRate: defaultSampleRate,
-    visibleTime: 4.0,
+    visibleTime: params.visibleTime,
     playheadRatio: 0.5,
-    zeroPaddingFactor: 1,
+    zeroPaddingFactor: params.zeroPaddingFactor,
     windowName: 'hamming',
     minDecibel: -40,
     minFrequency: 120,
     maxFrequency: 4000,
     viewSize: {
-      width: canvas.width,
-      height: canvas.height,
+      width: viewSize.width,
+      height: viewSize.height,
     },
     colors: {
       background: '#000000',
@@ -48,13 +57,24 @@ export const runPipeline = async (
       recordingClose: '#ff9800',
       recordingMiss: '#f44336',
     },
-    recordingLineWidthCents: 35,
-    recordingMatchThresholdCents: 15,
-    recordingCloseThresholdCents: 50,
-    showLeadSpectrogram: true,
-    showRecordingSpectrogram: true,
-    showLeadFundamental: true,
-    showRecordingFundamental: true,
+    lanes: {
+      lead: {
+        showSpectrogram: true,
+        showFundamental: true,
+        lineWidthCents: 26,
+      },
+      recording: {
+        showSpectrogram: true,
+        showFundamental: true,
+        lineWidthCents: 35,
+      },
+    },
+    comparison: {
+      reference: 'lead',
+      target: 'recording',
+      matchThresholdCents: 15,
+      closeThresholdCents: 50,
+    },
   };
   const processor = createSpectrogramProcessor({
     device,
@@ -63,7 +83,10 @@ export const runPipeline = async (
   });
 
   for (let i = 0; i < skipRuns + runs; i++) {
-    await processor.render(samples, progress, recordingSamples);
+    await processor.render(
+      { lead: samples, recording: recordingSamples },
+      progress,
+    );
     await waitNextFrame(15);
   }
   processor.dispose();

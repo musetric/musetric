@@ -2,8 +2,10 @@ import type { ExtSpectrogramConfig } from './common/extConfig.js';
 import { applySpectrogramPatchConfig } from './common/patchConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {
+  allTrackKeys,
   buildSpectrogramConfig,
   type SpectrogramConfig,
+  type TrackKey,
 } from './config.cross.js';
 import {
   createSpectrogramDrawCell,
@@ -12,6 +14,7 @@ import {
 import {
   createSpectrogramLaneCell,
   type SpectrogramLane,
+  type SpectrogramLaneMarkers,
 } from './lane/index.js';
 import {
   createSpectrogramRemapCell,
@@ -29,10 +32,7 @@ export type SpectrogramTrack = {
 
 export type SpectrogramRuntime = {
   state: SpectrogramState;
-  tracks: {
-    lead: SpectrogramTrack;
-    recording: SpectrogramTrack;
-  };
+  tracks: Record<TrackKey, SpectrogramTrack>;
   draw: SpectrogramDraw;
 };
 
@@ -41,6 +41,25 @@ export type SpectrogramConfigurator = {
   updateConfig: (config?: Partial<SpectrogramConfig>) => void;
   dispose: () => void;
 };
+
+const pickLaneMarkers = (
+  markers: SpectrogramMarkers,
+  key: TrackKey,
+): SpectrogramLaneMarkers => ({
+  sliceSamples: markers[`${key}.sliceSamples`],
+  windowing: markers[`${key}.windowing`],
+  fourierReverse: markers[`${key}.fourierReverse`],
+  fourierTransform: markers[`${key}.fourierTransform`],
+  magnitudify: markers[`${key}.magnitudify`],
+  decibelify: markers[`${key}.decibelify`],
+  fundamentalFrequency: markers[`${key}.fundamentalFrequency`],
+});
+
+type TrackCells = {
+  lane: ReturnType<typeof createSpectrogramLaneCell>;
+  remap: ReturnType<typeof createSpectrogramRemapCell>;
+};
+
 export const createSpectrogramConfigurator = (
   device: GPUDevice,
   markers: SpectrogramMarkers,
@@ -49,30 +68,23 @@ export const createSpectrogramConfigurator = (
   let config: ExtSpectrogramConfig | undefined = undefined;
   let runtime: SpectrogramRuntime | undefined = undefined;
 
-  const cells = {
-    state: createSpectrogramStateCell(device),
-    leadLane: createSpectrogramLaneCell(device, {
-      mode: 'granular',
-      label: 'lead',
-      markers: {
-        sliceSamples: markers.sliceSamples,
-        windowing: markers.windowing,
-        fourierReverse: markers.fourierReverse,
-        fourierTransform: markers.fourierTransform,
-        magnitudify: markers.magnitudify,
-        decibelify: markers.decibelify,
-        fundamentalFrequency: markers.fundamentalFrequency,
-      },
-    }),
-    recordingLane: createSpectrogramLaneCell(device, {
-      mode: 'bulk',
-      label: 'recording',
-      marker: markers.recordingFundamentalFrequency,
-    }),
-    leadRemap: createSpectrogramRemapCell(device, markers.remap),
-    recordingRemap: createSpectrogramRemapCell(device),
-    draw: createSpectrogramDrawCell(device, markers.draw),
-  };
+  const stateCell = createSpectrogramStateCell(device);
+  const drawCell = createSpectrogramDrawCell(device, markers.draw);
+
+  const trackCells = allTrackKeys.reduce(
+    (acc, key) => {
+      acc[key] = {
+        lane: createSpectrogramLaneCell(device, {
+          label: key,
+          markers: pickLaneMarkers(markers, key),
+        }),
+        remap: createSpectrogramRemapCell(device, markers[`${key}.remap`]),
+      };
+      return acc;
+    },
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as Record<TrackKey, TrackCells>,
+  );
 
   const buildConfig = (): ExtSpectrogramConfig | undefined => {
     const baseConfig = buildSpectrogramConfig(config, draftConfig);
@@ -92,39 +104,48 @@ export const createSpectrogramConfigurator = (
         return runtime;
       }
 
-      config = buildConfig();
-      if (!config) {
+      const nextConfig = buildConfig();
+      if (!nextConfig) {
         return undefined;
       }
+      config = nextConfig;
       draftConfig = undefined;
-      const state = cells.state.get(config);
+      const state = stateCell.get(nextConfig);
       const { texture } = state;
-      const leadLane = cells.leadLane.get(config);
-      const recordingLane = cells.recordingLane.get(config);
-      const leadRemap = cells.leadRemap.get({
-        signal: leadLane.signal.real,
-        texture: texture.layerViews[0],
-        config,
-      });
-      const recordingRemap = cells.recordingRemap.get({
-        signal: recordingLane.signal.real,
-        texture: texture.layerViews[1],
-        config,
-      });
-      const draw = cells.draw.get({
+
+      const tracks = allTrackKeys.reduce(
+        (acc, key, index) => {
+          const lane = trackCells[key].lane.get(nextConfig);
+          const remap = trackCells[key].remap.get({
+            signal: lane.signal.real,
+            texture: texture.layerViews[index],
+            config: nextConfig,
+          });
+          acc[key] = { lane, remap };
+          return acc;
+        },
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        {} as Record<TrackKey, SpectrogramTrack>,
+      );
+
+      const fundamentalFrequencies = allTrackKeys.reduce(
+        (acc, key) => {
+          acc[key] = tracks[key].lane.fundamentalFrequencyBuffer;
+          return acc;
+        },
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        {} as Record<TrackKey, GPUBuffer>,
+      );
+
+      const draw = drawCell.get({
         arrayView: texture.arrayView,
-        leadFundamentalFrequencies: leadLane.fundamentalFrequencyBuffer,
-        recordingFundamentalFrequencies:
-          recordingLane.fundamentalFrequencyBuffer,
-        config,
+        fundamentalFrequencies,
+        config: nextConfig,
       });
 
       runtime = {
         state,
-        tracks: {
-          lead: { lane: leadLane, remap: leadRemap },
-          recording: { lane: recordingLane, remap: recordingRemap },
-        },
+        tracks,
         draw,
       };
       return runtime;
@@ -137,12 +158,12 @@ export const createSpectrogramConfigurator = (
       });
     },
     dispose: () => {
-      cells.state.dispose();
-      cells.leadLane.dispose();
-      cells.recordingLane.dispose();
-      cells.leadRemap.dispose();
-      cells.recordingRemap.dispose();
-      cells.draw.dispose();
+      stateCell.dispose();
+      drawCell.dispose();
+      for (const key of allTrackKeys) {
+        trackCells[key].lane.dispose();
+        trackCells[key].remap.dispose();
+      }
     },
   };
 };

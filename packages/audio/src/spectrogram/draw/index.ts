@@ -1,6 +1,6 @@
 import { type ResourceCell } from '@musetric/resource-utils';
 import { setOffscreenCanvasSize } from '@musetric/resource-utils/cross/offscreenCanvas';
-import { type SpectrogramConfig } from '../config.cross.js';
+import { type SpectrogramConfig, type TrackKey } from '../config.cross.js';
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';
 import { createColorsCell } from './colors.js';
@@ -11,8 +11,7 @@ export type SpectrogramDraw = {
 
 export type SpectrogramDrawArg = {
   arrayView: GPUTextureView;
-  leadFundamentalFrequencies: GPUBuffer;
-  recordingFundamentalFrequencies: GPUBuffer;
+  fundamentalFrequencies: Record<TrackKey, GPUBuffer>;
   config: SpectrogramConfig;
 };
 
@@ -31,19 +30,15 @@ export const createSpectrogramDrawCell = (
 
   return {
     get: (arg) => {
-      const {
-        arrayView,
-        leadFundamentalFrequencies,
-        recordingFundamentalFrequencies,
-        config,
-      } = arg;
+      const { arrayView, fundamentalFrequencies, config } = arg;
+      const { reference, target } = config.comparison;
       const canvas = canvasCell.get(config.canvas);
       setOffscreenCanvasSize(config.canvas, config.viewSize);
       const colors = colorsCell.get(config);
       const bindGroup = bindGroupCell.get({
         arrayView,
-        leadFundamentalFrequencies,
-        recordingFundamentalFrequencies,
+        referenceFundamentalFrequencies: fundamentalFrequencies[reference],
+        targetFundamentalFrequencies: fundamentalFrequencies[target],
         colors: colors.buffer,
         layout: canvas.pipeline.getBindGroupLayout(0),
       });

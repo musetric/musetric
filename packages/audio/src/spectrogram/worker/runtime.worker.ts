@@ -1,8 +1,10 @@
 import { getGpuDevice } from '../common/gpuDevice.js';
+import { allTrackKeys } from '../config.cross.js';
 import { createSpectrogramProcessor } from '../processor.js';
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
+  type SpectrogramLaneSamples,
 } from '../protocol.cross.js';
 
 export type CreateSpectrogramRuntimeOptions = {
@@ -12,6 +14,12 @@ export type CreateSpectrogramRuntimeOptions = {
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
   profiling?: boolean;
 };
+
+const emptySamples = (): SpectrogramLaneSamples =>
+  allTrackKeys.reduce<SpectrogramLaneSamples>((acc, key) => {
+    acc[key] = undefined;
+    return acc;
+  }, {});
 
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
@@ -30,16 +38,18 @@ export const createSpectrogramRuntime = async (
     });
 
   let processor = createProcessor();
-  let samples: Float32Array<SharedArrayBuffer> | undefined = undefined;
-  let recordingSamples: Float32Array<SharedArrayBuffer> | undefined = undefined;
+  let samplesByLane: SpectrogramLaneSamples = emptySamples();
   let trackProgress = 0;
 
+  const hasAnySamples = () =>
+    allTrackKeys.some((key) => samplesByLane[key] !== undefined);
+
   const render = async () => {
-    if (!samples) {
+    if (!hasAnySamples()) {
       return;
     }
 
-    const ok = await processor.render(samples, trackProgress, recordingSamples);
+    const ok = await processor.render(samplesByLane, trackProgress);
     if (!ok) {
       return;
     }
@@ -50,18 +60,16 @@ export const createSpectrogramRuntime = async (
 
   dataPort.bindHandlers({
     mount: async (message) => {
-      samples = message.samples;
-      recordingSamples = message.recordingSamples;
+      samplesByLane = { ...emptySamples(), ...message.samples };
       await render();
     },
     unmount: () => {
-      samples = undefined;
-      recordingSamples = undefined;
+      samplesByLane = emptySamples();
       port.methods.setState({
         status: 'pending',
       });
     },
-    recordingSamplesChanged: () => {
+    samplesChanged: () => {
       void render();
     },
   });
