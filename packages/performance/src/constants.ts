@@ -4,7 +4,11 @@ import {
 } from '@musetric/audio/spectrogram';
 import { defaultSampleRate } from '@musetric/resource-utils';
 
-export const fourierModes: readonly FourierMode[] = ['fftRadix4', 'fftRadix2'];
+export const fourierModes: readonly FourierMode[] = [
+  'fftPrunedFourStepR2c',
+  'fftRadix4',
+  'fftRadix2',
+];
 
 export const runs = 10;
 export const skipRuns = 10;

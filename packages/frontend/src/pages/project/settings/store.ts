@@ -25,7 +25,7 @@ export type SettingsState = Pick<
 };
 
 const initialState: SettingsState = {
-  fourierMode: 'fftRadix4',
+  fourierMode: 'fftPrunedFourStepR2c',
   windowSize: 1024 * 4,
   visibleTime: 5,
   playheadRatio: 0.4,

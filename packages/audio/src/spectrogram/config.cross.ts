@@ -8,7 +8,11 @@ export type TrackKey = (typeof allTrackKeys)[number];
 
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
-export const allFourierModes = ['fftRadix2', 'fftRadix4'] as const;
+export const allFourierModes = [
+  'fftPrunedFourStepR2c',
+  'fftRadix4',
+  'fftRadix2',
+] as const;
 export type FourierMode = (typeof allFourierModes)[number];
 
 export const allSpectrogramWindowNames = [

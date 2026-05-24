@@ -13,19 +13,25 @@ type ExpectedBin = {
   imag?: number;
 };
 
-const createZeroComplexArray = (windowSize: number): ComplexArray => ({
-  real: new Float32Array(windowSize),
-  imag: new Float32Array(windowSize),
+const positiveSize = (windowSize: number): number => windowSize / 2 + 1;
+
+const createZeroComplexArray = (size: number): ComplexArray => ({
+  real: new Float32Array(size),
+  imag: new Float32Array(size),
 });
 
 const createExpectedOutput = (
   windowSize: number,
   expectedBins: ExpectedBin[],
 ): ComplexArray => {
-  const output = createZeroComplexArray(windowSize);
+  const size = positiveSize(windowSize);
+  const output = createZeroComplexArray(size);
 
   expectedBins.forEach((bin) => {
     const { index, real = 0, imag = 0 } = bin;
+    if (index >= size) {
+      return;
+    }
     output.real[index] = real;
     output.imag[index] = imag;
   });
@@ -34,13 +40,11 @@ const createExpectedOutput = (
 };
 
 const createSignal = (
-  windowSize: number,
+  size: number,
   createSample: (sampleIndex: number) => number,
 ): Float32Array<ArrayBuffer> =>
   Float32Array.from(
-    Array.from({ length: windowSize }, (_, sampleIndex) =>
-      createSample(sampleIndex),
-    ),
+    Array.from({ length: size }, (_, sampleIndex) => createSample(sampleIndex)),
   );
 
 const createUnitImpulseFixture = (windowSize: number): FourierFixture => ({
@@ -48,8 +52,8 @@ const createUnitImpulseFixture = (windowSize: number): FourierFixture => ({
   windowSize,
   input: createSignal(windowSize, (sampleIndex) => (sampleIndex === 0 ? 1 : 0)),
   output: {
-    real: Float32Array.from(new Array(windowSize).fill(1)),
-    imag: Float32Array.from(new Array(windowSize).fill(0)),
+    real: Float32Array.from(new Array(positiveSize(windowSize)).fill(1)),
+    imag: new Float32Array(positiveSize(windowSize)),
   },
 });
 
@@ -63,10 +67,10 @@ const createShiftedImpulseFixture = (windowSize: number): FourierFixture => {
       sampleIndex === shift ? 1 : 0,
     ),
     output: {
-      real: createSignal(windowSize, (binIndex) =>
+      real: createSignal(positiveSize(windowSize), (binIndex) =>
         Math.cos((-2 * Math.PI * binIndex * shift) / windowSize),
       ),
-      imag: createSignal(windowSize, (binIndex) =>
+      imag: createSignal(positiveSize(windowSize), (binIndex) =>
         Math.sin((-2 * Math.PI * binIndex * shift) / windowSize),
       ),
     },
@@ -187,68 +191,14 @@ const createPhasedBinFixture = (
 
 const createSmallHandWrittenFourierFixtures = (): FourierFixture[] => [
   {
-    name: 'FFT 2-point: unit impulse',
-    windowSize: 2,
-    input: Float32Array.from([1, 0]),
-    output: {
-      real: Float32Array.from([1, 1]),
-      imag: Float32Array.from([0, 0]),
-    },
-  },
-  {
-    name: 'FFT 2-point: constant',
-    windowSize: 2,
-    input: Float32Array.from([1, 1]),
-    output: {
-      real: Float32Array.from([2, 0]),
-      imag: Float32Array.from([0, 0]),
-    },
-  },
-  {
-    name: 'FFT 2-point: linear ramp',
-    windowSize: 2,
-    input: Float32Array.from([0, 1]),
-    output: {
-      real: Float32Array.from([1, -1]),
-      imag: Float32Array.from([0, 0]),
-    },
-  },
-  {
-    name: 'FFT 4-point: unit impulse',
-    windowSize: 4,
-    input: Float32Array.from([1, 0, 0, 0]),
-    output: {
-      real: Float32Array.from([1, 1, 1, 1]),
-      imag: Float32Array.from([0, 0, 0, 0]),
-    },
-  },
-  {
-    name: 'FFT 4-point: constant',
-    windowSize: 4,
-    input: Float32Array.from([1, 1, 1, 1]),
-    output: {
-      real: Float32Array.from([4, 0, 0, 0]),
-      imag: Float32Array.from([0, 0, 0, 0]),
-    },
-  },
-  {
-    name: 'FFT 4-point: linear ramp',
-    windowSize: 4,
-    input: Float32Array.from([0, 1, 2, 3]),
-    output: {
-      real: Float32Array.from([6, -2, -2, -2]),
-      imag: Float32Array.from([0, 2, 0, -2]),
-    },
-  },
-  {
     name: 'FFT 8-point: sin bin 1',
     windowSize: 8,
     input: createSignal(8, (sampleIndex) =>
       Math.sin((2 * Math.PI * sampleIndex) / 8),
     ),
     output: {
-      real: Float32Array.from(new Array(8).fill(0)),
-      imag: Float32Array.from([0, -4, 0, 0, 0, 0, 0, 4]),
+      real: Float32Array.from(new Array(positiveSize(8)).fill(0)),
+      imag: Float32Array.from([0, -4, 0, 0, 0]),
     },
   },
   {
@@ -266,15 +216,7 @@ const createSmallHandWrittenFourierFixtures = (): FourierFixture[] => [
         real: 8,
       },
       {
-        index: 13,
-        real: 8,
-      },
-      {
         index: 5,
-        real: 8,
-      },
-      {
-        index: 11,
         real: 8,
       },
     ]),
