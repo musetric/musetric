@@ -12,6 +12,7 @@ export * from './config.cross.js';
 export * from './decibelify/index.js';
 export * from './draw/index.js';
 export * from './fourier/config.js';
+export * from './fourier/fftPrunedFourStepR2c/index.js';
 export * from './fourier/fftRadix2/index.js';
 export * from './fourier/fftRadix4/index.js';
 export * from './fourier/fouriers.js';

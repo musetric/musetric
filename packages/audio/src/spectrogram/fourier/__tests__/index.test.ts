@@ -41,8 +41,17 @@ describe('fourier', async () => {
             await device.queue.onSubmittedWorkDone();
             const outputBuffer = await reader.read(buffers.signal);
             const result = complexArrayFrom(outputBuffer);
-            assertArrayClose('real', result.real, fixture.output.real);
-            assertArrayClose('imag', result.imag, fixture.output.imag);
+            const positiveSize = fixture.windowSize / 2 + 1;
+            assertArrayClose(
+              'real',
+              result.real.slice(0, positiveSize),
+              fixture.output.real,
+            );
+            assertArrayClose(
+              'imag',
+              result.imag.slice(0, positiveSize),
+              fixture.output.imag,
+            );
           });
 
           afterAll(() => {
