@@ -7,7 +7,185 @@ export type FourierFixture = {
   output: ComplexArray;
 };
 
-export const fourierFixtures: FourierFixture[] = [
+type ExpectedBin = {
+  index: number;
+  real?: number;
+  imag?: number;
+};
+
+const createZeroComplexArray = (windowSize: number): ComplexArray => ({
+  real: new Float32Array(windowSize),
+  imag: new Float32Array(windowSize),
+});
+
+const createExpectedOutput = (
+  windowSize: number,
+  expectedBins: ExpectedBin[],
+): ComplexArray => {
+  const output = createZeroComplexArray(windowSize);
+
+  expectedBins.forEach((bin) => {
+    const { index, real = 0, imag = 0 } = bin;
+    output.real[index] = real;
+    output.imag[index] = imag;
+  });
+
+  return output;
+};
+
+const createSignal = (
+  windowSize: number,
+  createSample: (sampleIndex: number) => number,
+): Float32Array<ArrayBuffer> =>
+  Float32Array.from(
+    Array.from({ length: windowSize }, (_, sampleIndex) =>
+      createSample(sampleIndex),
+    ),
+  );
+
+const createUnitImpulseFixture = (windowSize: number): FourierFixture => ({
+  name: `FFT ${windowSize}-point: unit impulse produces flat spectrum`,
+  windowSize,
+  input: createSignal(windowSize, (sampleIndex) => (sampleIndex === 0 ? 1 : 0)),
+  output: {
+    real: Float32Array.from(new Array(windowSize).fill(1)),
+    imag: Float32Array.from(new Array(windowSize).fill(0)),
+  },
+});
+
+const createShiftedImpulseFixture = (windowSize: number): FourierFixture => {
+  const shift = Math.floor(windowSize / 3) + 5;
+
+  return {
+    name: `FFT ${windowSize}-point: shifted impulse preserves phase ramp`,
+    windowSize,
+    input: createSignal(windowSize, (sampleIndex) =>
+      sampleIndex === shift ? 1 : 0,
+    ),
+    output: {
+      real: createSignal(windowSize, (binIndex) =>
+        Math.cos((-2 * Math.PI * binIndex * shift) / windowSize),
+      ),
+      imag: createSignal(windowSize, (binIndex) =>
+        Math.sin((-2 * Math.PI * binIndex * shift) / windowSize),
+      ),
+    },
+  };
+};
+
+const createConstantFixture = (windowSize: number): FourierFixture => ({
+  name: `FFT ${windowSize}-point: constant goes only to DC`,
+  windowSize,
+  input: Float32Array.from(new Array(windowSize).fill(1)),
+  output: createExpectedOutput(windowSize, [
+    {
+      index: 0,
+      real: windowSize,
+    },
+  ]),
+});
+
+const createNyquistCosineFixture = (windowSize: number): FourierFixture => ({
+  name: `FFT ${windowSize}-point: nyquist cosine goes only to N/2`,
+  windowSize,
+  input: createSignal(windowSize, (sampleIndex) =>
+    sampleIndex % 2 === 0 ? 1 : -1,
+  ),
+  output: createExpectedOutput(windowSize, [
+    {
+      index: windowSize / 2,
+      real: windowSize,
+    },
+  ]),
+});
+
+const createSineBinFixture = (
+  windowSize: number,
+  binIndex: number,
+  label: string,
+): FourierFixture => {
+  const mirrorIndex = windowSize - binIndex;
+
+  return {
+    name: `FFT ${windowSize}-point: ${label} sine mirrors imag sign correctly`,
+    windowSize,
+    input: createSignal(windowSize, (sampleIndex) =>
+      Math.sin((2 * Math.PI * binIndex * sampleIndex) / windowSize),
+    ),
+    output: createExpectedOutput(windowSize, [
+      {
+        index: binIndex,
+        imag: -windowSize / 2,
+      },
+      {
+        index: mirrorIndex,
+        imag: windowSize / 2,
+      },
+    ]),
+  };
+};
+
+const createCosineBinFixture = (
+  windowSize: number,
+  binIndex: number,
+  label: string,
+): FourierFixture => {
+  const mirrorIndex = windowSize - binIndex;
+
+  return {
+    name: `FFT ${windowSize}-point: ${label} cosine mirrors real amplitude correctly`,
+    windowSize,
+    input: createSignal(windowSize, (sampleIndex) =>
+      Math.cos((2 * Math.PI * binIndex * sampleIndex) / windowSize),
+    ),
+    output: createExpectedOutput(windowSize, [
+      {
+        index: binIndex,
+        real: windowSize / 2,
+      },
+      {
+        index: mirrorIndex,
+        real: windowSize / 2,
+      },
+    ]),
+  };
+};
+
+const createPhasedBinFixture = (
+  windowSize: number,
+  binIndex: number,
+  label: string,
+): FourierFixture => {
+  const cosineAmplitude = 3;
+  const sineAmplitude = 2;
+  const mirrorIndex = windowSize - binIndex;
+
+  return {
+    name: `FFT ${windowSize}-point: ${label} phased bin keeps real/imag and mirror signs`,
+    windowSize,
+    input: createSignal(windowSize, (sampleIndex) => {
+      const angle = (2 * Math.PI * binIndex * sampleIndex) / windowSize;
+
+      return (
+        cosineAmplitude * Math.cos(angle) + sineAmplitude * Math.sin(angle)
+      );
+    }),
+    output: createExpectedOutput(windowSize, [
+      {
+        index: binIndex,
+        real: (cosineAmplitude * windowSize) / 2,
+        imag: (-sineAmplitude * windowSize) / 2,
+      },
+      {
+        index: mirrorIndex,
+        real: (cosineAmplitude * windowSize) / 2,
+        imag: (sineAmplitude * windowSize) / 2,
+      },
+    ]),
+  };
+};
+
+const createSmallHandWrittenFourierFixtures = (): FourierFixture[] => [
   {
     name: 'FFT 2-point: unit impulse',
     windowSize: 2,
@@ -63,41 +241,10 @@ export const fourierFixtures: FourierFixture[] = [
     },
   },
   {
-    name: 'FFT 8-point: unit impulse',
+    name: 'FFT 8-point: sin bin 1',
     windowSize: 8,
-    input: Float32Array.from(
-      Array.from({ length: 8 }, (_, i) => (i === 0 ? 1 : 0)),
-    ),
-    output: {
-      real: Float32Array.from(new Array(8).fill(1)),
-      imag: Float32Array.from(new Array(8).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 8-point: constant',
-    windowSize: 8,
-    input: Float32Array.from(new Array(8).fill(1)),
-    output: {
-      real: Float32Array.from([8, ...new Array(7).fill(0)]),
-      imag: Float32Array.from(new Array(8).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 8-point: linear ramp',
-    windowSize: 8,
-    input: Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7]),
-    output: {
-      real: Float32Array.from([28, -4, -4, -4, -4, -4, -4, -4]),
-      imag: Float32Array.from([
-        0, 9.656854, 4, 1.656854, 0, -1.656854, -4, -9.656854,
-      ]),
-    },
-  },
-  {
-    name: 'FFT 8-point: sin 1',
-    windowSize: 8,
-    input: Float32Array.from(
-      Array.from({ length: 8 }, (_, i) => Math.sin((2 * Math.PI * i) / 8)),
+    input: createSignal(8, (sampleIndex) =>
+      Math.sin((2 * Math.PI * sampleIndex) / 8),
     ),
     output: {
       real: Float32Array.from(new Array(8).fill(0)),
@@ -105,187 +252,62 @@ export const fourierFixtures: FourierFixture[] = [
     },
   },
   {
-    name: 'FFT 16-point: unit impulse',
+    name: 'FFT 16-point: cos bin 3 and cos bin 5',
     windowSize: 16,
-    input: Float32Array.from([1, ...new Array(15).fill(0)]),
-    output: {
-      real: Float32Array.from(new Array(16).fill(1)),
-      imag: Float32Array.from(new Array(16).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 16-point: constant',
-    windowSize: 16,
-    input: Float32Array.from(new Array(16).fill(1)),
-    output: {
-      real: Float32Array.from([16, ...new Array(15).fill(0)]),
-      imag: Float32Array.from(new Array(16).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 16-point: sin 1',
-    windowSize: 16,
-    input: Float32Array.from(
-      Array.from({ length: 16 }, (_, i) => Math.sin((2 * Math.PI * i) / 16)),
+    input: createSignal(
+      16,
+      (sampleIndex) =>
+        Math.cos((2 * Math.PI * 3 * sampleIndex) / 16) +
+        Math.cos((2 * Math.PI * 5 * sampleIndex) / 16),
     ),
-    output: {
-      real: Float32Array.from(new Array(16).fill(0)),
-      imag: Float32Array.from(
-        Array.from({ length: 16 }, (_, i) => {
-          if (i === 1) return -8;
-          if (i === 15) return 8;
-          return 0;
-        }),
-      ),
-    },
+    output: createExpectedOutput(16, [
+      {
+        index: 3,
+        real: 8,
+      },
+      {
+        index: 13,
+        real: 8,
+      },
+      {
+        index: 5,
+        real: 8,
+      },
+      {
+        index: 11,
+        real: 8,
+      },
+    ]),
   },
-  {
-    name: 'FFT 16-point: cos 3 & cos 5',
-    windowSize: 16,
-    input: Float32Array.from(
-      Array.from(
-        { length: 16 },
-        (_, i) =>
-          Math.cos((2 * Math.PI * 3 * i) / 16) +
-          Math.cos((2 * Math.PI * 5 * i) / 16),
-      ),
-    ),
-    output: {
-      real: Float32Array.from(
-        Array.from({ length: 16 }, (_, i) => {
-          if (i === 3) return 8;
-          if (i === 13) return 8;
-          if (i === 5) return 8;
-          if (i === 11) return 8;
-          return 0;
-        }),
-      ),
-      imag: Float32Array.from(new Array(16).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 32-point: unit impulse',
-    windowSize: 32,
-    input: Float32Array.from([1, ...new Array(31).fill(0)]),
-    output: {
-      real: Float32Array.from(new Array(32).fill(1)),
-      imag: Float32Array.from(new Array(32).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 32-point: constant',
-    windowSize: 32,
-    input: Float32Array.from(new Array(32).fill(1)),
-    output: {
-      real: Float32Array.from([32, ...new Array(31).fill(0)]),
-      imag: Float32Array.from(new Array(32).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 32-point: sin 1',
-    windowSize: 32,
-    input: Float32Array.from(
-      Array.from({ length: 32 }, (_, i) => Math.sin((2 * Math.PI * i) / 32)),
-    ),
-    output: {
-      real: Float32Array.from(new Array(32).fill(0)),
-      imag: Float32Array.from(
-        Array.from({ length: 32 }, (_, i) => {
-          if (i === 1) return -16;
-          if (i === 31) return 16;
-          return 0;
-        }),
-      ),
-    },
-  },
-  {
-    name: 'FFT 32-point: cos 3 & cos 5',
-    windowSize: 32,
-    input: Float32Array.from(
-      Array.from(
-        { length: 32 },
-        (_, i) =>
-          Math.cos((2 * Math.PI * 3 * i) / 32) +
-          Math.cos((2 * Math.PI * 5 * i) / 32),
-      ),
-    ),
-    output: {
-      real: Float32Array.from(
-        Array.from({ length: 32 }, (_, i) => {
-          if (i === 3) return 16;
-          if (i === 29) return 16;
-          if (i === 5) return 16;
-          if (i === 27) return 16;
-          return 0;
-        }),
-      ),
-      imag: Float32Array.from(new Array(32).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 64-point: sin 7',
-    windowSize: 64,
-    input: Float32Array.from(
-      Array.from({ length: 64 }, (_, i) =>
-        Math.sin((2 * Math.PI * 7 * i) / 64),
-      ),
-    ),
-    output: {
-      real: Float32Array.from(new Array(64).fill(0)),
-      imag: Float32Array.from(
-        Array.from({ length: 64 }, (_, i) => {
-          if (i === 7) return -32;
-          if (i === 57) return 32;
-          return 0;
-        }),
-      ),
-    },
-  },
-  {
-    name: 'FFT 128-point: cos 9',
-    windowSize: 128,
-    input: Float32Array.from(
-      Array.from({ length: 128 }, (_, i) =>
-        Math.cos((2 * Math.PI * 9 * i) / 128),
-      ),
-    ),
-    output: {
-      real: Float32Array.from(
-        Array.from({ length: 128 }, (_, i) => {
-          if (i === 9) return 64;
-          if (i === 119) return 64;
-          return 0;
-        }),
-      ),
-      imag: Float32Array.from(new Array(128).fill(0)),
-    },
-  },
-  {
-    name: 'FFT 256-point: sin 12 & cos 20',
-    windowSize: 256,
-    input: Float32Array.from(
-      Array.from(
-        { length: 256 },
-        (_, i) =>
-          Math.sin((2 * Math.PI * 12 * i) / 256) +
-          Math.cos((2 * Math.PI * 20 * i) / 256),
-      ),
-    ),
-    output: {
-      real: Float32Array.from(
-        Array.from({ length: 256 }, (_, i) => {
-          if (i === 20) return 128;
-          if (i === 236) return 128;
-          return 0;
-        }),
-      ),
-      imag: Float32Array.from(
-        Array.from({ length: 256 }, (_, i) => {
-          if (i === 12) return -128;
-          if (i === 244) return 128;
-          return 0;
-        }),
-      ),
-    },
-  },
+];
+
+const createDiagnosticFourierFixtures = (
+  windowSize: number,
+): FourierFixture[] => {
+  const nearQuarterBinIndex = windowSize / 4 + 1;
+  const nearNyquistBinIndex = windowSize / 2 - 1;
+
+  return [
+    createUnitImpulseFixture(windowSize),
+    createShiftedImpulseFixture(windowSize),
+    createConstantFixture(windowSize),
+    createNyquistCosineFixture(windowSize),
+
+    createSineBinFixture(windowSize, 1, 'low-frequency'),
+    createCosineBinFixture(windowSize, nearQuarterBinIndex, 'near-quarter'),
+    createSineBinFixture(windowSize, nearNyquistBinIndex, 'near-nyquist'),
+
+    createPhasedBinFixture(windowSize, 1, 'low-frequency'),
+    createPhasedBinFixture(windowSize, nearQuarterBinIndex, 'near-quarter'),
+    createPhasedBinFixture(windowSize, nearNyquistBinIndex, 'near-nyquist'),
+  ];
+};
+
+const diagnosticWindowSizes = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
+
+export const fourierFixtures: FourierFixture[] = [
+  ...createSmallHandWrittenFourierFixtures(),
+  ...diagnosticWindowSizes.flatMap((windowSize) =>
+    createDiagnosticFourierFixtures(windowSize),
+  ),
 ];
