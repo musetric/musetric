@@ -2,6 +2,7 @@ import {
   type ControlledPromise,
   createControlledPromise,
 } from '@musetric/resource-utils';
+import { createLazyMount } from '@musetric/resource-utils/cross/lazyMount';
 import type { Store } from '../common/store.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './decoderProtocol.cross.js';
@@ -174,7 +175,7 @@ export const createEngineDecoder = (
 
       return bootPromise.promise;
     },
-    mount: (projectId) => {
+    mount: createLazyMount((projectId: number) => {
       mountPromise = createControlledPromise<void>();
       port.methods.mount({
         projectId,
@@ -184,7 +185,7 @@ export const createEngineDecoder = (
       return () => {
         port.methods.unmount();
       };
-    },
+    }),
     startRecordingStream: (recording) => {
       recordingStreamPromise = createControlledPromise<void>();
       port.methods.startRecordingStream(recording);
