@@ -4,7 +4,7 @@ import {
 } from '@musetric/resource-utils';
 import type { Store } from '../common/store.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
-import { engineDecoderChannel } from './decoderProtocol.js';
+import { engineDecoderChannel } from './decoderProtocol.cross.js';
 import type { EngineState } from './state.js';
 
 type Unmount = () => void;
