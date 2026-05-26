@@ -10,7 +10,7 @@ export type FrameIndexTracker = {
 };
 
 export const createFrameIndexTracker = (sampleRate: number) => {
-  const interval = alignFrames(sampleRate / 30);
+  const interval = alignFrames(sampleRate / 120);
   let pendingFrameCount = 0;
 
   const ref: FrameIndexTracker = {
