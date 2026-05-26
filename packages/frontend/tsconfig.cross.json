@@ -1,0 +1,3 @@
+{
+  "extends": "../../tsconfigs/tsconfig.cross.json"
+}

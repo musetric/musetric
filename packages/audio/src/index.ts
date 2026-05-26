@@ -1,4 +1,3 @@
-export * from './decoder/protocol.cross.js';
 export * from './index.es.js';
 export * from './player/protocol.cross.js';
 export * from './recording/index.js';

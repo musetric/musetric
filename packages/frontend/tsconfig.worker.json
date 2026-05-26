@@ -1,5 +1,6 @@
 {
   "extends": "../../tsconfigs/tsconfig.worker.json",
+  "references": [{ "path": "./tsconfig.cross.json" }],
   "compilerOptions": {
     "types": ["@webgpu/types", "vite/client"],
     "outDir": "${configDir}/.tsbuildinfo/dist"

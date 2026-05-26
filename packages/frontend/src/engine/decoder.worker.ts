@@ -12,7 +12,7 @@ import {
 import {
   type DecoderRecordingMessage,
   engineDecoderChannel,
-} from './decoderProtocol.worker.js';
+} from './decoderProtocol.cross.js';
 
 const port = engineDecoderChannel.inbound(self);
 
