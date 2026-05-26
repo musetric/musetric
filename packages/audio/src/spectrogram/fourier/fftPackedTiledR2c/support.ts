@@ -3,6 +3,7 @@ import { type FourierConfig } from '../config.js';
 export type PackedTiledR2cVariant = {
   windowSize: number;
   packedWindowSize: number;
+  tileSize: number;
   rowSize: number;
   rowHalfSize: number;
   rowPairCount: number;
@@ -12,9 +13,11 @@ export type PackedTiledR2cVariant = {
   log2ColumnSize: number;
 };
 
-const maxTileSize = 64;
+const batchSize = 4;
+const maxTileSize = 256;
+const maxWindowSize = 65536;
 const minPackedWindowSize = 4;
-const maxPackedWindowSize = maxTileSize * maxTileSize;
+const maxPackedWindowSize = maxWindowSize / 2;
 
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
@@ -26,6 +29,7 @@ const createVariant = (
 ): PackedTiledR2cVariant => ({
   windowSize,
   packedWindowSize: windowSize / 2,
+  tileSize: Math.max(rowSize, columnSize),
   rowSize,
   rowHalfSize: rowSize / 2,
   rowPairCount: rowSize / 2 + 1,
@@ -34,6 +38,10 @@ const createVariant = (
   log2RowSize: Math.log2(rowSize),
   log2ColumnSize: Math.log2(columnSize),
 });
+
+const getRequiredWorkgroupStorageSize = (
+  variant: PackedTiledR2cVariant,
+): number => 8 * batchSize * variant.tileSize * Float32Array.BYTES_PER_ELEMENT;
 
 const createVariantFromWindowSize = (
   windowSize: number,
@@ -59,6 +67,17 @@ const createVariantFromWindowSize = (
 };
 
 export const getPackedTiledR2cVariant = (
+  device: GPUDevice,
   config: FourierConfig,
-): PackedTiledR2cVariant | undefined =>
-  createVariantFromWindowSize(config.windowSize);
+): PackedTiledR2cVariant | undefined => {
+  const variant = createVariantFromWindowSize(config.windowSize);
+  if (
+    variant === undefined ||
+    getRequiredWorkgroupStorageSize(variant) >
+      device.limits.maxComputeWorkgroupStorageSize
+  ) {
+    return undefined;
+  }
+
+  return variant;
+};

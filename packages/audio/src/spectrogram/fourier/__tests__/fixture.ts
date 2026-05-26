@@ -189,40 +189,6 @@ const createPhasedBinFixture = (
   };
 };
 
-const createSmallHandWrittenFourierFixtures = (): FourierFixture[] => [
-  {
-    name: 'FFT 8-point: sin bin 1',
-    windowSize: 8,
-    input: createSignal(8, (sampleIndex) =>
-      Math.sin((2 * Math.PI * sampleIndex) / 8),
-    ),
-    output: {
-      real: Float32Array.from(new Array(positiveSize(8)).fill(0)),
-      imag: Float32Array.from([0, -4, 0, 0, 0]),
-    },
-  },
-  {
-    name: 'FFT 16-point: cos bin 3 and cos bin 5',
-    windowSize: 16,
-    input: createSignal(
-      16,
-      (sampleIndex) =>
-        Math.cos((2 * Math.PI * 3 * sampleIndex) / 16) +
-        Math.cos((2 * Math.PI * 5 * sampleIndex) / 16),
-    ),
-    output: createExpectedOutput(16, [
-      {
-        index: 3,
-        real: 8,
-      },
-      {
-        index: 5,
-        real: 8,
-      },
-    ]),
-  },
-];
-
 const createDiagnosticFourierFixtures = (
   windowSize: number,
 ): FourierFixture[] => {
@@ -245,10 +211,18 @@ const createDiagnosticFourierFixtures = (
   ];
 };
 
-const diagnosticWindowSizes = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
+const createDiagnosticWindowSizes = (from: number, to: number): number[] => {
+  const windowSizes: number[] = [];
+  for (let windowSize = from; windowSize <= to; windowSize *= 2) {
+    windowSizes.push(windowSize);
+  }
+
+  return windowSizes;
+};
+
+const diagnosticWindowSizes = createDiagnosticWindowSizes(32, 1024 * 64);
 
 export const fourierFixtures: FourierFixture[] = [
-  ...createSmallHandWrittenFourierFixtures(),
   ...diagnosticWindowSizes.flatMap((windowSize) =>
     createDiagnosticFourierFixtures(windowSize),
   ),

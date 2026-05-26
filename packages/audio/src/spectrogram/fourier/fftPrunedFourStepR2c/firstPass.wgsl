@@ -1,18 +1,21 @@
 override packedWindowSize: u32 = 4096u;
+override tileSize: u32 = 64u;
 override rowSize: u32 = 64u;
 override rowHalfSize: u32 = 32u;
 override columnSize: u32 = 64u;
 override log2RowSize: u32 = 6u;
+
+const threadCount: u32 = 64u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
 };
 
-var<workgroup> smReal0: array<f32, 64>;
-var<workgroup> smImag0: array<f32, 64>;
-var<workgroup> smReal1: array<f32, 64>;
-var<workgroup> smImag1: array<f32, 64>;
+var<workgroup> smReal0: array<f32, tileSize>;
+var<workgroup> smImag0: array<f32, tileSize>;
+var<workgroup> smReal1: array<f32, tileSize>;
+var<workgroup> smImag1: array<f32, tileSize>;
 
 @group(0) @binding(0) var<storage, read> signalReal: array<f32>;
 @group(0) @binding(1) var<storage, read_write> scratch: array<vec2<f32>>;
@@ -20,14 +23,14 @@ var<workgroup> smImag1: array<f32, 64>;
 @group(0) @binding(3) var<storage, read> fourStepTrigTable: array<f32>;
 @group(0) @binding(4) var<uniform> params: Params;
 
-fn runFft64(t: u32) {
+fn runFft(t: u32) {
   for (var stage: u32 = 0u; stage < log2RowSize; stage++) {
     let stride = 1u << stage;
     let evenStage = (stage & 1u) == 0u;
 
-    if (t < rowHalfSize) {
-      let k = t % stride;
-      let block = t / stride;
+    for (var j = t; j < rowHalfSize; j += threadCount) {
+      let k = j % stride;
+      let block = j / stride;
       let aIndex = block * stride + k;
       let bIndex = aIndex + rowHalfSize;
       let outEven = block * (stride << 1u) + k;
@@ -97,40 +100,39 @@ fn main(
   }
 
   let t = localId.x;
-  let packedIndex = t * columnSize + n1;
-  let sampleIndex = packedIndex * 2u;
   let windowOffset = params.windowSize * windowIndex;
 
-  var real = 0.0;
-  var imag = 0.0;
-  if (sampleIndex < params.windowSize) {
-    real = signalReal[windowOffset + sampleIndex];
-  }
-  if (sampleIndex + 1u < params.windowSize) {
-    imag = signalReal[windowOffset + sampleIndex + 1u];
-  }
+  for (var i = t; i < rowSize; i += threadCount) {
+    let packedIndex = i * columnSize + n1;
+    let sampleIndex = packedIndex * 2u;
 
-  if (t < rowSize) {
-    smReal0[t] = real;
-    smImag0[t] = imag;
+    var real = 0.0;
+    var imag = 0.0;
+    if (sampleIndex < params.windowSize) {
+      real = signalReal[windowOffset + sampleIndex];
+    }
+    if (sampleIndex + 1u < params.windowSize) {
+      imag = signalReal[windowOffset + sampleIndex + 1u];
+    }
+
+    smReal0[i] = real;
+    smImag0[i] = imag;
   }
   workgroupBarrier();
 
-  runFft64(t);
+  runFft(t);
 
-  if (t >= rowSize) {
-    return;
+  for (var i = t; i < rowSize; i += threadCount) {
+    let twiddleIndex = i * columnSize + n1;
+    let twiddleReal = fourStepTrigTable[2u * twiddleIndex];
+    let twiddleImag = -fourStepTrigTable[2u * twiddleIndex + 1u];
+    let outReal = getRowResultReal(i);
+    let outImag = getRowResultImag(i);
+    let productReal = outReal * twiddleReal - outImag * twiddleImag;
+    let productImag = outReal * twiddleImag + outImag * twiddleReal;
+    let scratchOffset = packedWindowSize * windowIndex;
+    let scratchIndex = scratchOffset + i * columnSize + n1;
+
+    scratch[scratchIndex] = vec2<f32>(productReal, productImag);
   }
-
-  let twiddleIndex = t * columnSize + n1;
-  let twiddleReal = fourStepTrigTable[2u * twiddleIndex];
-  let twiddleImag = -fourStepTrigTable[2u * twiddleIndex + 1u];
-  let outReal = getRowResultReal(t);
-  let outImag = getRowResultImag(t);
-  let productReal = outReal * twiddleReal - outImag * twiddleImag;
-  let productImag = outReal * twiddleImag + outImag * twiddleReal;
-  let scratchOffset = packedWindowSize * windowIndex;
-  let scratchIndex = scratchOffset + t * columnSize + n1;
-
-  scratch[scratchIndex] = vec2<f32>(productReal, productImag);
 }

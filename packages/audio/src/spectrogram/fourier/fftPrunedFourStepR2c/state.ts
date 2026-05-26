@@ -70,7 +70,7 @@ export const createStateCell = (
 ): ResourceCell<StateArg, State> =>
   createResourceCell({
     create: (arg): State => {
-      const variant = getPrunedFourStepR2cVariant(arg.config);
+      const variant = getPrunedFourStepR2cVariant(device, arg.config);
       if (variant === undefined) {
         throw new Error(
           `fftPrunedFourStepR2c does not support windowSize=${arg.config.windowSize}`,
