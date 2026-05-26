@@ -9,6 +9,7 @@ export type Pipelines = {
 
 const createFirstPassConstants = (variant: PrunedFourStepR2cVariant) => ({
   packedWindowSize: variant.packedWindowSize,
+  tileSize: variant.tileSize,
   rowSize: variant.rowSize,
   rowHalfSize: variant.rowHalfSize,
   columnSize: variant.columnSize,
@@ -18,6 +19,7 @@ const createFirstPassConstants = (variant: PrunedFourStepR2cVariant) => ({
 const createSecondPassConstants = (variant: PrunedFourStepR2cVariant) => ({
   packedWindowSize: variant.packedWindowSize,
   positiveWindowSize: variant.packedWindowSize,
+  tileSize: variant.tileSize,
   rowSize: variant.rowSize,
   rowHalfSize: variant.rowHalfSize,
   columnSize: variant.columnSize,

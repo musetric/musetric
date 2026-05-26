@@ -3,6 +3,7 @@ import { type FourierConfig } from '../config.js';
 export type PrunedFourStepR2cVariant = {
   windowSize: number;
   packedWindowSize: number;
+  tileSize: number;
   rowSize: number;
   rowHalfSize: number;
   rowPairCount: number;
@@ -12,9 +13,10 @@ export type PrunedFourStepR2cVariant = {
   log2ColumnSize: number;
 };
 
-const maxTileSize = 64;
+const maxTileSize = 256;
+const maxWindowSize = 65536;
 const minPackedWindowSize = 4;
-const maxPackedWindowSize = maxTileSize * maxTileSize;
+const maxPackedWindowSize = maxWindowSize / 2;
 
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
@@ -26,6 +28,7 @@ const createVariant = (
 ): PrunedFourStepR2cVariant => ({
   windowSize,
   packedWindowSize: windowSize / 2,
+  tileSize: Math.max(rowSize, columnSize),
   rowSize,
   rowHalfSize: rowSize / 2,
   rowPairCount: rowSize / 2 + 1,
@@ -34,6 +37,10 @@ const createVariant = (
   log2RowSize: Math.log2(rowSize),
   log2ColumnSize: Math.log2(columnSize),
 });
+
+const getRequiredWorkgroupStorageSize = (
+  variant: PrunedFourStepR2cVariant,
+): number => 8 * variant.tileSize * Float32Array.BYTES_PER_ELEMENT;
 
 const createVariantFromWindowSize = (
   windowSize: number,
@@ -59,6 +66,17 @@ const createVariantFromWindowSize = (
 };
 
 export const getPrunedFourStepR2cVariant = (
+  device: GPUDevice,
   config: FourierConfig,
-): PrunedFourStepR2cVariant | undefined =>
-  createVariantFromWindowSize(config.windowSize);
+): PrunedFourStepR2cVariant | undefined => {
+  const variant = createVariantFromWindowSize(config.windowSize);
+  if (
+    variant === undefined ||
+    getRequiredWorkgroupStorageSize(variant) >
+      device.limits.maxComputeWorkgroupStorageSize
+  ) {
+    return undefined;
+  }
+
+  return variant;
+};

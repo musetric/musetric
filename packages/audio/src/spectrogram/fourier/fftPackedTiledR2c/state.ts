@@ -72,7 +72,7 @@ export const createStateCell = (
 ): ResourceCell<StateArg, State> =>
   createResourceCell({
     create: (arg): State => {
-      const variant = getPackedTiledR2cVariant(arg.config);
+      const variant = getPackedTiledR2cVariant(device, arg.config);
       if (variant === undefined) {
         throw new Error(
           `fftPackedTiledR2c does not support windowSize=${arg.config.windowSize}`,

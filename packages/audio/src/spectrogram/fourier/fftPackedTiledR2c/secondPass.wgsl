@@ -1,5 +1,6 @@
 override packedWindowSize: u32 = 4096u;
 override positiveWindowSize: u32 = 4096u;
+override tileSize: u32 = 64u;
 override rowSize: u32 = 64u;
 override rowHalfSize: u32 = 32u;
 override rowPairCount: u32 = 33u;
@@ -7,22 +8,22 @@ override columnSize: u32 = 64u;
 override columnHalfSize: u32 = 32u;
 override log2ColumnSize: u32 = 6u;
 
+const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
-const maxTileSize: u32 = 64u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
 };
 
-var<workgroup> rowAReal0: array<f32, 256>;
-var<workgroup> rowAImag0: array<f32, 256>;
-var<workgroup> rowAReal1: array<f32, 256>;
-var<workgroup> rowAImag1: array<f32, 256>;
-var<workgroup> rowBReal0: array<f32, 256>;
-var<workgroup> rowBImag0: array<f32, 256>;
-var<workgroup> rowBReal1: array<f32, 256>;
-var<workgroup> rowBImag1: array<f32, 256>;
+var<workgroup> rowAReal0: array<f32, batchSize * tileSize>;
+var<workgroup> rowAImag0: array<f32, batchSize * tileSize>;
+var<workgroup> rowAReal1: array<f32, batchSize * tileSize>;
+var<workgroup> rowAImag1: array<f32, batchSize * tileSize>;
+var<workgroup> rowBReal0: array<f32, batchSize * tileSize>;
+var<workgroup> rowBImag0: array<f32, batchSize * tileSize>;
+var<workgroup> rowBReal1: array<f32, batchSize * tileSize>;
+var<workgroup> rowBImag1: array<f32, batchSize * tileSize>;
 
 @group(0) @binding(0) var<storage, read> scratch: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> signalReal: array<f32>;
@@ -32,7 +33,7 @@ var<workgroup> rowBImag1: array<f32, 256>;
 @group(0) @binding(5) var<uniform> params: Params;
 
 fn smIndex(lane: u32, index: u32) -> u32 {
-  return lane * maxTileSize + index;
+  return lane * tileSize + index;
 }
 
 fn runColumnFftPair(t: u32, lane: u32) {
@@ -40,9 +41,9 @@ fn runColumnFftPair(t: u32, lane: u32) {
     let stride = 1u << stage;
     let evenStage = (stage & 1u) == 0u;
 
-    if (t < columnHalfSize) {
-      let k = t % stride;
-      let block = t / stride;
+    for (var j = t; j < columnHalfSize; j += threadCount) {
+      let k = j % stride;
+      let block = j / stride;
       let aIndex = block * stride + k;
       let bIndex = aIndex + columnHalfSize;
       let outEven = block * (stride << 1u) + k;
@@ -178,60 +179,66 @@ fn main(
     rowB = rowSize - pairIndex;
   }
 
-  if (t < columnSize && pairIndex < rowPairCount) {
+  for (var i = t; i < columnSize; i += threadCount) {
+    if (pairIndex >= rowPairCount) {
+      continue;
+    }
+
     let scratchOffset = packedWindowSize * windowIndex;
-    let rowAIndex = scratchOffset + rowA * columnSize + t;
-    let rowBIndex = scratchOffset + rowB * columnSize + t;
+    let rowAIndex = scratchOffset + rowA * columnSize + i;
+    let rowBIndex = scratchOffset + rowB * columnSize + i;
     let rowAValue = scratch[rowAIndex];
     let rowBValue = scratch[rowBIndex];
-    rowAReal0[smIndex(lane, t)] = rowAValue.x;
-    rowAImag0[smIndex(lane, t)] = rowAValue.y;
-    rowBReal0[smIndex(lane, t)] = rowBValue.x;
-    rowBImag0[smIndex(lane, t)] = rowBValue.y;
+    rowAReal0[smIndex(lane, i)] = rowAValue.x;
+    rowAImag0[smIndex(lane, i)] = rowAValue.y;
+    rowBReal0[smIndex(lane, i)] = rowBValue.x;
+    rowBImag0[smIndex(lane, i)] = rowBValue.y;
   }
   workgroupBarrier();
 
   runColumnFftPair(t, lane);
 
-  if (t >= columnSize || pairIndex >= rowPairCount) {
+  if (pairIndex >= rowPairCount) {
     return;
   }
 
   let windowOffset = params.windowSize * windowIndex;
 
-  if (pairIndex == 0u) {
-    if (t == 0u) {
-      let z0 = getRowA(0u, lane);
-      writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
-      writeBin(windowOffset, positiveWindowSize, vec2<f32>(z0.x - z0.y, 0.0));
-    } else {
-      let k = t * rowSize;
-      let mirrorIndex = columnSize - t;
+  for (var i = t; i < columnSize; i += threadCount) {
+    if (pairIndex == 0u) {
+      if (i == 0u) {
+        let z0 = getRowA(0u, lane);
+        writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
+        writeBin(
+          windowOffset,
+          positiveWindowSize,
+          vec2<f32>(z0.x - z0.y, 0.0),
+        );
+      } else {
+        let k = i * rowSize;
+        let mirrorIndex = columnSize - i;
+        writeBin(
+          windowOffset,
+          k,
+          r2cBin(k, getRowA(i, lane), getRowA(mirrorIndex, lane)),
+        );
+      }
+    } else if (pairIndex == rowHalfSize) {
+      let k = pairIndex + rowSize * i;
+      let mirrorIndex = columnSize - 1u - i;
       writeBin(
         windowOffset,
         k,
-        r2cBin(k, getRowA(t, lane), getRowA(mirrorIndex, lane)),
+        r2cBin(k, getRowA(i, lane), getRowA(mirrorIndex, lane)),
       );
+    } else {
+      let mirrorIndex = columnSize - 1u - i;
+      let kA = rowA + rowSize * i;
+      let kB = rowB + rowSize * mirrorIndex;
+      let valueA = getRowA(i, lane);
+      let valueB = getRowB(mirrorIndex, lane);
+      writeBin(windowOffset, kA, r2cBin(kA, valueA, valueB));
+      writeBin(windowOffset, kB, r2cBin(kB, valueB, valueA));
     }
-    return;
   }
-
-  if (pairIndex == rowHalfSize) {
-    let k = pairIndex + rowSize * t;
-    let mirrorIndex = columnSize - 1u - t;
-    writeBin(
-      windowOffset,
-      k,
-      r2cBin(k, getRowA(t, lane), getRowA(mirrorIndex, lane)),
-    );
-    return;
-  }
-
-  let mirrorIndex = columnSize - 1u - t;
-  let kA = rowA + rowSize * t;
-  let kB = rowB + rowSize * mirrorIndex;
-  let valueA = getRowA(t, lane);
-  let valueB = getRowB(mirrorIndex, lane);
-  writeBin(windowOffset, kA, r2cBin(kA, valueA, valueB));
-  writeBin(windowOffset, kB, r2cBin(kB, valueB, valueA));
 }
