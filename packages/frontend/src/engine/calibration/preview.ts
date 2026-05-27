@@ -5,10 +5,7 @@ import {
 } from '@musetric/audio/recording';
 import type { Store } from '../../common/store.js';
 import type { EngineState } from '../state.js';
-import {
-  applyRecordingLatencyEstimate,
-  clearRecordingLatencyEstimate,
-} from './estimate.js';
+import { applyRecordingLatencyEstimate } from './estimate.js';
 
 export type CalibrationPreviewOptions = {
   context: AudioContext;
@@ -72,7 +69,6 @@ export const createCalibrationPreview = (
       store.update((draft) => {
         draft.inputLevel = 0;
       });
-      clearRecordingLatencyEstimate(store);
     };
 
     const updateLevel = () => {
@@ -99,7 +95,6 @@ export const createCalibrationPreview = (
         draft.inputLevel = 0;
         draft.calibrationError = undefined;
       });
-      clearRecordingLatencyEstimate(store);
 
       try {
         if (context.state === 'suspended') {

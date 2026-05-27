@@ -17,27 +17,21 @@ export const RecordingLatencyControl: FC = () => {
     manual: t('pages.project.audioSettings.latencySource.manual'),
   };
   const recordingLatencyFrameCount = useEngineStore(
-    (state) => state.recordingLatencyFrameCount,
+    (state) => state.latencyFrameCount,
   );
-  const recordingLatencySource = useEngineStore(
-    (state) => state.recordingLatencySource,
+  const recordingLatencySource = useEngineStore((state) => state.latencySource);
+  const inputLatencyFrameCount = useEngineStore(
+    (state) => state.inputLatencyFrameCount,
   );
   const recording = useEngineStore((state) => state.recording);
   const calibrating = useEngineStore((state) => state.calibrating);
   const calibrationError = useEngineStore((state) => state.calibrationError);
-  const latencyEstimate = useEngineStore(
-    (state) => state.recordingLatencyEstimate,
-  );
   const latencyMs = Math.round(
     (recordingLatencyFrameCount / engine.context.sampleRate) * 1000,
   );
-  const inputLatencyMs =
-    latencyEstimate === undefined
-      ? undefined
-      : Math.round(
-          (latencyEstimate.inputLatencyFrameCount / engine.context.sampleRate) *
-            1000,
-        );
+  const inputLatencyMs = Math.round(
+    (inputLatencyFrameCount / engine.context.sampleRate) * 1000,
+  );
 
   return (
     <>
@@ -49,11 +43,9 @@ export const RecordingLatencyControl: FC = () => {
           {latencySourceLabels[recordingLatencySource]}
         </Typography>
         <Typography variant='caption' color='text.secondary'>
-          {inputLatencyMs === undefined
-            ? t('pages.project.audioSettings.inputLatencyUnknown')
-            : t('pages.project.audioSettings.inputLatency', {
-                value: inputLatencyMs,
-              })}
+          {t('pages.project.audioSettings.inputLatency', {
+            value: inputLatencyMs,
+          })}
         </Typography>
         {recording && (
           <Typography variant='caption' color='text.secondary'>

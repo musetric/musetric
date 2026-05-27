@@ -16,7 +16,6 @@
   "pages.project.audioSettings.input": "Microphone",
   "pages.project.audioSettings.inputFallback": "Microphone {{value}}",
   "pages.project.audioSettings.inputLatency": "Mic input lag: {{value}} ms",
-  "pages.project.audioSettings.inputLatencyUnknown": "Mic input lag will appear after preview starts",
   "pages.project.audioSettings.inputPlaceholder": "Microphone unavailable",
   "pages.project.audioSettings.latency": "Recording delay: {{value}} ms",
   "pages.project.audioSettings.latencySource.calibrated": "Calibrated for the current microphone and output",

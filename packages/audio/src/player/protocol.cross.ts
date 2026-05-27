@@ -6,7 +6,11 @@ export const playerProcessorName = 'player-processor';
 
 export type PlayerOutboundMethods = {
   boot: (message: { dataPort: MessagePort }) => void;
-  play: (message: { revision: number }) => void;
+  play: (message: {
+    revision: number;
+    latencyFrameCount: number;
+    inputLatencyFrameCount: number;
+  }) => void;
   stop: (message: { revision: number }) => void;
   setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number; revision: number }) => void;
@@ -18,6 +22,7 @@ export type PlayerOutboundMethods = {
     frameIndex: number;
     revision: number;
     latencyFrameCount: number;
+    inputLatencyFrameCount: number;
     samples: Float32Array<SharedArrayBuffer>;
     metadata: Int32Array<SharedArrayBuffer>;
     notificationPort: MessagePort;
