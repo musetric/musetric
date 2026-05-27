@@ -27,7 +27,7 @@
   "pages.project.audioSettings.outputError": "Failed to change headphones",
   "pages.project.audioSettings.outputFallback": "Output {{value}}",
   "pages.project.audioSettings.outputPlaceholder": "Output unavailable",
-  "pages.project.audioSettings.outputUnsupported": "Headphone selection unavailable",
+  "pages.project.audioSettings.outputSystemControlled": "Output controlled by system",
   "pages.project.audioSettings.previewError": "Failed to open audio preview",
   "pages.project.audioSettings.title": "Audio settings",
   "pages.project.detailsMode.subtitles": "Subtitles",

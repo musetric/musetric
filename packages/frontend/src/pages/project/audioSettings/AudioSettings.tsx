@@ -23,9 +23,9 @@ export const AudioSettings: FC = () => {
             <AudioSettingsError />
             <AudioOutputSelect />
             <AudioInputSelect />
-            <RecordingLatencyControl />
             <InputLevelMeter />
             <RecordingGainControl />
+            <RecordingLatencyControl />
           </Stack>
         </Box>
       </AudioSettingsLifecycle>

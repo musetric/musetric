@@ -23,9 +23,5 @@ export const AudioSettingsError: FC = () => {
       </Alert>
     );
   }
-  return (
-    <Alert severity='error'>
-      {t('pages.project.audioSettings.calibrationFailed')}
-    </Alert>
-  );
+  return undefined;
 };
