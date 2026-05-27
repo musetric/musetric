@@ -9,9 +9,9 @@ export type TrackKey = (typeof allTrackKeys)[number];
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
 export const allFourierModes = [
+  'fftPackedTiledR2c',
   'fftPrunedFourStepR2c',
   'fftPackedStockhamR2c',
-  'fftPackedTiledR2c',
 ] as const;
 export type FourierMode = (typeof allFourierModes)[number];
 
