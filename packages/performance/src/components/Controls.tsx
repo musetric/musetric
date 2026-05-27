@@ -141,22 +141,24 @@ export const Controls: FC = () => {
         />
       </Box>
 
-      <ToggleButtonGroup
-        value={mode}
-        exclusive
-        sx={{ minWidth: 'max-content' }}
-      >
-        {fourierModes.map((fourierMode) => (
-          <ToggleButton
-            key={fourierMode}
-            size='small'
-            value={fourierMode}
-            onClick={() => setMode(fourierMode)}
-          >
-            {fourierMode}
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
+      <Box sx={{ width: '100%', overflowX: 'auto' }}>
+        <ToggleButtonGroup
+          value={mode}
+          exclusive
+          sx={{ minWidth: 'max-content' }}
+        >
+          {fourierModes.map((fourierMode) => (
+            <ToggleButton
+              key={fourierMode}
+              size='small'
+              value={fourierMode}
+              onClick={() => setMode(fourierMode)}
+            >
+              {fourierMode}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
     </Box>
   );
 };
