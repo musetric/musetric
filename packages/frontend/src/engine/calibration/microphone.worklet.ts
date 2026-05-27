@@ -3,7 +3,7 @@ import {
   createMicrophoneCalibrationRuntime,
   microphoneCalibrationProcessorName,
   type MicrophoneCalibrationRuntime,
-} from '@musetric/audio/recording/worklet';
+} from '@musetric/audio/calibration/worklet';
 
 export class MicrophoneCalibrationProcessor
   extends AudioWorkletProcessor

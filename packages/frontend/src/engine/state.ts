@@ -1,6 +1,9 @@
 import { type SpectrogramColors, type StemType } from '@musetric/audio';
+import { type RecordingLatencyEstimate } from '@musetric/audio/recording';
 
 export type PortStatus = 'pending' | 'success' | 'error';
+
+export type CalibrationErrorCode = 'preview' | 'output' | 'calibration';
 
 export type WaveformStatuses = Record<StemType, PortStatus> & {
   recording: PortStatus;
@@ -49,9 +52,14 @@ export type EngineState = {
   tempoBpm: number;
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
+  audioDevices: MediaDeviceInfo[];
   recordingLatencyFrameCount: number;
   recordingLatencySource: RecordingLatencySource;
   recordingLatencyDevicePairKey?: string;
+  recordingLatencyEstimate?: RecordingLatencyEstimate;
+  calibrating: boolean;
+  calibrationError?: CalibrationErrorCode;
+  inputLevel: number;
   recordingGain: number;
   trackVolumes: Record<StemType, number> & {
     recording: number;

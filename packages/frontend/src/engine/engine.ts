@@ -3,15 +3,19 @@ import { createStore, type Store } from '../common/store.js';
 import {
   createEngineAudioOutput,
   type EngineAudioOutput,
-} from './audioOutput.js';
-import { createEngineDecoder, type EngineDecoder } from './decoder.js';
+} from './audioOutput/index.js';
+import {
+  createEngineCalibration,
+  type EngineCalibration,
+} from './calibration/index.js';
+import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
-} from './spectrogram.js';
+} from './spectrogram/index.js';
 import { type EngineState } from './state.js';
-import { createEngineWaveform, type EngineWaveform } from './waveform.js';
+import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const initialState: EngineState = {
   statuses: {
@@ -50,8 +54,11 @@ const initialState: EngineState = {
   transposeSemitones: 0,
   sourceTempoBpm: 100,
   tempoBpm: 100,
+  audioDevices: [],
   recordingLatencyFrameCount: 0,
   recordingLatencySource: 'estimated',
+  calibrating: false,
+  inputLevel: 0,
   recordingGain: 1,
   trackVolumes: {
     lead: 1,
@@ -65,6 +72,7 @@ export type Engine = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
+  calibration: EngineCalibration;
   decoder: EngineDecoder;
   spectrogram: EngineSpectrogram;
   waveform: EngineWaveform;
@@ -83,6 +91,12 @@ export const createEngine = (): Engine => {
     context,
     audioOutput,
     store,
+    calibration: createEngineCalibration({
+      context,
+      audioOutput,
+      store,
+      getPlayer: () => ref.player,
+    }),
     spectrogram: createEngineSpectrogram({
       store,
       sampleRate: context.sampleRate,

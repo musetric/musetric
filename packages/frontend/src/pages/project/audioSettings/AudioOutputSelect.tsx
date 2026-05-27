@@ -1,3 +1,7 @@
+import BluetoothIcon from '@mui/icons-material/Bluetooth';
+import HeadphonesIcon from '@mui/icons-material/Headphones';
+import SpeakerIcon from '@mui/icons-material/Speaker';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import {
   FormControl,
   InputLabel,
@@ -7,28 +11,39 @@ import {
   Select,
   Stack,
 } from '@mui/material';
-import { classifyAudioOutputDevice } from '@musetric/audio/recording';
-import { type FC } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { renderAudioOutputIcon } from './audioDeviceIcon.js';
-import { getAudioDeviceLabel } from './audioDeviceLabel.js';
-import { useAudioSettingsStore } from './audioSettingsStore.js';
-import { useSelectAudioOutputDevice } from './useAudioSettingsActions.js';
 import {
-  getAudioSettingsOutputSelectionSupported,
-  useAudioSettingsOutputDevices,
-  useAudioSettingsOutputSelectValue,
-} from './useAudioSettingsDevices.js';
+  type AudioOutputSourceKind,
+  classifyAudioOutputDevice,
+  getRealAudioOutputDevices,
+  resolveAudioOutputDevice,
+} from '@musetric/audio/recording';
+import { type FC, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { engine } from '../../../engine/engine.js';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
+
+const outputIconByKind: Record<AudioOutputSourceKind, ReactNode> = {
+  bluetooth: <BluetoothIcon fontSize='small' />,
+  wiredHeadset: <HeadphonesIcon fontSize='small' />,
+  builtIn: <SpeakerIcon fontSize='small' />,
+  unknown: <VolumeUpIcon fontSize='small' />,
+};
 
 export const AudioOutputSelect: FC = () => {
   const { t } = useTranslation();
   const recording = useEngineStore((state) => state.recording);
-  const calibrating = useAudioSettingsStore((state) => state.calibrating);
-  const outputDevices = useAudioSettingsOutputDevices();
-  const outputSelectValue = useAudioSettingsOutputSelectValue();
-  const outputSelectionSupported = getAudioSettingsOutputSelectionSupported();
-  const selectOutputDevice = useSelectAudioOutputDevice();
+  const calibrating = useEngineStore((state) => state.calibrating);
+  const audioDevices = useEngineStore((state) => state.audioDevices);
+  const audioOutputDeviceId = useEngineStore(
+    (state) => state.audioOutputDeviceId,
+  );
+  const outputDevices = getRealAudioOutputDevices(audioDevices);
+  const resolvedOutputDevice = resolveAudioOutputDevice(audioDevices, {
+    explicitDeviceId: audioOutputDeviceId,
+  });
+  const outputSelectValue = resolvedOutputDevice?.deviceId ?? '';
+  const outputSelectionSupported =
+    engine.calibration.isOutputSelectionSupported();
 
   return (
     <FormControl
@@ -41,7 +56,7 @@ export const AudioOutputSelect: FC = () => {
         displayEmpty
         value={outputSelectValue}
         onChange={(event) => {
-          void selectOutputDevice(event.target.value);
+          void engine.calibration.selectOutputDevice(event.target.value);
         }}
         renderValue={(value) => {
           const device = outputDevices.find(
@@ -52,38 +67,32 @@ export const AudioOutputSelect: FC = () => {
               ? t('pages.project.audioSettings.outputPlaceholder')
               : t('pages.project.audioSettings.outputUnsupported');
           }
-          const kind = classifyAudioOutputDevice(device);
           return (
             <Stack direction='row' alignItems='center' gap={1} component='span'>
-              {renderAudioOutputIcon(kind)}
+              {outputIconByKind[classifyAudioOutputDevice(device)]}
               <span>
-                {getAudioDeviceLabel(
-                  device,
-                  t('pages.project.audioSettings.outputFallback', {
-                    value: 1,
-                  }),
-                )}
+                {device.label ||
+                  t('pages.project.audioSettings.outputFallback', { value: 1 })}
               </span>
             </Stack>
           );
         }}
       >
-        {outputDevices.map((device, index) => {
-          const kind = classifyAudioOutputDevice(device);
-          return (
-            <MenuItem key={device.deviceId} value={device.deviceId}>
-              <ListItemIcon>{renderAudioOutputIcon(kind)}</ListItemIcon>
-              <ListItemText
-                primary={getAudioDeviceLabel(
-                  device,
-                  t('pages.project.audioSettings.outputFallback', {
-                    value: index + 1,
-                  }),
-                )}
-              />
-            </MenuItem>
-          );
-        })}
+        {outputDevices.map((device, index) => (
+          <MenuItem key={device.deviceId} value={device.deviceId}>
+            <ListItemIcon>
+              {outputIconByKind[classifyAudioOutputDevice(device)]}
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                device.label ||
+                t('pages.project.audioSettings.outputFallback', {
+                  value: index + 1,
+                })
+              }
+            />
+          </MenuItem>
+        ))}
       </Select>
     </FormControl>
   );
