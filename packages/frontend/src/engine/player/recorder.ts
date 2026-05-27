@@ -1,6 +1,8 @@
 import {
   createMicrophoneAudioConstraints,
-  getInitialMicrophoneLatencyFrameCount,
+  estimateRecordingLatency,
+  isLikelyMobileUserAgent,
+  resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import type { Store } from '../../common/store.js';
 import type { EngineDecoder } from '../decoder.js';
@@ -39,6 +41,13 @@ const stopMediaStream = (stream: MediaStream) => {
   for (const track of stream.getTracks()) {
     track.stop();
   }
+};
+
+const getAudioDevices = async () => {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices.filter(
+    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
+  );
 };
 
 export const createEngineRecorder = (
@@ -146,22 +155,56 @@ export const createEngineRecorder = (
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      let stream = await navigator.mediaDevices.getUserMedia({
         audio: createMicrophoneAudioConstraints({
           deviceId: store.get().microphoneDeviceId,
           sampleRate: context.sampleRate,
         }),
       });
       session.stream = stream;
-      if (!store.get().microphoneLatencyUserSet) {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const latencyFrameCount = getInitialMicrophoneLatencyFrameCount(
-          context,
-          stream,
-          devices,
-        );
+      if (isStopRequested(session)) {
+        return;
+      }
+
+      const devices = await getAudioDevices();
+      if (store.get().microphoneDeviceId === undefined) {
+        const preferredDevice = resolveAudioInputDevice(devices, {
+          preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+        });
+        if (preferredDevice) {
+          const [currentTrack] = stream.getAudioTracks();
+          const currentDeviceId = currentTrack.getSettings().deviceId;
+          if (preferredDevice.deviceId !== currentDeviceId) {
+            stopMediaStream(stream);
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: createMicrophoneAudioConstraints({
+                deviceId: preferredDevice.deviceId,
+                sampleRate: context.sampleRate,
+              }),
+            });
+            session.stream = stream;
+            if (isStopRequested(session)) {
+              return;
+            }
+          }
+        }
+      }
+
+      const estimate = estimateRecordingLatency({
+        context,
+        stream,
+        devices,
+        outputDeviceId: store.get().audioOutputDeviceId,
+      });
+      const latencyState = store.get();
+      if (
+        latencyState.recordingLatencySource === 'estimated' ||
+        latencyState.recordingLatencyDevicePairKey !== estimate.devicePairKey
+      ) {
         store.update((state) => {
-          state.microphoneLatencyFrameCount = latencyFrameCount;
+          state.recordingLatencyFrameCount = estimate.frameCount;
+          state.recordingLatencySource = 'estimated';
+          state.recordingLatencyDevicePairKey = estimate.devicePairKey;
         });
       }
       if (isStopRequested(session)) {
@@ -182,7 +225,7 @@ export const createEngineRecorder = (
         ),
       );
       const recordingMetadata = new Int32Array(new SharedArrayBuffer(4));
-      const latencyFrameCount = store.get().microphoneLatencyFrameCount;
+      const latencyFrameCount = store.get().recordingLatencyFrameCount;
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,

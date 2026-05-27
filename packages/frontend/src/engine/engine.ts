@@ -1,5 +1,9 @@
 import { defaultSampleRate } from '@musetric/resource-utils';
 import { createStore, type Store } from '../common/store.js';
+import {
+  createEngineAudioOutput,
+  type EngineAudioOutput,
+} from './audioOutput.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
@@ -46,8 +50,8 @@ const initialState: EngineState = {
   transposeSemitones: 0,
   sourceTempoBpm: 100,
   tempoBpm: 100,
-  microphoneLatencyFrameCount: 0,
-  microphoneLatencyUserSet: false,
+  recordingLatencyFrameCount: 0,
+  recordingLatencySource: 'estimated',
   recordingGain: 1,
   trackVolumes: {
     lead: 1,
@@ -59,6 +63,7 @@ const initialState: EngineState = {
 
 export type Engine = {
   context: AudioContext;
+  audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
   decoder: EngineDecoder;
   spectrogram: EngineSpectrogram;
@@ -69,12 +74,14 @@ export type Engine = {
 
 export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
+  const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
   const playerChannel = new MessageChannel();
   const spectrogramChannel = new MessageChannel();
 
   const ref: Engine = {
     context,
+    audioOutput,
     store,
     spectrogram: createEngineSpectrogram({
       store,
@@ -126,6 +133,7 @@ export const createEngine = (): Engine => {
     }),
     player: createEnginePlayer({
       context,
+      audioOutput,
       store,
       decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,

@@ -10,6 +10,7 @@ import {
   nextNumber,
 } from '@musetric/resource-utils';
 import type { Store } from '../../common/store.js';
+import type { EngineAudioOutput } from '../audioOutput.js';
 import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 
@@ -58,6 +59,7 @@ export const createEngineStubPlayback = (): EnginePlayback => ({
 
 export type CreateEnginePlaybackOptions = {
   context: AudioContext;
+  audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
   decoderPort: MessagePort;
   onFrameIndexChanged?: (frameIndex: number) => void;
@@ -72,7 +74,8 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, store, decoderPort, onFrameIndexChanged } = options;
+  const { context, audioOutput, store, decoderPort, onFrameIndexChanged } =
+    options;
   const { onPlaybackEnded } = options;
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
@@ -80,7 +83,7 @@ export const createEnginePlayback = async (
     numberOfOutputs: 1,
     outputChannelCount: [2],
   });
-  node.connect(context.destination);
+  node.connect(audioOutput.outputNode);
   const port = playerChannel.outbound(node.port);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let playingWaiter: PlayingWaiter | undefined = undefined;
@@ -195,6 +198,7 @@ export const createEnginePlayback = async (
       if (context.state === 'suspended') {
         await context.resume();
       }
+      await audioOutput.play();
       const { revision } = store.get().seekEvent;
       const playingPromise = createPlayingPromise(revision);
       port.methods.play({ revision });

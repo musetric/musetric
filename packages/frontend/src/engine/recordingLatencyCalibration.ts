@@ -10,13 +10,15 @@ import {
 } from '@musetric/audio/recording';
 import microphoneCalibrationWorkletUrl from './microphoneCalibration.worklet.ts?worker&url';
 
-export type RunMicrophoneLatencyCalibrationOptions = {
+export type RunRecordingLatencyCalibrationOptions = {
   context: AudioContext;
+  outputNode: AudioNode;
+  playOutput: () => Promise<void>;
   deviceId?: string;
   stream?: MediaStream;
 };
 
-export type MicrophoneLatencyCalibrationResult = {
+export type RecordingLatencyCalibrationResult = {
   latencyFrameCount: number;
   measuredLatencyFrameCounts: number[];
 };
@@ -81,10 +83,10 @@ const waitForCalibrationResult = async (node: AudioWorkletNode) =>
     };
   });
 
-export const runMicrophoneLatencyCalibration = async (
-  options: RunMicrophoneLatencyCalibrationOptions,
-): Promise<MicrophoneLatencyCalibrationResult | undefined> => {
-  const { context, deviceId } = options;
+export const runRecordingLatencyCalibration = async (
+  options: RunRecordingLatencyCalibrationOptions,
+): Promise<RecordingLatencyCalibrationResult | undefined> => {
+  const { context, outputNode, playOutput, deviceId } = options;
   let stream: MediaStream | undefined = undefined;
   let source: MediaStreamAudioSourceNode | undefined = undefined;
   let calibrationNode: AudioWorkletNode | undefined = undefined;
@@ -92,6 +94,7 @@ export const runMicrophoneLatencyCalibration = async (
   const clickSources: AudioBufferSourceNode[] = [];
 
   try {
+    await playOutput();
     await loadCalibrationWorklet(context);
     stream =
       options.stream ??
@@ -119,7 +122,7 @@ export const runMicrophoneLatencyCalibration = async (
     silentGain.gain.value = 0;
     source.connect(calibrationNode);
     calibrationNode.connect(silentGain);
-    silentGain.connect(context.destination);
+    silentGain.connect(outputNode);
     const calibrationResultPromise = waitForCalibrationResult(calibrationNode);
 
     calibrationNode.port.postMessage({
@@ -130,7 +133,7 @@ export const runMicrophoneLatencyCalibration = async (
     for (const clickFrame of calibrationSchedule.clickFrames) {
       const clickSource = context.createBufferSource();
       clickSource.buffer = createRecordingLatencyCalibrationClick(context);
-      clickSource.connect(context.destination);
+      clickSource.connect(outputNode);
       clickSource.start(clickFrame / context.sampleRate);
       clickSources.push(clickSource);
     }

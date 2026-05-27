@@ -3,7 +3,7 @@ import { IconButton, Menu, Tooltip } from '@mui/material';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { MicrophoneSettingsMenuItem } from './MicrophoneSettingsMenuItem.js';
+import { AudioSettingsMenuItem } from './AudioSettingsMenuItem.js';
 import { SpectrogramSettingsMenuItem } from './SpectrogramSettingsMenuItem.js';
 
 export const ProjectHeaderMenu: FC = () => {
@@ -34,7 +34,7 @@ export const ProjectHeaderMenu: FC = () => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
-        <MicrophoneSettingsMenuItem
+        <AudioSettingsMenuItem
           closeMenu={() => {
             setAnchorEl(undefined);
           }}
