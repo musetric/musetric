@@ -41,18 +41,22 @@ export const AudioOutputSelect: FC = () => {
   const resolvedOutputDevice = resolveAudioOutputDevice(audioDevices, {
     explicitDeviceId: audioOutputDeviceId,
   });
-  const outputSelectValue = resolvedOutputDevice?.deviceId ?? '';
   const outputSelectionSupported =
     engine.calibration.isOutputSelectionSupported();
+  const outputControlUnavailable =
+    !outputSelectionSupported || outputDevices.length === 0;
+  const outputSelectValue = outputControlUnavailable
+    ? ''
+    : (resolvedOutputDevice?.deviceId ?? '');
+  const outputSelectDisabled =
+    outputControlUnavailable || recording || calibrating;
 
   return (
-    <FormControl
-      fullWidth
-      disabled={!outputSelectionSupported || recording || calibrating}
-    >
-      <InputLabel>{t('pages.project.audioSettings.output')}</InputLabel>
+    <FormControl fullWidth disabled={outputSelectDisabled}>
+      <InputLabel shrink>{t('pages.project.audioSettings.output')}</InputLabel>
       <Select<string>
         label={t('pages.project.audioSettings.output')}
+        disabled={outputSelectDisabled}
         displayEmpty
         value={outputSelectValue}
         onChange={(event) => {
@@ -63,9 +67,9 @@ export const AudioOutputSelect: FC = () => {
             (outputDevice) => outputDevice.deviceId === value,
           );
           if (!device) {
-            return outputSelectionSupported
-              ? t('pages.project.audioSettings.outputPlaceholder')
-              : t('pages.project.audioSettings.outputUnsupported');
+            return outputControlUnavailable
+              ? t('pages.project.audioSettings.outputSystemControlled')
+              : t('pages.project.audioSettings.outputPlaceholder');
           }
           return (
             <Stack direction='row' alignItems='center' gap={1} component='span'>

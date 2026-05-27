@@ -109,9 +109,17 @@ export const createCalibrationPreview = (
           return;
         }
 
+        const devices = await refreshDevices();
+        if (isStale()) {
+          return;
+        }
+        const inputDevice = resolveAudioInputDevice(devices, {
+          explicitDeviceId: store.get().microphoneDeviceId,
+          preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+        });
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: createMicrophoneAudioConstraints({
-            deviceId: store.get().microphoneDeviceId,
+            deviceId: inputDevice?.deviceId,
             sampleRate: context.sampleRate,
           }),
         });
@@ -121,11 +129,11 @@ export const createCalibrationPreview = (
         }
         activeStream = stream;
 
-        const devices = await refreshDevices();
+        const refreshedDevices = await refreshDevices();
         if (isStale() || activeStream !== stream) {
           return;
         }
-        const expectedInputDevice = resolveAudioInputDevice(devices, {
+        const expectedInputDevice = resolveAudioInputDevice(refreshedDevices, {
           explicitDeviceId: store.get().microphoneDeviceId,
           preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
         });

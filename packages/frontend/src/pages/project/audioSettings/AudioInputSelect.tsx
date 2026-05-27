@@ -46,9 +46,10 @@ export const AudioInputSelect: FC = () => {
 
   return (
     <FormControl fullWidth disabled={recording || calibrating}>
-      <InputLabel>{t('pages.project.audioSettings.input')}</InputLabel>
+      <InputLabel shrink>{t('pages.project.audioSettings.input')}</InputLabel>
       <Select<string>
         label={t('pages.project.audioSettings.input')}
+        disabled={recording || calibrating}
         displayEmpty
         value={inputSelectValue}
         onChange={(event) => {

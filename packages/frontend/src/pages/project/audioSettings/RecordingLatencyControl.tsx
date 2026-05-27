@@ -1,4 +1,4 @@
-import { Button, Slider, Stack, Typography } from '@mui/material';
+import { Alert, Button, Slider, Stack, Typography } from '@mui/material';
 import {
   maximumRecordingLatencyMs,
   minimumRecordingLatencyMs,
@@ -24,6 +24,7 @@ export const RecordingLatencyControl: FC = () => {
   );
   const recording = useEngineStore((state) => state.recording);
   const calibrating = useEngineStore((state) => state.calibrating);
+  const calibrationError = useEngineStore((state) => state.calibrationError);
   const latencyEstimate = useEngineStore(
     (state) => state.recordingLatencyEstimate,
   );
@@ -84,6 +85,11 @@ export const RecordingLatencyControl: FC = () => {
             ? t('pages.project.audioSettings.calibrating')
             : t('pages.project.audioSettings.calibrate')}
         </Button>
+        {calibrationError === 'calibration' && (
+          <Alert severity='error'>
+            {t('pages.project.audioSettings.calibrationFailed')}
+          </Alert>
+        )}
       </Stack>
     </>
   );
