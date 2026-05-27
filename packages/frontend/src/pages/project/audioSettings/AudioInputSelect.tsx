@@ -1,3 +1,6 @@
+import BluetoothIcon from '@mui/icons-material/Bluetooth';
+import HeadphonesIcon from '@mui/icons-material/Headphones';
+import MicIcon from '@mui/icons-material/Mic';
 import {
   FormControl,
   InputLabel,
@@ -7,26 +10,39 @@ import {
   Select,
   Stack,
 } from '@mui/material';
-import { classifyAudioInputDevice } from '@musetric/audio/recording';
-import { type FC } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { renderAudioInputIcon } from './audioDeviceIcon.js';
-import { getAudioDeviceLabel } from './audioDeviceLabel.js';
-import { useAudioSettingsStore } from './audioSettingsStore.js';
-import { useSelectAudioInputDevice } from './useAudioSettingsActions.js';
 import {
-  useAudioSettingsInputDevices,
-  useAudioSettingsInputSelectValue,
-} from './useAudioSettingsDevices.js';
+  type AudioInputSourceKind,
+  classifyAudioInputDevice,
+  getRealAudioInputDevices,
+  isLikelyMobileUserAgent,
+  resolveAudioInputDevice,
+} from '@musetric/audio/recording';
+import { type FC, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { engine } from '../../../engine/engine.js';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
+
+const inputIconByKind: Record<AudioInputSourceKind, ReactNode> = {
+  bluetooth: <BluetoothIcon fontSize='small' />,
+  wiredHeadset: <HeadphonesIcon fontSize='small' />,
+  builtIn: <MicIcon fontSize='small' />,
+  unknown: <MicIcon fontSize='small' />,
+};
 
 export const AudioInputSelect: FC = () => {
   const { t } = useTranslation();
   const recording = useEngineStore((state) => state.recording);
-  const calibrating = useAudioSettingsStore((state) => state.calibrating);
-  const inputDevices = useAudioSettingsInputDevices();
-  const inputSelectValue = useAudioSettingsInputSelectValue();
-  const selectInputDevice = useSelectAudioInputDevice();
+  const calibrating = useEngineStore((state) => state.calibrating);
+  const audioDevices = useEngineStore((state) => state.audioDevices);
+  const microphoneDeviceId = useEngineStore(
+    (state) => state.microphoneDeviceId,
+  );
+  const inputDevices = getRealAudioInputDevices(audioDevices);
+  const resolvedInputDevice = resolveAudioInputDevice(audioDevices, {
+    explicitDeviceId: microphoneDeviceId,
+    preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+  });
+  const inputSelectValue = resolvedInputDevice?.deviceId ?? '';
 
   return (
     <FormControl fullWidth disabled={recording || calibrating}>
@@ -36,7 +52,7 @@ export const AudioInputSelect: FC = () => {
         displayEmpty
         value={inputSelectValue}
         onChange={(event) => {
-          void selectInputDevice(event.target.value);
+          void engine.calibration.selectInputDevice(event.target.value);
         }}
         renderValue={(value) => {
           const device = inputDevices.find(
@@ -45,38 +61,32 @@ export const AudioInputSelect: FC = () => {
           if (!device) {
             return t('pages.project.audioSettings.inputPlaceholder');
           }
-          const kind = classifyAudioInputDevice(device);
           return (
             <Stack direction='row' alignItems='center' gap={1} component='span'>
-              {renderAudioInputIcon(kind)}
+              {inputIconByKind[classifyAudioInputDevice(device)]}
               <span>
-                {getAudioDeviceLabel(
-                  device,
-                  t('pages.project.audioSettings.inputFallback', {
-                    value: 1,
-                  }),
-                )}
+                {device.label ||
+                  t('pages.project.audioSettings.inputFallback', { value: 1 })}
               </span>
             </Stack>
           );
         }}
       >
-        {inputDevices.map((device, index) => {
-          const kind = classifyAudioInputDevice(device);
-          return (
-            <MenuItem key={device.deviceId} value={device.deviceId}>
-              <ListItemIcon>{renderAudioInputIcon(kind)}</ListItemIcon>
-              <ListItemText
-                primary={getAudioDeviceLabel(
-                  device,
-                  t('pages.project.audioSettings.inputFallback', {
-                    value: index + 1,
-                  }),
-                )}
-              />
-            </MenuItem>
-          );
-        })}
+        {inputDevices.map((device, index) => (
+          <MenuItem key={device.deviceId} value={device.deviceId}>
+            <ListItemIcon>
+              {inputIconByKind[classifyAudioInputDevice(device)]}
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                device.label ||
+                t('pages.project.audioSettings.inputFallback', {
+                  value: index + 1,
+                })
+              }
+            />
+          </MenuItem>
+        ))}
       </Select>
     </FormControl>
   );

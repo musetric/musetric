@@ -2,12 +2,11 @@ import { LinearProgress, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { useAudioSettingsStore } from './audioSettingsStore.js';
 
 export const InputLevelMeter: FC = () => {
   const { t } = useTranslation();
   const recordingGain = useEngineStore((state) => state.recordingGain);
-  const level = useAudioSettingsStore((state) => state.level);
+  const level = useEngineStore((state) => state.inputLevel);
   const gainedLevel = Math.min(1, level * recordingGain);
 
   return (

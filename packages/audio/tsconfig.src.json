@@ -10,6 +10,7 @@
     "types": ["vite/client"]
   },
   "include": [
+    "${configDir}/src/calibration/**/*",
     "${configDir}/src/common/**/*",
     "${configDir}/src/decoder/**/*",
     "${configDir}/src/player/**/*",

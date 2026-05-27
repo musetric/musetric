@@ -4,7 +4,7 @@ import { createWaveformRuntime } from '@musetric/audio/waveform/worker';
 import {
   getDeliveryAudioWave,
   getRecordingAudioWave,
-} from './audioRequest.worker.js';
+} from '../audioRequest/audioRequest.worker.js';
 
 const port = waveformChannel.inbound(self);
 

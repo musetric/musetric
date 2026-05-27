@@ -5,7 +5,7 @@ import {
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import type { Store } from '../../common/store.js';
-import type { EngineDecoder } from '../decoder.js';
+import type { EngineDecoder } from '../decoder/index.js';
 import type { EngineState } from '../state.js';
 import type { EnginePlayback } from './playback.js';
 

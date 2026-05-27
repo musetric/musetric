@@ -7,9 +7,9 @@ import {
   getCanvasSize,
   subscribeResizeObserver,
 } from '@musetric/resource-utils/dom';
-import type { Store } from '../common/store.js';
+import type { Store } from '../../common/store.js';
+import { type EngineState, getTrackProgress } from '../state.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
-import { type EngineState, getTrackProgress } from './state.js';
 
 type Unmount = () => void;
 

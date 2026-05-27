@@ -8,8 +8,8 @@ import {
   resizeCanvas,
   subscribeResizeObserver,
 } from '@musetric/resource-utils/dom';
-import type { Store } from '../common/store.js';
-import { type EngineState } from './state.js';
+import type { Store } from '../../common/store.js';
+import { type EngineState } from '../state.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
 type Unmount = () => void;

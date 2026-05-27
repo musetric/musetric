@@ -8,11 +8,11 @@ import { spectrogramDataChannel } from '@musetric/audio/spectrogram';
 import {
   getDeliveryAudioContent,
   getRecordingAudioContent,
-} from './audioRequest.worker.js';
+} from '../audioRequest/audioRequest.worker.js';
 import {
   type DecoderRecordingMessage,
   engineDecoderChannel,
-} from './decoderProtocol.cross.js';
+} from './protocol.cross.js';
 
 const port = engineDecoderChannel.inbound(self);
 

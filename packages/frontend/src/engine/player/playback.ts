@@ -10,7 +10,7 @@ import {
   nextNumber,
 } from '@musetric/resource-utils';
 import type { Store } from '../../common/store.js';
-import type { EngineAudioOutput } from '../audioOutput.js';
+import type { EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 

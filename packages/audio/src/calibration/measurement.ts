@@ -1,33 +1,35 @@
+import { createMicrophoneAudioConstraints } from '../recording/constraints.js';
 import {
-  createMicrophoneAudioConstraints,
+  microphoneCalibrationProcessorName,
+  type RecordingLatencyCalibrationPeak,
+} from './protocol.cross.js';
+import {
   createRecordingLatencyCalibrationClick,
   createRecordingLatencyCalibrationSchedule,
   getRecordingLatencyCalibrationFrameCounts,
   getRecordingLatencyFrameCount,
-  microphoneCalibrationProcessorName,
-  type RecordingLatencyCalibrationPeak,
   recordingLatencyCalibrationTimeoutSeconds,
-} from '@musetric/audio/recording';
-import microphoneCalibrationWorkletUrl from './microphoneCalibration.worklet.ts?worker&url';
+} from './schedule.js';
 
-export type RunRecordingLatencyCalibrationOptions = {
+export type CalibrationMeasurementOptions = {
   context: AudioContext;
   outputNode: AudioNode;
   playOutput: () => Promise<void>;
+  workletUrl: string | URL;
   deviceId?: string;
   stream?: MediaStream;
 };
 
-export type RecordingLatencyCalibrationResult = {
+export type CalibrationMeasurementResult = {
   latencyFrameCount: number;
   measuredLatencyFrameCounts: number[];
 };
 
-type CalibrationResult = {
+type WorkletResult = {
   peaks: RecordingLatencyCalibrationPeak[];
 };
 
-let calibrationWorkletPromise: Promise<void> | undefined = undefined;
+const workletPromises = new Map<string, Promise<void>>();
 
 const stopStream = (stream: MediaStream) => {
   for (const track of stream.getTracks()) {
@@ -35,26 +37,32 @@ const stopStream = (stream: MediaStream) => {
   }
 };
 
-const loadCalibrationWorklet = async (context: AudioContext) => {
-  calibrationWorkletPromise ??= context.audioWorklet
-    .addModule(microphoneCalibrationWorkletUrl)
-    .catch((error: unknown) => {
-      calibrationWorkletPromise = undefined;
-      throw error;
-    });
-
-  return calibrationWorkletPromise;
+const loadWorklet = async (
+  context: AudioContext,
+  workletUrl: string | URL,
+): Promise<void> => {
+  const key = workletUrl.toString();
+  let promise = workletPromises.get(key);
+  if (!promise) {
+    promise = context.audioWorklet
+      .addModule(workletUrl)
+      .catch((error: unknown) => {
+        workletPromises.delete(key);
+        throw error;
+      });
+    workletPromises.set(key, promise);
+  }
+  return promise;
 };
 
-const waitForCalibrationResult = async (node: AudioWorkletNode) =>
-  new Promise<CalibrationResult | undefined>((resolve) => {
+const waitForResult = async (node: AudioWorkletNode) =>
+  new Promise<WorkletResult | undefined>((resolve) => {
     let settled = false;
     const timeout = window.setTimeout(
       () => {
         if (settled) {
           return;
         }
-
         settled = true;
         resolve(undefined);
       },
@@ -77,16 +85,14 @@ const waitForCalibrationResult = async (node: AudioWorkletNode) =>
 
       settled = true;
       window.clearTimeout(timeout);
-      resolve({
-        peaks: event.data.peaks,
-      });
+      resolve({ peaks: event.data.peaks });
     };
   });
 
-export const runRecordingLatencyCalibration = async (
-  options: RunRecordingLatencyCalibrationOptions,
-): Promise<RecordingLatencyCalibrationResult | undefined> => {
-  const { context, outputNode, playOutput, deviceId } = options;
+export const measureRecordingLatency = async (
+  options: CalibrationMeasurementOptions,
+): Promise<CalibrationMeasurementResult | undefined> => {
+  const { context, outputNode, playOutput, workletUrl, deviceId } = options;
   let stream: MediaStream | undefined = undefined;
   let source: MediaStreamAudioSourceNode | undefined = undefined;
   let calibrationNode: AudioWorkletNode | undefined = undefined;
@@ -95,7 +101,7 @@ export const runRecordingLatencyCalibration = async (
 
   try {
     await playOutput();
-    await loadCalibrationWorklet(context);
+    await loadWorklet(context, workletUrl);
     stream =
       options.stream ??
       (await navigator.mediaDevices.getUserMedia({
@@ -104,10 +110,8 @@ export const runRecordingLatencyCalibration = async (
           sampleRate: context.sampleRate,
         }),
       }));
-    const calibrationSchedule = createRecordingLatencyCalibrationSchedule({
-      context,
-    });
 
+    const schedule = createRecordingLatencyCalibrationSchedule({ context });
     source = context.createMediaStreamSource(stream);
     calibrationNode = new AudioWorkletNode(
       context,
@@ -123,14 +127,14 @@ export const runRecordingLatencyCalibration = async (
     source.connect(calibrationNode);
     calibrationNode.connect(silentGain);
     silentGain.connect(outputNode);
-    const calibrationResultPromise = waitForCalibrationResult(calibrationNode);
 
+    const resultPromise = waitForResult(calibrationNode);
     calibrationNode.port.postMessage({
       type: 'start',
-      clickFrames: calibrationSchedule.clickFrames,
-      endFrame: calibrationSchedule.endFrame,
+      clickFrames: schedule.clickFrames,
+      endFrame: schedule.endFrame,
     });
-    for (const clickFrame of calibrationSchedule.clickFrames) {
+    for (const clickFrame of schedule.clickFrames) {
       const clickSource = context.createBufferSource();
       clickSource.buffer = createRecordingLatencyCalibrationClick(context);
       clickSource.connect(outputNode);
@@ -138,11 +142,12 @@ export const runRecordingLatencyCalibration = async (
       clickSources.push(clickSource);
     }
 
-    const calibrationResult = await calibrationResultPromise;
+    const workletResult = await resultPromise;
     const measuredLatencyFrameCounts =
-      calibrationResult === undefined
+      workletResult === undefined
         ? []
-        : getRecordingLatencyCalibrationFrameCounts(calibrationResult.peaks);
+        : getRecordingLatencyCalibrationFrameCounts(workletResult.peaks);
+
     if (measuredLatencyFrameCounts.length < 3) {
       return undefined;
     }
