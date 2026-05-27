@@ -5,8 +5,8 @@ import { waitNextFrame } from './waitNextFrame.js';
 
 export type MetricsData = {
   first: Record<string, number>;
-  average: Record<string, number>;
-  maxDeviation: Record<string, { positive: number; negative: number }>;
+  median: Record<string, number>;
+  spread: Record<string, { low: number; high: number }>;
 };
 
 export type BenchmarkData = Record<FourierMode, Record<number, MetricsData>>;
@@ -21,6 +21,6 @@ export type RunBenchmarkOptions = {
 
 export const runBenchmark = async (options: RunBenchmarkOptions) => {
   const metrics = await runPipeline(options);
-  await waitNextFrame(15);
+  await waitNextFrame();
   return metrics;
 };

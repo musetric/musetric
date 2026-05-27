@@ -10,8 +10,8 @@ export const fourierModes: readonly FourierMode[] = [
   'fftPackedStockhamR2c',
 ];
 
-export const runs = 10;
-export const skipRuns = 10;
+export const warmupIters = 10;
+export const measureIters = 30;
 export const progress = 0.5;
 
 const getWindowSizes = () => {

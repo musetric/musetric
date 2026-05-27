@@ -1,4 +1,4 @@
-export const waitNextFrame = async (ms: number) =>
+export const waitNextFrame = async () =>
   new Promise<void>((resolve) => {
-    setTimeout(() => resolve(), ms);
+    requestAnimationFrame(() => resolve());
   });
