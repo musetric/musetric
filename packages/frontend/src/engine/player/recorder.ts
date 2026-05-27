@@ -198,13 +198,18 @@ export const createEngineRecorder = (
       });
       const latencyState = store.get();
       if (
-        latencyState.recordingLatencySource === 'estimated' ||
-        latencyState.recordingLatencyDevicePairKey !== estimate.devicePairKey
+        latencyState.latencySource === 'estimated' ||
+        latencyState.latencyDevicePairKey !== estimate.devicePairKey
       ) {
         store.update((state) => {
-          state.recordingLatencyFrameCount = estimate.frameCount;
-          state.recordingLatencySource = 'estimated';
-          state.recordingLatencyDevicePairKey = estimate.devicePairKey;
+          state.latencyFrameCount = estimate.frameCount;
+          state.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
+          state.latencySource = 'estimated';
+          state.latencyDevicePairKey = estimate.devicePairKey;
+        });
+      } else {
+        store.update((state) => {
+          state.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
         });
       }
       if (isStopRequested(session)) {
@@ -225,7 +230,7 @@ export const createEngineRecorder = (
         ),
       );
       const recordingMetadata = new Int32Array(new SharedArrayBuffer(4));
-      const latencyFrameCount = store.get().recordingLatencyFrameCount;
+      const { latencyFrameCount, inputLatencyFrameCount } = store.get();
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,
@@ -240,6 +245,7 @@ export const createEngineRecorder = (
         frameIndex: startFrameIndex,
         revision: store.get().seekEvent.revision,
         latencyFrameCount,
+        inputLatencyFrameCount,
         samples: recordingSamples,
         metadata: recordingMetadata,
         notificationPort: recordingStreamChannel.port2,

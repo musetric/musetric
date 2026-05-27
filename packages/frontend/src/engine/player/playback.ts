@@ -25,6 +25,7 @@ export type EnginePlayback = {
     frameIndex: number;
     revision: number;
     latencyFrameCount: number;
+    inputLatencyFrameCount: number;
     samples: Float32Array<SharedArrayBuffer>;
     metadata: Int32Array<SharedArrayBuffer>;
     notificationPort: MessagePort;
@@ -199,9 +200,15 @@ export const createEnginePlayback = async (
         await context.resume();
       }
       await audioOutput.play();
-      const { revision } = store.get().seekEvent;
+      const { seekEvent, latencyFrameCount, inputLatencyFrameCount } =
+        store.get();
+      const { revision } = seekEvent;
       const playingPromise = createPlayingPromise(revision);
-      port.methods.play({ revision });
+      port.methods.play({
+        revision,
+        latencyFrameCount,
+        inputLatencyFrameCount,
+      });
       await playingPromise;
     },
     stop: async () => {

@@ -36,8 +36,9 @@ export type CreateEngineCalibrationOptions = {
 
 const resetLatencyState = (store: Store<EngineState>) => {
   store.update((state) => {
-    state.recordingLatencySource = 'estimated';
-    state.recordingLatencyDevicePairKey = undefined;
+    state.latencySource = 'estimated';
+    state.latencyDevicePairKey = undefined;
+    state.inputLatencyFrameCount = 0;
   });
 };
 
@@ -80,11 +81,9 @@ export const createEngineCalibration = (
 
   const runCalibration = async (): Promise<boolean> => {
     const stream = preview?.getStream();
-    if (!store.get().recordingLatencyEstimate && stream) {
-      applyRecordingLatencyEstimate(store, { context, stream });
-    }
-    const state = store.get();
-    const estimate = state.recordingLatencyEstimate;
+    const estimate = stream
+      ? applyRecordingLatencyEstimate(store, { context, stream })
+      : undefined;
     if (!estimate) {
       store.update((draft) => {
         draft.calibrationError = 'calibration';
@@ -123,9 +122,10 @@ export const createEngineCalibration = (
       }
 
       store.update((draft) => {
-        draft.recordingLatencyFrameCount = result.latencyFrameCount;
-        draft.recordingLatencySource = 'calibrated';
-        draft.recordingLatencyDevicePairKey = estimate.devicePairKey;
+        draft.latencyFrameCount = result.latencyFrameCount;
+        draft.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
+        draft.latencySource = 'calibrated';
+        draft.latencyDevicePairKey = estimate.devicePairKey;
       });
 
       return true;
@@ -183,10 +183,11 @@ export const createEngineCalibration = (
         context.sampleRate,
       );
       store.update((draft) => {
-        draft.recordingLatencyFrameCount = frameCount;
-        draft.recordingLatencySource = 'manual';
-        draft.recordingLatencyDevicePairKey =
-          draft.recordingLatencyEstimate?.devicePairKey;
+        draft.latencyFrameCount = frameCount;
+        draft.latencySource = 'manual';
+        if (draft.latencyDevicePairKey === undefined) {
+          draft.inputLatencyFrameCount = 0;
+        }
       });
     },
     calibrate: runCalibration,

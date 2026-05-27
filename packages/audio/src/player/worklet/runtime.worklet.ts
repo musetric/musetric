@@ -27,6 +27,11 @@ type RecordingStreamMessage =
     }
   | { type: 'flush'; sequence: number };
 
+type LatencyFrameCounts = {
+  latencyFrameCount: number;
+  inputLatencyFrameCount: number;
+};
+
 const chunkFrameCount = 256;
 
 export const createPlayerRuntime = async (
@@ -41,6 +46,11 @@ export const createPlayerRuntime = async (
   let revision = 0;
   let playing = false;
   let frozen = false;
+  let latencyFrameCount = 0;
+  let inputLatencyFrameCount = 0;
+  let outputLatencyFrameCount = 0;
+  let outputOffsetFrameIndex = 0;
+  let inputOffsetFrameIndex = 0;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const frameIndexTracker = createFrameIndexTracker(sampleRate);
@@ -49,15 +59,69 @@ export const createPlayerRuntime = async (
   let recordingMetadata: Int32Array<SharedArrayBuffer> | undefined = undefined;
   let recordingOffset = 0;
   let recordingWriteFrameIndex = 0;
-  let recordingLatencyFrameCount = 0;
   let recordingBufferFrameIndex = 0;
   let recordingChunkBufferFrameIndex = 0;
   let recordingChunkFrameIndex = 0;
   let recordingSequence = 0;
   let recordingNotificationPort: MessagePort | undefined = undefined;
 
+  const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
+    latencyFrameCount = Math.max(0, counts.latencyFrameCount);
+    inputLatencyFrameCount = Math.max(0, counts.inputLatencyFrameCount);
+    outputLatencyFrameCount = Math.max(
+      0,
+      latencyFrameCount - inputLatencyFrameCount,
+    );
+  };
+
+  const advanceOffsetFrameIndex = (
+    offsetFrameIndex: number,
+    limitFrameCount: number,
+    advanceFrameCount: number,
+  ) => {
+    if (offsetFrameIndex >= limitFrameCount) {
+      return {
+        offsetFrameIndex: limitFrameCount,
+        remainingFrameCount: advanceFrameCount,
+      };
+    }
+
+    const offsetRemainingFrameCount = limitFrameCount - offsetFrameIndex;
+    if (advanceFrameCount <= offsetRemainingFrameCount) {
+      return {
+        offsetFrameIndex: offsetFrameIndex + advanceFrameCount,
+        remainingFrameCount: 0,
+      };
+    }
+
+    return {
+      offsetFrameIndex: limitFrameCount,
+      remainingFrameCount: advanceFrameCount - offsetRemainingFrameCount,
+    };
+  };
+
+  const getAdvancedFrameCount = (
+    processedFrameCount: number,
+    outputFrameCount: number,
+    remainingOutputFrameCount: number,
+  ) => {
+    if (remainingOutputFrameCount === outputFrameCount) {
+      return processedFrameCount;
+    }
+    if (remainingOutputFrameCount === 0 || outputFrameCount === 0) {
+      return 0;
+    }
+    return Math.round(
+      (processedFrameCount * remainingOutputFrameCount) / outputFrameCount,
+    );
+  };
+
+  const getCurrentOutputFrameIndex = () => {
+    return frameIndex + outputOffsetFrameIndex;
+  };
+
   const setRecordingWriteFrameIndex = (nextFrameIndex: number) => {
-    const compensatedFrameIndex = nextFrameIndex - recordingLatencyFrameCount;
+    const compensatedFrameIndex = nextFrameIndex - outputLatencyFrameCount;
     recordingWriteFrameIndex = compensatedFrameIndex;
     recordingChunkFrameIndex = compensatedFrameIndex;
     recordingChunkBufferFrameIndex = recordingBufferFrameIndex;
@@ -116,7 +180,17 @@ export const createPlayerRuntime = async (
       return;
     }
 
-    for (let index = 0; index < firstChannel.length; index += 1) {
+    const skippedFrameCount = Math.min(
+      firstChannel.length,
+      Math.max(0, inputLatencyFrameCount - inputOffsetFrameIndex),
+    );
+    inputOffsetFrameIndex += skippedFrameCount;
+
+    for (
+      let index = skippedFrameCount;
+      index < firstChannel.length;
+      index += 1
+    ) {
       const left = firstChannel[index];
       const sample = secondChannel
         ? (left + (index < secondChannel.length ? secondChannel[index] : 0)) *
@@ -131,6 +205,8 @@ export const createPlayerRuntime = async (
       frameCount = message.frameCount;
       tracks = message.tracks;
       frameIndex = 0;
+      outputOffsetFrameIndex = 0;
+      inputOffsetFrameIndex = 0;
       playing = false;
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
@@ -138,6 +214,8 @@ export const createPlayerRuntime = async (
       frameCount = 0;
       tracks = undefined;
       frameIndex = 0;
+      outputOffsetFrameIndex = 0;
+      inputOffsetFrameIndex = 0;
       playing = false;
       frameIndexTracker.reset();
       timePitchProcessor.reset();
@@ -153,6 +231,9 @@ export const createPlayerRuntime = async (
         return;
       }
 
+      applyLatencyFrameCounts(message);
+      outputOffsetFrameIndex = 0;
+      inputOffsetFrameIndex = 0;
       playing = true;
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
@@ -170,8 +251,10 @@ export const createPlayerRuntime = async (
     seek: (message) => {
       revision = message.revision;
       frameIndex = message.frameIndex;
+      outputOffsetFrameIndex = 0;
       if (recordingNotificationPort) {
         flushRecordingBuffer();
+        inputOffsetFrameIndex = 0;
         setRecordingWriteFrameIndex(message.frameIndex);
       }
       frameIndexTracker.reset();
@@ -195,10 +278,11 @@ export const createPlayerRuntime = async (
       recordingSamples = message.samples;
       recordingMetadata = message.metadata;
       recordingNotificationPort = message.notificationPort;
-      recordingLatencyFrameCount = message.latencyFrameCount;
+      applyLatencyFrameCounts(message);
       recordingBufferFrameIndex = 0;
       recordingOffset = 0;
       recordingSequence = 0;
+      inputOffsetFrameIndex = 0;
       setRecordingWriteFrameIndex(message.frameIndex);
       Atomics.store(recordingMetadata, 0, recordingBufferFrameIndex);
     },
@@ -213,6 +297,7 @@ export const createPlayerRuntime = async (
       recordingSamples = undefined;
       recordingMetadata = undefined;
       recordingOffset = 0;
+      inputOffsetFrameIndex = 0;
       port.methods.recordingFlushed({
         sequence,
       });
@@ -233,7 +318,9 @@ export const createPlayerRuntime = async (
       processRecordingInput(inputs);
 
       const currentTracks = tracks;
-      frameIndex += timePitchProcessor.process(
+      const outputFrameCount = outputs[0].length;
+      const currentOutputFrameIndex = getCurrentOutputFrameIndex();
+      const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
           for (const stemType of stemTypes) {
@@ -254,7 +341,9 @@ export const createPlayerRuntime = async (
 
               for (let offset = 0; offset < inputFrameCount; offset += 1) {
                 const sample =
-                  samples[frameIndex + inputFrameOffset + offset] ?? 0;
+                  samples[
+                    currentOutputFrameIndex + inputFrameOffset + offset
+                  ] ?? 0;
                 input[offset] += sample * volume;
               }
             }
@@ -276,7 +365,9 @@ export const createPlayerRuntime = async (
 
               for (let offset = 0; offset < inputFrameCount; offset += 1) {
                 const sample =
-                  samples[frameIndex + inputFrameOffset + offset] ?? 0;
+                  samples[
+                    currentOutputFrameIndex + inputFrameOffset + offset
+                  ] ?? 0;
                 input[offset] += sample * recordingVolume;
               }
             }
@@ -284,8 +375,22 @@ export const createPlayerRuntime = async (
         },
       );
 
+      const outputAdvance = advanceOffsetFrameIndex(
+        outputOffsetFrameIndex,
+        outputLatencyFrameCount,
+        outputFrameCount,
+      );
+      outputOffsetFrameIndex = outputAdvance.offsetFrameIndex;
+      frameIndex += getAdvancedFrameCount(
+        processedFrameCount,
+        outputFrameCount,
+        outputAdvance.remainingFrameCount,
+      );
+
       if (frameIndex >= frameCount) {
         frameIndex = 0;
+        outputOffsetFrameIndex = 0;
+        inputOffsetFrameIndex = 0;
         playing = false;
         frameIndexTracker.reset();
         timePitchProcessor.reset();
@@ -299,7 +404,10 @@ export const createPlayerRuntime = async (
       }
 
       if (frameIndexTracker.advance(outputs[0].length)) {
-        port.methods.setFrameIndex({ frameIndex, revision });
+        port.methods.setFrameIndex({
+          frameIndex,
+          revision,
+        });
       }
     },
   };

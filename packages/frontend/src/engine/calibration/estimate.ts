@@ -10,7 +10,7 @@ export type CalibrationEstimateOptions = {
 export const applyRecordingLatencyEstimate = (
   store: Store<EngineState>,
   options: CalibrationEstimateOptions,
-): void => {
+): ReturnType<typeof estimateRecordingLatency> => {
   const state = store.get();
   const estimate = estimateRecordingLatency({
     context: options.context,
@@ -20,20 +20,16 @@ export const applyRecordingLatencyEstimate = (
   });
 
   store.update((draft) => {
-    draft.recordingLatencyEstimate = estimate;
     if (
-      draft.recordingLatencySource === 'estimated' ||
-      draft.recordingLatencyDevicePairKey !== estimate.devicePairKey
+      draft.latencySource === 'estimated' ||
+      draft.latencyDevicePairKey !== estimate.devicePairKey
     ) {
-      draft.recordingLatencyFrameCount = estimate.frameCount;
-      draft.recordingLatencySource = 'estimated';
-      draft.recordingLatencyDevicePairKey = estimate.devicePairKey;
+      draft.latencyFrameCount = estimate.frameCount;
+      draft.latencySource = 'estimated';
+      draft.latencyDevicePairKey = estimate.devicePairKey;
     }
+    draft.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
   });
-};
 
-export const clearRecordingLatencyEstimate = (store: Store<EngineState>) => {
-  store.update((draft) => {
-    draft.recordingLatencyEstimate = undefined;
-  });
+  return estimate;
 };
