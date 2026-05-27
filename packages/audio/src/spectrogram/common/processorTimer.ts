@@ -74,6 +74,20 @@ export type SpectrogramProcessorTimer = {
   dispose: () => void;
 };
 
+export const averageMetrics = (
+  buffer: SpectrogramProcessorMetrics[],
+): SpectrogramProcessorMetrics =>
+  spectrogramTimerLabels.reduce<SpectrogramProcessorMetrics>(
+    (acc, key) => {
+      acc[key] = roundDuration(
+        buffer.reduce((sum, m) => sum + m[key], 0) / buffer.length,
+      );
+      return acc;
+    },
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as SpectrogramProcessorMetrics,
+  );
+
 export const createSpectrogramProcessorTimer = (
   device: GPUDevice,
   onMetrics?: (metrics: SpectrogramProcessorMetrics) => void,
