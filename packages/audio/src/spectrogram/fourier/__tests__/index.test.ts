@@ -3,6 +3,7 @@ import { complexArrayFrom } from '../../common/complexArray.js';
 import { createComplexGpuBufferReader } from '../../common/gpuBufferReader/index.js';
 import { createGpuContext } from '../../common/gpuContext.js';
 import { allFourierModes, type FourierMode } from '../../config.cross.js';
+import { getPackedFusedTiledR2cVariant } from '../fftPackedFusedTiledR2c/support.js';
 import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js';
 import { getPackedTiledR2cVariant } from '../fftPackedTiledR2c/support.js';
 import { getPrunedFourStepR2cVariant } from '../fftPrunedFourStepR2c/support.js';
@@ -17,15 +18,19 @@ const isFourierFixtureSupported = (
 ): boolean => {
   const config = { windowSize, windowCount };
 
-  if (mode === 'fftPrunedFourStepR2c') {
-    return getPrunedFourStepR2cVariant(device, config) !== undefined;
+  if (mode === 'fftPackedFusedTiledR2c') {
+    return getPackedFusedTiledR2cVariant(device, config) !== undefined;
   }
 
   if (mode === 'fftPackedStockhamR2c') {
     return getPackedStockhamR2cVariant(device, config) !== undefined;
   }
 
-  return getPackedTiledR2cVariant(device, config) !== undefined;
+  if (mode === 'fftPackedTiledR2c') {
+    return getPackedTiledR2cVariant(device, config) !== undefined;
+  }
+
+  return getPrunedFourStepR2cVariant(device, config) !== undefined;
 };
 
 describe('fourier', async () => {

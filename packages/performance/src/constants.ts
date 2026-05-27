@@ -5,9 +5,10 @@ import {
 import { defaultSampleRate } from '@musetric/resource-utils';
 
 export const fourierModes: readonly FourierMode[] = [
+  'fftPackedFusedTiledR2c',
+  'fftPackedStockhamR2c',
   'fftPackedTiledR2c',
   'fftPrunedFourStepR2c',
-  'fftPackedStockhamR2c',
 ];
 
 export const warmupIters = 10;
