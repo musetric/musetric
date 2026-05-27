@@ -1,4 +1,9 @@
+import { createThrottleTime } from '@musetric/resource-utils/cross/throttleTime';
 import { getGpuDevice } from '../common/gpuDevice.js';
+import {
+  averageMetrics,
+  type SpectrogramProcessorMetrics,
+} from '../common/processorTimer.js';
 import { allTrackKeys } from '../config.cross.js';
 import { createSpectrogramProcessor } from '../processor.js';
 import {
@@ -27,12 +32,19 @@ export const createSpectrogramRuntime = async (
   const { port, dataPort, profiling } = options;
 
   const device = await getGpuDevice(profiling);
+
+  const metricsBuffer: SpectrogramProcessorMetrics[] = [];
+  const logMetrics = createThrottleTime(() => {
+    console.table(averageMetrics(metricsBuffer.splice(0)));
+  }, 500);
+
   const createProcessor = () =>
     createSpectrogramProcessor({
       device,
       onMetrics: profiling
         ? (metrics) => {
-            console.table(metrics);
+            metricsBuffer.push(metrics);
+            logMetrics();
           }
         : undefined,
     });
