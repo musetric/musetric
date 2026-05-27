@@ -7,7 +7,6 @@ import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js'
 import { getPackedTiledR2cVariant } from '../fftPackedTiledR2c/support.js';
 import { getPrunedFourStepR2cVariant } from '../fftPrunedFourStepR2c/support.js';
 import { fouriers } from '../fouriers.js';
-import { isPowerOfTwo } from '../isPowerOfTwo.js';
 import { assertArrayClose, createBuffers, windowCount } from './common.js';
 import { fourierFixtures } from './fixture.js';
 
@@ -26,11 +25,7 @@ const isFourierFixtureSupported = (
     return getPackedStockhamR2cVariant(device, config) !== undefined;
   }
 
-  if (mode === 'fftPackedTiledR2c') {
-    return getPackedTiledR2cVariant(device, config) !== undefined;
-  }
-
-  return isPowerOfTwo(windowSize);
+  return getPackedTiledR2cVariant(device, config) !== undefined;
 };
 
 describe('fourier', async () => {

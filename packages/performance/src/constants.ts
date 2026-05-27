@@ -8,8 +8,6 @@ export const fourierModes: readonly FourierMode[] = [
   'fftPrunedFourStepR2c',
   'fftPackedStockhamR2c',
   'fftPackedTiledR2c',
-  'fftStockham',
-  'fftRadix4',
 ];
 
 export const runs = 10;
