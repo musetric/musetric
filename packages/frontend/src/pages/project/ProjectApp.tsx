@@ -4,6 +4,7 @@ import { type FC, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
+import { AudioSettings } from './audioSettings/AudioSettings.js';
 import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { SubtitlesToggleButton } from './buttons/SubtitlesToggleButton.js';
 import { TempoButton } from './buttons/TempoButton.js';
@@ -11,7 +12,6 @@ import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposeButton } from './buttons/TransposeButton.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
 import { ProjectHeaderMenu } from './menu/ProjectHeaderMenu.js';
-import { MicrophoneSettings } from './microphone/MicrophoneSettings.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
@@ -56,7 +56,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <ProjectContent />
         <PlaybackPanel projectId={project.id} />
       </Stack>
-      <MicrophoneSettings />
+      <AudioSettings />
       <ProjectSettings />
     </ProjectLayout>
   );

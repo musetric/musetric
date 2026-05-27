@@ -28,6 +28,8 @@ export type EngineSeekEvent = {
   origin: EngineSeekOrigin;
 };
 
+export type RecordingLatencySource = 'estimated' | 'manual' | 'calibrated';
+
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
@@ -46,8 +48,10 @@ export type EngineState = {
   sourceTempoBpm: number;
   tempoBpm: number;
   microphoneDeviceId?: string;
-  microphoneLatencyFrameCount: number;
-  microphoneLatencyUserSet: boolean;
+  audioOutputDeviceId?: string;
+  recordingLatencyFrameCount: number;
+  recordingLatencySource: RecordingLatencySource;
+  recordingLatencyDevicePairKey?: string;
   recordingGain: number;
   trackVolumes: Record<StemType, number> & {
     recording: number;

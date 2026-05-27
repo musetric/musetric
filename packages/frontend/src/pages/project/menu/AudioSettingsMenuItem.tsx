@@ -3,26 +3,26 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useProjectStore } from '../store.js';
 
-export type MicrophoneSettingsMenuItemProps = {
+export type AudioSettingsMenuItemProps = {
   closeMenu: () => void;
 };
 
-export const MicrophoneSettingsMenuItem: FC<MicrophoneSettingsMenuItemProps> = (
+export const AudioSettingsMenuItem: FC<AudioSettingsMenuItemProps> = (
   props,
 ) => {
   const { t } = useTranslation();
-  const setMicrophoneSettingsOpen = useProjectStore(
-    (state) => state.setMicrophoneSettingsOpen,
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
   );
 
   return (
     <MenuItem
       onClick={() => {
         props.closeMenu();
-        setMicrophoneSettingsOpen(true);
+        setAudioSettingsOpen(true);
       }}
     >
-      <ListItemText primary={t('pages.project.menu.microphoneSettings')} />
+      <ListItemText primary={t('pages.project.menu.audioSettings')} />
     </MenuItem>
   );
 };
