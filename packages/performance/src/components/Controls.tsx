@@ -137,7 +137,7 @@ export const Controls: FC = () => {
               onClick={() => setShowDeviations(!showDeviations)}
             />
           }
-          label='Show max deviations'
+          label='Show spread'
         />
       </Box>
 

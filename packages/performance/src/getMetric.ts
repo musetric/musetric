@@ -18,23 +18,19 @@ export const getMetric = (
   if (!data) return undefined;
 
   if (showDeviations) {
-    let positive = 0;
-    let negative = 0;
+    let high = 0;
+    let low = 0;
     for (const metric of metrics) {
-      const deviation = data.maxDeviation[metric];
-      positive += deviation.positive;
-      negative += deviation.negative;
+      const spread = data.spread[metric];
+      high += spread.high;
+      low += spread.low;
     }
-    const positiveValue = showPercent
-      ? toPercent(positive, data.average.total)
-      : positive;
-    const negativeValue = showPercent
-      ? toPercent(negative, data.average.total)
-      : negative;
-    return `+${positiveValue.toFixed(2)} / -${negativeValue.toFixed(2)}`;
+    const highValue = showPercent ? toPercent(high, data.median.total) : high;
+    const lowValue = showPercent ? toPercent(low, data.median.total) : low;
+    return `+${highValue.toFixed(2)} / -${lowValue.toFixed(2)}`;
   }
 
-  const source = showFirst ? data.first : data.average;
+  const source = showFirst ? data.first : data.median;
   let value = 0;
   for (const metric of metrics) {
     value += source[metric];

@@ -6,14 +6,13 @@ import {
 import { defaultSampleRate } from '@musetric/resource-utils';
 import {
   type BenchmarkParams,
+  measureIters,
   progress,
   recordingSamples,
-  runs,
   samples,
-  skipRuns,
   viewSizePresets,
+  warmupIters,
 } from './constants.js';
-import { waitNextFrame } from './waitNextFrame.js';
 
 export type RunPipelineOptions = {
   device: GPUDevice;
@@ -23,12 +22,26 @@ export type RunPipelineOptions = {
   params: BenchmarkParams;
 };
 
+type Spread = { low: number; high: number };
+
+const quantile = (sorted: number[], q: number): number => {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0] ?? 0;
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  const loVal = sorted[lo] ?? 0;
+  const hiVal = sorted[hi] ?? 0;
+  if (lo === hi) return loVal;
+  return loVal + (hiVal - loVal) * (pos - lo);
+};
+
 export const runPipeline = async (
   options: RunPipelineOptions,
 ): Promise<{
   first: Record<string, number>;
-  average: Record<string, number>;
-  maxDeviation: Record<string, { positive: number; negative: number }>;
+  median: Record<string, number>;
+  spread: Record<string, Spread>;
 }> => {
   const { device, canvas, fourierMode, windowSize, params } = options;
   const viewSize = viewSizePresets[params.viewSizeKey];
@@ -82,50 +95,35 @@ export const runPipeline = async (
     onMetrics: (metrics) => metricsArray.push(metrics),
   });
 
-  for (let i = 0; i < skipRuns + runs; i++) {
+  const totalIters = warmupIters + measureIters;
+  for (let i = 0; i < totalIters; i++) {
     await processor.render(
       { lead: samples, recording: recordingSamples },
       progress,
     );
-    await waitNextFrame(15);
   }
   processor.dispose();
 
   const first = metricsArray[0] ?? {};
-  const average: Record<string, number> = {};
-  const maxDeviation: Record<string, { positive: number; negative: number }> =
-    {};
+  const measured = metricsArray.slice(warmupIters);
   const keys = Object.keys(first);
 
-  for (const key of keys) {
-    let sum = 0;
-    for (const metrics of metricsArray.slice(skipRuns)) {
-      sum += metrics[key] ?? 0;
-    }
-    average[key] = sum / runs;
-  }
+  const median: Record<string, number> = {};
+  const spread: Record<string, Spread> = {};
 
   for (const key of keys) {
-    let maxPositive = 0;
-    let maxNegative = 0;
-    const avg = average[key] ?? 0;
-
-    for (const metrics of metricsArray.slice(skipRuns)) {
-      const value = metrics[key] ?? 0;
-      const deviation = value - avg;
-      if (deviation > maxPositive) {
-        maxPositive = deviation;
-      }
-      if (deviation < maxNegative) {
-        maxNegative = deviation;
-      }
-    }
-
-    maxDeviation[key] = {
-      positive: maxPositive,
-      negative: Math.abs(maxNegative),
+    const values = measured
+      .map((metrics) => metrics[key] ?? 0)
+      .sort((a, b) => a - b);
+    const p25 = quantile(values, 0.25);
+    const p50 = quantile(values, 0.5);
+    const p75 = quantile(values, 0.75);
+    median[key] = p50;
+    spread[key] = {
+      low: Math.max(0, p50 - p25),
+      high: Math.max(0, p75 - p50),
     };
   }
 
-  return { first, average, maxDeviation };
+  return { first, median, spread };
 };
