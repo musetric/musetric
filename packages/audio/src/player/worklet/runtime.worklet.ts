@@ -350,7 +350,7 @@ export const createPlayerRuntime = async (
           }
 
           const recordingTrack = tracks?.recording;
-          if (recordingTrack) {
+          if (recordingTrack && !recordingNotificationPort) {
             for (
               let channelIndex = 0;
               channelIndex < outputs.length;
