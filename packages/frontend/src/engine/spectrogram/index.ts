@@ -81,6 +81,21 @@ export const createEngineSpectrogram = (
       const viewSize = getCanvasSize(canvas);
       const offscreenCanvas = canvas.transferControlToOffscreen();
 
+      const buildLanes = (recording: boolean) => ({
+        lead: {
+          showSpectrogram: true,
+          showFundamental: true,
+          lineWidthCents: 26,
+          truncateAfterPlayhead: false,
+        },
+        recording: {
+          showSpectrogram: false,
+          showFundamental: true,
+          lineWidthCents: 35,
+          truncateAfterPlayhead: recording,
+        },
+      });
+
       port.methods.mount({
         config: {
           ...config,
@@ -88,18 +103,7 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: store.get().colors,
           sampleRate,
-          lanes: {
-            lead: {
-              showSpectrogram: true,
-              showFundamental: true,
-              lineWidthCents: 26,
-            },
-            recording: {
-              showSpectrogram: false,
-              showFundamental: true,
-              lineWidthCents: 35,
-            },
-          },
+          lanes: buildLanes(store.get().recording),
           comparison: {
             reference: 'lead',
             target: 'recording',
@@ -116,7 +120,17 @@ export const createEngineSpectrogram = (
         });
       });
 
+      const unsubscribeRecording = store.subscribe(
+        (state) => state.recording,
+        (recording) => {
+          port.methods.updateConfig({
+            patch: { lanes: buildLanes(recording) },
+          });
+        },
+      );
+
       return () => {
+        unsubscribeRecording();
         unsubscribeResizeObserver();
         port.methods.unmount();
         store.update((state) => {

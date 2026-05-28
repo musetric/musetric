@@ -34,6 +34,7 @@ export type SpectrogramLaneConfig = {
   showSpectrogram: boolean;
   showFundamental: boolean;
   lineWidthCents: number;
+  truncateAfterPlayhead: boolean;
 };
 
 export type SpectrogramComparison = {
