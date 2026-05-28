@@ -4,7 +4,8 @@ import { createNumberLimit } from '@musetric/resource-utils';
 export const minimumSpectrogramFrequency = 16.351597831287414;
 /** 20 kHz is the practical upper bound of the human hearing range */
 export const maximumSpectrogramFrequency = 20_000;
-const minFrequencyDifference = 1;
+/** Visible frequency window must span at least one octave */
+export const minimumSpectrogramFrequencyRatio = 2;
 
 export const normalizeSpectrogramMinFrequency = (
   minFrequency: number,
@@ -12,7 +13,7 @@ export const normalizeSpectrogramMinFrequency = (
 ) => {
   const limit = createNumberLimit({
     minimum: minimumSpectrogramFrequency,
-    maximum: maxFrequency - minFrequencyDifference,
+    maximum: maxFrequency / minimumSpectrogramFrequencyRatio,
   });
   return limit.clamp(minFrequency);
 };
@@ -22,7 +23,7 @@ export const normalizeSpectrogramMaxFrequency = (
   minFrequency: number,
 ) => {
   const limit = createNumberLimit({
-    minimum: minFrequency + minFrequencyDifference,
+    minimum: minFrequency * minimumSpectrogramFrequencyRatio,
     maximum: maximumSpectrogramFrequency,
   });
   return limit.clamp(maxFrequency);
