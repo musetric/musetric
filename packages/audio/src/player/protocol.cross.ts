@@ -18,6 +18,12 @@ export type PlayerOutboundMethods = {
   setTempoRatio: (message: { tempoRatio: number }) => void;
   setTrackVolume: (message: { stemType: StemType; volume: number }) => void;
   setRecordingVolume: (message: { volume: number }) => void;
+  setMetronome: (message: {
+    beatsInSamples: Int32Array;
+    downbeatMask: Uint8Array;
+    enabled: boolean;
+    volume: number;
+  }) => void;
   startRecording: (message: {
     frameIndex: number;
     revision: number;
@@ -64,6 +70,7 @@ export const playerChannel = createMessageChannel<
       'setTempoRatio',
       'setTrackVolume',
       'setRecordingVolume',
+      'setMetronome',
       'startRecording',
       'flushRecording',
     ],

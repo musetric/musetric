@@ -67,6 +67,10 @@ const initialState: EngineState = {
     instrumental: 1,
     recording: 1,
   },
+  metronomeEnabled: false,
+  metronomeVolume: 0.3,
+  metronomeBeats: [],
+  metronomeDownbeats: [],
 };
 
 export type Engine = {

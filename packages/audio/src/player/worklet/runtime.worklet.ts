@@ -5,6 +5,7 @@ import {
 } from '../protocol.cross.js';
 import { createTimePitchProcessor } from '../timePitchProcessor.js';
 import { createFrameIndexTracker } from '../trackFrameIndex.js';
+import { createMetronome } from './metronome.worklet.js';
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
@@ -53,6 +54,7 @@ export const createPlayerRuntime = async (
   let inputOffsetFrameIndex = 0;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
+  const metronome = createMetronome(sampleRate);
   const frameIndexTracker = createFrameIndexTracker(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   let recordingSamples: Float32Array<SharedArrayBuffer> | undefined = undefined;
@@ -241,6 +243,7 @@ export const createPlayerRuntime = async (
       revision = message.revision;
       playing = false;
       frameIndexTracker.reset();
+      metronome.clear();
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     setFrozen: (message) => {
@@ -259,6 +262,8 @@ export const createPlayerRuntime = async (
       }
       frameIndexTracker.reset();
       timePitchProcessor.reset();
+      metronome.reset(message.frameIndex);
+      metronome.clear();
     },
     setTransposeSemitones: (message) => {
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
@@ -271,6 +276,9 @@ export const createPlayerRuntime = async (
     },
     setRecordingVolume: (message) => {
       recordingVolume = message.volume;
+    },
+    setMetronome: (message) => {
+      metronome.setConfig(message, frameIndex);
     },
     startRecording: (message) => {
       revision = message.revision;
@@ -320,6 +328,7 @@ export const createPlayerRuntime = async (
       const currentTracks = tracks;
       const outputFrameCount = outputs[0].length;
       const currentOutputFrameIndex = getCurrentOutputFrameIndex();
+      const oldFrameIndex = frameIndex;
       const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
@@ -387,6 +396,13 @@ export const createPlayerRuntime = async (
         outputAdvance.remainingFrameCount,
       );
 
+      metronome.process({
+        oldFrameIndex,
+        newFrameIndex: frameIndex,
+        outputs,
+        outputFrameCount,
+      });
+
       if (frameIndex >= frameCount) {
         frameIndex = 0;
         outputOffsetFrameIndex = 0;
@@ -394,6 +410,8 @@ export const createPlayerRuntime = async (
         playing = false;
         frameIndexTracker.reset();
         timePitchProcessor.reset();
+        metronome.reset(0);
+        metronome.clear();
         port.methods.setPlaying({
           playing,
           frameIndex,

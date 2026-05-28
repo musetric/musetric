@@ -63,6 +63,15 @@ const createSubtitle = `
   );
 `;
 
+const createRhythm = `
+  CREATE TABLE IF NOT EXISTS Rhythm (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+`;
+
 const createRecording = `
   CREATE TABLE IF NOT EXISTS Recording (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +93,7 @@ const creationStatements = [
   createAudioDeliveryIndex,
   createPreview,
   createSubtitle,
+  createRhythm,
   createRecording,
 ] as const;
 

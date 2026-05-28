@@ -5,5 +5,6 @@ export * as preview from './preview/index.js';
 export * as processing from './processing/index.js';
 export * as project from './project/index.js';
 export * as recording from './recording/index.js';
+export * as rhythm from './rhythm/index.js';
 export * as subtitle from './subtitle/index.js';
 export * as wavePeaks from './wavePeaks/index.js';

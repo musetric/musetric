@@ -178,6 +178,28 @@ export const createEnginePlayback = async (
     },
   );
 
+  const publishMetronome = () => {
+    const state = store.get();
+    const beatsInSamples = new Int32Array(state.metronomeBeats.length);
+    const downbeatMask = new Uint8Array(state.metronomeBeats.length);
+    const downbeatSet = new Set(state.metronomeDownbeats);
+    for (let i = 0; i < state.metronomeBeats.length; i += 1) {
+      const beat = state.metronomeBeats[i];
+      beatsInSamples[i] = Math.round(beat * context.sampleRate);
+      downbeatMask[i] = downbeatSet.has(beat) ? 1 : 0;
+    }
+    port.methods.setMetronome({
+      beatsInSamples,
+      downbeatMask,
+      enabled: state.metronomeEnabled,
+      volume: state.metronomeVolume,
+    });
+  };
+  store.subscribe((state) => state.metronomeEnabled, publishMetronome);
+  store.subscribe((state) => state.metronomeVolume, publishMetronome);
+  store.subscribe((state) => state.metronomeBeats, publishMetronome);
+  store.subscribe((state) => state.metronomeDownbeats, publishMetronome);
+
   const createPlayingPromise = async (revision: number) => {
     const playingPromise = createControlledPromise<number>();
     playingWaiter = {
