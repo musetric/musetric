@@ -27,7 +27,7 @@ export type SettingsState = Pick<
 const initialState: SettingsState = {
   fourierMode: 'fftPackedFusedTiledR2c',
   windowSize: 1024 * 4,
-  visibleTime: 5,
+  visibleTime: 3.5,
   playheadRatio: 0.4,
   zeroPaddingFactor: 2,
   windowName: 'hamming',
@@ -43,6 +43,7 @@ export type SettingsActions = {
   setWindowSize: (value: number) => void;
   setMinFrequency: (value: number) => void;
   setMaxFrequency: (value: number) => void;
+  setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   setMinDecibel: (value: number) => void;
   setVisibleTime: (value: number) => void;
   setPlayheadRatio: (value: number) => void;
@@ -60,6 +61,8 @@ export const useSettingsStore = create<State>()(
       setWindowSize: (windowSize) => set({ windowSize }),
       setMinFrequency: (minFrequency) => set({ minFrequency }),
       setMaxFrequency: (maxFrequency) => set({ maxFrequency }),
+      setFrequencyRange: (minFrequency, maxFrequency) =>
+        set({ minFrequency, maxFrequency }),
       setMinDecibel: (minDecibel) => set({ minDecibel }),
       setVisibleTime: (visibleTime) => set({ visibleTime }),
       setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
