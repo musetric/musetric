@@ -35,6 +35,7 @@ export const processingSchema = z.object({
     separation: processingStepSchema,
     transcription: processingStepSchema,
     rhythm: processingStepSchema,
+    key: processingStepSchema,
   }),
 });
 export type Processing = z.infer<typeof processingSchema>;

@@ -10,15 +10,16 @@ FROM base-${variant} AS runtime
 ARG variant
 
 ENV PATH="/root/.local/bin:${PATH}"
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils ffmpeg \
+RUN apt-get update -qq \
+  && apt-get install -qq -y --no-install-recommends ca-certificates curl xz-utils ffmpeg >/dev/null \
   && curl -fsSLo /tmp/node.tar.xz \
     "https://nodejs.org/dist/v24.7.0/node-v24.7.0-linux-x64.tar.xz" \
   && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
   && rm -f /tmp/node.tar.xz \
   && curl -LsSf https://astral.sh/uv/install.sh | sh \
-  && apt-get purge -y --auto-remove curl xz-utils \
+  && apt-get purge -qq -y --auto-remove curl xz-utils >/dev/null \
   && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$variant" = "cpu" ]; then \
@@ -32,7 +33,8 @@ RUN if [ "$variant" = "cpu" ]; then \
       --default-index https://pypi.org/simple \
       --index "$pytorch_index" \
       --index-strategy unsafe-best-match \
-      https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.15/musetric_toolkit-0.0.15-py3-none-any.whl
+      --overrides https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.17/overrides.txt \
+      https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.17/musetric_toolkit-0.0.17-py3-none-any.whl
 
 WORKDIR /app
 ENV NODE_ENV=production
