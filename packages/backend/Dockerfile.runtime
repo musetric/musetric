@@ -32,7 +32,7 @@ RUN if [ "$variant" = "cpu" ]; then \
       --default-index https://pypi.org/simple \
       --index "$pytorch_index" \
       --index-strategy unsafe-best-match \
-      https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.14/musetric_toolkit-0.0.14-py3-none-any.whl
+      https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.15/musetric_toolkit-0.0.15-py3-none-any.whl
 
 WORKDIR /app
 ENV NODE_ENV=production

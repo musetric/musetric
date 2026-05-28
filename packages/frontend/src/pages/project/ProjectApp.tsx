@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
+import { MetronomeToggleButton } from './buttons/MetronomeToggleButton.js';
 import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { SubtitlesToggleButton } from './buttons/SubtitlesToggleButton.js';
 import { TempoButton } from './buttons/TempoButton.js';
@@ -15,6 +16,7 @@ import { ProjectHeaderMenu } from './menu/ProjectHeaderMenu.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
+import { RhythmTempoSync } from './rhythm/RhythmTempoSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
 
@@ -40,6 +42,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
           <Box flexGrow={1} />
           <Stack direction='row' gap={1}>
             <SubtitlesToggleButton />
+            <MetronomeToggleButton />
             <TransposeButton />
             <TransposePicker />
             <TempoButton />
@@ -56,6 +59,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <ProjectContent />
         <PlaybackPanel projectId={project.id} />
       </Stack>
+      <RhythmTempoSync projectId={project.id} />
       <AudioSettings />
       <ProjectSettings />
     </ProjectLayout>

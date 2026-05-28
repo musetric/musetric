@@ -76,6 +76,15 @@ export namespace subtitle {
   export type Item = z.infer<typeof itemSchema>;
 }
 
+export namespace rhythm {
+  export const itemSchema = z.object({
+    id: numericIdSchema,
+    projectId: numericIdSchema,
+    blobId: z.string(),
+  });
+  export type Item = z.infer<typeof itemSchema>;
+}
+
 export namespace recording {
   export const itemSchema = z.object({
     id: numericIdSchema,

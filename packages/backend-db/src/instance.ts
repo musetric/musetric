@@ -9,6 +9,7 @@ import {
   processing,
   project,
   recording,
+  rhythm,
   subtitle,
   wavePeaks,
 } from './entity/index.js';
@@ -38,6 +39,7 @@ export const createInstance = async (databasePath: string) => {
     recording: recording.createInstance(database),
     processing: processing.createInstance(database),
     subtitle: subtitle.createInstance(database),
+    rhythm: rhythm.createInstance(database),
     blob: blob.createInstance(database),
     disconnect: async () => {
       if (database.isOpen) {
