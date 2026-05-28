@@ -3,8 +3,10 @@ import {
   measureRecordingLatency,
 } from '@musetric/audio/calibration';
 import {
+  getRecordingLatencyDevicePairKey,
   isLikelyMobileUserAgent,
   resolveAudioInputDevice,
+  resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
 import type { Store } from '../../common/store.js';
 import type { EngineAudioOutput } from '../audioOutput/index.js';
@@ -17,6 +19,10 @@ import {
   type CalibrationPreview,
   createCalibrationPreview,
 } from './preview.js';
+import {
+  type CalibrationLatencyStore,
+  createCalibrationLatencyStore,
+} from './storage.js';
 
 export type EngineCalibration = {
   selectInputDevice: (deviceId: string) => Promise<void>;
@@ -34,11 +40,23 @@ export type CreateEngineCalibrationOptions = {
   getPlayer: () => EnginePlayer;
 };
 
-const resetLatencyState = (store: Store<EngineState>) => {
+const restoreLatencyState = (
+  store: Store<EngineState>,
+  latencyStore: CalibrationLatencyStore,
+  devicePairKey: string,
+) => {
+  const stored = latencyStore.get(devicePairKey);
   store.update((state) => {
-    state.latencySource = 'estimated';
-    state.latencyDevicePairKey = undefined;
-    state.inputLatencyFrameCount = 0;
+    if (stored) {
+      state.latencyFrameCount = stored.latencyFrameCount;
+      state.inputLatencyFrameCount = stored.inputLatencyFrameCount;
+      state.latencySource = stored.source;
+      state.latencyDevicePairKey = devicePairKey;
+    } else {
+      state.latencySource = 'estimated';
+      state.latencyDevicePairKey = undefined;
+      state.inputLatencyFrameCount = 0;
+    }
   });
 };
 
@@ -55,16 +73,36 @@ export const createEngineCalibration = (
   options: CreateEngineCalibrationOptions,
 ): EngineCalibration => {
   const { context, audioOutput, store, getPlayer } = options;
+  const latencyStore = createCalibrationLatencyStore();
+
+  const restoreForCurrentDevices = () => {
+    const state = store.get();
+    const inputDevice = resolveAudioInputDevice(state.audioDevices, {
+      explicitDeviceId: state.microphoneDeviceId,
+      preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+    });
+    const outputDevice = resolveAudioOutputDevice(state.audioDevices, {
+      explicitDeviceId: state.audioOutputDeviceId,
+    });
+    restoreLatencyState(
+      store,
+      latencyStore,
+      getRecordingLatencyDevicePairKey(inputDevice, outputDevice),
+    );
+  };
 
   const devices = createCalibrationDevices({
     store,
     audioOutput,
-    onDeviceLost: () => {
-      resetLatencyState(store);
+    onInitialDevicePair: (devicePairKey) => {
+      restoreLatencyState(store, latencyStore, devicePairKey);
     },
-    onActiveDeviceChanged: () => {
+    onDeviceLost: (devicePairKey) => {
+      restoreLatencyState(store, latencyStore, devicePairKey);
+    },
+    onActiveDeviceChanged: (devicePairKey) => {
       void stopActivePlayback(store, getPlayer());
-      resetLatencyState(store);
+      restoreLatencyState(store, latencyStore, devicePairKey);
     },
   });
   devices.start();
@@ -121,6 +159,12 @@ export const createEngineCalibration = (
         return false;
       }
 
+      latencyStore.set(estimate.devicePairKey, {
+        latencyFrameCount: result.latencyFrameCount,
+        inputLatencyFrameCount: estimate.inputLatencyFrameCount,
+        source: 'calibrated',
+      });
+
       store.update((draft) => {
         draft.latencyFrameCount = result.latencyFrameCount;
         draft.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
@@ -154,7 +198,7 @@ export const createEngineCalibration = (
       store.update((draft) => {
         draft.microphoneDeviceId = deviceId;
       });
-      resetLatencyState(store);
+      restoreForCurrentDevices();
     },
     selectOutputDevice: async (deviceId) => {
       if (!deviceId || store.get().audioOutputDeviceId === deviceId) {
@@ -169,7 +213,7 @@ export const createEngineCalibration = (
         store.update((draft) => {
           draft.audioOutputDeviceId = deviceId;
         });
-        resetLatencyState(store);
+        restoreForCurrentDevices();
       } catch (error) {
         console.error('Failed to select audio output', error);
         store.update((draft) => {
@@ -189,6 +233,14 @@ export const createEngineCalibration = (
           draft.inputLatencyFrameCount = 0;
         }
       });
+      const state = store.get();
+      if (state.latencyDevicePairKey !== undefined) {
+        latencyStore.set(state.latencyDevicePairKey, {
+          latencyFrameCount: state.latencyFrameCount,
+          inputLatencyFrameCount: state.inputLatencyFrameCount,
+          source: 'manual',
+        });
+      }
     },
     calibrate: runCalibration,
     openPreview: () => getPreview().open(),
