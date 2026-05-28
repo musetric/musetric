@@ -1,6 +1,7 @@
 import {
   getRealAudioInputDevices,
   getRealAudioOutputDevices,
+  getRecordingLatencyDevicePairKey,
   isLikelyMobileUserAgent,
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
@@ -12,8 +13,9 @@ import type { EngineState } from '../state.js';
 export type CalibrationDevicesOptions = {
   store: Store<EngineState>;
   audioOutput: EngineAudioOutput;
-  onDeviceLost: () => void;
-  onActiveDeviceChanged: () => void;
+  onInitialDevicePair: (devicePairKey: string) => void;
+  onDeviceLost: (devicePairKey: string) => void;
+  onActiveDeviceChanged: (devicePairKey: string) => void;
 };
 
 export type CalibrationDevices = {
@@ -31,7 +33,13 @@ const enumerateAudioDevices = async () => {
 export const createCalibrationDevices = (
   options: CalibrationDevicesOptions,
 ): CalibrationDevices => {
-  const { store, audioOutput, onDeviceLost, onActiveDeviceChanged } = options;
+  const {
+    store,
+    audioOutput,
+    onInitialDevicePair,
+    onDeviceLost,
+    onActiveDeviceChanged,
+  } = options;
   let initialized = false;
   let previousInputDeviceId: string | undefined = undefined;
   let previousOutputDeviceId: string | undefined = undefined;
@@ -68,6 +76,11 @@ export const createCalibrationDevices = (
     const nextOutputDevice = resolveAudioOutputDevice(devices, {
       explicitDeviceId: nextOutputDeviceId,
     });
+    const nextDevicePairKey = getRecordingLatencyDevicePairKey(
+      nextInputDevice,
+      nextOutputDevice,
+    );
+    const isInitial = !initialized;
     const activeDeviceChanged =
       initialized &&
       (previousInputDeviceId !== nextInputDevice?.deviceId ||
@@ -77,8 +90,12 @@ export const createCalibrationDevices = (
       draft.audioDevices = devices;
     });
 
+    if (isInitial) {
+      onInitialDevicePair(nextDevicePairKey);
+    }
+
     if (activeDeviceChanged) {
-      onActiveDeviceChanged();
+      onActiveDeviceChanged(nextDevicePairKey);
     }
 
     if (
@@ -101,7 +118,7 @@ export const createCalibrationDevices = (
           draft.audioOutputDeviceId = undefined;
         }
       });
-      onDeviceLost();
+      onDeviceLost(nextDevicePairKey);
     }
 
     initialized = true;
