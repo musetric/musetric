@@ -7,7 +7,11 @@ const workgroupSize = 64;
 export type SpectrogramSliceSamples = {
   run: (encoder: GPUCommandEncoder) => void;
   dispatch: (pass: GPUComputePassEncoder) => void;
-  write: (samples: Float32Array, trackProgress: number) => void;
+  write: (
+    samples: Float32Array,
+    trackProgress: number,
+    truncateAfterPlayhead: boolean,
+  ) => void;
 };
 
 export const createSpectrogramSliceSamplesCell = (
@@ -39,8 +43,13 @@ export const createSpectrogramSliceSamplesCell = (
           pass.end();
         },
         dispatch,
-        write: (samples, trackProgress) => {
-          state.samples.write(samples, trackProgress, state.config);
+        write: (samples, trackProgress, truncateAfterPlayhead) => {
+          state.samples.write(
+            samples,
+            trackProgress,
+            state.config,
+            truncateAfterPlayhead,
+          );
         },
       };
     },

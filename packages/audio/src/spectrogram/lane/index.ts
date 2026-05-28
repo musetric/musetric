@@ -4,6 +4,7 @@ import {
 } from '@musetric/resource-utils';
 import { type ComplexGpuBuffer } from '../common/complexArray.js';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import { type TrackKey } from '../config.cross.js';
 import { createSpectrogramDecibelifyCell } from '../decibelify/index.js';
 import { createFourierCell } from '../fourier/cell.js';
 import { createSpectrogramFundamentalFrequencyCell } from '../fundamentalFrequency/index.js';
@@ -23,7 +24,7 @@ export type SpectrogramLaneMarkers = {
 };
 
 export type SpectrogramLaneOptions = {
-  label: string;
+  label: TrackKey;
   markers?: SpectrogramLaneMarkers;
 };
 
@@ -128,7 +129,13 @@ export const createSpectrogramLaneCell = (
       return {
         signal,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
-        writeSamples: sliceSamples.write,
+        writeSamples: (samples, trackProgress) => {
+          sliceSamples.write(
+            samples,
+            trackProgress,
+            config.lanes[options.label].truncateAfterPlayhead,
+          );
+        },
         run,
         skip,
       };
@@ -144,7 +151,9 @@ export const createSpectrogramLaneCell = (
       current.playheadRatio === next.playheadRatio &&
       current.minDecibel === next.minDecibel &&
       current.maxFrequency === next.maxFrequency &&
-      current.windowCount === next.windowCount,
+      current.windowCount === next.windowCount &&
+      current.lanes[options.label].truncateAfterPlayhead ===
+        next.lanes[options.label].truncateAfterPlayhead,
   });
 
   return {
