@@ -13,26 +13,36 @@ struct FundamentalFrequencyParams {
   pad1: u32,
 };
 
+struct CandidateStats {
+  score: f32,
+  harmonicMean: f32,
+  noiseScore: f32,
+  fundamentalProminence: f32,
+  supportCount: u32,
+  oddMean: f32,
+  evenMean: f32,
+};
+
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
 @group(0) @binding(1) var<storage, read_write> scores: array<f32>;
 @group(0) @binding(2) var<storage, read_write> rawOutput: array<f32>;
 @group(0) @binding(3) var<uniform> params: FundamentalFrequencyParams;
 
-const harmonicWeights = array<f32, 13>(
+const harmonicWeights = array<f32, 11>(
   0.0,
   1.0,
-  0.566441943,
-  0.406219317,
-  0.320856474,
-  0.26720501,
-  0.230099659,
-  0.202777427,
-  0.181746565,
-  0.165014133,
-  0.151356125,
-  0.139977424,
-  0.130338098,
+  0.707106781,
+  0.577350269,
+  0.5,
+  0.447213595,
+  0.40824829,
+  0.377964473,
+  0.353553391,
+  0.333333333,
+  0.316227766,
 );
+
+const prominenceProbeRatio = 1.041243772;
 
 fn frequencyAtCandidate(candidate: u32) -> f32 {
   return params.minimumFrequency *
@@ -59,169 +69,143 @@ fn sampleIntensity(windowIndex: u32, frequency: f32) -> f32 {
   return mix(lowerIntensity, upperIntensity, blend);
 }
 
-fn harmonicPatternScore(windowIndex: u32, frequency: f32) -> f32 {
-  let fundamentalIntensity = sampleIntensity(windowIndex, frequency);
-  var weightedIntensity = fundamentalIntensity * 1.4;
-  var totalWeight = 1.4;
+fn spectralProminence(windowIndex: u32, frequency: f32) -> f32 {
+  let center = sampleIntensity(windowIndex, frequency);
+  let lower = sampleIntensity(windowIndex, frequency / prominenceProbeRatio);
+  let upper = sampleIntensity(windowIndex, frequency * prominenceProbeRatio);
+  let localFloor = max(lower, upper) * 0.5;
+  return max(center - localFloor, 0.0);
+}
 
-  for (var harmonic = 2u; harmonic <= params.harmonicCount; harmonic += 1u) {
+fn baseCandidateStats(windowIndex: u32, frequency: f32) -> CandidateStats {
+  var weighted = 0.0;
+  var totalWeight = 0.0;
+  var supportCount = 0u;
+  var oddWeighted = 0.0;
+  var oddWeight = 0.0;
+  var evenWeighted = 0.0;
+  var evenWeight = 0.0;
+  var fundamentalProminence = 0.0;
+
+  for (var harmonic = 1u; harmonic <= params.harmonicCount; harmonic += 1u) {
     let harmonicFrequency = frequency * f32(harmonic);
     if (harmonicFrequency >= params.sampleRate * 0.5) {
       break;
     }
 
     let weight = harmonicWeights[harmonic];
-    weightedIntensity += sampleIntensity(windowIndex, harmonicFrequency) * weight;
+    let peak = spectralProminence(windowIndex, harmonicFrequency);
+    if (harmonic == 1u) {
+      fundamentalProminence = peak;
+    }
+
+    weighted += peak * weight;
     totalWeight += weight;
+    if (peak >= params.minimumFundamentalIntensity) {
+      supportCount += 1u;
+    }
+
+    if (harmonic % 2u == 1u) {
+      oddWeighted += peak * weight;
+      oddWeight += weight;
+    } else {
+      evenWeighted += peak * weight;
+      evenWeight += weight;
+    }
   }
 
-  return weightedIntensity / totalWeight;
-}
+  var harmonicMean = 0.0;
+  if (totalWeight > 0.0) {
+    harmonicMean = weighted / totalWeight;
+  }
 
-fn interharmonicPatternScore(windowIndex: u32, frequency: f32) -> f32 {
-  var weightedIntensity = 0.0;
-  var totalWeight = 0.0;
+  var oddMean = 0.0;
+  if (oddWeight > 0.0) {
+    oddMean = oddWeighted / oddWeight;
+  }
 
-  for (var harmonic = 1u; harmonic < params.harmonicCount; harmonic += 1u) {
+  var evenMean = 0.0;
+  if (evenWeight > 0.0) {
+    evenMean = evenWeighted / evenWeight;
+  }
+
+  var noiseWeighted = 0.0;
+  var noiseWeight = 0.0;
+  let noiseCount = min(params.harmonicCount, 8u);
+  for (var harmonic = 1u; harmonic < noiseCount; harmonic += 1u) {
     let harmonicFrequency = frequency * (f32(harmonic) + 0.5);
     if (harmonicFrequency >= params.sampleRate * 0.5) {
       break;
     }
 
     let weight = harmonicWeights[harmonic];
-    weightedIntensity += sampleIntensity(windowIndex, harmonicFrequency) * weight;
-    totalWeight += weight;
+    noiseWeighted += sampleIntensity(windowIndex, harmonicFrequency) * weight;
+    noiseWeight += weight;
   }
 
-  if (totalWeight <= 0.0) {
-    return 0.0;
+  var noiseScore = 0.0;
+  if (noiseWeight > 0.0) {
+    noiseScore = noiseWeighted / noiseWeight;
   }
 
-  return weightedIntensity / totalWeight;
+  let score = harmonicMean * 0.62 +
+    oddMean * 0.28 +
+    fundamentalProminence * 0.22 +
+    min(evenMean, oddMean + 0.08) * 0.08 -
+    noiseScore * 0.34;
+
+  return CandidateStats(
+    score,
+    harmonicMean,
+    noiseScore,
+    fundamentalProminence,
+    supportCount,
+    oddMean,
+    evenMean,
+  );
 }
 
-fn harmonicSupportCount(windowIndex: u32, frequency: f32) -> u32 {
-  var count = 0u;
-  let threshold = params.minimumFundamentalIntensity * 1.25;
-
-  for (var harmonic = 1u; harmonic <= 8u; harmonic += 1u) {
-    let harmonicFrequency = frequency * f32(harmonic);
-    if (harmonicFrequency >= params.sampleRate * 0.5) {
-      break;
-    }
-
-    if (sampleIntensity(windowIndex, harmonicFrequency) >= threshold) {
-      count += 1u;
-    }
+fn minimumSupportCount(frequency: f32) -> u32 {
+  if (frequency < 130.0) {
+    return 4u;
   }
 
-  return count;
+  if (frequency < 520.0) {
+    return 3u;
+  }
+
+  return 2u;
 }
 
-fn minimumScoreForFrequency(frequency: f32) -> f32 {
-  if (frequency >= 520.0) {
-    return params.minimumScore + 0.08;
+fn candidatePasses(frequency: f32, stats: CandidateStats) -> bool {
+  if (stats.supportCount < minimumSupportCount(frequency)) {
+    return false;
   }
 
-  if (frequency >= 360.0) {
-    return params.minimumScore + 0.03;
+  if (stats.score < params.minimumScore) {
+    return false;
   }
 
-  return params.minimumScore;
-}
+  if (stats.harmonicMean < stats.noiseScore * 1.08 + 0.035) {
+    return false;
+  }
 
-fn hasReliableHarmonicSupport(
-  frequency: f32,
-  fundamentalIntensity: f32,
-  score: f32,
-  noiseScore: f32,
-  supportCount: u32,
-) -> bool {
   if (
-    frequency < 140.0 &&
-    fundamentalIntensity < params.minimumFundamentalIntensity * 5.8
+    stats.fundamentalProminence < params.minimumFundamentalIntensity * 0.65 &&
+    stats.supportCount < minimumSupportCount(frequency) + 1u
   ) {
     return false;
   }
 
-  if (supportCount >= 3u) {
-    return true;
-  }
-
-  if (
-    supportCount >= 2u &&
-    frequency < 520.0 &&
-    fundamentalIntensity >= params.minimumFundamentalIntensity * 3.5 &&
-    score >= minimumScoreForFrequency(frequency) + 0.055 &&
-    score >= noiseScore * 1.3 + 0.06
-  ) {
-    return true;
-  }
-
-  return (
-    supportCount >= 1u &&
-    frequency < 360.0 &&
-    fundamentalIntensity >= params.minimumFundamentalIntensity * 5.5 &&
-    score >= minimumScoreForFrequency(frequency) + 0.06 &&
-    score >= noiseScore * 1.5 + 0.08
-  );
-}
-
-fn minimumSubharmonicFundamentalRatio(frequency: f32) -> f32 {
-  if (frequency < 150.0) {
-    return 0.55;
-  }
-
-  if (frequency < 220.0) {
-    return 0.45;
-  }
-
-  return 0.25;
-}
-
-fn harmonicScore(windowIndex: u32, frequency: f32) -> f32 {
-  let fundamentalIntensity = sampleIntensity(windowIndex, frequency);
-  if (fundamentalIntensity < params.minimumFundamentalIntensity) {
-    return 0.0;
-  }
-
-  let score = harmonicPatternScore(windowIndex, frequency);
-  if (score < minimumScoreForFrequency(frequency)) {
-    return 0.0;
-  }
-
-  let noiseScore = interharmonicPatternScore(windowIndex, frequency);
-  let supportCount = harmonicSupportCount(windowIndex, frequency);
-  if (
-    !hasReliableHarmonicSupport(
-      frequency,
-      fundamentalIntensity,
-      score,
-      noiseScore,
-      supportCount,
-    )
-  ) {
-    return 0.0;
-  }
-
-  if (score < noiseScore * 1.12 + 0.025) {
-    return 0.0;
-  }
-
-  if (isWeakSubtone(windowIndex, frequency, fundamentalIntensity, score)) {
-    return 0.0;
-  }
-
-  return score;
+  return true;
 }
 
 fn isWeakSubtone(
   windowIndex: u32,
   frequency: f32,
-  fundamentalIntensity: f32,
-  score: f32,
+  stats: CandidateStats,
 ) -> bool {
-  if (frequency >= 180.0) {
+  if (frequency >= 190.0) {
     return false;
   }
 
@@ -231,127 +215,62 @@ fn isWeakSubtone(
   }
 
   let doubleIntensity = sampleIntensity(windowIndex, doubleFrequency);
-  if (
-    doubleIntensity >= 0.65 &&
-    doubleIntensity >= fundamentalIntensity * 1.25
-  ) {
-    let doubleScore = harmonicPatternScore(windowIndex, doubleFrequency);
-    if (doubleScore >= score * 0.75) {
+  return (
+    stats.fundamentalProminence < params.minimumFundamentalIntensity * 1.45 &&
+    stats.oddMean < stats.evenMean * 0.72 &&
+    doubleIntensity >= stats.fundamentalProminence * 1.45 + 0.12
+  );
+}
+
+fn isLikelyOvertone(
+  windowIndex: u32,
+  frequency: f32,
+  stats: CandidateStats,
+) -> bool {
+  if (frequency < 140.0) {
+    return false;
+  }
+
+  for (var divisor = 2u; divisor <= 3u; divisor += 1u) {
+    let lowerFrequency = frequency / f32(divisor);
+    if (lowerFrequency < params.minimumFrequency) {
+      break;
+    }
+
+    let lowerStats = baseCandidateStats(windowIndex, lowerFrequency);
+    if (
+      candidatePasses(lowerFrequency, lowerStats) &&
+      lowerStats.score >= stats.score * 0.82 &&
+      lowerStats.fundamentalProminence >=
+        params.minimumFundamentalIntensity * 0.7
+    ) {
       return true;
     }
   }
 
-  var upperScore = 0.0;
-
-  for (var upperIndex = 0u; upperIndex <= 20u; upperIndex += 1u) {
-    let ratio = 1.75 + f32(upperIndex) * 0.025;
-    if (abs(ratio - 2.0) <= 0.08) {
-      continue;
-    }
-
-    let candidateFrequency = frequency * ratio;
-    if (candidateFrequency >= params.sampleRate * 0.5) {
-      continue;
-    }
-
-    let candidateIntensity = sampleIntensity(windowIndex, candidateFrequency);
-    if (
-      candidateIntensity < 0.65 ||
-      candidateIntensity < fundamentalIntensity * 1.18
-    ) {
-      continue;
-    }
-
-    let candidateScore = harmonicPatternScore(windowIndex, candidateFrequency);
-    if (candidateScore <= upperScore) {
-      continue;
-    }
-
-    upperScore = candidateScore;
-  }
-
-  return upperScore >= score * 0.84;
+  return false;
 }
 
-fn correctedSubharmonicFrequency(
-  windowIndex: u32,
-  frequency: f32,
-  score: f32,
-) -> f32 {
-  var correctedFrequency = frequency;
-  var correctedPriority = 0.0;
-  var rejectedAsOvertone = false;
-  let fundamentalIntensity = sampleIntensity(windowIndex, frequency);
-
-  for (var divisor = 2u; divisor <= 4u; divisor += 1u) {
-    let subharmonicFrequency = frequency / f32(divisor);
-    if (subharmonicFrequency < params.minimumFrequency) {
-      break;
-    }
-
-    let subharmonicFundamentalIntensity = sampleIntensity(
-      windowIndex,
-      subharmonicFrequency,
-    );
-    let subharmonicScore = harmonicPatternScore(
-      windowIndex,
-      subharmonicFrequency,
-    );
-    let subharmonicNoiseScore = interharmonicPatternScore(
-      windowIndex,
-      subharmonicFrequency,
-    );
-    let subharmonicSupportCount = harmonicSupportCount(
-      windowIndex,
-      subharmonicFrequency,
-    );
-    let hasSubharmonicSupport = hasReliableHarmonicSupport(
-      subharmonicFrequency,
-      subharmonicFundamentalIntensity,
-      subharmonicScore,
-      subharmonicNoiseScore,
-      subharmonicSupportCount,
-    );
-    let isWeakSubharmonic = isWeakSubtone(
-      windowIndex,
-      subharmonicFrequency,
-      subharmonicFundamentalIntensity,
-      subharmonicScore,
-    );
-    if (
-      hasSubharmonicSupport &&
-      !isWeakSubharmonic &&
-      subharmonicScore >= score * 0.72 &&
-      subharmonicFundamentalIntensity >=
-        params.minimumFundamentalIntensity * 1.4 &&
-      subharmonicFundamentalIntensity >=
-        fundamentalIntensity *
-          minimumSubharmonicFundamentalRatio(subharmonicFrequency)
-    ) {
-      let priority = subharmonicScore * (1.0 + f32(divisor) * 0.08);
-      if (priority <= correctedPriority) {
-        continue;
-      }
-
-      correctedFrequency = subharmonicFrequency;
-      correctedPriority = priority;
-    }
-
-    if (
-      correctedPriority <= 0.0 &&
-      frequency >= 520.0 &&
-      subharmonicScore >= score * 0.52 &&
-      subharmonicSupportCount >= 2u
-    ) {
-      rejectedAsOvertone = true;
-    }
-  }
-
-  if (correctedPriority <= 0.0 && rejectedAsOvertone) {
+fn harmonicScore(windowIndex: u32, frequency: f32) -> f32 {
+  let stats = baseCandidateStats(windowIndex, frequency);
+  if (!candidatePasses(frequency, stats)) {
     return 0.0;
   }
 
-  return correctedFrequency;
+  if (isWeakSubtone(windowIndex, frequency, stats)) {
+    return 0.0;
+  }
+
+  if (isLikelyOvertone(windowIndex, frequency, stats)) {
+    return 0.0;
+  }
+
+  return stats.score;
+}
+
+fn refinementScore(windowIndex: u32, frequency: f32) -> f32 {
+  let stats = baseCandidateStats(windowIndex, frequency);
+  return max(stats.score, 0.0);
 }
 
 @compute @workgroup_size(64)
@@ -416,25 +335,11 @@ fn pickBest(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
   }
 
-  if (bestScore < params.minimumScore) {
-    rawOutput[windowIndex] = 0.0;
-    return;
-  }
-
-  let correctedFrequency = correctedSubharmonicFrequency(
-    windowIndex,
-    bestFrequency,
-    bestScore,
-  );
-  var refinedFrequency = correctedFrequency;
+  var refinedFrequency = bestFrequency;
   if (bestCandidate > 0u && bestCandidate + 1u < candidateCount) {
-    let centerScore = harmonicPatternScore(windowIndex, correctedFrequency);
-    let previousScore = harmonicPatternScore(
-      windowIndex, correctedFrequency / fineStepRatio,
-    );
-    let nextScore = harmonicPatternScore(
-      windowIndex, correctedFrequency * fineStepRatio,
-    );
+    let centerScore = refinementScore(windowIndex, bestFrequency);
+    let previousScore = refinementScore(windowIndex, bestFrequency / fineStepRatio);
+    let nextScore = refinementScore(windowIndex, bestFrequency * fineStepRatio);
     let denominator = previousScore - 2.0 * centerScore + nextScore;
     if (abs(denominator) > 0.000001) {
       let offset = clamp(
@@ -442,7 +347,7 @@ fn pickBest(@builtin(global_invocation_id) gid: vec3<u32>) {
         -1.0,
         1.0,
       );
-      refinedFrequency = correctedFrequency *
+      refinedFrequency = bestFrequency *
         exp2(offset * params.candidateStepCents * 0.5 / 1200.0);
     }
   }
