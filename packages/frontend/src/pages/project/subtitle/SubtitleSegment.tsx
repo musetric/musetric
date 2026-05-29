@@ -8,10 +8,11 @@ import { useSubtitleSegmentStatus } from './useSubtitleSegmentStatus.js';
 
 type ActiveSubtitleSegmentProps = {
   segment: api.subtitle.Segment;
+  chordSegments: api.chords.ChordSegment[];
 };
 
 const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
-  const { segment } = props;
+  const { segment, chordSegments } = props;
   const playbackTime = useSubtitlePlaybackTime();
 
   return (
@@ -19,6 +20,7 @@ const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
       playbackTime={playbackTime}
       segment={segment}
       status='active'
+      chordSegments={chordSegments}
     />
   );
 };
@@ -27,18 +29,26 @@ export type SubtitleSegmentProps = {
   index: number;
   segment: api.subtitle.Segment;
   subtitleCursor: SubtitleCursor;
+  chordSegments: api.chords.ChordSegment[];
 };
 
 export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
-  const { index, segment, subtitleCursor } = props;
+  const { index, segment, subtitleCursor, chordSegments } = props;
   const status = useSubtitleSegmentStatus(index, subtitleCursor);
 
   return (
     <Box data-subtitle-segment-index={index} py={1}>
       {status === 'active' ? (
-        <ActiveSubtitleSegment segment={segment} />
+        <ActiveSubtitleSegment
+          segment={segment}
+          chordSegments={chordSegments}
+        />
       ) : (
-        <SubtitleSegmentText segment={segment} status={status} />
+        <SubtitleSegmentText
+          segment={segment}
+          status={status}
+          chordSegments={chordSegments}
+        />
       )}
     </Box>
   );

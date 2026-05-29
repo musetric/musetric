@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material';
 import { type api } from '@musetric/api';
-import { type FC, Fragment } from 'react';
+import { type FC, Fragment, useMemo } from 'react';
+import { getWordChordLabels } from './subtitleChords.js';
 import { type SubtitleSegmentStatus } from './subtitleTiming.js';
 import { SubtitleWord } from './SubtitleWord.js';
 
@@ -22,11 +23,17 @@ export type SubtitleSegmentTextProps = {
   playbackTime?: number;
   segment: api.subtitle.Segment;
   status: SubtitleSegmentStatus;
+  chordSegments: api.chords.ChordSegment[];
 };
 
 export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
-  const { playbackTime, segment, status } = props;
+  const { playbackTime, segment, status, chordSegments } = props;
   const active = status === 'active';
+
+  const chordLabels = useMemo(
+    () => getWordChordLabels(segment.words, chordSegments),
+    [segment.words, chordSegments],
+  );
 
   return (
     <Typography
@@ -49,6 +56,7 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
               <SubtitleWord
                 playbackTime={active ? playbackTime : undefined}
                 word={word}
+                chord={chordLabels[index]}
               />
               {index < segment.words.length - 1 ? ' ' : ''}
             </Fragment>

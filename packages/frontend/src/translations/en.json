@@ -57,6 +57,7 @@
   "pages.project.progress.status.done": "Done",
   "pages.project.progress.status.pending": "Queued",
   "pages.project.progress.status.processing": "In progress",
+  "pages.project.progress.steps.chords": "Detects chords with timings",
   "pages.project.progress.steps.key": "Detects musical key",
   "pages.project.progress.steps.rhythm": "Detects beats and downbeats",
   "pages.project.progress.steps.separation": "Splits lead/back vocals and instrumental",

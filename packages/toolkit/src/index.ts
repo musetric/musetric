@@ -1,3 +1,4 @@
+export * from './analyzeChords.js';
 export * from './analyzeKey.js';
 export * from './analyzeRhythm.js';
 export * from './convertToFlac.js';
