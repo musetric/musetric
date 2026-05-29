@@ -1,6 +1,7 @@
 export * as audioDelivery from './audioDelivery/index.js';
 export * as audioMaster from './audioMaster/index.js';
 export * as blob from './blob/index.js';
+export * as chords from './chords/index.js';
 export * as key from './key/index.js';
 export * as preview from './preview/index.js';
 export * as processing from './processing/index.js';

@@ -15,7 +15,8 @@ export const list = (database: DatabaseSync) => {
      UNION ALL SELECT blobId FROM Preview
      UNION ALL SELECT blobId FROM Subtitle
      UNION ALL SELECT blobId FROM Rhythm
-     UNION ALL SELECT blobId FROM Key`,
+     UNION ALL SELECT blobId FROM Key
+     UNION ALL SELECT blobId FROM Chords`,
   );
 
   return async (): Promise<string[]> => {

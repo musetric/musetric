@@ -45,6 +45,10 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
               title={t('pages.project.progress.steps.key')}
               step={project.processing.steps.key}
             />
+            <FlowStep
+              title={t('pages.project.progress.steps.chords')}
+              step={project.processing.steps.chords}
+            />
           </Stack>
         </Stack>
       </Box>
