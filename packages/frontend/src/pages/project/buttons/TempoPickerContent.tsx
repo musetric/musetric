@@ -23,12 +23,35 @@ const getTempoOptions = (
     { length: maxTempoBpm - minTempoBpm + 1 },
     (_, index): WheelPickerOption<number> => {
       const value = maxTempoBpm - index;
+      const ratio = sourceTempoBpm > 0 ? value / sourceTempoBpm : 1;
+      const roundedRatio = Math.round(ratio * 100) / 100;
+      const deltaLabel =
+        value === sourceTempoBpm
+          ? t('pages.project.player.controls.original', { value: 0 })
+          : `${roundedRatio.toFixed(2)}x`;
+      const bpmLabel = t('pages.project.player.controls.tempoValue', { value });
 
       return {
         value,
-        label: t('pages.project.player.controls.tempoValue', {
-          value,
-        }),
+        label: (
+          <Box
+            component='span'
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
+              alignItems: 'center',
+              width: '100%',
+              px: 2,
+            }}
+          >
+            <span />
+            <span>{bpmLabel}</span>
+            <Box component='span' sx={{ opacity: 0.6, justifySelf: 'end' }}>
+              {deltaLabel}
+            </Box>
+          </Box>
+        ),
+        textValue: bpmLabel,
       };
     },
   );

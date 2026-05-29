@@ -5,6 +5,7 @@ import {
   audioDelivery,
   audioMaster,
   blob,
+  key,
   preview,
   processing,
   project,
@@ -40,6 +41,7 @@ export const createInstance = async (databasePath: string) => {
     processing: processing.createInstance(database),
     subtitle: subtitle.createInstance(database),
     rhythm: rhythm.createInstance(database),
+    key: key.createInstance(database),
     blob: blob.createInstance(database),
     disconnect: async () => {
       if (database.isOpen) {

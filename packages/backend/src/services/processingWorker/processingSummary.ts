@@ -1,7 +1,11 @@
 import type { api } from '@musetric/api';
 import type { FastifyInstance } from 'fastify';
 
-export type ProcessingStepKind = 'separation' | 'transcription' | 'rhythm';
+export type ProcessingStepKind =
+  | 'separation'
+  | 'transcription'
+  | 'rhythm'
+  | 'key';
 export type ProcessingWorkerProgressEvent = {
   type: 'progress';
   projectId: number;
@@ -45,6 +49,7 @@ export const resolveProcessingEvent = (
           },
           transcription: pendingStep,
           rhythm: pendingStep,
+          key: pendingStep,
         },
       };
     }
@@ -59,6 +64,22 @@ export const resolveProcessingEvent = (
             download: event.download,
           },
           rhythm: pendingStep,
+          key: pendingStep,
+        },
+      };
+    }
+    if (event.step === 'rhythm') {
+      return {
+        done: false,
+        steps: {
+          separation: doneStep,
+          transcription: doneStep,
+          rhythm: {
+            status: 'processing',
+            progress: event.progress,
+            download: event.download,
+          },
+          key: pendingStep,
         },
       };
     }
@@ -67,7 +88,8 @@ export const resolveProcessingEvent = (
       steps: {
         separation: doneStep,
         transcription: doneStep,
-        rhythm: {
+        rhythm: doneStep,
+        key: {
           status: 'processing',
           progress: event.progress,
           download: event.download,
@@ -84,6 +106,7 @@ export const resolveProcessingEvent = (
           separation: doneStep,
           transcription: pendingStep,
           rhythm: pendingStep,
+          key: pendingStep,
         },
       };
     }
@@ -94,6 +117,18 @@ export const resolveProcessingEvent = (
           separation: doneStep,
           transcription: doneStep,
           rhythm: pendingStep,
+          key: pendingStep,
+        },
+      };
+    }
+    if (event.step === 'rhythm') {
+      return {
+        done: false,
+        steps: {
+          separation: doneStep,
+          transcription: doneStep,
+          rhythm: doneStep,
+          key: pendingStep,
         },
       };
     }
@@ -103,6 +138,7 @@ export const resolveProcessingEvent = (
         separation: doneStep,
         transcription: doneStep,
         rhythm: doneStep,
+        key: doneStep,
       },
     };
   }
@@ -114,6 +150,7 @@ export const resolveProcessingEvent = (
         separation: pendingStep,
         transcription: pendingStep,
         rhythm: pendingStep,
+        key: pendingStep,
       },
     };
   }
@@ -124,6 +161,18 @@ export const resolveProcessingEvent = (
         separation: doneStep,
         transcription: pendingStep,
         rhythm: pendingStep,
+        key: pendingStep,
+      },
+    };
+  }
+  if (event.step === 'rhythm') {
+    return {
+      done: false,
+      steps: {
+        separation: doneStep,
+        transcription: doneStep,
+        rhythm: pendingStep,
+        key: pendingStep,
       },
     };
   }
@@ -132,7 +181,8 @@ export const resolveProcessingEvent = (
     steps: {
       separation: doneStep,
       transcription: doneStep,
-      rhythm: pendingStep,
+      rhythm: doneStep,
+      key: pendingStep,
     },
   };
 };
@@ -146,20 +196,22 @@ export const resolveProcessing = async (
     return resolveProcessingEvent(active);
   }
 
-  const [subtitle, rhythm, lead, source] = await Promise.all([
+  const [subtitle, rhythm, key, lead, source] = await Promise.all([
     app.db.subtitle.getByProject(projectId),
     app.db.rhythm.getByProject(projectId),
+    app.db.key.getByProject(projectId),
     app.db.audioMaster.get(projectId, 'lead'),
     app.db.audioMaster.get(projectId, 'source'),
   ]);
 
-  if (subtitle && rhythm) {
+  if (subtitle && rhythm && key) {
     return {
       done: true,
       steps: {
         separation: doneStep,
         transcription: doneStep,
         rhythm: doneStep,
+        key: doneStep,
       },
     };
   }
@@ -171,6 +223,7 @@ export const resolveProcessing = async (
         separation: doneStep,
         transcription: subtitle ? doneStep : pendingStep,
         rhythm: rhythm ? doneStep : pendingStep,
+        key: key ? doneStep : pendingStep,
       },
     };
   }
@@ -182,6 +235,7 @@ export const resolveProcessing = async (
         separation: pendingStep,
         transcription: pendingStep,
         rhythm: pendingStep,
+        key: pendingStep,
       },
     };
   }
@@ -192,6 +246,7 @@ export const resolveProcessing = async (
       separation: pendingStep,
       transcription: pendingStep,
       rhythm: pendingStep,
+      key: pendingStep,
     },
   };
 };

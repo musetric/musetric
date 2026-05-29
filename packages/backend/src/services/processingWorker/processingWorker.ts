@@ -7,6 +7,7 @@ import { type Scheduler } from '@musetric/resource-utils/cross/scheduler';
 import { createSingleWorker } from '@musetric/resource-utils/cross/singleWorker';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
+import { createKeyWorker } from './processingKey.js';
 import { createRhythmWorker } from './processingRhythm.js';
 import { createSeparationWorker } from './processingSeparation.js';
 import {
@@ -30,6 +31,7 @@ export const createProcessingWorker = (
   const separationWorker = createSeparationWorker(app, emitter, logger);
   const transcriptionWorker = createTranscriptionWorker(app, emitter, logger);
   const rhythmWorker = createRhythmWorker(app, emitter, logger);
+  const keyWorker = createKeyWorker(app, emitter, logger);
 
   const worker = createSingleWorker({
     intervalMs: envs.processingIntervalMs,
@@ -42,6 +44,11 @@ export const createProcessingWorker = (
       const rhythm = await app.db.processing.pendingRhythm();
       if (rhythm) {
         await rhythmWorker.run(rhythm);
+      }
+
+      const key = await app.db.processing.pendingKey();
+      if (key) {
+        await keyWorker.run(key);
       }
 
       const separation = await app.db.processing.pendingSeparation();
@@ -58,6 +65,7 @@ export const createProcessingWorker = (
       return (
         transcriptionWorker.getState(projectId) ??
         rhythmWorker.getState(projectId) ??
+        keyWorker.getState(projectId) ??
         separationWorker.getState(projectId)
       );
     },
