@@ -1,6 +1,6 @@
 import { produce } from 'immer';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { createStore as createZustandStore } from 'zustand/vanilla';
+import * as zustand from 'zustand/vanilla';
 
 type Unmount = () => void;
 
@@ -15,7 +15,7 @@ export type Store<State> = {
 };
 
 export const createStore = <State>(initialState: State): Store<State> => {
-  const store = createZustandStore<State>()(
+  const store = zustand.createStore<State>()(
     subscribeWithSelector(() => initialState),
   );
 
