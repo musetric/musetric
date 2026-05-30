@@ -24,8 +24,10 @@ RUN apt-get update -qq \
 
 RUN if [ "$variant" = "cpu" ]; then \
       pytorch_index=https://download.pytorch.org/whl/cpu; \
+      ort_extra=cpu; \
     elif [ "$variant" = "cuda" ]; then \
       pytorch_index=https://download.pytorch.org/whl/cu129; \
+      ort_extra=cuda; \
     else \
       echo "Unsupported variant: $variant" >&2; exit 1; \
     fi && \
@@ -33,8 +35,8 @@ RUN if [ "$variant" = "cpu" ]; then \
       --default-index https://pypi.org/simple \
       --index "$pytorch_index" \
       --index-strategy unsafe-best-match \
-      --overrides https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.18/overrides.txt \
-      https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.18/musetric_toolkit-0.0.18-py3-none-any.whl
+      --overrides https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.19/overrides.txt \
+      "musetric-toolkit[$ort_extra] @ https://github.com/popelenkow/musetric-toolkit/releases/download/v0.0.19/musetric_toolkit-0.0.19-py3-none-any.whl"
 
 WORKDIR /app
 ENV NODE_ENV=production
