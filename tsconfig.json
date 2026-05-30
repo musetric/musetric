@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/api" },
     { "path": "packages/audio" },
+    { "path": "packages/ai" },
     { "path": "packages/backend" },
     { "path": "packages/backend-db" },
     { "path": "packages/eslint-config" },

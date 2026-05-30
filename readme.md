@@ -22,18 +22,7 @@ yarn fix:format
 yarn test
 ```
 
-## Third-party Components
-
-### FFT Algorithm (CPU & GPU)
-
-- **Source:** https://github.com/indutny/fft.js by Fedor Indutny (MIT)
-- **Usage:** Fast Fourier Transform - CPU implementation adapted, GPU version ported
-
-### Musetric Toolkit
-
-- **Repository:** https://github.com/popelenkow/musetric-toolkit
-- **Usage:** Companion CLI for running audio processing workflows and worker scripts
-
 ## License
 
 Musetric is [MIT licensed](https://github.com/popelenkow/Musetric/blob/main/license.md).
+Third-party notices are listed in [thirdPartyNotices.md](thirdPartyNotices.md).
