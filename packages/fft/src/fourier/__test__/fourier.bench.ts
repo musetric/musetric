@@ -100,6 +100,32 @@ const measureBatch = (
 
 const { device } = await createGpuContext(true);
 
+const createPaddedBenchWave = (
+  windowSize: number,
+  windowCount: number,
+): Float32Array<ArrayBuffer> => {
+  const input = createBenchWave(windowSize, windowCount);
+  const output = new Float32Array((windowSize + 2) * windowCount);
+
+  for (let windowIndex = 0; windowIndex < windowCount; windowIndex++) {
+    const inputOffset = windowSize * windowIndex;
+    const outputOffset = (windowSize + 2) * windowIndex;
+    output.set(
+      input.subarray(inputOffset, inputOffset + windowSize),
+      outputOffset,
+    );
+  }
+
+  return output;
+};
+
+const createBenchSpectrum = (
+  windowSize: number,
+  windowCount: number,
+): Float32Array<ArrayBuffer> => {
+  return new Float32Array(createBenchWave(windowSize + 2, windowCount));
+};
+
 const measureOne = async (
   mode: FourierMode,
   windowSize: number,
@@ -116,20 +142,16 @@ const measureOne = async (
     return undefined;
   }
 
-  const byteSize = windowSize * windowCount * Float32Array.BYTES_PER_ELEMENT;
-  const input = createBenchWave(windowSize, windowCount);
+  const byteSize =
+    (windowSize + 2) * windowCount * Float32Array.BYTES_PER_ELEMENT;
+  const input = createPaddedBenchWave(windowSize, windowCount);
 
-  const real = device.createBuffer({
-    size: byteSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const imag = device.createBuffer({
+  const signal = device.createBuffer({
     size: byteSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
 
-  device.queue.writeBuffer(real, 0, input);
-  device.queue.writeBuffer(imag, 0, new Float32Array(windowSize * windowCount));
+  device.queue.writeBuffer(signal, 0, input);
 
   const cell = fouriers[mode](device);
 
@@ -138,8 +160,8 @@ const measureOne = async (
 
   for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
     const fourier = cell.get({
-      wave: real,
-      spectrum: { real, imag },
+      wave: signal,
+      spectrum: signal,
       config: { windowSize, windowCount },
     });
 
@@ -179,8 +201,7 @@ const measureOne = async (
   }
 
   cell.dispose();
-  real.destroy();
-  imag.destroy();
+  signal.destroy();
 
   return computeBenchStats(values);
 };
@@ -204,16 +225,11 @@ const measureOneInverse = async (
     return undefined;
   }
 
-  const positiveWindowSize = Math.floor(windowSize / 2) + 1;
   const spectrumBytes =
-    positiveWindowSize * windowCount * Float32Array.BYTES_PER_ELEMENT;
+    (windowSize + 2) * windowCount * Float32Array.BYTES_PER_ELEMENT;
   const waveBytes = windowSize * windowCount * Float32Array.BYTES_PER_ELEMENT;
 
-  const real = device.createBuffer({
-    size: spectrumBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const imag = device.createBuffer({
+  const spectrum = device.createBuffer({
     size: spectrumBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
@@ -223,14 +239,9 @@ const measureOneInverse = async (
   });
 
   device.queue.writeBuffer(
-    real,
+    spectrum,
     0,
-    createBenchWave(positiveWindowSize, windowCount),
-  );
-  device.queue.writeBuffer(
-    imag,
-    0,
-    createBenchWave(positiveWindowSize, windowCount),
+    createBenchSpectrum(windowSize, windowCount),
   );
 
   const cell = iffts[mode](device);
@@ -241,7 +252,7 @@ const measureOneInverse = async (
   for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
     const fourier = cell.get({
       wave,
-      spectrum: { real, imag },
+      spectrum,
       config: { windowSize, windowCount },
     });
 
@@ -281,8 +292,7 @@ const measureOneInverse = async (
   }
 
   cell.dispose();
-  real.destroy();
-  imag.destroy();
+  spectrum.destroy();
   wave.destroy();
 
   return computeBenchStats(values);

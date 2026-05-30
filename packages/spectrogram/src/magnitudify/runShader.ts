@@ -4,8 +4,8 @@ struct MagnitudifyParams {
   windowCount: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> signalReal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> signalImag: array<f32>;
+@group(0) @binding(0) var<storage, read_write> signal: array<f32>;
+@group(0) @binding(1) var<storage, read_write> magnitude: array<f32>;
 @group(0) @binding(2) var<uniform> params: MagnitudifyParams;
 
 @compute @workgroup_size(64)
@@ -19,10 +19,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (sampleIndex >= halfSize || windowIndex >= windowCount) {
     return;
   }
-  let offset = windowSize * windowIndex + sampleIndex;
-  let real = signalReal[offset];
-  let imag = signalImag[offset];
-  let magnitude = sqrt(real * real + imag * imag);
-  signalImag[offset] = magnitude;
+  let complexStride = windowSize + 2u;
+  let spectrumOffset = complexStride * windowIndex + 2u * sampleIndex;
+  let magnitudeOffset = halfSize * windowIndex + sampleIndex;
+  let real = signal[spectrumOffset];
+  let imag = signal[spectrumOffset + 1u];
+  magnitude[magnitudeOffset] = sqrt(real * real + imag * imag);
 }
 `;

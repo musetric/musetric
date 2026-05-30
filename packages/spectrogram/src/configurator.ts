@@ -117,7 +117,7 @@ export const createSpectrogramConfigurator = (
         (acc, key, index) => {
           const lane = trackCells[key].lane.get(nextConfig);
           const remap = trackCells[key].remap.get({
-            signal: lane.signal.real,
+            signal: lane.signal,
             texture: texture.layerViews[index],
             config: nextConfig,
           });

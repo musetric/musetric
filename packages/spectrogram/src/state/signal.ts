@@ -1,5 +1,4 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 
 export type SignalBufferConfig = {
   windowSize: number;
@@ -7,31 +6,20 @@ export type SignalBufferConfig = {
 };
 export const createSignalBufferCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (config: SignalBufferConfig): ComplexGpuBuffer => {
+    create: (config: SignalBufferConfig): GPUBuffer => {
       const { windowSize, windowCount } = config;
 
-      return {
-        real: device.createBuffer({
-          label: 'pipeline-signal-real-buffer',
-          size: windowSize * windowCount * Float32Array.BYTES_PER_ELEMENT,
-          usage:
-            GPUBufferUsage.STORAGE |
-            GPUBufferUsage.COPY_SRC |
-            GPUBufferUsage.COPY_DST,
-        }),
-        imag: device.createBuffer({
-          label: 'pipeline-signal-imag-buffer',
-          size: windowSize * windowCount * Float32Array.BYTES_PER_ELEMENT,
-          usage:
-            GPUBufferUsage.STORAGE |
-            GPUBufferUsage.COPY_SRC |
-            GPUBufferUsage.COPY_DST,
-        }),
-      };
+      return device.createBuffer({
+        label: 'pipeline-signal-buffer',
+        size: (windowSize + 2) * windowCount * Float32Array.BYTES_PER_ELEMENT,
+        usage:
+          GPUBufferUsage.STORAGE |
+          GPUBufferUsage.COPY_SRC |
+          GPUBufferUsage.COPY_DST,
+      });
     },
     dispose: (buffer) => {
-      buffer.real.destroy();
-      buffer.imag.destroy();
+      buffer.destroy();
     },
     equals: (current, next) =>
       current.windowCount === next.windowCount &&

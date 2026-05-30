@@ -1,6 +1,7 @@
 export const transformInPlaceRadix8Shader = `
 override packedWindowSize: u32 = 4096u;
 override log2PackedWindowSize: u32 = 12u;
+override inPlace: u32 = 1u;
 override threadCount: u32 = 256u;
 
 const sqrt1_2: f32 = 0.70710678118654752440;
@@ -13,8 +14,8 @@ struct Params {
 var<workgroup> smReal: array<f32, packedWindowSize>;
 var<workgroup> smImag: array<f32, packedWindowSize>;
 
-@group(0) @binding(0) var<storage, read_write> signalReal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> signalImag: array<f32>;
+@group(0) @binding(0) var<storage, read> wave: array<f32>;
+@group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
 @group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
 @group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
 @group(0) @binding(4) var<uniform> params: Params;
@@ -40,9 +41,27 @@ fn reverseRest(index: u32) -> u32 {
   return result;
 }
 
-fn loadPacked(windowOffset: u32, packedIndex: u32) -> vec2<f32> {
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn getInputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return complexStride() * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
+fn readInput(inputOffset: u32, sampleIndex: u32) -> f32 {
+  if (inPlace == 1u) {
+    return spectrum[inputOffset + sampleIndex];
+  }
+  return wave[inputOffset + sampleIndex];
+}
+
+fn loadPacked(inputOffset: u32, packedIndex: u32) -> vec2<f32> {
   let s = packedIndex * 2u;
-  return vec2<f32>(signalReal[windowOffset + s], signalReal[windowOffset + s + 1u]);
+  return vec2<f32>(readInput(inputOffset, s), readInput(inputOffset, s + 1u));
 }
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
@@ -76,9 +95,10 @@ fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
   return even + mul(odd, twiddle);
 }
 
-fn writeBin(windowOffset: u32, k: u32, value: vec2<f32>) {
-  signalReal[windowOffset + k] = value.x;
-  signalImag[windowOffset + k] = value.y;
+fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
+  let index = spectrumOffset + 2u * k;
+  spectrum[index] = value.x;
+  spectrum[index + 1u] = value.y;
 }
 
 @compute @workgroup_size(threadCount)
@@ -92,7 +112,8 @@ fn main(
   }
 
   let t = localId.x;
-  let windowOffset = params.windowSize * windowIndex;
+  let inputOffset = getInputWindowOffset(windowIndex);
+  let spectrumOffset = complexStride() * windowIndex;
 
   let butterflyCount = packedWindowSize / 8u;
 
@@ -101,14 +122,14 @@ fn main(
   // the 8 contiguous outputs to the block-reversed destination the in-place DIT
   // stages expect. Avoids the scatter-load + a full shared round-trip.
   for (var j = t; j < butterflyCount; j += threadCount) {
-    let a0 = loadPacked(windowOffset, j);
-    let a1 = loadPacked(windowOffset, j + butterflyCount);
-    let a2 = loadPacked(windowOffset, j + 2u * butterflyCount);
-    let a3 = loadPacked(windowOffset, j + 3u * butterflyCount);
-    let a4 = loadPacked(windowOffset, j + 4u * butterflyCount);
-    let a5 = loadPacked(windowOffset, j + 5u * butterflyCount);
-    let a6 = loadPacked(windowOffset, j + 6u * butterflyCount);
-    let a7 = loadPacked(windowOffset, j + 7u * butterflyCount);
+    let a0 = loadPacked(inputOffset, j);
+    let a1 = loadPacked(inputOffset, j + butterflyCount);
+    let a2 = loadPacked(inputOffset, j + 2u * butterflyCount);
+    let a3 = loadPacked(inputOffset, j + 3u * butterflyCount);
+    let a4 = loadPacked(inputOffset, j + 4u * butterflyCount);
+    let a5 = loadPacked(inputOffset, j + 5u * butterflyCount);
+    let a6 = loadPacked(inputOffset, j + 6u * butterflyCount);
+    let a7 = loadPacked(inputOffset, j + 7u * butterflyCount);
 
     let e0 = a0 + a4;
     let e1 = a0 - a4;
@@ -231,19 +252,19 @@ fn main(
 
   if (t == 0u) {
     let z0 = getResult(0u);
-    writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
-    writeBin(windowOffset, packedWindowSize, vec2<f32>(z0.x - z0.y, 0.0));
+    writeBin(spectrumOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
+    writeBin(spectrumOffset, packedWindowSize, vec2<f32>(z0.x - z0.y, 0.0));
     if (packedWindowSize % 2u == 0u) {
       let half = packedWindowSize / 2u;
       let zh = getResult(half);
-      writeBin(windowOffset, half, r2cBin(half, zh, zh));
+      writeBin(spectrumOffset, half, r2cBin(half, zh, zh));
     }
   }
   for (var k = t + 1u; 2u * k < packedWindowSize; k += threadCount) {
     let value = getResult(k);
     let mirrorValue = getResult(packedWindowSize - k);
-    writeBin(windowOffset, k, r2cBin(k, value, mirrorValue));
-    writeBin(windowOffset, packedWindowSize - k,
+    writeBin(spectrumOffset, k, r2cBin(k, value, mirrorValue));
+    writeBin(spectrumOffset, packedWindowSize - k,
       r2cBin(packedWindowSize - k, mirrorValue, value));
   }
 }

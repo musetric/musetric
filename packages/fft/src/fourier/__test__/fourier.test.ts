@@ -1,10 +1,10 @@
 import {
   complexArrayFrom,
-  createComplexGpuBufferReader,
   createGpuBufferReader,
   createGpuContext,
+  createInterleavedGpuBufferReader,
 } from '@musetric/resource-utils/gpu';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   allFourierModes,
   allIFourierModes,
@@ -18,6 +18,8 @@ import {
   assertArrayClose,
   createBuffers,
   createIFourierBuffers,
+  createInterleavedSpectrum,
+  createPaddedWave,
   windowCount,
 } from './common.js';
 import { fourierFixtures } from './fixture.js';
@@ -52,6 +54,7 @@ const isIFourierFixtureSupported = (
 ): boolean => ifourierFixtureSupports[mode](device, windowSize);
 
 const { device } = await createGpuContext();
+const transformKinds = ['in-place', 'out-of-place'] as const;
 
 const fixtures = Object.groupBy(
   fourierFixtures,
@@ -74,51 +77,66 @@ Object.entries(fixtures).forEach((entry) => {
             return;
           }
 
-          it(mode, async () => {
-            const buffers = createBuffers(device, fixture.windowSize);
-            const createFourierCell = fouriers[mode];
-            const fourierCell = createFourierCell(device);
-            const reader = createComplexGpuBufferReader({
-              device,
-              typeSize: Float32Array.BYTES_PER_ELEMENT,
-              size: fixture.windowSize,
-            });
-
-            try {
-              const fourier = fourierCell.get({
-                wave: buffers.signal.real,
-                spectrum: buffers.signal,
-                config: {
-                  windowSize: fixture.windowSize,
-                  windowCount,
-                },
+          transformKinds.forEach((transformKind) => {
+            it(`${mode} ${transformKind}`, async () => {
+              const buffers = createBuffers(device, fixture.windowSize);
+              const createFourierCell = fouriers[mode];
+              const fourierCell = createFourierCell(device);
+              const reader = createInterleavedGpuBufferReader({
+                device,
+                windowSize: fixture.windowSize,
+                windowCount,
               });
-              const zeroImag = new Float32Array(fixture.windowSize).fill(0);
-              device.queue.writeBuffer(buffers.signal.real, 0, fixture.wave);
-              device.queue.writeBuffer(buffers.signal.imag, 0, zeroImag);
-              const encoder = device.createCommandEncoder();
-              fourier.run(encoder);
-              const command = encoder.finish();
-              device.queue.submit([command]);
-              await device.queue.onSubmittedWorkDone();
-              const outputBuffer = await reader.read(buffers.signal);
-              const result = complexArrayFrom(outputBuffer);
-              const positiveSize = fixture.windowSize / 2 + 1;
-              assertArrayClose(
-                'real',
-                result.real.slice(0, positiveSize),
-                fixture.spectrum.real,
-              );
-              assertArrayClose(
-                'imag',
-                result.imag.slice(0, positiveSize),
-                fixture.spectrum.imag,
-              );
-            } finally {
-              fourierCell.dispose();
-              reader.destroy();
-              buffers.destroy();
-            }
+
+              try {
+                const inPlace = transformKind === 'in-place';
+                const wave = inPlace ? buffers.inPlace : buffers.wave;
+                const spectrum = inPlace ? buffers.inPlace : buffers.spectrum;
+                if (inPlace) {
+                  expect(buffers.inPlaceByteSize).toBe(
+                    (fixture.windowSize + 2) * Float32Array.BYTES_PER_ELEMENT,
+                  );
+                  device.queue.writeBuffer(
+                    buffers.inPlace,
+                    0,
+                    createPaddedWave(fixture.wave),
+                  );
+                } else {
+                  device.queue.writeBuffer(buffers.wave, 0, fixture.wave);
+                }
+
+                const fourier = fourierCell.get({
+                  wave,
+                  spectrum,
+                  config: {
+                    windowSize: fixture.windowSize,
+                    windowCount,
+                  },
+                });
+                const encoder = device.createCommandEncoder();
+                fourier.run(encoder);
+                const command = encoder.finish();
+                device.queue.submit([command]);
+                await device.queue.onSubmittedWorkDone();
+                const outputBuffer = await reader.read(spectrum);
+                const result = complexArrayFrom(outputBuffer);
+                const positiveSize = fixture.windowSize / 2 + 1;
+                assertArrayClose(
+                  'real',
+                  result.real.slice(0, positiveSize),
+                  fixture.spectrum.real,
+                );
+                assertArrayClose(
+                  'imag',
+                  result.imag.slice(0, positiveSize),
+                  fixture.spectrum.imag,
+                );
+              } finally {
+                fourierCell.dispose();
+                reader.destroy();
+                buffers.destroy();
+              }
+            });
           });
         });
 
@@ -127,52 +145,55 @@ Object.entries(fixtures).forEach((entry) => {
             return;
           }
 
-          it(mode, async () => {
-            const buffers = createIFourierBuffers(device, {
-              spectrumSize: fixture.spectrum.real.byteLength,
-              waveSize: fixture.wave.byteLength,
-            });
-            const reader = createGpuBufferReader({
-              device,
-              typeSize: Float32Array.BYTES_PER_ELEMENT,
-              size: fixture.windowSize,
-            });
-            const createIFourierCell = iffts[mode];
-            const ifftCell = createIFourierCell(device);
-
-            try {
-              device.queue.writeBuffer(
-                buffers.spectrum.real,
-                0,
-                fixture.spectrum.real,
-              );
-              device.queue.writeBuffer(
-                buffers.spectrum.imag,
-                0,
-                fixture.spectrum.imag,
-              );
-
-              const ifft = ifftCell.get({
-                wave: buffers.wave,
-                spectrum: buffers.spectrum,
-                config: {
-                  windowSize: fixture.windowSize,
-                  windowCount,
-                },
+          transformKinds.forEach((transformKind) => {
+            it(`${mode} ${transformKind}`, async () => {
+              const buffers = createIFourierBuffers(device, {
+                windowSize: fixture.windowSize,
+                waveSize: fixture.wave.byteLength,
               });
-              const encoder = device.createCommandEncoder();
-              ifft.run(encoder);
-              const command = encoder.finish();
-              device.queue.submit([command]);
-              await device.queue.onSubmittedWorkDone();
+              const reader = createGpuBufferReader({
+                device,
+                typeSize: Float32Array.BYTES_PER_ELEMENT,
+                size: fixture.windowSize,
+              });
+              const createIFourierCell = iffts[mode];
+              const ifftCell = createIFourierCell(device);
 
-              const result = new Float32Array(await reader.read(buffers.wave));
-              assertArrayClose('wave', result, fixture.wave);
-            } finally {
-              ifftCell.dispose();
-              reader.destroy();
-              buffers.destroy();
-            }
+              try {
+                const inPlace = transformKind === 'in-place';
+                const spectrum = inPlace ? buffers.inPlace : buffers.spectrum;
+                const wave = inPlace ? buffers.inPlace : buffers.wave;
+                device.queue.writeBuffer(
+                  spectrum,
+                  0,
+                  createInterleavedSpectrum(
+                    fixture.spectrum,
+                    fixture.windowSize,
+                  ),
+                );
+
+                const ifft = ifftCell.get({
+                  wave,
+                  spectrum,
+                  config: {
+                    windowSize: fixture.windowSize,
+                    windowCount,
+                  },
+                });
+                const encoder = device.createCommandEncoder();
+                ifft.run(encoder);
+                const command = encoder.finish();
+                device.queue.submit([command]);
+                await device.queue.onSubmittedWorkDone();
+
+                const result = new Float32Array(await reader.read(wave));
+                assertArrayClose('wave', result, fixture.wave);
+              } finally {
+                ifftCell.dispose();
+                reader.destroy();
+                buffers.destroy();
+              }
+            });
           });
         });
       });

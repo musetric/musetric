@@ -4,6 +4,7 @@ import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 export type SliceSamplesParams = {
   windowSize: number;
   paddedWindowSize: number;
+  signalStride: number;
   windowCount: number;
   visibleSamples: number;
   step: number;
@@ -23,6 +24,7 @@ const toParams = (config: ExtSpectrogramConfig): SliceSamplesParams => {
   return {
     windowSize,
     paddedWindowSize,
+    signalStride: paddedWindowSize + 2,
     windowCount,
     visibleSamples,
     step,
@@ -38,12 +40,13 @@ export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: ExtSpectrogramConfig): StateParams => {
       const value = toParams(config);
-      const array = new DataView(new ArrayBuffer(20));
+      const array = new DataView(new ArrayBuffer(24));
       array.setUint32(0, value.windowSize, true);
       array.setUint32(4, value.paddedWindowSize, true);
-      array.setUint32(8, value.windowCount, true);
-      array.setUint32(12, value.visibleSamples, true);
-      array.setFloat32(16, value.step, true);
+      array.setUint32(8, value.signalStride, true);
+      array.setUint32(12, value.windowCount, true);
+      array.setUint32(16, value.visibleSamples, true);
+      array.setFloat32(20, value.step, true);
 
       const buffer = device.createBuffer({
         label: 'slice-samples-params-buffer',

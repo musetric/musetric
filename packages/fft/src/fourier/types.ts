@@ -1,5 +1,4 @@
 import { type ResourceCell } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type FourierConfig } from './config.es.js';
 
 export type FourierTimestampWrites = {
@@ -9,7 +8,7 @@ export type FourierTimestampWrites = {
 
 export type FourierArg = {
   wave: GPUBuffer;
-  spectrum: ComplexGpuBuffer;
+  spectrum: GPUBuffer;
   config: FourierConfig;
 };
 

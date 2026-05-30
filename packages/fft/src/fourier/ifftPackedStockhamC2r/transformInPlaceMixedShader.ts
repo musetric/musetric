@@ -5,6 +5,7 @@ override radix4StageCount: u32 = 0u;
 override radix2StageCount: u32 = 0u;
 override radix3StageCount: u32 = 0u;
 override radix5StageCount: u32 = 0u;
+override inPlace: u32 = 1u;
 override threadCount: u32 = 256u;
 
 const sin3: f32 = 0.86602540378443864676;
@@ -21,12 +22,11 @@ struct Params {
 var<workgroup> smReal: array<f32, packedWindowSize>;
 var<workgroup> smImag: array<f32, packedWindowSize>;
 
-@group(0) @binding(0) var<storage, read> spectrumReal: array<f32>;
-@group(0) @binding(1) var<storage, read> spectrumImag: array<f32>;
-@group(0) @binding(2) var<storage, read_write> signal: array<f32>;
-@group(0) @binding(3) var<storage, read> fftTrigTable: array<f32>;
-@group(0) @binding(4) var<storage, read> r2cTrigTable: array<f32>;
-@group(0) @binding(5) var<uniform> params: Params;
+@group(0) @binding(0) var<storage, read> sourceSpectrum: array<f32>;
+@group(0) @binding(1) var<storage, read_write> signal: array<f32>;
+@group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(4) var<uniform> params: Params;
 
 fn getFactorCount() -> u32 {
   return radix4StageCount + radix2StageCount + radix3StageCount + radix5StageCount;
@@ -91,22 +91,36 @@ fn store(index: u32, value: vec2<f32>) {
   smImag[index] = value.y;
 }
 
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn readSpectrumFloat(spectrumOffset: u32, index: u32) -> f32 {
+  if (inPlace == 1u) {
+    return signal[spectrumOffset + index];
+  }
+  return sourceSpectrum[spectrumOffset + index];
+}
+
+fn readSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
+  let index = 2u * k;
+  return vec2<f32>(
+    readSpectrumFloat(spectrumOffset, index),
+    readSpectrumFloat(spectrumOffset, index + 1u),
+  );
+}
+
 fn loadPackedSpectrum(spectrumOffset: u32, k: u32) -> vec2<f32> {
   if (k == 0u) {
-    let dc = spectrumReal[spectrumOffset];
-    let nyquist = spectrumReal[spectrumOffset + packedWindowSize];
+    let dc = readSpectrumFloat(spectrumOffset, 0u);
+    let nyquist = readSpectrumFloat(spectrumOffset, 2u * packedWindowSize);
     return vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
   }
 
   let mirrorK = packedWindowSize - k;
-  let a = vec2<f32>(
-    spectrumReal[spectrumOffset + k],
-    spectrumImag[spectrumOffset + k],
-  );
-  let b = vec2<f32>(
-    spectrumReal[spectrumOffset + mirrorK],
-    -spectrumImag[spectrumOffset + mirrorK],
-  );
+  let a = readSpectrumBin(spectrumOffset, k);
+  let mirror = readSpectrumBin(spectrumOffset, mirrorK);
+  let b = vec2<f32>(mirror.x, -mirror.y);
   let even = 0.5 * (a + b);
   let diff = 0.5 * (a - b);
   let invTwiddle = vec2<f32>(r2cTrigTable[2u * k], r2cTrigTable[2u * k + 1u]);
@@ -125,7 +139,7 @@ fn main(
   }
 
   let t = localId.x;
-  let spectrumOffset = positiveWindowSize * windowIndex;
+  let spectrumOffset = complexStride() * windowIndex;
   let signalOffset = params.windowSize * windowIndex;
 
   for (var i = t; i < packedWindowSize; i += threadCount) {

@@ -28,11 +28,10 @@ var<workgroup> rowBReal1: array<f32, batchSize * tileSize>;
 var<workgroup> rowBImag1: array<f32, batchSize * tileSize>;
 
 @group(0) @binding(0) var<storage, read> scratch: array<vec2<f32>>;
-@group(0) @binding(1) var<storage, read_write> signalReal: array<f32>;
-@group(0) @binding(2) var<storage, read_write> signalImag: array<f32>;
-@group(0) @binding(3) var<storage, read> columnTrigTable: array<f32>;
-@group(0) @binding(4) var<storage, read> r2cTrigTable: array<f32>;
-@group(0) @binding(5) var<uniform> params: Params;
+@group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
+@group(0) @binding(2) var<storage, read> columnTrigTable: array<f32>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(4) var<uniform> params: Params;
 
 fn getColumnFactorCount() -> u32 {
   return columnRadix4StageCount +
@@ -250,9 +249,14 @@ fn getRowB(index: u32, lane: u32) -> vec2<f32> {
   );
 }
 
-fn writeBin(windowOffset: u32, k: u32, value: vec2<f32>) {
-  signalReal[windowOffset + k] = value.x;
-  signalImag[windowOffset + k] = value.y;
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
+  let index = spectrumOffset + 2u * k;
+  spectrum[index] = value.x;
+  spectrum[index + 1u] = value.y;
 }
 
 @compute @workgroup_size(64, 4)
@@ -299,15 +303,15 @@ fn main(
     return;
   }
 
-  let windowOffset = params.windowSize * windowIndex;
+  let spectrumOffset = complexStride() * windowIndex;
 
   for (var i = t; i < columnSize; i += threadCount) {
     if (pairIndex == 0u) {
       if (i == 0u) {
         let z0 = getRowA(0u, lane);
-        writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
+        writeBin(spectrumOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
         writeBin(
-          windowOffset,
+          spectrumOffset,
           positiveWindowSize,
           vec2<f32>(z0.x - z0.y, 0.0),
         );
@@ -315,7 +319,7 @@ fn main(
         let k = i * rowSize;
         let mirrorIndex = columnSize - i;
         writeBin(
-          windowOffset,
+          spectrumOffset,
           k,
           r2cBin(k, getRowA(i, lane), getRowA(mirrorIndex, lane)),
         );
@@ -326,15 +330,15 @@ fn main(
       let valueA = getRowA(i, lane);
       if ((rowSize % 2u) == 0u && pairIndex == rowSize / 2u) {
         writeBin(
-          windowOffset,
+          spectrumOffset,
           kA,
           r2cBin(kA, valueA, getRowA(mirrorIndex, lane)),
         );
       } else {
         let kB = rowB + rowSize * mirrorIndex;
         let valueB = getRowB(mirrorIndex, lane);
-        writeBin(windowOffset, kA, r2cBin(kA, valueA, valueB));
-        writeBin(windowOffset, kB, r2cBin(kB, valueB, valueA));
+        writeBin(spectrumOffset, kA, r2cBin(kA, valueA, valueB));
+        writeBin(spectrumOffset, kB, r2cBin(kB, valueB, valueA));
       }
     }
   }

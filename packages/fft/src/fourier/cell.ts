@@ -2,7 +2,6 @@ import {
   createResourceCell,
   type ResourceCell,
 } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type FourierConfig, type FourierMode } from './config.es.js';
 import { fouriers } from './fouriers.js';
 import {
@@ -17,7 +16,7 @@ export type FourierCellConfig = FourierConfig & {
 };
 
 export type StateArg = {
-  signal: ComplexGpuBuffer;
+  signal: GPUBuffer;
   config: FourierCellConfig;
 };
 
@@ -38,7 +37,7 @@ export const createFourierCell = (
       const { signal, config } = arg;
       const fourier = modeCell.get(config.fourierMode);
       const fourierArg: FourierArg = {
-        wave: signal.real,
+        wave: signal,
         spectrum: signal,
         config: {
           windowSize: config.windowSize * config.zeroPaddingFactor,

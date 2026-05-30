@@ -41,7 +41,16 @@ export type State = {
   bindGroups: BindGroups;
   params: Params;
   windowCount: number;
+  dummySpectrum: GPUBuffer;
   scratch?: ScratchBuffers;
+};
+
+const createDummySpectrumBuffer = (device: GPUDevice): GPUBuffer => {
+  return device.createBuffer({
+    label: 'packed-stockham-c2r-dummy-spectrum',
+    size: Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.STORAGE,
+  });
 };
 
 const createScratchBuffers = (
@@ -77,10 +86,13 @@ export const createStateCell = (
         );
       }
 
-      const pipeline = createPipeline(device, variant);
+      const inPlace = arg.wave === arg.spectrum;
+      const pipeline = createPipeline(device, variant, inPlace);
       const tables = createTrigTables(device, variant);
       const params = createParams(device, arg.config);
       const { windowCount } = arg.config;
+      const dummySpectrum = createDummySpectrumBuffer(device);
+      const spectrum = inPlace ? dummySpectrum : arg.spectrum;
 
       if (pipeline.kind === 'multiPass') {
         const scratch = createScratchBuffers(
@@ -94,8 +106,8 @@ export const createStateCell = (
             label: 'packed-stockham-c2r-multipass-prepack-bind-group',
             layout: pipeline.prepack.getBindGroupLayout(0),
             entries: [
-              { binding: 0, resource: { buffer: arg.spectrum.real } },
-              { binding: 1, resource: { buffer: arg.spectrum.imag } },
+              { binding: 0, resource: { buffer: spectrum } },
+              { binding: 1, resource: { buffer: arg.wave } },
               { binding: 2, resource: { buffer: scratch.buffer0 } },
               { binding: 3, resource: { buffer: scratch.buffer1 } },
               { binding: 4, resource: { buffer: tables.r2c } },
@@ -133,6 +145,7 @@ export const createStateCell = (
           bindGroups,
           params,
           windowCount,
+          dummySpectrum,
           scratch,
         };
       }
@@ -143,12 +156,11 @@ export const createStateCell = (
           label: 'packed-stockham-c2r-transform-bind-group',
           layout: pipeline.transform.getBindGroupLayout(0),
           entries: [
-            { binding: 0, resource: { buffer: arg.spectrum.real } },
-            { binding: 1, resource: { buffer: arg.spectrum.imag } },
-            { binding: 2, resource: { buffer: arg.wave } },
-            { binding: 3, resource: { buffer: tables.fft } },
-            { binding: 4, resource: { buffer: tables.r2c } },
-            { binding: 5, resource: { buffer: params.buffer } },
+            { binding: 0, resource: { buffer: spectrum } },
+            { binding: 1, resource: { buffer: arg.wave } },
+            { binding: 2, resource: { buffer: tables.fft } },
+            { binding: 3, resource: { buffer: tables.r2c } },
+            { binding: 4, resource: { buffer: params.buffer } },
           ],
         }),
       };
@@ -160,10 +172,12 @@ export const createStateCell = (
         bindGroups,
         params,
         windowCount,
+        dummySpectrum,
       };
     },
     dispose: (state) => {
       state.params.buffer.destroy();
+      state.dummySpectrum.destroy();
       if (state.scratch) {
         state.scratch.buffer0.destroy();
         state.scratch.buffer1.destroy();
@@ -171,8 +185,7 @@ export const createStateCell = (
       disposeTrigTables(state.tables);
     },
     equals: (current, next) =>
-      current.spectrum.real === next.spectrum.real &&
-      current.spectrum.imag === next.spectrum.imag &&
+      current.spectrum === next.spectrum &&
       current.wave === next.wave &&
       current.config.windowSize === next.config.windowSize &&
       current.config.windowCount === next.config.windowCount,

@@ -3,30 +3,36 @@ import { expect } from 'vitest';
 export const windowCount = 1;
 
 export const createBuffers = (device: GPUDevice, windowSize: number) => {
-  const createSignalBuffer = () => ({
-    real: device.createBuffer({
-      label: 'test-signal-real-buffer',
-      size: windowSize * Float32Array.BYTES_PER_ELEMENT,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-    }),
-    imag: device.createBuffer({
-      label: 'test-signal-imag-buffer',
-      size: windowSize * Float32Array.BYTES_PER_ELEMENT,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-    }),
-  });
+  const waveByteSize = windowSize * Float32Array.BYTES_PER_ELEMENT;
+  const spectrumByteSize = (windowSize + 2) * Float32Array.BYTES_PER_ELEMENT;
 
   const buffers = {
-    signal: createSignalBuffer(),
+    wave: device.createBuffer({
+      label: 'test-r2c-wave',
+      size: waveByteSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }),
+    spectrum: device.createBuffer({
+      label: 'test-r2c-spectrum',
+      size: spectrumByteSize,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_SRC |
+        GPUBufferUsage.COPY_DST,
+    }),
+    inPlace: device.createBuffer({
+      label: 'test-r2c-in-place',
+      size: spectrumByteSize,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_SRC |
+        GPUBufferUsage.COPY_DST,
+    }),
+    inPlaceByteSize: spectrumByteSize,
     destroy: () => {
-      buffers.signal.real.destroy();
-      buffers.signal.imag.destroy();
+      buffers.wave.destroy();
+      buffers.spectrum.destroy();
+      buffers.inPlace.destroy();
     },
   };
 
@@ -36,36 +42,64 @@ export const createBuffers = (device: GPUDevice, windowSize: number) => {
 export const createIFourierBuffers = (
   device: GPUDevice,
   config: {
-    spectrumSize: number;
+    windowSize: number;
     waveSize: number;
   },
 ) => {
+  const spectrumSize = (config.windowSize + 2) * Float32Array.BYTES_PER_ELEMENT;
   const buffers = {
-    spectrum: {
-      real: device.createBuffer({
-        label: 'test-c2r-spectrum-real',
-        size: config.spectrumSize,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-      imag: device.createBuffer({
-        label: 'test-c2r-spectrum-imag',
-        size: config.spectrumSize,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-    },
+    spectrum: device.createBuffer({
+      label: 'test-c2r-spectrum',
+      size: spectrumSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }),
     wave: device.createBuffer({
       label: 'test-c2r-wave',
       size: config.waveSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }),
+    inPlace: device.createBuffer({
+      label: 'test-c2r-in-place',
+      size: spectrumSize,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    }),
     destroy: () => {
-      buffers.spectrum.real.destroy();
-      buffers.spectrum.imag.destroy();
+      buffers.spectrum.destroy();
       buffers.wave.destroy();
+      buffers.inPlace.destroy();
     },
   };
 
   return buffers;
+};
+
+export const createPaddedWave = (
+  wave: Float32Array<ArrayBuffer>,
+): Float32Array<ArrayBuffer> => {
+  const output = new Float32Array(wave.length + 2);
+  output.set(wave);
+  return output;
+};
+
+export const createInterleavedSpectrum = (
+  spectrum: {
+    real: Float32Array<ArrayBuffer>;
+    imag: Float32Array<ArrayBuffer>;
+  },
+  windowSize: number,
+): Float32Array<ArrayBuffer> => {
+  const output = new Float32Array(windowSize + 2);
+
+  for (let binIndex = 0; binIndex < spectrum.real.length; binIndex++) {
+    const outputIndex = 2 * binIndex;
+    output[outputIndex] = spectrum.real[binIndex];
+    output[outputIndex + 1] = spectrum.imag[binIndex];
+  }
+
+  return output;
 };
 
 export const assertArrayClose = (

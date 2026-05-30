@@ -5,6 +5,7 @@ override stageStride: u32 = 1u;
 override readFromInput: u32 = 1u;
 override readBufferIndex: u32 = 0u;
 override writeBufferIndex: u32 = 0u;
+override inPlace: u32 = 1u;
 
 const threadCount: u32 = 64u;
 
@@ -13,11 +14,12 @@ struct Params {
   windowCount: u32,
 };
 
-@group(0) @binding(0) var<storage, read> signalReal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> scratch0: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read_write> scratch1: array<vec2<f32>>;
-@group(0) @binding(3) var<storage, read> fftTrigTable: array<f32>;
-@group(0) @binding(4) var<uniform> params: Params;
+@group(0) @binding(0) var<storage, read> wave: array<f32>;
+@group(0) @binding(1) var<storage, read> spectrum: array<f32>;
+@group(0) @binding(2) var<storage, read_write> scratch0: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read_write> scratch1: array<vec2<f32>>;
+@group(0) @binding(4) var<storage, read> fftTrigTable: array<f32>;
+@group(0) @binding(5) var<uniform> params: Params;
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(
@@ -45,13 +47,31 @@ fn writeScratch(index: u32, value: vec2<f32>) {
   }
 }
 
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn getInputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return complexStride() * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
+fn readInput(inputOffset: u32, sampleIndex: u32) -> f32 {
+  if (inPlace == 1u) {
+    return spectrum[inputOffset + sampleIndex];
+  }
+  return wave[inputOffset + sampleIndex];
+}
+
 fn readStage(windowIndex: u32, index: u32) -> vec2<f32> {
   if (readFromInput == 1u) {
-    let windowOffset = params.windowSize * windowIndex;
+    let inputOffset = getInputWindowOffset(windowIndex);
     let sampleIndex = index * 2u;
     return vec2<f32>(
-      signalReal[windowOffset + sampleIndex],
-      signalReal[windowOffset + sampleIndex + 1u],
+      readInput(inputOffset, sampleIndex),
+      readInput(inputOffset, sampleIndex + 1u),
     );
   }
 
