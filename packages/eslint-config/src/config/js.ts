@@ -2,6 +2,7 @@ import eslint from '@eslint/js';
 import type { ESLint, Linter } from 'eslint';
 import importX from 'eslint-plugin-import-x';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import { musetricPlugin, musetricRecommendedRules } from '../plugin.js';
 
 export const jsConfig: Linter.Config = {
   files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
@@ -13,10 +14,12 @@ export const jsConfig: Linter.Config = {
   plugins: {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     'import-x': importX as unknown as ESLint.Plugin,
+    musetric: musetricPlugin,
     'simple-import-sort': simpleImportSort,
   },
   rules: {
     ...eslint.configs.recommended.rules,
+    ...musetricRecommendedRules,
     'import-x/no-extraneous-dependencies': [
       'error',
       {

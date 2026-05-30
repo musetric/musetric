@@ -3,7 +3,6 @@ import {
   type RecordingLatencyCalibrationPeak,
   type RecordingLatencyCalibrationStartMessage,
 } from './protocol.cross.js';
-export { microphoneCalibrationProcessorName } from './protocol.cross.js';
 
 export type MicrophoneCalibrationRuntime = {
   handleMessage: (message: unknown) => void;
