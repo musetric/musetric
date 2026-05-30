@@ -13,9 +13,9 @@ ENV PATH="/root/.local/bin:${PATH}"
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -qq \
-  && apt-get install -qq -y --no-install-recommends ca-certificates curl xz-utils ffmpeg >/dev/null \
+  && apt-get install -qq -y --no-install-recommends ca-certificates curl xz-utils ffmpeg libatomic1 >/dev/null \
   && curl -fsSLo /tmp/node.tar.xz \
-    "https://nodejs.org/dist/v24.7.0/node-v24.7.0-linux-x64.tar.xz" \
+    "https://nodejs.org/dist/v26.2.0/node-v26.2.0-linux-x64.tar.xz" \
   && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
   && rm -f /tmp/node.tar.xz \
   && curl -LsSf https://astral.sh/uv/install.sh | sh \

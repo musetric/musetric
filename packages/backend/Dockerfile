@@ -1,5 +1,6 @@
 ARG RUNTIME_IMAGE=musetric-runtime
 FROM ${RUNTIME_IMAGE} AS builder
+RUN npm install -g corepack@latest
 RUN corepack enable
 RUN corepack prepare yarn@4.12.0 --activate
 COPY . .
