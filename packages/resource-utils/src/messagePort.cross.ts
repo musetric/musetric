@@ -1,7 +1,7 @@
 import { createCallEvery } from './callEvery.js';
 
 export type MessagePortLike = {
-  // eslint-disable-next-line no-restricted-syntax
+  // eslint-disable-next-line musetric/no-type-method-signatures
   postMessage(message: unknown, transfer?: Transferable[]): void;
   onmessage: ((event: MessageEvent<unknown>) => unknown) | null;
 };

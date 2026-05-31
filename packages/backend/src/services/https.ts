@@ -4,7 +4,7 @@ import { envs } from '../common/envs.js';
 
 export const getHttps = async (): Promise<ServerOptions | null> => {
   if (envs.protocol !== 'https') {
-    // eslint-disable-next-line no-restricted-syntax
+    // eslint-disable-next-line musetric/no-null-literal
     return null;
   }
   const pems = await generate([{ name: 'commonName', value: 'localhost' }], {

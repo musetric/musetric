@@ -3,8 +3,19 @@ import { musetricRules } from './rules/index.js';
 
 export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-aliased-reexports': 'error',
+  'musetric/no-classes': 'error',
+  'musetric/no-dynamic-translation-keys': 'error',
+  'musetric/no-immediate-inline-function-calls': 'error',
+  'musetric/no-inline-parameter-destructuring': 'error',
   'musetric/no-mixed-reexports': 'error',
   'musetric/no-named-reexports': 'error',
+  'musetric/no-null-literal': 'error',
+  'musetric/no-object-methods': 'error',
+  'musetric/no-screaming-snake-case': 'error',
+  'musetric/no-separate-named-exports': 'error',
+  'musetric/no-switch-statements': 'error',
+  'musetric/no-this-expression': 'error',
+  'musetric/no-type-method-signatures': 'error',
 };
 
 export const musetricPlugin: ESLint.Plugin = {

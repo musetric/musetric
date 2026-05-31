@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax */
+/* eslint-disable musetric/no-classes, musetric/no-this-expression */
 import {
   playerChannel,
   playerDataChannel,
