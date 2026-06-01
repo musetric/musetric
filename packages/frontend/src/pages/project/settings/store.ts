@@ -1,10 +1,9 @@
 import {
   extractSpectrogramConfig,
-  type FourierMode,
   type SpectrogramConfig,
-  type SpectrogramWindowName,
   type SpectrogramZeroPaddingFactor,
 } from '@musetric/audio';
+import { type FourierMode, type SpectrogramWindowName } from '@musetric/fft';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { engine } from '../../../engine/engine.js';

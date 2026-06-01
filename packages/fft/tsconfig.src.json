@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfigs/tsconfig.cross.json",
+  "references": [{ "path": "./tsconfig.es.json" }],
+  "compilerOptions": {
+    "types": ["@webgpu/types"]
+  },
+  "include": ["${configDir}/src/**/*"],
+  "exclude": [
+    "${configDir}/src/**/*.es.ts",
+    "${configDir}/src/**/__tests__/**/*"
+  ]
+}

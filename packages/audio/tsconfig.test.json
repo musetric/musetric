@@ -1,7 +1,0 @@
-{
-  "extends": "../../tsconfigs/tsconfig.test.json",
-  "references": [{ "path": "./tsconfig.src.spectrogram.json" }],
-  "compilerOptions": {
-    "types": ["@webgpu/types"]
-  }
-}

@@ -1366,21 +1366,19 @@ __metadata:
   dependencies:
     "@alexanderolsen/libsamplerate-js": "catalog:"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
     "@types/audioworklet": "catalog:"
     "@types/node": "catalog:"
-    "@vitest/browser": "catalog:"
-    "@vitest/browser-playwright": "catalog:"
     "@webgpu/types": "catalog:"
     cpx2: "catalog:"
     eslint: "catalog:"
     mediabunny: "catalog:"
-    playwright: "catalog:"
     signalsmith-stretch: "catalog:"
     typescript: "catalog:"
-    vitest: "catalog:"
   peerDependencies:
     "@alexanderolsen/libsamplerate-js": 2.1.2
+    "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
     mediabunny: 1.35.1
     signalsmith-stretch: 1.3.2
@@ -1455,6 +1453,24 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/fft@workspace:*, @musetric/fft@workspace:packages/fft":
+  version: 0.0.0-use.local
+  resolution: "@musetric/fft@workspace:packages/fft"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/resource-utils": "workspace:*"
+    "@vitest/browser": "catalog:"
+    "@vitest/browser-playwright": "catalog:"
+    "@webgpu/types": "catalog:"
+    eslint: "catalog:"
+    playwright: "catalog:"
+    typescript: "catalog:"
+    vitest: "catalog:"
+  peerDependencies:
+    "@musetric/resource-utils": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/frontend@workspace:packages/frontend":
   version: 0.0.0-use.local
   resolution: "@musetric/frontend@workspace:packages/frontend"
@@ -1468,6 +1484,7 @@ __metadata:
     "@musetric/api": "workspace:*"
     "@musetric/audio": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
     "@musetric/spa-router": "workspace:*"
     "@ncdai/react-wheel-picker": "catalog:"
@@ -1542,6 +1559,7 @@ __metadata:
     "@mui/material": "catalog:"
     "@musetric/audio": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
     "@types/node": "catalog:"
     "@types/react": "catalog:"

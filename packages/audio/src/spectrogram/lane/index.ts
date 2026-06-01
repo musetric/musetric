@@ -1,4 +1,8 @@
 import {
+  createFourierCell,
+  createSpectrogramWindowingCell,
+} from '@musetric/fft/gpu';
+import {
   createResourceCell,
   type ResourceCell,
 } from '@musetric/resource-utils';
@@ -6,12 +10,10 @@ import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { type TrackKey } from '../config.cross.js';
 import { createSpectrogramDecibelifyCell } from '../decibelify/index.js';
-import { createFourierCell } from '../fourier/cell.js';
 import { createSpectrogramFundamentalFrequencyCell } from '../fundamentalFrequency/index.js';
 import { createSpectrogramMagnitudifyCell } from '../magnitudify/index.js';
 import { createSpectrogramSliceSamplesCell } from '../sliceSamples/index.js';
 import { createSignalBufferCell } from '../state/signal.js';
-import { createSpectrogramWindowingCell } from '../windowing/index.js';
 
 export type SpectrogramLaneMarkers = {
   sliceSamples?: GPUComputePassTimestampWrites;
