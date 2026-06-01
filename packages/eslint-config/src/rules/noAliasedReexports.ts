@@ -33,7 +33,7 @@ export const noAliasedReexportsRule: Rule.RuleModule = {
     },
     messages: {
       aliasedReexport:
-        'Do not re-export imported bindings through local aliases; use a dedicated re-export file or export the implementation directly.',
+        'Do not re-export imported bindings through local aliases. Remove the re-export and import the original binding directly where it is used.',
     },
     schema: [],
   },
@@ -61,7 +61,7 @@ export const noAliasedReexportsRule: Rule.RuleModule = {
     return {
       ImportDeclaration: (node) => {
         const { value } = node.source;
-        if (typeof value !== 'string' || !value.startsWith('.')) {
+        if (typeof value !== 'string') {
           return;
         }
 
