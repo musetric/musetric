@@ -2,7 +2,7 @@ import {
   createResourceCell,
   type ResourceCell,
 } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '../common/complexArray.js';
+import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { type FourierMode } from '../config.cross.js';
 import { fouriers } from './fouriers.js';

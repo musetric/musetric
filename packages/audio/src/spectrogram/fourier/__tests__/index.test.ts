@@ -1,7 +1,9 @@
+import {
+  complexArrayFrom,
+  createComplexGpuBufferReader,
+  createGpuContext,
+} from '@musetric/resource-utils/gpu';
 import { describe, it } from 'vitest';
-import { complexArrayFrom } from '../../common/complexArray.js';
-import { createComplexGpuBufferReader } from '../../common/gpuBufferReader/index.js';
-import { createGpuContext } from '../../common/gpuContext.js';
 import { allFourierModes, type FourierMode } from '../../config.cross.js';
 import { getPackedFusedTiledR2cVariant } from '../fftPackedFusedTiledR2c/support.js';
 import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js';

@@ -1,4 +1,4 @@
-import { type ComplexArray } from '../../common/complexArray.js';
+import { type ComplexArray } from '@musetric/resource-utils/gpu';
 
 export type FourierFixture = {
   name: string;

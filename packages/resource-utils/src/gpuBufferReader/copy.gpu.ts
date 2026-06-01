@@ -1,4 +1,4 @@
-import { type ComplexGpuBuffer } from '../complexArray.js';
+import { type ComplexGpuBuffer } from '../complexArray.gpu.js';
 
 export const copyGpuBuffer = async (
   device: GPUDevice,

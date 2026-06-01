@@ -42,6 +42,7 @@
     "${configDir}/src/**/*.es.ts",
     "${configDir}/src/**/*.cross.ts",
     "${configDir}/src/**/*.dom.ts",
+    "${configDir}/src/**/*.gpu.ts",
     "${configDir}/src/**/*.node.ts",
     "${configDir}/src/**/*.worker.ts",
     "${configDir}/src/**/*.worklet.ts",

@@ -1,5 +1,5 @@
 import { type ResourceCell } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '../common/complexArray.js';
+import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type FourierConfig } from './config.js';
 
 export type FourierArg = {

@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '../common/complexArray.js';
+import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 
 export type SignalBufferConfig = {
   windowSize: number;
