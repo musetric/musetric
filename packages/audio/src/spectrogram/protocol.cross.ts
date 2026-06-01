@@ -1,6 +1,6 @@
 import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/resource-utils/cross/messagePort';
-import type { SpectrogramConfig, TrackKey } from './config.cross.js';
+import { type SpectrogramConfig, type TrackKey } from './config.cross.js';
 
 export type SpectrogramOutboundMethods = {
   boot: (message: { dataPort: MessagePort }) => void;

@@ -1,6 +1,6 @@
 import { estimateRecordingLatency } from '@musetric/audio/recording';
-import type { Store } from '../../common/store.js';
-import type { EngineState } from '../state.js';
+import { type Store } from '../../common/store.js';
+import { type EngineState } from '../state.js';
 
 export type CalibrationEstimateOptions = {
   context: AudioContext;

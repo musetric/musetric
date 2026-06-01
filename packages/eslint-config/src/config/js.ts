@@ -1,5 +1,5 @@
 import eslint from '@eslint/js';
-import type { ESLint, Linter } from 'eslint';
+import { type ESLint, type Linter } from 'eslint';
 import importX from 'eslint-plugin-import-x';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import { musetricPlugin, musetricRecommendedRules } from '../plugin.js';

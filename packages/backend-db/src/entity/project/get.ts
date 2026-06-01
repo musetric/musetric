@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 import { type z } from 'zod';
 import { bucketizeRow, hasValue } from '../../common/index.js';
 import { table } from '../../schema/index.js';

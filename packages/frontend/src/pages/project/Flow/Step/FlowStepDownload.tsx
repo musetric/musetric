@@ -1,6 +1,6 @@
 import { Chip, Stack, type Theme, Typography, useTheme } from '@mui/material';
 import { type api } from '@musetric/api';
-import type { TFunction } from 'i18next';
+import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

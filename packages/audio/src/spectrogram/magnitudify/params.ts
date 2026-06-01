@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import type { ExtSpectrogramConfig } from '../common/extConfig.js';
+import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 
 export type MagnitudifyParams = {
   windowSize: number;

@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react';
+import { type MouseEvent } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
 

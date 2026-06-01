@@ -20,7 +20,7 @@ import {
 import { type FC, useState } from 'react';
 import { windowSizes } from '../constants.js';
 import { getMetric } from '../getMetric.js';
-import type { MetricsData } from '../runBenchmarks.js';
+import { type MetricsData } from '../runBenchmarks.js';
 import { useProcessingStore } from '../store.js';
 
 type Row =

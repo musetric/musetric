@@ -1,6 +1,6 @@
 import { Typography } from '@mui/material';
 import { type StemType } from '@musetric/audio';
-import type { TFunction } from 'i18next';
+import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 

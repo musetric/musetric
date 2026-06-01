@@ -1,5 +1,5 @@
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { Logger } from '../logger.js';
+import { type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { type Logger } from '../logger.js';
 import {
   createMessageHandler,
   type MessageHandlers,

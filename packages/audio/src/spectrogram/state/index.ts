@@ -1,4 +1,4 @@
-import type { ResourceCell } from '@musetric/resource-utils';
+import { type ResourceCell } from '@musetric/resource-utils';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { createStateTextureCell, type StateTexture } from './texture.js';
 

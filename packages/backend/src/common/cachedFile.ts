@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 export type CachedFile = {
   filename: string;

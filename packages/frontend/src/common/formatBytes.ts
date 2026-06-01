@@ -1,4 +1,4 @@
-import type { TFunction } from 'i18next';
+import { type TFunction } from 'i18next';
 
 const byteUnits = ['b', 'kb', 'mb', 'gb', 'tb'] as const;
 export type ByteUnit = (typeof byteUnits)[number];

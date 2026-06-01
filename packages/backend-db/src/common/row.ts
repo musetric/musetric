@@ -1,4 +1,4 @@
-import type { SQLOutputValue } from 'node:sqlite';
+import { type SQLOutputValue } from 'node:sqlite';
 
 export type Row = Record<string, SQLOutputValue>;
 export type Buckets = Partial<Record<string, Row>>;

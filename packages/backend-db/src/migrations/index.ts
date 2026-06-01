@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 
 // Do not attempt to migrate or preserve old tables/data.
 // Project is still early in development.

@@ -1,5 +1,5 @@
-import type { api } from '@musetric/api';
-import type { FastifyInstance } from 'fastify';
+import { type api } from '@musetric/api';
+import { type FastifyInstance } from 'fastify';
 
 export type ProcessingStepKind =
   | 'separation'

@@ -1,4 +1,4 @@
-import type { Logger } from '../logger.js';
+import { type Logger } from '../logger.js';
 
 export const tryParseMessage = <Message>(line: string): Message | undefined => {
   try {

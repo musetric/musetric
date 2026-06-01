@@ -1,7 +1,7 @@
 import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
-import type { WaveformColors } from '../common/colors.es.js';
-import type { StemType } from '../common/stemType.es.js';
-import type { ViewSize } from '../common/viewSize.es.js';
+import { type WaveformColors } from '../common/colors.es.js';
+import { type StemType } from '../common/stemType.es.js';
+import { type ViewSize } from '../common/viewSize.es.js';
 
 export type WaveformOutboundMethods = {
   boot: () => void;

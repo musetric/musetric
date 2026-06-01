@@ -1,4 +1,4 @@
-import type { ResourceCell } from '@musetric/resource-utils';
+import { type ResourceCell } from '@musetric/resource-utils';
 import { createPipelines } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 

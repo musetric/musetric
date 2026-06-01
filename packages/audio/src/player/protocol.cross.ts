@@ -1,6 +1,6 @@
 import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/resource-utils/cross/messagePort';
-import type { StemType } from '../common/stemType.es.js';
+import { type StemType } from '../common/stemType.es.js';
 
 export const playerProcessorName = 'player-processor';
 

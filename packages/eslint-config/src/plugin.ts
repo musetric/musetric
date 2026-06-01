@@ -1,4 +1,4 @@
-import type { ESLint, Linter } from 'eslint';
+import { type ESLint, type Linter } from 'eslint';
 import { musetricRules } from './rules/index.js';
 
 export const musetricRecommendedRules: Linter.RulesRecord = {
@@ -14,6 +14,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-renamed-imports': 'error',
   'musetric/no-screaming-snake-case': 'error',
   'musetric/no-separate-named-exports': 'error',
+  'musetric/no-separate-type-imports': 'error',
   'musetric/no-switch-statements': 'error',
   'musetric/no-this-expression': 'error',
   'musetric/no-type-method-signatures': 'error',

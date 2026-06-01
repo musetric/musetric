@@ -1,4 +1,4 @@
-import type { Rule } from 'eslint';
+import { type Rule } from 'eslint';
 
 type RestrictedSyntax = {
   message: string;
