@@ -21,4 +21,3 @@ export * from './remap/index.js';
 export * from './sliceSamples/index.js';
 export * from './state/index.js';
 export * from './windowing/index.js';
-export * from '@musetric/resource-utils/gpu';
