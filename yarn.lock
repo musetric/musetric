@@ -1564,6 +1564,7 @@ __metadata:
   dependencies:
     "@musetric/eslint-config": "workspace:*"
     "@types/node": "catalog:"
+    "@webgpu/types": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
     vitest: "catalog:"

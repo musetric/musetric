@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfigs/tsconfig.gpu.json",
+  "references": [{ "path": "./tsconfig.src.json" }]
+}

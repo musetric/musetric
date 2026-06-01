@@ -24,6 +24,12 @@
       "import": "./dist/*.cross.js",
       "default": "./dist/*.cross.js"
     },
+    "./gpu": {
+      "monorepo": "./src/index.gpu.ts",
+      "types": "./dist/index.gpu.d.ts",
+      "import": "./dist/index.gpu.js",
+      "default": "./dist/index.gpu.js"
+    },
     "./node": {
       "monorepo": "./src/index.node.ts",
       "types": "./dist/index.node.d.ts",
@@ -41,6 +47,7 @@
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@types/node": "catalog:",
+    "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

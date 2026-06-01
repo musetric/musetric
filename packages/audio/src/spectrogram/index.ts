@@ -1,8 +1,5 @@
-export * from './common/complexArray.js';
 export * from './common/extConfig.js';
 export * from './common/frequencyRange.js';
-export * from './common/gpuBufferReader/index.js';
-export * from './common/gpuContext.js';
 export * from './common/gpuDevice.js';
 export * from './common/patchConfig.js';
 export * from './common/processorTimer.js';
@@ -24,3 +21,4 @@ export * from './remap/index.js';
 export * from './sliceSamples/index.js';
 export * from './state/index.js';
 export * from './windowing/index.js';
+export * from '@musetric/resource-utils/gpu';

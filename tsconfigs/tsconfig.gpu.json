@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "WebWorker"],
+    "types": ["@webgpu/types"],
+    "tsBuildInfoFile": "${configDir}/.tsbuildinfo/gpu.tsbuildinfo"
+  },
+  "include": ["${configDir}/src/**/*.gpu.ts"],
+  "exclude": []
+}
