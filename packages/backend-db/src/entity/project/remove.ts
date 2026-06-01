@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 
 export const remove = (database: DatabaseSync) => {
   const statement = database.prepare(`DELETE FROM Project WHERE id = ?`);

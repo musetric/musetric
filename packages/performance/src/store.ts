@@ -7,7 +7,7 @@ import {
   fourierModes,
   windowSizes,
 } from './constants.js';
-import type { BenchmarkData, MetricsData } from './runBenchmarks.js';
+import { type BenchmarkData, type MetricsData } from './runBenchmarks.js';
 
 export type Task = {
   fourierMode: FourierMode;

@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import type { SpectrogramConfig } from '../config.cross.js';
+import { type SpectrogramConfig } from '../config.cross.js';
 
 export type RemapParams = {
   halfSize: number;

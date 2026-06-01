@@ -1,4 +1,4 @@
-import type { SpectrogramWindowName } from '../config.cross.js';
+import { type SpectrogramWindowName } from '../config.cross.js';
 
 type WindowFunction = (windowSize: number) => Float32Array<ArrayBuffer>;
 

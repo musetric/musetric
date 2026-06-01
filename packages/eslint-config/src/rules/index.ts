@@ -10,6 +10,7 @@ import { noObjectMethodsRule } from './noObjectMethods.js';
 import { noRenamedImportsRule } from './noRenamedImports.js';
 import { noScreamingSnakeCaseRule } from './noScreamingSnakeCase.js';
 import { noSeparateNamedExportsRule } from './noSeparateNamedExports.js';
+import { noSeparateTypeImportsRule } from './noSeparateTypeImports.js';
 import { noSwitchStatementsRule } from './noSwitchStatements.js';
 import { noThisExpressionRule } from './noThisExpression.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
@@ -27,6 +28,7 @@ export const musetricRules = {
   'no-renamed-imports': noRenamedImportsRule,
   'no-screaming-snake-case': noScreamingSnakeCaseRule,
   'no-separate-named-exports': noSeparateNamedExportsRule,
+  'no-separate-type-imports': noSeparateTypeImportsRule,
   'no-switch-statements': noSwitchStatementsRule,
   'no-this-expression': noThisExpressionRule,
   'no-type-method-signatures': noTypeMethodSignaturesRule,

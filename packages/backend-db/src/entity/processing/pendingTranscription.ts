@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 import { table } from '../../schema/index.js';
 
 export const pendingTranscription = (database: DatabaseSync) => {

@@ -3,8 +3,8 @@ import {
   isLikelyMobileUserAgent,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
-import type { Store } from '../../common/store.js';
-import type { EngineState } from '../state.js';
+import { type Store } from '../../common/store.js';
+import { type EngineState } from '../state.js';
 import { applyRecordingLatencyEstimate } from './estimate.js';
 
 export type CalibrationPreviewOptions = {

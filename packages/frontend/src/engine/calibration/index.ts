@@ -8,10 +8,10 @@ import {
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
-import type { Store } from '../../common/store.js';
-import type { EngineAudioOutput } from '../audioOutput/index.js';
-import type { EnginePlayer } from '../player/index.js';
-import type { EngineState } from '../state.js';
+import { type Store } from '../../common/store.js';
+import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EnginePlayer } from '../player/index.js';
+import { type EngineState } from '../state.js';
 import { createCalibrationDevices } from './devices.js';
 import { applyRecordingLatencyEstimate } from './estimate.js';
 import microphoneCalibrationWorkletUrl from './microphone.worklet.ts?worker&url';

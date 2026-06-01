@@ -1,7 +1,7 @@
 import { nextNumber } from '@musetric/resource-utils';
-import type { Store } from '../../common/store.js';
-import type { EngineAudioOutput } from '../audioOutput/index.js';
-import type { EngineDecoder } from '../decoder/index.js';
+import { type Store } from '../../common/store.js';
+import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineSeekOrigin, type EngineState } from '../state.js';
 import {
   createEnginePlayback,

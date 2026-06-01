@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 import { applyChordsResult } from './applyChordsResult.js';
 import { applyKeyResult } from './applyKeyResult.js';
 import { applyRhythmResult } from './applyRhythmResult.js';

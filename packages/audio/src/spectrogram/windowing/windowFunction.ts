@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import type { ExtSpectrogramConfig } from '../common/extConfig.js';
+import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { windowFunctions } from '../common/windowFunction.js';
 
 export type StateWindowFunction = {

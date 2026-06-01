@@ -3,8 +3,8 @@ import {
   createControlledPromise,
 } from '@musetric/resource-utils';
 import { createLazyMount } from '@musetric/resource-utils/cross/lazyMount';
-import type { Store } from '../../common/store.js';
-import type { EngineState } from '../state.js';
+import { type Store } from '../../common/store.js';
+import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './protocol.cross.js';
 

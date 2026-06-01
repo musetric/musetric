@@ -1,5 +1,5 @@
-import type { Rule } from 'eslint';
-import type { ModuleDeclaration, Statement } from 'estree';
+import { type Rule } from 'eslint';
+import { type ModuleDeclaration, type Statement } from 'estree';
 
 type ProgramStatement = ModuleDeclaration | Statement;
 

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { engine } from './engine.js';
-import type { EngineState } from './state.js';
+import { type EngineState } from './state.js';
 
 export const useEngineStore = <Value>(
   selector: (state: EngineState) => Value,

@@ -1,4 +1,4 @@
-import type { Linter } from 'eslint';
+import { type Linter } from 'eslint';
 import { jsConfig } from './config/js.js';
 import { reactConfig } from './config/react.js';
 

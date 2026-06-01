@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
 
 export type ApplyChordsResultArg = {

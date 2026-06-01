@@ -1,4 +1,4 @@
-import type { ExtSpectrogramConfig } from './common/extConfig.js';
+import { type ExtSpectrogramConfig } from './common/extConfig.js';
 import { applySpectrogramPatchConfig } from './common/patchConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {

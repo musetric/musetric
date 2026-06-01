@@ -1,4 +1,4 @@
-import type { Rule } from 'eslint';
+import { type Rule } from 'eslint';
 
 const hasTypeImportKind = (node: object): boolean =>
   'importKind' in node && node.importKind === 'type';

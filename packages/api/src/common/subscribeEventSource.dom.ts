@@ -1,5 +1,5 @@
 import type z from 'zod';
-import type { ApiEvent, UnsubscribeApiEvent } from './apiEvent.js';
+import { type ApiEvent, type UnsubscribeApiEvent } from './apiEvent.js';
 
 export const subscribeEventSource = <
   Path extends string,

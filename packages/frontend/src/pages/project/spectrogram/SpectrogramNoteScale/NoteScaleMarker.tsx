@@ -1,5 +1,5 @@
 import { alpha, Box, Typography } from '@mui/material';
-import type { FC } from 'react';
+import { type FC } from 'react';
 import { getNoteScaleColor } from './noteLineStyle.js';
 import { type NoteMarker } from './noteMarker.js';
 
