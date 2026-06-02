@@ -4,7 +4,7 @@ import {
   type DecoderRuntime,
 } from '@musetric/audio/decoder/worker';
 import { playerDataChannel } from '@musetric/audio/player';
-import { spectrogramDataChannel } from '@musetric/audio/spectrogram';
+import { spectrogramDataChannel } from '@musetric/spectrogram';
 import {
   getDeliveryAudioContent,
   getRecordingAudioContent,

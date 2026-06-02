@@ -1,7 +1,7 @@
+import { type ViewSize } from '@musetric/resource-utils';
 import { setOffscreenCanvasSize } from '@musetric/resource-utils/cross/offscreenCanvas';
-import { type WaveformColors } from '../../common/colors.es.js';
 import { type StemType, stemTypes } from '../../common/stemType.es.js';
-import { type ViewSize } from '../../common/viewSize.es.js';
+import { type WaveformColors } from '../colors.es.js';
 import {
   createWaveformProcessor,
   type WaveformProcessor,

@@ -16,7 +16,7 @@ import {
   spectrogramLaneStages,
   type SpectrogramTimerLabel,
   type TrackKey,
-} from '@musetric/audio/spectrogram';
+} from '@musetric/spectrogram/gpu';
 import { type FC, useState } from 'react';
 import { windowSizes } from '../constants.js';
 import { getMetric } from '../getMetric.js';

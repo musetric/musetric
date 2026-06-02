@@ -4,7 +4,6 @@
   "compilerOptions": {
     "types": ["@webgpu/types"]
   },
-  "include": ["${configDir}/src/**/*"],
   "exclude": [
     "${configDir}/src/**/*.es.ts",
     "${configDir}/src/**/__tests__/**/*"

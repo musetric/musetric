@@ -1368,6 +1368,7 @@ __metadata:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
     "@types/audioworklet": "catalog:"
     "@types/node": "catalog:"
     "@webgpu/types": "catalog:"
@@ -1378,8 +1379,8 @@ __metadata:
     typescript: "catalog:"
   peerDependencies:
     "@alexanderolsen/libsamplerate-js": 2.1.2
-    "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
     mediabunny: 1.35.1
     signalsmith-stretch: 1.3.2
   languageName: unknown
@@ -1487,6 +1488,7 @@ __metadata:
     "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
     "@musetric/spa-router": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
     "@ncdai/react-wheel-picker": "catalog:"
     "@tanstack/react-query": "catalog:"
     "@types/audioworklet": "catalog:"
@@ -1561,6 +1563,7 @@ __metadata:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/resource-utils": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
     "@types/node": "catalog:"
     "@types/react": "catalog:"
     "@webgpu/types": "catalog:"
@@ -1603,6 +1606,23 @@ __metadata:
   peerDependencies:
     react: 19.2.4
     zustand: 5.0.11
+  languageName: unknown
+  linkType: soft
+
+"@musetric/spectrogram@workspace:*, @musetric/spectrogram@workspace:packages/spectrogram":
+  version: 0.0.0-use.local
+  resolution: "@musetric/spectrogram@workspace:packages/spectrogram"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/resource-utils": "workspace:*"
+    "@webgpu/types": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+    vite: "catalog:"
+  peerDependencies:
+    "@musetric/fft": "workspace:*"
+    "@musetric/resource-utils": "workspace:*"
   languageName: unknown
   linkType: soft
 

@@ -1,0 +1,47 @@
+{
+  "name": "@musetric/spectrogram",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "monorepo": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./gpu": {
+      "monorepo": "./src/gpu.ts",
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js",
+      "default": "./dist/gpu.js"
+    },
+    "./worker": {
+      "monorepo": "./src/worker/index.worker.ts",
+      "types": "./dist/worker/index.worker.d.ts",
+      "import": "./dist/worker/index.worker.js",
+      "default": "./dist/worker/index.worker.js"
+    }
+  },
+  "scripts": {
+    "project:build": "tsc --build",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache",
+    "fix:lint": "eslint . --fix --cache"
+  },
+  "peerDependencies": {
+    "@musetric/fft": "workspace:*",
+    "@musetric/resource-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
+    "@musetric/resource-utils": "workspace:*",
+    "@webgpu/types": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

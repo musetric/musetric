@@ -1,5 +1,6 @@
 export * from './callEvery.js';
 export * from './callLatest.js';
+export * from './color.js';
 export * from './controlledPromise.js';
 export * from './eventEmitter.js';
 export * from './inertialDrag.js';
@@ -8,6 +9,8 @@ export * from './messageHandler.js';
 export * from './nextNumber.js';
 export * from './numberLimit.js';
 export * from './objectKeys.js';
+export * from './patchConfig.js';
 export * from './resourceCell.js';
 export * from './sampleRate.js';
 export * from './singletonManager.js';
+export * from './viewSize.js';

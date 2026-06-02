@@ -1,5 +1,5 @@
 import { TextField } from '@mui/material';
-import { normalizeSpectrogramMaxFrequency } from '@musetric/audio';
+import { normalizeSpectrogramMaxFrequency } from '@musetric/spectrogram';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';

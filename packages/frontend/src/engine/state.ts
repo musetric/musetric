@@ -1,4 +1,5 @@
-import { type SpectrogramColors, type StemType } from '@musetric/audio';
+import { type StemType } from '@musetric/audio';
+import { type SpectrogramColors } from '@musetric/spectrogram';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 

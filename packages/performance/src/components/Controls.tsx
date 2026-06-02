@@ -10,7 +10,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { type SpectrogramZeroPaddingFactor } from '@musetric/audio/spectrogram';
+import { type SpectrogramZeroPaddingFactor } from '@musetric/spectrogram';
 import { type FC } from 'react';
 import {
   fourierModes,
