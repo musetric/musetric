@@ -2,8 +2,7 @@
   "extends": "../../tsconfigs/tsconfig.base.json",
   "references": [
     { "path": "./tsconfig.es.json" },
-    { "path": "./tsconfig.cross.json" },
-    { "path": "./tsconfig.src.spectrogram.json" }
+    { "path": "./tsconfig.cross.json" }
   ],
   "compilerOptions": {
     "lib": ["ES2024", "DOM"],

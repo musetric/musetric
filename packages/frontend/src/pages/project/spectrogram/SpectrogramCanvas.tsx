@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { extractSpectrogramConfig } from '@musetric/audio';
+import { extractSpectrogramConfig } from '@musetric/spectrogram';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ViewError } from '../../../components/ViewError.js';

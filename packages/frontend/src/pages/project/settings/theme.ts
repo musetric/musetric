@@ -1,5 +1,5 @@
 import { useTheme } from '@mui/material';
-import { type SpectrogramColors } from '@musetric/audio';
+import { type SpectrogramColors } from '@musetric/spectrogram';
 import { useLayoutEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 

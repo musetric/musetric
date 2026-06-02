@@ -25,6 +25,7 @@
     "@musetric/fft": "workspace:*",
     "@musetric/resource-utils": "workspace:*",
     "@musetric/spa-router": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
     "@ncdai/react-wheel-picker": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@types/audioworklet": "catalog:",

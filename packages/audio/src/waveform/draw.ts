@@ -1,4 +1,4 @@
-import { type WaveformColors } from '../common/colors.es.js';
+import { type WaveformColors } from './colors.es.js';
 import { type WaveformSegment } from './generateSegments.js';
 
 export type WaveformDraw = {

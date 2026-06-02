@@ -1,9 +1,9 @@
+import { type FourierMode } from '@musetric/fft';
+import { defaultSampleRate } from '@musetric/resource-utils';
 import {
   createSpectrogramProcessor,
   type SpectrogramConfig,
-} from '@musetric/audio/spectrogram';
-import { type FourierMode } from '@musetric/fft';
-import { defaultSampleRate } from '@musetric/resource-utils';
+} from '@musetric/spectrogram/gpu';
 import {
   type BenchmarkParams,
   measureIters,

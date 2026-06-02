@@ -19,6 +19,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/resource-utils": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@webgpu/types": "catalog:",

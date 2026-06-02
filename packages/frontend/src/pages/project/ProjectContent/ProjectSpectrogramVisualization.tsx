@@ -1,11 +1,11 @@
 import { Box } from '@mui/material';
+import { createNumberLimit } from '@musetric/resource-utils';
+import { createMultiPointerGesture } from '@musetric/resource-utils/dom';
 import {
   maximumSpectrogramFrequency,
   minimumSpectrogramFrequency,
   minimumSpectrogramFrequencyRatio,
-} from '@musetric/audio';
-import { createNumberLimit } from '@musetric/resource-utils';
-import { createMultiPointerGesture } from '@musetric/resource-utils/dom';
+} from '@musetric/spectrogram';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';

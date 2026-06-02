@@ -1,6 +1,6 @@
+import { type spectrogramDataChannel } from '@musetric/spectrogram';
 import { type StemType } from '../../common/stemType.es.js';
 import { type playerDataChannel } from '../../player/protocol.cross.js';
-import { type spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
 import { decodeMp4 } from '../mp4/index.js';
 import { decodeWav } from '../wav/index.js';
 

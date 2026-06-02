@@ -3,5 +3,13 @@
   "references": [{ "path": "./tsconfig.src.json" }],
   "compilerOptions": {
     "types": ["@webgpu/types"]
-  }
+  },
+  "include": ["${configDir}/src/**/*.ts"],
+  "exclude": [
+    "${configDir}/src/**/*.cross.ts",
+    "${configDir}/src/**/*.dom.ts",
+    "${configDir}/src/**/*.node.ts",
+    "${configDir}/src/**/*.worker.ts",
+    "${configDir}/src/**/*.worklet.ts"
+  ]
 }

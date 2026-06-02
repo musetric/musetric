@@ -60,18 +60,6 @@
       "import": "./dist/calibration/index.worklet.js",
       "default": "./dist/calibration/index.worklet.js"
     },
-    "./spectrogram": {
-      "monorepo": "./src/spectrogram/index.ts",
-      "types": "./dist/spectrogram/index.d.ts",
-      "import": "./dist/spectrogram/index.js",
-      "default": "./dist/spectrogram/index.js"
-    },
-    "./spectrogram/worker": {
-      "monorepo": "./src/spectrogram/worker/index.worker.ts",
-      "types": "./dist/spectrogram/worker/index.worker.d.ts",
-      "import": "./dist/spectrogram/worker/index.worker.js",
-      "default": "./dist/spectrogram/worker/index.worker.js"
-    },
     "./timeline": {
       "monorepo": "./src/timeline/index.ts",
       "types": "./dist/timeline/index.d.ts",
@@ -99,8 +87,8 @@
   },
   "peerDependencies": {
     "@alexanderolsen/libsamplerate-js": "2.1.2",
-    "@musetric/fft": "workspace:*",
     "@musetric/resource-utils": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
     "mediabunny": "1.35.1",
     "signalsmith-stretch": "1.3.2"
   },
@@ -109,6 +97,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/resource-utils": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
     "@types/audioworklet": "catalog:",
     "@types/node": "catalog:",
     "@webgpu/types": "catalog:",
