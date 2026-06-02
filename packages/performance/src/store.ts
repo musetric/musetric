@@ -1,4 +1,4 @@
-import { type FourierMode } from '@musetric/audio/spectrogram';
+import { type FourierMode } from '@musetric/fft';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {

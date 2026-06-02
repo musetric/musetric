@@ -1,3 +1,4 @@
+import { type FourierMode, type SpectrogramWindowName } from '@musetric/fft';
 import { createObjectKeys } from '@musetric/resource-utils';
 import { type SpectrogramColors } from '../common/colors.es.js';
 import { extractConfig } from '../common/config.es.js';
@@ -7,28 +8,6 @@ export const allTrackKeys = ['lead', 'recording'] as const;
 export type TrackKey = (typeof allTrackKeys)[number];
 
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
-
-export const allFourierModes = [
-  'fftPackedFusedTiledR2c',
-  'fftPackedStockhamR2c',
-  'fftPackedTiledR2c',
-  'fftPrunedFourStepR2c',
-] as const;
-export type FourierMode = (typeof allFourierModes)[number];
-
-export const allSpectrogramWindowNames = [
-  'bartlett',
-  'bartlettHann',
-  'blackman',
-  'cosine',
-  'gauss',
-  'hamming',
-  'hann',
-  'lanczoz',
-  'rectangular',
-  'triangular',
-] as const;
-export type SpectrogramWindowName = (typeof allSpectrogramWindowNames)[number];
 
 export type SpectrogramLaneConfig = {
   showSpectrogram: boolean;

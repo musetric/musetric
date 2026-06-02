@@ -22,6 +22,7 @@
     "@musetric/api": "workspace:*",
     "@musetric/audio": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
     "@musetric/resource-utils": "workspace:*",
     "@musetric/spa-router": "workspace:*",
     "@ncdai/react-wheel-picker": "catalog:",

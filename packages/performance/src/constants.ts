@@ -1,7 +1,5 @@
-import {
-  type FourierMode,
-  type SpectrogramZeroPaddingFactor,
-} from '@musetric/audio/spectrogram';
+import { type SpectrogramZeroPaddingFactor } from '@musetric/audio/spectrogram';
+import { type FourierMode } from '@musetric/fft';
 import { defaultSampleRate } from '@musetric/resource-utils';
 
 export const fourierModes: readonly FourierMode[] = [
