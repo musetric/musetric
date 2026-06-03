@@ -1,4 +1,4 @@
-import { type FourierMode, type SpectrogramWindowName } from '@musetric/fft';
+import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import {
   extractSpectrogramConfig,
   type SpectrogramConfig,
@@ -38,7 +38,7 @@ const initialState: SettingsState = {
 
 export type SettingsActions = {
   setFourierMode: (value: FourierMode) => void;
-  setWindowName: (value: SpectrogramWindowName) => void;
+  setWindowName: (value: WindowFunctionName) => void;
   setWindowSize: (value: number) => void;
   setMinFrequency: (value: number) => void;
   setMaxFrequency: (value: number) => void;

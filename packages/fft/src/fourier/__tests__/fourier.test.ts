@@ -4,7 +4,7 @@ import {
   createGpuContext,
 } from '@musetric/resource-utils/gpu';
 import { describe, it } from 'vitest';
-import { allFourierModes, type FourierMode } from '../../common/config.es.js';
+import { allFourierModes, type FourierMode } from '../config.es.js';
 import { getPackedFusedTiledR2cVariant } from '../fftPackedFusedTiledR2c/support.js';
 import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js';
 import { getPackedTiledR2cVariant } from '../fftPackedTiledR2c/support.js';
@@ -59,7 +59,8 @@ describe('fourier', async () => {
 
             try {
               const fourier = fourierCell.get({
-                signal: buffers.signal,
+                wave: buffers.signal.real,
+                spectrum: buffers.signal,
                 config: {
                   windowSize: fixture.windowSize,
                   windowCount,
@@ -69,7 +70,7 @@ describe('fourier', async () => {
               device.queue.writeBuffer(buffers.signal.real, 0, fixture.input);
               device.queue.writeBuffer(buffers.signal.imag, 0, zeroImag);
               const encoder = device.createCommandEncoder();
-              fourier.forward(encoder);
+              fourier.run(encoder);
               const command = encoder.finish();
               device.queue.submit([command]);
               await device.queue.onSubmittedWorkDone();

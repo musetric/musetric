@@ -1,4 +1,4 @@
-import { type WindowFunctionName } from '../common/config.es.js';
+import { type WindowFunctionName } from '../windowFunction/config.es.js';
 
 export type FftWindowingConfig = {
   windowSize: number;

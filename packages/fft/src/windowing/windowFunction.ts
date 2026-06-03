@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/resource-utils';
-import { windowFunctions } from '../common/windowFunction.es.js';
+import { windowFunctions } from '../windowFunction/windowFunction.es.js';
 import { type FftWindowingConfig } from './config.js';
 
 export type StateWindowFunction = {
