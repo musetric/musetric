@@ -41,7 +41,7 @@ describe('fourier', async () => {
   for (const mode of allFourierModes) {
     describe(mode, () => {
       for (const fixture of fourierFixtures) {
-        describe(fixture.name, () => {
+        describe(`FFT ${fixture.windowSize}-point: ${fixture.caseName}`, () => {
           if (!isFourierFixtureSupported(device, mode, fixture.windowSize)) {
             it.skip('forward', () => undefined);
             return;
@@ -67,7 +67,7 @@ describe('fourier', async () => {
                 },
               });
               const zeroImag = new Float32Array(fixture.windowSize).fill(0);
-              device.queue.writeBuffer(buffers.signal.real, 0, fixture.input);
+              device.queue.writeBuffer(buffers.signal.real, 0, fixture.wave);
               device.queue.writeBuffer(buffers.signal.imag, 0, zeroImag);
               const encoder = device.createCommandEncoder();
               fourier.run(encoder);
@@ -80,12 +80,12 @@ describe('fourier', async () => {
               assertArrayClose(
                 'real',
                 result.real.slice(0, positiveSize),
-                fixture.output.real,
+                fixture.spectrum.real,
               );
               assertArrayClose(
                 'imag',
                 result.imag.slice(0, positiveSize),
-                fixture.output.imag,
+                fixture.spectrum.imag,
               );
             } finally {
               fourierCell.dispose();

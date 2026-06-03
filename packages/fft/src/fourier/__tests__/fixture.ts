@@ -1,10 +1,10 @@
 import { type ComplexArray } from '@musetric/resource-utils/gpu';
 
 export type FourierFixture = {
-  name: string;
+  caseName: string;
   windowSize: number;
-  input: Float32Array<ArrayBuffer>;
-  output: ComplexArray;
+  wave: Float32Array<ArrayBuffer>;
+  spectrum: ComplexArray;
 };
 
 type ExpectedBin = {
@@ -48,10 +48,10 @@ const createSignal = (
   );
 
 const createUnitImpulseFixture = (windowSize: number): FourierFixture => ({
-  name: `FFT ${windowSize}-point: unit impulse produces flat spectrum`,
+  caseName: 'unit impulse produces flat spectrum',
   windowSize,
-  input: createSignal(windowSize, (sampleIndex) => (sampleIndex === 0 ? 1 : 0)),
-  output: {
+  wave: createSignal(windowSize, (sampleIndex) => (sampleIndex === 0 ? 1 : 0)),
+  spectrum: {
     real: Float32Array.from(new Array(positiveSize(windowSize)).fill(1)),
     imag: new Float32Array(positiveSize(windowSize)),
   },
@@ -61,12 +61,12 @@ const createShiftedImpulseFixture = (windowSize: number): FourierFixture => {
   const shift = Math.floor(windowSize / 3) + 5;
 
   return {
-    name: `FFT ${windowSize}-point: shifted impulse preserves phase ramp`,
+    caseName: 'shifted impulse preserves phase ramp',
     windowSize,
-    input: createSignal(windowSize, (sampleIndex) =>
+    wave: createSignal(windowSize, (sampleIndex) =>
       sampleIndex === shift ? 1 : 0,
     ),
-    output: {
+    spectrum: {
       real: createSignal(positiveSize(windowSize), (binIndex) =>
         Math.cos((-2 * Math.PI * binIndex * shift) / windowSize),
       ),
@@ -78,10 +78,10 @@ const createShiftedImpulseFixture = (windowSize: number): FourierFixture => {
 };
 
 const createConstantFixture = (windowSize: number): FourierFixture => ({
-  name: `FFT ${windowSize}-point: constant goes only to DC`,
+  caseName: 'constant goes only to DC',
   windowSize,
-  input: Float32Array.from(new Array(windowSize).fill(1)),
-  output: createExpectedOutput(windowSize, [
+  wave: Float32Array.from(new Array(windowSize).fill(1)),
+  spectrum: createExpectedOutput(windowSize, [
     {
       index: 0,
       real: windowSize,
@@ -90,12 +90,12 @@ const createConstantFixture = (windowSize: number): FourierFixture => ({
 });
 
 const createNyquistCosineFixture = (windowSize: number): FourierFixture => ({
-  name: `FFT ${windowSize}-point: nyquist cosine goes only to N/2`,
+  caseName: 'nyquist cosine goes only to N/2',
   windowSize,
-  input: createSignal(windowSize, (sampleIndex) =>
+  wave: createSignal(windowSize, (sampleIndex) =>
     sampleIndex % 2 === 0 ? 1 : -1,
   ),
-  output: createExpectedOutput(windowSize, [
+  spectrum: createExpectedOutput(windowSize, [
     {
       index: windowSize / 2,
       real: windowSize,
@@ -111,12 +111,12 @@ const createSineBinFixture = (
   const mirrorIndex = windowSize - binIndex;
 
   return {
-    name: `FFT ${windowSize}-point: ${label} sine mirrors imag sign correctly`,
+    caseName: `${label} sine mirrors imag sign correctly`,
     windowSize,
-    input: createSignal(windowSize, (sampleIndex) =>
+    wave: createSignal(windowSize, (sampleIndex) =>
       Math.sin((2 * Math.PI * binIndex * sampleIndex) / windowSize),
     ),
-    output: createExpectedOutput(windowSize, [
+    spectrum: createExpectedOutput(windowSize, [
       {
         index: binIndex,
         imag: -windowSize / 2,
@@ -137,12 +137,12 @@ const createCosineBinFixture = (
   const mirrorIndex = windowSize - binIndex;
 
   return {
-    name: `FFT ${windowSize}-point: ${label} cosine mirrors real amplitude correctly`,
+    caseName: `${label} cosine mirrors real amplitude correctly`,
     windowSize,
-    input: createSignal(windowSize, (sampleIndex) =>
+    wave: createSignal(windowSize, (sampleIndex) =>
       Math.cos((2 * Math.PI * binIndex * sampleIndex) / windowSize),
     ),
-    output: createExpectedOutput(windowSize, [
+    spectrum: createExpectedOutput(windowSize, [
       {
         index: binIndex,
         real: windowSize / 2,
@@ -165,16 +165,16 @@ const createPhasedBinFixture = (
   const mirrorIndex = windowSize - binIndex;
 
   return {
-    name: `FFT ${windowSize}-point: ${label} phased bin keeps real/imag and mirror signs`,
+    caseName: `${label} phased bin keeps real/imag and mirror signs`,
     windowSize,
-    input: createSignal(windowSize, (sampleIndex) => {
+    wave: createSignal(windowSize, (sampleIndex) => {
       const angle = (2 * Math.PI * binIndex * sampleIndex) / windowSize;
 
       return (
         cosineAmplitude * Math.cos(angle) + sineAmplitude * Math.sin(angle)
       );
     }),
-    output: createExpectedOutput(windowSize, [
+    spectrum: createExpectedOutput(windowSize, [
       {
         index: binIndex,
         real: (cosineAmplitude * windowSize) / 2,
