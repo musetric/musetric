@@ -21,7 +21,7 @@ export const createFftPackedTiledR2c: CreateFourier = (device, markers) => {
       };
 
       const ref: Fourier = {
-        forward: (encoder) => {
+        run: (encoder) => {
           const firstPass = encoder.beginComputePass({
             label: 'packed-tiled-r2c-first-pass',
             timestampWrites: markers?.reverse,
@@ -36,7 +36,7 @@ export const createFftPackedTiledR2c: CreateFourier = (device, markers) => {
           dispatchSecondPass(secondPass);
           secondPass.end();
         },
-        forwardDispatch: (pass) => {
+        dispatch: (pass) => {
           dispatchFirstPass(pass);
           dispatchSecondPass(pass);
         },

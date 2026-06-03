@@ -98,7 +98,7 @@ export const createSpectrogramLaneCell = (
         sliceSamples.run(encoder);
         encoder.clearBuffer(signal.imag);
         windowing.run(encoder);
-        fourier.forward(encoder);
+        fourier.run(encoder);
         magnitudify.run(encoder);
         decibelify.run(encoder);
         fundamentalFrequency.run(encoder);

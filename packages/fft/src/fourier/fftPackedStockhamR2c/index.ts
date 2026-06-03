@@ -15,7 +15,7 @@ export const createFftPackedStockhamR2c: CreateFourier = (device, markers) => {
       };
 
       const ref: Fourier = {
-        forward: (encoder) => {
+        run: (encoder) => {
           const pass = encoder.beginComputePass({
             label: 'packed-stockham-r2c-transform',
             timestampWrites: markers?.transform,
@@ -23,7 +23,7 @@ export const createFftPackedStockhamR2c: CreateFourier = (device, markers) => {
           dispatch(pass);
           pass.end();
         },
-        forwardDispatch: dispatch,
+        dispatch,
       };
       return ref;
     },

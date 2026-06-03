@@ -21,7 +21,7 @@ export const createFftPrunedFourStepR2c: CreateFourier = (device, markers) => {
       };
 
       const ref: Fourier = {
-        forward: (encoder) => {
+        run: (encoder) => {
           const firstPass = encoder.beginComputePass({
             label: 'pruned-four-step-r2c-first-pass',
             timestampWrites: markers?.reverse,
@@ -36,7 +36,7 @@ export const createFftPrunedFourStepR2c: CreateFourier = (device, markers) => {
           dispatchSecondPass(secondPass);
           secondPass.end();
         },
-        forwardDispatch: (pass) => {
+        dispatch: (pass) => {
           dispatchFirstPass(pass);
           dispatchSecondPass(pass);
         },

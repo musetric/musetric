@@ -2,19 +2,20 @@ import { type ResourceCell } from '@musetric/resource-utils';
 import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type FourierConfig } from './config.es.js';
 
+export type FourierTimestampWrites = {
+  reverse?: GPUComputePassTimestampWrites;
+  transform?: GPUComputePassTimestampWrites;
+};
+
 export type FourierArg = {
-  signal: ComplexGpuBuffer;
+  wave: GPUBuffer;
+  spectrum: ComplexGpuBuffer;
   config: FourierConfig;
 };
 
 export type Fourier = {
-  forward: (encoder: GPUCommandEncoder) => void;
-  forwardDispatch: (pass: GPUComputePassEncoder) => void;
-};
-
-export type FourierTimestampWrites = {
-  reverse?: GPUComputePassTimestampWrites;
-  transform?: GPUComputePassTimestampWrites;
+  run: (encoder: GPUCommandEncoder) => void;
+  dispatch: (pass: GPUComputePassEncoder) => void;
 };
 
 export type CreateFourier = (

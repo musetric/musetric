@@ -1,4 +1,4 @@
-import { type FourierMode, type SpectrogramWindowName } from '@musetric/fft';
+import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import { createObjectKeys, type ViewSize } from '@musetric/resource-utils';
 import { type SpectrogramColors } from './common/colors.es.js';
 import { extractConfig } from './common/config.es.js';
@@ -30,7 +30,7 @@ export type SpectrogramConfig = {
   visibleTime: number;
   playheadRatio: number;
   zeroPaddingFactor: SpectrogramZeroPaddingFactor;
-  windowName: SpectrogramWindowName;
+  windowName: WindowFunctionName;
   minDecibel: number;
   minFrequency: number;
   maxFrequency: number;

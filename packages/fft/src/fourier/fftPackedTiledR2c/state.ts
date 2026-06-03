@@ -2,8 +2,7 @@ import {
   createResourceCell,
   type ResourceCell,
 } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
-import { type FourierConfig } from '../config.es.js';
+import { type FourierArg } from '../types.js';
 import { createParams, type Params } from './params.js';
 import { createPipelines, type Pipelines } from './pipeline.js';
 import {
@@ -19,11 +18,6 @@ import {
 type BindGroups = {
   firstPass: GPUBindGroup;
   secondPass: GPUBindGroup;
-};
-
-export type StateArg = {
-  signal: ComplexGpuBuffer;
-  config: FourierConfig;
 };
 
 type Resources = {
@@ -67,11 +61,20 @@ const createResources = (
   tables: createTrigTables(device, variant),
 });
 
+const assertInPlaceTransform = (arg: FourierArg): void => {
+  if (arg.wave !== arg.spectrum.real) {
+    throw new Error(
+      'fftPackedTiledR2c currently requires wave and spectrum.real to use the same buffer',
+    );
+  }
+};
+
 export const createStateCell = (
   device: GPUDevice,
-): ResourceCell<StateArg, State> =>
+): ResourceCell<FourierArg, State> =>
   createResourceCell({
     create: (arg): State => {
+      assertInPlaceTransform(arg);
       const variant = getPackedTiledR2cVariant(device, arg.config);
       if (variant === undefined) {
         throw new Error(
@@ -91,7 +94,7 @@ export const createStateCell = (
           label: 'packed-tiled-r2c-first-pass-bind-group',
           layout: pipelines.firstPass.getBindGroupLayout(0),
           entries: [
-            { binding: 0, resource: { buffer: arg.signal.real } },
+            { binding: 0, resource: { buffer: arg.wave } },
             { binding: 1, resource: { buffer: scratch } },
             { binding: 2, resource: { buffer: tables.rowFft } },
             { binding: 3, resource: { buffer: tables.fourStep } },
@@ -103,8 +106,8 @@ export const createStateCell = (
           layout: pipelines.secondPass.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer: scratch } },
-            { binding: 1, resource: { buffer: arg.signal.real } },
-            { binding: 2, resource: { buffer: arg.signal.imag } },
+            { binding: 1, resource: { buffer: arg.spectrum.real } },
+            { binding: 2, resource: { buffer: arg.spectrum.imag } },
             { binding: 3, resource: { buffer: tables.columnFft } },
             { binding: 4, resource: { buffer: tables.r2c } },
             { binding: 5, resource: { buffer: params.buffer } },
@@ -129,8 +132,9 @@ export const createStateCell = (
       disposeTrigTables(state.tables);
     },
     equals: (current, next) =>
-      current.signal.real === next.signal.real &&
-      current.signal.imag === next.signal.imag &&
+      current.wave === next.wave &&
+      current.spectrum.real === next.spectrum.real &&
+      current.spectrum.imag === next.spectrum.imag &&
       current.config.windowSize === next.config.windowSize &&
       current.config.windowCount === next.config.windowCount,
   });

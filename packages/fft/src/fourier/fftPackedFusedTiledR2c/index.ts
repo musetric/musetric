@@ -18,7 +18,7 @@ export const createFftPackedFusedTiledR2c: CreateFourier = (
       };
 
       const ref: Fourier = {
-        forward: (encoder) => {
+        run: (encoder) => {
           const pass = encoder.beginComputePass({
             label:
               state.pipelines.kind === 'fused'
@@ -29,7 +29,7 @@ export const createFftPackedFusedTiledR2c: CreateFourier = (
           dispatchTransform(pass);
           pass.end();
         },
-        forwardDispatch: dispatchTransform,
+        dispatch: dispatchTransform,
       };
       return ref;
     },

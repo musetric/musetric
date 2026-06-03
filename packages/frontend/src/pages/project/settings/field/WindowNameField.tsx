@@ -1,5 +1,5 @@
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material';
-import { allSpectrogramWindowNames } from '@musetric/fft';
+import { allWindowFunctionNames } from '@musetric/fft';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';
@@ -18,7 +18,7 @@ export const WindowNameField: FC = () => {
         value={currentFilter}
         label={t('pages.project.settings.fields.windowName.label')}
       >
-        {allSpectrogramWindowNames.map((name) => (
+        {allWindowFunctionNames.map((name) => (
           <MenuItem key={name} value={name} onClick={() => setFilter(name)}>
             {name}
           </MenuItem>

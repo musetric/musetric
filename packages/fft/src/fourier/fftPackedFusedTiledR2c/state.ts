@@ -3,7 +3,7 @@ import {
   type ResourceCell,
 } from '@musetric/resource-utils';
 import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
-import { type FourierConfig } from '../config.es.js';
+import { type FourierArg } from '../types.js';
 import { createParams, type Params } from './params.js';
 import { createPipelines, type Pipelines } from './pipeline.js';
 import {
@@ -27,11 +27,6 @@ type FusedInPlaceBindGroups = {
 };
 
 type BindGroups = FusedBindGroups | FusedInPlaceBindGroups;
-
-export type StateArg = {
-  signal: ComplexGpuBuffer;
-  config: FourierConfig;
-};
 
 type Resources = {
   pipelines: Pipelines;
@@ -119,11 +114,20 @@ const createBindGroups = (
   );
 };
 
+const assertInPlaceTransform = (arg: FourierArg): void => {
+  if (arg.wave !== arg.spectrum.real) {
+    throw new Error(
+      'fftPackedFusedTiledR2c currently requires wave and spectrum.real to use the same buffer',
+    );
+  }
+};
+
 export const createStateCell = (
   device: GPUDevice,
-): ResourceCell<StateArg, State> =>
+): ResourceCell<FourierArg, State> =>
   createResourceCell({
     create: (arg): State => {
+      assertInPlaceTransform(arg);
       const variant = getPackedFusedTiledR2cVariant(device, arg.config);
       if (variant === undefined) {
         throw new Error(
@@ -137,7 +141,7 @@ export const createStateCell = (
         device,
         pipelines,
         tables,
-        arg.signal,
+        arg.spectrum,
         params,
       );
 
@@ -154,8 +158,9 @@ export const createStateCell = (
       disposeTrigTables(state.tables);
     },
     equals: (current, next) =>
-      current.signal.real === next.signal.real &&
-      current.signal.imag === next.signal.imag &&
+      current.wave === next.wave &&
+      current.spectrum.real === next.spectrum.real &&
+      current.spectrum.imag === next.spectrum.imag &&
       current.config.windowSize === next.config.windowSize &&
       current.config.windowCount === next.config.windowCount,
   });
