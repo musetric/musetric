@@ -1,11 +1,8 @@
 {
-  "extends": "../../tsconfigs/tsconfig.cross.json",
+  "extends": "../../tsconfigs/tsconfig.base.json",
   "references": [{ "path": "./tsconfig.es.json" }],
   "compilerOptions": {
+    "lib": ["ES2024", "WebWorker"],
     "types": ["@webgpu/types"]
-  },
-  "exclude": [
-    "${configDir}/src/**/*.es.ts",
-    "${configDir}/src/**/__tests__/**/*"
-  ]
+  }
 }

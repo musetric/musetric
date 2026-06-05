@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2024", "DOM"],
+    "lib": ["ES2024", "WebWorker"],
     "noEmit": true,
     "tsBuildInfoFile": "${configDir}/.tsbuildinfo/test.tsbuildinfo"
   },
