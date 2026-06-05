@@ -1,6 +1,7 @@
 export const transformInPlaceRadix4Shader = `
 override packedWindowSize: u32 = 4096u;
 override log2PackedWindowSize: u32 = 12u;
+override threadCount: u32 = 64u;
 
 struct Params {
   windowSize: u32,
@@ -62,7 +63,7 @@ fn writeBin(windowOffset: u32, k: u32, value: vec2<f32>) {
   signalImag[windowOffset + k] = value.y;
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(threadCount)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
@@ -75,7 +76,7 @@ fn main(
   let t = localId.x;
   let windowOffset = params.windowSize * windowIndex;
 
-  for (var i = t; i < packedWindowSize; i += 64u) {
+  for (var i = t; i < packedWindowSize; i += threadCount) {
     let reversedIndex = reverseRadix4(i);
     let sampleIndex = i * 2u;
     smReal[reversedIndex] = signalReal[windowOffset + sampleIndex];
@@ -88,7 +89,7 @@ fn main(
     let twiddleStep = packedWindowSize / len;
     let butterflyCount = packedWindowSize / 4u;
 
-    for (var j = t; j < butterflyCount; j += 64u) {
+    for (var j = t; j < butterflyCount; j += threadCount) {
       let k = j % quarter;
       let block = j / quarter;
       let i0 = block * len + k;
@@ -125,7 +126,7 @@ fn main(
     workgroupBarrier();
   }
 
-  for (var k = t; k <= packedWindowSize; k += 64u) {
+  for (var k = t; k <= packedWindowSize; k += threadCount) {
     if (k == 0u) {
       let z0 = getResult(0u);
       writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));

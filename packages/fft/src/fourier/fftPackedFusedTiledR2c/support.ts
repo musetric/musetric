@@ -22,12 +22,33 @@ const maxWindowSize = 65536;
 const minPackedWindowSize = 4;
 const maxPackedWindowSize = maxWindowSize / 2;
 
-const getFusedWorkgroupStorageSize = (packedWindowSize: number): number =>
-  4 * packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
+const createVariant = (
+  windowSize: number,
+  shape: TileShape,
+  rowStageCounts: RadixStageCounts,
+  columnStageCounts: RadixStageCounts,
+  kind: PackedFusedTiledR2cKind,
+): PackedFusedTiledR2cVariant => {
+  const { rowSize, columnSize } = shape;
+
+  return {
+    kind,
+    windowSize,
+    packedWindowSize: windowSize / 2,
+    rowSize,
+    columnSize,
+    rowStageCounts,
+    columnStageCounts,
+  };
+};
+
+const getFusedWorkgroupStorageSize = (
+  variant: PackedFusedTiledR2cVariant,
+): number => 4 * variant.packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
 
 const getFusedInPlaceWorkgroupStorageSize = (
-  packedWindowSize: number,
-): number => 2 * packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
+  variant: PackedFusedTiledR2cVariant,
+): number => 2 * variant.packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
 
 type VariantSkeleton = TileShape & {
   rowStageCounts: RadixStageCounts;
@@ -70,23 +91,32 @@ export const getPackedFusedTiledR2cVariant = (
     return undefined;
   }
 
-  const packedWindowSize = config.windowSize / 2;
-  const base = {
-    windowSize: config.windowSize,
-    packedWindowSize,
-    rowSize: skeleton.rowSize,
-    columnSize: skeleton.columnSize,
-    rowStageCounts: skeleton.rowStageCounts,
-    columnStageCounts: skeleton.columnStageCounts,
-  };
-  const maxStorage = device.limits.maxComputeWorkgroupStorageSize;
-
-  if (getFusedWorkgroupStorageSize(packedWindowSize) <= maxStorage) {
-    return { kind: 'fused', ...base };
+  const fused = createVariant(
+    config.windowSize,
+    skeleton,
+    skeleton.rowStageCounts,
+    skeleton.columnStageCounts,
+    'fused',
+  );
+  if (
+    getFusedWorkgroupStorageSize(fused) <=
+    device.limits.maxComputeWorkgroupStorageSize
+  ) {
+    return fused;
   }
 
-  if (getFusedInPlaceWorkgroupStorageSize(packedWindowSize) <= maxStorage) {
-    return { kind: 'fusedInPlace', ...base };
+  const fusedInPlace = createVariant(
+    config.windowSize,
+    skeleton,
+    skeleton.rowStageCounts,
+    skeleton.columnStageCounts,
+    'fusedInPlace',
+  );
+  if (
+    getFusedInPlaceWorkgroupStorageSize(fusedInPlace) <=
+    device.limits.maxComputeWorkgroupStorageSize
+  ) {
+    return fusedInPlace;
   }
 
   return undefined;
