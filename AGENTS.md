@@ -63,7 +63,7 @@
 ## Runtime Boundaries
 
 - Runtime boundaries are defined by `tsconfigs/` and each package `tsconfig.*.json`.
-- `tsconfig.src.json`: regular package source code in that package's default runtime context.
+- `tsconfig.src.json`: regular package source code in that package's default runtime context; must extend `tsconfigs/base.json`.
 - `tsconfig.script.json`: package-local tooling and Node.js script files that are not package runtime source code.
 - Use a more specific boundary only when the code belongs to a narrower runtime than `tsconfig.src.json`.
 - `*.es.ts`: portable ES code safe for any runtime boundary in the repository.
@@ -73,7 +73,7 @@
 - `*.worker.ts`: Web Worker code.
 - `*.worklet.ts`: AudioWorklet code.
 - `*.node.ts`: Node.js code.
-- `__tests__`: test-only folder.
+- `__test__`: test-only folder.
 
 ## Before Finishing
 
