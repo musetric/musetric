@@ -46,6 +46,6 @@
     "${configDir}/src/**/*.node.ts",
     "${configDir}/src/**/*.worker.ts",
     "${configDir}/src/**/*.worklet.ts",
-    "${configDir}/src/**/__tests__/**/*"
+    "${configDir}/src/**/__test__/**/*"
   ]
 }

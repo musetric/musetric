@@ -5,7 +5,7 @@
     "noEmit": true,
     "tsBuildInfoFile": "${configDir}/.tsbuildinfo/test.tsbuildinfo"
   },
-  "include": ["${configDir}/src/**/__tests__/**/*.ts"],
+  "include": ["${configDir}/src/**/__test__/**/*.ts"],
   "exclude": [
     "${configDir}/src/**/*.es.ts",
     "${configDir}/src/**/*.cross.ts",
