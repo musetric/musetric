@@ -33,6 +33,41 @@ export const createBuffers = (device: GPUDevice, windowSize: number) => {
   return buffers;
 };
 
+export const createIFourierBuffers = (
+  device: GPUDevice,
+  config: {
+    spectrumSize: number;
+    waveSize: number;
+  },
+) => {
+  const buffers = {
+    spectrum: {
+      real: device.createBuffer({
+        label: 'test-c2r-spectrum-real',
+        size: config.spectrumSize,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }),
+      imag: device.createBuffer({
+        label: 'test-c2r-spectrum-imag',
+        size: config.spectrumSize,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }),
+    },
+    wave: device.createBuffer({
+      label: 'test-c2r-wave',
+      size: config.waveSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    }),
+    destroy: () => {
+      buffers.spectrum.real.destroy();
+      buffers.spectrum.imag.destroy();
+      buffers.wave.destroy();
+    },
+  };
+
+  return buffers;
+};
+
 export const assertArrayClose = (
   name: string,
   received: Float32Array<ArrayBuffer>,
