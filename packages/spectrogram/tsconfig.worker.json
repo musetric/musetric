@@ -7,6 +7,5 @@
   ],
   "compilerOptions": {
     "types": ["@webgpu/types"]
-  },
-  "include": ["${configDir}/src/**/*.ts"]
+  }
 }
