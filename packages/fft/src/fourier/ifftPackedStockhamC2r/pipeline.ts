@@ -1,5 +1,5 @@
 import { type PackedStockhamC2rVariant } from './support.js';
-import { transformShader } from './transform.js';
+import { transformShader } from './transformShader.js';
 
 const createConstants = (variant: PackedStockhamC2rVariant) => ({
   packedWindowSize: variant.packedWindowSize,

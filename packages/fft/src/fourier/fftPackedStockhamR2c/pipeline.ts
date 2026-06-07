@@ -1,6 +1,6 @@
 import { type PackedStockhamR2cVariant } from './support.js';
-import { transformShader } from './transform.js';
-import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4.js';
+import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4Shader.js';
+import { transformShader } from './transformShader.js';
 
 const createConstants = (variant: PackedStockhamR2cVariant) => ({
   packedWindowSize: variant.packedWindowSize,

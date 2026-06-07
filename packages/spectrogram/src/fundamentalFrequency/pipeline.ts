@@ -1,4 +1,4 @@
-import { filterShader } from './filter.js';
+import { filterShader } from './filterShader.js';
 import { shader } from './shader.js';
 
 export type FundamentalFrequencyPipelines = {

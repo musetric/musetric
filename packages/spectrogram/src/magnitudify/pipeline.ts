@@ -1,5 +1,5 @@
-import { moveShader } from './move.js';
-import { runShader } from './run.js';
+import { moveShader } from './moveShader.js';
+import { runShader } from './runShader.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;

@@ -1,4 +1,4 @@
-export const shaderCode = `
+export const shader = `
 struct WindowingParams {
   windowSize: u32,
   paddedWindowSize: u32,

@@ -1,5 +1,5 @@
-import { fragmentShader } from './fragment.js';
-import { vertexShader } from './vertex.js';
+import { fragmentShader } from './fragmentShader.js';
+import { vertexShader } from './vertexShader.js';
 
 export const createPipeline = (
   device: GPUDevice,
