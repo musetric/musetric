@@ -1,5 +1,5 @@
-import { firstPassShader } from './firstPass.js';
-import { secondPassShader } from './secondPass.js';
+import { firstPassShader } from './firstPassShader.js';
+import { secondPassShader } from './secondPassShader.js';
 import { type PackedTiledR2cVariant } from './support.js';
 
 export type Pipelines = {

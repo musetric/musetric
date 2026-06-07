@@ -1,5 +1,5 @@
-import { findMaxShader } from './findMax.js';
-import { runShader } from './run.js';
+import { findMaxShader } from './findMaxShader.js';
+import { runShader } from './runShader.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;

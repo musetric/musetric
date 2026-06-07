@@ -1,5 +1,5 @@
-import { fusedTransformShader } from './fusedTransform.js';
-import { fusedTransformInPlaceShader } from './fusedTransformInPlace.js';
+import { fusedTransformInPlaceShader } from './fusedTransformInPlaceShader.js';
+import { fusedTransformShader } from './fusedTransformShader.js';
 import { type PackedFusedTiledR2cVariant } from './support.js';
 
 export type FusedPipeline = {
