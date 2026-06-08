@@ -1,4 +1,5 @@
 import { type ComplexArray } from '@musetric/resource-utils/gpu';
+import { createWindowSizes } from './windowSizes.es.js';
 
 export type FourierFixture = {
   caseName: string;
@@ -211,19 +212,8 @@ const createDiagnosticFourierFixtures = (
   ];
 };
 
-const createDiagnosticWindowSizes = (from: number, to: number): number[] => {
-  const windowSizes: number[] = [];
-  for (let windowSize = from; windowSize <= to; windowSize *= 2) {
-    windowSizes.push(windowSize);
-  }
+const windowSizes = createWindowSizes(32, 1024 * 64);
 
-  return windowSizes;
-};
-
-const diagnosticWindowSizes = createDiagnosticWindowSizes(32, 1024 * 64);
-
-export const fourierFixtures: FourierFixture[] = [
-  ...diagnosticWindowSizes.flatMap((windowSize) =>
-    createDiagnosticFourierFixtures(windowSize),
-  ),
-];
+export const fourierFixtures: FourierFixture[] = windowSizes.flatMap(
+  (windowSize) => createDiagnosticFourierFixtures(windowSize),
+);

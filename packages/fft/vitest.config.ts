@@ -10,14 +10,18 @@ export default defineConfig({
     passWithNoTests: isSkip,
     browser: {
       enabled: true,
+      headless: true,
       provider: playwright({
         launchOptions: {
+          channel: 'chromium',
           args: [
             '--enable-unsafe-webgpu',
             '--disable-webgpu-blocklist',
-            '--enable-features=WebGpu',
-            '--enable-vulkan',
+            '--ignore-gpu-blocklist',
           ],
+        },
+        contextOptions: {
+          colorScheme: 'dark',
         },
       }),
       instances: [{ browser: 'chromium' }],

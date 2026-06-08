@@ -11,10 +11,6 @@ import {
   type FourierMode,
   type IFourierMode,
 } from '../config.es.js';
-import { getPackedFusedTiledR2cVariant } from '../fftPackedFusedTiledR2c/support.js';
-import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js';
-import { getPackedTiledR2cVariant } from '../fftPackedTiledR2c/support.js';
-import { getPrunedFourStepR2cVariant } from '../fftPrunedFourStepR2c/support.js';
 import { fouriers } from '../fouriers.js';
 import { getPackedStockhamC2rVariant } from '../ifftPackedStockhamC2r/support.js';
 import { iffts } from '../iffts.js';
@@ -25,27 +21,18 @@ import {
   windowCount,
 } from './common.js';
 import { fourierFixtures } from './fixture.js';
+import { formatRadixStages } from './formatRadixStages.es.js';
+import { isFourierModeSupported } from './fourierModeSupport.js';
 
 const isFourierFixtureSupported = (
   device: GPUDevice,
   mode: FourierMode,
   windowSize: number,
 ): boolean => {
-  const config = { windowSize, windowCount };
-
-  if (mode === 'fftPackedFusedTiledR2c') {
-    return getPackedFusedTiledR2cVariant(device, config) !== undefined;
-  }
-
-  if (mode === 'fftPackedStockhamR2c') {
-    return getPackedStockhamR2cVariant(device, config) !== undefined;
-  }
-
-  if (mode === 'fftPackedTiledR2c') {
-    return getPackedTiledR2cVariant(device, config) !== undefined;
-  }
-
-  return getPrunedFourStepR2cVariant(device, config) !== undefined;
+  return isFourierModeSupported(device, mode, {
+    windowSize,
+    windowCount,
+  });
 };
 
 const ifourierFixtureSupports: Record<
@@ -77,7 +64,9 @@ Object.entries(fixtures).forEach((entry) => {
 
   if (!group) return;
 
-  describe(`Fourier ${windowSize}-point`, () => {
+  const factorization = formatRadixStages(windowSize) ?? String(windowSize);
+
+  describe(`Fourier ${factorization}-point`, () => {
     for (const fixture of group) {
       describe(fixture.caseName, () => {
         allFourierModes.forEach((mode) => {
