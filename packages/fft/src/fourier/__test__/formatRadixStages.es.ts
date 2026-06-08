@@ -2,13 +2,10 @@ import { createRadixStages } from '../factorization.es.js';
 
 const maxFormattedPowerOfTwo = 1024;
 
-export const formatRadixStages = (
-  size: number,
-  separator = 'x',
-): string | undefined => {
+export const formatRadixStages = (size: number, separator = '·'): string => {
   const stages = createRadixStages(size);
   if (stages === undefined) {
-    return undefined;
+    return String(size);
   }
 
   let powerOfTwoCount = stages.radix4StageCount * 2 + stages.radix2StageCount;

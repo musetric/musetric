@@ -19,7 +19,7 @@ export const benchBatchSize = 32;
 
 export const benchMaxTries = 10;
 
-export const benchStableCvPercent = 15;
+export const benchStableCvPercent = 5;
 
 export const benchTargetSampleMs = 1;
 
@@ -201,8 +201,7 @@ export const formatBenchMarkdown = (
   const cufftSummary = summaries.find((summary) => summary.mode === 'cufft');
 
   for (const [index, windowSize] of windowSizes.entries()) {
-    const factorization =
-      formatRadixStages(windowSize, '*') ?? String(windowSize);
+    const factorization = formatRadixStages(windowSize);
     const meanCells = [factorization];
     const cvCells = [factorization];
 
