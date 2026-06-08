@@ -20,12 +20,13 @@
     }
   },
   "scripts": {
-    "postinstall": "node ./scripts/install.ts",
+    "postinstall": "node ./scripts/setup.ts",
     "project:build": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
     "fix:lint": "eslint . --fix --cache",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "node --import tsx ./scripts/bench.ts"
   },
   "peerDependencies": {
     "@musetric/resource-utils": "workspace:*"
@@ -37,6 +38,7 @@
     "@vitest/browser-playwright": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
+    "koffi": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
