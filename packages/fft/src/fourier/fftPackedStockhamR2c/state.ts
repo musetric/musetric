@@ -7,6 +7,7 @@ import { createParams, type Params } from './params.js';
 import {
   createPipeline,
   type MultiPassPipeline,
+  type Pipeline,
   type SinglePassPipeline,
 } from './pipeline.js';
 import {
@@ -19,13 +20,18 @@ import {
   type TrigTables,
 } from './trigTables.js';
 
+type Resources = {
+  pipeline: Pipeline;
+  tables: TrigTables;
+};
+
 type ScratchBuffers = {
   buffer0: GPUBuffer;
   buffer1: GPUBuffer;
 };
 
 type SinglePassBindGroups = {
-  kind: 'stockham' | 'inPlaceRadix4';
+  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
   transform: GPUBindGroup;
 };
 
@@ -35,14 +41,21 @@ type MultiPassBindGroups = {
   pack: GPUBindGroup;
 };
 
+type BindGroups = SinglePassBindGroups | MultiPassBindGroups;
+
 type BaseState = {
+  kind: PackedStockhamR2cVariant['kind'];
+  variant: PackedStockhamR2cVariant;
+  pipeline: Pipeline;
   tables: TrigTables;
+  bindGroups: BindGroups;
   params: Params;
   windowCount: number;
 };
 
 type SinglePassState = BaseState & {
-  kind: 'stockham' | 'inPlaceRadix4';
+  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
   pipeline: SinglePassPipeline;
   bindGroups: SinglePassBindGroups;
 };
@@ -56,6 +69,37 @@ type MultiPassState = BaseState & {
 };
 
 export type State = SinglePassState | MultiPassState;
+
+function createResources(
+  device: GPUDevice,
+  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+): {
+  pipeline: SinglePassPipeline;
+  tables: TrigTables;
+};
+function createResources(
+  device: GPUDevice,
+  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+): {
+  pipeline: MultiPassPipeline;
+  tables: TrigTables;
+};
+function createResources(
+  device: GPUDevice,
+  variant: PackedStockhamR2cVariant,
+): Resources {
+  if (variant.kind === 'multiPass') {
+    return {
+      pipeline: createPipeline(device, variant),
+      tables: createTrigTables(device, variant),
+    };
+  }
+
+  return {
+    pipeline: createPipeline(device, variant),
+    tables: createTrigTables(device, variant),
+  };
+}
 
 const createScratchBuffers = (
   device: GPUDevice,
@@ -89,7 +133,10 @@ const assertInPlaceTransform = (arg: FourierArg): void => {
 
 const createSinglePassBindGroups = (
   device: GPUDevice,
-  pipeline: SinglePassPipeline,
+  pipeline: Extract<
+    Pipeline,
+    { kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed' }
+  >,
   tables: TrigTables,
   arg: FourierArg,
   params: Params,
@@ -110,7 +157,7 @@ const createSinglePassBindGroups = (
 
 const createMultiPassBindGroups = (
   device: GPUDevice,
-  pipeline: MultiPassPipeline,
+  pipeline: Extract<Pipeline, { kind: 'multiPass' }>,
   tables: TrigTables,
   scratch: ScratchBuffers,
   arg: FourierArg,
@@ -157,10 +204,9 @@ export const createStateCell = (
         );
       }
       const params = createParams(device, arg.config);
-      const tables = createTrigTables(device, variant);
 
       if (variant.kind === 'multiPass') {
-        const pipeline = createPipeline(device, variant);
+        const { pipeline, tables } = createResources(device, variant);
         const scratch = createScratchBuffers(
           device,
           variant,
@@ -168,7 +214,7 @@ export const createStateCell = (
         );
 
         return {
-          kind: 'multiPass',
+          kind: variant.kind,
           variant,
           pipeline,
           tables,
@@ -186,10 +232,11 @@ export const createStateCell = (
         };
       }
 
-      const pipeline = createPipeline(device, variant);
+      const { pipeline, tables } = createResources(device, variant);
 
       return {
         kind: variant.kind,
+        variant,
         pipeline,
         tables,
         bindGroups: createSinglePassBindGroups(

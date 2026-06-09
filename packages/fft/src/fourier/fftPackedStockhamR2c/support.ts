@@ -3,6 +3,7 @@ import {
   createRadixStages,
   expandRadixStages,
   type RadixStage,
+  type RadixStageCounts,
 } from '../factorization.es.js';
 
 export type ScratchBufferIndex = 0 | 1;
@@ -16,15 +17,30 @@ export type PackedStockhamR2cStage = {
   workgroupCount: number;
 };
 
-type BaseVariant = {
+export type InPlaceMixedStageCounts = {
+  radix8StageCount: number;
+  radix4StageCount: number;
+  radix2StageCount: number;
+  radix3StageCount: number;
+  radix5StageCount: number;
+};
+
+type PackedStockhamR2cBaseVariant = {
   windowSize: number;
   packedWindowSize: number;
   log2PackedWindowSize: number;
+  radixStageCounts: RadixStageCounts;
 };
 
 export type PackedStockhamR2cVariant =
-  | (BaseVariant & { kind: 'stockham' | 'inPlaceRadix4' })
-  | (BaseVariant & {
+  | (PackedStockhamR2cBaseVariant & {
+      kind: 'stockham' | 'inPlaceRadix4';
+    })
+  | (PackedStockhamR2cBaseVariant & {
+      kind: 'inPlaceMixed';
+      inPlaceStageCounts: InPlaceMixedStageCounts;
+    })
+  | (PackedStockhamR2cBaseVariant & {
       kind: 'multiPass';
       stages: PackedStockhamR2cStage[];
       finalReadBufferIndex: ScratchBufferIndex;
@@ -36,9 +52,35 @@ const multiPassThreadCount = 64;
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
 
-// One compute dispatch per radix stage, ping-ponging through two global scratch
-// buffers. Works for any factorization and any size, so it carries the whole
-// non-power-of-two (radix-3/5) range without a shared-memory size limit.
+// Greedy radix-8-preferring factorization (then 4, 2, 3, 5) used by the
+// in-place single-pass kernel to minimise the stage/barrier count.
+const createRadix8PreferredCounts = (
+  packedWindowSize: number,
+): InPlaceMixedStageCounts | undefined => {
+  let remaining = packedWindowSize;
+  const counts = {
+    radix8StageCount: 0,
+    radix4StageCount: 0,
+    radix2StageCount: 0,
+    radix3StageCount: 0,
+    radix5StageCount: 0,
+  };
+  const factors = [
+    [8, 'radix8StageCount'],
+    [4, 'radix4StageCount'],
+    [2, 'radix2StageCount'],
+    [3, 'radix3StageCount'],
+    [5, 'radix5StageCount'],
+  ] as const;
+  for (const [factor, key] of factors) {
+    while (remaining % factor === 0) {
+      counts[key]++;
+      remaining /= factor;
+    }
+  }
+  return remaining === 1 ? counts : undefined;
+};
+
 const createMultiPassStages = (
   packedWindowSize: number,
   radixStageList: readonly RadixStage[],
@@ -72,54 +114,64 @@ export const getPackedStockhamR2cVariant = (
   config: FourierConfig,
 ): PackedStockhamR2cVariant | undefined => {
   const packedWindowSize = config.windowSize / 2;
+  const radixStageCounts = createRadixStages(packedWindowSize);
   if (
     !Number.isInteger(packedWindowSize) ||
-    packedWindowSize < minPackedWindowSize ||
-    createRadixStages(packedWindowSize) === undefined
+    radixStageCounts === undefined ||
+    packedWindowSize < minPackedWindowSize
   ) {
     return undefined;
   }
 
+  const maxStockhamPackedWindowSize = Math.floor(
+    device.limits.maxComputeWorkgroupStorageSize / 16,
+  );
+  if (packedWindowSize <= maxStockhamPackedWindowSize) {
+    return {
+      kind: 'stockham',
+      windowSize: config.windowSize,
+      packedWindowSize,
+      log2PackedWindowSize: Math.log2(packedWindowSize),
+      radixStageCounts,
+    };
+  }
+
   const log2PackedWindowSize = Math.log2(packedWindowSize);
-
-  // Power-of-two sizes keep the original radix-2 single-pass / radix-4 in-place
-  // shaders untouched.
-  if (isPowerOfTwo(packedWindowSize)) {
-    const maxStockhamPackedWindowSize = Math.floor(
-      device.limits.maxComputeWorkgroupStorageSize / 16,
-    );
-    if (packedWindowSize <= maxStockhamPackedWindowSize) {
-      return {
-        kind: 'stockham',
-        windowSize: config.windowSize,
-        packedWindowSize,
-        log2PackedWindowSize,
-      };
-    }
-
-    const maxInPlacePackedWindowSize = Math.floor(
-      device.limits.maxComputeWorkgroupStorageSize / 8,
-    );
-    if (
-      packedWindowSize <= maxInPlacePackedWindowSize &&
-      log2PackedWindowSize % 2 === 0
-    ) {
-      return {
-        kind: 'inPlaceRadix4',
-        windowSize: config.windowSize,
-        packedWindowSize,
-        log2PackedWindowSize,
-      };
-    }
-
-    return undefined;
+  const maxInPlacePackedWindowSize = Math.floor(
+    device.limits.maxComputeWorkgroupStorageSize / 8,
+  );
+  if (
+    isPowerOfTwo(packedWindowSize) &&
+    packedWindowSize <= maxInPlacePackedWindowSize &&
+    log2PackedWindowSize % 2 === 0
+  ) {
+    return {
+      kind: 'inPlaceRadix4',
+      windowSize: config.windowSize,
+      packedWindowSize,
+      log2PackedWindowSize,
+      radixStageCounts,
+    };
   }
 
-  // Non-power-of-two (radix-3/5) sizes run through the generic multi-pass path.
-  const radixStageCounts = createRadixStages(packedWindowSize);
-  if (radixStageCounts === undefined) {
-    return undefined;
+  // Non-power-of-two sizes that still fit a single shared buffer (8 B/elem) run
+  // as an in-place mixed-radix single pass instead of the global-memory-bound
+  // multi-pass path, keeping the whole transform resident in shared memory.
+  const inPlaceStageCounts = createRadix8PreferredCounts(packedWindowSize);
+  if (
+    packedWindowSize <= maxInPlacePackedWindowSize &&
+    inPlaceStageCounts !== undefined
+  ) {
+    return {
+      kind: 'inPlaceMixed',
+      windowSize: config.windowSize,
+      packedWindowSize,
+      log2PackedWindowSize,
+      radixStageCounts,
+      inPlaceStageCounts,
+    };
   }
+
   const stages = createMultiPassStages(
     packedWindowSize,
     expandRadixStages(radixStageCounts),
@@ -134,6 +186,7 @@ export const getPackedStockhamR2cVariant = (
     windowSize: config.windowSize,
     packedWindowSize,
     log2PackedWindowSize,
+    radixStageCounts,
     stages,
     finalReadBufferIndex: stages[stages.length - 1].writeBufferIndex,
   };

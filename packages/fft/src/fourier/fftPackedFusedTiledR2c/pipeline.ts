@@ -15,9 +15,20 @@ export type FusedInPlacePipeline = {
 
 export type Pipelines = FusedPipeline | FusedInPlacePipeline;
 
-const createConstants = (variant: PackedFusedTiledR2cVariant) => ({
+const selectFusedThreadCount = (packedWindowSize: number): number => {
+  if (packedWindowSize <= 768) {
+    return 64;
+  }
+  if (packedWindowSize <= 1536) {
+    return 128;
+  }
+  return 256;
+};
+
+const createFusedConstants = (variant: PackedFusedTiledR2cVariant) => ({
   packedWindowSize: variant.packedWindowSize,
   positiveWindowSize: variant.packedWindowSize,
+  threadCount: selectFusedThreadCount(variant.packedWindowSize),
   rowSize: variant.rowSize,
   columnSize: variant.columnSize,
   ...createPrefixedRadixStageConstants(variant.rowStageCounts, 'row'),
@@ -41,11 +52,21 @@ const createFusedPipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createConstants(variant),
+        constants: createFusedConstants(variant),
       },
     }),
   };
 };
+
+const createFusedInPlaceConstants = (variant: PackedFusedTiledR2cVariant) => ({
+  packedWindowSize: variant.packedWindowSize,
+  positiveWindowSize: variant.packedWindowSize,
+  threadCount: selectFusedThreadCount(variant.packedWindowSize),
+  rowSize: variant.rowSize,
+  columnSize: variant.columnSize,
+  ...createPrefixedRadixStageConstants(variant.rowStageCounts, 'row'),
+  ...createPrefixedRadixStageConstants(variant.columnStageCounts, 'column'),
+});
 
 const createFusedInPlacePipeline = (
   device: GPUDevice,
@@ -64,7 +85,7 @@ const createFusedInPlacePipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createConstants(variant),
+        constants: createFusedInPlaceConstants(variant),
       },
     }),
   };
