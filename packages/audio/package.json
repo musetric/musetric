@@ -80,7 +80,7 @@
     }
   },
   "scripts": {
-    "project:build": "cpx \"src/**/*.wgsl\" dist --clean && tsc --build",
+    "project:build": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
     "fix:lint": "eslint . --fix --cache"
@@ -101,7 +101,6 @@
     "@types/audioworklet": "catalog:",
     "@types/node": "catalog:",
     "@webgpu/types": "catalog:",
-    "cpx2": "catalog:",
     "eslint": "catalog:",
     "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:",
