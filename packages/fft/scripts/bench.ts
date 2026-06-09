@@ -13,6 +13,8 @@ declare module '@vitest/runner' {
   }
 }
 
+const startTime = performance.now();
+
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(currentDir, '..');
 
@@ -66,3 +68,6 @@ if (cufftResults === undefined) {
 
 const webgpuResults = await runVitest();
 writeBenchReport(webgpuResults, cufftResults);
+
+const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+console.log(`Total script time: ${elapsed}s`);

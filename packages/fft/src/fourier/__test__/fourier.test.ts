@@ -64,7 +64,7 @@ Object.entries(fixtures).forEach((entry) => {
 
   if (!group) return;
 
-  const factorization = formatRadixStages(windowSize) ?? String(windowSize);
+  const factorization = formatRadixStages(windowSize);
 
   describe(`Fourier ${factorization}-point`, () => {
     for (const fixture of group) {
