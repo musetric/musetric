@@ -16,13 +16,13 @@ jobs:
       - run: npm install -g corepack@latest
       - run: corepack enable
       - run: corepack prepare yarn@4.12.0 --activate
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.yarn/berry/cache
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
       - run: yarn --immutable
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: packages/*/.eslintcache
           key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
