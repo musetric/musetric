@@ -22,14 +22,6 @@ yarn fix:format
 yarn test
 ```
 
-## Docker
-
-```bash
-yarn
-yarn docker:build:cuda # yarn docker:build:cpu
-yarn docker:start:cuda # yarn docker:start:cpu
-```
-
 ## Third-party Components
 
 ### FFT Algorithm (CPU & GPU)

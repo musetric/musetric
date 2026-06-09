@@ -8,10 +8,6 @@
     "project:build": "tsc --build",
     "project:init": "node --import tsx ./scripts/init.js",
     "project:start": "node dist/index.js",
-    "docker:build:cpu": "docker build --progress=plain -f Dockerfile.runtime --build-arg variant=cpu -t musetric-runtime-cpu ../.. && docker build --progress=plain -f Dockerfile --build-arg RUNTIME_IMAGE=musetric-runtime-cpu -t musetric-cpu ../..",
-    "docker:build:cuda": "docker build --progress=plain -f Dockerfile.runtime --build-arg variant=cuda -t musetric-runtime-cuda ../.. && docker build --progress=plain -f Dockerfile --build-arg RUNTIME_IMAGE=musetric-runtime-cuda -t musetric-cuda ../..",
-    "docker:start:cpu": "docker compose -f docker-compose.cpu.yml up -d",
-    "docker:start:cuda": "docker compose -f docker-compose.cuda.yml up -d",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache",
     "fix:lint": "eslint . --fix --cache"
