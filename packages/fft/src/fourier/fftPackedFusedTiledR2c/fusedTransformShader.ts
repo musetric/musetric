@@ -2,14 +2,17 @@ export const fusedTransformShader = `
 override packedWindowSize: u32 = 2048u;
 override positiveWindowSize: u32 = 2048u;
 override rowSize: u32 = 64u;
-override rowHalfSize: u32 = 32u;
 override columnSize: u32 = 32u;
-override columnHalfSize: u32 = 16u;
-override log2RowSize: u32 = 6u;
-override log2ColumnSize: u32 = 5u;
-override log2PackedWindowSize: u32 = 11u;
+override rowRadix4StageCount: u32 = 0u;
+override rowRadix2StageCount: u32 = 0u;
+override rowRadix3StageCount: u32 = 0u;
+override rowRadix5StageCount: u32 = 0u;
+override columnRadix4StageCount: u32 = 0u;
+override columnRadix2StageCount: u32 = 0u;
+override columnRadix3StageCount: u32 = 0u;
+override columnRadix5StageCount: u32 = 0u;
 
-const threadCount: u32 = 256u;
+override threadCount: u32 = 256u;
 
 struct Params {
   windowSize: u32,
@@ -29,11 +32,291 @@ var<workgroup> smImag1: array<f32, packedWindowSize>;
 @group(0) @binding(5) var<storage, read> r2cTrigTable: array<f32>;
 @group(0) @binding(6) var<uniform> params: Params;
 
-fn getResult(index: u32) -> vec2<f32> {
-  if ((log2PackedWindowSize & 1u) == 0u) {
+fn getRowFactorCount() -> u32 {
+  return rowRadix4StageCount +
+    rowRadix2StageCount +
+    rowRadix3StageCount +
+    rowRadix5StageCount;
+}
+
+fn getColumnFactorCount() -> u32 {
+  return columnRadix4StageCount +
+    columnRadix2StageCount +
+    columnRadix3StageCount +
+    columnRadix5StageCount;
+}
+
+fn getRowFactor(stage: u32) -> u32 {
+  if (stage < rowRadix4StageCount) {
+    return 4u;
+  }
+  if (stage < rowRadix4StageCount + rowRadix2StageCount) {
+    return 2u;
+  }
+  if (stage < rowRadix4StageCount + rowRadix2StageCount + rowRadix3StageCount) {
+    return 3u;
+  }
+  return 5u;
+}
+
+fn getColumnFactor(stage: u32) -> u32 {
+  if (stage < columnRadix4StageCount) {
+    return 4u;
+  }
+  if (stage < columnRadix4StageCount + columnRadix2StageCount) {
+    return 2u;
+  }
+  if (
+    stage <
+    columnRadix4StageCount + columnRadix2StageCount + columnRadix3StageCount
+  ) {
+    return 3u;
+  }
+  return 5u;
+}
+
+fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
+  return vec2<f32>(
+    a.x * b.x - a.y * b.y,
+    a.x * b.y + a.y * b.x,
+  );
+}
+
+fn getRowTwiddle(index: u32) -> vec2<f32> {
+  return vec2<f32>(rowTrigTable[2u * index], -rowTrigTable[2u * index + 1u]);
+}
+
+fn getColumnTwiddle(index: u32) -> vec2<f32> {
+  return vec2<f32>(
+    columnTrigTable[2u * index],
+    -columnTrigTable[2u * index + 1u],
+  );
+}
+
+fn smIndex(row: u32, column: u32) -> u32 {
+  return row * columnSize + column;
+}
+
+fn readStage(index: u32, readEven: bool) -> vec2<f32> {
+  if (readEven) {
     return vec2<f32>(smReal0[index], smImag0[index]);
   }
   return vec2<f32>(smReal1[index], smImag1[index]);
+}
+
+fn writeStage(index: u32, readEven: bool, value: vec2<f32>) {
+  if (readEven) {
+    smReal1[index] = value.x;
+    smImag1[index] = value.y;
+  } else {
+    smReal0[index] = value.x;
+    smImag0[index] = value.y;
+  }
+}
+
+fn getResult(index: u32) -> vec2<f32> {
+  let rowFactorCount = getRowFactorCount();
+  let columnFactorCount = getColumnFactorCount();
+  if (((rowFactorCount + columnFactorCount) & 1u) == 0u) {
+    return vec2<f32>(smReal0[index], smImag0[index]);
+  }
+  return vec2<f32>(smReal1[index], smImag1[index]);
+}
+
+fn runRowFft(t: u32) {
+  var stageStride = 1u;
+  for (var stage = 0u; stage < getRowFactorCount(); stage++) {
+    let factor = getRowFactor(stage);
+    let readEven = (stage & 1u) == 0u;
+    let butterflyCount = rowSize / factor;
+    let twiddleScale = rowSize / (stageStride * factor);
+
+    for (var j = t; j < butterflyCount * columnSize; j += threadCount) {
+      let n1 = j % columnSize;
+      let butterfly = j / columnSize;
+      let k = butterfly % stageStride;
+      let block = butterfly / stageStride;
+      let stageTwiddle = (k * twiddleScale) % rowSize;
+
+      if (factor == 2u) {
+        let i0 = block * stageStride + k;
+        let i1 = i0 + butterflyCount;
+        let a0 = readStage(smIndex(i0, n1), readEven);
+        let a1 = mul(
+          readStage(smIndex(i1, n1), readEven),
+          getRowTwiddle(stageTwiddle),
+        );
+        let o0 = block * (stageStride * 2u) + k;
+        writeStage(smIndex(o0, n1), readEven, a0 + a1);
+        writeStage(smIndex(o0 + stageStride, n1), readEven, a0 - a1);
+      } else if (factor == 4u) {
+        let i0 = block * stageStride + k;
+        let i1 = i0 + butterflyCount;
+        let i2 = i1 + butterflyCount;
+        let i3 = i2 + butterflyCount;
+        let a0 = readStage(smIndex(i0, n1), readEven);
+        let a1 = mul(
+          readStage(smIndex(i1, n1), readEven),
+          getRowTwiddle(stageTwiddle),
+        );
+        let a2 = mul(
+          readStage(smIndex(i2, n1), readEven),
+          getRowTwiddle((2u * stageTwiddle) % rowSize),
+        );
+        let a3 = mul(
+          readStage(smIndex(i3, n1), readEven),
+          getRowTwiddle((3u * stageTwiddle) % rowSize),
+        );
+        let sum02 = a0 + a2;
+        let diff02 = a0 - a2;
+        let sum13 = a1 + a3;
+        let diff13 = a1 - a3;
+        let o0 = block * (stageStride * 4u) + k;
+        let o1 = o0 + stageStride;
+        let o2 = o1 + stageStride;
+        let o3 = o2 + stageStride;
+        writeStage(smIndex(o0, n1), readEven, sum02 + sum13);
+        writeStage(
+          smIndex(o1, n1),
+          readEven,
+          diff02 + vec2<f32>(diff13.y, -diff13.x),
+        );
+        writeStage(smIndex(o2, n1), readEven, sum02 - sum13);
+        writeStage(
+          smIndex(o3, n1),
+          readEven,
+          diff02 + vec2<f32>(-diff13.y, diff13.x),
+        );
+      } else {
+        for (var r = 0u; r < factor; r++) {
+          var sum = vec2<f32>(0.0, 0.0);
+          for (var q = 0u; q < factor; q++) {
+            let inputRow = block * stageStride + k + q * butterflyCount;
+            let twiddleIndex =
+              (q * (k * twiddleScale + r * (rowSize / factor))) % rowSize;
+            var value = readStage(smIndex(inputRow, n1), readEven);
+            value = mul(value, getRowTwiddle(twiddleIndex));
+            sum += value;
+          }
+
+          let outputRow = block * (stageStride * factor) + r * stageStride + k;
+          writeStage(smIndex(outputRow, n1), readEven, sum);
+        }
+      }
+    }
+
+    stageStride *= factor;
+    workgroupBarrier();
+  }
+}
+
+fn applyFourStepTwiddle(t: u32) {
+  let rowFactorCount = getRowFactorCount();
+  let rowResultEven = (rowFactorCount & 1u) == 0u;
+  for (var p = t; p < packedWindowSize; p += threadCount) {
+    let twiddleReal = fourStepTrigTable[2u * p];
+    let twiddleImag = -fourStepTrigTable[2u * p + 1u];
+    let value = readStage(p, rowResultEven);
+    let product = mul(value, vec2<f32>(twiddleReal, twiddleImag));
+
+    if (rowResultEven) {
+      smReal0[p] = product.x;
+      smImag0[p] = product.y;
+    } else {
+      smReal1[p] = product.x;
+      smImag1[p] = product.y;
+    }
+  }
+  workgroupBarrier();
+}
+
+fn runColumnFft(t: u32) {
+  var stageStride = 1u;
+  let rowFactorCount = getRowFactorCount();
+  for (var stage = 0u; stage < getColumnFactorCount(); stage++) {
+    let factor = getColumnFactor(stage);
+    let readEven = ((rowFactorCount + stage) & 1u) == 0u;
+    let butterflyCount = columnSize / factor;
+    let twiddleScale = columnSize / (stageStride * factor);
+
+    for (var j = t; j < rowSize * butterflyCount; j += threadCount) {
+      let row = j / butterflyCount;
+      let butterfly = j % butterflyCount;
+      let k = butterfly % stageStride;
+      let block = butterfly / stageStride;
+      let stageTwiddle = (k * twiddleScale) % columnSize;
+
+      if (factor == 2u) {
+        let i0 = block * stageStride + k;
+        let i1 = i0 + butterflyCount;
+        let a0 = readStage(smIndex(row, i0), readEven);
+        let a1 = mul(
+          readStage(smIndex(row, i1), readEven),
+          getColumnTwiddle(stageTwiddle),
+        );
+        let o0 = block * (stageStride * 2u) + k;
+        writeStage(smIndex(row, o0), readEven, a0 + a1);
+        writeStage(smIndex(row, o0 + stageStride), readEven, a0 - a1);
+      } else if (factor == 4u) {
+        let i0 = block * stageStride + k;
+        let i1 = i0 + butterflyCount;
+        let i2 = i1 + butterflyCount;
+        let i3 = i2 + butterflyCount;
+        let a0 = readStage(smIndex(row, i0), readEven);
+        let a1 = mul(
+          readStage(smIndex(row, i1), readEven),
+          getColumnTwiddle(stageTwiddle),
+        );
+        let a2 = mul(
+          readStage(smIndex(row, i2), readEven),
+          getColumnTwiddle((2u * stageTwiddle) % columnSize),
+        );
+        let a3 = mul(
+          readStage(smIndex(row, i3), readEven),
+          getColumnTwiddle((3u * stageTwiddle) % columnSize),
+        );
+        let sum02 = a0 + a2;
+        let diff02 = a0 - a2;
+        let sum13 = a1 + a3;
+        let diff13 = a1 - a3;
+        let o0 = block * (stageStride * 4u) + k;
+        let o1 = o0 + stageStride;
+        let o2 = o1 + stageStride;
+        let o3 = o2 + stageStride;
+        writeStage(smIndex(row, o0), readEven, sum02 + sum13);
+        writeStage(
+          smIndex(row, o1),
+          readEven,
+          diff02 + vec2<f32>(diff13.y, -diff13.x),
+        );
+        writeStage(smIndex(row, o2), readEven, sum02 - sum13);
+        writeStage(
+          smIndex(row, o3),
+          readEven,
+          diff02 + vec2<f32>(-diff13.y, diff13.x),
+        );
+      } else {
+        for (var r = 0u; r < factor; r++) {
+          var sum = vec2<f32>(0.0, 0.0);
+          for (var q = 0u; q < factor; q++) {
+            let inputColumn = block * stageStride + k + q * butterflyCount;
+            let twiddleIndex =
+              (q * (k * twiddleScale + r * (columnSize / factor))) % columnSize;
+            var value = readStage(smIndex(row, inputColumn), readEven);
+            value = mul(value, getColumnTwiddle(twiddleIndex));
+            sum += value;
+          }
+
+          let outputColumn =
+            block * (stageStride * factor) + r * stageStride + k;
+          writeStage(smIndex(row, outputColumn), readEven, sum);
+        }
+      }
+    }
+
+    stageStride *= factor;
+    workgroupBarrier();
+  }
 }
 
 fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
@@ -85,148 +368,9 @@ fn main(
   }
   workgroupBarrier();
 
-  let butterfliesPerRowStage = rowHalfSize * columnSize;
-  for (var stage: u32 = 0u; stage < log2RowSize; stage++) {
-    let stride = 1u << stage;
-    let evenStage = (stage & 1u) == 0u;
-
-    for (var j = t; j < butterfliesPerRowStage; j += threadCount) {
-      let n1 = j % columnSize;
-      let bIdx = j / columnSize;
-      let k = bIdx % stride;
-      let block = bIdx / stride;
-      let aRowIdx = block * stride + k;
-      let bRowIdx = aRowIdx + rowHalfSize;
-      let outEvenRowIdx = block * (stride << 1u) + k;
-      let outOddRowIdx = outEvenRowIdx + stride;
-      let trigIndex = k * (rowHalfSize / stride);
-      let twiddleReal = rowTrigTable[2u * trigIndex];
-      let twiddleImag = -rowTrigTable[2u * trigIndex + 1u];
-
-      let aSmIdx = aRowIdx * columnSize + n1;
-      let bSmIdx = bRowIdx * columnSize + n1;
-      let outEvenSmIdx = outEvenRowIdx * columnSize + n1;
-      let outOddSmIdx = outOddRowIdx * columnSize + n1;
-
-      var aReal: f32;
-      var aImag: f32;
-      var bReal: f32;
-      var bImag: f32;
-      if (evenStage) {
-        aReal = smReal0[aSmIdx];
-        aImag = smImag0[aSmIdx];
-        bReal = smReal0[bSmIdx];
-        bImag = smImag0[bSmIdx];
-      } else {
-        aReal = smReal1[aSmIdx];
-        aImag = smImag1[aSmIdx];
-        bReal = smReal1[bSmIdx];
-        bImag = smImag1[bSmIdx];
-      }
-
-      let productReal = bReal * twiddleReal - bImag * twiddleImag;
-      let productImag = bReal * twiddleImag + bImag * twiddleReal;
-
-      if (evenStage) {
-        smReal1[outEvenSmIdx] = aReal + productReal;
-        smImag1[outEvenSmIdx] = aImag + productImag;
-        smReal1[outOddSmIdx] = aReal - productReal;
-        smImag1[outOddSmIdx] = aImag - productImag;
-      } else {
-        smReal0[outEvenSmIdx] = aReal + productReal;
-        smImag0[outEvenSmIdx] = aImag + productImag;
-        smReal0[outOddSmIdx] = aReal - productReal;
-        smImag0[outOddSmIdx] = aImag - productImag;
-      }
-    }
-    workgroupBarrier();
-  }
-
-  let rowResultEven = (log2RowSize & 1u) == 0u;
-  for (var p = t; p < packedWindowSize; p += threadCount) {
-    let twiddleReal = fourStepTrigTable[2u * p];
-    let twiddleImag = -fourStepTrigTable[2u * p + 1u];
-
-    var real: f32;
-    var imag: f32;
-    if (rowResultEven) {
-      real = smReal0[p];
-      imag = smImag0[p];
-    } else {
-      real = smReal1[p];
-      imag = smImag1[p];
-    }
-
-    let prodReal = real * twiddleReal - imag * twiddleImag;
-    let prodImag = real * twiddleImag + imag * twiddleReal;
-
-    if (rowResultEven) {
-      smReal0[p] = prodReal;
-      smImag0[p] = prodImag;
-    } else {
-      smReal1[p] = prodReal;
-      smImag1[p] = prodImag;
-    }
-  }
-  workgroupBarrier();
-
-  let butterfliesPerColumnStage = rowSize * columnHalfSize;
-  for (var stage: u32 = 0u; stage < log2ColumnSize; stage++) {
-    let stride = 1u << stage;
-    let totalStage = log2RowSize + stage;
-    let readEven = (totalStage & 1u) == 0u;
-
-    for (var j = t; j < butterfliesPerColumnStage; j += threadCount) {
-      let row = j / columnHalfSize;
-      let bIdx = j % columnHalfSize;
-      let k = bIdx % stride;
-      let block = bIdx / stride;
-      let aColIdx = block * stride + k;
-      let bColIdx = aColIdx + columnHalfSize;
-      let outEvenColIdx = block * (stride << 1u) + k;
-      let outOddColIdx = outEvenColIdx + stride;
-      let trigIndex = k * (columnHalfSize / stride);
-      let twiddleReal = columnTrigTable[2u * trigIndex];
-      let twiddleImag = -columnTrigTable[2u * trigIndex + 1u];
-
-      let aSmIdx = row * columnSize + aColIdx;
-      let bSmIdx = row * columnSize + bColIdx;
-      let outEvenSmIdx = row * columnSize + outEvenColIdx;
-      let outOddSmIdx = row * columnSize + outOddColIdx;
-
-      var aReal: f32;
-      var aImag: f32;
-      var bReal: f32;
-      var bImag: f32;
-      if (readEven) {
-        aReal = smReal0[aSmIdx];
-        aImag = smImag0[aSmIdx];
-        bReal = smReal0[bSmIdx];
-        bImag = smImag0[bSmIdx];
-      } else {
-        aReal = smReal1[aSmIdx];
-        aImag = smImag1[aSmIdx];
-        bReal = smReal1[bSmIdx];
-        bImag = smImag1[bSmIdx];
-      }
-
-      let productReal = bReal * twiddleReal - bImag * twiddleImag;
-      let productImag = bReal * twiddleImag + bImag * twiddleReal;
-
-      if (readEven) {
-        smReal1[outEvenSmIdx] = aReal + productReal;
-        smImag1[outEvenSmIdx] = aImag + productImag;
-        smReal1[outOddSmIdx] = aReal - productReal;
-        smImag1[outOddSmIdx] = aImag - productImag;
-      } else {
-        smReal0[outEvenSmIdx] = aReal + productReal;
-        smImag0[outEvenSmIdx] = aImag + productImag;
-        smReal0[outOddSmIdx] = aReal - productReal;
-        smImag0[outOddSmIdx] = aImag - productImag;
-      }
-    }
-    workgroupBarrier();
-  }
+  runRowFft(t);
+  applyFourStepTwiddle(t);
+  runColumnFft(t);
 
   for (var k = t; k <= packedWindowSize; k += threadCount) {
     if (k == 0u) {

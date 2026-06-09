@@ -1,3 +1,4 @@
+import { createPrefixedRadixStageConstants } from '../radixStageConstants.js';
 import { fusedTransformInPlaceShader } from './fusedTransformInPlaceShader.js';
 import { fusedTransformShader } from './fusedTransformShader.js';
 import { type PackedFusedTiledR2cVariant } from './support.js';
@@ -14,16 +15,13 @@ export type FusedInPlacePipeline = {
 
 export type Pipelines = FusedPipeline | FusedInPlacePipeline;
 
-const createFusedConstants = (variant: PackedFusedTiledR2cVariant) => ({
+const createConstants = (variant: PackedFusedTiledR2cVariant) => ({
   packedWindowSize: variant.packedWindowSize,
   positiveWindowSize: variant.packedWindowSize,
   rowSize: variant.rowSize,
-  rowHalfSize: variant.rowHalfSize,
   columnSize: variant.columnSize,
-  columnHalfSize: variant.columnHalfSize,
-  log2RowSize: variant.log2RowSize,
-  log2ColumnSize: variant.log2ColumnSize,
-  log2PackedWindowSize: variant.log2PackedWindowSize,
+  ...createPrefixedRadixStageConstants(variant.rowStageCounts, 'row'),
+  ...createPrefixedRadixStageConstants(variant.columnStageCounts, 'column'),
 });
 
 const createFusedPipeline = (
@@ -43,22 +41,11 @@ const createFusedPipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createFusedConstants(variant),
+        constants: createConstants(variant),
       },
     }),
   };
 };
-
-const createFusedInPlaceConstants = (variant: PackedFusedTiledR2cVariant) => ({
-  packedWindowSize: variant.packedWindowSize,
-  positiveWindowSize: variant.packedWindowSize,
-  rowSize: variant.rowSize,
-  columnSize: variant.columnSize,
-  log2RowSize: variant.log2RowSize,
-  log2ColumnSize: variant.log2ColumnSize,
-  log4RowSize: variant.log4RowSize,
-  log4ColumnSize: variant.log4ColumnSize,
-});
 
 const createFusedInPlacePipeline = (
   device: GPUDevice,
@@ -77,7 +64,7 @@ const createFusedInPlacePipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createFusedInPlaceConstants(variant),
+        constants: createConstants(variant),
       },
     }),
   };

@@ -1,4 +1,9 @@
 import { type FourierConfig } from '../config.es.js';
+import {
+  createRadixStages,
+  type RadixStageCounts,
+} from '../factorization.es.js';
+import { selectBalancedTileShape, type TileShape } from '../tileShape.js';
 
 export type PackedFusedTiledR2cKind = 'fused' | 'fusedInPlace';
 
@@ -6,15 +11,10 @@ export type PackedFusedTiledR2cVariant = {
   kind: PackedFusedTiledR2cKind;
   windowSize: number;
   packedWindowSize: number;
-  log2PackedWindowSize: number;
   rowSize: number;
-  rowHalfSize: number;
   columnSize: number;
-  columnHalfSize: number;
-  log2RowSize: number;
-  log2ColumnSize: number;
-  log4RowSize: number;
-  log4ColumnSize: number;
+  rowStageCounts: RadixStageCounts;
+  columnStageCounts: RadixStageCounts;
 };
 
 const maxTileSize = 256;
@@ -22,61 +22,43 @@ const maxWindowSize = 65536;
 const minPackedWindowSize = 4;
 const maxPackedWindowSize = maxWindowSize / 2;
 
-const isPowerOfTwo = (value: number): boolean =>
-  Number.isInteger(Math.log2(value));
-
-const isRadix4Compatible = (size: number): boolean =>
-  Number.isInteger(Math.log2(size) / 2);
-
-const createVariant = (
-  windowSize: number,
-  rowSize: number,
-  columnSize: number,
-  kind: PackedFusedTiledR2cKind,
-): PackedFusedTiledR2cVariant => ({
-  kind,
-  windowSize,
-  packedWindowSize: windowSize / 2,
-  log2PackedWindowSize: Math.log2(windowSize / 2),
-  rowSize,
-  rowHalfSize: rowSize / 2,
-  columnSize,
-  columnHalfSize: columnSize / 2,
-  log2RowSize: Math.log2(rowSize),
-  log2ColumnSize: Math.log2(columnSize),
-  log4RowSize: Math.log2(rowSize) / 2,
-  log4ColumnSize: Math.log2(columnSize) / 2,
-});
-
-const getFusedWorkgroupStorageSize = (
-  variant: PackedFusedTiledR2cVariant,
-): number => 4 * variant.packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
+const getFusedWorkgroupStorageSize = (packedWindowSize: number): number =>
+  4 * packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
 
 const getFusedInPlaceWorkgroupStorageSize = (
-  variant: PackedFusedTiledR2cVariant,
-): number => 2 * variant.packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
+  packedWindowSize: number,
+): number => 2 * packedWindowSize * Float32Array.BYTES_PER_ELEMENT;
+
+type VariantSkeleton = TileShape & {
+  rowStageCounts: RadixStageCounts;
+  columnStageCounts: RadixStageCounts;
+};
 
 const createVariantSkeleton = (
   windowSize: number,
-): { rowSize: number; columnSize: number } | undefined => {
+): VariantSkeleton | undefined => {
   const packedWindowSize = windowSize / 2;
   if (
     !Number.isInteger(packedWindowSize) ||
-    !isPowerOfTwo(packedWindowSize) ||
     packedWindowSize < minPackedWindowSize ||
-    packedWindowSize > maxPackedWindowSize
+    packedWindowSize > maxPackedWindowSize ||
+    createRadixStages(packedWindowSize) === undefined
   ) {
     return undefined;
   }
 
-  const log2PackedWindowSize = Math.log2(packedWindowSize);
-  const rowSize = 2 ** Math.ceil(log2PackedWindowSize / 2);
-  const columnSize = packedWindowSize / rowSize;
-  if (rowSize > maxTileSize || columnSize > maxTileSize) {
+  const shape = selectBalancedTileShape(packedWindowSize, maxTileSize);
+  if (shape === undefined) {
     return undefined;
   }
 
-  return { rowSize, columnSize };
+  const rowStageCounts = createRadixStages(shape.rowSize);
+  const columnStageCounts = createRadixStages(shape.columnSize);
+  if (rowStageCounts === undefined || columnStageCounts === undefined) {
+    return undefined;
+  }
+
+  return { ...shape, rowStageCounts, columnStageCounts };
 };
 
 export const getPackedFusedTiledR2cVariant = (
@@ -88,35 +70,23 @@ export const getPackedFusedTiledR2cVariant = (
     return undefined;
   }
 
-  const fused = createVariant(
-    config.windowSize,
-    skeleton.rowSize,
-    skeleton.columnSize,
-    'fused',
-  );
-  if (
-    getFusedWorkgroupStorageSize(fused) <=
-    device.limits.maxComputeWorkgroupStorageSize
-  ) {
-    return fused;
+  const packedWindowSize = config.windowSize / 2;
+  const base = {
+    windowSize: config.windowSize,
+    packedWindowSize,
+    rowSize: skeleton.rowSize,
+    columnSize: skeleton.columnSize,
+    rowStageCounts: skeleton.rowStageCounts,
+    columnStageCounts: skeleton.columnStageCounts,
+  };
+  const maxStorage = device.limits.maxComputeWorkgroupStorageSize;
+
+  if (getFusedWorkgroupStorageSize(packedWindowSize) <= maxStorage) {
+    return { kind: 'fused', ...base };
   }
 
-  if (
-    isRadix4Compatible(skeleton.rowSize) &&
-    isRadix4Compatible(skeleton.columnSize)
-  ) {
-    const fusedInPlace = createVariant(
-      config.windowSize,
-      skeleton.rowSize,
-      skeleton.columnSize,
-      'fusedInPlace',
-    );
-    if (
-      getFusedInPlaceWorkgroupStorageSize(fusedInPlace) <=
-      device.limits.maxComputeWorkgroupStorageSize
-    ) {
-      return fusedInPlace;
-    }
+  if (getFusedInPlaceWorkgroupStorageSize(packedWindowSize) <= maxStorage) {
+    return { kind: 'fusedInPlace', ...base };
   }
 
   return undefined;

@@ -9,8 +9,26 @@ export const createFftPackedStockhamR2c: CreateFourier = (device, markers) => {
       const state = stateCell.get(arg);
 
       const dispatch = (pass: GPUComputePassEncoder): void => {
-        pass.setPipeline(state.pipeline);
-        pass.setBindGroup(0, state.bindGroup);
+        if (state.kind === 'multiPass') {
+          state.pipeline.stages.forEach((pipeline, index) => {
+            const stage = state.variant.stages[index];
+            const bindGroup = state.bindGroups.stages[index];
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup);
+            pass.dispatchWorkgroups(state.windowCount, stage.workgroupCount);
+          });
+
+          const packWorkgroupCount = Math.ceil(
+            (state.variant.packedWindowSize + 1) / 64,
+          );
+          pass.setPipeline(state.pipeline.pack);
+          pass.setBindGroup(0, state.bindGroups.pack);
+          pass.dispatchWorkgroups(state.windowCount, packWorkgroupCount);
+          return;
+        }
+
+        pass.setPipeline(state.pipeline.transform);
+        pass.setBindGroup(0, state.bindGroups.transform);
         pass.dispatchWorkgroups(state.windowCount);
       };
 
