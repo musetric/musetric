@@ -9,8 +9,8 @@
     "project:init": "node --import tsx ./scripts/init.js",
     "project:start": "node dist/index.js",
     "check:ts": "tsc --build",
-    "check:lint": "eslint . --cache",
-    "fix:lint": "eslint . --fix --cache"
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "dependencies": {
     "@fastify/multipart": "catalog:",

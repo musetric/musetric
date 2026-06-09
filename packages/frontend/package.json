@@ -7,8 +7,8 @@
     "dev": "vite",
     "project:build": "vite build && cpx \"dist/**/*\" ../backend/storage/public --clean",
     "check:ts": "tsc --build",
-    "check:lint": "eslint . --cache",
-    "fix:lint": "eslint . --fix --cache",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
     "check:translations": "i18next-cli extract --config ./i18next.config.ts --ci --dry-run",
     "fix:translations": "i18next-cli extract --config ./i18next.config.ts"
   },
