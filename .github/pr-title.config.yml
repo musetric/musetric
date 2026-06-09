@@ -21,7 +21,7 @@ types:
   - revert # roll back a previously merged change
   - docs # documentation, comments, readme only
   - test # tests added/changed, no production code touched
-  - build # build system & packaged artifacts (vite, docker image, ts emit)
+  - build # build system & packaged artifacts (vite, ts emit)
   - ci # CI/CD pipelines (this workflow, etc.)
   - chore # housekeeping that touches no production code, build, or CI
 
@@ -49,7 +49,6 @@ scopes:
   - frontend # packages/frontend app shell (cross-feature)
   - backend # packages/backend Fastify server & orchestration
   - landing # packages/landing marketing site
-  - docker # Dockerfile, compose, container image
   - api # packages/api contracts & client/server integration
   - db # packages/backend-db data access, entities, schema
   # Quality & tooling
