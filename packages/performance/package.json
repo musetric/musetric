@@ -7,8 +7,8 @@
     "project:build": "tsc --build",
     "dev": "vite",
     "check:ts": "tsc --build",
-    "check:lint": "eslint . --cache",
-    "fix:lint": "eslint . --fix --cache"
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "devDependencies": {
     "@alexanderolsen/libsamplerate-js": "catalog:",

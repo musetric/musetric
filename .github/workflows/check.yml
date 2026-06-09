@@ -22,6 +22,12 @@ jobs:
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
       - run: yarn --immutable
+      - uses: actions/cache@v4
+        with:
+          path: packages/*/.eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
       - run: yarn check:security
       - run: yarn check:deps
       - run: yarn check:ts

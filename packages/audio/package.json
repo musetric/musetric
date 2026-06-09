@@ -82,8 +82,8 @@
   "scripts": {
     "project:build": "tsc --build",
     "check:ts": "tsc --build",
-    "check:lint": "eslint . --cache",
-    "fix:lint": "eslint . --fix --cache"
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
     "@alexanderolsen/libsamplerate-js": "2.1.2",
