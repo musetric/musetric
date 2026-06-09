@@ -5,6 +5,10 @@
 - This repository is a Yarn monorepo. Use `yarn@4.12.0`.
 - Prefer existing Yarn scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
 
+## Commits & PR Titles
+
+- Name commits and PR titles per `.github/pr-title.config.yml`.
+
 ## Repository Map
 
 - Musetric is split into a web app, a backend, audio-processing modules, and shared infrastructure packages.

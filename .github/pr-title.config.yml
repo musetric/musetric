@@ -1,0 +1,62 @@
+# Allowed Conventional Commit types and scopes.
+#
+# Format: `type(scope): subject`  (scope is required)
+#   feat(player): add loop region
+#   fix(decoder): handle empty mp3 frames
+#   ci(github): cancel superseded pr-title runs
+#
+# Read by .github/workflows/pr-title.yml and enforced on every PR title.
+# Inline comments below document what each key means and when to use it.
+#
+# Adding a new scope: add it here and merge to main first — the linter reads
+#   this list from the base branch, so a PR cannot use a scope that is not yet on main.
+# Removing a feature + its scope: do it in one PR (the scope still exists on the base branch).
+
+# Type = what kind of change it is.
+types:
+  - feat # new user-facing functionality
+  - fix # bug fix in existing behavior
+  - perf # speed/memory optimization, behavior unchanged
+  - refactor # internal code rewritten, behavior unchanged
+  - revert # roll back a previously merged change
+  - docs # documentation, comments, readme only
+  - test # tests added/changed, no production code touched
+  - build # build system & packaged artifacts (vite, docker image, ts emit)
+  - ci # CI/CD pipelines (this workflow, etc.)
+  - chore # housekeeping that touches no production code, build, or CI
+
+# Scope = which area the change belongs to.
+scopes:
+  # Features
+  - player # track playback
+  - chords # chord detection & display
+  - key # musical key detection / transpose
+  - rhythm # tempo, beat, metronome
+  - subtitle # lyrics / subtitle track
+  - waveform # amplitude waveform visualization
+  - timeline # time ruler, cursor, seeking
+  - recording # audio capture / recording
+  - decoder # decoding input audio files
+  - calibration # audio input/output calibration
+  - translations # app localization: translation values & i18n support
+  # Libraries
+  - ai # neural-network inference
+  - spectrogram # frequency spectrogram visualization
+  - fft # FFT signal-processing core behind visualizations
+  - toolkit # packages/toolkit backend media/processing helpers
+  - utils # packages/resource-utils low-level shared utilities
+  # App
+  - frontend # packages/frontend app shell (cross-feature)
+  - backend # packages/backend Fastify server & orchestration
+  - landing # packages/landing marketing site
+  - docker # Dockerfile, compose, container image
+  - api # packages/api contracts & client/server integration
+  - db # packages/backend-db data access, entities, schema
+  # Quality & tooling
+  - lint # ESLint rules / packages/eslint-config
+  - ts # TypeScript config & strictness (tsconfig, types)
+  - bench # benchmarks & perf measurement (packages/performance)
+  - format # Prettier formatting
+  - deps # dependency add / update / remove
+  - agent # agent guidance & config (AGENTS.md, AI tooling)
+  - github # repo & GitHub Actions settings (workflows, templates)
