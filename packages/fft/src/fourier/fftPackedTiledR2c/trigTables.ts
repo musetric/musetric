@@ -21,11 +21,15 @@ const createBuffer = (
   return buffer;
 };
 
-const createFftTrigTable = (windowSize: number): Float32Array<ArrayBuffer> => {
-  const halfSize = windowSize / 2;
-  const table = new Float32Array(halfSize * 2);
-  for (let i = 0; i < halfSize; i++) {
-    const angle = (2 * Math.PI * i) / windowSize;
+// The radix-2 (power-of-two) shaders index a half-size table; the mixed-radix
+// shaders index a full-size table.
+const createFftTrigTable = (
+  size: number,
+  entryCount: number,
+): Float32Array<ArrayBuffer> => {
+  const table = new Float32Array(entryCount * 2);
+  for (let i = 0; i < entryCount; i++) {
+    const angle = (2 * Math.PI * i) / size;
     table[2 * i] = Math.cos(angle);
     table[2 * i + 1] = Math.sin(angle);
   }
@@ -67,12 +71,20 @@ export const createTrigTables = (
   rowFft: createBuffer(
     device,
     'packed-tiled-r2c-row-trig-table',
-    createFftTrigTable(variant.rowSize),
+    createFftTrigTable(
+      variant.rowSize,
+      variant.kind === 'tiledMixed' ? variant.rowSize : variant.rowSize / 2,
+    ),
   ),
   columnFft: createBuffer(
     device,
     'packed-tiled-r2c-column-trig-table',
-    createFftTrigTable(variant.columnSize),
+    createFftTrigTable(
+      variant.columnSize,
+      variant.kind === 'tiledMixed'
+        ? variant.columnSize
+        : variant.columnSize / 2,
+    ),
   ),
   fourStep: createBuffer(
     device,
