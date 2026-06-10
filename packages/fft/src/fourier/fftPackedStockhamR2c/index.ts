@@ -17,13 +17,6 @@ export const createFftPackedStockhamR2c: CreateFourier = (device, markers) => {
             pass.setBindGroup(0, bindGroup);
             pass.dispatchWorkgroups(state.windowCount, stage.workgroupCount);
           });
-
-          const packWorkgroupCount = Math.ceil(
-            (state.variant.packedWindowSize + 1) / 64,
-          );
-          pass.setPipeline(state.pipeline.pack);
-          pass.setBindGroup(0, state.bindGroups.pack);
-          pass.dispatchWorkgroups(state.windowCount, packWorkgroupCount);
           return;
         }
 

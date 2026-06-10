@@ -1,6 +1,7 @@
 export const transformInPlaceMixedShader = `
 override packedWindowSize: u32 = 2560u;
 override positiveWindowSize: u32 = 2561u;
+override radix8StageCount: u32 = 0u;
 override radix4StageCount: u32 = 0u;
 override radix2StageCount: u32 = 0u;
 override radix3StageCount: u32 = 0u;
@@ -8,6 +9,7 @@ override radix5StageCount: u32 = 0u;
 override inPlace: u32 = 1u;
 override threadCount: u32 = 256u;
 
+const sqrt1_2: f32 = 0.70710678118654752440;
 const sin3: f32 = 0.86602540378443864676;
 const cos5a: f32 = 0.30901699437494742410;
 const cos5b: f32 = -0.80901699437494742410;
@@ -19,8 +21,7 @@ struct Params {
   windowCount: u32,
 };
 
-var<workgroup> smReal: array<f32, packedWindowSize>;
-var<workgroup> smImag: array<f32, packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> sourceSpectrum: array<f32>;
 @group(0) @binding(1) var<storage, read_write> signal: array<f32>;
@@ -29,17 +30,24 @@ var<workgroup> smImag: array<f32, packedWindowSize>;
 @group(0) @binding(4) var<uniform> params: Params;
 
 fn getFactorCount() -> u32 {
-  return radix4StageCount + radix2StageCount + radix3StageCount + radix5StageCount;
+  return radix8StageCount + radix4StageCount + radix2StageCount +
+    radix3StageCount + radix5StageCount;
 }
 
 fn getFactor(stage: u32) -> u32 {
-  if (stage < radix4StageCount) {
+  if (stage < radix8StageCount) {
+    return 8u;
+  }
+  if (stage < radix8StageCount + radix4StageCount) {
     return 4u;
   }
-  if (stage < radix4StageCount + radix2StageCount) {
+  if (stage < radix8StageCount + radix4StageCount + radix2StageCount) {
     return 2u;
   }
-  if (stage < radix4StageCount + radix2StageCount + radix3StageCount) {
+  if (
+    stage <
+    radix8StageCount + radix4StageCount + radix2StageCount + radix3StageCount
+  ) {
     return 3u;
   }
   return 5u;
@@ -50,6 +58,11 @@ fn reverseMixed(index: u32) -> u32 {
   var rev = 0u;
   var placeIn = packedWindowSize;
   var placeOut = 1u;
+  for (var s = 0u; s < radix8StageCount; s++) {
+    placeIn = placeIn / 8u;
+    rev = rev + ((index / placeIn) % 8u) * placeOut;
+    placeOut = placeOut * 8u;
+  }
   for (var s = 0u; s < radix4StageCount; s++) {
     placeIn = placeIn / 4u;
     rev = rev + ((index / placeIn) % 4u) * placeOut;
@@ -83,12 +96,11 @@ fn getInvTwiddle(index: u32) -> vec2<f32> {
 }
 
 fn getResult(index: u32) -> vec2<f32> {
-  return vec2<f32>(smReal[index], smImag[index]);
+  return sm[index];
 }
 
 fn store(index: u32, value: vec2<f32>) {
-  smReal[index] = value.x;
-  smImag[index] = value.y;
+  sm[index] = value;
 }
 
 fn complexStride() -> u32 {
@@ -142,8 +154,29 @@ fn main(
   let spectrumOffset = complexStride() * windowIndex;
   let signalOffset = params.windowSize * windowIndex;
 
-  for (var i = t; i < packedWindowSize; i += threadCount) {
-    store(reverseMixed(i), loadPackedSpectrum(spectrumOffset, i));
+  // C2R prepack: packed(k) and packed(P-k) share the bin pair {k, P-k} and one
+  // twiddle (packed(P-k) = conj(even - i*odd)), halving global/table reads.
+  if (t == 0u) {
+    store(0u, loadPackedSpectrum(spectrumOffset, 0u));
+    if (packedWindowSize % 2u == 0u) {
+      let half = packedWindowSize / 2u;
+      store(reverseMixed(half), loadPackedSpectrum(spectrumOffset, half));
+    }
+  }
+  for (var k = t + 1u; 2u * k < packedWindowSize; k += threadCount) {
+    let mirrorK = packedWindowSize - k;
+    let a = readSpectrumBin(spectrumOffset, k);
+    let mirror = readSpectrumBin(spectrumOffset, mirrorK);
+    let b = vec2<f32>(mirror.x, -mirror.y);
+    let even = 0.5 * (a + b);
+    let diff = 0.5 * (a - b);
+    let invTwiddle = vec2<f32>(
+      r2cTrigTable[2u * k],
+      r2cTrigTable[2u * k + 1u],
+    );
+    let odd = mul(diff, invTwiddle);
+    store(reverseMixed(k), vec2<f32>(even.x - odd.y, even.y + odd.x));
+    store(reverseMixed(mirrorK), vec2<f32>(even.x + odd.y, odd.x - even.y));
   }
   workgroupBarrier();
 
@@ -153,7 +186,56 @@ fn main(
     let butterflyCount = packedWindowSize / factor;
     let twiddleScale = packedWindowSize / (stride * factor);
 
-    if (factor == 4u) {
+    if (factor == 8u) {
+      for (var j = t; j < butterflyCount; j += threadCount) {
+        let k = j % stride;
+        let block = j / stride;
+        let base = block * (stride * 8u) + k;
+        let tw = k * twiddleScale;
+        let a0 = getResult(base);
+        let a1 = mul(getResult(base + stride), getInvTwiddle(tw));
+        let a2 = mul(getResult(base + 2u * stride), getInvTwiddle(2u * tw));
+        let a3 = mul(getResult(base + 3u * stride), getInvTwiddle(3u * tw));
+        let a4 = mul(getResult(base + 4u * stride), getInvTwiddle(4u * tw));
+        let a5 = mul(getResult(base + 5u * stride), getInvTwiddle(5u * tw));
+        let a6 = mul(getResult(base + 6u * stride), getInvTwiddle(6u * tw));
+        let a7 = mul(getResult(base + 7u * stride), getInvTwiddle(7u * tw));
+        let e0 = a0 + a4;
+        let e1 = a0 - a4;
+        let e2 = a2 + a6;
+        let e3 = a2 - a6;
+        let E0 = e0 + e2;
+        let E1 = e1 + vec2<f32>(-e3.y, e3.x);
+        let E2 = e0 - e2;
+        let E3 = e1 + vec2<f32>(e3.y, -e3.x);
+        let f0 = a1 + a5;
+        let f1 = a1 - a5;
+        let f2 = a3 + a7;
+        let f3 = a3 - a7;
+        let O0 = f0 + f2;
+        let O1 = f1 + vec2<f32>(-f3.y, f3.x);
+        let O2 = f0 - f2;
+        let O3 = f1 + vec2<f32>(f3.y, -f3.x);
+        let p0 = O0;
+        let p1 = vec2<f32>(
+          sqrt1_2 * (O1.x - O1.y),
+          sqrt1_2 * (O1.x + O1.y),
+        );
+        let p2 = vec2<f32>(-O2.y, O2.x);
+        let p3 = vec2<f32>(
+          -sqrt1_2 * (O3.x + O3.y),
+          sqrt1_2 * (O3.x - O3.y),
+        );
+        store(base, E0 + p0);
+        store(base + stride, E1 + p1);
+        store(base + 2u * stride, E2 + p2);
+        store(base + 3u * stride, E3 + p3);
+        store(base + 4u * stride, E0 - p0);
+        store(base + 5u * stride, E1 - p1);
+        store(base + 6u * stride, E2 - p2);
+        store(base + 7u * stride, E3 - p3);
+      }
+    } else if (factor == 4u) {
       for (var j = t; j < butterflyCount; j += threadCount) {
         let k = j % stride;
         let block = j / stride;

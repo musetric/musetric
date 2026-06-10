@@ -53,3 +53,21 @@ export const expandRadixStages = (stages: RadixStageCounts): RadixStage[] => [
   ...new Array<RadixStage>(stages.radix3StageCount).fill(3),
   ...new Array<RadixStage>(stages.radix5StageCount).fill(5),
 ];
+
+export type MultiPassRadixStage = RadixStage | 8;
+
+// Greedy radix-8-preferring stage list (then 4, 2, 3, 5) to minimise the
+// number of global-memory passes in the multi-pass pipelines.
+export const expandRadix8PreferredStages = (
+  size: number,
+): MultiPassRadixStage[] | undefined => {
+  const stages: MultiPassRadixStage[] = [];
+  let remaining = size;
+  for (const factor of [8, 4, 2, 3, 5] as const) {
+    while (remaining % factor === 0) {
+      stages.push(factor);
+      remaining /= factor;
+    }
+  }
+  return remaining === 1 ? stages : undefined;
+};

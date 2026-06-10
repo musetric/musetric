@@ -21,10 +21,8 @@ struct Params {
   windowCount: u32,
 };
 
-var<workgroup> smReal0: array<f32, packedWindowSize>;
-var<workgroup> smImag0: array<f32, packedWindowSize>;
-var<workgroup> smReal1: array<f32, packedWindowSize>;
-var<workgroup> smImag1: array<f32, packedWindowSize>;
+var<workgroup> sm0: array<vec2<f32>, packedWindowSize>;
+var<workgroup> sm1: array<vec2<f32>, packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -72,27 +70,25 @@ fn getFftTwiddle(index: u32) -> vec2<f32> {
 
 fn readStage(index: u32, readEven: bool) -> vec2<f32> {
   if (readEven) {
-    return vec2<f32>(smReal0[index], smImag0[index]);
+    return sm0[index];
   }
-  return vec2<f32>(smReal1[index], smImag1[index]);
+  return sm1[index];
 }
 
 fn writeStage(index: u32, readEven: bool, value: vec2<f32>) {
   if (readEven) {
-    smReal1[index] = value.x;
-    smImag1[index] = value.y;
+    sm1[index] = value;
   } else {
-    smReal0[index] = value.x;
-    smImag0[index] = value.y;
+    sm0[index] = value;
   }
 }
 
 fn getResult(index: u32) -> vec2<f32> {
   let factorCount = getFactorCount();
   if ((factorCount & 1u) == 0u) {
-    return vec2<f32>(smReal0[index], smImag0[index]);
+    return sm0[index];
   }
-  return vec2<f32>(smReal1[index], smImag1[index]);
+  return sm1[index];
 }
 
 fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
@@ -204,14 +200,14 @@ fn main(
       let r6 = E2 - p2;
       let r7 = E3 - p3;
       let o0 = j * 8u;
-      smReal1[o0] = r0.x; smImag1[o0] = r0.y;
-      smReal1[o0 + 1u] = r1.x; smImag1[o0 + 1u] = r1.y;
-      smReal1[o0 + 2u] = r2.x; smImag1[o0 + 2u] = r2.y;
-      smReal1[o0 + 3u] = r3.x; smImag1[o0 + 3u] = r3.y;
-      smReal1[o0 + 4u] = r4.x; smImag1[o0 + 4u] = r4.y;
-      smReal1[o0 + 5u] = r5.x; smImag1[o0 + 5u] = r5.y;
-      smReal1[o0 + 6u] = r6.x; smImag1[o0 + 6u] = r6.y;
-      smReal1[o0 + 7u] = r7.x; smImag1[o0 + 7u] = r7.y;
+      sm1[o0] = r0;
+      sm1[o0 + 1u] = r1;
+      sm1[o0 + 2u] = r2;
+      sm1[o0 + 3u] = r3;
+      sm1[o0 + 4u] = r4;
+      sm1[o0 + 5u] = r5;
+      sm1[o0 + 6u] = r6;
+      sm1[o0 + 7u] = r7;
     }
     workgroupBarrier();
     stageStride = 8u;
@@ -219,8 +215,10 @@ fn main(
   } else {
     for (var i = t; i < packedWindowSize; i += threadCount) {
       let sampleIndex = i * 2u;
-      smReal0[i] = readInput(inputOffset, sampleIndex);
-      smImag0[i] = readInput(inputOffset, sampleIndex + 1u);
+      sm0[i] = vec2<f32>(
+        readInput(inputOffset, sampleIndex),
+        readInput(inputOffset, sampleIndex + 1u),
+      );
     }
     workgroupBarrier();
   }

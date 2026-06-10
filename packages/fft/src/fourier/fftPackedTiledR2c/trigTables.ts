@@ -21,8 +21,6 @@ const createBuffer = (
   return buffer;
 };
 
-// The radix-2 (power-of-two) shaders index a half-size table; the mixed-radix
-// shaders index a full-size table.
 const createFftTrigTable = (
   size: number,
   entryCount: number,
@@ -71,20 +69,12 @@ export const createTrigTables = (
   rowFft: createBuffer(
     device,
     'packed-tiled-r2c-row-trig-table',
-    createFftTrigTable(
-      variant.rowSize,
-      variant.kind === 'tiledMixed' ? variant.rowSize : variant.rowSize / 2,
-    ),
+    createFftTrigTable(variant.rowSize, variant.rowSize),
   ),
   columnFft: createBuffer(
     device,
     'packed-tiled-r2c-column-trig-table',
-    createFftTrigTable(
-      variant.columnSize,
-      variant.kind === 'tiledMixed'
-        ? variant.columnSize
-        : variant.columnSize / 2,
-    ),
+    createFftTrigTable(variant.columnSize, variant.columnSize),
   ),
   fourStep: createBuffer(
     device,

@@ -11,8 +11,7 @@ struct Params {
   windowCount: u32,
 };
 
-var<workgroup> smReal: array<f32, packedWindowSize>;
-var<workgroup> smImag: array<f32, packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -76,7 +75,7 @@ fn getFftTwiddle(index: u32) -> vec2<f32> {
 }
 
 fn getResult(index: u32) -> vec2<f32> {
-  return vec2<f32>(smReal[index], smImag[index]);
+  return sm[index];
 }
 
 fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
@@ -155,22 +154,14 @@ fn main(
     let p3 = vec2<f32>(sqrt1_2 * (O3.y - O3.x), -sqrt1_2 * (O3.x + O3.y));
 
     let dst = reverseRest(j) * 8u;
-    let r0 = E0 + p0;
-    let r1 = E1 + p1;
-    let r2 = E2 + p2;
-    let r3 = E3 + p3;
-    let r4 = E0 - p0;
-    let r5 = E1 - p1;
-    let r6 = E2 - p2;
-    let r7 = E3 - p3;
-    smReal[dst] = r0.x; smImag[dst] = r0.y;
-    smReal[dst + 1u] = r1.x; smImag[dst + 1u] = r1.y;
-    smReal[dst + 2u] = r2.x; smImag[dst + 2u] = r2.y;
-    smReal[dst + 3u] = r3.x; smImag[dst + 3u] = r3.y;
-    smReal[dst + 4u] = r4.x; smImag[dst + 4u] = r4.y;
-    smReal[dst + 5u] = r5.x; smImag[dst + 5u] = r5.y;
-    smReal[dst + 6u] = r6.x; smImag[dst + 6u] = r6.y;
-    smReal[dst + 7u] = r7.x; smImag[dst + 7u] = r7.y;
+    sm[dst] = E0 + p0;
+    sm[dst + 1u] = E1 + p1;
+    sm[dst + 2u] = E2 + p2;
+    sm[dst + 3u] = E3 + p3;
+    sm[dst + 4u] = E0 - p0;
+    sm[dst + 5u] = E1 - p1;
+    sm[dst + 6u] = E2 - p2;
+    sm[dst + 7u] = E3 - p3;
   }
   workgroupBarrier();
 
@@ -222,30 +213,14 @@ fn main(
         -sqrt1_2 * (O3.x + O3.y),
       );
 
-      let o0 = base;
-      let o1 = base + quarter;
-      let o2 = base + 2u * quarter;
-      let o3 = base + 3u * quarter;
-      let o4 = base + 4u * quarter;
-      let o5 = base + 5u * quarter;
-      let o6 = base + 6u * quarter;
-      let o7 = base + 7u * quarter;
-      let r0 = E0 + p0;
-      let r1 = E1 + p1;
-      let r2 = E2 + p2;
-      let r3 = E3 + p3;
-      let r4 = E0 - p0;
-      let r5 = E1 - p1;
-      let r6 = E2 - p2;
-      let r7 = E3 - p3;
-      smReal[o0] = r0.x; smImag[o0] = r0.y;
-      smReal[o1] = r1.x; smImag[o1] = r1.y;
-      smReal[o2] = r2.x; smImag[o2] = r2.y;
-      smReal[o3] = r3.x; smImag[o3] = r3.y;
-      smReal[o4] = r4.x; smImag[o4] = r4.y;
-      smReal[o5] = r5.x; smImag[o5] = r5.y;
-      smReal[o6] = r6.x; smImag[o6] = r6.y;
-      smReal[o7] = r7.x; smImag[o7] = r7.y;
+      sm[base] = E0 + p0;
+      sm[base + quarter] = E1 + p1;
+      sm[base + 2u * quarter] = E2 + p2;
+      sm[base + 3u * quarter] = E3 + p3;
+      sm[base + 4u * quarter] = E0 - p0;
+      sm[base + 5u * quarter] = E1 - p1;
+      sm[base + 6u * quarter] = E2 - p2;
+      sm[base + 7u * quarter] = E3 - p3;
     }
     workgroupBarrier();
   }

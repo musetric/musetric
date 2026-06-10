@@ -38,7 +38,6 @@ type SinglePassBindGroups = {
 type MultiPassBindGroups = {
   kind: 'multiPass';
   stages: GPUBindGroup[];
-  pack: GPUBindGroup;
 };
 
 type BindGroups = SinglePassBindGroups | MultiPassBindGroups;
@@ -181,20 +180,10 @@ const createMultiPassBindGroups = (
         { binding: 3, resource: { buffer: scratch.buffer1 } },
         { binding: 4, resource: { buffer: tables.fft } },
         { binding: 5, resource: { buffer: params.buffer } },
+        { binding: 6, resource: { buffer: tables.r2c } },
       ],
     }),
   ),
-  pack: device.createBindGroup({
-    label: 'packed-stockham-r2c-multipass-pack-bind-group',
-    layout: pipeline.pack.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: arg.spectrum } },
-      { binding: 1, resource: { buffer: scratch.buffer0 } },
-      { binding: 2, resource: { buffer: scratch.buffer1 } },
-      { binding: 3, resource: { buffer: tables.r2c } },
-      { binding: 4, resource: { buffer: params.buffer } },
-    ],
-  }),
 });
 
 export const createStateCell = (
