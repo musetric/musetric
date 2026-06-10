@@ -3,10 +3,8 @@ import { defaultSampleRate } from '@musetric/resource-utils';
 import { type SpectrogramZeroPaddingFactor } from '@musetric/spectrogram';
 
 export const fourierModes: readonly FourierMode[] = [
-  'fftPackedFusedTiledR2c',
   'fftPackedStockhamR2c',
   'fftPackedTiledR2c',
-  'fftPrunedFourStepR2c',
 ];
 
 export const warmupIters = 10;
