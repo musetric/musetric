@@ -1,6 +1,4 @@
-import { multiPassPrepackShader } from './multiPassPrepackShader.js';
 import { multiPassStageShader } from './multiPassStageShader.js';
-import { multiPassUnpackShader } from './multiPassUnpackShader.js';
 import {
   type PackedStockhamC2rStage,
   type PackedStockhamC2rVariant,
@@ -15,27 +13,80 @@ export type SinglePassPipeline = {
 
 export type MultiPassPipeline = {
   kind: 'multiPass';
-  prepack: GPUComputePipeline;
   stages: GPUComputePipeline[];
-  unpack: GPUComputePipeline;
 };
 
 export type Pipeline = SinglePassPipeline | MultiPassPipeline;
 
-const stageCount = (counts: { [key: string]: number }): number =>
+type TransformStageCounts = {
+  radix8StageCount: number;
+  radix4StageCount: number;
+  radix2StageCount: number;
+  radix3StageCount: number;
+  radix5StageCount: number;
+};
+
+const stageCount = (counts: TransformStageCounts): number =>
+  counts.radix8StageCount +
   counts.radix4StageCount +
   counts.radix2StageCount +
   counts.radix3StageCount +
   counts.radix5StageCount;
+
+const isPowerOfTwo = (value: number): boolean => (value & (value - 1)) === 0;
+
+// Greedy radix-8-preferring factorization (then 4, 2, 3, 5) to minimise the
+// stage/barrier count, mirroring the forward pipeline.
+const createRadix8PreferredCounts = (
+  packedWindowSize: number,
+): TransformStageCounts => {
+  let remaining = packedWindowSize;
+  const counts: TransformStageCounts = {
+    radix8StageCount: 0,
+    radix4StageCount: 0,
+    radix2StageCount: 0,
+    radix3StageCount: 0,
+    radix5StageCount: 0,
+  };
+  const factors = [
+    [8, 'radix8StageCount'],
+    [4, 'radix4StageCount'],
+    [2, 'radix2StageCount'],
+    [3, 'radix3StageCount'],
+    [5, 'radix5StageCount'],
+  ] as const;
+  for (const [factor, key] of factors) {
+    while (remaining % factor === 0) {
+      counts[key]++;
+      remaining /= factor;
+    }
+  }
+  return counts;
+};
+
+const selectTransformStageCounts = (
+  variant: Extract<
+    PackedStockhamC2rVariant,
+    { kind: 'singlePass' | 'inPlaceMixed' }
+  >,
+): TransformStageCounts =>
+  createRadix8PreferredCounts(variant.packedWindowSize);
 
 const selectTransformThreadCount = (
   variant: Extract<
     PackedStockhamC2rVariant,
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
+  counts: TransformStageCounts,
 ): number => {
   if (variant.kind === 'inPlaceMixed') {
-    return stageCount(variant.radixStageCounts) <= 4 ? 128 : 256;
+    // Power-of-two in-place sizes (packed 4096) prefer the wide 256-thread
+    // groups like the forward radix-8 path; non-power-of-two keeps the
+    // stage-count rule tuned on 2560/3072/3840.
+    if (isPowerOfTwo(variant.packedWindowSize)) {
+      return 256;
+    }
+    return stageCount(counts) <= 4 ? 128 : 256;
   }
   if (variant.packedWindowSize <= 768) {
     return 64;
@@ -52,40 +103,33 @@ const createTransformConstants = (
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
   inPlace: boolean,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  positiveWindowSize: variant.positiveWindowSize,
-  inPlace: inPlace ? 1 : 0,
-  threadCount: selectTransformThreadCount(variant),
-  ...variant.radixStageCounts,
-});
+) => {
+  const counts = selectTransformStageCounts(variant);
+  return {
+    packedWindowSize: variant.packedWindowSize,
+    positiveWindowSize: variant.positiveWindowSize,
+    inPlace: inPlace ? 1 : 0,
+    threadCount: selectTransformThreadCount(variant, counts),
+    ...counts,
+  };
+};
 
-const createPrepackConstants = (
-  variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
-  inPlace: boolean,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  positiveWindowSize: variant.positiveWindowSize,
-  inPlace: inPlace ? 1 : 0,
-  writeBufferIndex: variant.prepackWriteBufferIndex,
-});
-
+// The first stage fuses the C2R prepack read and the last stage fuses the
+// scaled unpack write, dropping two full global-memory passes.
 const createStageConstants = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
   stage: PackedStockhamC2rStage,
+  stageIndex: number,
+  inPlace: boolean,
 ) => ({
   packedWindowSize: variant.packedWindowSize,
   factor: stage.factor,
   stageStride: stage.stageStride,
   readBufferIndex: stage.readBufferIndex,
   writeBufferIndex: stage.writeBufferIndex,
-});
-
-const createUnpackConstants = (
-  variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  finalReadBufferIndex: variant.finalReadBufferIndex,
+  readFromPrepack: stageIndex === 0 ? 1 : 0,
+  writeToSignal: stageIndex === variant.stages.length - 1 ? 1 : 0,
+  inPlace: inPlace ? 1 : 0,
 });
 
 const createSinglePassPipeline = (
@@ -122,50 +166,24 @@ const createMultiPassPipeline = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
   inPlace: boolean,
 ): MultiPassPipeline => {
-  const prepackModule = device.createShaderModule({
-    label: 'packed-stockham-c2r-multipass-prepack-shader',
-    code: multiPassPrepackShader,
-  });
   const stageModule = device.createShaderModule({
     label: 'packed-stockham-c2r-multipass-stage-shader',
     code: multiPassStageShader,
   });
-  const unpackModule = device.createShaderModule({
-    label: 'packed-stockham-c2r-multipass-unpack-shader',
-    code: multiPassUnpackShader,
-  });
 
   return {
     kind: 'multiPass',
-    prepack: device.createComputePipeline({
-      label: 'packed-stockham-c2r-multipass-prepack-pipeline',
-      layout: 'auto',
-      compute: {
-        module: prepackModule,
-        entryPoint: 'main',
-        constants: createPrepackConstants(variant, inPlace),
-      },
-    }),
-    stages: variant.stages.map((stage) =>
+    stages: variant.stages.map((stage, stageIndex) =>
       device.createComputePipeline({
         label: 'packed-stockham-c2r-multipass-stage-pipeline',
         layout: 'auto',
         compute: {
           module: stageModule,
           entryPoint: 'main',
-          constants: createStageConstants(variant, stage),
+          constants: createStageConstants(variant, stage, stageIndex, inPlace),
         },
       }),
     ),
-    unpack: device.createComputePipeline({
-      label: 'packed-stockham-c2r-multipass-unpack-pipeline',
-      layout: 'auto',
-      compute: {
-        module: unpackModule,
-        entryPoint: 'main',
-        constants: createUnpackConstants(variant),
-      },
-    }),
   };
 };
 

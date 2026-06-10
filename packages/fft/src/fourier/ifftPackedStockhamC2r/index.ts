@@ -1,8 +1,6 @@
 import { type CreateFourier, type Fourier } from '../types.js';
 import { createStateCell } from './state.js';
 
-const multiPassThreadCount = 64;
-
 export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
   const stateCell = createStateCell(device);
   return {
@@ -16,13 +14,6 @@ export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
           pipeline.kind === 'multiPass' &&
           bindGroups.kind === 'multiPass'
         ) {
-          const cells = Math.ceil(
-            variant.packedWindowSize / multiPassThreadCount,
-          );
-          pass.setPipeline(pipeline.prepack);
-          pass.setBindGroup(0, bindGroups.prepack);
-          pass.dispatchWorkgroups(state.windowCount, cells);
-
           pipeline.stages.forEach((stagePipeline, index) => {
             pass.setPipeline(stagePipeline);
             pass.setBindGroup(0, bindGroups.stages[index]);
@@ -31,10 +22,6 @@ export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
               variant.stages[index].workgroupCount,
             );
           });
-
-          pass.setPipeline(pipeline.unpack);
-          pass.setBindGroup(0, bindGroups.unpack);
-          pass.dispatchWorkgroups(state.windowCount, cells);
           return;
         }
 

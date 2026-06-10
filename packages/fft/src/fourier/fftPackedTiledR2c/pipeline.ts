@@ -10,6 +10,31 @@ export type Pipelines = {
   secondPass: GPUComputePipeline;
 };
 
+// Power-of-two tile FFTs of >= 128 points prefer radix-8 stages to minimise
+// the shared-memory round-trip/barrier count (e.g. 128 -> 8,8,2 = 3 stages
+// instead of 7). Smaller tiles keep radix-2: their butterfly count is already
+// below the thread count, so wider codelets only serialise work into fewer
+// threads (measured regressions at 64-point tiles under low window counts).
+const createRadix8StageCounts = (
+  log2Size: number,
+  prefix: 'row' | 'column',
+): Record<string, number> => {
+  if (log2Size < 7) {
+    return {
+      [`${prefix}Radix8StageCount`]: 0,
+      [`${prefix}Radix4StageCount`]: 0,
+      [`${prefix}Radix2StageCount`]: log2Size,
+    };
+  }
+  const radix8StageCount = Math.floor(log2Size / 3);
+  const remainder = log2Size - radix8StageCount * 3;
+  return {
+    [`${prefix}Radix8StageCount`]: radix8StageCount,
+    [`${prefix}Radix4StageCount`]: remainder === 2 ? 1 : 0,
+    [`${prefix}Radix2StageCount`]: remainder === 1 ? 1 : 0,
+  };
+};
+
 const createFirstPassConstants = (
   variant: PackedTiledR2cVariant,
   inPlace: boolean,
@@ -30,9 +55,8 @@ const createFirstPassConstants = (
     inPlace: inPlace ? 1 : 0,
     tileSize: variant.tileSize,
     rowSize: variant.rowSize,
-    rowHalfSize: variant.rowHalfSize,
     columnSize: variant.columnSize,
-    log2RowSize: variant.log2RowSize,
+    ...createRadix8StageCounts(variant.log2RowSize, 'row'),
   };
 };
 
@@ -59,8 +83,7 @@ const createSecondPassConstants = (
     rowHalfSize: variant.rowHalfSize,
     rowPairCount: variant.rowPairCount,
     columnSize: variant.columnSize,
-    columnHalfSize: variant.columnHalfSize,
-    log2ColumnSize: variant.log2ColumnSize,
+    ...createRadix8StageCounts(variant.log2ColumnSize, 'column'),
   };
 };
 

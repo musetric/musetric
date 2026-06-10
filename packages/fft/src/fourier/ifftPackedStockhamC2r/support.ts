@@ -1,15 +1,15 @@
 import { type FourierConfig } from '../config.es.js';
 import {
   createRadixStages,
-  expandRadixStages,
-  type RadixStage,
+  expandRadix8PreferredStages,
+  type MultiPassRadixStage,
   type RadixStageCounts,
 } from '../factorization.es.js';
 
 export type ScratchBufferIndex = 0 | 1;
 
 export type PackedStockhamC2rStage = {
-  factor: RadixStage;
+  factor: MultiPassRadixStage;
   stageStride: number;
   readBufferIndex: ScratchBufferIndex;
   writeBufferIndex: ScratchBufferIndex;
@@ -38,7 +38,7 @@ const multiPassThreadCount = 64;
 
 const createMultiPassStages = (
   packedWindowSize: number,
-  radixStageList: readonly RadixStage[],
+  radixStageList: readonly MultiPassRadixStage[],
   maxComputeWorkgroupsPerDimension: number,
 ): PackedStockhamC2rStage[] | undefined => {
   const stages: PackedStockhamC2rStage[] = [];
@@ -103,9 +103,13 @@ export const getPackedStockhamC2rVariant = (
 
   // Larger sizes run a generic multi-pass inverse through two global scratch
   // buffers.
+  const radixStageList = expandRadix8PreferredStages(packedWindowSize);
+  if (radixStageList === undefined) {
+    return undefined;
+  }
   const stages = createMultiPassStages(
     packedWindowSize,
-    expandRadixStages(radixStageCounts),
+    radixStageList,
     device.limits.maxComputeWorkgroupsPerDimension,
   );
   if (stages === undefined) {

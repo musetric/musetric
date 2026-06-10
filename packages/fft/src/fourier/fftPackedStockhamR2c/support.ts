@@ -1,15 +1,15 @@
 import { type FourierConfig } from '../config.es.js';
 import {
   createRadixStages,
-  expandRadixStages,
-  type RadixStage,
+  expandRadix8PreferredStages,
+  type MultiPassRadixStage,
   type RadixStageCounts,
 } from '../factorization.es.js';
 
 export type ScratchBufferIndex = 0 | 1;
 
 export type PackedStockhamR2cStage = {
-  factor: RadixStage;
+  factor: MultiPassRadixStage;
   stageStride: number;
   readFromInput: boolean;
   readBufferIndex: ScratchBufferIndex;
@@ -83,7 +83,7 @@ const createRadix8PreferredCounts = (
 
 const createMultiPassStages = (
   packedWindowSize: number,
-  radixStageList: readonly RadixStage[],
+  radixStageList: readonly MultiPassRadixStage[],
   maxComputeWorkgroupsPerDimension: number,
 ): PackedStockhamR2cStage[] | undefined => {
   const stages: PackedStockhamR2cStage[] = [];
@@ -105,6 +105,13 @@ const createMultiPassStages = (
     });
     stageStride *= factor;
   }
+
+  // The last stage fuses the R2C pack: one thread runs the butterfly pair
+  // (k, stageStride - k), so it only needs threads for k in [0, stride / 2].
+  const lastStage = stages[stages.length - 1];
+  lastStage.workgroupCount = Math.ceil(
+    (Math.floor(lastStage.stageStride / 2) + 1) / multiPassThreadCount,
+  );
 
   return stages;
 };
@@ -172,9 +179,13 @@ export const getPackedStockhamR2cVariant = (
     };
   }
 
+  const radixStageList = expandRadix8PreferredStages(packedWindowSize);
+  if (radixStageList === undefined) {
+    return undefined;
+  }
   const stages = createMultiPassStages(
     packedWindowSize,
-    expandRadixStages(radixStageCounts),
+    radixStageList,
     device.limits.maxComputeWorkgroupsPerDimension,
   );
   if (stages === undefined) {

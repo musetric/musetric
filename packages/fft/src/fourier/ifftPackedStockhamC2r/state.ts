@@ -27,9 +27,7 @@ type SinglePassBindGroups = {
 
 type MultiPassBindGroups = {
   kind: 'multiPass';
-  prepack: GPUBindGroup;
   stages: GPUBindGroup[];
-  unpack: GPUBindGroup;
 };
 
 type BindGroups = SinglePassBindGroups | MultiPassBindGroups;
@@ -102,18 +100,6 @@ export const createStateCell = (
         );
         const bindGroups: MultiPassBindGroups = {
           kind: 'multiPass',
-          prepack: device.createBindGroup({
-            label: 'packed-stockham-c2r-multipass-prepack-bind-group',
-            layout: pipeline.prepack.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: { buffer: spectrum } },
-              { binding: 1, resource: { buffer: arg.wave } },
-              { binding: 2, resource: { buffer: scratch.buffer0 } },
-              { binding: 3, resource: { buffer: scratch.buffer1 } },
-              { binding: 4, resource: { buffer: tables.r2c } },
-              { binding: 5, resource: { buffer: params.buffer } },
-            ],
-          }),
           stages: pipeline.stages.map((stagePipeline) =>
             device.createBindGroup({
               label: 'packed-stockham-c2r-multipass-stage-bind-group',
@@ -123,19 +109,12 @@ export const createStateCell = (
                 { binding: 1, resource: { buffer: scratch.buffer1 } },
                 { binding: 2, resource: { buffer: tables.fft } },
                 { binding: 3, resource: { buffer: params.buffer } },
+                { binding: 4, resource: { buffer: spectrum } },
+                { binding: 5, resource: { buffer: arg.wave } },
+                { binding: 6, resource: { buffer: tables.r2c } },
               ],
             }),
           ),
-          unpack: device.createBindGroup({
-            label: 'packed-stockham-c2r-multipass-unpack-bind-group',
-            layout: pipeline.unpack.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: { buffer: arg.wave } },
-              { binding: 1, resource: { buffer: scratch.buffer0 } },
-              { binding: 2, resource: { buffer: scratch.buffer1 } },
-              { binding: 3, resource: { buffer: params.buffer } },
-            ],
-          }),
         };
 
         return {

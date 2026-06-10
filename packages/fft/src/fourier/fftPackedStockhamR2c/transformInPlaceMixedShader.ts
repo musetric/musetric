@@ -20,8 +20,7 @@ struct Params {
   windowCount: u32,
 };
 
-var<workgroup> smReal: array<f32, packedWindowSize>;
-var<workgroup> smImag: array<f32, packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -157,12 +156,11 @@ fn getFftTwiddle(index: u32) -> vec2<f32> {
 }
 
 fn getResult(index: u32) -> vec2<f32> {
-  return vec2<f32>(smReal[index], smImag[index]);
+  return sm[index];
 }
 
 fn store(index: u32, value: vec2<f32>) {
-  smReal[index] = value.x;
-  smImag[index] = value.y;
+  sm[index] = value;
 }
 
 fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {

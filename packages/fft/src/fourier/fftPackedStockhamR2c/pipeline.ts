@@ -1,4 +1,3 @@
-import { multiPassPackShader } from './multiPassPackShader.js';
 import { multiPassStageShader } from './multiPassStageShader.js';
 import {
   type PackedStockhamR2cStage,
@@ -17,7 +16,6 @@ export type SinglePassPipeline = {
 export type MultiPassPipeline = {
   kind: 'multiPass';
   stages: GPUComputePipeline[];
-  pack: GPUComputePipeline;
 };
 
 export type Pipeline = SinglePassPipeline | MultiPassPipeline;
@@ -100,6 +98,7 @@ const createInPlaceMixedConstants = (
 const createMultiPassStageConstants = (
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
   stage: PackedStockhamR2cStage,
+  stageIndex: number,
   inPlace: boolean,
 ) => ({
   packedWindowSize: variant.packedWindowSize,
@@ -109,13 +108,7 @@ const createMultiPassStageConstants = (
   readFromInput: stage.readFromInput ? 1 : 0,
   readBufferIndex: stage.readBufferIndex,
   writeBufferIndex: stage.writeBufferIndex,
-});
-
-const createMultiPassPackConstants = (
-  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  finalReadBufferIndex: variant.finalReadBufferIndex,
+  fuseR2cPack: stageIndex === variant.stages.length - 1 ? 1 : 0,
 });
 
 const createSinglePassPipeline = (
@@ -167,33 +160,25 @@ const createMultiPassPipeline = (
     label: 'packed-stockham-r2c-multipass-stage-shader',
     code: multiPassStageShader,
   });
-  const packModule = device.createShaderModule({
-    label: 'packed-stockham-r2c-multipass-pack-shader',
-    code: multiPassPackShader,
-  });
 
   return {
     kind: 'multiPass',
-    stages: variant.stages.map((stage) =>
+    stages: variant.stages.map((stage, stageIndex) =>
       device.createComputePipeline({
         label: 'packed-stockham-r2c-multipass-stage-pipeline',
         layout: 'auto',
         compute: {
           module: stageModule,
           entryPoint: 'main',
-          constants: createMultiPassStageConstants(variant, stage, inPlace),
+          constants: createMultiPassStageConstants(
+            variant,
+            stage,
+            stageIndex,
+            inPlace,
+          ),
         },
       }),
     ),
-    pack: device.createComputePipeline({
-      label: 'packed-stockham-r2c-multipass-pack-pipeline',
-      layout: 'auto',
-      compute: {
-        module: packModule,
-        entryPoint: 'main',
-        constants: createMultiPassPackConstants(variant),
-      },
-    }),
   };
 };
 

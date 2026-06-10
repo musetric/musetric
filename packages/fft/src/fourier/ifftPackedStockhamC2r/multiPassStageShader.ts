@@ -4,8 +4,12 @@ override factor: u32 = 5u;
 override stageStride: u32 = 1u;
 override readBufferIndex: u32 = 1u;
 override writeBufferIndex: u32 = 0u;
+override readFromPrepack: u32 = 0u;
+override writeToSignal: u32 = 0u;
+override inPlace: u32 = 1u;
 
 const threadCount: u32 = 64u;
+const sqrt1_2: f32 = 0.70710678118654752440;
 const sin3: f32 = 0.86602540378443864676;
 const cos5a: f32 = 0.30901699437494742410;
 const cos5b: f32 = -0.80901699437494742410;
@@ -21,6 +25,16 @@ struct Params {
 @group(0) @binding(1) var<storage, read_write> scratch1: array<vec2<f32>>;
 @group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
 @group(0) @binding(3) var<uniform> params: Params;
+@group(0) @binding(4) var<storage, read> sourceSpectrum: array<f32>;
+@group(0) @binding(5) var<storage, read_write> signal: array<f32>;
+@group(0) @binding(6) var<storage, read> r2cTrigTable: array<f32>;
+
+// Per-invocation window offsets, set once in main so the fused prepack read
+// and signal write paths can recover local indices without changing the
+// butterfly codelets' readScratch/writeScratch call sites.
+var<private> windowScratchOffset: u32;
+var<private> windowSpectrumOffset: u32;
+var<private> windowSignalOffset: u32;
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
@@ -31,7 +45,42 @@ fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
 
+fn readSpectrumFloat(index: u32) -> f32 {
+  if (inPlace == 1u) {
+    return signal[windowSpectrumOffset + index];
+  }
+  return sourceSpectrum[windowSpectrumOffset + index];
+}
+
+fn readSpectrumBin(k: u32) -> vec2<f32> {
+  let index = 2u * k;
+  return vec2<f32>(readSpectrumFloat(index), readSpectrumFloat(index + 1u));
+}
+
+// C2R combine: fold the half-spectrum bin k and its mirror (N-k) into the
+// packed complex sample feeding the size-(N/2) inverse FFT.
+fn loadPackedSpectrum(k: u32) -> vec2<f32> {
+  if (k == 0u) {
+    let dc = readSpectrumFloat(0u);
+    let nyquist = readSpectrumFloat(2u * packedWindowSize);
+    return vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
+  }
+
+  let mirrorK = packedWindowSize - k;
+  let a = readSpectrumBin(k);
+  let mirror = readSpectrumBin(mirrorK);
+  let b = vec2<f32>(mirror.x, -mirror.y);
+  let even = 0.5 * (a + b);
+  let diff = 0.5 * (a - b);
+  let invTwiddle = vec2<f32>(r2cTrigTable[2u * k], r2cTrigTable[2u * k + 1u]);
+  let odd = mul(diff, invTwiddle);
+  return even + vec2<f32>(-odd.y, odd.x);
+}
+
 fn readScratch(index: u32) -> vec2<f32> {
+  if (readFromPrepack == 1u) {
+    return loadPackedSpectrum(index - windowScratchOffset);
+  }
   if (readBufferIndex == 0u) {
     return scratch0[index];
   }
@@ -39,6 +88,13 @@ fn readScratch(index: u32) -> vec2<f32> {
 }
 
 fn writeScratch(index: u32, value: vec2<f32>) {
+  if (writeToSignal == 1u) {
+    let localIndex = index - windowScratchOffset;
+    let scaled = value * (1.0 / f32(packedWindowSize));
+    signal[windowSignalOffset + 2u * localIndex] = scaled.x;
+    signal[windowSignalOffset + 2u * localIndex + 1u] = scaled.y;
+    return;
+  }
   if (writeBufferIndex == 0u) {
     scratch0[index] = value;
   } else {
@@ -66,8 +122,66 @@ fn main(
   let block = j / stageStride;
   let twiddleScale = packedWindowSize / (stageStride * factor);
   let scratchOffset = packedWindowSize * windowIndex;
+  windowScratchOffset = scratchOffset;
+  windowSpectrumOffset = (params.windowSize + 2u) * windowIndex;
+  windowSignalOffset = params.windowSize * windowIndex;
 
-  if (factor == 2u) {
+  if (factor == 8u) {
+    let base = block * stageStride + k;
+    let tw = k * twiddleScale;
+    let a0 = readScratch(scratchOffset + base);
+    let a1 = mul(readScratch(scratchOffset + base + butterflyCount),
+      getInvTwiddle(tw));
+    let a2 = mul(readScratch(scratchOffset + base + 2u * butterflyCount),
+      getInvTwiddle(2u * tw));
+    let a3 = mul(readScratch(scratchOffset + base + 3u * butterflyCount),
+      getInvTwiddle(3u * tw));
+    let a4 = mul(readScratch(scratchOffset + base + 4u * butterflyCount),
+      getInvTwiddle(4u * tw));
+    let a5 = mul(readScratch(scratchOffset + base + 5u * butterflyCount),
+      getInvTwiddle(5u * tw));
+    let a6 = mul(readScratch(scratchOffset + base + 6u * butterflyCount),
+      getInvTwiddle(6u * tw));
+    let a7 = mul(readScratch(scratchOffset + base + 7u * butterflyCount),
+      getInvTwiddle(7u * tw));
+    // inverse radix-8: conjugate W8 rotations vs the forward.
+    let e0 = a0 + a4;
+    let e1 = a0 - a4;
+    let e2 = a2 + a6;
+    let e3 = a2 - a6;
+    let E0 = e0 + e2;
+    let E1 = e1 + vec2<f32>(-e3.y, e3.x);
+    let E2 = e0 - e2;
+    let E3 = e1 + vec2<f32>(e3.y, -e3.x);
+    let f0 = a1 + a5;
+    let f1 = a1 - a5;
+    let f2 = a3 + a7;
+    let f3 = a3 - a7;
+    let O0 = f0 + f2;
+    let O1 = f1 + vec2<f32>(-f3.y, f3.x);
+    let O2 = f0 - f2;
+    let O3 = f1 + vec2<f32>(f3.y, -f3.x);
+    let p0 = O0;
+    let p1 = vec2<f32>(sqrt1_2 * (O1.x - O1.y), sqrt1_2 * (O1.x + O1.y));
+    let p2 = vec2<f32>(-O2.y, O2.x);
+    let p3 = vec2<f32>(-sqrt1_2 * (O3.x + O3.y), sqrt1_2 * (O3.x - O3.y));
+    let o0 = block * (stageStride * 8u) + k;
+    let o1 = o0 + stageStride;
+    let o2 = o1 + stageStride;
+    let o3 = o2 + stageStride;
+    let o4 = o3 + stageStride;
+    let o5 = o4 + stageStride;
+    let o6 = o5 + stageStride;
+    let o7 = o6 + stageStride;
+    writeScratch(scratchOffset + o0, E0 + p0);
+    writeScratch(scratchOffset + o1, E1 + p1);
+    writeScratch(scratchOffset + o2, E2 + p2);
+    writeScratch(scratchOffset + o3, E3 + p3);
+    writeScratch(scratchOffset + o4, E0 - p0);
+    writeScratch(scratchOffset + o5, E1 - p1);
+    writeScratch(scratchOffset + o6, E2 - p2);
+    writeScratch(scratchOffset + o7, E3 - p3);
+  } else if (factor == 2u) {
     let aIndex = block * stageStride + k;
     let bIndex = aIndex + butterflyCount;
     let a = readScratch(scratchOffset + aIndex);
