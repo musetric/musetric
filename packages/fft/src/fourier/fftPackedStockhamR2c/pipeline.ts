@@ -1,6 +1,7 @@
+import { multiPassPairStageShader } from './multiPassPairStageShader.js';
 import { multiPassStageShader } from './multiPassStageShader.js';
 import {
-  type PackedStockhamR2cStage,
+  type PackedStockhamR2cKernel,
   type PackedStockhamR2cVariant,
 } from './support.js';
 import { transformInPlaceMixedShader } from './transformInPlaceMixedShader.js';
@@ -95,21 +96,36 @@ const createInPlaceMixedConstants = (
   };
 };
 
-const createMultiPassStageConstants = (
+const createMultiPassKernelConstants = (
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  stage: PackedStockhamR2cStage,
-  stageIndex: number,
+  kernel: PackedStockhamR2cKernel,
   inPlace: boolean,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  inPlace: inPlace ? 1 : 0,
-  factor: stage.factor,
-  stageStride: stage.stageStride,
-  readFromInput: stage.readFromInput ? 1 : 0,
-  readBufferIndex: stage.readBufferIndex,
-  writeBufferIndex: stage.writeBufferIndex,
-  fuseR2cPack: stageIndex === variant.stages.length - 1 ? 1 : 0,
-});
+): Record<string, number> => {
+  const base = {
+    packedWindowSize: variant.packedWindowSize,
+    inPlace: inPlace ? 1 : 0,
+    stageStride: kernel.stageStride,
+    readFromInput: kernel.readFromInput ? 1 : 0,
+    readBufferIndex: kernel.readBufferIndex,
+    writeBufferIndex: kernel.writeBufferIndex,
+    threadCount: kernel.threadCount,
+  };
+  if (kernel.kind === 'pair') {
+    const groupsPerWorkgroup = kernel.threadCount / 8;
+    return {
+      ...base,
+      factor1: kernel.factor1,
+      factor2: kernel.factor2,
+      groupsPerWorkgroup,
+      pairSharedSize: groupsPerWorkgroup * kernel.factor1 * kernel.factor2,
+    };
+  }
+  return {
+    ...base,
+    factor: kernel.factor,
+    fuseR2cPack: kernel.fuseR2cPack ? 1 : 0,
+  };
+};
 
 const createSinglePassPipeline = (
   device: GPUDevice,
@@ -160,22 +176,21 @@ const createMultiPassPipeline = (
     label: 'packed-stockham-r2c-multipass-stage-shader',
     code: multiPassStageShader,
   });
+  const pairModule = device.createShaderModule({
+    label: 'packed-stockham-r2c-multipass-pair-stage-shader',
+    code: multiPassPairStageShader,
+  });
 
   return {
     kind: 'multiPass',
-    stages: variant.stages.map((stage, stageIndex) =>
+    stages: variant.kernels.map((kernel) =>
       device.createComputePipeline({
         label: 'packed-stockham-r2c-multipass-stage-pipeline',
         layout: 'auto',
         compute: {
-          module: stageModule,
+          module: kernel.kind === 'pair' ? pairModule : stageModule,
           entryPoint: 'main',
-          constants: createMultiPassStageConstants(
-            variant,
-            stage,
-            stageIndex,
-            inPlace,
-          ),
+          constants: createMultiPassKernelConstants(variant, kernel, inPlace),
         },
       }),
     ),
