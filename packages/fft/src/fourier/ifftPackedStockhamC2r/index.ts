@@ -1,6 +1,8 @@
 import { type CreateFourier, type Fourier } from '../types.js';
 import { createStateCell } from './state.js';
 
+const multiPassThreadCount = 64;
+
 export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
   const stateCell = createStateCell(device);
   return {
@@ -8,9 +10,42 @@ export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
       const state = stateCell.get(arg);
 
       const dispatch = (pass: GPUComputePassEncoder): void => {
-        pass.setPipeline(state.pipeline);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(state.windowCount);
+        const { variant, pipeline, bindGroups } = state;
+        if (
+          variant.kind === 'multiPass' &&
+          pipeline.kind === 'multiPass' &&
+          bindGroups.kind === 'multiPass'
+        ) {
+          const cells = Math.ceil(
+            variant.packedWindowSize / multiPassThreadCount,
+          );
+          pass.setPipeline(pipeline.prepack);
+          pass.setBindGroup(0, bindGroups.prepack);
+          pass.dispatchWorkgroups(state.windowCount, cells);
+
+          pipeline.stages.forEach((stagePipeline, index) => {
+            pass.setPipeline(stagePipeline);
+            pass.setBindGroup(0, bindGroups.stages[index]);
+            pass.dispatchWorkgroups(
+              state.windowCount,
+              variant.stages[index].workgroupCount,
+            );
+          });
+
+          pass.setPipeline(pipeline.unpack);
+          pass.setBindGroup(0, bindGroups.unpack);
+          pass.dispatchWorkgroups(state.windowCount, cells);
+          return;
+        }
+
+        if (
+          pipeline.kind === 'singlePass' &&
+          bindGroups.kind === 'singlePass'
+        ) {
+          pass.setPipeline(pipeline.transform);
+          pass.setBindGroup(0, bindGroups.transform);
+          pass.dispatchWorkgroups(state.windowCount);
+        }
       };
 
       const ref: Fourier = {

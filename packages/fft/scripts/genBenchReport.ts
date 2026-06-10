@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   formatBenchMarkdown,
   formatBenchTimestamp,
+  type FourierBenchDirection,
   type FourierBenchMode,
   type FourierBenchSummary,
 } from '../src/fourier/__test__/bench.es.js';
@@ -11,6 +12,20 @@ import {
 const cwd = process.cwd();
 const tmpCufftJsonPath = resolve(cwd, '.bench-cufft.json');
 const outputDirectory = resolve(cwd, 'tmp/bench');
+
+type BenchGroup = {
+  direction: FourierBenchDirection;
+  count: number;
+  summariesByMode: Partial<Record<FourierBenchMode, FourierBenchSummary>>;
+};
+
+const directionPrefix: Record<FourierBenchDirection, string> = {
+  forward: 'f',
+  inverse: 'i',
+};
+
+const groupKey = (summary: FourierBenchSummary): string =>
+  `${summary.direction}_${summary.count}`;
 
 const normalizeSummary = (summary: FourierBenchSummary): void => {
   summary.means = summary.means.map((value) =>
@@ -23,45 +38,42 @@ const normalizeSummary = (summary: FourierBenchSummary): void => {
 
 const collectBenchSummaries = (
   summaries: FourierBenchSummary[],
-): Map<number, Partial<Record<FourierBenchMode, FourierBenchSummary>>> => {
-  const summariesByCount = new Map<
-    number,
-    Partial<Record<FourierBenchMode, FourierBenchSummary>>
-  >();
+): Map<string, BenchGroup> => {
+  const groups = new Map<string, BenchGroup>();
 
   for (const summary of summaries) {
     normalizeSummary(summary);
-    const summariesByMode = summariesByCount.get(summary.count) ?? {};
-    summariesByMode[summary.mode] = summary;
-    summariesByCount.set(summary.count, summariesByMode);
+    const key = groupKey(summary);
+    const group = groups.get(key) ?? {
+      direction: summary.direction,
+      count: summary.count,
+      summariesByMode: {},
+    };
+    group.summariesByMode[summary.mode] = summary;
+    groups.set(key, group);
   }
 
-  return summariesByCount;
+  return groups;
 };
 
 export const writeBenchReport = (
   webgpuSummaries: FourierBenchSummary[],
   cufftSummaries?: FourierBenchSummary[],
 ): void => {
-  const summariesByCount = collectBenchSummaries(webgpuSummaries);
-
-  if (cufftSummaries !== undefined) {
-    for (const summary of cufftSummaries) {
-      normalizeSummary(summary);
-      const summariesByMode = summariesByCount.get(summary.count) ?? {};
-      summariesByMode[summary.mode] = summary;
-      summariesByCount.set(summary.count, summariesByMode);
-    }
-  }
+  const groups = collectBenchSummaries([
+    ...webgpuSummaries,
+    ...(cufftSummaries ?? []),
+  ]);
 
   mkdirSync(outputDirectory, { recursive: true });
 
-  for (const [count, summariesByMode] of [...summariesByCount.entries()].sort(
-    (left, right) => left[0] - right[0],
-  )) {
-    const summaryKeys = Object.keys(summariesByMode);
+  const sortedGroups = [...groups.values()].sort(
+    (left, right) =>
+      left.direction.localeCompare(right.direction) || left.count - right.count,
+  );
 
-    if (summaryKeys.length < 1) {
+  for (const { direction, count, summariesByMode } of sortedGroups) {
+    if (Object.keys(summariesByMode).length < 1) {
       continue;
     }
 
@@ -70,7 +82,7 @@ export const writeBenchReport = (
 
     const filePath = resolve(
       outputDirectory,
-      `count${count}_${formatBenchTimestamp(timestamp)}.md`,
+      `${directionPrefix[direction]}count${count}_${formatBenchTimestamp(timestamp)}.md`,
     );
 
     writeFileSync(filePath, formatBenchMarkdown(summariesByMode), 'utf-8');

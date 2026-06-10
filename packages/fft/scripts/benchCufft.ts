@@ -18,6 +18,9 @@ const cudaSuccess = 0;
 const cufftSuccess = 0;
 const cudaMemcpyHostToDevice = 1;
 const cufftR2c = 0x2a;
+const cufftC2r = 0x2c;
+
+type BenchDirection = 'forward' | 'inverse';
 
 const dllPairs = [
   { cudart: 'cudart64_13', cufft: 'cufft64_12' },
@@ -115,6 +118,7 @@ const measureOneRun = (
   cudart: LibraryHandle,
   cufft: LibraryHandle,
   runsPerSample: number,
+  direction: BenchDirection,
 ): number => {
   const cudaEventCreate = cudart.func(
     'int cudaEventCreate(_Out_ void **event)',
@@ -132,9 +136,10 @@ const measureOneRun = (
   const cudaGetErrorString = cudart.func(
     'const char *cudaGetErrorString(int error)',
   );
-  const cufftExecR2C = cufft.func(
-    'int cufftExecR2C(int plan, void *idata, void *odata)',
-  );
+  const cufftExec =
+    direction === 'inverse'
+      ? cufft.func('int cufftExecC2R(int plan, void *idata, void *odata)')
+      : cufft.func('int cufftExecR2C(int plan, void *idata, void *odata)');
 
   // eslint-disable-next-line musetric/no-null-literal
   const startEvent: Array<bigint | null> = [null];
@@ -175,9 +180,7 @@ const measureOneRun = (
   }
 
   for (let i = 0; i < runsPerSample; i++) {
-    if (
-      !checkCufft(cufftExecR2C(plan, deviceInput, deviceOutput), 'cufftExecR2C')
-    ) {
+    if (!checkCufft(cufftExec(plan, deviceInput, deviceOutput), 'cufftExec')) {
       cudaEventDestroy(startEvent[0]);
       cudaEventDestroy(stopEvent[0]);
       return -1;
@@ -235,6 +238,7 @@ const measureBatch = (
   cudart: LibraryHandle,
   cufft: LibraryHandle,
   runsPerSample: number,
+  direction: BenchDirection,
 ): number[] => {
   const values: number[] = [];
 
@@ -246,6 +250,7 @@ const measureBatch = (
       cudart,
       cufft,
       runsPerSample,
+      direction,
     );
 
     if (ms < 0) {
@@ -263,6 +268,7 @@ const measureOne = (
   windowCount: number,
   cudart: LibraryHandle,
   cufft: LibraryHandle,
+  direction: BenchDirection,
 ):
   | {
       mean: number;
@@ -285,8 +291,14 @@ const measureOne = (
   );
   const cufftDestroy = cufft.func('int cufftDestroy(int plan)');
 
-  const outputSize = (Math.floor(windowSize / 2) + 1) * windowCount;
-  const input = createBenchWave(windowSize, windowCount);
+  const complexSize = (Math.floor(windowSize / 2) + 1) * windowCount;
+  const realSize = windowSize * windowCount;
+  // Forward R2C: real (windowSize) -> complex (N/2+1). Inverse C2R reverses it.
+  const input =
+    direction === 'inverse'
+      ? createBenchWave(2 * (Math.floor(windowSize / 2) + 1), windowCount)
+      : createBenchWave(windowSize, windowCount);
+  const outputBytes = direction === 'inverse' ? realSize * 4 : complexSize * 8;
 
   // eslint-disable-next-line musetric/no-null-literal
   const deviceInput: Array<bigint | null> = [null];
@@ -304,7 +316,7 @@ const measureOne = (
   const deviceOutput: Array<bigint | null> = [null];
   if (
     !checkCuda(
-      cudaMalloc(deviceOutput, outputSize * 8),
+      cudaMalloc(deviceOutput, outputBytes),
       'cudaMalloc(output)',
       cudaGetErrorString,
     )
@@ -332,8 +344,10 @@ const measureOne = (
 
   const plan = [0];
   const n = Int32Array.of(windowSize);
-  const inembed = Int32Array.of(windowSize);
-  const onembed = Int32Array.of(Math.floor(windowSize / 2) + 1);
+  const positiveSize = Math.floor(windowSize / 2) + 1;
+  const inverse = direction === 'inverse';
+  const inembed = Int32Array.of(inverse ? positiveSize : windowSize);
+  const onembed = Int32Array.of(inverse ? windowSize : positiveSize);
 
   if (
     !checkCufft(
@@ -343,11 +357,11 @@ const measureOne = (
         n,
         inembed,
         1,
-        windowSize,
+        inverse ? positiveSize : windowSize,
         onembed,
         1,
-        Math.floor(windowSize / 2) + 1,
-        cufftR2c,
+        inverse ? windowSize : positiveSize,
+        inverse ? cufftC2r : cufftR2c,
         windowCount,
       ),
       'cufftPlanMany',
@@ -370,6 +384,7 @@ const measureOne = (
         cudart,
         cufft,
         runsPerSample,
+        direction,
       );
 
       if (batch.length === 0) {
@@ -403,6 +418,8 @@ const measureOne = (
   }
 };
 
+const benchDirections: BenchDirection[] = ['forward', 'inverse'];
+
 const runBenchmark = (
   cudart: LibraryHandle,
   cufft: LibraryHandle,
@@ -410,47 +427,56 @@ const runBenchmark = (
   const timestamp = createBenchTimestamp();
   const results: FourierBenchSummary[] = [];
 
-  for (const windowCount of benchConfig.windowCounts) {
-    const windowSizes: number[] = [];
-    const means: number[] = [];
-    const cvs: number[] = [];
-    const sampleCounts: number[] = [];
+  for (const direction of benchDirections) {
+    for (const windowCount of benchConfig.windowCounts) {
+      const windowSizes: number[] = [];
+      const means: number[] = [];
+      const cvs: number[] = [];
+      const sampleCounts: number[] = [];
 
-    let hasSupportedResult = false;
+      let hasSupportedResult = false;
 
-    for (const windowSize of benchConfig.windowSizes) {
-      windowSizes.push(windowSize);
+      for (const windowSize of benchConfig.windowSizes) {
+        windowSizes.push(windowSize);
 
-      const measureResult = measureOne(windowSize, windowCount, cudart, cufft);
+        const measureResult = measureOne(
+          windowSize,
+          windowCount,
+          cudart,
+          cufft,
+          direction,
+        );
 
-      if (measureResult) {
-        means.push(measureResult.mean);
-        cvs.push(measureResult.cv);
-        sampleCounts.push(measureResult.sampleCount);
-        hasSupportedResult = true;
-      } else {
-        means.push(Number.NaN);
-        cvs.push(Number.NaN);
-        sampleCounts.push(0);
+        if (measureResult) {
+          means.push(measureResult.mean);
+          cvs.push(measureResult.cv);
+          sampleCounts.push(measureResult.sampleCount);
+          hasSupportedResult = true;
+        } else {
+          means.push(Number.NaN);
+          cvs.push(Number.NaN);
+          sampleCounts.push(0);
+        }
       }
+
+      if (!hasSupportedResult) {
+        continue;
+      }
+
+      const maxSampleCount = Math.max(...sampleCounts);
+
+      results.push({
+        timestamp,
+        direction,
+        count: windowCount,
+        mode: 'cufft',
+        modeLabel: 'cuFFT',
+        windowSizes,
+        means,
+        cvs,
+        sampleCount: maxSampleCount,
+      });
     }
-
-    if (!hasSupportedResult) {
-      continue;
-    }
-
-    const maxSampleCount = Math.max(...sampleCounts);
-
-    results.push({
-      timestamp,
-      count: windowCount,
-      mode: 'cufft',
-      modeLabel: 'cuFFT',
-      windowSizes,
-      means,
-      cvs,
-      sampleCount: maxSampleCount,
-    });
   }
 
   return results;
