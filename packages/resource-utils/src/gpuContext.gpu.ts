@@ -13,8 +13,12 @@ export const createGpuContext = async (
   const device = await adapter.requestDevice({
     requiredFeatures: profiling ? ['timestamp-query'] : undefined,
     requiredLimits: {
+      maxBufferSize: adapter.limits.maxBufferSize,
+      maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
       maxComputeWorkgroupStorageSize:
         adapter.limits.maxComputeWorkgroupStorageSize,
+      maxComputeWorkgroupsPerDimension:
+        adapter.limits.maxComputeWorkgroupsPerDimension,
     },
   });
   return { adapter, device };
