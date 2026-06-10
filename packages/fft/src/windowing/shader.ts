@@ -2,6 +2,7 @@ export const shader = `
 struct WindowingParams {
   windowSize: u32,
   paddedWindowSize: u32,
+  signalStride: u32,
   windowCount: u32,
 };
 
@@ -12,7 +13,7 @@ struct WindowingParams {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowSize = params.windowSize;
-  let paddedWindowSize = params.paddedWindowSize;
+  let signalStride = params.signalStride;
   let windowCount = params.windowCount;
   
   let sampleIndex = gid.x;
@@ -20,7 +21,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (sampleIndex >= windowSize || windowIndex >= windowCount) {
     return;
   }
-  let offset = paddedWindowSize * windowIndex + sampleIndex;
+  let offset = signalStride * windowIndex + sampleIndex;
   let weight = windowFunction[sampleIndex];
   signal[offset] *= weight;
 }

@@ -9,12 +9,11 @@ struct Params {
   windowCount: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> signalReal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> signalImag: array<f32>;
-@group(0) @binding(2) var<storage, read> scratch0: array<vec2<f32>>;
-@group(0) @binding(3) var<storage, read> scratch1: array<vec2<f32>>;
-@group(0) @binding(4) var<storage, read> r2cTrigTable: array<f32>;
-@group(0) @binding(5) var<uniform> params: Params;
+@group(0) @binding(0) var<storage, read_write> spectrum: array<f32>;
+@group(0) @binding(1) var<storage, read> scratch0: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> scratch1: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(4) var<uniform> params: Params;
 
 fn readResult(windowIndex: u32, index: u32) -> vec2<f32> {
   let offset = packedWindowSize * windowIndex + index;
@@ -42,9 +41,14 @@ fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
   return even + product;
 }
 
-fn writeBin(windowOffset: u32, k: u32, value: vec2<f32>) {
-  signalReal[windowOffset + k] = value.x;
-  signalImag[windowOffset + k] = value.y;
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
+  let index = spectrumOffset + 2u * k;
+  spectrum[index] = value.x;
+  spectrum[index + 1u] = value.y;
 }
 
 @compute @workgroup_size(threadCount)
@@ -62,15 +66,15 @@ fn main(
     return;
   }
 
-  let windowOffset = params.windowSize * windowIndex;
+  let spectrumOffset = complexStride() * windowIndex;
   if (k == 0u) {
     let z0 = readResult(windowIndex, 0u);
-    writeBin(windowOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
-    writeBin(windowOffset, packedWindowSize, vec2<f32>(z0.x - z0.y, 0.0));
+    writeBin(spectrumOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
+    writeBin(spectrumOffset, packedWindowSize, vec2<f32>(z0.x - z0.y, 0.0));
   } else if (k < packedWindowSize) {
     let value = readResult(windowIndex, k);
     let mirrorValue = readResult(windowIndex, packedWindowSize - k);
-    writeBin(windowOffset, k, r2cBin(k, value, mirrorValue));
+    writeBin(spectrumOffset, k, r2cBin(k, value, mirrorValue));
   }
 }
 `;

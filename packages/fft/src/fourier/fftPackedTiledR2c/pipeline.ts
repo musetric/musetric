@@ -12,10 +12,12 @@ export type Pipelines = {
 
 const createFirstPassConstants = (
   variant: PackedTiledR2cVariant,
+  inPlace: boolean,
 ): Record<string, number> => {
   if (variant.kind === 'tiledMixed') {
     return {
       packedWindowSize: variant.packedWindowSize,
+      inPlace: inPlace ? 1 : 0,
       tileSize: variant.tileSize,
       rowSize: variant.rowSize,
       columnSize: variant.columnSize,
@@ -25,6 +27,7 @@ const createFirstPassConstants = (
 
   return {
     packedWindowSize: variant.packedWindowSize,
+    inPlace: inPlace ? 1 : 0,
     tileSize: variant.tileSize,
     rowSize: variant.rowSize,
     rowHalfSize: variant.rowHalfSize,
@@ -64,6 +67,7 @@ const createSecondPassConstants = (
 export const createPipelines = (
   device: GPUDevice,
   variant: PackedTiledR2cVariant,
+  inPlace: boolean,
 ): Pipelines => {
   const mixed = variant.kind === 'tiledMixed';
   const firstPassModule = device.createShaderModule({
@@ -82,7 +86,7 @@ export const createPipelines = (
       compute: {
         module: firstPassModule,
         entryPoint: 'main',
-        constants: createFirstPassConstants(variant),
+        constants: createFirstPassConstants(variant, inPlace),
       },
     }),
     secondPass: device.createComputePipeline({

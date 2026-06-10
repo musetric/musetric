@@ -51,18 +51,22 @@ const createTransformConstants = (
     PackedStockhamC2rVariant,
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
+  inPlace: boolean,
 ) => ({
   packedWindowSize: variant.packedWindowSize,
   positiveWindowSize: variant.positiveWindowSize,
+  inPlace: inPlace ? 1 : 0,
   threadCount: selectTransformThreadCount(variant),
   ...variant.radixStageCounts,
 });
 
 const createPrepackConstants = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ) => ({
   packedWindowSize: variant.packedWindowSize,
   positiveWindowSize: variant.positiveWindowSize,
+  inPlace: inPlace ? 1 : 0,
   writeBufferIndex: variant.prepackWriteBufferIndex,
 });
 
@@ -90,6 +94,7 @@ const createSinglePassPipeline = (
     PackedStockhamC2rVariant,
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
+  inPlace: boolean,
 ): SinglePassPipeline => {
   const module = device.createShaderModule({
     label: 'packed-stockham-c2r-transform-shader',
@@ -106,7 +111,7 @@ const createSinglePassPipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createTransformConstants(variant),
+        constants: createTransformConstants(variant, inPlace),
       },
     }),
   };
@@ -115,6 +120,7 @@ const createSinglePassPipeline = (
 const createMultiPassPipeline = (
   device: GPUDevice,
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ): MultiPassPipeline => {
   const prepackModule = device.createShaderModule({
     label: 'packed-stockham-c2r-multipass-prepack-shader',
@@ -137,7 +143,7 @@ const createMultiPassPipeline = (
       compute: {
         module: prepackModule,
         entryPoint: 'main',
-        constants: createPrepackConstants(variant),
+        constants: createPrepackConstants(variant, inPlace),
       },
     }),
     stages: variant.stages.map((stage) =>
@@ -166,9 +172,10 @@ const createMultiPassPipeline = (
 export const createPipeline = (
   device: GPUDevice,
   variant: PackedStockhamC2rVariant,
+  inPlace: boolean,
 ): Pipeline => {
   if (variant.kind === 'multiPass') {
-    return createMultiPassPipeline(device, variant);
+    return createMultiPassPipeline(device, variant, inPlace);
   }
-  return createSinglePassPipeline(device, variant);
+  return createSinglePassPipeline(device, variant, inPlace);
 };

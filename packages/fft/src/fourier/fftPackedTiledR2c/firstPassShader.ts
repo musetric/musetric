@@ -5,6 +5,7 @@ override rowSize: u32 = 64u;
 override rowHalfSize: u32 = 32u;
 override columnSize: u32 = 64u;
 override log2RowSize: u32 = 6u;
+override inPlace: u32 = 1u;
 
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
@@ -19,14 +20,33 @@ var<workgroup> smImag0: array<f32, batchSize * tileSize>;
 var<workgroup> smReal1: array<f32, batchSize * tileSize>;
 var<workgroup> smImag1: array<f32, batchSize * tileSize>;
 
-@group(0) @binding(0) var<storage, read> signalReal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> scratch: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read> rowTrigTable: array<f32>;
-@group(0) @binding(3) var<storage, read> fourStepTrigTable: array<f32>;
-@group(0) @binding(4) var<uniform> params: Params;
+@group(0) @binding(0) var<storage, read> wave: array<f32>;
+@group(0) @binding(1) var<storage, read> spectrum: array<f32>;
+@group(0) @binding(2) var<storage, read_write> scratch: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> rowTrigTable: array<f32>;
+@group(0) @binding(4) var<storage, read> fourStepTrigTable: array<f32>;
+@group(0) @binding(5) var<uniform> params: Params;
 
 fn smIndex(lane: u32, index: u32) -> u32 {
   return lane * tileSize + index;
+}
+
+fn complexStride() -> u32 {
+  return params.windowSize + 2u;
+}
+
+fn getInputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return complexStride() * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
+fn readInput(inputOffset: u32, sampleIndex: u32) -> f32 {
+  if (inPlace == 1u) {
+    return spectrum[inputOffset + sampleIndex];
+  }
+  return wave[inputOffset + sampleIndex];
 }
 
 fn runRowFft(t: u32, lane: u32) {
@@ -106,14 +126,14 @@ fn main(
 
   let t = localId.x;
   let lane = localId.y;
+  let inputOffset = getInputWindowOffset(windowIndex);
 
   for (var i = t; i < rowSize; i += threadCount) {
     if (n1 < columnSize) {
       let packedIndex = i * columnSize + n1;
       let sampleIndex = packedIndex * 2u;
-      let windowOffset = params.windowSize * windowIndex;
-      smReal0[smIndex(lane, i)] = signalReal[windowOffset + sampleIndex];
-      smImag0[smIndex(lane, i)] = signalReal[windowOffset + sampleIndex + 1u];
+      smReal0[smIndex(lane, i)] = readInput(inputOffset, sampleIndex);
+      smImag0[smIndex(lane, i)] = readInput(inputOffset, sampleIndex + 1u);
     }
   }
   workgroupBarrier();

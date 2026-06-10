@@ -6,7 +6,6 @@ import {
   createResourceCell,
   type ResourceCell,
 } from '@musetric/resource-utils';
-import { type ComplexGpuBuffer } from '@musetric/resource-utils/gpu';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { type TrackKey } from '../config.cross.js';
 import { createSpectrogramDecibelifyCell } from '../decibelify/index.js';
@@ -31,7 +30,7 @@ export type SpectrogramLaneOptions = {
 };
 
 export type SpectrogramLane = {
-  signal: ComplexGpuBuffer;
+  signal: GPUBuffer;
   fundamentalFrequencyBuffer: GPUBuffer;
   writeSamples: (samples: Float32Array, trackProgress: number) => void;
   run: (encoder: GPUCommandEncoder) => void;
@@ -82,21 +81,20 @@ export const createSpectrogramLaneCell = (
         windowCount: config.windowCount,
       });
       const sliceSamples = sliceSamplesCell.get({
-        out: signal.real,
+        out: signal,
         config,
       });
-      const windowing = windowingCell.get({ signal: signal.real, config });
+      const windowing = windowingCell.get({ signal, config });
       const fourier = fourierCell.get({ signal, config });
       const magnitudify = magnitudifyCell.get({ signal, config });
-      const decibelify = decibelifyCell.get({ signal: signal.real, config });
+      const decibelify = decibelifyCell.get({ signal, config });
       const fundamentalFrequency = fundamentalFrequencyCell.get({
-        signal: signal.real,
+        signal,
         config,
       });
 
       const run = (encoder: GPUCommandEncoder) => {
         sliceSamples.run(encoder);
-        encoder.clearBuffer(signal.imag);
         windowing.run(encoder);
         fourier.run(encoder);
         magnitudify.run(encoder);
@@ -106,7 +104,7 @@ export const createSpectrogramLaneCell = (
 
       const skip = (encoder: GPUCommandEncoder, clear: boolean) => {
         if (clear) {
-          encoder.clearBuffer(signal.real);
+          encoder.clearBuffer(signal);
           encoder.clearBuffer(fundamentalFrequency.buffer);
         }
         const emit = (marker?: GPUComputePassTimestampWrites) => {

@@ -51,8 +51,12 @@ const createRadix8StageCounts = (
   };
 };
 
-const createStockhamConstants = (variant: PackedStockhamR2cVariant) => ({
+const createStockhamConstants = (
+  variant: PackedStockhamR2cVariant,
+  inPlace: boolean,
+) => ({
   packedWindowSize: variant.packedWindowSize,
+  inPlace: inPlace ? 1 : 0,
   threadCount: selectStockhamThreadCount(variant.packedWindowSize),
   radix8StageCount: 0,
   ...variant.radixStageCounts,
@@ -61,14 +65,19 @@ const createStockhamConstants = (variant: PackedStockhamR2cVariant) => ({
     : {}),
 });
 
-const createInPlaceRadix4Constants = (variant: PackedStockhamR2cVariant) => ({
+const createInPlaceRadix4Constants = (
+  variant: PackedStockhamR2cVariant,
+  inPlace: boolean,
+) => ({
   packedWindowSize: variant.packedWindowSize,
   log2PackedWindowSize: variant.log2PackedWindowSize,
+  inPlace: inPlace ? 1 : 0,
   threadCount: selectStockhamThreadCount(variant.packedWindowSize),
 });
 
 const createInPlaceMixedConstants = (
   variant: Extract<PackedStockhamR2cVariant, { kind: 'inPlaceMixed' }>,
+  inPlace: boolean,
 ) => {
   const counts = variant.inPlaceStageCounts;
   const stageCount =
@@ -82,6 +91,7 @@ const createInPlaceMixedConstants = (
   const threadCount = stageCount <= 4 ? 128 : 256;
   return {
     packedWindowSize: variant.packedWindowSize,
+    inPlace: inPlace ? 1 : 0,
     threadCount,
     ...counts,
   };
@@ -90,8 +100,10 @@ const createInPlaceMixedConstants = (
 const createMultiPassStageConstants = (
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
   stage: PackedStockhamR2cStage,
+  inPlace: boolean,
 ) => ({
   packedWindowSize: variant.packedWindowSize,
+  inPlace: inPlace ? 1 : 0,
   factor: stage.factor,
   stageStride: stage.stageStride,
   readFromInput: stage.readFromInput ? 1 : 0,
@@ -109,20 +121,24 @@ const createMultiPassPackConstants = (
 const createSinglePassPipeline = (
   device: GPUDevice,
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ): SinglePassPipeline => {
   const isPowerOfEight =
     isPowerOfTwo(variant.packedWindowSize) &&
     variant.log2PackedWindowSize % 3 === 0;
   let shader = transformShader;
-  let constants: Record<string, number> = createStockhamConstants(variant);
+  let constants: Record<string, number> = createStockhamConstants(
+    variant,
+    inPlace,
+  );
   if (variant.kind === 'inPlaceRadix4') {
     shader = isPowerOfEight
       ? transformInPlaceRadix8Shader
       : transformInPlaceRadix4Shader;
-    constants = createInPlaceRadix4Constants(variant);
+    constants = createInPlaceRadix4Constants(variant, inPlace);
   } else if (variant.kind === 'inPlaceMixed') {
     shader = transformInPlaceMixedShader;
-    constants = createInPlaceMixedConstants(variant);
+    constants = createInPlaceMixedConstants(variant, inPlace);
   }
   const module = device.createShaderModule({
     label: 'packed-stockham-r2c-transform-shader',
@@ -145,6 +161,7 @@ const createSinglePassPipeline = (
 const createMultiPassPipeline = (
   device: GPUDevice,
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ): MultiPassPipeline => {
   const stageModule = device.createShaderModule({
     label: 'packed-stockham-r2c-multipass-stage-shader',
@@ -164,7 +181,7 @@ const createMultiPassPipeline = (
         compute: {
           module: stageModule,
           entryPoint: 'main',
-          constants: createMultiPassStageConstants(variant, stage),
+          constants: createMultiPassStageConstants(variant, stage, inPlace),
         },
       }),
     ),
@@ -183,17 +200,20 @@ const createMultiPassPipeline = (
 export function createPipeline(
   device: GPUDevice,
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ): MultiPassPipeline;
 export function createPipeline(
   device: GPUDevice,
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
+  inPlace: boolean,
 ): SinglePassPipeline;
 export function createPipeline(
   device: GPUDevice,
   variant: PackedStockhamR2cVariant,
+  inPlace: boolean,
 ): Pipeline {
   if (variant.kind === 'multiPass') {
-    return createMultiPassPipeline(device, variant);
+    return createMultiPassPipeline(device, variant, inPlace);
   }
-  return createSinglePassPipeline(device, variant);
+  return createSinglePassPipeline(device, variant, inPlace);
 }

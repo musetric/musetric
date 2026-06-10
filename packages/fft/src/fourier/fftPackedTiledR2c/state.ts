@@ -30,6 +30,7 @@ export type State = {
   tables: TrigTables;
   bindGroups: BindGroups;
   params: Params;
+  dummyInput: GPUBuffer;
   scratch: GPUBuffer;
   windowCount: number;
   firstPassXGroups: number;
@@ -56,17 +57,18 @@ const createScratchBuffer = (
 const createResources = (
   device: GPUDevice,
   variant: PackedTiledR2cVariant,
+  inPlace: boolean,
 ): Resources => ({
-  pipelines: createPipelines(device, variant),
+  pipelines: createPipelines(device, variant, inPlace),
   tables: createTrigTables(device, variant),
 });
 
-const assertInPlaceTransform = (arg: FourierArg): void => {
-  if (arg.wave !== arg.spectrum.real) {
-    throw new Error(
-      'fftPackedTiledR2c currently requires wave and spectrum.real to use the same buffer',
-    );
-  }
+const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
+  return device.createBuffer({
+    label: 'packed-tiled-r2c-dummy-input',
+    size: Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.STORAGE,
+  });
 };
 
 export const createStateCell = (
@@ -74,15 +76,17 @@ export const createStateCell = (
 ): ResourceCell<FourierArg, State> =>
   createResourceCell({
     create: (arg): State => {
-      assertInPlaceTransform(arg);
+      const inPlace = arg.wave === arg.spectrum;
       const variant = getPackedTiledR2cVariant(device, arg.config);
       if (variant === undefined) {
         throw new Error(
           `fftPackedTiledR2c does not support windowSize=${arg.config.windowSize}`,
         );
       }
-      const resources = createResources(device, variant);
+      const resources = createResources(device, variant, inPlace);
       const { pipelines, tables } = resources;
+      const dummyInput = createDummyInputBuffer(device);
+      const input = inPlace ? dummyInput : arg.wave;
       const scratch = createScratchBuffer(
         device,
         variant,
@@ -94,11 +98,12 @@ export const createStateCell = (
           label: 'packed-tiled-r2c-first-pass-bind-group',
           layout: pipelines.firstPass.getBindGroupLayout(0),
           entries: [
-            { binding: 0, resource: { buffer: arg.wave } },
-            { binding: 1, resource: { buffer: scratch } },
-            { binding: 2, resource: { buffer: tables.rowFft } },
-            { binding: 3, resource: { buffer: tables.fourStep } },
-            { binding: 4, resource: { buffer: params.buffer } },
+            { binding: 0, resource: { buffer: input } },
+            { binding: 1, resource: { buffer: arg.spectrum } },
+            { binding: 2, resource: { buffer: scratch } },
+            { binding: 3, resource: { buffer: tables.rowFft } },
+            { binding: 4, resource: { buffer: tables.fourStep } },
+            { binding: 5, resource: { buffer: params.buffer } },
           ],
         }),
         secondPass: device.createBindGroup({
@@ -106,11 +111,10 @@ export const createStateCell = (
           layout: pipelines.secondPass.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer: scratch } },
-            { binding: 1, resource: { buffer: arg.spectrum.real } },
-            { binding: 2, resource: { buffer: arg.spectrum.imag } },
-            { binding: 3, resource: { buffer: tables.columnFft } },
-            { binding: 4, resource: { buffer: tables.r2c } },
-            { binding: 5, resource: { buffer: params.buffer } },
+            { binding: 1, resource: { buffer: arg.spectrum } },
+            { binding: 2, resource: { buffer: tables.columnFft } },
+            { binding: 3, resource: { buffer: tables.r2c } },
+            { binding: 4, resource: { buffer: params.buffer } },
           ],
         }),
       };
@@ -120,6 +124,7 @@ export const createStateCell = (
         tables,
         bindGroups,
         params,
+        dummyInput,
         scratch,
         windowCount: arg.config.windowCount,
         firstPassXGroups: Math.ceil(variant.columnSize / batchSize),
@@ -128,13 +133,13 @@ export const createStateCell = (
     },
     dispose: (state) => {
       state.params.buffer.destroy();
+      state.dummyInput.destroy();
       state.scratch.destroy();
       disposeTrigTables(state.tables);
     },
     equals: (current, next) =>
       current.wave === next.wave &&
-      current.spectrum.real === next.spectrum.real &&
-      current.spectrum.imag === next.spectrum.imag &&
+      current.spectrum === next.spectrum &&
       current.config.windowSize === next.config.windowSize &&
       current.config.windowCount === next.config.windowCount,
   });

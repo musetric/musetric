@@ -2,6 +2,7 @@ export const shader = `
 struct SliceSamplesParams {
   windowSize : u32,
   paddedWindowSize : u32,
+  signalStride : u32,
   windowCount : u32,
   visibleSamples : u32,
   step : f32,
@@ -15,6 +16,7 @@ struct SliceSamplesParams {
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let windowSize = params.windowSize;
   let paddedWindowSize = params.paddedWindowSize;
+  let signalStride = params.signalStride;
   let windowCount = params.windowCount;
   let visibleSamples = params.visibleSamples;
   let step = params.step;
@@ -32,6 +34,6 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
       value = samples[srcIndex];
     }
   }
-  signal[paddedWindowSize * windowIndex + sampleIndex] = value;
+  signal[signalStride * windowIndex + sampleIndex] = value;
 }
 `;
