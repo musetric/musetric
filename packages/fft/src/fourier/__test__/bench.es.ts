@@ -34,7 +34,7 @@ export type FourierBenchConfig = {
   windowCounts: readonly number[];
 };
 
-export const benchWindowSizes = createWindowSizes(1024, 8192);
+export const benchWindowSizes = createWindowSizes(512, 1024 * 64);
 
 export const benchWindowCounts: readonly number[] = [512, 1920];
 
