@@ -1,7 +1,14 @@
 import { createGpuContext } from '@musetric/resource-utils/gpu';
 import { describe, it } from 'vitest';
-import { allFourierModes, type FourierMode } from '../config.es.js';
+import {
+  allFourierModes,
+  allIFourierModes,
+  type FourierMode,
+  type IFourierMode,
+} from '../config.es.js';
 import { fouriers } from '../fouriers.js';
+import { getPackedStockhamC2rVariant } from '../ifftPackedStockhamC2r/support.js';
+import { iffts } from '../iffts.js';
 import { type Fourier } from '../types.js';
 import {
   benchBatchSize,
@@ -178,6 +185,109 @@ const measureOne = async (
   return computeBenchStats(values);
 };
 
+const measureOneInverse = async (
+  mode: IFourierMode,
+  windowSize: number,
+  windowCount: number,
+): Promise<
+  | {
+      mean: number;
+      cv: number;
+      sampleCount: number;
+    }
+  | undefined
+> => {
+  if (
+    getPackedStockhamC2rVariant(device, { windowSize, windowCount }) ===
+    undefined
+  ) {
+    return undefined;
+  }
+
+  const positiveWindowSize = Math.floor(windowSize / 2) + 1;
+  const spectrumBytes =
+    positiveWindowSize * windowCount * Float32Array.BYTES_PER_ELEMENT;
+  const waveBytes = windowSize * windowCount * Float32Array.BYTES_PER_ELEMENT;
+
+  const real = device.createBuffer({
+    size: spectrumBytes,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  const imag = device.createBuffer({
+    size: spectrumBytes,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  const wave = device.createBuffer({
+    size: waveBytes,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+
+  device.queue.writeBuffer(
+    real,
+    0,
+    createBenchWave(positiveWindowSize, windowCount),
+  );
+  device.queue.writeBuffer(
+    imag,
+    0,
+    createBenchWave(positiveWindowSize, windowCount),
+  );
+
+  const cell = iffts[mode](device);
+
+  const values: number[] = [];
+  let runsPerSample = 1;
+
+  for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
+    const fourier = cell.get({
+      wave,
+      spectrum: { real, imag },
+      config: { windowSize, windowCount },
+    });
+
+    const timer = createGpuTimer(device, benchBatchSize * 2);
+    const encoder = device.createCommandEncoder();
+
+    measureBatch(encoder, timer, fourier, runsPerSample);
+
+    timer.resolve(encoder);
+    device.queue.submit([encoder.finish()]);
+    await device.queue.onSubmittedWorkDone();
+
+    const durations = (await timer.read()).map(
+      (duration) => duration / runsPerSample,
+    );
+    timer.dispose();
+
+    if (tryIndex === 0) {
+      runsPerSample = selectBenchRunsPerSample(durations);
+      continue;
+    }
+
+    values.push(...durations);
+
+    const { cv } = computeBenchStats(values);
+
+    if (cv <= benchStableCvPercent) {
+      console.log(
+        `i${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}%`,
+      );
+      break;
+    }
+
+    console.log(
+      `i${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${benchMaxTries - 1}`,
+    );
+  }
+
+  cell.dispose();
+  real.destroy();
+  imag.destroy();
+  wave.destroy();
+
+  return computeBenchStats(values);
+};
+
 const benchTimestamp = createBenchTimestamp();
 
 describe('FFT benchmarks', () => {
@@ -185,7 +295,7 @@ describe('FFT benchmarks', () => {
     for (const mode of allFourierModes) {
       const modeLabel = fourierModeLabels[mode];
 
-      it(`count ${windowCount} ${modeLabel}`, async (context) => {
+      it(`forward count ${windowCount} ${modeLabel}`, async (context) => {
         const { task } = context;
         const means: number[] = [];
         const cvs: number[] = [];
@@ -209,6 +319,48 @@ describe('FFT benchmarks', () => {
 
         const bench: FourierBenchSummary = {
           timestamp: benchTimestamp,
+          direction: 'forward',
+          count: windowCount,
+          mode,
+          modeLabel,
+          windowSizes: benchWindowSizes,
+          means,
+          cvs,
+          sampleCount: maxSampleCount,
+        };
+
+        Object.assign(task.meta, { bench });
+      });
+    }
+
+    for (const mode of allIFourierModes) {
+      const modeLabel = fourierModeLabels[mode];
+
+      it(`inverse count ${windowCount} ${modeLabel}`, async (context) => {
+        const { task } = context;
+        const means: number[] = [];
+        const cvs: number[] = [];
+        const sampleCounts: number[] = [];
+
+        for (const windowSize of benchWindowSizes) {
+          const result = await measureOneInverse(mode, windowSize, windowCount);
+
+          if (result) {
+            means.push(result.mean);
+            cvs.push(result.cv);
+            sampleCounts.push(result.sampleCount);
+          } else {
+            means.push(Number.NaN);
+            cvs.push(Number.NaN);
+            sampleCounts.push(0);
+          }
+        }
+
+        const maxSampleCount = Math.max(...sampleCounts);
+
+        const bench: FourierBenchSummary = {
+          timestamp: benchTimestamp,
+          direction: 'inverse',
           count: windowCount,
           mode,
           modeLabel,

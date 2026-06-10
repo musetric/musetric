@@ -1,11 +1,19 @@
-import { allFourierModes, type FourierMode } from '../config.es.js';
+import {
+  allFourierModes,
+  allIFourierModes,
+  type FourierMode,
+  type IFourierMode,
+} from '../config.es.js';
 import { formatRadixStages } from './formatRadixStages.es.js';
 import { createWindowSizes } from './windowSizes.es.js';
 
-export type FourierBenchMode = 'cufft' | FourierMode;
+export type FourierBenchDirection = 'forward' | 'inverse';
+
+export type FourierBenchMode = 'cufft' | FourierMode | IFourierMode;
 
 export type FourierBenchSummary = {
   timestamp: string;
+  direction: FourierBenchDirection;
   count: number;
   mode: FourierBenchMode;
   modeLabel: string;
@@ -147,9 +155,14 @@ export const fourierModeLabels: Record<FourierBenchMode, string> = {
   cufft: 'cuFFT',
   fftPackedStockhamR2c: 'Stockham',
   fftPackedTiledR2c: 'Tiled',
+  ifftPackedStockhamC2r: 'Stockham',
 };
 
-export const benchModeOrder: FourierBenchMode[] = ['cufft', ...allFourierModes];
+export const benchModeOrder: FourierBenchMode[] = [
+  'cufft',
+  ...allFourierModes,
+  ...allIFourierModes,
+];
 
 const padTimestamp = (value: number): string => String(value).padStart(2, '0');
 
