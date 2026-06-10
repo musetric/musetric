@@ -144,11 +144,9 @@ export const computeBenchStats = (
 };
 
 export const fourierModeLabels: Record<FourierBenchMode, string> = {
-  fftPackedFusedTiledR2c: 'FusedTiled',
+  cufft: 'cuFFT',
   fftPackedStockhamR2c: 'Stockham',
   fftPackedTiledR2c: 'Tiled',
-  fftPrunedFourStepR2c: 'FourStep',
-  cufft: 'cuFFT',
 };
 
 export const benchModeOrder: FourierBenchMode[] = ['cufft', ...allFourierModes];

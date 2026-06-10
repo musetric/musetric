@@ -24,7 +24,7 @@ export type SettingsState = Pick<
 };
 
 const initialState: SettingsState = {
-  fourierMode: 'fftPackedFusedTiledR2c',
+  fourierMode: 'fftPackedStockhamR2c',
   windowSize: 1024 * 4,
   visibleTime: 3.5,
   playheadRatio: 0.4,
