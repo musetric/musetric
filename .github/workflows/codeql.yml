@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  analyze:
+  analyze-security:
     runs-on: ubuntu-latest
     env:
       CODEQL_ACTION_FILE_COVERAGE_ON_PRS: 'true'

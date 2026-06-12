@@ -59,3 +59,4 @@ scopes:
   - deps # dependency add / update / remove
   - agent # agent guidance & config (AGENTS.md, AI tooling)
   - github # repo & GitHub Actions settings (workflows, templates)
+  - license # license headers & third-party notices
