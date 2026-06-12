@@ -5,6 +5,7 @@ on:
     types:
       - opened
       - edited
+      - synchronize
       - reopened
 
 permissions:
@@ -12,27 +13,27 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: pr-title-${{ github.event.pull_request.number }}
+  group: prTitle-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  validate-pr-title:
+  validatePrTitle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      # Allowed types/scopes live in .github/pr-title.config.yml (with inline docs).
+      # Allowed types/scopes live in .github/prTitle.config.yml (with inline docs).
       # Flatten the YAML lists into the newline-delimited strings the action expects.
       - id: config
         name: Build allowed types and scopes
         run: |
           {
             printf 'types<<EOF\n'
-            yq '.types[]' .github/pr-title.config.yml
+            yq '.types[]' .github/prTitle.config.yml
             printf 'EOF\n'
             printf 'scopes<<EOF\n'
-            yq '.scopes[]' .github/pr-title.config.yml
+            yq '.scopes[]' .github/prTitle.config.yml
             printf 'EOF\n'
           } >> "$GITHUB_OUTPUT"
       - uses: amannn/action-semantic-pull-request@v6
