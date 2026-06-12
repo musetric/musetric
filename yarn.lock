@@ -8207,13 +8207,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"onnxruntime-common@npm:1.24.0-dev.20251116-b39e144322":
-  version: 1.24.0-dev.20251116-b39e144322
-  resolution: "onnxruntime-common@npm:1.24.0-dev.20251116-b39e144322"
-  checksum: 10c0/0f93d8bf8b3337667bf1234c74a0e0d4680f969f121fe8f765cc4b6653d0ad9d67fe7b449dbce4e4c3233737b0744b371f3512b706954868d32065681da0efc4
-  languageName: node
-  linkType: hard
-
 "onnxruntime-common@npm:1.24.3":
   version: 1.24.3
   resolution: "onnxruntime-common@npm:1.24.3"
@@ -8254,17 +8247,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"onnxruntime-web@npm:1.26.0-dev.20260416-b7804b056c":
-  version: 1.26.0-dev.20260416-b7804b056c
-  resolution: "onnxruntime-web@npm:1.26.0-dev.20260416-b7804b056c"
+"onnxruntime-web@patch:onnxruntime-web@npm%3A1.26.0#~/.yarn/patches/onnxruntime-web-npm-1.26.0-8c231f93bf.patch":
+  version: 1.26.0
+  resolution: "onnxruntime-web@patch:onnxruntime-web@npm%3A1.26.0#~/.yarn/patches/onnxruntime-web-npm-1.26.0-8c231f93bf.patch::version=1.26.0&hash=fc6b7b"
   dependencies:
     flatbuffers: "npm:^25.1.24"
     guid-typescript: "npm:^1.0.9"
     long: "npm:^5.2.3"
-    onnxruntime-common: "npm:1.24.0-dev.20251116-b39e144322"
+    onnxruntime-common: "npm:1.26.0"
     platform: "npm:^1.3.6"
     protobufjs: "npm:^7.2.4"
-  checksum: 10c0/81c6ccdd81844f9590b0c1fccd220d31d201341969ca7ad659a36542ba7741cb0e090020ca85f61d3656a9ccc96ce0889106986a6bab8afc29c3cb1895ddb38e
+  checksum: 10c0/ab9b58d2040bf8b273305e3d9e728166d29bdd88f23b32d9452b82365181cf486bfdaca34799028731e1570115e31d94de546ef31ece12cbfdb4e498e67989f7
   languageName: node
   linkType: hard
 

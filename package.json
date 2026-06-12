@@ -39,6 +39,7 @@
   },
   "resolutions": {
     "adm-zip": "^0.6.0",
+    "onnxruntime-web": "patch:onnxruntime-web@npm%3A1.26.0#~/.yarn/patches/onnxruntime-web-npm-1.26.0-8c231f93bf.patch",
     "sharp": "^0.35.3"
   }
 }
