@@ -3,9 +3,9 @@
 # Format: `type(scope): subject`  (scope is required)
 #   feat(player): add loop region
 #   fix(decoder): handle empty mp3 frames
-#   ci(github): cancel superseded pr-title runs
+#   ci(github): cancel superseded prTitle runs
 #
-# Read by .github/workflows/pr-title.yml and enforced on every PR title.
+# Read by .github/workflows/prTitle.yml and enforced on every PR title.
 # Inline comments below document what each key means and when to use it.
 #
 # Adding a new scope: add it here and merge to main first — the linter reads
