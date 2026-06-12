@@ -8,14 +8,26 @@ import {
 
 export type ScratchBufferIndex = 0 | 1;
 
-export type PackedStockhamR2cStage = {
-  factor: MultiPassRadixStage;
+type MultiPassKernelBase = {
   stageStride: number;
   readFromInput: boolean;
   readBufferIndex: ScratchBufferIndex;
   writeBufferIndex: ScratchBufferIndex;
   workgroupCount: number;
+  threadCount: number;
 };
+
+export type PackedStockhamR2cKernel =
+  | (MultiPassKernelBase & {
+      kind: 'single';
+      factor: MultiPassRadixStage;
+      fuseR2cPack: boolean;
+    })
+  | (MultiPassKernelBase & {
+      kind: 'pair';
+      factor1: MultiPassRadixStage;
+      factor2: MultiPassRadixStage;
+    });
 
 export type InPlaceMixedStageCounts = {
   radix8StageCount: number;
@@ -42,12 +54,11 @@ export type PackedStockhamR2cVariant =
     })
   | (PackedStockhamR2cBaseVariant & {
       kind: 'multiPass';
-      stages: PackedStockhamR2cStage[];
-      finalReadBufferIndex: ScratchBufferIndex;
+      kernels: PackedStockhamR2cKernel[];
     });
 
 const minPackedWindowSize = 2;
-const multiPassThreadCount = 64;
+const pairThreadsPerGroup = 8;
 
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
@@ -81,39 +92,86 @@ const createRadix8PreferredCounts = (
   return remaining === 1 ? counts : undefined;
 };
 
-const createMultiPassStages = (
+const maxPairGroupSize = 64;
+
+// Builds the kernel plan: adjacent stages with a combined group of at most 64
+// points are fused into pair kernels (two stages through shared memory per
+// global round trip); the last stage stays single because it fuses the R2C
+// pack instead. Full radix-64 pairs and single stages measured fastest with
+// 64-thread workgroups; narrower pairs (fewer butterflies per group set)
+// prefer 128.
+const selectPairThreadCount = (groupSize: number): number =>
+  groupSize === 64 ? 64 : 128;
+
+const createMultiPassKernels = (
   packedWindowSize: number,
   radixStageList: readonly MultiPassRadixStage[],
   maxComputeWorkgroupsPerDimension: number,
-): PackedStockhamR2cStage[] | undefined => {
-  const stages: PackedStockhamR2cStage[] = [];
+): PackedStockhamR2cKernel[] | undefined => {
+  const kernels: PackedStockhamR2cKernel[] = [];
   let stageStride = 1;
-  for (const [stageIndex, factor] of radixStageList.entries()) {
-    const butterflyCount = packedWindowSize / factor;
-    const workgroupCount = Math.ceil(butterflyCount / multiPassThreadCount);
-    if (workgroupCount > maxComputeWorkgroupsPerDimension) {
-      return undefined;
-    }
-
-    stages.push({
-      factor,
+  let stageIndex = 0;
+  while (stageIndex < radixStageList.length) {
+    const factor = radixStageList[stageIndex];
+    const nextFactor =
+      stageIndex + 1 < radixStageList.length - 1
+        ? radixStageList[stageIndex + 1]
+        : undefined;
+    const kernelIndex = kernels.length;
+    const readBufferIndex: ScratchBufferIndex = kernelIndex % 2 === 0 ? 1 : 0;
+    const writeBufferIndex: ScratchBufferIndex = kernelIndex % 2 === 0 ? 0 : 1;
+    const base = {
       stageStride,
       readFromInput: stageIndex === 0,
-      readBufferIndex: stageIndex % 2 === 0 ? 1 : 0,
-      writeBufferIndex: stageIndex % 2 === 0 ? 0 : 1,
-      workgroupCount,
+      readBufferIndex,
+      writeBufferIndex,
+    };
+
+    if (nextFactor !== undefined && factor * nextFactor <= maxPairGroupSize) {
+      const groupSize = factor * nextFactor;
+      const groupCount = packedWindowSize / groupSize;
+      const threadCount = selectPairThreadCount(groupSize);
+      kernels.push({
+        ...base,
+        kind: 'pair',
+        factor1: factor,
+        factor2: nextFactor,
+        threadCount,
+        workgroupCount: Math.ceil(
+          groupCount / (threadCount / pairThreadsPerGroup),
+        ),
+      });
+      stageStride *= groupSize;
+      stageIndex += 2;
+      continue;
+    }
+
+    const isLast = stageIndex === radixStageList.length - 1;
+    const singleThreadCount = 64;
+    // The fused-pack last stage runs the butterfly pair (k, stageStride - k)
+    // per thread, so it only needs threads for k in [0, stride / 2].
+    const threadTotal = isLast
+      ? Math.floor(packedWindowSize / factor / 2) + 1
+      : packedWindowSize / factor;
+    kernels.push({
+      ...base,
+      kind: 'single',
+      factor,
+      fuseR2cPack: isLast,
+      threadCount: singleThreadCount,
+      workgroupCount: Math.ceil(threadTotal / singleThreadCount),
     });
     stageStride *= factor;
+    stageIndex += 1;
   }
 
-  // The last stage fuses the R2C pack: one thread runs the butterfly pair
-  // (k, stageStride - k), so it only needs threads for k in [0, stride / 2].
-  const lastStage = stages[stages.length - 1];
-  lastStage.workgroupCount = Math.ceil(
-    (Math.floor(lastStage.stageStride / 2) + 1) / multiPassThreadCount,
-  );
+  for (const kernel of kernels) {
+    if (kernel.workgroupCount > maxComputeWorkgroupsPerDimension) {
+      return undefined;
+    }
+  }
 
-  return stages;
+  return kernels;
 };
 
 export const getPackedStockhamR2cVariant = (
@@ -183,12 +241,12 @@ export const getPackedStockhamR2cVariant = (
   if (radixStageList === undefined) {
     return undefined;
   }
-  const stages = createMultiPassStages(
+  const kernels = createMultiPassKernels(
     packedWindowSize,
     radixStageList,
     device.limits.maxComputeWorkgroupsPerDimension,
   );
-  if (stages === undefined) {
+  if (kernels === undefined) {
     return undefined;
   }
 
@@ -198,7 +256,6 @@ export const getPackedStockhamR2cVariant = (
     packedWindowSize,
     log2PackedWindowSize,
     radixStageCounts,
-    stages,
-    finalReadBufferIndex: stages[stages.length - 1].writeBufferIndex,
+    kernels,
   };
 };

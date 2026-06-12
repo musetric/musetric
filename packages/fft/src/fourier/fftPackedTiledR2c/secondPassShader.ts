@@ -13,20 +13,24 @@ override columnRadix2StageCount: u32 = 0u;
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
+// Lane stride padding keeps the four lanes of a warp on distinct shared
+// memory banks now that warps span lanes first. Zero at tileSize 256, where
+// the eight padded arrays would not fit the 32 KB workgroup storage budget.
+override smPad: u32 = 8u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
 };
 
-var<workgroup> rowAReal0: array<f32, batchSize * tileSize>;
-var<workgroup> rowAImag0: array<f32, batchSize * tileSize>;
-var<workgroup> rowAReal1: array<f32, batchSize * tileSize>;
-var<workgroup> rowAImag1: array<f32, batchSize * tileSize>;
-var<workgroup> rowBReal0: array<f32, batchSize * tileSize>;
-var<workgroup> rowBImag0: array<f32, batchSize * tileSize>;
-var<workgroup> rowBReal1: array<f32, batchSize * tileSize>;
-var<workgroup> rowBImag1: array<f32, batchSize * tileSize>;
+var<workgroup> rowAReal0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAImag0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAReal1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAImag1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBReal0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBImag0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBReal1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBImag1: array<f32, batchSize * (tileSize + smPad)>;
 
 @group(0) @binding(0) var<storage, read> scratch: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -35,7 +39,7 @@ var<workgroup> rowBImag1: array<f32, batchSize * tileSize>;
 @group(0) @binding(4) var<uniform> params: Params;
 
 fn smIndex(lane: u32, index: u32) -> u32 {
-  return lane * tileSize + index;
+  return lane * (tileSize + smPad) + index;
 }
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
@@ -410,19 +414,21 @@ fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
   spectrum[index + 1u] = value.y;
 }
 
-@compute @workgroup_size(64, 4)
+// Lanes sit on x so a warp spans the batch rows first: spectrum bin writes of
+// adjacent lanes land in the same 32-byte sector.
+@compute @workgroup_size(4, 64)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let pairIndex = workgroupId.x * batchSize + localId.y;
+  let pairIndex = workgroupId.x * batchSize + localId.x;
   let windowIndex = workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }
 
-  let t = localId.x;
-  let lane = localId.y;
+  let t = localId.y;
+  let lane = localId.x;
   let rowA = pairIndex;
   var rowB = 0u;
   if (pairIndex == 0u || pairIndex == rowHalfSize) {

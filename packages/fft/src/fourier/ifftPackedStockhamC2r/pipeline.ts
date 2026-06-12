@@ -1,6 +1,7 @@
+import { multiPassPairStageShader } from './multiPassPairStageShader.js';
 import { multiPassStageShader } from './multiPassStageShader.js';
 import {
-  type PackedStockhamC2rStage,
+  type PackedStockhamC2rKernel,
   type PackedStockhamC2rVariant,
 } from './support.js';
 import { transformInPlaceMixedShader } from './transformInPlaceMixedShader.js';
@@ -114,23 +115,38 @@ const createTransformConstants = (
   };
 };
 
-// The first stage fuses the C2R prepack read and the last stage fuses the
+// The first kernel fuses the C2R prepack read and the last kernel fuses the
 // scaled unpack write, dropping two full global-memory passes.
-const createStageConstants = (
+const createKernelConstants = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
-  stage: PackedStockhamC2rStage,
-  stageIndex: number,
+  kernel: PackedStockhamC2rKernel,
   inPlace: boolean,
-) => ({
-  packedWindowSize: variant.packedWindowSize,
-  factor: stage.factor,
-  stageStride: stage.stageStride,
-  readBufferIndex: stage.readBufferIndex,
-  writeBufferIndex: stage.writeBufferIndex,
-  readFromPrepack: stageIndex === 0 ? 1 : 0,
-  writeToSignal: stageIndex === variant.stages.length - 1 ? 1 : 0,
-  inPlace: inPlace ? 1 : 0,
-});
+): Record<string, number> => {
+  const base = {
+    packedWindowSize: variant.packedWindowSize,
+    stageStride: kernel.stageStride,
+    readBufferIndex: kernel.readBufferIndex,
+    writeBufferIndex: kernel.writeBufferIndex,
+    readFromPrepack: kernel.readFromPrepack ? 1 : 0,
+    writeToSignal: kernel.writeToSignal ? 1 : 0,
+    inPlace: inPlace ? 1 : 0,
+    threadCount: kernel.threadCount,
+  };
+  if (kernel.kind === 'pair') {
+    const groupsPerWorkgroup = kernel.threadCount / 8;
+    return {
+      ...base,
+      factor1: kernel.factor1,
+      factor2: kernel.factor2,
+      groupsPerWorkgroup,
+      pairSharedSize: groupsPerWorkgroup * kernel.factor1 * kernel.factor2,
+    };
+  }
+  return {
+    ...base,
+    factor: kernel.factor,
+  };
+};
 
 const createSinglePassPipeline = (
   device: GPUDevice,
@@ -170,17 +186,21 @@ const createMultiPassPipeline = (
     label: 'packed-stockham-c2r-multipass-stage-shader',
     code: multiPassStageShader,
   });
+  const pairModule = device.createShaderModule({
+    label: 'packed-stockham-c2r-multipass-pair-stage-shader',
+    code: multiPassPairStageShader,
+  });
 
   return {
     kind: 'multiPass',
-    stages: variant.stages.map((stage, stageIndex) =>
+    stages: variant.kernels.map((kernel) =>
       device.createComputePipeline({
         label: 'packed-stockham-c2r-multipass-stage-pipeline',
         layout: 'auto',
         compute: {
-          module: stageModule,
+          module: kernel.kind === 'pair' ? pairModule : stageModule,
           entryPoint: 'main',
-          constants: createStageConstants(variant, stage, stageIndex, inPlace),
+          constants: createKernelConstants(variant, kernel, inPlace),
         },
       }),
     ),

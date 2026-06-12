@@ -8,13 +8,26 @@ import {
 
 export type ScratchBufferIndex = 0 | 1;
 
-export type PackedStockhamC2rStage = {
-  factor: MultiPassRadixStage;
+type MultiPassKernelBase = {
   stageStride: number;
+  readFromPrepack: boolean;
+  writeToSignal: boolean;
   readBufferIndex: ScratchBufferIndex;
   writeBufferIndex: ScratchBufferIndex;
   workgroupCount: number;
+  threadCount: number;
 };
+
+export type PackedStockhamC2rKernel =
+  | (MultiPassKernelBase & {
+      kind: 'single';
+      factor: MultiPassRadixStage;
+    })
+  | (MultiPassKernelBase & {
+      kind: 'pair';
+      factor1: MultiPassRadixStage;
+      factor2: MultiPassRadixStage;
+    });
 
 type BaseVariant = {
   windowSize: number;
@@ -29,38 +42,85 @@ export type PackedStockhamC2rVariant =
     })
   | (BaseVariant & {
       kind: 'multiPass';
-      stages: PackedStockhamC2rStage[];
-      prepackWriteBufferIndex: ScratchBufferIndex;
-      finalReadBufferIndex: ScratchBufferIndex;
+      kernels: PackedStockhamC2rKernel[];
     });
 
-const multiPassThreadCount = 64;
+const pairThreadsPerGroup = 8;
+const maxPairGroupSize = 64;
 
-const createMultiPassStages = (
+// Builds the kernel plan: adjacent stages with a combined group of at most 64
+// points are fused into pair kernels (two stages through shared memory per
+// global round trip). The first kernel fuses the C2R prepack read, the last
+// one (single or pair) the scaled unpack write. Full radix-64 pairs and
+// single stages measured fastest with 64-thread workgroups; narrower pairs
+// prefer 128.
+const selectPairThreadCount = (groupSize: number): number =>
+  groupSize === 64 ? 64 : 128;
+
+const createMultiPassKernels = (
   packedWindowSize: number,
   radixStageList: readonly MultiPassRadixStage[],
   maxComputeWorkgroupsPerDimension: number,
-): PackedStockhamC2rStage[] | undefined => {
-  const stages: PackedStockhamC2rStage[] = [];
+): PackedStockhamC2rKernel[] | undefined => {
+  const kernels: PackedStockhamC2rKernel[] = [];
   let stageStride = 1;
-  for (const [stageIndex, factor] of radixStageList.entries()) {
-    const butterflyCount = packedWindowSize / factor;
-    const workgroupCount = Math.ceil(butterflyCount / multiPassThreadCount);
-    if (workgroupCount > maxComputeWorkgroupsPerDimension) {
-      return undefined;
+  let stageIndex = 0;
+  while (stageIndex < radixStageList.length) {
+    const factor = radixStageList[stageIndex];
+    const nextFactor =
+      stageIndex + 1 < radixStageList.length
+        ? radixStageList[stageIndex + 1]
+        : undefined;
+    const kernelIndex = kernels.length;
+    const readBufferIndex: ScratchBufferIndex = kernelIndex % 2 === 0 ? 1 : 0;
+    const writeBufferIndex: ScratchBufferIndex = kernelIndex % 2 === 0 ? 0 : 1;
+    const base = {
+      stageStride,
+      readFromPrepack: stageIndex === 0,
+      readBufferIndex,
+      writeBufferIndex,
+    };
+
+    if (nextFactor !== undefined && factor * nextFactor <= maxPairGroupSize) {
+      const groupSize = factor * nextFactor;
+      const groupCount = packedWindowSize / groupSize;
+      const threadCount = selectPairThreadCount(groupSize);
+      kernels.push({
+        ...base,
+        kind: 'pair',
+        factor1: factor,
+        factor2: nextFactor,
+        writeToSignal: stageIndex + 2 === radixStageList.length,
+        threadCount,
+        workgroupCount: Math.ceil(
+          groupCount / (threadCount / pairThreadsPerGroup),
+        ),
+      });
+      stageStride *= groupSize;
+      stageIndex += 2;
+      continue;
     }
 
-    stages.push({
+    const singleThreadCount = 64;
+    kernels.push({
+      ...base,
+      kind: 'single',
       factor,
-      stageStride,
-      readBufferIndex: stageIndex % 2 === 0 ? 1 : 0,
-      writeBufferIndex: stageIndex % 2 === 0 ? 0 : 1,
-      workgroupCount,
+      writeToSignal: stageIndex === radixStageList.length - 1,
+      threadCount: singleThreadCount,
+      workgroupCount: Math.ceil(packedWindowSize / factor / singleThreadCount),
     });
     stageStride *= factor;
+    stageIndex += 1;
   }
 
-  return stages;
+  for (const kernel of kernels) {
+    if (kernel.workgroupCount > maxComputeWorkgroupsPerDimension) {
+      return undefined;
+    }
+  }
+
+  return kernels;
 };
 
 export const getPackedStockhamC2rVariant = (
@@ -107,20 +167,18 @@ export const getPackedStockhamC2rVariant = (
   if (radixStageList === undefined) {
     return undefined;
   }
-  const stages = createMultiPassStages(
+  const kernels = createMultiPassKernels(
     packedWindowSize,
     radixStageList,
     device.limits.maxComputeWorkgroupsPerDimension,
   );
-  if (stages === undefined) {
+  if (kernels === undefined) {
     return undefined;
   }
 
   return {
     kind: 'multiPass',
     ...base,
-    stages,
-    prepackWriteBufferIndex: stages[0].readBufferIndex,
-    finalReadBufferIndex: stages[stages.length - 1].writeBufferIndex,
+    kernels,
   };
 };

@@ -11,16 +11,19 @@ override inPlace: u32 = 1u;
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
+// Lane stride padding keeps the four lanes of a warp on distinct shared
+// memory banks now that warps span lanes first.
+override smPad: u32 = 8u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
 };
 
-var<workgroup> smReal0: array<f32, batchSize * tileSize>;
-var<workgroup> smImag0: array<f32, batchSize * tileSize>;
-var<workgroup> smReal1: array<f32, batchSize * tileSize>;
-var<workgroup> smImag1: array<f32, batchSize * tileSize>;
+var<workgroup> smReal0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> smImag0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> smReal1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> smImag1: array<f32, batchSize * (tileSize + smPad)>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read> spectrum: array<f32>;
@@ -30,7 +33,7 @@ var<workgroup> smImag1: array<f32, batchSize * tileSize>;
 @group(0) @binding(5) var<uniform> params: Params;
 
 fn smIndex(lane: u32, index: u32) -> u32 {
-  return lane * tileSize + index;
+  return lane * (tileSize + smPad) + index;
 }
 
 fn complexStride() -> u32 {
@@ -279,19 +282,21 @@ fn getRowResult(index: u32, lane: u32) -> vec2<f32> {
   );
 }
 
-@compute @workgroup_size(64, 4)
+// Lanes sit on x so a warp spans the batch columns first: per-(lane, i)
+// global accesses of adjacent lanes land in the same 32-byte sector.
+@compute @workgroup_size(4, 64)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let n1 = workgroupId.x * batchSize + localId.y;
+  let n1 = workgroupId.x * batchSize + localId.x;
   let windowIndex = workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }
 
-  let t = localId.x;
-  let lane = localId.y;
+  let t = localId.y;
+  let lane = localId.x;
   let inputOffset = getInputWindowOffset(windowIndex);
 
   for (var i = t; i < rowSize; i += threadCount) {

@@ -161,6 +161,7 @@ const createSinglePassBindGroups = (
 
 const createMultiPassBindGroups = (
   device: GPUDevice,
+  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
   pipeline: Extract<Pipeline, { kind: 'multiPass' }>,
   tables: TrigTables,
   scratch: ScratchBuffers,
@@ -169,21 +170,26 @@ const createMultiPassBindGroups = (
   input: GPUBuffer,
 ): MultiPassBindGroups => ({
   kind: 'multiPass',
-  stages: pipeline.stages.map((stagePipeline) =>
-    device.createBindGroup({
+  stages: pipeline.stages.map((stagePipeline, index) => {
+    const entries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: input } },
+      { binding: 1, resource: { buffer: arg.spectrum } },
+      { binding: 2, resource: { buffer: scratch.buffer0 } },
+      { binding: 3, resource: { buffer: scratch.buffer1 } },
+      { binding: 4, resource: { buffer: tables.fft } },
+      { binding: 5, resource: { buffer: params.buffer } },
+    ];
+    // Pair kernels never pack, so their shader (and auto layout) has no
+    // r2c table binding.
+    if (variant.kernels[index].kind === 'single') {
+      entries.push({ binding: 6, resource: { buffer: tables.r2c } });
+    }
+    return device.createBindGroup({
       label: 'packed-stockham-r2c-multipass-stage-bind-group',
       layout: stagePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: input } },
-        { binding: 1, resource: { buffer: arg.spectrum } },
-        { binding: 2, resource: { buffer: scratch.buffer0 } },
-        { binding: 3, resource: { buffer: scratch.buffer1 } },
-        { binding: 4, resource: { buffer: tables.fft } },
-        { binding: 5, resource: { buffer: params.buffer } },
-        { binding: 6, resource: { buffer: tables.r2c } },
-      ],
-    }),
-  ),
+      entries,
+    });
+  }),
 });
 
 export const createStateCell = (
@@ -217,6 +223,7 @@ export const createStateCell = (
           tables,
           bindGroups: createMultiPassBindGroups(
             device,
+            variant,
             pipeline,
             tables,
             scratch,

@@ -19,7 +19,7 @@ export const createIfftPackedStockhamC2r: CreateFourier = (device, markers) => {
             pass.setBindGroup(0, bindGroups.stages[index]);
             pass.dispatchWorkgroups(
               state.windowCount,
-              variant.stages[index].workgroupCount,
+              variant.kernels[index].workgroupCount,
             );
           });
           return;

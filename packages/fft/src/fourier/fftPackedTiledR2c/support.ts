@@ -37,9 +37,20 @@ const maxPackedWindowSize = maxWindowSize / 2;
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
 
+// The second pass holds 8 padded arrays (pad 8 up to tileSize 248; larger
+// tiles drop the padding so they still fit the 32 KB budget); the first pass
+// only holds 4.
 const getRequiredWorkgroupStorageSize = (
   variant: PackedTiledR2cVariant,
-): number => 8 * batchSize * variant.tileSize * Float32Array.BYTES_PER_ELEMENT;
+): number => {
+  const secondPassPad = variant.tileSize <= 248 ? 8 : 0;
+  return (
+    8 *
+    batchSize *
+    (variant.tileSize + secondPassPad) *
+    Float32Array.BYTES_PER_ELEMENT
+  );
+};
 
 // Power-of-two sizes keep the original balanced radix-2 tiling untouched.
 const createPowerOfTwoVariant = (

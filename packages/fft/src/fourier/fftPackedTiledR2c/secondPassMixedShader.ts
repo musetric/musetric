@@ -1,4 +1,4 @@
-export const secondPassMixedShader = `
+﻿export const secondPassMixedShader = `
 override packedWindowSize: u32 = 2560u;
 override positiveWindowSize: u32 = 2560u;
 override tileSize: u32 = 64u;
@@ -9,6 +9,10 @@ override columnRadix4StageCount: u32 = 0u;
 override columnRadix2StageCount: u32 = 0u;
 override columnRadix3StageCount: u32 = 0u;
 override columnRadix5StageCount: u32 = 0u;
+// Lane stride padding keeps the four lanes of a warp on distinct shared
+// memory banks now that warps span lanes first. Zero when the eight padded
+// arrays would not fit the 32 KB workgroup storage budget.
+override smPad: u32 = 8u;
 
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
@@ -18,14 +22,14 @@ struct Params {
   windowCount: u32,
 };
 
-var<workgroup> rowAReal0: array<f32, batchSize * tileSize>;
-var<workgroup> rowAImag0: array<f32, batchSize * tileSize>;
-var<workgroup> rowAReal1: array<f32, batchSize * tileSize>;
-var<workgroup> rowAImag1: array<f32, batchSize * tileSize>;
-var<workgroup> rowBReal0: array<f32, batchSize * tileSize>;
-var<workgroup> rowBImag0: array<f32, batchSize * tileSize>;
-var<workgroup> rowBReal1: array<f32, batchSize * tileSize>;
-var<workgroup> rowBImag1: array<f32, batchSize * tileSize>;
+var<workgroup> rowAReal0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAImag0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAReal1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAImag1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBReal0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBImag0: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBReal1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowBImag1: array<f32, batchSize * (tileSize + smPad)>;
 
 @group(0) @binding(0) var<storage, read> scratch: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -57,7 +61,7 @@ fn getColumnFactor(stage: u32) -> u32 {
 }
 
 fn smIndex(lane: u32, index: u32) -> u32 {
-  return lane * tileSize + index;
+  return lane * (tileSize + smPad) + index;
 }
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
@@ -259,19 +263,19 @@ fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
   spectrum[index + 1u] = value.y;
 }
 
-@compute @workgroup_size(64, 4)
+@compute @workgroup_size(4, 64)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let pairIndex = workgroupId.x * batchSize + localId.y;
+  let pairIndex = workgroupId.x * batchSize + localId.x;
   let windowIndex = workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }
 
-  let t = localId.x;
-  let lane = localId.y;
+  let t = localId.y;
+  let lane = localId.x;
   let rowA = pairIndex;
   var rowB = 0u;
   if (pairIndex == 0u) {

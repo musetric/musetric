@@ -1,4 +1,4 @@
-export const multiPassStageShader = `
+﻿export const multiPassStageShader = `
 override packedWindowSize: u32 = 2560u;
 override factor: u32 = 5u;
 override stageStride: u32 = 1u;
@@ -8,7 +8,7 @@ override readFromPrepack: u32 = 0u;
 override writeToSignal: u32 = 0u;
 override inPlace: u32 = 1u;
 
-const threadCount: u32 = 64u;
+override threadCount: u32 = 64u;
 const sqrt1_2: f32 = 0.70710678118654752440;
 const sin3: f32 = 0.86602540378443864676;
 const cos5a: f32 = 0.30901699437494742410;

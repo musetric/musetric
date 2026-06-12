@@ -46,6 +46,7 @@ const createFirstPassConstants = (
       tileSize: variant.tileSize,
       rowSize: variant.rowSize,
       columnSize: variant.columnSize,
+      smPad: 8,
       ...createPrefixedRadixStageConstants(variant.rowStageCounts, 'row'),
     };
   }
@@ -56,6 +57,7 @@ const createFirstPassConstants = (
     tileSize: variant.tileSize,
     rowSize: variant.rowSize,
     columnSize: variant.columnSize,
+    smPad: 8,
     ...createRadix8StageCounts(variant.log2RowSize, 'row'),
   };
 };
@@ -71,6 +73,7 @@ const createSecondPassConstants = (
       rowSize: variant.rowSize,
       rowPairCount: variant.rowPairCount,
       columnSize: variant.columnSize,
+      smPad: variant.tileSize <= 248 ? 8 : 0,
       ...createPrefixedRadixStageConstants(variant.columnStageCounts, 'column'),
     };
   }
@@ -83,6 +86,7 @@ const createSecondPassConstants = (
     rowHalfSize: variant.rowHalfSize,
     rowPairCount: variant.rowPairCount,
     columnSize: variant.columnSize,
+    smPad: variant.tileSize <= 248 ? 8 : 0,
     ...createRadix8StageCounts(variant.log2ColumnSize, 'column'),
   };
 };
