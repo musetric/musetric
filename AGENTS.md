@@ -15,6 +15,7 @@
 - `packages/frontend`: the main React application.
 - `packages/backend`: the Fastify server, orchestration, and runtime services.
 - `packages/audio`: browser-side audio, waveform, spectrogram, workers, and worklets.
+- `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/backend-db`: backend data access, entities, and schema-related code.
 - `packages/resource-utils`: low-level shared utilities used across packages.

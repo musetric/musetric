@@ -1,9 +1,6 @@
+import { separateAudio } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/resource-utils';
-import {
-  convertToFmp4,
-  generateWavePeaks,
-  separateAudio,
-} from '@musetric/toolkit';
+import { convertToFmp4, generateWavePeaks } from '@musetric/toolkit';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
 import {
