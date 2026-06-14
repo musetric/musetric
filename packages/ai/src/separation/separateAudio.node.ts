@@ -1,9 +1,10 @@
+import { rm } from 'node:fs/promises';
 import { type Logger, type MessageHandlers } from '@musetric/resource-utils';
 import { vocalsModel } from '../models/vocalsModel.js';
 import {
-  readAudioFile,
-  writeFlacAudioFile,
-} from '../service/audioFile.node.js';
+  decodeInterleavedPcm,
+  encodeFlacFromRawFile,
+} from '../service/audioCodec.node.js';
 import { separateAudioHeadless } from '../service/headlessAiService.node.js';
 import { ensureSeparationModelFiles } from '../service/modelCache.node.js';
 
@@ -46,42 +47,52 @@ export const separateAudio = async (
     modelsPath,
   } = options;
 
-  const modelFiles = await ensureSeparationModelFiles({
-    handlers,
-    modelsPath,
-  });
-  const sourceAudio = await readAudioFile({
+  const modelFiles = await ensureSeparationModelFiles({ handlers, modelsPath });
+
+  const pcm = await decodeInterleavedPcm({
     sourcePath,
     sampleRate: vocalsModel.sampleRate,
     logger,
   });
-  const result = await separateAudioHeadless({
-    logger,
-    audio: sourceAudio,
-    modelFiles,
-    onMessage: async (message) => {
-      await handlers[message.type](message);
-    },
-  });
 
-  await Promise.all([
-    writeFlacAudioFile({
-      audio: result.lead,
-      outputSampleRate: sampleRate,
-      outputPath: leadPath,
+  const rawStemPaths = {
+    lead: `${leadPath}.raw`,
+    backing: `${backingPath}.raw`,
+    instrumental: `${instrumentalPath}.raw`,
+  };
+  try {
+    await separateAudioHeadless({
       logger,
-    }),
-    writeFlacAudioFile({
-      audio: result.backing,
-      outputSampleRate: sampleRate,
-      outputPath: backingPath,
-      logger,
-    }),
-    writeFlacAudioFile({
-      audio: result.instrumental,
-      outputSampleRate: sampleRate,
-      outputPath: instrumentalPath,
-      logger,
-    }),
-  ]);
+      pcm,
+      sampleRate: vocalsModel.sampleRate,
+      modelFiles,
+      rawStemPaths,
+      onMessage: async (message) => {
+        await handlers[message.type](message);
+      },
+    });
+
+    const stemEncodes = [
+      { rawPath: rawStemPaths.lead, outputPath: leadPath },
+      { rawPath: rawStemPaths.backing, outputPath: backingPath },
+      { rawPath: rawStemPaths.instrumental, outputPath: instrumentalPath },
+    ];
+    await Promise.all(
+      stemEncodes.map(async (stem) =>
+        encodeFlacFromRawFile({
+          rawPath: stem.rawPath,
+          inputSampleRate: vocalsModel.sampleRate,
+          outputSampleRate: sampleRate,
+          outputPath: stem.outputPath,
+          logger,
+        }),
+      ),
+    );
+  } finally {
+    await Promise.all(
+      Object.values(rawStemPaths).map(async (path) =>
+        rm(path, { force: true }),
+      ),
+    );
+  }
 };
