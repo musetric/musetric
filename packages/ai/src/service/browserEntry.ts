@@ -2,14 +2,29 @@ import { createLeadBackingGpuRuntime } from '../runtime/leadBacking/leadBackingR
 import { createVocalsGpuRuntime } from '../runtime/vocals/vocalsRuntime.js';
 import { separateLeadBacking } from '../separation/separateLeadBacking.js';
 import { separateVocals } from '../separation/separateVocals.js';
-import { type StereoAudio } from '../separation/stereoAudio.js';
+import {
+  interleavedToPlanar,
+  planarToInterleaved,
+  type StereoAudio,
+} from '../separation/stereoAudio.js';
 import {
   type BrowserProgressMessage,
   type BrowserSeparateAudioRequest,
-  type BrowserSeparateAudioResponse,
   reportProgressApiName,
   separateAudioApiName,
+  stemDownloadNames,
 } from './browserApi.js';
+
+type AnchorElement = {
+  href: string;
+  download: string;
+  click: () => void;
+  remove: () => void;
+};
+declare const document: {
+  createElement: (tagName: 'a') => AnchorElement;
+  body: { appendChild: (node: AnchorElement) => void };
+};
 
 const reportProgress = async (progress: number): Promise<void> => {
   const api: unknown = Reflect.get(globalThis, reportProgressApiName);
@@ -62,50 +77,42 @@ const runLeadBackingStage = async (
   }
 };
 
-const createAudio = async (
-  request: BrowserSeparateAudioRequest,
-): Promise<StereoAudio> => {
-  const response = await fetch(request.audioUrl);
+const fetchInterleavedPcm = async (
+  pcmUrl: string,
+): Promise<Float32Array<ArrayBuffer>> => {
+  const response = await fetch(pcmUrl);
   if (!response.ok) {
-    throw new Error(`Failed to fetch AI input audio: HTTP ${response.status}`);
+    throw new Error(`Failed to fetch AI input PCM: HTTP ${response.status}`);
   }
-  return {
-    sampleRate: request.sampleRate,
-    samples: request.samples,
-    channels: 2,
-    data: new Float32Array(await response.arrayBuffer()),
-  };
+  return new Float32Array(await response.arrayBuffer());
 };
 
-const toArrayBuffer = (data: Float32Array<ArrayBuffer>): ArrayBuffer =>
-  data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-
-const uploadBuffer = async (
-  data: Float32Array<ArrayBuffer>,
-): Promise<string> => {
-  const response = await fetch('/buffers', {
-    method: 'POST',
-    body: toArrayBuffer(data),
+const downloadStem = async (
+  audio: StereoAudio,
+  filename: string,
+): Promise<void> => {
+  const interleaved = planarToInterleaved(audio);
+  const blob = new Blob([interleaved.buffer], {
+    type: 'application/octet-stream',
   });
-  if (!response.ok) {
-    throw new Error(
-      `Failed to upload AI output audio: HTTP ${response.status}`,
-    );
-  }
-  const token: unknown = Reflect.get(await response.json(), 'token');
-  if (typeof token !== 'string') {
-    throw new Error('AI output upload response is missing a token');
-  }
-  return token;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  URL.revokeObjectURL(url);
 };
 
 Reflect.set(
   globalThis,
   separateAudioApiName,
-  async (
-    request: BrowserSeparateAudioRequest,
-  ): Promise<BrowserSeparateAudioResponse> => {
-    const sourceAudio = await createAudio(request);
+  async (request: BrowserSeparateAudioRequest): Promise<void> => {
+    const interleaved = await fetchInterleavedPcm(request.pcmUrl);
+    const sourceAudio = interleavedToPlanar(interleaved, request.sampleRate);
+
     const vocalsResult = await runVocalsStage(request, sourceAudio);
     const leadBackingResult = await runLeadBackingStage(
       request,
@@ -114,10 +121,11 @@ Reflect.set(
 
     await reportProgress(1);
 
-    return {
-      leadToken: await uploadBuffer(leadBackingResult.lead.data),
-      backingToken: await uploadBuffer(leadBackingResult.backing.data),
-      instrumentalToken: await uploadBuffer(vocalsResult.instrumental.data),
-    };
+    await downloadStem(leadBackingResult.lead, stemDownloadNames.lead);
+    await downloadStem(leadBackingResult.backing, stemDownloadNames.backing);
+    await downloadStem(
+      vocalsResult.instrumental,
+      stemDownloadNames.instrumental,
+    );
   },
 );

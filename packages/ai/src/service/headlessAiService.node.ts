@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import {
   createServer,
@@ -8,15 +8,15 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Logger } from '@musetric/resource-utils';
-import { type Browser, chromium, type Page } from 'playwright';
+import { type Browser, chromium, type Download, type Page } from 'playwright';
 import * as vite from 'vite';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';
-import { type StereoAudio } from '../separation/stereoAudio.js';
 import {
   type BrowserSeparateAudioRequest,
-  type BrowserSeparateAudioResponse,
   reportProgressApiName,
   separateAudioApiName,
+  stemDownloadNames,
+  type StemKey,
 } from './browserApi.js';
 import { type SeparationModelFiles } from './modelCache.node.js';
 
@@ -26,22 +26,17 @@ type ProgressMessageHandler = (
 
 type HeadlessSeparateAudioOptions = {
   logger: Logger;
-  audio: StereoAudio;
+  pcm: Buffer;
+  sampleRate: number;
   modelFiles: SeparationModelFiles;
+  rawStemPaths: Record<StemKey, string>;
   onMessage: ProgressMessageHandler;
-};
-
-type HeadlessSeparateAudioResult = {
-  lead: StereoAudio;
-  backing: StereoAudio;
-  instrumental: StereoAudio;
 };
 
 type ModuleServer = {
   baseUrl: string;
   registerModelFile: (path: string) => string;
-  registerBinary: (data: Uint8Array<ArrayBuffer>) => string;
-  consumeBinary: (token: string) => Uint8Array<ArrayBuffer>;
+  pcmUrl: string;
   close: () => Promise<void>;
 };
 
@@ -56,16 +51,6 @@ const getPackageRoot = (): string =>
 
 const getFileToken = (path: string): string =>
   createHash('sha256').update(path).digest('hex').slice(0, 20);
-
-const createToken = (): string => randomUUID().replaceAll('-', '');
-
-const toArrayBufferBytes = (
-  data: Uint8Array<ArrayBufferLike>,
-): Uint8Array<ArrayBuffer> => {
-  const buffer = new ArrayBuffer(data.byteLength);
-  new Uint8Array(buffer).set(data);
-  return new Uint8Array(buffer);
-};
 
 const sendFile = async (
   path: string,
@@ -83,37 +68,15 @@ const sendFile = async (
   });
 };
 
-const sendBinary = (
-  data: Uint8Array<ArrayBuffer>,
-  response: ServerResponse,
-): void => {
-  response.writeHead(200, {
-    'content-type': 'application/octet-stream',
-    'cache-control': 'no-store',
-  });
-  response.end(data);
-};
-
-const readRequestBody = async (
-  request: IncomingMessage,
-): Promise<Uint8Array<ArrayBuffer>> => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return toArrayBufferBytes(Buffer.concat(chunks));
-};
-
 const handleModuleRequest = async (options: {
   request: IncomingMessage;
   response: ServerResponse;
   viteServer: vite.ViteDevServer;
   modelFiles: Map<string, string>;
-  binaryBuffers: Map<string, Uint8Array<ArrayBuffer>>;
+  pcm: Buffer;
   logger: Logger;
 }): Promise<void> => {
-  const { request, response, viteServer, modelFiles, binaryBuffers, logger } =
-    options;
+  const { request, response, viteServer, modelFiles, pcm, logger } = options;
   const requestUrl = request.url ?? '/';
   const url = new URL(requestUrl, 'http://127.0.0.1');
 
@@ -124,6 +87,15 @@ const handleModuleRequest = async (options: {
     );
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end(html);
+    return;
+  }
+
+  if (url.pathname === '/pcm') {
+    response.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'cache-control': 'no-store',
+    });
+    response.end(pcm);
     return;
   }
 
@@ -140,28 +112,6 @@ const handleModuleRequest = async (options: {
     return;
   }
 
-  if (request.method === 'GET' && url.pathname.startsWith('/buffers/')) {
-    const parts = url.pathname.split('/');
-    const [, , token] = parts;
-    const data = token ? binaryBuffers.get(token) : undefined;
-    if (!data) {
-      response.writeHead(404);
-      response.end('buffer not found');
-      return;
-    }
-    binaryBuffers.delete(token);
-    sendBinary(data, response);
-    return;
-  }
-
-  if (request.method === 'POST' && url.pathname === '/buffers') {
-    const token = createToken();
-    binaryBuffers.set(token, await readRequestBody(request));
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ token }));
-    return;
-  }
-
   viteServer.middlewares(request, response, () => {
     logger.warn({ url: requestUrl }, 'AI service route not found');
     response.writeHead(404);
@@ -169,7 +119,10 @@ const handleModuleRequest = async (options: {
   });
 };
 
-const createModuleServer = async (logger: Logger): Promise<ModuleServer> => {
+const createModuleServer = async (
+  logger: Logger,
+  pcm: Buffer,
+): Promise<ModuleServer> => {
   const packageRoot = getPackageRoot();
   const packagesRoot = dirname(packageRoot);
   const repositoryRoot = dirname(packagesRoot);
@@ -179,13 +132,13 @@ const createModuleServer = async (logger: Logger): Promise<ModuleServer> => {
   }
 
   const modelFiles = new Map<string, string>();
-  const binaryBuffers = new Map<string, Uint8Array<ArrayBuffer>>();
   const viteServer = await vite.createServer({
     root: packageRoot,
     appType: 'custom',
     logLevel: 'error',
     server: {
       middlewareMode: true,
+      watch: { ignored: ['**'] },
       fs: {
         allow: [repositoryRoot],
       },
@@ -217,7 +170,7 @@ const createModuleServer = async (logger: Logger): Promise<ModuleServer> => {
       response,
       viteServer,
       modelFiles,
-      binaryBuffers,
+      pcm,
       logger,
     });
   });
@@ -238,19 +191,7 @@ const createModuleServer = async (logger: Logger): Promise<ModuleServer> => {
       modelFiles.set(token, path);
       return `${baseUrl}/models/${token}/${basename(path)}`;
     },
-    registerBinary: (data) => {
-      const token = createToken();
-      binaryBuffers.set(token, data);
-      return `${baseUrl}/buffers/${token}`;
-    },
-    consumeBinary: (token) => {
-      const data = binaryBuffers.get(token);
-      if (!data) {
-        throw new Error(`AI service buffer ${token} not found`);
-      }
-      binaryBuffers.delete(token);
-      return data;
-    },
+    pcmUrl: `${baseUrl}/pcm`,
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
@@ -263,8 +204,6 @@ const createModuleServer = async (logger: Logger): Promise<ModuleServer> => {
 const launchBrowser = async (): Promise<Browser> =>
   chromium.launch({
     headless: true,
-    // The default headless shell ships without dxcompiler.dll/dxil.dll, so
-    // requestDevice with shader-f16 fails on Windows; the full build has them.
     channel: 'chromium',
     args: browserLaunchArgs,
   });
@@ -326,34 +265,56 @@ const createPage = async (
   return page;
 };
 
-const createStereoAudio = (
-  source: StereoAudio,
-  data: Uint8Array<ArrayBuffer>,
-): StereoAudio => ({
-  sampleRate: source.sampleRate,
-  samples: source.samples,
-  channels: 2,
-  data: new Float32Array(data.buffer),
-});
+const registerStemDownloads = async (
+  page: Page,
+  rawStemPaths: Record<StemKey, string>,
+): Promise<void> => {
+  const targets = new Map<string, string>([
+    [stemDownloadNames.lead, rawStemPaths.lead],
+    [stemDownloadNames.backing, rawStemPaths.backing],
+    [stemDownloadNames.instrumental, rawStemPaths.instrumental],
+  ]);
+  const remaining = new Set(targets.keys());
+
+  return new Promise<void>((resolve, reject) => {
+    const onDownload = (download: Download): void => {
+      const name = download.suggestedFilename();
+      const target = targets.get(name);
+      if (!target) {
+        reject(new Error(`Unexpected AI download: ${name}`));
+        return;
+      }
+      void download
+        .saveAs(target)
+        .then(() => {
+          remaining.delete(name);
+          if (remaining.size === 0) {
+            page.off('download', onDownload);
+            resolve();
+          }
+        })
+        .catch(reject);
+    };
+    page.on('download', onDownload);
+  });
+};
 
 export const separateAudioHeadless = async (
   options: HeadlessSeparateAudioOptions,
-): Promise<HeadlessSeparateAudioResult> => {
-  const { logger, audio, modelFiles, onMessage } = options;
-  const moduleServer = await createModuleServer(logger);
+): Promise<void> => {
+  const { logger, pcm, sampleRate, modelFiles, rawStemPaths, onMessage } =
+    options;
+  const moduleServer = await createModuleServer(logger, pcm);
   try {
     const browser = await launchBrowser();
     try {
       const page = await createPage(browser, moduleServer.baseUrl, onMessage);
-      const audioBytes = new Uint8Array(
-        audio.data.buffer,
-        audio.data.byteOffset,
-        audio.data.byteLength,
-      );
+
+      const downloadsSaved = registerStemDownloads(page, rawStemPaths);
+
       const request: BrowserSeparateAudioRequest = {
-        sampleRate: audio.sampleRate,
-        samples: audio.samples,
-        audioUrl: moduleServer.registerBinary(toArrayBufferBytes(audioBytes)),
+        pcmUrl: moduleServer.pcmUrl,
+        sampleRate,
         vocalsModelUrl: moduleServer.registerModelFile(
           modelFiles.vocalsModelPath,
         ),
@@ -365,13 +326,12 @@ export const separateAudioHeadless = async (
           modelFiles.leadBackingModelPath,
         ),
       };
-      const response = await page.evaluate(
+
+      await page.evaluate(
         (evaluateArgs: {
           apiName: string;
           request: BrowserSeparateAudioRequest;
-        }):
-          | BrowserSeparateAudioResponse
-          | Promise<BrowserSeparateAudioResponse> => {
+        }) => {
           const api: unknown = Reflect.get(globalThis, evaluateArgs.apiName);
           if (typeof api !== 'function') {
             throw new Error('AI browser API is not initialized');
@@ -381,20 +341,7 @@ export const separateAudioHeadless = async (
         { apiName: separateAudioApiName, request },
       );
 
-      return {
-        lead: createStereoAudio(
-          audio,
-          moduleServer.consumeBinary(response.leadToken),
-        ),
-        backing: createStereoAudio(
-          audio,
-          moduleServer.consumeBinary(response.backingToken),
-        ),
-        instrumental: createStereoAudio(
-          audio,
-          moduleServer.consumeBinary(response.instrumentalToken),
-        ),
-      };
+      await downloadsSaved;
     } finally {
       await browser.close();
     }
