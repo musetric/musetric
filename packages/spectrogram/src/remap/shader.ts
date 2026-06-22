@@ -30,12 +30,15 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   }
   let ratio = 1.0 - f32(y) / f32(height - 1u);
   let frequency = exp(logMinFrequency + logFrequencyRange * ratio);
-  var idx = u32(floor((frequency / sampleRate) * f32(windowSize)));
-  if (idx >= halfSize) {
-    idx = halfSize - 1u;
-  }
-  let offset = x * halfSize + idx;
-  let intensity = signal[offset];
+  let rawIndex = (frequency / sampleRate) * f32(windowSize);
+  let clampedIndex = clamp(rawIndex, 0.0, f32(halfSize - 1u));
+  let lowerIndex = u32(floor(clampedIndex));
+  let upperIndex = min(lowerIndex + 1u, halfSize - 1u);
+  let blend = fract(clampedIndex);
+  let offset = x * halfSize;
+  let lowerIntensity = signal[offset + lowerIndex];
+  let upperIntensity = signal[offset + upperIndex];
+  let intensity = mix(lowerIntensity, upperIntensity, blend);
   textureStore(texture, vec2u(x, y), vec4f(intensity, 0.0, 0.0, 1.0));
 }
 `;
