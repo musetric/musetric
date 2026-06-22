@@ -13,6 +13,12 @@ struct RemapParams {
 @group(0) @binding(1) var texture: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: RemapParams;
 
+fn displayFrequencyTilt(frequency: f32) -> f32 {
+  let anchorFrequency = 440.0;
+  let slope = 0.14;
+  return clamp(pow(frequency / anchorFrequency, slope), 0.72, 1.55);
+}
+
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let halfSize = params.halfSize;
@@ -38,7 +44,11 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let offset = x * halfSize;
   let lowerIntensity = signal[offset + lowerIndex];
   let upperIntensity = signal[offset + upperIndex];
-  let intensity = mix(lowerIntensity, upperIntensity, blend);
+  let intensity = clamp(
+    mix(lowerIntensity, upperIntensity, blend) * displayFrequencyTilt(frequency),
+    0.0,
+    1.0,
+  );
   textureStore(texture, vec2u(x, y), vec4f(intensity, 0.0, 0.0, 1.0));
 }
 `;
