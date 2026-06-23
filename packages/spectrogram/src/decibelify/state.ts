@@ -30,7 +30,7 @@ export const createStateCell = (
       device.createBuffer({
         label: 'decibelify-column-energy-buffer',
         size: params.value.windowCount * Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       }),
     dispose: (buffer) => {
       buffer.destroy();

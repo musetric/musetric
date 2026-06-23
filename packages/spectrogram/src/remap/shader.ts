@@ -7,11 +7,16 @@ struct RemapParams {
   sampleRate: f32,
   logMinFrequency: f32,
   logFrequencyRange: f32,
+  decibelFactor: f32,
+  gain: f32,
+  gateFloorDb: f32,
+  gateRangeDb: f32,
 };
 
-@group(0) @binding(0) var<storage, read> signal: array<f32>;
+@group(0) @binding(0) var<storage, read> rawMagnitude: array<f32>;
 @group(0) @binding(1) var texture: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: RemapParams;
+@group(0) @binding(3) var<storage, read> columnEnergy: array<f32>;
 
 fn displayFrequencyTilt(frequency: f32) -> f32 {
   let anchorFrequency = 440.0;
@@ -28,6 +33,8 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let sampleRate = params.sampleRate;
   let logMinFrequency = params.logMinFrequency;
   let logFrequencyRange = params.logFrequencyRange;
+  let decibelFactor = params.decibelFactor;
+  let gain = params.gain;
   
   let x = gid.x;
   let y = gid.y;
@@ -42,10 +49,22 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let upperIndex = min(lowerIndex + 1u, halfSize - 1u);
   let blend = fract(clampedIndex);
   let offset = x * halfSize;
-  let lowerIntensity = signal[offset + lowerIndex];
-  let upperIntensity = signal[offset + upperIndex];
+  let lowerMagnitude = rawMagnitude[offset + lowerIndex];
+  let upperMagnitude = rawMagnitude[offset + upperIndex];
+  let magnitude = mix(lowerMagnitude, upperMagnitude, blend);
+  let referenceMagnitude = sqrt(f32(halfSize));
+  let epsilon = 1e-12;
+  let normalizedMagnitude = magnitude * gain / referenceMagnitude + epsilon;
+  let normalizedEnergy = columnEnergy[x] * gain / referenceMagnitude + epsilon;
+  let energyDb = log(normalizedEnergy) * 8.685889638;
+  let gate = clamp(
+    (energyDb - params.gateFloorDb) / params.gateRangeDb,
+    0.0,
+    1.0,
+  );
+  let decibel = max(log(normalizedMagnitude) * decibelFactor + 1.0, 0.0);
   let intensity = clamp(
-    mix(lowerIntensity, upperIntensity, blend) * displayFrequencyTilt(frequency),
+    decibel * gate * displayFrequencyTilt(frequency),
     0.0,
     1.0,
   );

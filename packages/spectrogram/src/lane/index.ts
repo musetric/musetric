@@ -31,6 +31,8 @@ export type SpectrogramLaneOptions = {
 
 export type SpectrogramLane = {
   signal: GPUBuffer;
+  rawMagnitudeBuffer: GPUBuffer;
+  columnEnergyBuffer: GPUBuffer;
   fundamentalFrequencyBuffer: GPUBuffer;
   writeSamples: (samples: Float32Array, trackProgress: number) => void;
   run: (encoder: GPUCommandEncoder) => void;
@@ -109,6 +111,8 @@ export const createSpectrogramLaneCell = (
       const skip = (encoder: GPUCommandEncoder, clear: boolean) => {
         if (clear) {
           encoder.clearBuffer(signal);
+          encoder.clearBuffer(magnitudify.magnitude);
+          encoder.clearBuffer(decibelify.columnEnergy);
           encoder.clearBuffer(fundamentalFrequency.buffer);
         }
         const emit = (marker?: GPUComputePassTimestampWrites) => {
@@ -132,6 +136,8 @@ export const createSpectrogramLaneCell = (
 
       return {
         signal,
+        rawMagnitudeBuffer: magnitudify.magnitude,
+        columnEnergyBuffer: decibelify.columnEnergy,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
         writeSamples: (samples, trackProgress) => {
           sliceSamples.write(

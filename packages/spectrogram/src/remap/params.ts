@@ -9,18 +9,31 @@ export type RemapParams = {
   sampleRate: number;
   logMinFrequency: number;
   logFrequencyRange: number;
+  decibelFactor: number;
+  gain: number;
+  gateFloorDb: number;
+  gateRangeDb: number;
 };
 
-const toParams = (config: SpectrogramConfig): RemapParams => {
+export type RemapParamsArg = {
+  config: SpectrogramConfig;
+  gainDb: number;
+};
+
+const gateFloorDb = -64;
+const gateRangeDb = 24;
+
+const toParams = (arg: RemapParamsArg): RemapParams => {
   const {
     sampleRate,
     zeroPaddingFactor,
     minFrequency,
     maxFrequency,
     viewSize,
-  } = config;
+    minDecibel,
+  } = arg.config;
   const { width, height } = viewSize;
-  const windowSize = config.windowSize * zeroPaddingFactor;
+  const windowSize = arg.config.windowSize * zeroPaddingFactor;
   const halfSize = windowSize / 2;
   const logMinFrequency = Math.log(minFrequency);
   const logFrequencyRange = Math.log(maxFrequency) - logMinFrequency;
@@ -32,6 +45,10 @@ const toParams = (config: SpectrogramConfig): RemapParams => {
     sampleRate,
     logMinFrequency,
     logFrequencyRange,
+    decibelFactor: (20 * Math.LOG10E) / -minDecibel,
+    gain: 10 ** (arg.gainDb / 20),
+    gateFloorDb,
+    gateRangeDb,
   };
 };
 
@@ -42,9 +59,9 @@ export type StateParams = {
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (config: SpectrogramConfig): StateParams => {
-      const value = toParams(config);
-      const array = new DataView(new ArrayBuffer(28));
+    create: (arg: RemapParamsArg): StateParams => {
+      const value = toParams(arg);
+      const array = new DataView(new ArrayBuffer(44));
       array.setUint32(0, value.halfSize, true);
       array.setUint32(4, value.width, true);
       array.setUint32(8, value.height, true);
@@ -52,6 +69,10 @@ export const createParamsCell = (device: GPUDevice) =>
       array.setFloat32(16, value.sampleRate, true);
       array.setFloat32(20, value.logMinFrequency, true);
       array.setFloat32(24, value.logFrequencyRange, true);
+      array.setFloat32(28, value.decibelFactor, true);
+      array.setFloat32(32, value.gain, true);
+      array.setFloat32(36, value.gateFloorDb, true);
+      array.setFloat32(40, value.gateRangeDb, true);
 
       const buffer = device.createBuffer({
         label: 'remap-params-buffer',
@@ -69,11 +90,13 @@ export const createParamsCell = (device: GPUDevice) =>
       params.buffer.destroy();
     },
     equals: (current, next) =>
-      current.windowSize === next.windowSize &&
-      current.sampleRate === next.sampleRate &&
-      current.zeroPaddingFactor === next.zeroPaddingFactor &&
-      current.minFrequency === next.minFrequency &&
-      current.maxFrequency === next.maxFrequency &&
-      current.viewSize.width === next.viewSize.width &&
-      current.viewSize.height === next.viewSize.height,
+      current.config.windowSize === next.config.windowSize &&
+      current.config.sampleRate === next.config.sampleRate &&
+      current.config.zeroPaddingFactor === next.config.zeroPaddingFactor &&
+      current.config.minDecibel === next.config.minDecibel &&
+      current.config.minFrequency === next.config.minFrequency &&
+      current.config.maxFrequency === next.config.maxFrequency &&
+      current.config.viewSize.width === next.config.viewSize.width &&
+      current.config.viewSize.height === next.config.viewSize.height &&
+      current.gainDb === next.gainDb,
   });

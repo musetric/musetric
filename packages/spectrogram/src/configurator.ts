@@ -117,9 +117,11 @@ export const createSpectrogramConfigurator = (
         (acc, key, index) => {
           const lane = trackCells[key].lane.get(nextConfig);
           const remap = trackCells[key].remap.get({
-            signal: lane.signal,
+            rawMagnitude: lane.rawMagnitudeBuffer,
+            columnEnergy: lane.columnEnergyBuffer,
             texture: texture.layerViews[index],
             config: nextConfig,
+            gainDb: nextConfig.lanes[key].gainDb,
           });
           acc[key] = { lane, remap };
           return acc;

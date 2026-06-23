@@ -30,7 +30,7 @@ export const createStateCell = (
       return device.createBuffer({
         label: 'magnitudify-magnitude-buffer',
         size: (windowSize / 2) * windowCount * Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
     },
     dispose: (buffer) => {
