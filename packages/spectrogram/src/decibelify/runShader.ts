@@ -8,9 +8,10 @@ struct DecibelifyParams {
   gateRangeDb: f32,
 };
 
-@group(0) @binding(0) var<storage, read_write> signal: array<f32>;
+@group(0) @binding(0) var<storage, read> magnitude: array<f32>;
 @group(0) @binding(1) var<uniform> params: DecibelifyParams;
 @group(0) @binding(2) var<storage, read_write> columnEnergy: array<f32>;
+@group(0) @binding(3) var<storage, read_write> signal: array<f32>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -27,7 +28,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowOffset = halfSize * windowIndex + sampleIndex;
   let referenceMagnitude = sqrt(f32(halfSize));
   let epsilon = 1e-12;
-  let normalizedMagnitude = signal[windowOffset] * gain / referenceMagnitude + epsilon;
+  let normalizedMagnitude = magnitude[windowOffset] * gain / referenceMagnitude + epsilon;
   let normalizedEnergy = columnEnergy[windowIndex] * gain / referenceMagnitude + epsilon;
   let energyDb = log(normalizedEnergy) * 8.685889638;
   let gate = clamp((energyDb - params.gateFloorDb) / params.gateRangeDb, 0.0, 1.0);

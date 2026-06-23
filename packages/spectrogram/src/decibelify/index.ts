@@ -7,6 +7,8 @@ const workgroupSize = 64;
 export type SpectrogramDecibelify = {
   columnEnergy: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
+  dispatchEnergy: (pass: GPUComputePassEncoder) => void;
+  dispatchRun: (pass: GPUComputePassEncoder) => void;
   dispatch: (pass: GPUComputePassEncoder) => void;
 };
 
@@ -21,17 +23,26 @@ export const createSpectrogramDecibelifyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatch = (pass: GPUComputePassEncoder) => {
-        const { halfSize, windowCount } = state.params.value;
-        const xCount = Math.ceil(halfSize / workgroupSize);
+      const dispatchEnergy = (pass: GPUComputePassEncoder) => {
+        const { windowCount } = state.params.value;
 
         pass.setPipeline(state.pipelines.energy);
         pass.setBindGroup(0, state.bindGroup);
         pass.dispatchWorkgroups(windowCount);
+      };
+
+      const dispatchRun = (pass: GPUComputePassEncoder) => {
+        const { halfSize, windowCount } = state.params.value;
+        const xCount = Math.ceil(halfSize / workgroupSize);
 
         pass.setPipeline(state.pipelines.run);
         pass.setBindGroup(0, state.bindGroup);
         pass.dispatchWorkgroups(xCount, windowCount);
+      };
+
+      const dispatch = (pass: GPUComputePassEncoder) => {
+        dispatchEnergy(pass);
+        dispatchRun(pass);
       };
 
       return {
@@ -44,6 +55,8 @@ export const createSpectrogramDecibelifyCell = (
           dispatch(pass);
           pass.end();
         },
+        dispatchEnergy,
+        dispatchRun,
         dispatch,
       };
     },

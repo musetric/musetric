@@ -1,10 +1,8 @@
-import { moveShader } from './moveShader.js';
 import { runShader } from './runShader.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;
   run: GPUComputePipeline;
-  move: GPUComputePipeline;
 };
 
 export const createPipelines = (device: GPUDevice): Pipelines => {
@@ -43,19 +41,8 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
     compute: { module: runModule, entryPoint: 'main' },
   });
 
-  const moveModule = device.createShaderModule({
-    label: 'magnitudify-move-shader',
-    code: moveShader,
-  });
-  const move = device.createComputePipeline({
-    label: 'magnitudify-move-pipeline',
-    layout: pipelineLayout,
-    compute: { module: moveModule, entryPoint: 'main' },
-  });
-
   return {
     layout,
     run,
-    move,
   };
 };

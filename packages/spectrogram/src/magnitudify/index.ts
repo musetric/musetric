@@ -29,10 +29,6 @@ export const createSpectrogramMagnitudifyCell = (
         pass.setPipeline(state.pipelines.run);
         pass.setBindGroup(0, state.bindGroup);
         pass.dispatchWorkgroups(xCount, windowCount);
-
-        pass.setPipeline(state.pipelines.move);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(xCount, windowCount);
       };
 
       return {

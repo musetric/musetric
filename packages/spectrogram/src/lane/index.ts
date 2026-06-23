@@ -28,16 +28,30 @@ export type SpectrogramBandSpectrum = {
   band: SpectrogramSpectralBand;
 };
 
+export type SpectrogramLaneWork = {
+  spectrogram: boolean;
+  fundamental: boolean;
+};
+
+type SpectrogramLaneDispatch = (
+  pass: GPUComputePassEncoder,
+  work: SpectrogramLaneWork,
+) => void;
+
 export type SpectrogramLane = {
   signal: GPUBuffer;
   bandSpectra: SpectrogramBandSpectrum[];
   fundamentalFrequencyBuffer: GPUBuffer;
-  writeSamples: (samples: Float32Array, trackProgress: number) => void;
-  dispatchSliceSamples: (pass: GPUComputePassEncoder) => void;
-  dispatchWindowing: (pass: GPUComputePassEncoder) => void;
-  dispatchFourierTransform: (pass: GPUComputePassEncoder) => void;
-  dispatchMagnitudify: (pass: GPUComputePassEncoder) => void;
-  dispatchDecibelify: (pass: GPUComputePassEncoder) => void;
+  writeSamples: (
+    samples: Float32Array,
+    trackProgress: number,
+    work: SpectrogramLaneWork,
+  ) => void;
+  dispatchSliceSamples: SpectrogramLaneDispatch;
+  dispatchWindowing: SpectrogramLaneDispatch;
+  dispatchFourierTransform: SpectrogramLaneDispatch;
+  dispatchMagnitudify: SpectrogramLaneDispatch;
+  dispatchDecibelify: SpectrogramLaneDispatch;
   dispatchFundamentalFrequency: (pass: GPUComputePassEncoder) => void;
   clear: (encoder: GPUCommandEncoder) => void;
 };
@@ -56,7 +70,8 @@ type BandSpectrumPipeline = {
   dispatchWindowing: (pass: GPUComputePassEncoder) => void;
   dispatchFourier: (pass: GPUComputePassEncoder) => void;
   dispatchMagnitudify: (pass: GPUComputePassEncoder) => void;
-  dispatchDecibelify: (pass: GPUComputePassEncoder) => void;
+  dispatchDecibelEnergy: (pass: GPUComputePassEncoder) => void;
+  dispatchDecibelRun: (pass: GPUComputePassEncoder) => void;
   clear: (encoder: GPUCommandEncoder) => void;
 };
 
@@ -134,6 +149,7 @@ const createBandSpectrumCell = (
       });
       const decibelify = decibelifyCell.get({
         signal,
+        magnitude: magnitudify.magnitude,
         config: bandConfig,
         gainDb: bandConfig.lanes[label].gainDb,
       });
@@ -153,7 +169,8 @@ const createBandSpectrumCell = (
         dispatchWindowing: windowing.dispatch,
         dispatchFourier: fourier.dispatch,
         dispatchMagnitudify: magnitudify.dispatch,
-        dispatchDecibelify: decibelify.dispatch,
+        dispatchDecibelEnergy: decibelify.dispatchEnergy,
+        dispatchDecibelRun: decibelify.dispatchRun,
         clear: (encoder) => {
           encoder.clearBuffer(signal);
           encoder.clearBuffer(magnitudify.magnitude);
@@ -221,6 +238,7 @@ export const createSpectrogramLaneCell = (
 
   const laneCell = createResourceCell<ExtSpectrogramConfig, SpectrogramLane>({
     create: (config): SpectrogramLane => {
+      const laneConfig = config.lanes[options.label];
       const signal = signalCell.get({
         windowSize: config.windowSize * config.zeroPaddingFactor,
         windowCount: config.windowCount,
@@ -235,8 +253,9 @@ export const createSpectrogramLaneCell = (
       const magnitudify = magnitudifyCell.get({ signal, config });
       const decibelify = decibelifyCell.get({
         signal,
+        magnitude: magnitudify.magnitude,
         config,
-        gainDb: config.lanes[options.label].gainDb,
+        gainDb: laneConfig.gainDb,
       });
       const fundamentalFrequency = fundamentalFrequencyCell.get({
         signal,
@@ -250,23 +269,26 @@ export const createSpectrogramLaneCell = (
           sliceSamples.write(
             samples,
             trackProgress,
-            config.lanes[options.label].truncateAfterPlayhead,
+            laneConfig.truncateAfterPlayhead,
           );
         },
         dispatchSliceSamples: sliceSamples.dispatch,
         dispatchWindowing: windowing.dispatch,
         dispatchFourier: fourier.dispatch,
         dispatchMagnitudify: magnitudify.dispatch,
-        dispatchDecibelify: decibelify.dispatch,
+        dispatchDecibelEnergy: decibelify.dispatchEnergy,
+        dispatchDecibelRun: decibelify.dispatchRun,
         clear: (encoder) => {
           encoder.clearBuffer(signal);
           encoder.clearBuffer(magnitudify.magnitude);
           encoder.clearBuffer(decibelify.columnEnergy);
         },
       };
-      const externalSpectralBands = config.spectralBands.filter(
-        (band) => band.windowSize !== config.windowSize,
-      );
+      const externalSpectralBands = laneConfig.showSpectrogram
+        ? config.spectralBands.filter(
+            (band) => band.windowSize !== config.windowSize,
+          )
+        : [];
       const bandPipelines = getBandSpectrumCells(externalSpectralBands).map(
         (cell, index) => {
           const band = externalSpectralBands[index];
@@ -278,71 +300,96 @@ export const createSpectrogramLaneCell = (
         },
       );
       let externalBandPipelineIndex = 0;
-      const orderedBandPipelines: BandSpectrumPipeline[] = [];
-      for (const band of config.spectralBands) {
-        const pipeline =
-          band.windowSize === config.windowSize
-            ? baseBandPipeline
-            : bandPipelines[externalBandPipelineIndex];
-        if (band.windowSize !== config.windowSize) {
-          externalBandPipelineIndex += 1;
-        }
-        if (!orderedBandPipelines.includes(pipeline)) {
-          orderedBandPipelines.push(pipeline);
+      const spectrogramBandPipelines: BandSpectrumPipeline[] = [];
+      if (laneConfig.showSpectrogram) {
+        for (const band of config.spectralBands) {
+          const pipeline =
+            band.windowSize === config.windowSize
+              ? baseBandPipeline
+              : bandPipelines[externalBandPipelineIndex];
+          if (band.windowSize !== config.windowSize) {
+            externalBandPipelineIndex += 1;
+          }
+          if (!spectrogramBandPipelines.includes(pipeline)) {
+            spectrogramBandPipelines.push(pipeline);
+          }
         }
       }
       externalBandPipelineIndex = 0;
-      const bandSpectra = config.spectralBands.map((band) => {
-        if (band.windowSize === config.windowSize) {
-          return {
-            rawMagnitudeBuffer: magnitudify.magnitude,
-            columnEnergyBuffer: decibelify.columnEnergy,
-            windowSize: config.windowSize * config.zeroPaddingFactor,
-            band,
-          };
+      const bandSpectra = laneConfig.showSpectrogram
+        ? config.spectralBands.map((band) => {
+            if (band.windowSize === config.windowSize) {
+              return {
+                rawMagnitudeBuffer: magnitudify.magnitude,
+                columnEnergyBuffer: decibelify.columnEnergy,
+                windowSize: config.windowSize * config.zeroPaddingFactor,
+                band,
+              };
+            }
+            const pipeline = bandPipelines[externalBandPipelineIndex];
+            externalBandPipelineIndex += 1;
+            return {
+              rawMagnitudeBuffer: pipeline.rawMagnitudeBuffer,
+              columnEnergyBuffer: pipeline.columnEnergyBuffer,
+              windowSize: pipeline.windowSize,
+              band,
+            };
+          })
+        : [];
+
+      const forEachWorkPipeline = (
+        work: SpectrogramLaneWork,
+        fn: (pipeline: BandSpectrumPipeline) => void,
+      ) => {
+        if (work.spectrogram) {
+          for (const pipeline of spectrogramBandPipelines) {
+            fn(pipeline);
+          }
         }
-        const pipeline = bandPipelines[externalBandPipelineIndex];
-        externalBandPipelineIndex += 1;
-        return {
-          rawMagnitudeBuffer: pipeline.rawMagnitudeBuffer,
-          columnEnergyBuffer: pipeline.columnEnergyBuffer,
-          windowSize: pipeline.windowSize,
-          band,
-        };
-      });
+        if (
+          work.fundamental &&
+          (!work.spectrogram ||
+            !spectrogramBandPipelines.includes(baseBandPipeline))
+        ) {
+          fn(baseBandPipeline);
+        }
+      };
 
       return {
         signal,
         bandSpectra,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
-        writeSamples: (samples, trackProgress) => {
-          for (const pipeline of orderedBandPipelines) {
+        writeSamples: (samples, trackProgress, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
             pipeline.writeSamples(samples, trackProgress);
-          }
+          });
         },
-        dispatchSliceSamples: (pass) => {
-          for (const pipeline of orderedBandPipelines) {
+        dispatchSliceSamples: (pass, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
             pipeline.dispatchSliceSamples(pass);
-          }
+          });
         },
-        dispatchWindowing: (pass) => {
-          for (const pipeline of orderedBandPipelines) {
+        dispatchWindowing: (pass, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
             pipeline.dispatchWindowing(pass);
-          }
+          });
         },
-        dispatchFourierTransform: (pass) => {
-          for (const pipeline of orderedBandPipelines) {
+        dispatchFourierTransform: (pass, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
             pipeline.dispatchFourier(pass);
-          }
+          });
         },
-        dispatchMagnitudify: (pass) => {
-          for (const pipeline of orderedBandPipelines) {
+        dispatchMagnitudify: (pass, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
             pipeline.dispatchMagnitudify(pass);
-          }
+          });
         },
-        dispatchDecibelify: (pass) => {
-          for (const pipeline of orderedBandPipelines) {
-            pipeline.dispatchDecibelify(pass);
+        dispatchDecibelify: (pass, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
+            pipeline.dispatchDecibelEnergy(pass);
+          });
+          if (work.fundamental) {
+            baseBandPipeline.dispatchDecibelRun(pass);
           }
         },
         dispatchFundamentalFrequency: fundamentalFrequency.dispatch,
@@ -369,6 +416,8 @@ export const createSpectrogramLaneCell = (
       current.minDecibel === next.minDecibel &&
       current.maxFrequency === next.maxFrequency &&
       current.windowCount === next.windowCount &&
+      current.lanes[options.label].showSpectrogram ===
+        next.lanes[options.label].showSpectrogram &&
       current.lanes[options.label].gainDb ===
         next.lanes[options.label].gainDb &&
       current.lanes[options.label].truncateAfterPlayhead ===
