@@ -5,6 +5,7 @@ import { createStateCell, type StateArg } from './state.js';
 const workgroupSize = 64;
 
 export type SpectrogramMagnitudify = {
+  magnitude: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
   dispatch: (pass: GPUComputePassEncoder) => void;
 };
@@ -35,6 +36,7 @@ export const createSpectrogramMagnitudifyCell = (
       };
 
       return {
+        magnitude: state.magnitude,
         run: (encoder) => {
           const pass = encoder.beginComputePass({
             label: 'magnitudify-pass',

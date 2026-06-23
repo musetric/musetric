@@ -5,6 +5,7 @@ import { createStateCell, type StateArg } from './state.js';
 const workgroupSize = 64;
 
 export type SpectrogramDecibelify = {
+  columnEnergy: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
   dispatch: (pass: GPUComputePassEncoder) => void;
 };
@@ -34,6 +35,7 @@ export const createSpectrogramDecibelifyCell = (
       };
 
       return {
+        columnEnergy: state.columnEnergy,
         run: (encoder) => {
           const pass = encoder.beginComputePass({
             label: 'decibelify-pass',
