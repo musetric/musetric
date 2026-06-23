@@ -26,7 +26,7 @@ import {
 
 export type SpectrogramTrack = {
   lane: SpectrogramLane;
-  remap: SpectrogramRemap;
+  remap?: SpectrogramRemap;
 };
 
 export type SpectrogramRuntime = {
@@ -104,12 +104,14 @@ export const createSpectrogramConfigurator = (
       const tracks = allTrackKeys.reduce(
         (acc, key, index) => {
           const lane = trackCells[key].lane.get(nextConfig);
-          const remap = trackCells[key].remap.get({
-            spectra: lane.bandSpectra,
-            texture: texture.layerViews[index],
-            config: nextConfig,
-            gainDb: nextConfig.lanes[key].gainDb,
-          });
+          const remap = nextConfig.lanes[key].showSpectrogram
+            ? trackCells[key].remap.get({
+                spectra: lane.bandSpectra,
+                texture: texture.layerViews[index],
+                config: nextConfig,
+                gainDb: nextConfig.lanes[key].gainDb,
+              })
+            : undefined;
           acc[key] = { lane, remap };
           return acc;
         },

@@ -14,7 +14,7 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
+        buffer: { type: 'read-only-storage' },
       },
       {
         binding: 1,
@@ -23,6 +23,11 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
       },
       {
         binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' },
+      },
+      {
+        binding: 3,
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: 'storage' },
       },

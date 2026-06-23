@@ -8,6 +8,7 @@ import { type Pipelines } from './pipeline.js';
 
 export type StateArg = {
   signal: GPUBuffer;
+  magnitude: GPUBuffer;
   config: ExtSpectrogramConfig;
   gainDb: number;
 };
@@ -41,6 +42,7 @@ export const createStateCell = (
   const bindGroupCell = createResourceCell({
     create: (arg: {
       signal: GPUBuffer;
+      magnitude: GPUBuffer;
       params: GPUBuffer;
       columnEnergy: GPUBuffer;
     }): GPUBindGroup =>
@@ -48,21 +50,23 @@ export const createStateCell = (
         label: 'decibelify-bind-group',
         layout: pipelines.layout,
         entries: [
-          { binding: 0, resource: { buffer: arg.signal } },
+          { binding: 0, resource: { buffer: arg.magnitude } },
           { binding: 1, resource: { buffer: arg.params } },
           { binding: 2, resource: { buffer: arg.columnEnergy } },
+          { binding: 3, resource: { buffer: arg.signal } },
         ],
       }),
     dispose: () => undefined,
     equals: (current, next) =>
       current.signal === next.signal &&
+      current.magnitude === next.magnitude &&
       current.params === next.params &&
       current.columnEnergy === next.columnEnergy,
   });
 
   return {
     get: (arg) => {
-      const { signal, config } = arg;
+      const { signal, magnitude, config } = arg;
       const params = paramsCell.get({
         config,
         gainDb: arg.gainDb,
@@ -70,6 +74,7 @@ export const createStateCell = (
       const columnEnergy = columnEnergyCell.get(params);
       const bindGroup = bindGroupCell.get({
         signal,
+        magnitude,
         params: params.buffer,
         columnEnergy,
       });
