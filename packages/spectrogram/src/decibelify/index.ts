@@ -24,6 +24,10 @@ export const createSpectrogramDecibelifyCell = (
         const { halfSize, windowCount } = state.params.value;
         const xCount = Math.ceil(halfSize / workgroupSize);
 
+        pass.setPipeline(state.pipelines.energy);
+        pass.setBindGroup(0, state.bindGroup);
+        pass.dispatchWorkgroups(windowCount);
+
         pass.setPipeline(state.pipelines.run);
         pass.setBindGroup(0, state.bindGroup);
         pass.dispatchWorkgroups(xCount, windowCount);

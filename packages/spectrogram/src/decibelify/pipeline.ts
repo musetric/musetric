@@ -1,7 +1,9 @@
+import { energyShader } from './energyShader.js';
 import { runShader } from './runShader.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;
+  energy: GPUComputePipeline;
   run: GPUComputePipeline;
 };
 
@@ -19,6 +21,11 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: 'uniform' },
       },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' },
+      },
     ],
   });
   const pipelineLayout = device.createPipelineLayout({
@@ -30,6 +37,15 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
     label: 'decibelify-run-shader',
     code: runShader,
   });
+  const energyModule = device.createShaderModule({
+    label: 'decibelify-energy-shader',
+    code: energyShader,
+  });
+  const energy = device.createComputePipeline({
+    label: 'decibelify-energy-pipeline',
+    layout: pipelineLayout,
+    compute: { module: energyModule, entryPoint: 'main' },
+  });
   const run = device.createComputePipeline({
     label: 'decibelify-run-pipeline',
     layout: pipelineLayout,
@@ -38,6 +54,7 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
 
   return {
     layout,
+    energy,
     run,
   };
 };

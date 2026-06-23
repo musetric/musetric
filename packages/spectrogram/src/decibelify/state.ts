@@ -16,6 +16,7 @@ export type State = {
   pipelines: Pipelines;
   config: ExtSpectrogramConfig;
   params: StateParams;
+  columnEnergy: GPUBuffer;
   bindGroup: GPUBindGroup;
 };
 
@@ -24,19 +25,39 @@ export const createStateCell = (
   pipelines: Pipelines,
 ): ResourceCell<StateArg, State> => {
   const paramsCell = createParamsCell(device);
+  const columnEnergyCell = createResourceCell({
+    create: (params: StateParams): GPUBuffer =>
+      device.createBuffer({
+        label: 'decibelify-column-energy-buffer',
+        size: params.value.windowCount * Float32Array.BYTES_PER_ELEMENT,
+        usage: GPUBufferUsage.STORAGE,
+      }),
+    dispose: (buffer) => {
+      buffer.destroy();
+    },
+    equals: (current, next) =>
+      current.value.windowCount === next.value.windowCount,
+  });
   const bindGroupCell = createResourceCell({
-    create: (arg: { signal: GPUBuffer; buffer: GPUBuffer }): GPUBindGroup =>
+    create: (arg: {
+      signal: GPUBuffer;
+      params: GPUBuffer;
+      columnEnergy: GPUBuffer;
+    }): GPUBindGroup =>
       device.createBindGroup({
         label: 'decibelify-bind-group',
         layout: pipelines.layout,
         entries: [
           { binding: 0, resource: { buffer: arg.signal } },
-          { binding: 1, resource: { buffer: arg.buffer } },
+          { binding: 1, resource: { buffer: arg.params } },
+          { binding: 2, resource: { buffer: arg.columnEnergy } },
         ],
       }),
     dispose: () => undefined,
     equals: (current, next) =>
-      current.signal === next.signal && current.buffer === next.buffer,
+      current.signal === next.signal &&
+      current.params === next.params &&
+      current.columnEnergy === next.columnEnergy,
   });
 
   return {
@@ -46,20 +67,24 @@ export const createStateCell = (
         config,
         gainDb: arg.gainDb,
       });
+      const columnEnergy = columnEnergyCell.get(params);
       const bindGroup = bindGroupCell.get({
         signal,
-        buffer: params.buffer,
+        params: params.buffer,
+        columnEnergy,
       });
 
       return {
         pipelines,
         config,
         params,
+        columnEnergy,
         bindGroup,
       };
     },
     dispose: () => {
       bindGroupCell.dispose();
+      columnEnergyCell.dispose();
       paramsCell.dispose();
     },
   };
