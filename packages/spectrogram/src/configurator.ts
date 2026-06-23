@@ -14,7 +14,6 @@ import {
 import {
   createSpectrogramLaneCell,
   type SpectrogramLane,
-  type SpectrogramLaneMarkers,
 } from './lane/index.js';
 import {
   createSpectrogramRemapCell,
@@ -31,6 +30,7 @@ export type SpectrogramTrack = {
 };
 
 export type SpectrogramRuntime = {
+  config: SpectrogramConfig;
   state: SpectrogramState;
   tracks: Record<TrackKey, SpectrogramTrack>;
   draw: SpectrogramDraw;
@@ -41,19 +41,6 @@ export type SpectrogramConfigurator = {
   updateConfig: (config?: Partial<SpectrogramConfig>) => void;
   dispose: () => void;
 };
-
-const pickLaneMarkers = (
-  markers: SpectrogramMarkers,
-  key: TrackKey,
-): SpectrogramLaneMarkers => ({
-  sliceSamples: markers[`${key}.sliceSamples`],
-  windowing: markers[`${key}.windowing`],
-  fourierReverse: markers[`${key}.fourierReverse`],
-  fourierTransform: markers[`${key}.fourierTransform`],
-  magnitudify: markers[`${key}.magnitudify`],
-  decibelify: markers[`${key}.decibelify`],
-  fundamentalFrequency: markers[`${key}.fundamentalFrequency`],
-});
 
 type TrackCells = {
   lane: ReturnType<typeof createSpectrogramLaneCell>;
@@ -69,16 +56,17 @@ export const createSpectrogramConfigurator = (
   let runtime: SpectrogramRuntime | undefined = undefined;
 
   const stateCell = createSpectrogramStateCell(device);
-  const drawCell = createSpectrogramDrawCell(device, markers.draw);
+  const drawCell = createSpectrogramDrawCell(device, () =>
+    markers.getGpuMarker('draw'),
+  );
 
   const trackCells = allTrackKeys.reduce(
     (acc, key) => {
       acc[key] = {
         lane: createSpectrogramLaneCell(device, {
           label: key,
-          markers: pickLaneMarkers(markers, key),
         }),
-        remap: createSpectrogramRemapCell(device, markers[`${key}.remap`]),
+        remap: createSpectrogramRemapCell(device),
       };
       return acc;
     },
@@ -117,8 +105,7 @@ export const createSpectrogramConfigurator = (
         (acc, key, index) => {
           const lane = trackCells[key].lane.get(nextConfig);
           const remap = trackCells[key].remap.get({
-            rawMagnitude: lane.rawMagnitudeBuffer,
-            columnEnergy: lane.columnEnergyBuffer,
+            spectra: lane.bandSpectra,
             texture: texture.layerViews[index],
             config: nextConfig,
             gainDb: nextConfig.lanes[key].gainDb,
@@ -146,6 +133,7 @@ export const createSpectrogramConfigurator = (
       });
 
       runtime = {
+        config: nextConfig,
         state,
         tracks,
         draw,

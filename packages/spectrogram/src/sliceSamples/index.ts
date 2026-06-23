@@ -49,6 +49,7 @@ export const createSpectrogramSliceSamplesCell = (
             trackProgress,
             state.config,
             truncateAfterPlayhead,
+            state.sampleOffset,
           );
         },
       };

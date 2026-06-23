@@ -1,5 +1,6 @@
 import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import {
+  defaultSpectrogramSpectralBands,
   extractSpectrogramConfig,
   type SpectrogramConfig,
   type SpectrogramZeroPaddingFactor,
@@ -15,6 +16,7 @@ export type SettingsState = Pick<
   | 'visibleTime'
   | 'playheadRatio'
   | 'zeroPaddingFactor'
+  | 'spectralBands'
   | 'windowName'
   | 'minDecibel'
   | 'minFrequency'
@@ -29,6 +31,7 @@ const initialState: SettingsState = {
   visibleTime: 3.5,
   playheadRatio: 0.4,
   zeroPaddingFactor: 2,
+  spectralBands: defaultSpectrogramSpectralBands,
   windowName: 'hamming',
   minDecibel: -40,
   minFrequency: 120,

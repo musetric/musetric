@@ -6,6 +6,7 @@ import {
   allTrackKeys,
   type SpectrogramConfig,
   type SpectrogramLaneConfig,
+  type SpectrogramSpectralBand,
 } from '../config.cross.js';
 
 const areLanesEqual = (
@@ -21,6 +22,23 @@ const areLanesEqual = (
       a.lineWidthCents === b.lineWidthCents &&
       a.truncateAfterPlayhead === b.truncateAfterPlayhead &&
       a.gainDb === b.gainDb
+    );
+  });
+
+const areSpectralBandsEqual = (
+  first: SpectrogramSpectralBand[],
+  second: SpectrogramSpectralBand[],
+) =>
+  first.length === second.length &&
+  first.every((band, index) => {
+    const next = second[index];
+    return (
+      band.label === next.label &&
+      band.windowSize === next.windowSize &&
+      band.minFrequency === next.minFrequency &&
+      band.fullMinFrequency === next.fullMinFrequency &&
+      band.fullMaxFrequency === next.fullMaxFrequency &&
+      band.maxFrequency === next.maxFrequency
     );
   });
 
@@ -42,6 +60,7 @@ export const applySpectrogramPatchConfig = (
         first.recordingClose === second.recordingClose &&
         first.recordingMiss === second.recordingMiss,
       lanes: areLanesEqual,
+      spectralBands: areSpectralBandsEqual,
       comparison: (first, second) =>
         first.reference === second.reference &&
         first.target === second.target &&
