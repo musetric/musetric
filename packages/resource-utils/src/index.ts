@@ -5,6 +5,7 @@ export * from './controlledPromise.js';
 export * from './eventEmitter.js';
 export * from './inertialDrag.js';
 export * from './logger.js';
+export * from './loudness.js';
 export * from './messageHandler.js';
 export * from './nextNumber.js';
 export * from './numberLimit.js';

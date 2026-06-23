@@ -9,6 +9,7 @@ import { type Pipelines } from './pipeline.js';
 export type StateArg = {
   signal: GPUBuffer;
   config: ExtSpectrogramConfig;
+  gainDb: number;
 };
 
 export type State = {
@@ -41,7 +42,10 @@ export const createStateCell = (
   return {
     get: (arg) => {
       const { signal, config } = arg;
-      const params = paramsCell.get(config);
+      const params = paramsCell.get({
+        config,
+        gainDb: arg.gainDb,
+      });
       const bindGroup = bindGroupCell.get({
         signal,
         buffer: params.buffer,

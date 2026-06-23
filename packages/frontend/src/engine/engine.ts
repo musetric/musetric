@@ -61,6 +61,8 @@ const initialState: EngineState = {
   calibrating: false,
   inputLevel: 0,
   recordingGain: 1,
+  sourceGainDb: 0,
+  leadSpectrogramGainDb: 0,
   trackVolumes: {
     lead: 1,
     backing: 1,

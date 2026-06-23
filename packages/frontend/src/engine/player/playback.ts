@@ -72,6 +72,8 @@ type PlayingWaiter = {
   resolve: (frameIndex: number) => void;
 };
 
+const dbToGain = (db: number) => 10 ** (db / 20);
+
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
@@ -136,20 +138,31 @@ export const createEnginePlayback = async (
     },
   });
 
+  const publishTrackVolume = (stemType: StemType) => {
+    const state = store.get();
+    port.methods.setTrackVolume({
+      stemType,
+      volume: state.trackVolumes[stemType] * dbToGain(state.sourceGainDb),
+    });
+  };
+
   const subscribeTrackVolume = (stemType: StemType) => {
     store.subscribe(
       (state) => state.trackVolumes[stemType],
-      (volume) => {
-        port.methods.setTrackVolume({
-          stemType,
-          volume,
-        });
-      },
+      () => publishTrackVolume(stemType),
     );
   };
   for (const stemType of stemTypes) {
     subscribeTrackVolume(stemType);
   }
+  store.subscribe(
+    (state) => state.sourceGainDb,
+    () => {
+      for (const stemType of stemTypes) {
+        publishTrackVolume(stemType);
+      }
+    },
+  );
   store.subscribe(
     (state) => state.trackVolumes.recording,
     (volume) => {

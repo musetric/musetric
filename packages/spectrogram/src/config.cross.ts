@@ -13,6 +13,7 @@ export type SpectrogramLaneConfig = {
   showFundamental: boolean;
   lineWidthCents: number;
   truncateAfterPlayhead: boolean;
+  gainDb: number;
 };
 
 export type SpectrogramComparison = {

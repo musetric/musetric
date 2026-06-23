@@ -3,6 +3,15 @@ import { transaction } from '../../common/index.js';
 
 export type ApplySeparationResultArg = {
   projectId: number;
+  audioAnalysis: {
+    sourceIntegratedLoudnessDb: number;
+    sourceTruePeakDb: number;
+    sourceGainDb: number;
+    leadIntegratedLoudnessDb: number;
+    leadTruePeakDb: number;
+    leadP95RmsDb: number;
+    leadSpectrogramGainDb: number;
+  };
   master: {
     leadId: string;
     backingId: string;
@@ -32,9 +41,42 @@ export const applySeparationResult = (database: DatabaseSync) => {
        blobId = excluded.blobId,
        waveBlobId = excluded.waveBlobId`,
   );
+  const upsertProjectAudioAnalysisStatement = database.prepare(
+    `INSERT INTO ProjectAudioAnalysis (
+       projectId,
+       sourceIntegratedLoudnessDb,
+       sourceTruePeakDb,
+       sourceGainDb,
+       leadIntegratedLoudnessDb,
+       leadTruePeakDb,
+       leadP95RmsDb,
+       leadSpectrogramGainDb
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(projectId) DO UPDATE SET
+       sourceIntegratedLoudnessDb = excluded.sourceIntegratedLoudnessDb,
+       sourceTruePeakDb = excluded.sourceTruePeakDb,
+       sourceGainDb = excluded.sourceGainDb,
+       leadIntegratedLoudnessDb = excluded.leadIntegratedLoudnessDb,
+       leadTruePeakDb = excluded.leadTruePeakDb,
+       leadP95RmsDb = excluded.leadP95RmsDb,
+       leadSpectrogramGainDb = excluded.leadSpectrogramGainDb`,
+  );
 
   return async (arg: ApplySeparationResultArg): Promise<void> => {
     return await transaction(database, async () => {
+      await Promise.resolve(
+        upsertProjectAudioAnalysisStatement.run(
+          arg.projectId,
+          arg.audioAnalysis.sourceIntegratedLoudnessDb,
+          arg.audioAnalysis.sourceTruePeakDb,
+          arg.audioAnalysis.sourceGainDb,
+          arg.audioAnalysis.leadIntegratedLoudnessDb,
+          arg.audioAnalysis.leadTruePeakDb,
+          arg.audioAnalysis.leadP95RmsDb,
+          arg.audioAnalysis.leadSpectrogramGainDb,
+        ),
+      );
+
       await Promise.resolve(
         upsertAudioMasterStatement.run(
           arg.projectId,

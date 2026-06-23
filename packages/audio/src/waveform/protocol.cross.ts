@@ -23,6 +23,7 @@ export type WaveformOutboundMethods = {
   unmountDelivery: (message: { stemType: StemType }) => void;
   unmountRecording: () => void;
   setColors: (message: { colors: WaveformColors }) => void;
+  setSourceGainDb: (message: { gainDb: number }) => void;
   resizeDelivery: (message: { stemType: StemType; viewSize: ViewSize }) => void;
   resizeRecording: (message: { viewSize: ViewSize }) => void;
   refreshDelivery: (message: { stemType: StemType }) => void;
@@ -57,6 +58,7 @@ export const waveformChannel = createMessageChannel<
       'unmountDelivery',
       'unmountRecording',
       'setColors',
+      'setSourceGainDb',
       'resizeDelivery',
       'resizeRecording',
       'refreshDelivery',

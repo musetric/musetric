@@ -11,6 +11,20 @@ export namespace project {
   export type Item = z.infer<typeof itemSchema>;
 }
 
+export namespace projectAudioAnalysis {
+  export const itemSchema = z.object({
+    projectId: numericIdSchema,
+    sourceIntegratedLoudnessDb: z.number(),
+    sourceTruePeakDb: z.number(),
+    sourceGainDb: z.number(),
+    leadIntegratedLoudnessDb: z.number(),
+    leadTruePeakDb: z.number(),
+    leadP95RmsDb: z.number(),
+    leadSpectrogramGainDb: z.number(),
+  });
+  export type Item = z.infer<typeof itemSchema>;
+}
+
 export namespace audioMaster {
   export const typeSchema = z.enum([
     'source',

@@ -20,7 +20,8 @@ const areLaneConfigsEqual = (
 ) =>
   first.showSpectrogram === second.showSpectrogram &&
   first.showFundamental === second.showFundamental &&
-  first.lineWidthCents === second.lineWidthCents;
+  first.lineWidthCents === second.lineWidthCents &&
+  first.gainDb === second.gainDb;
 
 const areComparisonsEqual = (
   first: SpectrogramComparison,

@@ -6,6 +6,7 @@ export type WaveformSegment = {
 export const generateWaveformSegments = (
   wavePeaks: Float32Array,
   segmentCount: number,
+  gain = 1,
 ): WaveformSegment[] => {
   const wavePeakCount = Math.floor(wavePeaks.length / 2);
   const clampedSegmentCount = Math.max(
@@ -24,8 +25,8 @@ export const generateWaveformSegments = (
     let min = 1;
     let max = -1;
     for (let j = start; j < end; j++) {
-      min = Math.min(min, wavePeaks[j * 2]);
-      max = Math.max(max, wavePeaks[j * 2 + 1]);
+      min = Math.min(min, Math.max(-1, wavePeaks[j * 2] * gain));
+      max = Math.max(max, Math.min(1, wavePeaks[j * 2 + 1] * gain));
     }
     segments.push({ min, max });
   }
