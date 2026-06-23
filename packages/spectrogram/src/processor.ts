@@ -2,6 +2,8 @@ import { createCallLatest } from '@musetric/resource-utils';
 import {
   createSpectrogramProcessorTimer,
   type SpectrogramProcessorMetrics,
+  type SpectrumStage,
+  spectrumStages,
 } from './common/processorTimer.js';
 import {
   allTrackKeys,
@@ -40,6 +42,83 @@ const createTrackFlags = (): Record<TrackKey, boolean> =>
     {} as Record<TrackKey, boolean>,
   );
 
+const dispatchSpectrumStage = (
+  encoder: GPUCommandEncoder,
+  options: {
+    marker?: GPUComputePassTimestampWrites;
+    presence: Record<TrackKey, boolean>;
+    runtime: SpectrogramRuntime;
+    stage: SpectrumStage;
+  },
+) => {
+  const { marker, presence, runtime, stage } = options;
+  const pass = encoder.beginComputePass({
+    label: `${stage}-pass`,
+    timestampWrites: marker,
+  });
+  for (const key of allTrackKeys) {
+    if (!presence[key]) {
+      continue;
+    }
+    const { lane } = runtime.tracks[key];
+    if (stage === 'sliceSamples') {
+      lane.dispatchSliceSamples(pass);
+    }
+    if (stage === 'windowing') {
+      lane.dispatchWindowing(pass);
+    }
+    if (stage === 'fourierTransform') {
+      lane.dispatchFourierTransform(pass);
+    }
+    if (stage === 'magnitudify') {
+      lane.dispatchMagnitudify(pass);
+    }
+    if (stage === 'decibelify') {
+      lane.dispatchDecibelify(pass);
+    }
+  }
+  pass.end();
+};
+
+const dispatchFundamentalFrequency = (
+  encoder: GPUCommandEncoder,
+  options: {
+    marker?: GPUComputePassTimestampWrites;
+    presence: Record<TrackKey, boolean>;
+    runtime: SpectrogramRuntime;
+  },
+) => {
+  const { marker, presence, runtime } = options;
+  const pass = encoder.beginComputePass({
+    label: 'fundamentalFrequency-pass',
+    timestampWrites: marker,
+  });
+  for (const key of allTrackKeys) {
+    if (presence[key]) {
+      runtime.tracks[key].lane.dispatchFundamentalFrequency(pass);
+    }
+  }
+  pass.end();
+};
+
+const dispatchRemap = (
+  encoder: GPUCommandEncoder,
+  options: {
+    marker?: GPUComputePassTimestampWrites;
+    runtime: SpectrogramRuntime;
+  },
+) => {
+  const { marker, runtime } = options;
+  const pass = encoder.beginComputePass({
+    label: 'remap-pass',
+    timestampWrites: marker,
+  });
+  for (const key of allTrackKeys) {
+    runtime.tracks[key].remap.dispatch(pass);
+  }
+  pass.end();
+};
+
 export const createSpectrogramProcessor = (
   options: CreateSpectrogramProcessorOptions,
 ): SpectrogramProcessor => {
@@ -75,14 +154,27 @@ export const createSpectrogramProcessor = (
         label: 'processor-render-encoder',
       });
       for (const key of allTrackKeys) {
-        const track = runtime.tracks[key];
-        if (presence[key]) {
-          track.lane.run(encoder);
-        } else {
-          track.lane.skip(encoder, clearMissing[key]);
+        if (clearMissing[key]) {
+          runtime.tracks[key].lane.clear(encoder);
         }
-        track.remap.run(encoder);
       }
+      for (const stage of spectrumStages) {
+        dispatchSpectrumStage(encoder, {
+          marker: markers.getGpuMarker(stage),
+          presence,
+          runtime,
+          stage,
+        });
+      }
+      dispatchFundamentalFrequency(encoder, {
+        marker: markers.getGpuMarker('fundamentalFrequency'),
+        presence,
+        runtime,
+      });
+      dispatchRemap(encoder, {
+        marker: markers.getGpuMarker('remap'),
+        runtime,
+      });
       runtime.draw.run(encoder);
       timer.resolve(encoder);
       return encoder.finish();
@@ -104,6 +196,7 @@ export const createSpectrogramProcessor = (
       if (!runtime) {
         return false;
       }
+      timer.configure();
       writeBuffers(runtime, samples, trackProgress);
       const presence: Record<TrackKey, boolean> = createTrackFlags();
       const clearMissing: Record<TrackKey, boolean> = createTrackFlags();

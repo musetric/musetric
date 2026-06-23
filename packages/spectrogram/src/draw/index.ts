@@ -17,7 +17,7 @@ export type SpectrogramDrawArg = {
 
 export const createSpectrogramDrawCell = (
   device: GPUDevice,
-  marker?: GPUComputePassTimestampWrites,
+  getMarker?: () => GPUComputePassTimestampWrites | undefined,
 ): ResourceCell<SpectrogramDrawArg, SpectrogramDraw> => {
   const canvasCell = createCanvasCell(device);
   const colorsCell = createColorsCell(device);
@@ -58,7 +58,7 @@ export const createSpectrogramDrawCell = (
                 storeOp: 'store',
               },
             ],
-            timestampWrites: marker,
+            timestampWrites: getMarker?.(),
           });
           pass.setPipeline(canvas.pipeline);
           pass.setBindGroup(0, bindGroup);

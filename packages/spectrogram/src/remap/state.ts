@@ -3,11 +3,11 @@ import {
   type ResourceCell,
 } from '@musetric/resource-utils';
 import { type SpectrogramConfig } from '../config.cross.js';
+import { type SpectrogramBandSpectrum } from '../lane/index.js';
 import { createParamsCell, type StateParams } from './params.js';
 
 export type StateArg = {
-  rawMagnitude: GPUBuffer;
-  columnEnergy: GPUBuffer;
+  spectra: SpectrogramBandSpectrum[];
   texture: GPUTextureView;
   config: SpectrogramConfig;
   gainDb: number;
@@ -20,45 +20,65 @@ export type State = {
   bindGroup: GPUBindGroup;
 };
 
+const areSpectraBuffersEqual = (
+  current: SpectrogramBandSpectrum[],
+  next: SpectrogramBandSpectrum[],
+) =>
+  current.length === next.length &&
+  current.every((spectrum, index) => {
+    const nextSpectrum = next[index];
+    return (
+      spectrum.rawMagnitudeBuffer === nextSpectrum.rawMagnitudeBuffer &&
+      spectrum.columnEnergyBuffer === nextSpectrum.columnEnergyBuffer
+    );
+  });
+
 export const createStateCell = (
   device: GPUDevice,
-  pipeline: GPUComputePipeline,
-): ResourceCell<StateArg, State> => {
+): ResourceCell<StateArg & { pipeline: GPUComputePipeline }, State> => {
   const paramsCell = createParamsCell(device);
   const bindGroupCell = createResourceCell({
     create: (arg: {
-      rawMagnitude: GPUBuffer;
-      columnEnergy: GPUBuffer;
+      spectra: SpectrogramBandSpectrum[];
       texture: GPUTextureView;
       params: GPUBuffer;
+      pipeline: GPUComputePipeline;
     }): GPUBindGroup =>
       device.createBindGroup({
         label: 'remap-column-bind-group',
-        layout: pipeline.getBindGroupLayout(0),
+        layout: arg.pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: { buffer: arg.rawMagnitude } },
-          { binding: 1, resource: arg.texture },
-          { binding: 2, resource: { buffer: arg.params } },
-          { binding: 3, resource: { buffer: arg.columnEnergy } },
+          { binding: 0, resource: arg.texture },
+          { binding: 1, resource: { buffer: arg.params } },
+          ...arg.spectra.flatMap((spectrum, index) => [
+            {
+              binding: 2 + index * 2,
+              resource: { buffer: spectrum.rawMagnitudeBuffer },
+            },
+            {
+              binding: 3 + index * 2,
+              resource: { buffer: spectrum.columnEnergyBuffer },
+            },
+          ]),
         ],
       }),
     dispose: () => undefined,
     equals: (current, next) =>
-      current.rawMagnitude === next.rawMagnitude &&
-      current.columnEnergy === next.columnEnergy &&
+      current.pipeline === next.pipeline &&
       current.texture === next.texture &&
-      current.params === next.params,
+      current.params === next.params &&
+      areSpectraBuffersEqual(current.spectra, next.spectra),
   });
 
   return {
     get: (arg) => {
-      const { rawMagnitude, columnEnergy, texture, config, gainDb } = arg;
-      const params = paramsCell.get({ config, gainDb });
+      const { spectra, texture, config, gainDb, pipeline } = arg;
+      const params = paramsCell.get({ config, gainDb, spectra });
       const bindGroup = bindGroupCell.get({
-        rawMagnitude,
-        columnEnergy,
+        spectra,
         texture,
         params: params.buffer,
+        pipeline,
       });
 
       return {

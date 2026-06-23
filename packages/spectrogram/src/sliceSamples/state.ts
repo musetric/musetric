@@ -9,11 +9,13 @@ import { createStateSamplesCell, type StateSamples } from './samples.js';
 export type StateArg = {
   out: GPUBuffer;
   config: ExtSpectrogramConfig;
+  sampleOffset: number;
 };
 
 export type State = {
   pipeline: GPUComputePipeline;
   config: ExtSpectrogramConfig;
+  sampleOffset: number;
   params: StateParams;
   samples: StateSamples;
   bindGroup: GPUBindGroup;
@@ -49,7 +51,7 @@ export const createStateCell = (
 
   return {
     get: (arg) => {
-      const { out, config } = arg;
+      const { out, config, sampleOffset } = arg;
       const params = paramsCell.get(config);
       const samples = samplesCell.get(params.value.visibleSamples);
       const bindGroup = bindGroupCell.get({
@@ -61,6 +63,7 @@ export const createStateCell = (
       return {
         pipeline,
         config,
+        sampleOffset,
         params,
         samples,
         bindGroup,

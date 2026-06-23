@@ -54,6 +54,16 @@ export const runPipeline = async (
     visibleTime: params.visibleTime,
     playheadRatio: 0.5,
     zeroPaddingFactor: params.zeroPaddingFactor,
+    spectralBands: [
+      {
+        label: `${windowSize}`,
+        windowSize,
+        minFrequency: 120,
+        fullMinFrequency: 120,
+        fullMaxFrequency: 4000,
+        maxFrequency: 4000,
+      },
+    ],
     windowName: 'hamming',
     minDecibel: -40,
     minFrequency: 120,

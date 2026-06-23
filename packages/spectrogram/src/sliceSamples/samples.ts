@@ -9,6 +9,7 @@ export type StateSamples = {
     trackProgress: number,
     config: ExtSpectrogramConfig,
     truncateAfterPlayhead: boolean,
+    sampleOffset: number,
   ) => void;
 };
 
@@ -25,13 +26,19 @@ export const createStateSamplesCell = (device: GPUDevice) =>
       return {
         buffer,
         array,
-        write: (samples, trackProgress, config, truncateAfterPlayhead) => {
+        write: (
+          samples,
+          trackProgress,
+          config,
+          truncateAfterPlayhead,
+          sampleOffset,
+        ) => {
           const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
           const beforeSamples =
             visibleTime * playheadRatio * sampleRate + windowSize;
           const totalVisibleSamples = visibleTime * sampleRate + windowSize;
           const startIndex = Math.floor(
-            trackProgress * samples.length - beforeSamples,
+            trackProgress * samples.length - beforeSamples + sampleOffset,
           );
 
           const limit = truncateAfterPlayhead

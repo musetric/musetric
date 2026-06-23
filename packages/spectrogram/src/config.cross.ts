@@ -16,6 +16,42 @@ export type SpectrogramLaneConfig = {
   gainDb: number;
 };
 
+export type SpectrogramSpectralBand = {
+  label: string;
+  windowSize: number;
+  minFrequency: number;
+  fullMinFrequency: number;
+  fullMaxFrequency: number;
+  maxFrequency: number;
+};
+
+export const defaultSpectrogramSpectralBands: SpectrogramSpectralBand[] = [
+  {
+    label: '4096',
+    windowSize: 4096,
+    minFrequency: 20,
+    fullMinFrequency: 20,
+    fullMaxFrequency: 300,
+    maxFrequency: 900,
+  },
+  {
+    label: '2048',
+    windowSize: 2048,
+    minFrequency: 300,
+    fullMinFrequency: 900,
+    fullMaxFrequency: 2200,
+    maxFrequency: 4200,
+  },
+  {
+    label: '1024',
+    windowSize: 1024,
+    minFrequency: 2200,
+    fullMinFrequency: 4200,
+    fullMaxFrequency: 20_000,
+    maxFrequency: 20_000,
+  },
+];
+
 export type SpectrogramComparison = {
   reference: TrackKey;
   target: TrackKey;
@@ -31,6 +67,7 @@ export type SpectrogramConfig = {
   visibleTime: number;
   playheadRatio: number;
   zeroPaddingFactor: SpectrogramZeroPaddingFactor;
+  spectralBands: SpectrogramSpectralBand[];
   windowName: WindowFunctionName;
   minDecibel: number;
   minFrequency: number;
@@ -48,6 +85,7 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'visibleTime',
   'playheadRatio',
   'zeroPaddingFactor',
+  'spectralBands',
   'windowName',
   'minDecibel',
   'minFrequency',
@@ -66,6 +104,15 @@ const isConfigComplete = (
 ): config is SpectrogramConfig =>
   allSpectrogramConfigKeys.every((key) => config[key] !== undefined);
 
+const normalizeSpectrogramConfig = (
+  config: SpectrogramConfig,
+): SpectrogramConfig => ({
+  ...config,
+  spectralBands: config.spectralBands.length
+    ? config.spectralBands
+    : defaultSpectrogramSpectralBands,
+});
+
 export const buildSpectrogramConfig = (
   base?: SpectrogramConfig,
   draft?: Partial<SpectrogramConfig>,
@@ -78,11 +125,11 @@ export const buildSpectrogramConfig = (
     if (!isConfigComplete(draft)) {
       return undefined;
     }
-    return draft;
+    return normalizeSpectrogramConfig(draft);
   }
 
-  return {
+  return normalizeSpectrogramConfig({
     ...base,
     ...draft,
-  };
+  });
 };
