@@ -1,9 +1,7 @@
-import { findMaxShader } from './findMaxShader.js';
 import { runShader } from './runShader.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;
-  findMax: GPUComputePipeline;
   run: GPUComputePipeline;
 };
 
@@ -28,16 +26,6 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
     bindGroupLayouts: [layout],
   });
 
-  const findMaxModule = device.createShaderModule({
-    label: 'decibelify-find-max-shader',
-    code: findMaxShader,
-  });
-  const findMax = device.createComputePipeline({
-    label: 'decibelify-find-max-pipeline',
-    layout: pipelineLayout,
-    compute: { module: findMaxModule, entryPoint: 'main' },
-  });
-
   const runModule = device.createShaderModule({
     label: 'decibelify-run-shader',
     code: runShader,
@@ -50,7 +38,6 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
 
   return {
     layout,
-    findMax,
     run,
   };
 };

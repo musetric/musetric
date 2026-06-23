@@ -6,6 +6,7 @@ export * as key from './key/index.js';
 export * as preview from './preview/index.js';
 export * as processing from './processing/index.js';
 export * as project from './project/index.js';
+export * as projectAudioAnalysis from './projectAudioAnalysis/index.js';
 export * as recording from './recording/index.js';
 export * as rhythm from './rhythm/index.js';
 export * as subtitle from './subtitle/index.js';

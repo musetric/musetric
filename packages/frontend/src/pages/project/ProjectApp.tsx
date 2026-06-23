@@ -32,6 +32,14 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
 
   useEffect(() => subscribeSettingsStore(), []);
 
+  useEffect(() => {
+    engine.store.update((state) => {
+      state.sourceGainDb = project.audioAnalysis?.sourceGainDb ?? 0;
+      state.leadSpectrogramGainDb =
+        project.audioAnalysis?.leadSpectrogramGainDb ?? 0;
+    });
+  }, [project.audioAnalysis]);
+
   useEffect(() => engine.decoder.mount(project.id), [project.id]);
 
   return (

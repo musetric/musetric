@@ -87,7 +87,11 @@ export const createSpectrogramLaneCell = (
       const windowing = windowingCell.get({ signal, config });
       const fourier = fourierCell.get({ signal, config });
       const magnitudify = magnitudifyCell.get({ signal, config });
-      const decibelify = decibelifyCell.get({ signal, config });
+      const decibelify = decibelifyCell.get({
+        signal,
+        config,
+        gainDb: config.lanes[options.label].gainDb,
+      });
       const fundamentalFrequency = fundamentalFrequencyCell.get({
         signal,
         config,
@@ -152,6 +156,8 @@ export const createSpectrogramLaneCell = (
       current.minDecibel === next.minDecibel &&
       current.maxFrequency === next.maxFrequency &&
       current.windowCount === next.windowCount &&
+      current.lanes[options.label].gainDb ===
+        next.lanes[options.label].gainDb &&
       current.lanes[options.label].truncateAfterPlayhead ===
         next.lanes[options.label].truncateAfterPlayhead,
   });

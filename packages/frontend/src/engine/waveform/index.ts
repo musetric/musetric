@@ -2,6 +2,7 @@ import { type StemType, waveformChannel } from '@musetric/audio';
 import {
   type ControlledPromise,
   createControlledPromise,
+  sourceTargetLufs,
 } from '@musetric/resource-utils';
 import {
   getCanvasSize,
@@ -13,6 +14,9 @@ import { type EngineState } from '../state.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
 type Unmount = () => void;
+
+const getWaveformSourceGainDb = (sourceGainDb: number) =>
+  sourceGainDb - sourceTargetLufs;
 
 export type EngineWaveform = {
   port: ReturnType<typeof waveformChannel.outbound<Worker>>;
@@ -76,6 +80,14 @@ export const createEngineWaveform = (
       });
     },
   );
+  store.subscribe(
+    (state) => state.sourceGainDb,
+    (gainDb) => {
+      port.methods.setSourceGainDb({
+        gainDb: getWaveformSourceGainDb(gainDb),
+      });
+    },
+  );
 
   return {
     port,
@@ -91,6 +103,9 @@ export const createEngineWaveform = (
       const viewSize = getCanvasSize(canvas);
       const offscreenCanvas = canvas.transferControlToOffscreen();
 
+      port.methods.setSourceGainDb({
+        gainDb: getWaveformSourceGainDb(store.get().sourceGainDb),
+      });
       port.methods.mountDelivery({
         projectId,
         stemType,

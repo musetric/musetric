@@ -41,12 +41,19 @@ export const processingSchema = z.object({
 });
 export type Processing = z.infer<typeof processingSchema>;
 
+export const audioAnalysisSchema = z.object({
+  sourceGainDb: z.number(),
+  leadSpectrogramGainDb: z.number(),
+});
+export type AudioAnalysis = z.infer<typeof audioAnalysisSchema>;
+
 export const itemSchema = z.object({
   id: z.number(),
   name: z.string().min(3),
   sampleRate: z.number().int().positive(),
   frameCount: z.number().int().positive(),
   previewUrl: z.string().optional(),
+  audioAnalysis: audioAnalysisSchema.optional(),
   processing: processingSchema,
 });
 export type Item = z.infer<typeof itemSchema>;

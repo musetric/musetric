@@ -1,4 +1,7 @@
-import { type ViewSize } from '@musetric/resource-utils';
+import {
+  type ViewSize,
+  waveformVisualPeakCeilingDb,
+} from '@musetric/resource-utils';
 import { setOffscreenCanvasSize } from '@musetric/resource-utils/cross/offscreenCanvas';
 import { type StemType, stemTypes } from '../../common/stemType.es.js';
 import { type WaveformColors } from '../colors.es.js';
@@ -32,20 +35,61 @@ export const createWaveformRuntime = (
 
   const deliveryWaveformItems: Partial<Record<StemType, WaveformItem>> = {};
   let recordingWaveformItem: WaveformItem | undefined = undefined;
+  let sourceGainDb = 0;
 
-  const renderItem = (item: WaveformItem | undefined): boolean => {
+  const dbToGain = (db: number) => 10 ** (db / 20);
+  const amplitudeToDb = (amplitude: number) => 20 * Math.log10(amplitude);
+
+  const getWavePeaksMax = (wavePeaks: Float32Array): number => {
+    let max = 0;
+    for (let i = 0; i < wavePeaks.length; i += 1) {
+      max = Math.max(max, Math.abs(wavePeaks[i]));
+    }
+    return max;
+  };
+
+  const getDeliveryPeakMax = (): number => {
+    let max = 0;
+    for (const stemType of stemTypes) {
+      const wavePeaks = deliveryWaveformItems[stemType]?.wavePeaks;
+      if (wavePeaks) {
+        max = Math.max(max, getWavePeaksMax(wavePeaks));
+      }
+    }
+    return max;
+  };
+
+  const getLimitedSourceGainDb = (): number => {
+    const peakMax = getDeliveryPeakMax();
+    if (peakMax <= 0) {
+      return sourceGainDb;
+    }
+    return Math.min(
+      sourceGainDb,
+      waveformVisualPeakCeilingDb - amplitudeToDb(peakMax),
+    );
+  };
+
+  const renderItem = (item: WaveformItem | undefined, gain = 1): boolean => {
     if (!item || !item.wavePeaks) {
       return false;
     }
 
-    item.processor.render(item.wavePeaks);
+    item.processor.render(item.wavePeaks, gain);
     return true;
   };
 
-  const renderAll = () => {
+  const renderDeliveryItem = (item: WaveformItem | undefined): boolean =>
+    renderItem(item, dbToGain(getLimitedSourceGainDb()));
+
+  const renderDeliveryItems = () => {
     for (const stemType of stemTypes) {
-      renderItem(deliveryWaveformItems[stemType]);
+      renderDeliveryItem(deliveryWaveformItems[stemType]);
     }
+  };
+
+  const renderAll = () => {
+    renderDeliveryItems();
     renderItem(recordingWaveformItem);
   };
 
@@ -55,7 +99,7 @@ export const createWaveformRuntime = (
       return;
     }
     item.wavePeaks = await getDeliveryWavePeaks(item.projectId, stemType);
-    renderItem(item);
+    renderDeliveryItems();
   };
 
   const reloadRecording = async (): Promise<void> => {
@@ -127,6 +171,10 @@ export const createWaveformRuntime = (
       recordingWaveformItem?.processor.setColors(message.colors);
       renderAll();
     },
+    setSourceGainDb: (message) => {
+      sourceGainDb = message.gainDb;
+      renderDeliveryItems();
+    },
     resizeDelivery: (message) => {
       const item = deliveryWaveformItems[message.stemType];
       if (!item) {
@@ -134,7 +182,7 @@ export const createWaveformRuntime = (
       }
 
       setOffscreenCanvasSize(item.canvas, message.viewSize);
-      renderItem(item);
+      renderDeliveryItem(item);
     },
     resizeRecording: (message) => {
       const item = recordingWaveformItem;

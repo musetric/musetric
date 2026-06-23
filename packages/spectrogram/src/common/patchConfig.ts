@@ -19,7 +19,8 @@ const areLanesEqual = (
       a.showSpectrogram === b.showSpectrogram &&
       a.showFundamental === b.showFundamental &&
       a.lineWidthCents === b.lineWidthCents &&
-      a.truncateAfterPlayhead === b.truncateAfterPlayhead
+      a.truncateAfterPlayhead === b.truncateAfterPlayhead &&
+      a.gainDb === b.gainDb
     );
   });
 

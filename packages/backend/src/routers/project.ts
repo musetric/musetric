@@ -17,16 +17,33 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
     }
   });
 
+  const resolveAudioAnalysis = async (
+    projectId: number,
+  ): Promise<api.project.AudioAnalysis | undefined> => {
+    const analysis = await app.db.projectAudioAnalysis.get(projectId);
+    if (!analysis) {
+      return undefined;
+    }
+    return {
+      sourceGainDb: analysis.sourceGainDb,
+      leadSpectrogramGainDb: analysis.leadSpectrogramGainDb,
+    };
+  };
+
   app.route({
     ...fastifyRoute(api.project.list.base),
     handler: async () => {
       const all = await app.db.project.list();
       return await Promise.all(
         all.map(async (project): Promise<api.project.list.Response[number]> => {
-          const processing = await resolveProcessing(app, project.id);
+          const [processing, audioAnalysis] = await Promise.all([
+            resolveProcessing(app, project.id),
+            resolveAudioAnalysis(project.id),
+          ]);
           return {
             ...project,
             previewUrl: api.preview.get.url(project.preview?.id),
+            audioAnalysis,
             processing,
           };
         }),
@@ -40,10 +57,14 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
       const { projectId } = request.params;
       const found = await app.db.project.get(projectId);
       assertFound(found, `Project with id ${projectId} not found`);
-      const processing = await resolveProcessing(app, projectId);
+      const [processing, audioAnalysis] = await Promise.all([
+        resolveProcessing(app, projectId),
+        resolveAudioAnalysis(projectId),
+      ]);
       const result: api.project.get.Response = {
         ...found,
         previewUrl: api.preview.get.url(found.preview?.id),
+        audioAnalysis,
         processing,
       };
       return result;
@@ -100,6 +121,7 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
       const result: api.project.create.Response = {
         ...created.project,
         previewUrl: api.preview.get.url(created.preview?.id),
+        audioAnalysis: undefined,
         processing,
       };
 
@@ -127,9 +149,11 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
       assertFound(updated, `Project with id ${projectId} not found`);
 
       const processing = await resolveProcessing(app, projectId);
+      const audioAnalysis = await resolveAudioAnalysis(projectId);
       const result: api.project.edit.Response = {
         ...updated.project,
         previewUrl: api.preview.get.url(updated.preview?.id),
+        audioAnalysis,
         processing,
       };
 

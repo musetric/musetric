@@ -61,6 +61,8 @@ export type EngineState = {
   calibrationError?: CalibrationErrorCode;
   inputLevel: number;
   recordingGain: number;
+  sourceGainDb: number;
+  leadSpectrogramGainDb: number;
   trackVolumes: Record<StemType, number> & {
     recording: number;
   };

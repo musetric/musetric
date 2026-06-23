@@ -76,12 +76,14 @@ export const runPipeline = async (
         showFundamental: true,
         lineWidthCents: 26,
         truncateAfterPlayhead: false,
+        gainDb: 0,
       },
       recording: {
         showSpectrogram: true,
         showFundamental: true,
         lineWidthCents: 35,
         truncateAfterPlayhead: false,
+        gainDb: 0,
       },
     },
     comparison: {

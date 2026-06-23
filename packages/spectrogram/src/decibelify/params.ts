@@ -5,12 +5,19 @@ export type DecibelifyParams = {
   halfSize: number;
   windowCount: number;
   decibelFactor: number;
+  gain: number;
 };
 
-const toParams = (config: ExtSpectrogramConfig): DecibelifyParams => ({
-  halfSize: (config.windowSize * config.zeroPaddingFactor) / 2,
-  windowCount: config.windowCount,
-  decibelFactor: (20 * Math.LOG10E) / -config.minDecibel,
+export type DecibelifyParamsArg = {
+  config: ExtSpectrogramConfig;
+  gainDb: number;
+};
+
+const toParams = (arg: DecibelifyParamsArg): DecibelifyParams => ({
+  halfSize: (arg.config.windowSize * arg.config.zeroPaddingFactor) / 2,
+  windowCount: arg.config.windowCount,
+  decibelFactor: (20 * Math.LOG10E) / -arg.config.minDecibel,
+  gain: 10 ** (arg.gainDb / 20),
 });
 
 export type StateParams = {
@@ -20,12 +27,13 @@ export type StateParams = {
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (config: ExtSpectrogramConfig): StateParams => {
-      const value = toParams(config);
-      const array = new DataView(new ArrayBuffer(12));
+    create: (arg: DecibelifyParamsArg): StateParams => {
+      const value = toParams(arg);
+      const array = new DataView(new ArrayBuffer(16));
       array.setUint32(0, value.halfSize, true);
       array.setUint32(4, value.windowCount, true);
       array.setFloat32(8, value.decibelFactor, true);
+      array.setFloat32(12, value.gain, true);
 
       const buffer = device.createBuffer({
         label: 'decibelify-params-buffer',
@@ -43,8 +51,9 @@ export const createParamsCell = (device: GPUDevice) =>
       params.buffer.destroy();
     },
     equals: (current, next) =>
-      current.windowSize === next.windowSize &&
-      current.windowCount === next.windowCount &&
-      current.zeroPaddingFactor === next.zeroPaddingFactor &&
-      current.minDecibel === next.minDecibel,
+      current.config.windowSize === next.config.windowSize &&
+      current.config.windowCount === next.config.windowCount &&
+      current.config.zeroPaddingFactor === next.config.zeroPaddingFactor &&
+      current.config.minDecibel === next.config.minDecibel &&
+      current.gainDb === next.gainDb,
   });

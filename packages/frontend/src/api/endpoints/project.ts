@@ -43,6 +43,13 @@ export const subscribeToStatus = (queryClient: QueryClient) =>
       }
       return applyEvent(projectItem);
     });
+
+    if (event.processing.done) {
+      void queryClient.invalidateQueries({
+        queryKey: get(event.projectId).queryKey,
+      });
+      void queryClient.invalidateQueries({ queryKey: list().queryKey });
+    }
   });
 
 export const create = (queryClient: QueryClient) =>

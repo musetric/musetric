@@ -90,12 +90,14 @@ export const createEngineSpectrogram = (
           showFundamental: true,
           lineWidthCents: 26,
           truncateAfterPlayhead: false,
+          gainDb: store.get().leadSpectrogramGainDb,
         },
         recording: {
           showSpectrogram: false,
           showFundamental: true,
           lineWidthCents: 35,
           truncateAfterPlayhead: recording,
+          gainDb: 0,
         },
       });
 
@@ -131,8 +133,17 @@ export const createEngineSpectrogram = (
           });
         },
       );
+      const unsubscribeLeadSpectrogramGain = store.subscribe(
+        (state) => state.leadSpectrogramGainDb,
+        () => {
+          port.methods.updateConfig({
+            patch: { lanes: buildLanes(store.get().recording) },
+          });
+        },
+      );
 
       return () => {
+        unsubscribeLeadSpectrogramGain();
         unsubscribeRecording();
         unsubscribeResizeObserver();
         port.methods.unmount();

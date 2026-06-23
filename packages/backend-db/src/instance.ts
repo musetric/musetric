@@ -10,6 +10,7 @@ import {
   preview,
   processing,
   project,
+  projectAudioAnalysis,
   recording,
   rhythm,
   subtitle,
@@ -34,6 +35,7 @@ export const createInstance = async (databasePath: string) => {
 
   return {
     project: project.createInstance(database),
+    projectAudioAnalysis: projectAudioAnalysis.createInstance(database),
     preview: preview.createInstance(database),
     audioMaster: audioMaster.createInstance(database),
     audioDelivery: audioDelivery.createInstance(database),

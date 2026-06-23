@@ -1,6 +1,15 @@
 import { separateAudio } from '@musetric/ai/node';
-import { type EventEmitter, type Logger } from '@musetric/resource-utils';
-import { convertToFmp4, generateWavePeaks } from '@musetric/toolkit';
+import {
+  type EventEmitter,
+  type Logger,
+  sourceTargetLufs,
+} from '@musetric/resource-utils';
+import {
+  analyzeLeadVisualLoudness,
+  analyzeLoudness,
+  convertToFmp4,
+  generateWavePeaks,
+} from '@musetric/toolkit';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
 import {
@@ -17,6 +26,44 @@ export type SeparationWorker = {
   run: (task: SeparationTask) => Promise<void>;
   getState: (projectId: number) => ProcessingWorkerProgressEvent | undefined;
 };
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+const sourceTruePeakCeilingDb = -1;
+const sourceMaxBoostDb = 18;
+const sourceMaxCutDb = -12;
+
+const leadVisualTargetP95RmsDb = -22;
+const leadVisualPeakCeilingDb = 3;
+const leadVisualMaxBoostDb = 48;
+const leadVisualMaxCutDb = -12;
+
+const calculateSourceGainDb = (analysis: {
+  integratedLoudnessDb: number;
+  truePeakDb: number;
+}) =>
+  clamp(
+    Math.min(
+      sourceTargetLufs - analysis.integratedLoudnessDb,
+      sourceTruePeakCeilingDb - analysis.truePeakDb,
+    ),
+    sourceMaxCutDb,
+    sourceMaxBoostDb,
+  );
+
+const calculateLeadSpectrogramGainDb = (analysis: {
+  p95RmsDb: number;
+  truePeakDb: number;
+}) =>
+  clamp(
+    leadVisualTargetP95RmsDb - analysis.p95RmsDb,
+    leadVisualMaxCutDb,
+    Math.min(
+      leadVisualMaxBoostDb,
+      leadVisualPeakCeilingDb - analysis.truePeakDb,
+    ),
+  );
 
 export const createSeparationWorker = (
   app: FastifyInstance,
@@ -42,6 +89,10 @@ export const createSeparationWorker = (
         }
 
         const masterSourcePath = app.blobStorage.getPath(task.blobId);
+        const sourceAnalysisPromise = analyzeLoudness({
+          fromPath: masterSourcePath,
+          logger,
+        });
         const masterLead = app.blobStorage.createPath();
         const masterBacking = app.blobStorage.createPath();
         const masterInstrumental = app.blobStorage.createPath();
@@ -126,8 +177,26 @@ export const createSeparationWorker = (
           }),
         ]);
 
+        const [sourceAnalysis, leadAnalysis] = await Promise.all([
+          sourceAnalysisPromise,
+          analyzeLeadVisualLoudness({
+            fromPath: masterLead.blobPath,
+            sampleRate: project.sampleRate,
+            logger,
+          }),
+        ]);
+
         await app.db.processing.applySeparationResult({
           projectId: task.projectId,
+          audioAnalysis: {
+            sourceIntegratedLoudnessDb: sourceAnalysis.integratedLoudnessDb,
+            sourceTruePeakDb: sourceAnalysis.truePeakDb,
+            sourceGainDb: calculateSourceGainDb(sourceAnalysis),
+            leadIntegratedLoudnessDb: leadAnalysis.integratedLoudnessDb,
+            leadTruePeakDb: leadAnalysis.truePeakDb,
+            leadP95RmsDb: leadAnalysis.p95RmsDb,
+            leadSpectrogramGainDb: calculateLeadSpectrogramGainDb(leadAnalysis),
+          },
           master: {
             leadId: masterLead.blobId,
             backingId: masterBacking.blobId,

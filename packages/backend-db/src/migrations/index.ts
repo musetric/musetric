@@ -27,6 +27,20 @@ const createAudioMasterIndex = `
   CREATE INDEX IF NOT EXISTS AudioMaster_projectId_type_index ON AudioMaster (projectId, type);
 `;
 
+const createProjectAudioAnalysis = `
+  CREATE TABLE IF NOT EXISTS ProjectAudioAnalysis (
+    projectId INTEGER PRIMARY KEY,
+    sourceIntegratedLoudnessDb REAL NOT NULL,
+    sourceTruePeakDb REAL NOT NULL,
+    sourceGainDb REAL NOT NULL,
+    leadIntegratedLoudnessDb REAL NOT NULL,
+    leadTruePeakDb REAL NOT NULL,
+    leadP95RmsDb REAL NOT NULL,
+    leadSpectrogramGainDb REAL NOT NULL,
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+`;
+
 const createAudioDelivery = `
   CREATE TABLE IF NOT EXISTS AudioDelivery (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +121,7 @@ const creationStatements = [
   createProject,
   createAudioMaster,
   createAudioMasterIndex,
+  createProjectAudioAnalysis,
   createAudioDelivery,
   createAudioDeliveryIndex,
   createPreview,
