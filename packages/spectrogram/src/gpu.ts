@@ -1,6 +1,6 @@
+export * from './common/configFieldEqual.js';
 export * from './common/extConfig.js';
 export * from './common/gpuDevice.js';
-export * from './common/patchConfig.js';
 export * from './common/processorTimer.js';
 export * from './common/timer/index.js';
 export * from './configurator.js';
