@@ -21,6 +21,10 @@ export type RemapParams = {
   gain: number;
   gateFloorDb: number;
   gateRangeDb: number;
+  frequencyTiltSlope: number;
+  frequencyTiltMinGain: number;
+  frequencyTiltMaxGain: number;
+  displayGamma: number;
   bands: RemapBandParams[];
 };
 
@@ -30,14 +34,13 @@ export type RemapParamsArg = {
   spectra: SpectrogramBandSpectrum[];
 };
 
-const gateFloorDb = -64;
-const gateRangeDb = 24;
-const headerByteLength = 48;
+const headerByteLength = 64;
 const bandByteLength = 32;
 
 const toParams = (arg: RemapParamsArg): RemapParams => {
   const { sampleRate, minFrequency, maxFrequency, viewSize, minDecibel } =
     arg.config;
+  const { visual } = arg.config;
   const { width, height } = viewSize;
   const logMinFrequency = Math.log(minFrequency);
   const logFrequencyRange = Math.log(maxFrequency) - logMinFrequency;
@@ -49,8 +52,12 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
     logFrequencyRange,
     decibelFactor: (20 * Math.LOG10E) / -minDecibel,
     gain: 10 ** (arg.gainDb / 20),
-    gateFloorDb,
-    gateRangeDb,
+    gateFloorDb: visual.gateFloorDb,
+    gateRangeDb: visual.gateRangeDb,
+    frequencyTiltSlope: visual.frequencyTiltSlope,
+    frequencyTiltMinGain: visual.frequencyTiltMinGain,
+    frequencyTiltMaxGain: visual.frequencyTiltMaxGain,
+    displayGamma: visual.displayGamma,
     bands: arg.spectra.map((spectrum) => ({
       windowSize: spectrum.windowSize,
       halfSize: spectrum.windowSize / 2,
@@ -101,6 +108,10 @@ export const createParamsCell = (device: GPUDevice) =>
       array.setFloat32(24, value.gain, true);
       array.setFloat32(28, value.gateFloorDb, true);
       array.setFloat32(32, value.gateRangeDb, true);
+      array.setFloat32(36, value.frequencyTiltSlope, true);
+      array.setFloat32(40, value.frequencyTiltMinGain, true);
+      array.setFloat32(44, value.frequencyTiltMaxGain, true);
+      array.setFloat32(48, value.displayGamma, true);
       value.bands.forEach((band, index) => {
         const offset = headerByteLength + index * bandByteLength;
         array.setFloat32(offset, band.windowSize, true);
@@ -129,6 +140,15 @@ export const createParamsCell = (device: GPUDevice) =>
     equals: (current, next) =>
       current.config.sampleRate === next.config.sampleRate &&
       current.config.minDecibel === next.config.minDecibel &&
+      current.config.visual.gateFloorDb === next.config.visual.gateFloorDb &&
+      current.config.visual.gateRangeDb === next.config.visual.gateRangeDb &&
+      current.config.visual.frequencyTiltSlope ===
+        next.config.visual.frequencyTiltSlope &&
+      current.config.visual.frequencyTiltMinGain ===
+        next.config.visual.frequencyTiltMinGain &&
+      current.config.visual.frequencyTiltMaxGain ===
+        next.config.visual.frequencyTiltMaxGain &&
+      current.config.visual.displayGamma === next.config.visual.displayGamma &&
       current.config.minFrequency === next.config.minFrequency &&
       current.config.maxFrequency === next.config.maxFrequency &&
       current.config.viewSize.width === next.config.viewSize.width &&

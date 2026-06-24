@@ -1,4 +1,5 @@
 import { defaultSampleRate } from '@musetric/resource-utils';
+import { defaultSpectrogramConfig } from '@musetric/spectrogram';
 import { createStore, type Store } from '../common/store.js';
 import {
   createEngineAudioOutput,
@@ -29,14 +30,7 @@ const initialState: EngineState = {
       recording: 'pending',
     },
   },
-  colors: {
-    background: '#000000',
-    foreground: '#888888',
-    primary: '#1976d2',
-    recordingMatch: '#4caf50',
-    recordingClose: '#ff9800',
-    recordingMiss: '#f44336',
-  },
+  colors: defaultSpectrogramConfig.colors,
   duration: 0,
   playing: false,
   frozen: false,
@@ -62,7 +56,7 @@ const initialState: EngineState = {
   inputLevel: 0,
   recordingGain: 1,
   sourceGainDb: 0,
-  leadSpectrogramGainDb: 0,
+  leadSpectrogramGainDb: defaultSpectrogramConfig.lanes.lead.gainDb,
   trackVolumes: {
     lead: 1,
     backing: 1,

@@ -1,7 +1,7 @@
 import { type FourierMode } from '@musetric/fft';
-import { defaultSampleRate } from '@musetric/resource-utils';
 import {
   createSpectrogramProcessor,
+  defaultSpectrogramConfig,
   type SpectrogramConfig,
 } from '@musetric/spectrogram/gpu';
 import {
@@ -47,12 +47,11 @@ export const runPipeline = async (
   const viewSize = viewSizePresets[params.viewSizeKey];
   const metricsArray: Record<string, number>[] = [];
   const config: SpectrogramConfig = {
+    ...defaultSpectrogramConfig,
     canvas,
     fourierMode,
     windowSize,
-    sampleRate: defaultSampleRate,
     visibleTime: params.visibleTime,
-    playheadRatio: 0.5,
     zeroPaddingFactor: params.zeroPaddingFactor,
     spectralBands: [
       {
@@ -64,43 +63,21 @@ export const runPipeline = async (
         maxFrequency: 4000,
       },
     ],
-    windowName: 'hamming',
-    minDecibel: -40,
-    minFrequency: 120,
-    maxFrequency: 4000,
     viewSize: {
       width: viewSize.width,
       height: viewSize.height,
     },
-    colors: {
-      background: '#000000',
-      foreground: '#888888',
-      primary: '#1976d2',
-      recordingMatch: '#4caf50',
-      recordingClose: '#ff9800',
-      recordingMiss: '#f44336',
-    },
     lanes: {
       lead: {
+        ...defaultSpectrogramConfig.lanes.lead,
         showSpectrogram: true,
         showFundamental: true,
-        lineWidthCents: 26,
-        truncateAfterPlayhead: false,
-        gainDb: 0,
       },
       recording: {
+        ...defaultSpectrogramConfig.lanes.recording,
         showSpectrogram: true,
         showFundamental: true,
-        lineWidthCents: 35,
-        truncateAfterPlayhead: false,
-        gainDb: 0,
       },
-    },
-    comparison: {
-      reference: 'lead',
-      target: 'recording',
-      matchThresholdCents: 15,
-      closeThresholdCents: 50,
     },
   };
   const processor = createSpectrogramProcessor({

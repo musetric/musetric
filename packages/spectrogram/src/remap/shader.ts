@@ -55,6 +55,10 @@ struct RemapParams {
   gain: f32,
   gateFloorDb: f32,
   gateRangeDb: f32,
+  frequencyTiltSlope: f32,
+  frequencyTiltMinGain: f32,
+  frequencyTiltMaxGain: f32,
+  displayGamma: f32,
   padding0: f32,
   padding1: f32,
   padding2: f32,
@@ -67,8 +71,11 @@ ${createSpectrumBindings(spectrumCount)}
 
 fn displayFrequencyTilt(frequency: f32) -> f32 {
   let anchorFrequency = 440.0;
-  let slope = 0.14;
-  return clamp(pow(frequency / anchorFrequency, slope), 0.72, 1.55);
+  return clamp(
+    pow(frequency / anchorFrequency, params.frequencyTiltSlope),
+    params.frequencyTiltMinGain,
+    params.frequencyTiltMaxGain,
+  );
 }
 
 fn risingWeight(frequency: f32, startFrequency: f32, fullFrequency: f32) -> f32 {
@@ -145,11 +152,12 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   var totalWeight = 0.0;
 ${createSpectrumSampling(spectrumCount)}
   let mixedDisplayIntensity = weightedIntensity / max(totalWeight, 1e-6);
-  let intensity = clamp(
+  let tiltedIntensity = clamp(
     mixedDisplayIntensity * displayFrequencyTilt(frequency),
     0.0,
     1.0,
   );
+  let intensity = pow(tiltedIntensity, max(params.displayGamma, 0.001));
   textureStore(texture, vec2u(x, y), vec4f(intensity, 0.0, 0.0, 1.0));
 }
 `;

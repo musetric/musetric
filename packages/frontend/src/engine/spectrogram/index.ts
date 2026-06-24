@@ -7,6 +7,7 @@ import {
   subscribeResizeObserver,
 } from '@musetric/resource-utils/dom';
 import {
+  defaultSpectrogramConfig,
   spectrogramChannel,
   type SpectrogramConfig,
 } from '@musetric/spectrogram';
@@ -86,35 +87,24 @@ export const createEngineSpectrogram = (
 
       const buildLanes = (recording: boolean) => ({
         lead: {
-          showSpectrogram: true,
-          showFundamental: true,
-          lineWidthCents: 26,
-          truncateAfterPlayhead: false,
+          ...defaultSpectrogramConfig.lanes.lead,
           gainDb: store.get().leadSpectrogramGainDb,
         },
         recording: {
-          showSpectrogram: false,
-          showFundamental: true,
-          lineWidthCents: 35,
+          ...defaultSpectrogramConfig.lanes.recording,
           truncateAfterPlayhead: recording,
-          gainDb: 0,
         },
       });
 
       port.methods.mount({
         config: {
+          ...defaultSpectrogramConfig,
           ...config,
           canvas: offscreenCanvas,
           viewSize,
           colors: store.get().colors,
           sampleRate,
           lanes: buildLanes(store.get().recording),
-          comparison: {
-            reference: 'lead',
-            target: 'recording',
-            matchThresholdCents: 15,
-            closeThresholdCents: 50,
-          },
         },
         trackProgress: getTrackProgress(store.get()),
       });

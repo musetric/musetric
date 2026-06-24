@@ -1,5 +1,6 @@
+import { applyPatchConfig } from '@musetric/resource-utils';
+import { spectrogramConfigFieldEqual } from './common/configFieldEqual.js';
 import { type ExtSpectrogramConfig } from './common/extConfig.js';
-import { applySpectrogramPatchConfig } from './common/patchConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {
   allTrackKeys,
@@ -143,10 +144,11 @@ export const createSpectrogramConfigurator = (
       return runtime;
     }),
     updateConfig: (patchConfig) => {
-      draftConfig = applySpectrogramPatchConfig({
+      draftConfig = applyPatchConfig({
         base: config,
         draft: draftConfig,
         patch: patchConfig,
+        isEqual: spectrogramConfigFieldEqual,
       });
     },
     dispose: () => {

@@ -1,6 +1,6 @@
 import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import {
-  defaultSpectrogramSpectralBands,
+  defaultSpectrogramConfig,
   extractSpectrogramConfig,
   type SpectrogramConfig,
   type SpectrogramZeroPaddingFactor,
@@ -19,6 +19,7 @@ export type SettingsState = Pick<
   | 'spectralBands'
   | 'windowName'
   | 'minDecibel'
+  | 'visual'
   | 'minFrequency'
   | 'maxFrequency'
 > & {
@@ -26,16 +27,17 @@ export type SettingsState = Pick<
 };
 
 const initialState: SettingsState = {
-  fourierMode: 'fftPackedStockhamR2c',
-  windowSize: 1024 * 4,
-  visibleTime: 3.5,
-  playheadRatio: 0.4,
-  zeroPaddingFactor: 2,
-  spectralBands: defaultSpectrogramSpectralBands,
-  windowName: 'hamming',
-  minDecibel: -40,
-  minFrequency: 120,
-  maxFrequency: 4000,
+  fourierMode: defaultSpectrogramConfig.fourierMode,
+  windowSize: defaultSpectrogramConfig.windowSize,
+  visibleTime: defaultSpectrogramConfig.visibleTime,
+  playheadRatio: defaultSpectrogramConfig.playheadRatio,
+  zeroPaddingFactor: defaultSpectrogramConfig.zeroPaddingFactor,
+  spectralBands: defaultSpectrogramConfig.spectralBands,
+  windowName: defaultSpectrogramConfig.windowName,
+  minDecibel: defaultSpectrogramConfig.minDecibel,
+  visual: defaultSpectrogramConfig.visual,
+  minFrequency: defaultSpectrogramConfig.minFrequency,
+  maxFrequency: defaultSpectrogramConfig.maxFrequency,
   open: false,
 };
 
