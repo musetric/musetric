@@ -10,6 +10,9 @@ import {
   shouldFollowFromSubtitleSegment,
 } from './subtitleScroll.js';
 
+const isVisualizationSeekOrigin = (origin: string) =>
+  origin === 'spectrogramVisualization' || origin === 'tracksVisualization';
+
 export type UseSubtitleAutoScrollOptions = {
   scrollFrameRef: RefObject<number | undefined>;
   skippedFollowScrollSegmentIndexRef: RefObject<number | undefined>;
@@ -55,10 +58,15 @@ export const useSubtitleAutoScroll = (
     return engine.store.subscribe(
       (state) => state.seekEvent.revision,
       (nextSeekRevision) => {
+        const { seekEvent } = engine.store.get();
         seekRevisionRef.current = nextSeekRevision;
 
         if (skippedSeekRevisionRef.current === nextSeekRevision) {
           skippedSeekRevisionRef.current = undefined;
+          return;
+        }
+
+        if (isVisualizationSeekOrigin(seekEvent.origin)) {
           return;
         }
 
@@ -100,8 +108,9 @@ export const useSubtitleAutoScroll = (
 
     const unsubscribe = subtitleCursor.subscribeActiveSegmentIndex(() => {
       const nextActiveSegmentIndex = subtitleCursor.getActiveSegmentIndex();
+      const { seekEvent } = engine.store.get();
       const activeChangeFromSeek =
-        engine.store.get().seekEvent.revision !== seekRevisionRef.current;
+        seekEvent.revision !== seekRevisionRef.current;
       const subtitleListElement = subtitleListRef.current;
 
       if (!subtitleListElement) {
@@ -121,6 +130,10 @@ export const useSubtitleAutoScroll = (
         : false;
 
       activeSegmentIndexRef.current = nextActiveSegmentIndex;
+
+      if (activeChangeFromSeek && isVisualizationSeekOrigin(seekEvent.origin)) {
+        return;
+      }
 
       if (skippedFollowScrollSegmentIndexRef.current !== undefined) {
         const shouldSkipFollowScroll =

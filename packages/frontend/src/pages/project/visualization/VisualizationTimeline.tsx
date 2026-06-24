@@ -35,6 +35,8 @@ export const VisualizationTimeline: FC = () => {
         font: `11px ${theme.typography.fontFamily}`,
       },
     });
+    let canvasWidth = canvas.getBoundingClientRect().width;
+
     const render = () => {
       const { duration, frameIndex, frameCount } = engine.store.get();
       const { visibleTime, playheadRatio } = useSettingsStore.getState();
@@ -56,16 +58,23 @@ export const VisualizationTimeline: FC = () => {
         cursorRatio = frameCount ? frameIndex / frameCount : 0;
       }
 
-      const { width } = canvas.getBoundingClientRect();
-      const cursorX = alignPixel(cursorRatio * width, window.devicePixelRatio);
+      const cursorX = alignPixel(
+        cursorRatio * canvasWidth,
+        window.devicePixelRatio,
+      );
 
       handle.style.transform = `translateX(${cursorX + 0.5}px) translateX(-50%)`;
+    };
+
+    const resize = () => {
+      canvasWidth = canvas.getBoundingClientRect().width;
+      render();
     };
 
     render();
 
     const unsubscribes = [
-      subscribeResizeObserver(canvas, render),
+      subscribeResizeObserver(canvas, resize),
       ...engineRenderKeys.map((key) =>
         engine.store.subscribe((state) => state[key], render),
       ),

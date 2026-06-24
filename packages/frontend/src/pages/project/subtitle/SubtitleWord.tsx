@@ -1,54 +1,21 @@
-import { alpha, Box } from '@mui/material';
-import { type Theme } from '@mui/material/styles';
+import { Box } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC } from 'react';
 import { type WordChord } from './subtitleChords.js';
 
-const getTimedColor = (
-  start: number,
-  end: number,
-  playbackTime: number,
-  theme: Theme,
-) => {
-  if (playbackTime >= start && playbackTime < end) {
-    return 'primary.main';
-  }
-
-  if (playbackTime >= end) {
-    return alpha(
-      theme.palette.text.primary,
-      theme.palette.action.disabledOpacity,
-    );
-  }
-
-  return 'text.primary';
-};
-
 export type SubtitleWordProps = {
-  playbackTime?: number;
   word: api.subtitle.Word;
   chord?: WordChord;
 };
 
 export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
-  const { playbackTime, word, chord } = props;
-
-  const wordColor =
-    playbackTime !== undefined
-      ? (theme: Theme) =>
-          getTimedColor(word.start, word.end, playbackTime, theme)
-      : 'inherit';
-
-  const chordColor =
-    playbackTime !== undefined && chord
-      ? (theme: Theme) =>
-          getTimedColor(chord.start, chord.end, playbackTime, theme)
-      : 'inherit';
+  const { word, chord } = props;
 
   return (
     <Box
       component='span'
       data-subtitle-word-start={word.start}
+      data-subtitle-word-end={word.end}
       sx={{
         cursor: 'pointer',
         display: 'inline-flex',
@@ -59,12 +26,13 @@ export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
     >
       <Box
         component='span'
+        data-subtitle-chord-start={chord?.start}
+        data-subtitle-chord-end={chord?.end}
         sx={{
           height: '1.15em',
           lineHeight: 1,
           fontSize: '0.62em',
           fontWeight: 700,
-          color: chordColor,
           whiteSpace: 'nowrap',
           userSelect: 'none',
           pointerEvents: 'none',
@@ -75,8 +43,8 @@ export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
       </Box>
       <Box
         component='span'
+        data-subtitle-word-text=''
         sx={{
-          color: wordColor,
           display: 'inline-block',
           transition: 'color 120ms linear',
         }}
