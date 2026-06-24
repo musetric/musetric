@@ -25,6 +25,9 @@ export type RemapParams = {
   frequencyTiltMinGain: number;
   frequencyTiltMaxGain: number;
   displayGamma: number;
+  rowNormalizationStrength: number;
+  rowNormalizationFloorFactor: number;
+  rowNormalizationMinRange: number;
   bands: RemapBandParams[];
 };
 
@@ -34,7 +37,7 @@ export type RemapParamsArg = {
   spectra: SpectrogramBandSpectrum[];
 };
 
-const headerByteLength = 64;
+const headerByteLength = 80;
 const bandByteLength = 32;
 
 const toParams = (arg: RemapParamsArg): RemapParams => {
@@ -58,6 +61,9 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
     frequencyTiltMinGain: visual.frequencyTiltMinGain,
     frequencyTiltMaxGain: visual.frequencyTiltMaxGain,
     displayGamma: visual.displayGamma,
+    rowNormalizationStrength: visual.rowNormalizationStrength,
+    rowNormalizationFloorFactor: visual.rowNormalizationFloorFactor,
+    rowNormalizationMinRange: visual.rowNormalizationMinRange,
     bands: arg.spectra.map((spectrum) => ({
       windowSize: spectrum.windowSize,
       halfSize: spectrum.windowSize / 2,
@@ -112,6 +118,9 @@ export const createParamsCell = (device: GPUDevice) =>
       array.setFloat32(40, value.frequencyTiltMinGain, true);
       array.setFloat32(44, value.frequencyTiltMaxGain, true);
       array.setFloat32(48, value.displayGamma, true);
+      array.setFloat32(52, value.rowNormalizationStrength, true);
+      array.setFloat32(56, value.rowNormalizationFloorFactor, true);
+      array.setFloat32(60, value.rowNormalizationMinRange, true);
       value.bands.forEach((band, index) => {
         const offset = headerByteLength + index * bandByteLength;
         array.setFloat32(offset, band.windowSize, true);
@@ -149,6 +158,12 @@ export const createParamsCell = (device: GPUDevice) =>
       current.config.visual.frequencyTiltMaxGain ===
         next.config.visual.frequencyTiltMaxGain &&
       current.config.visual.displayGamma === next.config.visual.displayGamma &&
+      current.config.visual.rowNormalizationStrength ===
+        next.config.visual.rowNormalizationStrength &&
+      current.config.visual.rowNormalizationFloorFactor ===
+        next.config.visual.rowNormalizationFloorFactor &&
+      current.config.visual.rowNormalizationMinRange ===
+        next.config.visual.rowNormalizationMinRange &&
       current.config.minFrequency === next.config.minFrequency &&
       current.config.maxFrequency === next.config.maxFrequency &&
       current.config.viewSize.width === next.config.viewSize.width &&

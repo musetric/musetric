@@ -32,6 +32,9 @@ export type SpectrogramVisualConfig = {
   frequencyTiltMinGain: number;
   frequencyTiltMaxGain: number;
   displayGamma: number;
+  rowNormalizationStrength: number;
+  rowNormalizationFloorFactor: number;
+  rowNormalizationMinRange: number;
 };
 
 export type SpectrogramComparison = {

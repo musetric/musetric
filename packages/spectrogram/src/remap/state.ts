@@ -14,9 +14,14 @@ export type StateArg = {
 };
 
 export type State = {
-  pipeline: GPUComputePipeline;
+  pipelines: {
+    bindGroupLayout: GPUBindGroupLayout;
+    stats: GPUComputePipeline;
+    render: GPUComputePipeline;
+  };
   config: SpectrogramConfig;
   params: StateParams;
+  rowStats: GPUBuffer;
   bindGroup: GPUBindGroup;
 };
 
@@ -35,28 +40,51 @@ const areSpectraBuffersEqual = (
 
 export const createStateCell = (
   device: GPUDevice,
-): ResourceCell<StateArg & { pipeline: GPUComputePipeline }, State> => {
+): ResourceCell<
+  StateArg & {
+    pipelines: {
+      bindGroupLayout: GPUBindGroupLayout;
+      stats: GPUComputePipeline;
+      render: GPUComputePipeline;
+    };
+  },
+  State
+> => {
   const paramsCell = createParamsCell(device);
+  const rowStatsCell = createResourceCell({
+    create: (height: number): GPUBuffer =>
+      device.createBuffer({
+        label: 'remap-row-stats-buffer',
+        size: Math.max(1, height) * 4 * Float32Array.BYTES_PER_ELEMENT,
+        usage: GPUBufferUsage.STORAGE,
+      }),
+    dispose: (buffer) => {
+      buffer.destroy();
+    },
+    equals: (current, next) => current === next,
+  });
   const bindGroupCell = createResourceCell({
     create: (arg: {
       spectra: SpectrogramBandSpectrum[];
       texture: GPUTextureView;
       params: GPUBuffer;
-      pipeline: GPUComputePipeline;
+      rowStats: GPUBuffer;
+      bindGroupLayout: GPUBindGroupLayout;
     }): GPUBindGroup =>
       device.createBindGroup({
         label: 'remap-column-bind-group',
-        layout: arg.pipeline.getBindGroupLayout(0),
+        layout: arg.bindGroupLayout,
         entries: [
           { binding: 0, resource: arg.texture },
           { binding: 1, resource: { buffer: arg.params } },
+          { binding: 2, resource: { buffer: arg.rowStats } },
           ...arg.spectra.flatMap((spectrum, index) => [
             {
-              binding: 2 + index * 2,
+              binding: 3 + index * 2,
               resource: { buffer: spectrum.rawMagnitudeBuffer },
             },
             {
-              binding: 3 + index * 2,
+              binding: 4 + index * 2,
               resource: { buffer: spectrum.columnEnergyBuffer },
             },
           ]),
@@ -64,32 +92,37 @@ export const createStateCell = (
       }),
     dispose: () => undefined,
     equals: (current, next) =>
-      current.pipeline === next.pipeline &&
+      current.bindGroupLayout === next.bindGroupLayout &&
       current.texture === next.texture &&
       current.params === next.params &&
+      current.rowStats === next.rowStats &&
       areSpectraBuffersEqual(current.spectra, next.spectra),
   });
 
   return {
     get: (arg) => {
-      const { spectra, texture, config, gainDb, pipeline } = arg;
+      const { spectra, texture, config, gainDb, pipelines } = arg;
       const params = paramsCell.get({ config, gainDb, spectra });
+      const rowStats = rowStatsCell.get(params.value.height);
       const bindGroup = bindGroupCell.get({
         spectra,
         texture,
         params: params.buffer,
-        pipeline,
+        rowStats,
+        bindGroupLayout: pipelines.bindGroupLayout,
       });
 
       return {
-        pipeline,
+        pipelines,
         config,
         params,
+        rowStats,
         bindGroup,
       };
     },
     dispose: () => {
       bindGroupCell.dispose();
+      rowStatsCell.dispose();
       paramsCell.dispose();
     },
   };
