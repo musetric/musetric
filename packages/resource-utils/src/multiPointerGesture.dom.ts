@@ -265,6 +265,7 @@ export const createMultiPointerGesture = (
     pointers.set(event.pointerId, pointer);
 
     element.setPointerCapture(event.pointerId);
+    event.stopPropagation();
     event.preventDefault();
 
     const list = Array.from(pointers.values());
@@ -281,6 +282,7 @@ export const createMultiPointerGesture = (
   const handlePointerMove = (event: PointerEvent) => {
     const pointer = pointers.get(event.pointerId);
     if (!pointer) return;
+    event.stopPropagation();
     pointer.x = event.clientX;
     pointer.y = event.clientY;
 
@@ -370,6 +372,7 @@ export const createMultiPointerGesture = (
   const handlePointerUp = (event: PointerEvent) => {
     const pointer = pointers.get(event.pointerId);
     if (!pointer) return;
+    event.stopPropagation();
     pointers.delete(event.pointerId);
     releaseCapture(event.pointerId);
 
@@ -392,6 +395,7 @@ export const createMultiPointerGesture = (
   const handlePointerCancel = (event: PointerEvent) => {
     const pointer = pointers.get(event.pointerId);
     if (!pointer) return;
+    event.stopPropagation();
     pointers.delete(event.pointerId);
     releaseCapture(event.pointerId);
 

@@ -1,5 +1,4 @@
 import { Box } from '@mui/material';
-import { createNumberLimit } from '@musetric/resource-utils';
 import { createMultiPointerGesture } from '@musetric/resource-utils/dom';
 import {
   maximumSpectrogramFrequency,
@@ -24,6 +23,13 @@ const wheelZoomSensitivity = 0.002;
 const wheelLinePixels = 16;
 const wheelPagePixels = 400;
 
+type SpectrogramAreaRect = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 export const ProjectSpectrogramVisualization: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
   const spectrogramAreaRef = useRef<HTMLDivElement>(null);
@@ -37,14 +43,46 @@ export const ProjectSpectrogramVisualization: FC = () => {
     }
 
     let { frameIndex } = engine.store.get();
+    let requestedFrameIndex = Math.round(frameIndex);
     let pointerFrozen = false;
     let gestureActive = false;
     let releaseFrozenOnEnd = true;
+    const { sampleRate } = engine.context;
+
+    const readSpectrogramAreaRect = (): SpectrogramAreaRect => {
+      const rect = spectrogramArea.getBoundingClientRect();
+
+      return {
+        height: rect.height,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+      };
+    };
+
+    let spectrogramAreaRect = readSpectrogramAreaRect();
+
+    const areaResizeObserver = new ResizeObserver(() => {
+      spectrogramAreaRect = readSpectrogramAreaRect();
+    });
+    areaResizeObserver.observe(spectrogramArea);
 
     const freeze = () => {
       if (pointerFrozen) return;
       pointerFrozen = true;
       engine.player.setFrozen(true);
+    };
+
+    const seekSpectrogramFrame = (nextFrameIndex: number) => {
+      frameIndex = nextFrameIndex;
+      const roundedFrameIndex = Math.round(nextFrameIndex);
+
+      if (roundedFrameIndex === requestedFrameIndex) {
+        return;
+      }
+
+      requestedFrameIndex = roundedFrameIndex;
+      engine.player.seek(roundedFrameIndex, 'spectrogramVisualization');
     };
 
     const releaseFrozen = () => {
@@ -58,7 +96,9 @@ export const ProjectSpectrogramVisualization: FC = () => {
       if (!event.isPrimary) return;
 
       releaseFrozenOnEnd = true;
+      spectrogramAreaRect = readSpectrogramAreaRect();
       frameIndex = engine.store.get().frameIndex;
+      requestedFrameIndex = Math.round(frameIndex);
       freeze();
     };
 
@@ -77,11 +117,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
       height: number;
       areaLeft: number;
       areaTop: number;
-      initialCenter: number;
       initialSpread: number;
-      sampleRate: number;
       visibleTime0: number;
-      frameIndex0: number;
       playheadRatio: number;
       logMin0: number;
       logMax0: number;
@@ -97,7 +134,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
       stop: () => void,
     ) => {
       const { frameCount } = engine.store.get();
-      const { width } = spectrogramArea.getBoundingClientRect();
+      const { width } = spectrogramAreaRect;
 
       if (!frameCount || width <= 0) {
         stop();
@@ -105,19 +142,9 @@ export const ProjectSpectrogramVisualization: FC = () => {
       }
 
       const { visibleTime } = useSettingsStore.getState();
-      const frameLimit = createNumberLimit({
-        minimum: 0,
-        maximum: frameCount,
-      });
-      const frameDelta =
-        (-delta * visibleTime * engine.context.sampleRate) / width;
+      const frameDelta = (-delta * visibleTime * sampleRate) / width;
       const rawFrameIndex = frameIndex + frameDelta;
-      const nextFrameIndex = frameLimit.clamp(rawFrameIndex);
-      frameIndex = nextFrameIndex;
-      engine.player.seek(
-        Math.round(nextFrameIndex),
-        'spectrogramVisualization',
-      );
+      seekSpectrogramFrame(Math.min(frameCount, Math.max(0, rawFrameIndex)));
 
       if (isInertia && (rawFrameIndex < 0 || rawFrameIndex > frameCount)) {
         stop();
@@ -129,7 +156,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
       isInertia: boolean,
       stop: () => void,
     ) => {
-      const { height } = spectrogramArea.getBoundingClientRect();
+      const { height } = spectrogramAreaRect;
       if (height <= 0) {
         stop();
         return;
@@ -141,19 +168,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
       const logMax = Math.log(maxFrequency);
       const range = logMax - logMin;
       const rawShift = (delta / height) * range;
-      let shift = rawShift;
-      const minAllowedShift = logMinFrequency - logMin;
-      const maxAllowedShift = logMaxFrequency - logMax;
-      let clamped = false;
-
-      if (shift < minAllowedShift) {
-        shift = minAllowedShift;
-        clamped = true;
-      }
-      if (shift > maxAllowedShift) {
-        shift = maxAllowedShift;
-        clamped = true;
-      }
+      const shift = Math.min(
+        logMaxFrequency - logMax,
+        Math.max(logMinFrequency - logMin, rawShift),
+      );
 
       if (shift !== 0) {
         const nextMin = Math.exp(logMin + shift);
@@ -161,7 +179,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
         setFrequencyRange(nextMin, nextMax);
       }
 
-      if (isInertia && clamped) {
+      if (isInertia && shift !== rawShift) {
         stop();
       }
     };
@@ -171,13 +189,13 @@ export const ProjectSpectrogramVisualization: FC = () => {
       center: number,
       spread: number,
     ): PinchInitial | undefined => {
-      const rect = spectrogramArea.getBoundingClientRect();
+      spectrogramAreaRect = readSpectrogramAreaRect();
+      const rect = spectrogramAreaRect;
       if (rect.width <= 0 || rect.height <= 0) return undefined;
 
       const { visibleTime, playheadRatio, minFrequency, maxFrequency } =
         useSettingsStore.getState();
       const frameCount = engine.store.get().frameCount ?? 0;
-      const { sampleRate } = engine.context;
       const visibleTime0 = visibleTime;
       const frameIndex0 = engine.store.get().frameIndex;
       const logMin0 = Math.log(minFrequency);
@@ -189,11 +207,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
         height: rect.height,
         areaLeft: rect.left,
         areaTop: rect.top,
-        initialCenter: center,
         initialSpread: Math.max(spread, 1),
-        sampleRate,
         visibleTime0,
-        frameIndex0,
         playheadRatio,
         logMin0,
         logMax0,
@@ -220,12 +235,9 @@ export const ProjectSpectrogramVisualization: FC = () => {
     const updatePinchHorizontal = (center: number, spread: number) => {
       if (!pinchInitial || pinchInitial.axis !== 'x') return;
       const scale = spread / pinchInitial.initialSpread;
-      const visibleLimit = createNumberLimit({
-        minimum: minVisibleTime,
-        maximum: maxVisibleTime,
-      });
-      const newVisibleTime = visibleLimit.clamp(
-        pinchInitial.visibleTime0 / scale,
+      const newVisibleTime = Math.min(
+        maxVisibleTime,
+        Math.max(minVisibleTime, pinchInitial.visibleTime0 / scale),
       );
       const localX = center - pinchInitial.areaLeft;
       const newLeftEdgeTime =
@@ -233,31 +245,25 @@ export const ProjectSpectrogramVisualization: FC = () => {
         (localX / pinchInitial.width) * newVisibleTime;
       const rawFrameIndex =
         (newLeftEdgeTime + pinchInitial.playheadRatio * newVisibleTime) *
-        pinchInitial.sampleRate;
-      const frameLimit = createNumberLimit({
-        minimum: 0,
-        maximum: pinchInitial.frameCount,
-      });
-      const nextFrameIndex = frameLimit.clamp(rawFrameIndex);
+        sampleRate;
+      const nextFrameIndex = Math.min(
+        pinchInitial.frameCount,
+        Math.max(0, rawFrameIndex),
+      );
 
       const { setVisibleTime } = useSettingsStore.getState();
       setVisibleTime(newVisibleTime);
-      frameIndex = nextFrameIndex;
-      engine.player.seek(
-        Math.round(nextFrameIndex),
-        'spectrogramVisualization',
-      );
+      seekSpectrogramFrame(nextFrameIndex);
     };
 
     const updatePinchVertical = (center: number, spread: number) => {
       if (!pinchInitial || pinchInitial.axis !== 'y') return;
       const scale = spread / pinchInitial.initialSpread;
       const range0 = pinchInitial.logMax0 - pinchInitial.logMin0;
-      const rangeLimit = createNumberLimit({
-        minimum: logMinRange,
-        maximum: logMaxRange,
-      });
-      const newRange = rangeLimit.clamp(range0 / scale);
+      const newRange = Math.min(
+        logMaxRange,
+        Math.max(logMinRange, range0 / scale),
+      );
       const localY = center - pinchInitial.areaTop;
       let newLogMax =
         pinchInitial.anchorLogFreq + (localY / pinchInitial.height) * newRange;
@@ -281,7 +287,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
     };
 
     const zoomHorizontalAt = (scale: number, clientX: number) => {
-      const rect = spectrogramArea.getBoundingClientRect();
+      const rect = spectrogramAreaRect;
       if (rect.width <= 0) return;
 
       const { visibleTime, playheadRatio, setVisibleTime } =
@@ -289,36 +295,31 @@ export const ProjectSpectrogramVisualization: FC = () => {
       const currentFrameIndex = engine.store.get().frameIndex;
       const frameCount = engine.store.get().frameCount ?? 0;
       if (!frameCount) return;
-      const { sampleRate } = engine.context;
+      frameIndex = currentFrameIndex;
+      requestedFrameIndex = Math.round(frameIndex);
 
       const localX = clientX - rect.left;
       const leftEdgeTime =
         currentFrameIndex / sampleRate - playheadRatio * visibleTime;
       const anchorTime = leftEdgeTime + (localX / rect.width) * visibleTime;
 
-      const visibleLimit = createNumberLimit({
-        minimum: minVisibleTime,
-        maximum: maxVisibleTime,
-      });
-      const newVisibleTime = visibleLimit.clamp(visibleTime / scale);
+      const newVisibleTime = Math.min(
+        maxVisibleTime,
+        Math.max(minVisibleTime, visibleTime / scale),
+      );
 
       const newLeftEdgeTime =
         anchorTime - (localX / rect.width) * newVisibleTime;
       const rawFrameIndex =
         (newLeftEdgeTime + playheadRatio * newVisibleTime) * sampleRate;
-      const frameLimit = createNumberLimit({ minimum: 0, maximum: frameCount });
-      const nextFrameIndex = frameLimit.clamp(rawFrameIndex);
+      const nextFrameIndex = Math.min(frameCount, Math.max(0, rawFrameIndex));
 
       setVisibleTime(newVisibleTime);
-      frameIndex = nextFrameIndex;
-      engine.player.seek(
-        Math.round(nextFrameIndex),
-        'spectrogramVisualization',
-      );
+      seekSpectrogramFrame(nextFrameIndex);
     };
 
     const zoomVerticalAt = (scale: number, clientY: number) => {
-      const rect = spectrogramArea.getBoundingClientRect();
+      const rect = spectrogramAreaRect;
       if (rect.height <= 0) return;
 
       const { minFrequency, maxFrequency, setFrequencyRange } =
@@ -330,11 +331,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
       const localY = clientY - rect.top;
       const anchorLogFreq = logMax - (localY / rect.height) * range;
 
-      const rangeLimit = createNumberLimit({
-        minimum: logMinRange,
-        maximum: logMaxRange,
-      });
-      const newRange = rangeLimit.clamp(range / scale);
+      const newRange = Math.min(
+        logMaxRange,
+        Math.max(logMinRange, range / scale),
+      );
 
       let newLogMax = anchorLogFreq + (localY / rect.height) * newRange;
       let newLogMin = newLogMax - newRange;
@@ -361,7 +361,6 @@ export const ProjectSpectrogramVisualization: FC = () => {
       if (!wantsVertical && !wantsHorizontal) return;
 
       event.preventDefault();
-
       let { deltaY } = event;
       if (event.deltaMode === 1) deltaY *= wheelLinePixels;
       else if (event.deltaMode === 2) deltaY *= wheelPagePixels;
@@ -383,6 +382,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
         gestureActive = true;
         releaseFrozenOnEnd = true;
         frameIndex = engine.store.get().frameIndex;
+        requestedFrameIndex = Math.round(frameIndex);
         freeze();
       },
       onPanUpdate: (event) => {
@@ -401,6 +401,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
       onPinchStart: (event) => {
         gestureActive = true;
         releaseFrozenOnEnd = true;
+        frameIndex = engine.store.get().frameIndex;
+        requestedFrameIndex = Math.round(frameIndex);
         freeze();
         pinchInitial = seedPinch(event.axis, event.center, event.spread);
       },
@@ -430,6 +432,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
 
         releaseFrozenOnEnd = false;
         pointerFrozen = false;
+        frameIndex = seekEvent.frameIndex;
+        requestedFrameIndex = Math.round(frameIndex);
         gesture.stop();
       },
     );
@@ -439,6 +443,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
       document.removeEventListener('pointerup', handlePointerEnd);
       document.removeEventListener('pointercancel', handlePointerEnd);
       spectrogramArea.removeEventListener('wheel', handleWheel);
+      areaResizeObserver.disconnect();
       unsubscribeSeek();
       gesture.dispose();
       releaseFrozen();

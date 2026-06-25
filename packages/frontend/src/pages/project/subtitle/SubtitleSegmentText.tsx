@@ -20,14 +20,13 @@ const getInactiveSubtitleSegmentSx = (status: SubtitleSegmentStatus) => {
 };
 
 export type SubtitleSegmentTextProps = {
-  playbackTime?: number;
   segment: api.subtitle.Segment;
   status: SubtitleSegmentStatus;
   chordSegments: api.chords.ChordSegment[];
 };
 
 export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
-  const { playbackTime, segment, status, chordSegments } = props;
+  const { segment, status, chordSegments } = props;
   const active = status === 'active';
 
   const chordLabels = useMemo(
@@ -53,11 +52,7 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
       {segment.words.length > 0
         ? segment.words.map((word, index) => (
             <Fragment key={`${word.start}-${index}`}>
-              <SubtitleWord
-                playbackTime={active ? playbackTime : undefined}
-                word={word}
-                chord={chordLabels[index]}
-              />
+              <SubtitleWord word={word} chord={chordLabels[index]} />
               {index < segment.words.length - 1 ? ' ' : ''}
             </Fragment>
           ))

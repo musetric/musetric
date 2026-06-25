@@ -1,17 +1,22 @@
 import { type TimelineConfig } from '../config.js';
-import { createCanvasCell } from './canvas.js';
+import { createCanvasCell, type TimelineCanvasState } from './canvas.js';
 import { getTimelineMarkers } from './markers.js';
 
 const labelOffset = 4;
+const maxLabelMetricsCacheSize = 4096;
 
 export type TimelineDraw = {
   run: (config: TimelineConfig) => void;
   dispose: () => void;
 };
 
-const resizeCanvas = (canvas: HTMLCanvasElement, pixelRatio: number) => {
-  const width = Math.max(1, Math.floor(canvas.clientWidth * pixelRatio));
-  const height = Math.max(1, Math.floor(canvas.clientHeight * pixelRatio));
+const resizeCanvas = (
+  canvas: HTMLCanvasElement,
+  state: TimelineCanvasState,
+  pixelRatio: number,
+) => {
+  const width = Math.max(1, Math.floor(state.width * pixelRatio));
+  const height = Math.max(1, Math.floor(state.height * pixelRatio));
 
   if (canvas.width === width && canvas.height === height) {
     return;
@@ -34,16 +39,46 @@ const formatTime = (timeInSeconds: number) => {
 
 export const createTimelineDraw = (): TimelineDraw => {
   const canvasCell = createCanvasCell();
+  const labelMetricsCache = new Map<
+    string,
+    Pick<TextMetrics, 'actualBoundingBoxDescent' | 'width'>
+  >();
+
+  const getLabelMetrics = (
+    context: CanvasRenderingContext2D,
+    font: string,
+    label: string,
+  ) => {
+    const key = `${font}\n${label}`;
+    const cachedMetrics = labelMetricsCache.get(key);
+
+    if (cachedMetrics) {
+      return cachedMetrics;
+    }
+
+    if (labelMetricsCache.size > maxLabelMetricsCacheSize) {
+      labelMetricsCache.clear();
+    }
+
+    const metrics = context.measureText(label);
+    const labelMetrics = {
+      actualBoundingBoxDescent: metrics.actualBoundingBoxDescent,
+      width: metrics.width,
+    };
+    labelMetricsCache.set(key, labelMetrics);
+
+    return labelMetrics;
+  };
 
   return {
     run: (config) => {
       const { canvas } = config;
-      const { context } = canvasCell.get(canvas);
+      const canvasState = canvasCell.get(canvas);
+      const { context } = canvasState;
       const pixelRatio = window.devicePixelRatio;
-      resizeCanvas(canvas, pixelRatio);
+      resizeCanvas(canvas, canvasState, pixelRatio);
 
-      const width = canvas.width / pixelRatio;
-      const height = canvas.height / pixelRatio;
+      const { width, height } = canvasState;
       const markers = getTimelineMarkers(config, width);
 
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -77,7 +112,7 @@ export const createTimelineDraw = (): TimelineDraw => {
 
         const label = formatTime(marker.time);
         const labelX = marker.ratio * width + labelOffset;
-        const labelMetrics = context.measureText(label);
+        const labelMetrics = getLabelMetrics(context, config.font, label);
 
         if (labelX + labelMetrics.width < 0 || labelX > width) {
           continue;
@@ -92,6 +127,7 @@ export const createTimelineDraw = (): TimelineDraw => {
     },
     dispose: () => {
       canvasCell.dispose();
+      labelMetricsCache.clear();
     },
   };
 };

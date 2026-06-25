@@ -137,6 +137,15 @@ export const createEngine = (): Engine => {
         ref.player.applyRemoteFrameIndex(frameIndex, frozen, revision, source);
       },
       onPlayerRevisionChanged: (revision) => {
+        const currentState = store.get();
+
+        if (
+          currentState.backendRevision === revision &&
+          !currentState.playerFrameIndexPending
+        ) {
+          return;
+        }
+
         store.update((state) => {
           state.backendRevision = revision;
           state.playerFrameIndexPending = false;

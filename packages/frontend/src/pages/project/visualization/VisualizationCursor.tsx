@@ -28,6 +28,8 @@ export const VisualizationCursor: FC = () => {
       return;
     }
 
+    let parentWidth = parentElement.getBoundingClientRect().width;
+
     const render = () => {
       const { frameCount, frameIndex } = engine.store.get();
       const { playheadRatio } = useSettingsStore.getState();
@@ -37,16 +39,23 @@ export const VisualizationCursor: FC = () => {
         visualizationMode === 'spectrogram'
           ? playheadRatio
           : waveformCursorRatio;
-      const { width } = parentElement.getBoundingClientRect();
-      const cursorX = alignPixel(cursorRatio * width, window.devicePixelRatio);
+      const cursorX = alignPixel(
+        cursorRatio * parentWidth,
+        window.devicePixelRatio,
+      );
 
       element.style.transform = `translateX(${cursorX}px)`;
+    };
+
+    const resize = () => {
+      parentWidth = parentElement.getBoundingClientRect().width;
+      render();
     };
 
     render();
 
     const unsubscribes = [
-      subscribeResizeObserver(parentElement, render),
+      subscribeResizeObserver(parentElement, resize),
       ...engineRenderKeys.map((key) =>
         engine.store.subscribe((state) => state[key], render),
       ),
