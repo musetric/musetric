@@ -20,6 +20,8 @@ __screenshots__/
 generated/
 .claude
 CLAUDE.md
+.env
+.env.local
 
 .yarn/*
 !.yarn/cache
@@ -28,3 +30,4 @@ CLAUDE.md
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
