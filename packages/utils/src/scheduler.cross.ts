@@ -4,7 +4,7 @@ export type Scheduler = {
 };
 
 export const createScheduler = (
-  run: () => Promise<void>,
+  run: () => void | Promise<void>,
   timeout: number,
 ): Scheduler => {
   let intervalId: ReturnType<typeof setInterval> | undefined = undefined;

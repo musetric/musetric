@@ -1,3 +1,4 @@
+import { type Playhead } from '@musetric/audio';
 import { nextNumber } from '@musetric/utils';
 import { type Store } from '../../common/store.js';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
@@ -44,12 +45,14 @@ export type CreateEnginePlayerOptions = {
   store: Store<EngineState>;
   decoderPort: MessagePort;
   getDecoder: () => EngineDecoder;
+  playhead: Playhead;
 };
 
 export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
-  const { context, audioOutput, store, decoderPort, getDecoder } = options;
+  const { context, audioOutput, store, decoderPort, getDecoder, playhead } =
+    options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
 
@@ -70,17 +73,7 @@ export const createEnginePlayer = (
         audioOutput,
         store,
         decoderPort,
-        onFrameIndexChanged: (frameIndex) => {
-          const state = store.get();
-          if (state.playing && !state.isSlave) {
-            getDecoderValue().sendPlayerFrameIndex({
-              frameIndex,
-              frozen: state.frozen,
-              revision: state.backendRevision,
-              source: 'playback',
-            });
-          }
-        },
+        playhead,
         onPlaybackEnded: () => {
           const state = store.get();
           if (!state.isSlave) {

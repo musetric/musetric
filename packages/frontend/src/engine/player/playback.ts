@@ -1,6 +1,8 @@
 import {
   playerChannel,
   playerProcessorName,
+  type Playhead,
+  readPlayhead,
   type StemType,
   stemTypes,
 } from '@musetric/audio';
@@ -9,6 +11,7 @@ import {
   createControlledPromise,
   nextNumber,
 } from '@musetric/utils';
+import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { type Store } from '../../common/store.js';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineState } from '../state.js';
@@ -63,7 +66,7 @@ export type CreateEnginePlaybackOptions = {
   audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
   decoderPort: MessagePort;
-  onFrameIndexChanged?: (frameIndex: number) => void;
+  playhead: Playhead;
   onPlaybackEnded?: () => void;
 };
 
@@ -77,8 +80,7 @@ const dbToGain = (db: number) => 10 ** (db / 20);
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, store, decoderPort, onFrameIndexChanged } =
-    options;
+  const { context, audioOutput, store, decoderPort, playhead } = options;
   const { onPlaybackEnded } = options;
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
@@ -94,6 +96,28 @@ export const createEnginePlayback = async (
 
   const isCurrentRevision = (revision: number) =>
     store.get().seekEvent.revision === revision;
+
+  let lastPumpedFrameIndex = -1;
+
+  const frameIndexPump = createAnimationFrameLoop(() => {
+    const { frameIndex, revision } = readPlayhead(playhead);
+    if (!isCurrentRevision(revision) || frameIndex === lastPumpedFrameIndex) {
+      return;
+    }
+    lastPumpedFrameIndex = frameIndex;
+    store.update((state) => {
+      state.frameIndex = frameIndex;
+    });
+  });
+
+  const startFrameIndexPump = () => {
+    lastPumpedFrameIndex = -1;
+    frameIndexPump.start();
+  };
+
+  const stopFrameIndexPump = () => {
+    frameIndexPump.stop();
+  };
 
   port.bindHandlers({
     booted: () => {
@@ -117,6 +141,11 @@ export const createEnginePlayback = async (
             };
           }
         });
+        if (message.playing) {
+          startFrameIndexPump();
+        } else {
+          stopFrameIndexPump();
+        }
       }
       if (currentRevision && !message.playing && message.positionJump) {
         onPlaybackEnded?.();
@@ -125,16 +154,6 @@ export const createEnginePlayback = async (
         playingWaiter.resolve(message.frameIndex);
         playingWaiter = undefined;
       }
-    },
-    setFrameIndex: (message) => {
-      if (!isCurrentRevision(message.revision)) {
-        return;
-      }
-
-      store.update((state) => {
-        state.frameIndex = message.frameIndex;
-      });
-      onFrameIndexChanged?.(message.frameIndex);
     },
   });
 
@@ -226,6 +245,7 @@ export const createEnginePlayback = async (
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
+        playhead,
       });
 
       return bootPromise.promise;

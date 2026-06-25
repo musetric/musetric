@@ -20,6 +20,7 @@ port.bindBoot(async (message) => {
   await createSpectrogramRuntime({
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
+    playhead: message.playhead,
     profiling,
   });
   port.methods.booted();

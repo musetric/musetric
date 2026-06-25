@@ -1,3 +1,4 @@
+import { type Playhead } from '@musetric/audio';
 import {
   defaultSpectrogramConfig,
   spectrogramChannel,
@@ -28,12 +29,13 @@ export type CreateEngineSpectrogramOptions = {
   store: Store<EngineState>;
   sampleRate: number;
   decoderPort: MessagePort;
+  playhead: Playhead;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort } = options;
+  const { store, sampleRate, decoderPort, playhead } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -54,11 +56,30 @@ export const createEngineSpectrogram = (
     },
   });
 
+  // While playing, the spectrogram worker polls the shared playhead itself, so
+  // only push discrete progress changes (e.g. seeks while paused) from here.
   store.subscribe(getTrackProgress, (trackProgress) => {
+    if (store.get().playing) {
+      return;
+    }
     port.methods.setTrackProgress({
       trackProgress,
     });
   });
+
+  store.subscribe(
+    (state) => state.playing,
+    (playing) => {
+      port.methods.setPlaying({ playing });
+    },
+  );
+
+  store.subscribe(
+    (state) => state.frameCount,
+    (frameCount) => {
+      port.methods.setFrameCount({ frameCount: frameCount ?? 0 });
+    },
+  );
 
   store.subscribe(
     (state) => state.colors,
@@ -74,9 +95,11 @@ export const createEngineSpectrogram = (
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
+        playhead,
       });
 
-      return bootPromise.promise;
+      await bootPromise.promise;
+      port.methods.setFrameCount({ frameCount: store.get().frameCount ?? 0 });
     },
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);

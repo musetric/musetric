@@ -3,8 +3,13 @@ import {
   createDecoderRuntime,
   type DecoderRuntime,
 } from '@musetric/audio/decoder/worker';
-import { playerDataChannel } from '@musetric/audio/player';
+import {
+  playerDataChannel,
+  type Playhead,
+  readPlayhead,
+} from '@musetric/audio/player';
 import { spectrogramDataChannel } from '@musetric/spectrogram';
+import { createScheduler } from '@musetric/utils/cross/scheduler';
 import {
   getDeliveryAudioContent,
   getRecordingAudioContent,
@@ -75,10 +80,18 @@ type ProjectRealtimeEvent =
 
 const recordingPacketHeaderByteLength = 8;
 
+// The player position is streamed to the backend by polling the shared playhead
+// buffer the worklet writes to, instead of receiving a postMessage per frame
+// from the main thread. ~33ms (~30Hz) is smooth enough for a remote playhead.
+const playerFrameIndexStreamIntervalMs = 33;
+
 let decoderRuntime: DecoderRuntime | undefined = undefined;
 let projectRealtime: ProjectRealtime | undefined = undefined;
 let recordingStream: RecordingStream | undefined = undefined;
 let recordingReady = false;
+let playhead: Playhead | undefined = undefined;
+let backendRevision = 0;
+let lastStreamedFrameIndex = -1;
 let finishInterruptedRecordingStream = (stream: RecordingStream) => {
   stream.finish.resolve();
 };
@@ -221,6 +234,40 @@ const sendRealtimeJson = (message: object) => {
   realtime.pendingMessages.push(json);
 };
 
+const streamPlayerFrameIndex = () => {
+  if (!playhead) {
+    return;
+  }
+
+  const { frameIndex } = readPlayhead(playhead);
+  if (frameIndex === lastStreamedFrameIndex) {
+    return;
+  }
+
+  lastStreamedFrameIndex = frameIndex;
+  sendRealtimeJson({
+    type: 'player.frameIndex',
+    frameIndex,
+    frozen: false,
+    revision: backendRevision,
+    source: 'playback',
+  });
+};
+
+const playerFrameIndexStream = createScheduler(
+  streamPlayerFrameIndex,
+  playerFrameIndexStreamIntervalMs,
+);
+
+const startPlayerFrameIndexStream = () => {
+  lastStreamedFrameIndex = -1;
+  playerFrameIndexStream.start();
+};
+
+const stopPlayerFrameIndexStream = () => {
+  playerFrameIndexStream.stop();
+};
+
 const sendRealtimePacket = (packet: ArrayBuffer) => {
   const realtime = projectRealtime;
   if (!realtime || realtime.closed) {
@@ -298,6 +345,7 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
   }
 
   if (event.type === 'player.frameIndex') {
+    backendRevision = event.revision;
     port.methods.playerFrameIndexChanged({
       frameIndex: event.frameIndex,
       frozen: event.frozen,
@@ -308,6 +356,7 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
   }
 
   if (event.type === 'player.revision') {
+    backendRevision = event.revision;
     port.methods.playerRevisionChanged({
       revision: event.revision,
     });
@@ -315,6 +364,7 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
   }
 
   if (event.type === 'player.sync.state') {
+    backendRevision = event.revision;
     port.methods.playerSyncState({
       isSlave: event.active,
       playing: event.active,
@@ -356,6 +406,7 @@ const handleProjectRealtimePacket = (data: ArrayBuffer) => {
 const closeProjectRealtime = () => {
   const realtime = projectRealtime;
   projectRealtime = undefined;
+  stopPlayerFrameIndexStream();
   clearRecordingStream();
   if (!realtime || realtime.closed) {
     return;
@@ -599,13 +650,16 @@ self.addEventListener('messageerror', reportError);
 
 const sendPlayerPlay = () => {
   sendRealtimeJson({ type: 'player.play' });
+  startPlayerFrameIndexStream();
 };
 
 const sendPlayerRecord = () => {
   sendRealtimeJson({ type: 'player.record' });
+  startPlayerFrameIndexStream();
 };
 
 const sendPlayerStop = () => {
+  stopPlayerFrameIndexStream();
   sendRealtimeJson({ type: 'player.stop' });
 };
 
@@ -663,6 +717,7 @@ const bindRuntimeHandlers = () => {
 };
 
 port.bindBoot((message) => {
+  playhead = message.playhead;
   const playerPort = playerDataChannel.outbound(message.playerPort);
   const spectrogramPort = spectrogramDataChannel.outbound(
     message.spectrogramPort,

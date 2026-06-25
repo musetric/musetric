@@ -1,3 +1,4 @@
+import { createScheduler } from '@musetric/utils/cross/scheduler';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { getGpuDevice } from '../common/gpuDevice.js';
 import {
@@ -10,6 +11,7 @@ import {
   type spectrogramChannel,
   type spectrogramDataChannel,
   type SpectrogramLaneSamples,
+  type SpectrogramPlayhead,
 } from '../protocol.cross.js';
 
 export type CreateSpectrogramRuntimeOptions = {
@@ -17,8 +19,15 @@ export type CreateSpectrogramRuntimeOptions = {
     typeof spectrogramChannel.inbound<DedicatedWorkerGlobalScope>
   >;
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
+  playhead: SpectrogramPlayhead;
   profiling?: boolean;
 };
+
+// Slot 0 of the shared playhead holds the current frameIndex (layout owned by
+// playhead.cross.ts in @musetric/audio).
+const playheadFrameIndexSlot = 0;
+// ~60Hz polling of the playhead while playing, matching the display refresh.
+const renderLoopIntervalMs = 16;
 
 const emptySamples = (): SpectrogramLaneSamples =>
   allTrackKeys.reduce<SpectrogramLaneSamples>((acc, key) => {
@@ -29,7 +38,7 @@ const emptySamples = (): SpectrogramLaneSamples =>
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
-  const { port, dataPort, profiling } = options;
+  const { port, dataPort, playhead, profiling } = options;
 
   // The status is posted to the main thread after every render, but it almost
   // never changes between frames. Posting an identical 'success' ~60 times per
@@ -65,6 +74,9 @@ export const createSpectrogramRuntime = async (
   let processor = createProcessor();
   let samplesByLane: SpectrogramLaneSamples = emptySamples();
   let trackProgress = 0;
+  let frameCount = 0;
+  let playing = false;
+  let rendering = false;
 
   const hasAnySamples = () =>
     allTrackKeys.some((key) => samplesByLane[key] !== undefined);
@@ -89,6 +101,31 @@ export const createSpectrogramRuntime = async (
 
   const presentTrackKeys = (): TrackKey[] =>
     allTrackKeys.filter((key) => samplesByLane[key] !== undefined);
+
+  const playheadTrackProgress = () => {
+    if (frameCount <= 0) {
+      return trackProgress;
+    }
+    const frameIndex = Atomics.load(playhead, playheadFrameIndexSlot);
+    return Math.min(1, Math.max(0, frameIndex / frameCount));
+  };
+
+  // While playing, the worker reads the shared playhead on its own interval and
+  // re-renders, so the main thread no longer pushes setTrackProgress per frame.
+  const renderFromPlayhead = async () => {
+    if (rendering) {
+      return;
+    }
+    rendering = true;
+    try {
+      trackProgress = playheadTrackProgress();
+      await render();
+    } finally {
+      rendering = false;
+    }
+  };
+
+  const renderLoop = createScheduler(renderFromPlayhead, renderLoopIntervalMs);
 
   dataPort.bindHandlers({
     mount: async (message) => {
@@ -115,20 +152,36 @@ export const createSpectrogramRuntime = async (
         processor = createProcessor();
         processor.updateConfig(message.config);
         await render();
+        if (playing) {
+          renderLoop.start();
+        }
       } catch (error) {
         console.error('Failed to render spectrogram', error);
         setStatus('error');
       }
     },
     unmount: () => {
+      renderLoop.stop();
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
+      frameCount = 0;
       setStatus('pending');
     },
     setTrackProgress: (message) => {
       trackProgress = message.trackProgress;
       void render();
+    },
+    setFrameCount: (message) => {
+      frameCount = message.frameCount;
+    },
+    setPlaying: (message) => {
+      playing = message.playing;
+      if (playing) {
+        renderLoop.start();
+      } else {
+        renderLoop.stop();
+      }
     },
     updateConfig: (message) => {
       processor.updateConfig(message.patch);

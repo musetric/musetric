@@ -1,3 +1,4 @@
+import { type Playhead } from '@musetric/audio';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -41,6 +42,7 @@ export type CreateEngineDecoderOptions = {
   sampleRate: number;
   playerPort: MessagePort;
   spectrogramPort: MessagePort;
+  playhead: Playhead;
   onRecordingPeaksChanged: (message: {
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
@@ -76,6 +78,7 @@ export const createEngineDecoder = (
     store,
     playerPort,
     spectrogramPort,
+    playhead,
     onRecordingPeaksChanged,
     onRecordingStreamFailed,
     onPlayerPlayRequested,
@@ -171,6 +174,7 @@ export const createEngineDecoder = (
       port.methods.boot({
         playerPort,
         spectrogramPort,
+        playhead,
       });
 
       return bootPromise.promise;
