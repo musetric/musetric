@@ -5,6 +5,8 @@
 #   fix(decoder): handle empty mp3 frames
 #   ci(github): cancel superseded prTitle runs
 #
+# Subject must be 70 characters or less.
+#
 # Read by .github/workflows/prTitle.yml and enforced on every PR title.
 # Inline comments below document what each key means and when to use it.
 #
