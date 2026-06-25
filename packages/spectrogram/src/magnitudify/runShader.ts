@@ -12,7 +12,7 @@ struct MagnitudifyParams {
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowSize = params.windowSize;
   let windowCount = params.windowCount;
-  
+
   let sampleIndex = gid.x;
   let windowIndex = gid.y;
   let halfSize = windowSize / 2u;
@@ -24,6 +24,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let magnitudeOffset = halfSize * windowIndex + sampleIndex;
   let real = signal[spectrumOffset];
   let imag = signal[spectrumOffset + 1u];
-  magnitude[magnitudeOffset] = sqrt(real * real + imag * imag);
+  magnitude[magnitudeOffset] = real * real + imag * imag;
 }
 `;

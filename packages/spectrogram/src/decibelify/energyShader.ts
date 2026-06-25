@@ -4,8 +4,10 @@ struct DecibelifyParams {
   windowCount: u32,
   decibelFactor: f32,
   gain: f32,
+  gainOverReferenceMagnitude: f32,
   gateFloorDb: f32,
   gateRangeDb: f32,
+  padding: f32,
 };
 
 @group(0) @binding(0) var<storage, read> magnitude: array<f32>;
@@ -30,22 +32,21 @@ fn main(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local_invocation
   let chunkStart = chunkSize * workerId;
   let chunkEnd = min(chunkStart + chunkSize, halfSize);
 
-  var sumSquares = 0.0;
+  var sum = 0.0;
   for (var i = chunkStart; i < chunkEnd; i += 1u) {
-    let value = magnitude[windowOffset + i];
-    sumSquares += value * value;
+    sum += magnitude[windowOffset + i];
   }
 
-  localSums[workerId] = sumSquares;
+  localSums[workerId] = sum;
 
   workgroupBarrier();
 
   if (workerId == 0u) {
-    var totalSumSquares = 0.0;
+    var totalSum = 0.0;
     for (var i = 0u; i < 64u; i += 1u) {
-      totalSumSquares += localSums[i];
+      totalSum += localSums[i];
     }
-    columnEnergy[windowIndex] = sqrt(totalSumSquares / f32(halfSize));
+    columnEnergy[windowIndex] = sqrt(totalSum / f32(halfSize));
   }
 }
 `;

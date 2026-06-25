@@ -4,7 +4,7 @@ import {
   averageMetrics,
   type SpectrogramProcessorMetrics,
 } from '../common/processorTimer.js';
-import { allTrackKeys } from '../config.cross.js';
+import { allTrackKeys, type TrackKey } from '../config.cross.js';
 import { createSpectrogramProcessor } from '../processor.js';
 import {
   type spectrogramChannel,
@@ -56,12 +56,14 @@ export const createSpectrogramRuntime = async (
   const hasAnySamples = () =>
     allTrackKeys.some((key) => samplesByLane[key] !== undefined);
 
-  const render = async () => {
+  const render = async (dirtyTracks?: readonly TrackKey[]) => {
     if (!hasAnySamples()) {
       return;
     }
 
-    const ok = await processor.render(samplesByLane, trackProgress);
+    const ok = await processor.render(samplesByLane, trackProgress, {
+      dirtyTracks,
+    });
     if (!ok) {
       return;
     }
@@ -81,8 +83,8 @@ export const createSpectrogramRuntime = async (
         status: 'pending',
       });
     },
-    samplesChanged: () => {
-      void render();
+    samplesChanged: (message) => {
+      void render([message.trackKey]);
     },
   });
 
@@ -90,6 +92,7 @@ export const createSpectrogramRuntime = async (
     mount: async (message) => {
       try {
         trackProgress = message.trackProgress;
+        processor.dispose();
         processor = createProcessor();
         processor.updateConfig(message.config);
         await render();

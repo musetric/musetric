@@ -16,12 +16,12 @@ import {
   benchStableCvPercent,
   benchWindowCounts,
   benchWindowSizes,
-  computeBenchStats,
   createBenchTimestamp,
   createBenchWave,
   type FourierBenchSummary,
+  fourierComputeStats,
   fourierModeLabels,
-  selectBenchRunsPerSample,
+  fourierSelectRunsPerSample,
 } from './bench.es.js';
 import { isFourierModeSupported } from './fourierModeSupport.js';
 
@@ -180,13 +180,13 @@ const measureOne = async (
     timer.dispose();
 
     if (tryIndex === 0) {
-      runsPerSample = selectBenchRunsPerSample(durations);
+      runsPerSample = fourierSelectRunsPerSample(durations);
       continue;
     }
 
     values.push(...durations);
 
-    const { cv } = computeBenchStats(values);
+    const { cv } = fourierComputeStats(values);
 
     if (cv <= benchStableCvPercent) {
       console.log(
@@ -203,7 +203,7 @@ const measureOne = async (
   cell.dispose();
   signal.destroy();
 
-  return computeBenchStats(values);
+  return fourierComputeStats(values);
 };
 
 const measureOneInverse = async (
@@ -271,13 +271,13 @@ const measureOneInverse = async (
     timer.dispose();
 
     if (tryIndex === 0) {
-      runsPerSample = selectBenchRunsPerSample(durations);
+      runsPerSample = fourierSelectRunsPerSample(durations);
       continue;
     }
 
     values.push(...durations);
 
-    const { cv } = computeBenchStats(values);
+    const { cv } = fourierComputeStats(values);
 
     if (cv <= benchStableCvPercent) {
       console.log(
@@ -295,7 +295,7 @@ const measureOneInverse = async (
   spectrum.destroy();
   wave.destroy();
 
-  return computeBenchStats(values);
+  return fourierComputeStats(values);
 };
 
 const benchTimestamp = createBenchTimestamp();

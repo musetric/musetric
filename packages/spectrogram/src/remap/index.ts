@@ -7,7 +7,7 @@ import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 16;
 const storageBuffersPerSpectrum = 2;
-const storageBuffersPerRemap = 1;
+const storageBuffersPerRemap = 2;
 
 export type SpectrogramRemap = {
   dispatch: (pass: GPUComputePassEncoder) => void;
@@ -47,6 +47,9 @@ export const createSpectrogramRemapCell = (
 
       return {
         dispatch: (pass) => {
+          pass.setPipeline(state.pipelines.computeIntensity);
+          pass.setBindGroup(0, state.bindGroup);
+          pass.dispatchWorkgroups(xGroups, yGroups);
           pass.setPipeline(state.pipelines.stats);
           pass.setBindGroup(0, state.bindGroup);
           pass.dispatchWorkgroups(rowStatsGroups);

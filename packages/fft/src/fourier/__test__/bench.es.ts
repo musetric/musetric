@@ -1,4 +1,11 @@
 import {
+  type BenchStats,
+  type BenchStatsConfig,
+  computeBenchStats,
+  defaultBenchStatsConfig,
+  selectBenchRunsPerSample,
+} from '@musetric/resource-utils';
+import {
   allFourierModes,
   allIFourierModes,
   type FourierMode,
@@ -23,19 +30,13 @@ export type FourierBenchSummary = {
   sampleCount: number;
 };
 
-export const benchBatchSize = 32;
+export const fourierBenchConfig: BenchStatsConfig = defaultBenchStatsConfig;
 
-export const benchMaxTries = 10;
+export const benchBatchSize = fourierBenchConfig.batchSize;
 
-export const benchStableCvPercent = 5;
+export const benchMaxTries = fourierBenchConfig.maxTries;
 
-export const benchTargetSampleMs = 1;
-
-export const benchMaxRunsPerSample = 128;
-
-export const benchStableSampleWindow = benchBatchSize * 3;
-
-const benchTrimFraction = 0.1;
+export const benchStableCvPercent = fourierBenchConfig.stableCvPercent;
 
 export type FourierBenchConfig = {
   windowSizes: number[];
@@ -51,105 +52,12 @@ export const benchConfig: FourierBenchConfig = {
   windowCounts: benchWindowCounts,
 };
 
-export const computeMean = (values: readonly number[]): number =>
-  values.reduce((sum, v) => sum + v, 0) / values.length;
-
-const collectFiniteSamples = (values: readonly number[]): number[] =>
-  values.filter((value) => Number.isFinite(value) && value >= 0);
-
-export const computeMedian = (values: readonly number[]): number => {
-  const samples = collectFiniteSamples(values).sort(
-    (left, right) => left - right,
-  );
-
-  if (samples.length === 0) {
-    return Number.NaN;
-  }
-
-  const middle = Math.floor(samples.length / 2);
-
-  if (samples.length % 2 === 1) {
-    return samples[middle];
-  }
-
-  return (samples[middle - 1] + samples[middle]) / 2;
-};
-
-export const computeCvPercent = (values: readonly number[]): number => {
-  if (values.length < 2) {
-    return 0;
-  }
-
-  const mean = computeMean(values);
-
-  if (mean === 0) {
-    return 0;
-  }
-
-  const variance =
-    values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
-
-  return (Math.sqrt(variance) / mean) * 100;
-};
-
-export const selectBenchRunsPerSample = (
+export const fourierSelectRunsPerSample = (
   durations: readonly number[],
-): number => {
-  const samples = collectFiniteSamples(durations);
-  const positiveSamples = samples.filter((value) => value > 0);
+): number => selectBenchRunsPerSample(durations, fourierBenchConfig);
 
-  if (samples.length > 0 && positiveSamples.length === 0) {
-    return benchMaxRunsPerSample;
-  }
-
-  const median = computeMedian(positiveSamples);
-
-  if (!Number.isFinite(median) || median <= 0) {
-    return 1;
-  }
-
-  return Math.max(
-    1,
-    Math.min(benchMaxRunsPerSample, Math.ceil(benchTargetSampleMs / median)),
-  );
-};
-
-const collectStableSamples = (values: readonly number[]): number[] => {
-  const window = collectFiniteSamples(values).slice(-benchStableSampleWindow);
-
-  if (window.length < 4) {
-    return window;
-  }
-
-  const trimCount = Math.min(
-    Math.floor(window.length * benchTrimFraction),
-    Math.floor((window.length - 2) / 2),
-  );
-
-  if (trimCount === 0) {
-    return window;
-  }
-
-  return [...window]
-    .sort((left, right) => left - right)
-    .slice(trimCount, window.length - trimCount);
-};
-
-export const computeBenchStats = (
-  values: readonly number[],
-): { mean: number; cv: number; sampleCount: number } => {
-  const samples = collectStableSamples(values);
-
-  if (samples.length === 0) {
-    return { mean: Number.NaN, cv: Number.NaN, sampleCount: 0 };
-  }
-
-  return {
-    mean: computeMean(samples),
-    cv: computeCvPercent(samples),
-    sampleCount: samples.length,
-  };
-};
+export const fourierComputeStats = (values: readonly number[]): BenchStats =>
+  computeBenchStats(values, fourierBenchConfig);
 
 export const fourierModeLabels: Record<FourierBenchMode, string> = {
   cufft: 'cuFFT',
