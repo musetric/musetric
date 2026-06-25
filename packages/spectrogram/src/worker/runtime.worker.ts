@@ -31,6 +31,19 @@ export const createSpectrogramRuntime = async (
 ) => {
   const { port, dataPort, profiling } = options;
 
+  // The status is posted to the main thread after every render, but it almost
+  // never changes between frames. Posting an identical 'success' ~60 times per
+  // second was the dominant worker cost (cross-thread postMessage + main-thread
+  // store churn), so only post when the status actually transitions.
+  let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
+  const setStatus = (status: 'pending' | 'error' | 'success') => {
+    if (status === lastStatus) {
+      return;
+    }
+    lastStatus = status;
+    port.methods.setState({ status });
+  };
+
   const device = await getGpuDevice(profiling);
 
   const metricsBuffer: SpectrogramProcessorMetrics[] = [];
@@ -56,35 +69,41 @@ export const createSpectrogramRuntime = async (
   const hasAnySamples = () =>
     allTrackKeys.some((key) => samplesByLane[key] !== undefined);
 
-  const render = async (dirtyTracks?: readonly TrackKey[]) => {
+  const render = async (renderOptions?: {
+    dirtyTracks?: readonly TrackKey[];
+    contentChangedTracks?: readonly TrackKey[];
+  }) => {
     if (!hasAnySamples()) {
       return;
     }
 
     const ok = await processor.render(samplesByLane, trackProgress, {
-      dirtyTracks,
+      dirtyTracks: renderOptions?.dirtyTracks,
+      contentChangedTracks: renderOptions?.contentChangedTracks,
     });
     if (!ok) {
       return;
     }
-    port.methods.setState({
-      status: 'success',
-    });
+    setStatus('success');
   };
+
+  const presentTrackKeys = (): TrackKey[] =>
+    allTrackKeys.filter((key) => samplesByLane[key] !== undefined);
 
   dataPort.bindHandlers({
     mount: async (message) => {
       samplesByLane = { ...emptySamples(), ...message.samples };
-      await render();
+      await render({ contentChangedTracks: presentTrackKeys() });
     },
     unmount: () => {
       samplesByLane = emptySamples();
-      port.methods.setState({
-        status: 'pending',
-      });
+      setStatus('pending');
     },
     samplesChanged: (message) => {
-      void render([message.trackKey]);
+      void render({
+        dirtyTracks: [message.trackKey],
+        contentChangedTracks: [message.trackKey],
+      });
     },
   });
 
@@ -98,18 +117,14 @@ export const createSpectrogramRuntime = async (
         await render();
       } catch (error) {
         console.error('Failed to render spectrogram', error);
-        port.methods.setState({
-          status: 'error',
-        });
+        setStatus('error');
       }
     },
     unmount: () => {
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
-      port.methods.setState({
-        status: 'pending',
-      });
+      setStatus('pending');
     },
     setTrackProgress: (message) => {
       trackProgress = message.trackProgress;

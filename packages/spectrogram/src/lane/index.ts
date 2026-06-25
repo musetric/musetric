@@ -43,6 +43,7 @@ export type SpectrogramLane = {
     samples: Float32Array,
     trackProgress: number,
     work: SpectrogramLaneWork,
+    contentChanged: boolean,
   ) => void;
   clearSignal: (encoder: GPUCommandEncoder, work: SpectrogramLaneWork) => void;
   dispatchSliceSamples: SpectrogramLaneDispatch;
@@ -62,7 +63,11 @@ type BandSpectrumPipeline = {
   rawMagnitudeBuffer: GPUBuffer;
   columnEnergyBuffer: GPUBuffer;
   windowSize: number;
-  writeSamples: (samples: Float32Array, trackProgress: number) => void;
+  writeSamples: (
+    samples: Float32Array,
+    trackProgress: number,
+    contentChanged: boolean,
+  ) => void;
   clearSignal: (encoder: GPUCommandEncoder) => void;
   dispatchSliceSamples: (pass: GPUComputePassEncoder) => void;
   dispatchFourier: (pass: GPUComputePassEncoder) => void;
@@ -150,11 +155,12 @@ const createBandSpectrumCell = (
         rawMagnitudeBuffer: magnitudify.magnitude,
         columnEnergyBuffer: decibelify.columnEnergy,
         windowSize: bandConfig.windowSize * bandConfig.zeroPaddingFactor,
-        writeSamples: (samples, trackProgress) => {
+        writeSamples: (samples, trackProgress, contentChanged) => {
           sliceSamples.write(
             samples,
             trackProgress,
             bandConfig.lanes[label].truncateAfterPlayhead,
+            contentChanged,
           );
         },
         dispatchSliceSamples: sliceSamples.dispatch,
@@ -258,11 +264,12 @@ export const createSpectrogramLaneCell = (
         rawMagnitudeBuffer: magnitudify.magnitude,
         columnEnergyBuffer: decibelify.columnEnergy,
         windowSize: config.windowSize * config.zeroPaddingFactor,
-        writeSamples: (samples, trackProgress) => {
+        writeSamples: (samples, trackProgress, contentChanged) => {
           sliceSamples.write(
             samples,
             trackProgress,
             laneConfig.truncateAfterPlayhead,
+            contentChanged,
           );
         },
         dispatchSliceSamples: sliceSamples.dispatch,
@@ -356,9 +363,9 @@ export const createSpectrogramLaneCell = (
         signal,
         bandSpectra,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
-        writeSamples: (samples, trackProgress, work) => {
+        writeSamples: (samples, trackProgress, work, contentChanged) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.writeSamples(samples, trackProgress);
+            pipeline.writeSamples(samples, trackProgress, contentChanged);
           });
         },
         clearSignal: (encoder, work) => {

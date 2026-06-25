@@ -1,4 +1,5 @@
 import { type ResourceCell } from '@musetric/resource-utils';
+import { ringStartByteOffset } from './params.js';
 import { createPipeline } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -11,6 +12,7 @@ export type SpectrogramSliceSamples = {
     samples: Float32Array,
     trackProgress: number,
     truncateAfterPlayhead: boolean,
+    contentChanged: boolean,
   ) => void;
 };
 
@@ -20,6 +22,7 @@ export const createSpectrogramSliceSamplesCell = (
 ): ResourceCell<StateArg, SpectrogramSliceSamples> => {
   const pipeline = createPipeline(device);
   const stateCell = createStateCell(device, pipeline);
+  const ringStartScratch = new Uint32Array(1);
 
   return {
     get: (arg) => {
@@ -47,13 +50,25 @@ export const createSpectrogramSliceSamplesCell = (
           pass.end();
         },
         dispatch,
-        write: (samples, trackProgress, truncateAfterPlayhead) => {
-          state.samples.write(
+        write: (
+          samples,
+          trackProgress,
+          truncateAfterPlayhead,
+          contentChanged,
+        ) => {
+          const ringStart = state.samples.write(
             samples,
             trackProgress,
             state.config,
             truncateAfterPlayhead,
             state.sampleOffset,
+            contentChanged,
+          );
+          ringStartScratch[0] = ringStart;
+          device.queue.writeBuffer(
+            state.params.buffer,
+            ringStartByteOffset,
+            ringStartScratch,
           );
         },
       };
