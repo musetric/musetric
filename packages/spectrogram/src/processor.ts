@@ -20,6 +20,12 @@ export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
 
 export type SpectrogramRenderOptions = {
   dirtyTracks?: readonly TrackKey[];
+  /**
+   * Tracks whose underlying PCM content changed since the last render (e.g. a
+   * recording write into the shared sample buffer). These force a full re-upload
+   * of the sample ring instead of an incremental playhead-slide upload.
+   */
+  contentChangedTracks?: readonly TrackKey[];
 };
 
 export type SpectrogramProcessor = {
@@ -216,6 +222,7 @@ export const createSpectrogramProcessor = (
       samples: SpectrogramSamples,
       trackProgress: number,
       dirty: Record<TrackKey, boolean>,
+      contentChanged: Record<TrackKey, boolean>,
       work: Record<TrackKey, SpectrogramLaneWork>,
     ) => {
       for (const key of allTrackKeys) {
@@ -230,6 +237,7 @@ export const createSpectrogramProcessor = (
             trackSamples,
             trackProgress,
             trackWork,
+            contentChanged[key],
           );
         }
       }
@@ -312,6 +320,9 @@ export const createSpectrogramProcessor = (
       timer.configure();
       const work = createTrackWork(runtime);
       const dirty = createTrackSelection(renderOptions?.dirtyTracks);
+      const contentChanged = createTrackSelection(
+        renderOptions?.contentChangedTracks ?? [],
+      );
       const presence: Record<TrackKey, boolean> = createTrackFlags();
       const clearMissing: Record<TrackKey, boolean> = createTrackFlags();
       for (const key of allTrackKeys) {
@@ -319,7 +330,14 @@ export const createSpectrogramProcessor = (
         presence[key] = has;
         clearMissing[key] = dirty[key] && !has && lastRendered[key];
       }
-      writeBuffers(runtime, samples, trackProgress, dirty, work);
+      writeBuffers(
+        runtime,
+        samples,
+        trackProgress,
+        dirty,
+        contentChanged,
+        work,
+      );
       const command = createCommand(
         runtime,
         dirty,
@@ -338,14 +356,20 @@ export const createSpectrogramProcessor = (
   );
 
   return {
-    render: createCallLatest(async (samples, trackProgress) => {
-      const ok = await render(samples, trackProgress);
-      if (!ok) {
-        return false;
-      }
-      await timer.finish();
-      return true;
-    }),
+    render: createCallLatest(
+      async (
+        samples: SpectrogramSamples,
+        trackProgress: number,
+        renderOptions?: SpectrogramRenderOptions,
+      ) => {
+        const ok = await render(samples, trackProgress, renderOptions);
+        if (!ok) {
+          return false;
+        }
+        await timer.finish();
+        return true;
+      },
+    ),
     updateConfig: configurator.updateConfig,
     dispose: () => {
       timer.dispose();
