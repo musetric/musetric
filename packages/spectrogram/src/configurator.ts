@@ -1,4 +1,4 @@
-import { applyPatchConfig } from '@musetric/resource-utils';
+import { applyPatchConfig } from '@musetric/utils';
 import { spectrogramConfigFieldEqual } from './common/configFieldEqual.js';
 import { type ExtSpectrogramConfig } from './common/extConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';

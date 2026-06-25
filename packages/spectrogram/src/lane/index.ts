@@ -1,8 +1,5 @@
 import { createFourierCell } from '@musetric/fft/gpu';
-import {
-  createResourceCell,
-  type ResourceCell,
-} from '@musetric/resource-utils';
+import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import {
   type SpectrogramSpectralBand,

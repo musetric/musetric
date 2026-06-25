@@ -1,5 +1,5 @@
-import { type ViewSize } from '@musetric/resource-utils';
-import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
+import { type ViewSize } from '@musetric/utils';
+import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type StemType } from '../common/stemType.es.js';
 import { type WaveformColors } from './colors.es.js';
 

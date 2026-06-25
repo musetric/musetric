@@ -46,7 +46,7 @@ scopes:
   - spectrogram # frequency spectrogram visualization
   - fft # FFT signal-processing core behind visualizations
   - toolkit # packages/toolkit backend media/processing helpers
-  - utils # packages/resource-utils low-level shared utilities
+  - utils # packages/utils low-level shared utilities
   # App
   - frontend # packages/frontend app shell (cross-feature)
   - backend # packages/backend Fastify server & orchestration

@@ -3,7 +3,7 @@ import {
   createGpuBufferReader,
   createGpuContext,
   createInterleavedGpuBufferReader,
-} from '@musetric/resource-utils/gpu';
+} from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
 import {
   allFourierModes,

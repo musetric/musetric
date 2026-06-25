@@ -9,8 +9,8 @@
     { "path": "packages/eslint-config" },
     { "path": "packages/frontend" },
     { "path": "packages/spa-router" },
-    { "path": "packages/resource-utils" },
     { "path": "packages/performance" },
-    { "path": "packages/toolkit" }
+    { "path": "packages/toolkit" },
+    { "path": "packages/utils" }
   ]
 }

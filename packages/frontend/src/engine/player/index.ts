@@ -1,4 +1,4 @@
-import { nextNumber } from '@musetric/resource-utils';
+import { nextNumber } from '@musetric/utils';
 import { type Store } from '../../common/store.js';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineDecoder } from '../decoder/index.js';

@@ -1,7 +1,4 @@
-import {
-  createGpuContext,
-  type GpuContext,
-} from '@musetric/resource-utils/gpu';
+import { createGpuContext, type GpuContext } from '@musetric/utils/gpu';
 
 let gpuContext: GpuContext | undefined = undefined;
 let promise: Promise<GpuContext> | undefined = undefined;

@@ -1,4 +1,4 @@
-import { createBlobGarbageCollector } from '@musetric/resource-utils/node';
+import { createBlobGarbageCollector } from '@musetric/utils/node';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../common/envs.js';
 

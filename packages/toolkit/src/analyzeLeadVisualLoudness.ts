@@ -1,4 +1,4 @@
-import { type Logger } from '@musetric/resource-utils';
+import { type Logger } from '@musetric/utils';
 import { analyzeLoudness, type LoudnessAnalysis } from './analyzeLoudness.js';
 import { readPcm } from './generateWavePeaks/readPcm.js';
 

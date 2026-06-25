@@ -25,13 +25,13 @@
   },
   "peerDependencies": {
     "@musetric/fft": "workspace:*",
-    "@musetric/resource-utils": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "onnxruntime-web": "1.26.0"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
-    "@musetric/resource-utils": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",

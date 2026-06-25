@@ -33,12 +33,12 @@
   },
   "peerDependencies": {
     "@musetric/fft": "workspace:*",
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
-    "@musetric/resource-utils": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

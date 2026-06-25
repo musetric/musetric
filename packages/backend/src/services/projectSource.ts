@@ -1,10 +1,10 @@
-import { defaultSampleRate, type Logger } from '@musetric/resource-utils';
-import { type BlobFile, type BlobStorage } from '@musetric/resource-utils/node';
 import {
   convertToFlac,
   flacAudioOutput,
   getAudioFrameCount,
 } from '@musetric/toolkit';
+import { defaultSampleRate, type Logger } from '@musetric/utils';
+import { type BlobFile, type BlobStorage } from '@musetric/utils/node';
 
 export type ProjectSource = BlobFile & {
   sampleRate: number;

@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isLogLevel, type LogLevel } from '@musetric/resource-utils';
+import { isLogLevel, type LogLevel } from '@musetric/utils';
 
 const rootPath = join(dirname(fileURLToPath(import.meta.url)), '../../');
 

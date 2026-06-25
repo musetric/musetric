@@ -1,4 +1,4 @@
-import { createResourceCell, parseHexColor } from '@musetric/resource-utils';
+import { createResourceCell, parseHexColor } from '@musetric/utils';
 import {
   allTrackKeys,
   type SpectrogramComparison,

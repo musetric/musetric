@@ -1,6 +1,6 @@
 import { alpha, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { subscribeResizeObserver } from '@musetric/resource-utils/dom';
+import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../../settings/store.js';
 import { getNoteMarkers } from './noteMarker.js';

@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises';
-import { type Logger, type MessageHandlers } from '@musetric/resource-utils';
+import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { vocalsModel } from '../models/vocalsModel.js';
 import {
   decodeInterleavedPcm,

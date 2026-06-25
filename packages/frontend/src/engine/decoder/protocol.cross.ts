@@ -1,4 +1,4 @@
-import { createMessageChannel } from '@musetric/resource-utils/cross/messageChannel';
+import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type DecoderRecordingChunkMessage = {
   type: 'chunk';

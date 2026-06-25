@@ -1,5 +1,5 @@
 import { type DatabaseSync } from 'node:sqlite';
-import { type BlobFile } from '@musetric/resource-utils/node';
+import { type BlobFile } from '@musetric/utils/node';
 import { z } from 'zod';
 import { transaction } from '../../common/index.js';
 import { numericIdSchema, table } from '../../schema/index.js';

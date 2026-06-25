@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/resource-utils';
+import { createResourceCell } from '@musetric/utils';
 
 export type DrawBindGroupArg = {
   arrayView: GPUTextureView;

@@ -4,7 +4,7 @@ import {
   computeBenchStats,
   defaultBenchStatsConfig,
   selectBenchRunsPerSample,
-} from '@musetric/resource-utils';
+} from '@musetric/utils';
 import {
   allFourierModes,
   allIFourierModes,

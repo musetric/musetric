@@ -1,7 +1,4 @@
-import {
-  createResourceCell,
-  type ResourceCell,
-} from '@musetric/resource-utils';
+import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FourierArg } from '../types.js';
 import { createParams, type Params } from './params.js';
 import { createPipelines, type Pipelines } from './pipeline.js';

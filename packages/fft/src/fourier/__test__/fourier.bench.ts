@@ -1,4 +1,4 @@
-import { createGpuContext } from '@musetric/resource-utils/gpu';
+import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, it } from 'vitest';
 import {
   allFourierModes,

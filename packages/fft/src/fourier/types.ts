@@ -1,4 +1,4 @@
-import { type ResourceCell } from '@musetric/resource-utils';
+import { type ResourceCell } from '@musetric/utils';
 import { type FourierConfig } from './config.es.js';
 
 export type FourierTimestampWrites = {

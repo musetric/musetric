@@ -1,7 +1,4 @@
-import {
-  createResourceCell,
-  type ResourceCell,
-} from '@musetric/resource-utils';
+import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FourierConfig, type FourierMode } from './config.es.js';
 import { fouriers } from './fouriers.js';
 import {

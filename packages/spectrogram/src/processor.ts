@@ -1,4 +1,4 @@
-import { createCallLatest } from '@musetric/resource-utils';
+import { createCallLatest } from '@musetric/utils';
 import {
   createSpectrogramProcessorTimer,
   type SpectrogramProcessorMetrics,

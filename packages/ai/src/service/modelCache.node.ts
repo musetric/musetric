@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { type MessageHandlers } from '@musetric/resource-utils';
+import { type MessageHandlers } from '@musetric/utils';
 import { leadBackingModel } from '../models/leadBackingModel.js';
 import { resolveVocalsModelUrl, vocalsModel } from '../models/vocalsModel.js';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';

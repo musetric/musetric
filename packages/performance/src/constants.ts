@@ -1,10 +1,10 @@
 import { type FourierMode } from '@musetric/fft';
-import { defaultSampleRate } from '@musetric/resource-utils';
 import {
   allTrackKeys,
   type SpectrogramZeroPaddingFactor,
   type TrackKey,
 } from '@musetric/spectrogram';
+import { defaultSampleRate } from '@musetric/utils';
 
 export const fourierModes: readonly FourierMode[] = [
   'fftPackedStockhamR2c',

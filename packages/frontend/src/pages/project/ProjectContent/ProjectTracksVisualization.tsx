@@ -1,7 +1,7 @@
 import { Box, Paper, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
-import { createNumberLimit } from '@musetric/resource-utils';
-import { createSeekDrag } from '@musetric/resource-utils/dom';
+import { createNumberLimit } from '@musetric/utils';
+import { createSeekDrag } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';

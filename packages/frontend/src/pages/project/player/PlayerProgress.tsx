@@ -1,5 +1,5 @@
 import { Box, Slider, Typography } from '@mui/material';
-import { subscribeResizeObserver } from '@musetric/resource-utils/dom';
+import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { getTrackProgress } from '../../../engine/state.js';

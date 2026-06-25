@@ -1,7 +1,4 @@
-import {
-  createResourceCell,
-  type ResourceCell,
-} from '@musetric/resource-utils';
+import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramBandSpectrum } from '../lane/index.js';
 import { createParamsCell, type StateParams } from './params.js';

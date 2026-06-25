@@ -1,5 +1,5 @@
-import { type Logger, type MessageHandlers } from '@musetric/resource-utils';
-import { spawnScript } from '@musetric/resource-utils/node';
+import { type Logger, type MessageHandlers } from '@musetric/utils';
+import { spawnScript } from '@musetric/utils/node';
 
 export type AnalyzeKeyMessage =
   | {

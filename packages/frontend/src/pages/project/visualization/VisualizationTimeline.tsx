@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { createTimelineProcessor } from '@musetric/audio/timeline';
-import { subscribeResizeObserver } from '@musetric/resource-utils/dom';
+import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';

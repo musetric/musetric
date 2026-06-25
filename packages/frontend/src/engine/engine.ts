@@ -1,5 +1,5 @@
-import { defaultSampleRate } from '@musetric/resource-utils';
 import { defaultSpectrogramConfig } from '@musetric/spectrogram';
+import { defaultSampleRate } from '@musetric/utils';
 import { createStore, type Store } from '../common/store.js';
 import {
   createEngineAudioOutput,

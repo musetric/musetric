@@ -18,7 +18,7 @@
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/backend-db`: backend data access, entities, and schema-related code.
-- `packages/resource-utils`: low-level shared utilities used across packages.
+- `packages/utils`: low-level shared utilities used across packages.
 - `packages/toolkit`: backend-oriented media and processing helpers.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.

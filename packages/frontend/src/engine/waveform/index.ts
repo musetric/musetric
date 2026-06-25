@@ -3,12 +3,12 @@ import {
   type ControlledPromise,
   createControlledPromise,
   sourceTargetLufs,
-} from '@musetric/resource-utils';
+} from '@musetric/utils';
 import {
   getCanvasSize,
   resizeCanvas,
   subscribeResizeObserver,
-} from '@musetric/resource-utils/dom';
+} from '@musetric/utils/dom';
 import { type Store } from '../../common/store.js';
 import { type EngineState } from '../state.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';

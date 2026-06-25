@@ -1,4 +1,4 @@
-import { type ComplexArray } from '@musetric/resource-utils/gpu';
+import { type ComplexArray } from '@musetric/utils/gpu';
 import { createWindowSizes } from './windowSizes.es.js';
 
 export type FourierFixture = {
