@@ -7,7 +7,7 @@ import {
 } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Logger } from '@musetric/resource-utils';
+import { type Logger } from '@musetric/utils';
 import { type Browser, chromium, type Download, type Page } from 'playwright';
 import * as vite from 'vite';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';
@@ -150,12 +150,12 @@ const createModuleServer = async (
           replacement: join(packagesRoot, 'fft/src/index.ts'),
         },
         {
-          find: '@musetric/resource-utils/gpu',
-          replacement: join(packagesRoot, 'resource-utils/src/index.gpu.ts'),
+          find: '@musetric/utils/gpu',
+          replacement: join(packagesRoot, 'utils/src/index.gpu.ts'),
         },
         {
-          find: '@musetric/resource-utils',
-          replacement: join(packagesRoot, 'resource-utils/src/index.ts'),
+          find: '@musetric/utils',
+          replacement: join(packagesRoot, 'utils/src/index.ts'),
         },
       ],
     },

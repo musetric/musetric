@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/resource-utils';
+import { createResourceCell } from '@musetric/utils';
 
 export type TimelineCanvasState = {
   context: CanvasRenderingContext2D;

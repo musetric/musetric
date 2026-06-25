@@ -1,4 +1,4 @@
-import { createThrottleTime } from '@musetric/resource-utils/cross/throttleTime';
+import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { getGpuDevice } from '../common/gpuDevice.js';
 import {
   averageMetrics,

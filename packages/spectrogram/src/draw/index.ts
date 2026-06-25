@@ -1,5 +1,5 @@
-import { type ResourceCell } from '@musetric/resource-utils';
-import { setOffscreenCanvasSize } from '@musetric/resource-utils/cross/offscreenCanvas';
+import { type ResourceCell } from '@musetric/utils';
+import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
 import { type SpectrogramConfig, type TrackKey } from '../config.cross.js';
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';

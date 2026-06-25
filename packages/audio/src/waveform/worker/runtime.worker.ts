@@ -1,8 +1,5 @@
-import {
-  type ViewSize,
-  waveformVisualPeakCeilingDb,
-} from '@musetric/resource-utils';
-import { setOffscreenCanvasSize } from '@musetric/resource-utils/cross/offscreenCanvas';
+import { type ViewSize, waveformVisualPeakCeilingDb } from '@musetric/utils';
+import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
 import { type StemType, stemTypes } from '../../common/stemType.es.js';
 import { type WaveformColors } from '../colors.es.js';
 import {

@@ -1,11 +1,11 @@
 import { type FourierMode } from '@musetric/fft';
-import { computeBenchStats, computeCvPercent } from '@musetric/resource-utils';
 import {
   createSpectrogramProcessor,
   defaultSpectrogramConfig,
   type SpectrogramConfig,
   type SpectrogramSpectralBand,
 } from '@musetric/spectrogram/gpu';
+import { computeBenchStats, computeCvPercent } from '@musetric/utils';
 import {
   benchBatchSize,
   type BenchmarkBandCount,

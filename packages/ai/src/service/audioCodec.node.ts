@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { type Logger } from '@musetric/resource-utils';
+import { type Logger } from '@musetric/utils';
 
 type RunFfmpegOptions = {
   args: string[];

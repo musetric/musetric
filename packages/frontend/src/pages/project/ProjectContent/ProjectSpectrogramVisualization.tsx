@@ -1,10 +1,10 @@
 import { Box } from '@mui/material';
-import { createMultiPointerGesture } from '@musetric/resource-utils/dom';
 import {
   maximumSpectrogramFrequency,
   minimumSpectrogramFrequency,
   minimumSpectrogramFrequencyRatio,
 } from '@musetric/spectrogram';
+import { createMultiPointerGesture } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';

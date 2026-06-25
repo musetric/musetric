@@ -1,4 +1,4 @@
-import { applyPatchConfig } from '@musetric/resource-utils';
+import { applyPatchConfig } from '@musetric/utils';
 import { buildTimelineConfig, type TimelineConfig } from './config.js';
 import { createTimelineDraw, type TimelineDraw } from './draw/index.js';
 

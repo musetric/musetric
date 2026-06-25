@@ -1,4 +1,4 @@
-import { createGpuContext } from '@musetric/resource-utils/gpu';
+import { createGpuContext } from '@musetric/utils/gpu';
 import { runBenchmark } from './runBenchmarks.js';
 import { useProcessingStore } from './store.js';
 

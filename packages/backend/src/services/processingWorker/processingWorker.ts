@@ -2,9 +2,9 @@ import {
   bindLogger,
   createEventEmitter,
   type EventEmitter,
-} from '@musetric/resource-utils';
-import { type Scheduler } from '@musetric/resource-utils/cross/scheduler';
-import { createSingleWorker } from '@musetric/resource-utils/cross/singleWorker';
+} from '@musetric/utils';
+import { type Scheduler } from '@musetric/utils/cross/scheduler';
+import { createSingleWorker } from '@musetric/utils/cross/singleWorker';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
 import { createChordsWorker } from './processingChords.js';

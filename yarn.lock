@@ -1420,7 +1420,7 @@ __metadata:
   dependencies:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@webgpu/types": "catalog:"
     eslint: "catalog:"
@@ -1430,7 +1430,7 @@ __metadata:
     vite: "catalog:"
   peerDependencies:
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     onnxruntime-web: 1.26.0
   languageName: unknown
   linkType: soft
@@ -1458,8 +1458,8 @@ __metadata:
     "@alexanderolsen/libsamplerate-js": "catalog:"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/audioworklet": "catalog:"
     "@types/node": "catalog:"
     "@webgpu/types": "catalog:"
@@ -1469,8 +1469,8 @@ __metadata:
     typescript: "catalog:"
   peerDependencies:
     "@alexanderolsen/libsamplerate-js": 2.1.2
-    "@musetric/resource-utils": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
     mediabunny: 1.35.1
     signalsmith-stretch: 1.3.2
   languageName: unknown
@@ -1481,13 +1481,13 @@ __metadata:
   resolution: "@musetric/backend-db@workspace:packages/backend-db"
   dependencies:
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
     zod: "catalog:"
   peerDependencies:
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     zod: 4.3.6
   languageName: unknown
   linkType: soft
@@ -1506,8 +1506,8 @@ __metadata:
     "@musetric/backend-db": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
     "@musetric/toolkit": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     axios: "catalog:"
     eslint: "catalog:"
@@ -1552,7 +1552,7 @@ __metadata:
   resolution: "@musetric/fft@workspace:packages/fft"
   dependencies:
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@vitest/browser": "catalog:"
     "@vitest/browser-playwright": "catalog:"
     "@webgpu/types": "catalog:"
@@ -1562,7 +1562,7 @@ __metadata:
     typescript: "catalog:"
     vitest: "catalog:"
   peerDependencies:
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -1580,9 +1580,9 @@ __metadata:
     "@musetric/audio": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
     "@musetric/spa-router": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@ncdai/react-wheel-picker": "catalog:"
     "@tanstack/react-query": "catalog:"
     "@types/audioworklet": "catalog:"
@@ -1656,8 +1656,8 @@ __metadata:
     "@musetric/audio": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@types/react": "catalog:"
     "@webgpu/types": "catalog:"
@@ -1670,19 +1670,6 @@ __metadata:
     vite: "catalog:"
     vite-plugin-mkcert: "catalog:"
     zustand: "catalog:"
-  languageName: unknown
-  linkType: soft
-
-"@musetric/resource-utils@workspace:*, @musetric/resource-utils@workspace:packages/resource-utils":
-  version: 0.0.0-use.local
-  resolution: "@musetric/resource-utils@workspace:packages/resource-utils"
-  dependencies:
-    "@musetric/eslint-config": "workspace:*"
-    "@types/node": "catalog:"
-    "@webgpu/types": "catalog:"
-    eslint: "catalog:"
-    typescript: "catalog:"
-    vitest: "catalog:"
   languageName: unknown
   linkType: soft
 
@@ -1709,14 +1696,14 @@ __metadata:
   dependencies:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@webgpu/types": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
   peerDependencies:
     "@musetric/fft": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -1725,12 +1712,25 @@ __metadata:
   resolution: "@musetric/toolkit@workspace:packages/toolkit"
   dependencies:
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
   peerDependencies:
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
+"@musetric/utils@workspace:*, @musetric/utils@workspace:packages/utils":
+  version: 0.0.0-use.local
+  resolution: "@musetric/utils@workspace:packages/utils"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@types/node": "catalog:"
+    "@webgpu/types": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+    vitest: "catalog:"
   languageName: unknown
   linkType: soft
 

@@ -1,5 +1,5 @@
-import { type Logger } from '@musetric/resource-utils';
-import { spawnScript } from '@musetric/resource-utils/node';
+import { type Logger } from '@musetric/utils';
+import { spawnScript } from '@musetric/utils/node';
 
 export type LoudnessAnalysis = {
   integratedLoudnessDb: number;

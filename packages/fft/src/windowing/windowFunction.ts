@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/resource-utils';
+import { createResourceCell } from '@musetric/utils';
 import { windowFunctions } from '../windowFunction/windowFunction.es.js';
 import { type FftWindowingConfig } from './config.js';
 

@@ -1,4 +1,4 @@
-import { createResourceCell, type ViewSize } from '@musetric/resource-utils';
+import { createResourceCell, type ViewSize } from '@musetric/utils';
 
 export const spectrogramLayerCount = 2;
 

@@ -1,15 +1,15 @@
 import { separateAudio } from '@musetric/ai/node';
 import {
-  type EventEmitter,
-  type Logger,
-  sourceTargetLufs,
-} from '@musetric/resource-utils';
-import {
   analyzeLeadVisualLoudness,
   analyzeLoudness,
   convertToFmp4,
   generateWavePeaks,
 } from '@musetric/toolkit';
+import {
+  type EventEmitter,
+  type Logger,
+  sourceTargetLufs,
+} from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
 import {

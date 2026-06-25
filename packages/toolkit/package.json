@@ -20,11 +20,11 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/resource-utils": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:"

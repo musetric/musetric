@@ -1,6 +1,6 @@
 import { mkdir, open } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { defaultSampleRate } from '@musetric/resource-utils';
+import { defaultSampleRate } from '@musetric/utils';
 
 export const wavContentType = 'audio/wav';
 

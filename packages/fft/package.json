@@ -29,11 +29,11 @@
     "bench": "node --import tsx ./scripts/bench.ts"
   },
   "peerDependencies": {
-    "@musetric/resource-utils": "workspace:*"
+    "@musetric/utils": "workspace:*"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/resource-utils": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@webgpu/types": "catalog:",

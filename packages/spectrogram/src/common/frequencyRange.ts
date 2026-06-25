@@ -1,4 +1,4 @@
-import { createNumberLimit } from '@musetric/resource-utils';
+import { createNumberLimit } from '@musetric/utils';
 
 /** C0 keeps the logarithmic scale in the musical range without negative MIDI notes */
 export const minimumSpectrogramFrequency = 16.351597831287414;

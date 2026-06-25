@@ -1,6 +1,6 @@
 import { api } from '@musetric/api';
 import { fastifyRoute } from '@musetric/api/node';
-import { bindLogger } from '@musetric/resource-utils';
+import { bindLogger } from '@musetric/utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
 import { envs } from '../common/envs.js';

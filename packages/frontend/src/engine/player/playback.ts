@@ -8,7 +8,7 @@ import {
   type ControlledPromise,
   createControlledPromise,
   nextNumber,
-} from '@musetric/resource-utils';
+} from '@musetric/utils';
 import { type Store } from '../../common/store.js';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineState } from '../state.js';

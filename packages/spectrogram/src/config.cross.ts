@@ -1,5 +1,5 @@
 import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
-import { createObjectKeys, type ViewSize } from '@musetric/resource-utils';
+import { createObjectKeys, type ViewSize } from '@musetric/utils';
 import { type SpectrogramColors } from './common/colors.es.js';
 import { extractConfig } from './common/config.es.js';
 

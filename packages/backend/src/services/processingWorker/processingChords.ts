@@ -1,5 +1,5 @@
-import { type EventEmitter, type Logger } from '@musetric/resource-utils';
 import { analyzeChords } from '@musetric/toolkit';
+import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
 import {

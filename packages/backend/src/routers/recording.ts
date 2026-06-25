@@ -3,12 +3,12 @@ import { type FileHandle, mkdir, open, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { type WebSocket } from '@fastify/websocket';
 import { api } from '@musetric/api';
-import { bindLogger, nextNumber } from '@musetric/resource-utils';
 import {
   emptyWavePeaksBuffer,
   generateWavePeaks,
   wavePeakCount,
 } from '@musetric/toolkit';
+import { bindLogger, nextNumber } from '@musetric/utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
 import { envs } from '../common/envs.js';

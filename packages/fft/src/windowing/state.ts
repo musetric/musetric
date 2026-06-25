@@ -1,7 +1,4 @@
-import {
-  createResourceCell,
-  type ResourceCell,
-} from '@musetric/resource-utils';
+import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FftWindowingConfig } from './config.js';
 import { createParamsCell, type StateParams } from './params.js';
 import {

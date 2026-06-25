@@ -1,4 +1,4 @@
-import { defaultSampleRate } from '@musetric/resource-utils';
+import { defaultSampleRate } from '@musetric/utils';
 import {
   type SpectrogramConfig,
   type SpectrogramSpectralBand,

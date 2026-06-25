@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/resource-utils';
+import { createResourceCell } from '@musetric/utils';
 import { createPipeline } from './pipeline.js';
 
 export type CanvasState = {

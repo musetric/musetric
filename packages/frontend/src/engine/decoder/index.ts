@@ -1,8 +1,8 @@
 import {
   type ControlledPromise,
   createControlledPromise,
-} from '@musetric/resource-utils';
-import { createLazyMount } from '@musetric/resource-utils/cross/lazyMount';
+} from '@musetric/utils';
+import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../../common/store.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
