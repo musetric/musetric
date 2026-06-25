@@ -1,7 +1,4 @@
-import {
-  createFourierCell,
-  createSpectrogramWindowingCell,
-} from '@musetric/fft/gpu';
+import { createFourierCell } from '@musetric/fft/gpu';
 import {
   createResourceCell,
   type ResourceCell,
@@ -47,8 +44,8 @@ export type SpectrogramLane = {
     trackProgress: number,
     work: SpectrogramLaneWork,
   ) => void;
+  clearSignal: (encoder: GPUCommandEncoder, work: SpectrogramLaneWork) => void;
   dispatchSliceSamples: SpectrogramLaneDispatch;
-  dispatchWindowing: SpectrogramLaneDispatch;
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
   dispatchDecibelify: SpectrogramLaneDispatch;
@@ -66,8 +63,8 @@ type BandSpectrumPipeline = {
   columnEnergyBuffer: GPUBuffer;
   windowSize: number;
   writeSamples: (samples: Float32Array, trackProgress: number) => void;
+  clearSignal: (encoder: GPUCommandEncoder) => void;
   dispatchSliceSamples: (pass: GPUComputePassEncoder) => void;
-  dispatchWindowing: (pass: GPUComputePassEncoder) => void;
   dispatchFourier: (pass: GPUComputePassEncoder) => void;
   dispatchMagnitudify: (pass: GPUComputePassEncoder) => void;
   dispatchDecibelEnergy: (pass: GPUComputePassEncoder) => void;
@@ -117,7 +114,6 @@ const createBandSpectrumCell = (
 ): ResourceCell<BandSpectrumCellArg, BandSpectrumPipeline> => {
   const signalCell = createSignalBufferCell(device);
   const sliceSamplesCell = createSpectrogramSliceSamplesCell(device);
-  const windowingCell = createSpectrogramWindowingCell(device);
   const fourierCell = createFourierCell(device);
   const magnitudifyCell = createSpectrogramMagnitudifyCell(device);
   const decibelifyCell = createSpectrogramDecibelifyCell(device);
@@ -134,10 +130,6 @@ const createBandSpectrumCell = (
         out: signal,
         config: bandConfig,
         sampleOffset: getSpectralBandSampleOffset(config, band),
-      });
-      const windowing = windowingCell.get({
-        signal,
-        config: bandConfig,
       });
       const fourier = fourierCell.get({
         signal,
@@ -166,7 +158,11 @@ const createBandSpectrumCell = (
           );
         },
         dispatchSliceSamples: sliceSamples.dispatch,
-        dispatchWindowing: windowing.dispatch,
+        clearSignal: (encoder) => {
+          if (bandConfig.zeroPaddingFactor > 1) {
+            encoder.clearBuffer(signal);
+          }
+        },
         dispatchFourier: fourier.dispatch,
         dispatchMagnitudify: magnitudify.dispatch,
         dispatchDecibelEnergy: decibelify.dispatchEnergy,
@@ -205,7 +201,6 @@ const createBandSpectrumCell = (
       decibelifyCell.dispose();
       magnitudifyCell.dispose();
       fourierCell.dispose();
-      windowingCell.dispose();
       sliceSamplesCell.dispose();
       signalCell.dispose();
     },
@@ -218,7 +213,6 @@ export const createSpectrogramLaneCell = (
 ): SpectrogramLaneCell => {
   const signalCell = createSignalBufferCell(device);
   const sliceSamplesCell = createSpectrogramSliceSamplesCell(device);
-  const windowingCell = createSpectrogramWindowingCell(device);
   const fourierCell = createFourierCell(device);
   const magnitudifyCell = createSpectrogramMagnitudifyCell(device);
   const decibelifyCell = createSpectrogramDecibelifyCell(device);
@@ -248,7 +242,6 @@ export const createSpectrogramLaneCell = (
         config,
         sampleOffset: 0,
       });
-      const windowing = windowingCell.get({ signal, config });
       const fourier = fourierCell.get({ signal, config });
       const magnitudify = magnitudifyCell.get({ signal, config });
       const decibelify = decibelifyCell.get({
@@ -273,7 +266,11 @@ export const createSpectrogramLaneCell = (
           );
         },
         dispatchSliceSamples: sliceSamples.dispatch,
-        dispatchWindowing: windowing.dispatch,
+        clearSignal: (encoder) => {
+          if (config.zeroPaddingFactor > 1) {
+            encoder.clearBuffer(signal);
+          }
+        },
         dispatchFourier: fourier.dispatch,
         dispatchMagnitudify: magnitudify.dispatch,
         dispatchDecibelEnergy: decibelify.dispatchEnergy,
@@ -364,14 +361,14 @@ export const createSpectrogramLaneCell = (
             pipeline.writeSamples(samples, trackProgress);
           });
         },
+        clearSignal: (encoder, work) => {
+          forEachWorkPipeline(work, (pipeline) => {
+            pipeline.clearSignal(encoder);
+          });
+        },
         dispatchSliceSamples: (pass, work) => {
           forEachWorkPipeline(work, (pipeline) => {
             pipeline.dispatchSliceSamples(pass);
-          });
-        },
-        dispatchWindowing: (pass, work) => {
-          forEachWorkPipeline(work, (pipeline) => {
-            pipeline.dispatchWindowing(pass);
           });
         },
         dispatchFourierTransform: (pass, work) => {
@@ -436,7 +433,6 @@ export const createSpectrogramLaneCell = (
       decibelifyCell.dispose();
       magnitudifyCell.dispose();
       fourierCell.dispose();
-      windowingCell.dispose();
       sliceSamplesCell.dispose();
       signalCell.dispose();
     },

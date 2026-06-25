@@ -6,7 +6,6 @@ import {
 
 export const spectrumStages = [
   'sliceSamples',
-  'windowing',
   'fourierTransform',
   'magnitudify',
   'decibelify',
@@ -28,7 +27,7 @@ type CpuRootLabel = (typeof cpuRootLabels)[number];
 const gpuRootLabels = ['draw'] as const;
 type GpuRootLabel = (typeof gpuRootLabels)[number];
 
-type GpuLabel = GpuRootLabel | SpectrumStage | AggregateStage;
+export type GpuLabel = GpuRootLabel | SpectrumStage | AggregateStage;
 
 export type SpectrogramTimerLabel =
   | CpuRootLabel
@@ -77,7 +76,7 @@ export type SpectrogramMarkers = {
   createCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
   submitCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
   total: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  getGpuMarker: (label: string) => GPUComputePassTimestampWrites | undefined;
+  getGpuMarker: (label: GpuLabel) => GPUComputePassTimestampWrites | undefined;
 };
 
 export type SpectrogramProcessorTimer = {
@@ -139,11 +138,7 @@ export const createSpectrogramProcessorTimer = (
 
   const markers: SpectrogramMarkers = {
     ...cpu.markers,
-    getGpuMarker: (label) =>
-      Object.entries(gpu.markers).find((entry) => {
-        const [key] = entry;
-        return key === label;
-      })?.[1],
+    getGpuMarker: (label) => gpu.markers[label],
   };
 
   return {

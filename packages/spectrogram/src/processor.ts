@@ -18,10 +18,15 @@ import { type SpectrogramLaneWork } from './lane/index.js';
 
 export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
 
+export type SpectrogramRenderOptions = {
+  dirtyTracks?: readonly TrackKey[];
+};
+
 export type SpectrogramProcessor = {
   render: (
     samples: SpectrogramSamples,
     trackProgress: number,
+    options?: SpectrogramRenderOptions,
   ) => Promise<boolean>;
   updateConfig: (config: Partial<SpectrogramConfig>) => void;
   dispose: () => void;
@@ -43,6 +48,22 @@ const createTrackFlags = (): Record<TrackKey, boolean> =>
     {} as Record<TrackKey, boolean>,
   );
 
+const createTrackSelection = (
+  dirtyTracks?: readonly TrackKey[],
+): Record<TrackKey, boolean> => {
+  const selection = createTrackFlags();
+  if (!dirtyTracks) {
+    for (const key of allTrackKeys) {
+      selection[key] = true;
+    }
+    return selection;
+  }
+  for (const key of dirtyTracks) {
+    selection[key] = true;
+  }
+  return selection;
+};
+
 const createTrackWork = (
   runtime: SpectrogramRuntime,
 ): Record<TrackKey, SpectrogramLaneWork> =>
@@ -62,6 +83,7 @@ const createTrackWork = (
 const dispatchSpectrumStage = (
   encoder: GPUCommandEncoder,
   options: {
+    dirty: Record<TrackKey, boolean>;
     marker?: GPUComputePassTimestampWrites;
     presence: Record<TrackKey, boolean>;
     runtime: SpectrogramRuntime;
@@ -69,13 +91,23 @@ const dispatchSpectrumStage = (
     work: Record<TrackKey, SpectrogramLaneWork>;
   },
 ) => {
-  const { marker, presence, runtime, stage, work } = options;
+  const { dirty, marker, presence, runtime, stage, work } = options;
+  const hasWork = allTrackKeys.some((key) => {
+    if (!presence[key] || !dirty[key]) {
+      return false;
+    }
+    const trackWork = work[key];
+    return trackWork.spectrogram || trackWork.fundamental;
+  });
+  if (!hasWork && !marker) {
+    return;
+  }
   const pass = encoder.beginComputePass({
     label: `${stage}-pass`,
     timestampWrites: marker,
   });
   for (const key of allTrackKeys) {
-    if (!presence[key]) {
+    if (!presence[key] || !dirty[key]) {
       continue;
     }
     const trackWork = work[key];
@@ -85,9 +117,6 @@ const dispatchSpectrumStage = (
     const { lane } = runtime.tracks[key];
     if (stage === 'sliceSamples') {
       lane.dispatchSliceSamples(pass, trackWork);
-    }
-    if (stage === 'windowing') {
-      lane.dispatchWindowing(pass, trackWork);
     }
     if (stage === 'fourierTransform') {
       lane.dispatchFourierTransform(pass, trackWork);
@@ -105,18 +134,30 @@ const dispatchSpectrumStage = (
 const dispatchFundamentalFrequency = (
   encoder: GPUCommandEncoder,
   options: {
+    dirty: Record<TrackKey, boolean>;
     marker?: GPUComputePassTimestampWrites;
     presence: Record<TrackKey, boolean>;
     runtime: SpectrogramRuntime;
   },
 ) => {
-  const { marker, presence, runtime } = options;
+  const { dirty, marker, presence, runtime } = options;
+  const hasWork = allTrackKeys.some(
+    (key) =>
+      presence[key] && dirty[key] && runtime.config.lanes[key].showFundamental,
+  );
+  if (!hasWork && !marker) {
+    return;
+  }
   const pass = encoder.beginComputePass({
     label: 'fundamentalFrequency-pass',
     timestampWrites: marker,
   });
   for (const key of allTrackKeys) {
-    if (presence[key] && runtime.config.lanes[key].showFundamental) {
+    if (
+      presence[key] &&
+      dirty[key] &&
+      runtime.config.lanes[key].showFundamental
+    ) {
       runtime.tracks[key].lane.dispatchFundamentalFrequency(pass);
     }
   }
@@ -127,12 +168,21 @@ const dispatchRemap = (
   encoder: GPUCommandEncoder,
   options: {
     clearMissing: Record<TrackKey, boolean>;
+    dirty: Record<TrackKey, boolean>;
     marker?: GPUComputePassTimestampWrites;
     presence: Record<TrackKey, boolean>;
     runtime: SpectrogramRuntime;
   },
 ) => {
-  const { clearMissing, marker, presence, runtime } = options;
+  const { clearMissing, dirty, marker, presence, runtime } = options;
+  const hasWork = allTrackKeys.some(
+    (key) =>
+      runtime.config.lanes[key].showSpectrogram &&
+      ((presence[key] && dirty[key]) || clearMissing[key]),
+  );
+  if (!hasWork && !marker) {
+    return;
+  }
   const pass = encoder.beginComputePass({
     label: 'remap-pass',
     timestampWrites: marker,
@@ -141,7 +191,7 @@ const dispatchRemap = (
     if (!runtime.config.lanes[key].showSpectrogram) {
       continue;
     }
-    if (!presence[key] && !clearMissing[key]) {
+    if (!((presence[key] && dirty[key]) || clearMissing[key])) {
       continue;
     }
     runtime.tracks[key].remap?.dispatch(pass);
@@ -165,12 +215,17 @@ export const createSpectrogramProcessor = (
       runtime: SpectrogramRuntime,
       samples: SpectrogramSamples,
       trackProgress: number,
+      dirty: Record<TrackKey, boolean>,
       work: Record<TrackKey, SpectrogramLaneWork>,
     ) => {
       for (const key of allTrackKeys) {
         const trackSamples = samples[key];
         const trackWork = work[key];
-        if (trackSamples && (trackWork.spectrogram || trackWork.fundamental)) {
+        if (
+          trackSamples &&
+          dirty[key] &&
+          (trackWork.spectrogram || trackWork.fundamental)
+        ) {
           runtime.tracks[key].lane.writeSamples(
             trackSamples,
             trackProgress,
@@ -183,6 +238,7 @@ export const createSpectrogramProcessor = (
   const createCommand = markers.createCommand(
     (
       runtime: SpectrogramRuntime,
+      dirty: Record<TrackKey, boolean>,
       presence: Record<TrackKey, boolean>,
       clearMissing: Record<TrackKey, boolean>,
       work: Record<TrackKey, SpectrogramLaneWork>,
@@ -195,8 +251,19 @@ export const createSpectrogramProcessor = (
           runtime.tracks[key].lane.clear(encoder);
         }
       }
+      for (const key of allTrackKeys) {
+        if (!presence[key] || !dirty[key]) {
+          continue;
+        }
+        const trackWork = work[key];
+        if (!trackWork.spectrogram && !trackWork.fundamental) {
+          continue;
+        }
+        runtime.tracks[key].lane.clearSignal(encoder, trackWork);
+      }
       for (const stage of spectrumStages) {
         dispatchSpectrumStage(encoder, {
+          dirty,
           marker: markers.getGpuMarker(stage),
           presence,
           runtime,
@@ -205,12 +272,14 @@ export const createSpectrogramProcessor = (
         });
       }
       dispatchFundamentalFrequency(encoder, {
+        dirty,
         marker: markers.getGpuMarker('fundamentalFrequency'),
         presence,
         runtime,
       });
       dispatchRemap(encoder, {
         clearMissing,
+        dirty,
         marker: markers.getGpuMarker('remap'),
         presence,
         runtime,
@@ -231,25 +300,38 @@ export const createSpectrogramProcessor = (
   const lastRendered: Record<TrackKey, boolean> = createTrackFlags();
 
   const render = markers.total(
-    async (samples: SpectrogramSamples, trackProgress: number) => {
+    async (
+      samples: SpectrogramSamples,
+      trackProgress: number,
+      renderOptions?: SpectrogramRenderOptions,
+    ) => {
       const runtime = configurator.configure();
       if (!runtime) {
         return false;
       }
       timer.configure();
       const work = createTrackWork(runtime);
-      writeBuffers(runtime, samples, trackProgress, work);
+      const dirty = createTrackSelection(renderOptions?.dirtyTracks);
       const presence: Record<TrackKey, boolean> = createTrackFlags();
       const clearMissing: Record<TrackKey, boolean> = createTrackFlags();
       for (const key of allTrackKeys) {
         const has = samples[key] !== undefined;
         presence[key] = has;
-        clearMissing[key] = !has && lastRendered[key];
+        clearMissing[key] = dirty[key] && !has && lastRendered[key];
       }
-      const command = createCommand(runtime, presence, clearMissing, work);
+      writeBuffers(runtime, samples, trackProgress, dirty, work);
+      const command = createCommand(
+        runtime,
+        dirty,
+        presence,
+        clearMissing,
+        work,
+      );
       await submitCommand(command);
       for (const key of allTrackKeys) {
-        lastRendered[key] = presence[key];
+        if (dirty[key] || clearMissing[key]) {
+          lastRendered[key] = presence[key];
+        }
       }
       return true;
     },

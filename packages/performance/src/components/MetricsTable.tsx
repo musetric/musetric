@@ -24,7 +24,6 @@ const rowLabels: SpectrogramTimerLabel[] = [
   'submitCommand',
   'draw',
   'sliceSamples',
-  'windowing',
   'fourierTransform',
   'magnitudify',
   'decibelify',

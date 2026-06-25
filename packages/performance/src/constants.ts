@@ -1,19 +1,25 @@
 import { type FourierMode } from '@musetric/fft';
 import { defaultSampleRate } from '@musetric/resource-utils';
-import { type SpectrogramZeroPaddingFactor } from '@musetric/spectrogram';
+import {
+  allTrackKeys,
+  type SpectrogramZeroPaddingFactor,
+  type TrackKey,
+} from '@musetric/spectrogram';
 
 export const fourierModes: readonly FourierMode[] = [
   'fftPackedStockhamR2c',
   'fftPackedTiledR2c',
 ];
 
-export const warmupIters = 10;
-export const measureIters = 30;
+export const warmupIters = 3;
+export const benchBatchSize = 10;
+export const benchMaxTries = 10;
+export const benchStableCvPercent = 5;
 export const progress = 0.5;
 
 const getWindowSizes = () => {
   const sizes: number[] = [];
-  for (let size = 64; size <= 1024 * 8; size *= 2) {
+  for (let size = 256; size <= 1024 * 8; size *= 2) {
     sizes.push(size);
   }
   return sizes;
@@ -35,6 +41,15 @@ export const viewSizePresetKeys: readonly ViewSizePresetKey[] = [
 export const visibleTimes = [1, 4, 16] as const;
 export type VisibleTime = (typeof visibleTimes)[number];
 
+export type BenchmarkTrackScope = 'all' | TrackKey;
+export const benchmarkTrackScopes: readonly BenchmarkTrackScope[] = [
+  'all',
+  ...allTrackKeys,
+];
+
+export type BenchmarkBandCount = 1 | 3;
+export const benchmarkBandCounts: readonly BenchmarkBandCount[] = [1, 3];
+
 export const zeroPaddingFactors = [
   1, 2, 4,
 ] as const satisfies readonly SpectrogramZeroPaddingFactor[];
@@ -42,13 +57,19 @@ export const zeroPaddingFactors = [
 export type BenchmarkParams = {
   viewSizeKey: ViewSizePresetKey;
   visibleTime: VisibleTime;
+  trackScope: BenchmarkTrackScope;
+  recordingSpectrogram: boolean;
   zeroPaddingFactor: SpectrogramZeroPaddingFactor;
+  bandCount: BenchmarkBandCount;
 };
 
 export const defaultBenchmarkParams: BenchmarkParams = {
   viewSizeKey: '1080p',
   visibleTime: 4,
-  zeroPaddingFactor: 1,
+  trackScope: 'all',
+  recordingSpectrogram: false,
+  zeroPaddingFactor: 2,
+  bandCount: 3,
 };
 
 const createSamples = () => {

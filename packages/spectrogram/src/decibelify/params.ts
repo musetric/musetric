@@ -6,6 +6,7 @@ export type DecibelifyParams = {
   windowCount: number;
   decibelFactor: number;
   gain: number;
+  gainOverReferenceMagnitude: number;
   gateFloorDb: number;
   gateRangeDb: number;
 };
@@ -18,14 +19,19 @@ export type DecibelifyParamsArg = {
 const gateFloorDb = -64;
 const gateRangeDb = 24;
 
-const toParams = (arg: DecibelifyParamsArg): DecibelifyParams => ({
-  halfSize: (arg.config.windowSize * arg.config.zeroPaddingFactor) / 2,
-  windowCount: arg.config.windowCount,
-  decibelFactor: (20 * Math.LOG10E) / -arg.config.minDecibel,
-  gain: 10 ** (arg.gainDb / 20),
-  gateFloorDb,
-  gateRangeDb,
-});
+const toParams = (arg: DecibelifyParamsArg): DecibelifyParams => {
+  const halfSize = (arg.config.windowSize * arg.config.zeroPaddingFactor) / 2;
+  const gain = 10 ** (arg.gainDb / 20);
+  return {
+    halfSize,
+    windowCount: arg.config.windowCount,
+    decibelFactor: (20 * Math.LOG10E) / -arg.config.minDecibel,
+    gain,
+    gainOverReferenceMagnitude: gain / Math.sqrt(halfSize),
+    gateFloorDb,
+    gateRangeDb,
+  };
+};
 
 export type StateParams = {
   value: DecibelifyParams;
@@ -36,13 +42,14 @@ export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: DecibelifyParamsArg): StateParams => {
       const value = toParams(arg);
-      const array = new DataView(new ArrayBuffer(24));
+      const array = new DataView(new ArrayBuffer(32));
       array.setUint32(0, value.halfSize, true);
       array.setUint32(4, value.windowCount, true);
       array.setFloat32(8, value.decibelFactor, true);
       array.setFloat32(12, value.gain, true);
-      array.setFloat32(16, value.gateFloorDb, true);
-      array.setFloat32(20, value.gateRangeDb, true);
+      array.setFloat32(16, value.gainOverReferenceMagnitude, true);
+      array.setFloat32(20, value.gateFloorDb, true);
+      array.setFloat32(24, value.gateRangeDb, true);
 
       const buffer = device.createBuffer({
         label: 'decibelify-params-buffer',

@@ -26,8 +26,8 @@ export const createSpectrogramSliceSamplesCell = (
       const state = stateCell.get(arg);
 
       const dispatch = (pass: GPUComputePassEncoder) => {
-        const { paddedWindowSize, windowCount } = state.params.value;
-        const xGroups = Math.ceil(paddedWindowSize / workgroupSize);
+        const { windowSize, windowCount } = state.params.value;
+        const xGroups = Math.ceil(windowSize / workgroupSize);
         pass.setPipeline(state.pipeline);
         pass.setBindGroup(0, state.bindGroup);
         pass.dispatchWorkgroups(xGroups, windowCount);
@@ -35,6 +35,10 @@ export const createSpectrogramSliceSamplesCell = (
 
       return {
         run: (encoder) => {
+          const { paddedWindowSize, windowSize } = state.params.value;
+          if (paddedWindowSize > windowSize) {
+            encoder.clearBuffer(state.out);
+          }
           const pass = encoder.beginComputePass({
             label: 'slice-samples-pass',
             timestampWrites: marker,

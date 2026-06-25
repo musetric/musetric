@@ -7,11 +7,11 @@ import {
   benchConfig,
   benchMaxTries,
   benchStableCvPercent,
-  computeBenchStats,
   createBenchTimestamp,
   createBenchWave,
   type FourierBenchSummary,
-  selectBenchRunsPerSample,
+  fourierComputeStats,
+  fourierSelectRunsPerSample,
 } from '../src/fourier/__test__/bench.es.js';
 
 const cudaSuccess = 0;
@@ -392,13 +392,13 @@ const measureOne = (
       }
 
       if (tryIndex === 0) {
-        runsPerSample = selectBenchRunsPerSample(batch);
+        runsPerSample = fourierSelectRunsPerSample(batch);
         continue;
       }
 
       values.push(...batch);
 
-      const { cv } = computeBenchStats(values);
+      const { cv } = fourierComputeStats(values);
 
       if (cv <= benchStableCvPercent) {
         console.log(`cuFFT ${windowCount} ${windowSize} cv=${cv.toFixed(1)}%`);
@@ -410,7 +410,7 @@ const measureOne = (
       );
     }
 
-    return computeBenchStats(values);
+    return fourierComputeStats(values);
   } finally {
     cufftDestroy(plan[0]);
     cudaFree(deviceInput[0]);

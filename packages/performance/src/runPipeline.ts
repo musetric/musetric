@@ -1,12 +1,17 @@
 import { type FourierMode } from '@musetric/fft';
+import { computeBenchStats, computeCvPercent } from '@musetric/resource-utils';
 import {
   createSpectrogramProcessor,
   defaultSpectrogramConfig,
   type SpectrogramConfig,
+  type SpectrogramSpectralBand,
 } from '@musetric/spectrogram/gpu';
 import {
+  benchBatchSize,
+  type BenchmarkBandCount,
   type BenchmarkParams,
-  measureIters,
+  benchMaxTries,
+  benchStableCvPercent,
   progress,
   recordingSamples,
   samples,
@@ -24,17 +29,61 @@ export type RunPipelineOptions = {
 
 type Spread = { low: number; high: number };
 
-const quantile = (sorted: number[], q: number): number => {
-  if (sorted.length === 0) return 0;
-  if (sorted.length === 1) return sorted[0] ?? 0;
-  const pos = (sorted.length - 1) * q;
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  const loVal = sorted[lo] ?? 0;
-  const hiVal = sorted[hi] ?? 0;
-  if (lo === hi) return loVal;
-  return loVal + (hiVal - loVal) * (pos - lo);
+const createSpectralBands = (
+  windowSize: number,
+  bandCount: BenchmarkBandCount,
+): SpectrogramSpectralBand[] => {
+  if (bandCount === 1) {
+    return [
+      {
+        label: `${windowSize}`,
+        windowSize,
+        minFrequency: 120,
+        fullMinFrequency: 120,
+        fullMaxFrequency: 4000,
+        maxFrequency: 4000,
+      },
+    ];
+  }
+  const half = windowSize / 2;
+  const quarter = windowSize / 4;
+  return [
+    {
+      label: `${windowSize}`,
+      windowSize,
+      minFrequency: 20,
+      fullMinFrequency: 20,
+      fullMaxFrequency: 300,
+      maxFrequency: 900,
+    },
+    {
+      label: `${half}`,
+      windowSize: half,
+      minFrequency: 300,
+      fullMinFrequency: 900,
+      fullMaxFrequency: 2200,
+      maxFrequency: 4200,
+    },
+    {
+      label: `${quarter}`,
+      windowSize: quarter,
+      minFrequency: 2200,
+      fullMinFrequency: 4200,
+      fullMaxFrequency: 20_000,
+      maxFrequency: 20_000,
+    },
+  ];
 };
+
+const benchStatsConfig = {
+  batchSize: benchBatchSize,
+  maxTries: benchMaxTries,
+  stableCvPercent: benchStableCvPercent,
+  targetSampleMs: 1,
+  maxRunsPerSample: 1,
+  stableSampleWindow: benchBatchSize * 3,
+  trimFraction: 0.1,
+} as const;
 
 export const runPipeline = async (
   options: RunPipelineOptions,
@@ -53,16 +102,7 @@ export const runPipeline = async (
     windowSize,
     visibleTime: params.visibleTime,
     zeroPaddingFactor: params.zeroPaddingFactor,
-    spectralBands: [
-      {
-        label: `${windowSize}`,
-        windowSize,
-        minFrequency: 120,
-        fullMinFrequency: 120,
-        fullMaxFrequency: 4000,
-        maxFrequency: 4000,
-      },
-    ],
+    spectralBands: createSpectralBands(windowSize, params.bandCount),
     viewSize: {
       width: viewSize.width,
       height: viewSize.height,
@@ -75,7 +115,7 @@ export const runPipeline = async (
       },
       recording: {
         ...defaultSpectrogramConfig.lanes.recording,
-        showSpectrogram: true,
+        showSpectrogram: params.recordingSpectrogram,
         showFundamental: true,
       },
     },
@@ -86,34 +126,64 @@ export const runPipeline = async (
     onMetrics: (metrics) => metricsArray.push(metrics),
   });
 
-  const totalIters = warmupIters + measureIters;
-  for (let i = 0; i < totalIters; i++) {
+  const renderOptions =
+    params.trackScope === 'all'
+      ? undefined
+      : { dirtyTracks: [params.trackScope] };
+
+  if (renderOptions) {
     await processor.render(
       { lead: samples, recording: recordingSamples },
       progress,
     );
+    metricsArray.length = 0;
   }
+
+  for (let i = 0; i < warmupIters; i++) {
+    await processor.render(
+      { lead: samples, recording: recordingSamples },
+      progress,
+      renderOptions,
+    );
+  }
+  metricsArray.length = 0;
+
+  for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
+    for (let i = 0; i < benchBatchSize; i++) {
+      await processor.render(
+        { lead: samples, recording: recordingSamples },
+        progress,
+        renderOptions,
+      );
+    }
+
+    const totals = metricsArray.map((m) => m.total);
+    const { cv } = computeBenchStats(totals, benchStatsConfig);
+
+    if (cv <= benchStableCvPercent) {
+      break;
+    }
+  }
+
   processor.dispose();
 
   const first = metricsArray[0] ?? {};
-  const measured = metricsArray.slice(warmupIters);
   const keys = Object.keys(first);
 
   const median: Record<string, number> = {};
   const spread: Record<string, Spread> = {};
 
   for (const key of keys) {
-    const values = measured
-      .map((metrics) => metrics[key] ?? 0)
+    const values = metricsArray.map((m) => m[key]);
+    const stats = computeBenchStats(values, benchStatsConfig);
+    median[key] = stats.mean;
+
+    const sorted = values
+      .filter((v) => Number.isFinite(v) && v >= 0)
       .sort((a, b) => a - b);
-    const p25 = quantile(values, 0.25);
-    const p50 = quantile(values, 0.5);
-    const p75 = quantile(values, 0.75);
-    median[key] = p50;
-    spread[key] = {
-      low: Math.max(0, p50 - p25),
-      high: Math.max(0, p75 - p50),
-    };
+    const cv = computeCvPercent(sorted);
+    const halfRange = (stats.mean * cv) / 100 / 2;
+    spread[key] = { low: halfRange, high: halfRange };
   }
 
   return { first, median, spread };

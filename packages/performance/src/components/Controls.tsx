@@ -13,6 +13,10 @@ import {
 import { type SpectrogramZeroPaddingFactor } from '@musetric/spectrogram';
 import { type FC } from 'react';
 import {
+  type BenchmarkBandCount,
+  benchmarkBandCounts,
+  type BenchmarkTrackScope,
+  benchmarkTrackScopes,
   fourierModes,
   type ViewSizePresetKey,
   viewSizePresetKeys,
@@ -55,6 +59,20 @@ export const Controls: FC = () => {
     const match = zeroPaddingFactors.find((v) => v === numeric);
     if (match === undefined) return;
     setParam('zeroPaddingFactor', match);
+  };
+  const onTrackScopeChange = (
+    event: SelectChangeEvent<BenchmarkTrackScope>,
+  ) => {
+    const raw = event.target.value;
+    const match = benchmarkTrackScopes.find((v) => v === raw);
+    if (match === undefined) return;
+    setParam('trackScope', match);
+  };
+  const onBandCountChange = (event: SelectChangeEvent<BenchmarkBandCount>) => {
+    const numeric = Number(event.target.value);
+    const match = benchmarkBandCounts.find((v) => v === numeric);
+    if (match === undefined) return;
+    setParam('bandCount', match);
   };
 
   return (
@@ -111,6 +129,36 @@ export const Controls: FC = () => {
         </Select>
       </FormControl>
 
+      <FormControl size='small' sx={{ minWidth: 130 }}>
+        <InputLabel>trackScope</InputLabel>
+        <Select<BenchmarkTrackScope>
+          label='trackScope'
+          value={params.trackScope}
+          onChange={onTrackScopeChange}
+        >
+          {benchmarkTrackScopes.map((value) => (
+            <MenuItem key={value} value={value}>
+              {value}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl size='small' sx={{ minWidth: 110 }}>
+        <InputLabel>bands</InputLabel>
+        <Select<BenchmarkBandCount>
+          label='bands'
+          value={params.bandCount}
+          onChange={onBandCountChange}
+        >
+          {benchmarkBandCounts.map((value) => (
+            <MenuItem key={value} value={value}>
+              {value === 1 ? '1 band' : '3 bands'}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
       <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
         <FormControlLabel
           control={
@@ -138,6 +186,17 @@ export const Controls: FC = () => {
             />
           }
           label='Show spread'
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={params.recordingSpectrogram}
+              onClick={() =>
+                setParam('recordingSpectrogram', !params.recordingSpectrogram)
+              }
+            />
+          }
+          label='Recording spectrogram'
         />
       </Box>
 

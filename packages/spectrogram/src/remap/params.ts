@@ -9,6 +9,7 @@ export type RemapBandParams = {
   fullMinFrequency: number;
   fullMaxFrequency: number;
   maxFrequency: number;
+  inverseReferenceMagnitude: number;
 };
 
 export type RemapParams = {
@@ -71,6 +72,7 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
       fullMinFrequency: spectrum.band.fullMinFrequency,
       fullMaxFrequency: spectrum.band.fullMaxFrequency,
       maxFrequency: spectrum.band.maxFrequency,
+      inverseReferenceMagnitude: 1 / Math.sqrt(spectrum.windowSize / 2),
     })),
   };
 };
@@ -129,6 +131,7 @@ export const createParamsCell = (device: GPUDevice) =>
         array.setFloat32(offset + 12, band.fullMinFrequency, true);
         array.setFloat32(offset + 16, band.fullMaxFrequency, true);
         array.setFloat32(offset + 20, band.maxFrequency, true);
+        array.setFloat32(offset + 24, band.inverseReferenceMagnitude, true);
       });
 
       const buffer = device.createBuffer({

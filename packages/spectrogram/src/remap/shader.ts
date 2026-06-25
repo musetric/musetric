@@ -1,6 +1,6 @@
 const createSpectrumBindings = (spectrumCount: number) =>
   Array.from({ length: spectrumCount }, (_, index) => {
-    const rawMagnitudeBinding = 3 + index * 2;
+    const rawMagnitudeBinding = 4 + index * 2;
     const columnEnergyBinding = rawMagnitudeBinding + 1;
     return [
       `@group(0) @binding(${rawMagnitudeBinding}) var<storage, read> rawMagnitude${index}: array<f32>;`,
@@ -16,6 +16,7 @@ const createSpectrumSampling = (spectrumCount: number) =>
   let band${index}b = params.bands[${paramsIndex + 1}];
   let windowSize${index} = band${index}a.x;
   let halfSize${index} = band${index}a.y;
+  let referenceScale${index} = gain * band${index}b.z;
   let rawIndex${index} = (frequency / sampleRate) * windowSize${index};
   let clampedIndex${index} = clamp(rawIndex${index}, 0.0, halfSize${index} - 1.0);
   let lowerIndex${index} = u32(floor(clampedIndex${index}));
@@ -24,12 +25,11 @@ const createSpectrumSampling = (spectrumCount: number) =>
   let offset${index} = x * u32(halfSize${index});
   let lowerMagnitude${index} = rawMagnitude${index}[offset${index} + lowerIndex${index}];
   let upperMagnitude${index} = rawMagnitude${index}[offset${index} + upperIndex${index}];
-  let magnitude${index} = mix(lowerMagnitude${index}, upperMagnitude${index}, blend${index});
+  let magnitudeSq${index} = mix(lowerMagnitude${index}, upperMagnitude${index}, blend${index});
   let intensity${index} = displayIntensity(
-    magnitude${index},
+    magnitudeSq${index},
     columnEnergy${index}[x],
-    halfSize${index},
-    gain,
+    referenceScale${index},
     decibelFactor,
   );
   let weight${index} = bandWeight(
@@ -72,6 +72,7 @@ struct RemapParams {
 @group(0) @binding(0) var texture: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(1) var<uniform> params: RemapParams;
 @group(0) @binding(2) var<storage, read_write> rowStats: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> intensityCache: array<f32>;
 ${createSpectrumBindings(spectrumCount)}
 
 var<workgroup> rowSums: array<f32, 256>;
@@ -127,23 +128,23 @@ fn bandWeight(
 }
 
 fn displayIntensity(
-  magnitude: f32,
+  magnitudeSq: f32,
   energy: f32,
-  halfSize: f32,
-  gain: f32,
+  referenceScale: f32,
   decibelFactor: f32,
 ) -> f32 {
-  let referenceMagnitude = sqrt(halfSize);
   let epsilon = 1e-12;
-  let normalizedMagnitude = magnitude * gain / referenceMagnitude + epsilon;
-  let normalizedEnergy = energy * gain / referenceMagnitude + epsilon;
+  let refScaleSq = referenceScale * referenceScale;
+  let halfDecibelFactor = decibelFactor * 0.5;
+  let normalizedMagnitudeSq = magnitudeSq * refScaleSq + epsilon;
+  let normalizedEnergy = energy * referenceScale + epsilon;
   let energyDb = log(normalizedEnergy) * 8.685889638;
   let gate = clamp(
     (energyDb - params.gateFloorDb) / params.gateRangeDb,
     0.0,
     1.0,
   );
-  let decibel = max(log(normalizedMagnitude) * decibelFactor + 1.0, 0.0);
+  let decibel = max(log(normalizedMagnitudeSq) * halfDecibelFactor + 1.0, 0.0);
   return decibel * gate;
 }
 
@@ -178,6 +179,26 @@ fn normalizeRowIntensity(y: u32, intensity: f32) -> f32 {
   );
 }
 
+@compute @workgroup_size(16, 16)
+fn computeIntensity(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let width = params.width;
+  let height = params.height;
+  let x = gid.x;
+  let y = gid.y;
+  if (x >= width || y >= height) {
+    return;
+  }
+  let frequency = frequencyAtRow(y);
+  let intensity = baseDisplayIntensity(
+    x,
+    frequency,
+    params.sampleRate,
+    params.gain,
+    params.decibelFactor,
+  );
+  intensityCache[y * width + x] = intensity;
+}
+
 @compute @workgroup_size(256)
 fn collectRowStats(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let dimensions = textureDimensions(texture);
@@ -189,17 +210,10 @@ fn collectRowStats(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local
     return;
   }
 
-  let frequency = frequencyAtRow(y);
   var sum = 0.0;
   var peak = 0.0;
   for (var x = workerId; x < width; x += 256u) {
-    let intensity = baseDisplayIntensity(
-      x,
-      frequency,
-      params.sampleRate,
-      params.gain,
-      params.decibelFactor,
-    );
+    let intensity = intensityCache[y * width + x];
     sum += intensity;
     peak = max(peak, intensity);
   }
@@ -223,23 +237,13 @@ fn collectRowStats(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let width = params.width;
   let height = params.height;
-  let sampleRate = params.sampleRate;
-  let decibelFactor = params.decibelFactor;
-  let gain = params.gain;
-  
+
   let x = gid.x;
   let y = gid.y;
   if (x >= width || y >= height) {
     return;
   }
-  let frequency = frequencyAtRow(y);
-  let tiltedIntensity = baseDisplayIntensity(
-    x,
-    frequency,
-    sampleRate,
-    gain,
-    decibelFactor,
-  );
+  let tiltedIntensity = intensityCache[y * width + x];
   let rowNormalizedIntensity = normalizeRowIntensity(y, tiltedIntensity);
   let intensity = pow(rowNormalizedIntensity, max(params.displayGamma, 0.001));
   textureStore(texture, vec2u(x, y), vec4f(intensity, 0.0, 0.0, 1.0));

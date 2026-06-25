@@ -4,8 +4,10 @@ struct DecibelifyParams {
   windowCount: u32,
   decibelFactor: f32,
   gain: f32,
+  gainOverReferenceMagnitude: f32,
   gateFloorDb: f32,
   gateRangeDb: f32,
+  padding: f32,
 };
 
 @group(0) @binding(0) var<storage, read> magnitude: array<f32>;
@@ -18,7 +20,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let halfSize = params.halfSize;
   let windowCount = params.windowCount;
   let decibelFactor = params.decibelFactor;
-  let gain = params.gain;
+  let gainOverReferenceMagnitude = params.gainOverReferenceMagnitude;
   
   let sampleIndex = gid.x;
   let windowIndex = gid.y;
@@ -26,13 +28,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
   let windowOffset = halfSize * windowIndex + sampleIndex;
-  let referenceMagnitude = sqrt(f32(halfSize));
   let epsilon = 1e-12;
-  let normalizedMagnitude = magnitude[windowOffset] * gain / referenceMagnitude + epsilon;
-  let normalizedEnergy = columnEnergy[windowIndex] * gain / referenceMagnitude + epsilon;
+  let gainOverRefMagSq = gainOverReferenceMagnitude * gainOverReferenceMagnitude;
+  let halfDecibelFactor = decibelFactor * 0.5;
+  let normalizedMagnitudeSq = magnitude[windowOffset] * gainOverRefMagSq + epsilon;
+  let normalizedEnergy = columnEnergy[windowIndex] * gainOverReferenceMagnitude + epsilon;
   let energyDb = log(normalizedEnergy) * 8.685889638;
   let gate = clamp((energyDb - params.gateFloorDb) / params.gateRangeDb, 0.0, 1.0);
-  var decibel = log(normalizedMagnitude) * decibelFactor + 1.0;
+  var decibel = log(normalizedMagnitudeSq) * halfDecibelFactor + 1.0;
   if (decibel < 0.0) {
     decibel = 0.0;
   }

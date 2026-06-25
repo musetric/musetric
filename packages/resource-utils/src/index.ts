@@ -1,3 +1,4 @@
+export * from './benchStats.js';
 export * from './callEvery.js';
 export * from './callLatest.js';
 export * from './color.js';
