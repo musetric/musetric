@@ -23,7 +23,6 @@ export const createLink = <Params,>(
   const Link: LinkFC<Params> = (props) => {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const defaultParams = {} as Params;
-    // eslint-disable-next-line react/prop-types
     const { params = defaultParams, onClick, children, ...rest } = props;
     const url = href(params);
     return (

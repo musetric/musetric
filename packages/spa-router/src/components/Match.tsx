@@ -13,7 +13,6 @@ export const createMatch = <Params,>(
   prefixName?: string,
 ) => {
   const Match: MatchFC<Params> = (props) => {
-    // eslint-disable-next-line react/prop-types
     const Component = props.component;
     const params = useMemoLocation(match);
     return params ? <Component {...params} /> : undefined;
