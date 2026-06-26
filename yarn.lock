@@ -1628,6 +1628,41 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/engine@workspace:*, @musetric/engine@workspace:packages/engine":
+  version: 0.0.0-use.local
+  resolution: "@musetric/engine@workspace:packages/engine"
+  dependencies:
+    "@alexanderolsen/libsamplerate-js": "catalog:"
+    "@musetric/api": "workspace:*"
+    "@musetric/audio": "workspace:*"
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    "@types/audioworklet": "catalog:"
+    "@types/node": "catalog:"
+    "@webgpu/types": "catalog:"
+    axios: "catalog:"
+    eslint: "catalog:"
+    immer: "catalog:"
+    mediabunny: "catalog:"
+    signalsmith-stretch: "catalog:"
+    typescript: "catalog:"
+    vite: "catalog:"
+    zod: "catalog:"
+    zustand: "catalog:"
+  peerDependencies:
+    "@musetric/api": "workspace:*"
+    "@musetric/audio": "workspace:*"
+    "@musetric/spectrogram": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    axios: ^1.15.0
+    immer: 11.1.4
+    zod: 4.3.6
+    zustand: 5.0.11
+  languageName: unknown
+  linkType: soft
+
 "@musetric/eslint-config@workspace:*, @musetric/eslint-config@workspace:packages/eslint-config":
   version: 0.0.0-use.local
   resolution: "@musetric/eslint-config@workspace:packages/eslint-config"
@@ -1681,6 +1716,7 @@ __metadata:
     "@mui/material": "catalog:"
     "@musetric/api": "workspace:*"
     "@musetric/audio": "workspace:*"
+    "@musetric/engine": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/spa-router": "workspace:*"

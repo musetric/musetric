@@ -3,10 +3,10 @@ import {
   maximumRecordingLatencyMs,
   minimumRecordingLatencyMs,
 } from '@musetric/audio/calibration';
+import { type RecordingLatencySource } from '@musetric/engine/state';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
-import { type RecordingLatencySource } from '../../../engine/state.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 export const RecordingLatencyControl: FC = () => {

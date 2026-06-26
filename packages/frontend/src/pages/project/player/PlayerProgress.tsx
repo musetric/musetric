@@ -1,7 +1,7 @@
 import { Box, Slider, Typography } from '@mui/material';
+import { getTrackProgress } from '@musetric/engine/state';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
-import { getTrackProgress } from '../../../engine/state.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 const progressScale = 1000;

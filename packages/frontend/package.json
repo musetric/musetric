@@ -21,6 +21,7 @@
     "@mui/material": "catalog:",
     "@musetric/api": "workspace:*",
     "@musetric/audio": "workspace:*",
+    "@musetric/engine": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/spa-router": "workspace:*",

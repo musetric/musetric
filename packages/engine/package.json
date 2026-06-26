@@ -1,0 +1,54 @@
+{
+  "name": "@musetric/engine",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "monorepo": "./src/engine.ts",
+      "default": "./src/engine.ts"
+    },
+    "./state": {
+      "monorepo": "./src/state.ts",
+      "default": "./src/state.ts"
+    }
+  },
+  "scripts": {
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+  },
+  "peerDependencies": {
+    "@musetric/api": "workspace:*",
+    "@musetric/audio": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
+    "@musetric/utils": "workspace:*",
+    "axios": "^1.15.0",
+    "immer": "11.1.4",
+    "zod": "4.3.6",
+    "zustand": "5.0.11"
+  },
+  "devDependencies": {
+    "@alexanderolsen/libsamplerate-js": "catalog:",
+    "@musetric/api": "workspace:*",
+    "@musetric/audio": "workspace:*",
+    "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
+    "@musetric/utils": "workspace:*",
+    "@types/audioworklet": "catalog:",
+    "@types/node": "catalog:",
+    "@webgpu/types": "catalog:",
+    "axios": "catalog:",
+    "eslint": "catalog:",
+    "immer": "catalog:",
+    "mediabunny": "catalog:",
+    "signalsmith-stretch": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  }
+}

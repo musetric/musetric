@@ -9,7 +9,7 @@ import {
   createControlledPromise,
 } from '@musetric/utils';
 import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
-import { type Store } from '../../common/store.js';
+import { type Store } from '../common/store.js';
 import { type EngineState, getTrackProgress } from '../state.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
 

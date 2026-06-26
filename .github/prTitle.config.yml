@@ -30,35 +30,36 @@ types:
 # Scope = which area the change belongs to.
 scopes:
   # Features
-  - player # track playback
+  - calibration # audio input/output calibration
   - chords # chord detection & display
+  - decoder # decoding input audio files
   - key # musical key detection / transpose
+  - player # track playback
+  - recording # audio capture / recording
   - rhythm # tempo, beat, metronome
   - subtitle # lyrics / subtitle track
-  - waveform # amplitude waveform visualization
   - timeline # time ruler, cursor, seeking
-  - recording # audio capture / recording
-  - decoder # decoding input audio files
-  - calibration # audio input/output calibration
-  - translations # app localization: translation values & i18n support
+  - translation # app localization: translation values & i18n support
+  - waveform # amplitude waveform visualization
   # Libraries
   - ai # neural-network inference
-  - spectrogram # frequency spectrogram visualization
+  - api # packages/api contracts & client/server integration
+  - db # packages/backend-db data access, entities, schema
+  - engine # packages/engine audio engine: playback/decode/visualization orchestration
   - fft # FFT signal-processing core behind visualizations
+  - spectrogram # frequency spectrogram visualization
   - toolkit # packages/toolkit backend media/processing helpers
   - utils # packages/utils low-level shared utilities
   # App
-  - frontend # packages/frontend app shell (cross-feature)
   - backend # packages/backend Fastify server & orchestration
+  - frontend # packages/frontend app shell (cross-feature)
   - landing # packages/landing marketing site
-  - api # packages/api contracts & client/server integration
-  - db # packages/backend-db data access, entities, schema
   # Quality & tooling
+  - agent # agent guidance & config (AGENTS.md, AI tooling)
+  - bench # benchmarks & perf measurement (packages/performance)
+  - deps # dependency add / update / remove
+  - format # Prettier formatting
+  - github # repo & GitHub Actions settings (workflows, templates)
   - lint # ESLint rules / packages/eslint-config
   - ts # TypeScript config & strictness (tsconfig, types)
-  - bench # benchmarks & perf measurement (packages/performance)
-  - format # Prettier formatting
-  - deps # dependency add / update / remove
-  - agent # agent guidance & config (AGENTS.md, AI tooling)
-  - github # repo & GitHub Actions settings (workflows, templates)
   - license # license headers & third-party notices

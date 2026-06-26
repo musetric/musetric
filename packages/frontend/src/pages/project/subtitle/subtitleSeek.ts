@@ -1,4 +1,4 @@
-import { type EngineState } from '../../../engine/state.js';
+import { type EngineState } from '@musetric/engine/state';
 
 const subtitleSeekLeadSeconds = 0.15;
 
