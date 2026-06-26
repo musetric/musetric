@@ -9,7 +9,7 @@ import {
   readPlayhead,
 } from '@musetric/audio/player';
 import { spectrogramDataChannel } from '@musetric/spectrogram';
-import { createScheduler } from '@musetric/utils/cross/scheduler';
+import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import {
   getDeliveryAudioContent,
   getRecordingAudioContent,
@@ -79,11 +79,6 @@ type ProjectRealtimeEvent =
     };
 
 const recordingPacketHeaderByteLength = 8;
-
-// The player position is streamed to the backend by polling the shared playhead
-// buffer the worklet writes to, instead of receiving a postMessage per frame
-// from the main thread. ~33ms (~30Hz) is smooth enough for a remote playhead.
-const playerFrameIndexStreamIntervalMs = 33;
 
 let decoderRuntime: DecoderRuntime | undefined = undefined;
 let projectRealtime: ProjectRealtime | undefined = undefined;
@@ -254,10 +249,7 @@ const streamPlayerFrameIndex = () => {
   });
 };
 
-const playerFrameIndexStream = createScheduler(
-  streamPlayerFrameIndex,
-  playerFrameIndexStreamIntervalMs,
-);
+const playerFrameIndexStream = createAnimationFrameLoop(streamPlayerFrameIndex);
 
 const startPlayerFrameIndexStream = () => {
   lastStreamedFrameIndex = -1;

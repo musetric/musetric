@@ -1,4 +1,4 @@
-import { createScheduler } from '@musetric/utils/cross/scheduler';
+import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { getGpuDevice } from '../common/gpuDevice.js';
 import {
@@ -26,8 +26,6 @@ export type CreateSpectrogramRuntimeOptions = {
 // Slot 0 of the shared playhead holds the current frameIndex (layout owned by
 // playhead.cross.ts in @musetric/audio).
 const playheadFrameIndexSlot = 0;
-// ~60Hz polling of the playhead while playing, matching the display refresh.
-const renderLoopIntervalMs = 16;
 
 const emptySamples = (): SpectrogramLaneSamples =>
   allTrackKeys.reduce<SpectrogramLaneSamples>((acc, key) => {
@@ -125,7 +123,7 @@ export const createSpectrogramRuntime = async (
     }
   };
 
-  const renderLoop = createScheduler(renderFromPlayhead, renderLoopIntervalMs);
+  const renderLoop = createAnimationFrameLoop(renderFromPlayhead);
 
   dataPort.bindHandlers({
     mount: async (message) => {
