@@ -15,12 +15,49 @@ const formatTime = (timeInSeconds: number) => {
 
 export const PlayerProgress: FC = () => {
   const ref = useRef<HTMLSpanElement>(null);
+  const currentTimeRef = useRef<HTMLSpanElement>(null);
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
-  const progress = useEngineStore((state) => getTrackProgress(state));
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
+
+  const initialProgress = getTrackProgress(engine.store.get());
+
+  // High-frequency progress is driven straight into the DOM, bypassing React
+  // render: the Slider stays uncontrolled and we move its thumb/track manually.
+  useEffect(() => {
+    const root = ref.current;
+
+    const apply = (progress: number) => {
+      const percent = `${progress * 100}%`;
+
+      const track = root?.querySelector<HTMLElement>('.MuiSlider-track');
+      if (track) {
+        track.style.width = percent;
+      }
+
+      const thumb = root?.querySelector<HTMLElement>('.MuiSlider-thumb');
+      if (thumb) {
+        thumb.style.left = percent;
+      }
+
+      const input = root?.querySelector('input');
+      if (input) {
+        const value = String(Math.round(progress * progressScale));
+        input.value = value;
+        input.setAttribute('aria-valuenow', value);
+      }
+
+      if (currentTimeRef.current) {
+        currentTimeRef.current.textContent = formatTime(progress * duration);
+      }
+    };
+
+    apply(getTrackProgress(engine.store.get()));
+
+    return engine.store.subscribe(getTrackProgress, apply);
+  }, [duration]);
 
   useEffect(() => {
     const element = ref.current;
@@ -74,7 +111,7 @@ export const PlayerProgress: FC = () => {
         ref={ref}
         min={0}
         max={progressScale}
-        value={Math.round(progress * progressScale)}
+        defaultValue={Math.round(initialProgress * progressScale)}
         disabled={!frameCount || realtimeFailed}
         size='small'
         sx={{
@@ -96,13 +133,14 @@ export const PlayerProgress: FC = () => {
         }}
       />
       <Typography
+        ref={currentTimeRef}
         variant='caption'
         position='absolute'
         top='calc(100% - 12px)'
         left={0}
         lineHeight={1}
       >
-        {formatTime(progress * duration)}
+        {formatTime(initialProgress * duration)}
       </Typography>
       <Typography
         variant='caption'
