@@ -5,13 +5,14 @@ export type AnimationFrameLoop = {
 };
 
 export const createAnimationFrameLoop = (
-  run: () => boolean | void,
+  run: () => Promise<boolean | void> | boolean | void,
 ): AnimationFrameLoop => {
   let handle: number | undefined = undefined;
 
-  const tick = () => {
+  const tick = async () => {
     handle = undefined;
-    if (run() === false) {
+    const result = await run();
+    if (result === false) {
       return;
     }
 
