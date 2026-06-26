@@ -1,15 +1,16 @@
 import { type StemType, stemTypes } from '../../common/stemType.es.js';
+import { type Playhead, writePlayhead } from '../playhead.cross.js';
 import {
   type playerChannel,
   type playerDataChannel,
 } from '../protocol.cross.js';
 import { createTimePitchProcessor } from '../timePitchProcessor.js';
-import { createFrameIndexTracker } from '../trackFrameIndex.js';
 import { createMetronome } from './metronome.worklet.js';
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
+  playhead: Playhead;
 };
 
 export type PlayerRuntime = {
@@ -38,7 +39,7 @@ const chunkFrameCount = 256;
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
 ): Promise<PlayerRuntime> => {
-  const { port, dataPort } = options;
+  const { port, dataPort, playhead } = options;
 
   let frameCount = 0;
   let tracks: Record<StemType | 'recording', Float32Array[]> | undefined =
@@ -55,7 +56,6 @@ export const createPlayerRuntime = async (
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
-  const frameIndexTracker = createFrameIndexTracker(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   let recordingSamples: Float32Array<SharedArrayBuffer> | undefined = undefined;
   let recordingMetadata: Int32Array<SharedArrayBuffer> | undefined = undefined;
@@ -210,6 +210,7 @@ export const createPlayerRuntime = async (
       outputOffsetFrameIndex = 0;
       inputOffsetFrameIndex = 0;
       playing = false;
+      writePlayhead(playhead, frameIndex, revision);
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     unmount: () => {
@@ -219,8 +220,8 @@ export const createPlayerRuntime = async (
       outputOffsetFrameIndex = 0;
       inputOffsetFrameIndex = 0;
       playing = false;
-      frameIndexTracker.reset();
       timePitchProcessor.reset();
+      writePlayhead(playhead, frameIndex, revision);
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
   });
@@ -242,13 +243,12 @@ export const createPlayerRuntime = async (
     stop: (message) => {
       revision = message.revision;
       playing = false;
-      frameIndexTracker.reset();
       metronome.clear();
+      writePlayhead(playhead, frameIndex, revision);
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     setFrozen: (message) => {
       frozen = message.frozen;
-      frameIndexTracker.reset();
       timePitchProcessor.reset();
     },
     seek: (message) => {
@@ -260,10 +260,10 @@ export const createPlayerRuntime = async (
         inputOffsetFrameIndex = 0;
         setRecordingWriteFrameIndex(message.frameIndex);
       }
-      frameIndexTracker.reset();
       timePitchProcessor.reset();
       metronome.reset(message.frameIndex);
       metronome.clear();
+      writePlayhead(playhead, frameIndex, revision);
     },
     setTransposeSemitones: (message) => {
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
@@ -408,10 +408,10 @@ export const createPlayerRuntime = async (
         outputOffsetFrameIndex = 0;
         inputOffsetFrameIndex = 0;
         playing = false;
-        frameIndexTracker.reset();
         timePitchProcessor.reset();
         metronome.reset(0);
         metronome.clear();
+        writePlayhead(playhead, frameIndex, revision);
         port.methods.setPlaying({
           playing,
           frameIndex,
@@ -421,12 +421,7 @@ export const createPlayerRuntime = async (
         return;
       }
 
-      if (frameIndexTracker.advance(outputs[0].length)) {
-        port.methods.setFrameIndex({
-          frameIndex,
-          revision,
-        });
-      }
+      writePlayhead(playhead, frameIndex, revision);
     },
   };
 };

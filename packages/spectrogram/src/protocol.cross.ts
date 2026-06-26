@@ -2,14 +2,25 @@ import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 import { type SpectrogramConfig, type TrackKey } from './config.cross.js';
 
+// Shared playback position written by the player worklet. Slot 0 holds the
+// current frameIndex (see playhead.cross.ts in @musetric/audio for the layout).
+// The worker polls it instead of receiving a setTrackProgress postMessage per
+// frame while playing.
+export type SpectrogramPlayhead = Int32Array<SharedArrayBuffer>;
+
 export type SpectrogramOutboundMethods = {
-  boot: (message: { dataPort: MessagePort }) => void;
+  boot: (message: {
+    dataPort: MessagePort;
+    playhead: SpectrogramPlayhead;
+  }) => void;
   mount: (message: {
     config: Partial<SpectrogramConfig>;
     trackProgress: number;
   }) => void;
   unmount: () => void;
   setTrackProgress: (message: { trackProgress: number }) => void;
+  setFrameCount: (message: { frameCount: number }) => void;
+  setPlaying: (message: { playing: boolean }) => void;
   updateConfig: (message: { patch: Partial<SpectrogramConfig> }) => void;
 };
 
@@ -26,7 +37,15 @@ export const spectrogramChannel = createMessageChannel<
     keys: ['booted', 'setState'],
   },
   outbound: {
-    keys: ['boot', 'mount', 'unmount', 'setTrackProgress', 'updateConfig'],
+    keys: [
+      'boot',
+      'mount',
+      'unmount',
+      'setTrackProgress',
+      'setFrameCount',
+      'setPlaying',
+      'updateConfig',
+    ],
     transfers: {
       boot: (message) => [message.dataPort],
       mount: (message) =>

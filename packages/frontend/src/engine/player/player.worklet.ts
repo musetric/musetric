@@ -17,6 +17,7 @@ export class PlayerProcessor
       const runtime = await createPlayerRuntime({
         port,
         dataPort: playerDataChannel.inbound(message.dataPort),
+        playhead: message.playhead,
       });
       this.handleProcess = (
         inputs: Float32Array[][],

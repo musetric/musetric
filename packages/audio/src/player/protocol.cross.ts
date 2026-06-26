@@ -1,11 +1,12 @@
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 import { type StemType } from '../common/stemType.es.js';
+import { type Playhead } from './playhead.cross.js';
 
 export const playerProcessorName = 'player-processor';
 
 export type PlayerOutboundMethods = {
-  boot: (message: { dataPort: MessagePort }) => void;
+  boot: (message: { dataPort: MessagePort; playhead: Playhead }) => void;
   play: (message: {
     revision: number;
     latencyFrameCount: number;
@@ -44,11 +45,6 @@ export type PlayerInboundMethods = {
     revision: number;
     positionJump?: true;
   }) => void;
-  setFrameIndex: (message: {
-    frameIndex: number;
-    revision: number;
-    positionJump?: true;
-  }) => void;
   recordingFlushed: (message: { sequence: number }) => void;
 };
 
@@ -57,7 +53,7 @@ export const playerChannel = createMessageChannel<
   PlayerOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setPlaying', 'setFrameIndex', 'recordingFlushed'],
+    keys: ['booted', 'setPlaying', 'recordingFlushed'],
   },
   outbound: {
     keys: [

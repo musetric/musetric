@@ -1,3 +1,4 @@
+import { createPlayhead } from '@musetric/audio';
 import { defaultSpectrogramConfig } from '@musetric/spectrogram';
 import { defaultSampleRate } from '@musetric/utils';
 import { createStore, type Store } from '../common/store.js';
@@ -85,6 +86,7 @@ export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
+  const playhead = createPlayhead();
   const playerChannel = new MessageChannel();
   const spectrogramChannel = new MessageChannel();
 
@@ -102,6 +104,7 @@ export const createEngine = (): Engine => {
       store,
       sampleRate: context.sampleRate,
       decoderPort: spectrogramChannel.port2,
+      playhead,
     }),
     waveform: createEngineWaveform(store),
     decoder: createEngineDecoder({
@@ -109,6 +112,7 @@ export const createEngine = (): Engine => {
       sampleRate: context.sampleRate,
       playerPort: playerChannel.port1,
       spectrogramPort: spectrogramChannel.port1,
+      playhead,
       onRecordingPeaksChanged: (message) => {
         ref.waveform.applyRecordingPeakPatch({
           startPeakIndex: message.startPeakIndex,
@@ -161,6 +165,7 @@ export const createEngine = (): Engine => {
       store,
       decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,
+      playhead,
     }),
     boot: async () => {
       await Promise.all([
