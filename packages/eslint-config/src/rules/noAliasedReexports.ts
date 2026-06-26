@@ -16,13 +16,14 @@ const getImportedName = (node: {
 
 type TypeReference = {
   type: string;
-  typeName?: TypeReference;
   name?: string;
+  typeName?: TypeReference;
 };
 
 type TypeAliasDeclaration = {
-  id: TypeReference;
-  typeAnnotation: TypeReference;
+  type: string;
+  id?: TypeReference;
+  typeAnnotation?: TypeReference;
 };
 
 export const noAliasedReexportsRule: Rule.RuleModule = {
@@ -42,14 +43,14 @@ export const noAliasedReexportsRule: Rule.RuleModule = {
     const importedTypeNameByLocalName = new Map<string, string>();
 
     const reportIfImportedTypeAlias = (node: TypeAliasDeclaration): void => {
-      const { typeAnnotation } = node;
+      const { id, typeAnnotation } = node;
       if (
-        node.id.type === 'Identifier' &&
-        typeAnnotation.type === 'TSTypeReference' &&
+        id?.type === 'Identifier' &&
+        typeAnnotation?.type === 'TSTypeReference' &&
         typeAnnotation.typeName?.type === 'Identifier' &&
         typeAnnotation.typeName.name !== undefined &&
         importedTypeNameByLocalName.get(typeAnnotation.typeName.name) ===
-          node.id.name
+          id.name
       ) {
         context.report({
           node: context.sourceCode.ast,

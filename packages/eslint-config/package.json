@@ -14,13 +14,13 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "eslint": "9.39.4",
+    "eslint": "10.5.0",
     "typescript": "6.0.2"
   },
   "dependencies": {
+    "@eslint-react/eslint-plugin": "catalog:",
     "@eslint/js": "catalog:",
     "eslint-plugin-import-x": "catalog:",
-    "eslint-plugin-react": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",
     "eslint-plugin-react-refresh": "catalog:",
     "eslint-plugin-simple-import-sort": "catalog:",

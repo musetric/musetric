@@ -638,6 +638,7 @@ export const recordingRouter: FastifyPluginCallbackZod = (app) => {
             return;
           }
 
+          // eslint-disable-next-line no-useless-assignment
           let message: unknown = undefined;
           try {
             message = JSON.parse(toBuffer(data)?.toString() ?? '');
