@@ -12,8 +12,8 @@ import {
   nextNumber,
 } from '@musetric/utils';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
-import { type Store } from '../../common/store.js';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 
