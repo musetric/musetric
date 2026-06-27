@@ -4,7 +4,6 @@ import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 16;
 const storageBuffersPerSpectrum = 2;
-const storageBuffersPerRemap = 2;
 
 export type SpectrogramRemap = {
   dispatch: (pass: GPUComputePassEncoder) => void;
@@ -14,8 +13,7 @@ export const createSpectrogramRemapCell = (
   device: GPUDevice,
 ): ResourceCell<StateArg, SpectrogramRemap> => {
   const maxSpectrumCount = Math.floor(
-    (device.limits.maxStorageBuffersPerShaderStage - storageBuffersPerRemap) /
-      storageBuffersPerSpectrum,
+    device.limits.maxStorageBuffersPerShaderStage / storageBuffersPerSpectrum,
   );
   const pipelineCell = createResourceCell({
     create: (spectrumCount: number) => createPipeline(device, spectrumCount),
@@ -40,17 +38,10 @@ export const createSpectrogramRemapCell = (
       const { width, height } = state.params.value;
       const xGroups = Math.ceil(width / workgroupSize);
       const yGroups = Math.ceil(height / workgroupSize);
-      const rowStatsGroups = height;
 
       return {
         dispatch: (pass) => {
-          pass.setPipeline(state.pipelines.computeIntensity);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(xGroups, yGroups);
-          pass.setPipeline(state.pipelines.stats);
-          pass.setBindGroup(0, state.bindGroup);
-          pass.dispatchWorkgroups(rowStatsGroups);
-          pass.setPipeline(state.pipelines.render);
+          pass.setPipeline(state.pipelines.compute);
           pass.setBindGroup(0, state.bindGroup);
           pass.dispatchWorkgroups(xGroups, yGroups);
         },

@@ -64,10 +64,7 @@ const isSpectrogramVisualEqual = (
   first.frequencyTiltSlope === second.frequencyTiltSlope &&
   first.frequencyTiltMinGain === second.frequencyTiltMinGain &&
   first.frequencyTiltMaxGain === second.frequencyTiltMaxGain &&
-  first.displayGamma === second.displayGamma &&
-  first.rowNormalizationStrength === second.rowNormalizationStrength &&
-  first.rowNormalizationFloorFactor === second.rowNormalizationFloorFactor &&
-  first.rowNormalizationMinRange === second.rowNormalizationMinRange;
+  first.displayGamma === second.displayGamma;
 
 const isSpectrogramComparisonEqual = (
   first: SpectrogramConfig['comparison'],

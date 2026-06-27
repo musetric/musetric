@@ -4,12 +4,12 @@ export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
   const spectrumEntries = Array.from({ length: spectrumCount }).flatMap(
     (_, index): GPUBindGroupLayoutEntry[] => [
       {
-        binding: 4 + index * 2,
+        binding: 2 + index * 2,
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: 'read-only-storage' },
       },
       {
-        binding: 5 + index * 2,
+        binding: 3 + index * 2,
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: 'read-only-storage' },
       },
@@ -32,16 +32,6 @@ export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: 'uniform' },
       },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
       ...spectrumEntries,
     ],
   });
@@ -50,23 +40,13 @@ export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
     bindGroupLayouts: [bindGroupLayout],
   });
   const module = device.createShaderModule({
-    label: 'remap-column-shader',
+    label: 'remap-shader',
     code: createShader(spectrumCount),
   });
   return {
     bindGroupLayout,
-    computeIntensity: device.createComputePipeline({
-      label: 'remap-compute-intensity-pipeline',
-      layout,
-      compute: { module, entryPoint: 'computeIntensity' },
-    }),
-    stats: device.createComputePipeline({
-      label: 'remap-row-stats-pipeline',
-      layout,
-      compute: { module, entryPoint: 'collectRowStats' },
-    }),
-    render: device.createComputePipeline({
-      label: 'remap-column-pipeline',
+    compute: device.createComputePipeline({
+      label: 'remap-pipeline',
       layout,
       compute: { module, entryPoint: 'main' },
     }),
