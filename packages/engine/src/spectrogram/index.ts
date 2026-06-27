@@ -104,11 +104,15 @@ export const createEngineSpectrogram = (
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);
       const offscreenCanvas = canvas.transferControlToOffscreen();
+      const engineState = store.get();
 
-      const buildLanes = (recording: boolean) => ({
+      const buildLanes = (
+        recording: boolean,
+        leadSpectrogramGainDb: number,
+      ) => ({
         lead: {
           ...defaultSpectrogramConfig.lanes.lead,
-          gainDb: store.get().leadSpectrogramGainDb,
+          gainDb: leadSpectrogramGainDb,
         },
         recording: {
           ...defaultSpectrogramConfig.lanes.recording,
@@ -116,18 +120,23 @@ export const createEngineSpectrogram = (
         },
       });
 
+      port.methods.setFrameCount({ frameCount: engineState.frameCount ?? 0 });
       port.methods.mount({
         config: {
           ...defaultSpectrogramConfig,
           ...config,
           canvas: offscreenCanvas,
           viewSize,
-          colors: store.get().colors,
+          colors: engineState.colors,
           sampleRate,
-          lanes: buildLanes(store.get().recording),
+          lanes: buildLanes(
+            engineState.recording,
+            engineState.leadSpectrogramGainDb,
+          ),
         },
-        trackProgress: getTrackProgress(store.get()),
+        trackProgress: getTrackProgress(engineState),
       });
+      port.methods.setPlaying({ playing: engineState.playing });
 
       const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
         port.methods.updateConfig({
@@ -138,16 +147,19 @@ export const createEngineSpectrogram = (
       const unsubscribeRecording = store.subscribe(
         (state) => state.recording,
         (recording) => {
+          const { leadSpectrogramGainDb } = store.get();
           port.methods.updateConfig({
-            patch: { lanes: buildLanes(recording) },
+            patch: { lanes: buildLanes(recording, leadSpectrogramGainDb) },
           });
         },
       );
       const unsubscribeLeadSpectrogramGain = store.subscribe(
         (state) => state.leadSpectrogramGainDb,
-        () => {
+        (leadSpectrogramGainDb) => {
           port.methods.updateConfig({
-            patch: { lanes: buildLanes(store.get().recording) },
+            patch: {
+              lanes: buildLanes(store.get().recording, leadSpectrogramGainDb),
+            },
           });
         },
       );
