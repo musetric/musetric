@@ -27,6 +27,7 @@ export const reactConfig: Linter.Config = {
     // eslint-plugin-react-hooks owns hook rules; silence @eslint-react duplicates.
     '@eslint-react/error-boundaries': 'off',
     '@eslint-react/exhaustive-deps': 'off',
+    '@eslint-react/no-array-index-key': 'off',
     '@eslint-react/purity': 'off',
     '@eslint-react/rules-of-hooks': 'off',
     '@eslint-react/set-state-in-effect': 'off',
