@@ -1,8 +1,8 @@
 import {
   spectrogramChannel,
   spectrogramDataChannel,
-} from '@musetric/spectrogram';
-import { createSpectrogramRuntime } from '@musetric/spectrogram/worker';
+} from './protocol.cross.js';
+import { createSpectrogramRuntime } from './runtime.worker.js';
 
 const profiling = import.meta.env.frontendSpectrogramProfiling === 'true';
 const port = spectrogramChannel.inbound(self);

@@ -7,12 +7,10 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "monorepo": "./src/engine.ts",
-      "default": "./src/engine.ts"
-    },
-    "./state": {
-      "monorepo": "./src/state.ts",
-      "default": "./src/state.ts"
+      "monorepo": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {

@@ -1,7 +1,5 @@
-import { type Playhead } from '@musetric/audio';
 import {
   defaultSpectrogramConfig,
-  spectrogramChannel,
   type SpectrogramConfig,
 } from '@musetric/spectrogram';
 import {
@@ -10,7 +8,9 @@ import {
 } from '@musetric/utils';
 import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
+import { type Playhead } from '../player/playhead.cross.js';
 import { type EngineState, getTrackProgress } from '../state.js';
+import { spectrogramChannel } from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
 
 type Unmount = () => void;

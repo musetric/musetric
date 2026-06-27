@@ -1,18 +1,18 @@
-import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
-import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
-import { getGpuDevice } from '../common/gpuDevice.js';
+import { allTrackKeys, type TrackKey } from '@musetric/spectrogram';
 import {
   averageMetrics,
+  createSpectrogramProcessor,
+  getGpuDevice,
   type SpectrogramProcessorMetrics,
-} from '../common/processorTimer.js';
-import { allTrackKeys, type TrackKey } from '../config.cross.js';
-import { createSpectrogramProcessor } from '../processor.js';
+} from '@musetric/spectrogram/gpu';
+import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
+import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
   type SpectrogramLaneSamples,
   type SpectrogramPlayhead,
-} from '../protocol.cross.js';
+} from './protocol.cross.js';
 
 export type CreateSpectrogramRuntimeOptions = {
   port: ReturnType<
@@ -24,7 +24,7 @@ export type CreateSpectrogramRuntimeOptions = {
 };
 
 // Slot 0 of the shared playhead holds the current frameIndex (layout owned by
-// playhead.cross.ts in @musetric/audio).
+// playhead.cross.ts).
 const playheadFrameIndexSlot = 0;
 
 const emptySamples = (): SpectrogramLaneSamples =>

@@ -1,6 +1,6 @@
+import { type StemType } from '@musetric/audio/es';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
-import { type StemType } from '../common/stemType.es.js';
 import { type Playhead } from './playhead.cross.js';
 
 export const playerProcessorName = 'player-processor';

@@ -1,4 +1,3 @@
-import { createPlayhead } from '@musetric/audio';
 import { defaultSpectrogramConfig } from '@musetric/spectrogram';
 import { defaultSampleRate } from '@musetric/utils';
 import {
@@ -12,6 +11,7 @@ import {
 import { createStore, type Store } from './common/store.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
+import { createPlayhead } from './player/playhead.cross.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,

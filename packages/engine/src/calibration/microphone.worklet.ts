@@ -1,9 +1,9 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
 import {
   createMicrophoneCalibrationRuntime,
-  microphoneCalibrationProcessorName,
   type MicrophoneCalibrationRuntime,
-} from '@musetric/audio/calibration/worklet';
+} from './microphoneRuntime.worklet.js';
+import { microphoneCalibrationProcessorName } from './protocol.cross.js';
 
 export class MicrophoneCalibrationProcessor
   extends AudioWorkletProcessor

@@ -1,13 +1,10 @@
 import { createMicrophoneAudioConstraints } from '../recording/constraints.js';
 import {
-  microphoneCalibrationProcessorName,
-  type RecordingLatencyCalibrationPeak,
-} from './protocol.cross.js';
-import {
   createRecordingLatencyCalibrationClick,
   createRecordingLatencyCalibrationSchedule,
   getRecordingLatencyCalibrationFrameCounts,
   getRecordingLatencyFrameCount,
+  type RecordingLatencyCalibrationPeak,
   recordingLatencyCalibrationTimeoutSeconds,
 } from './schedule.js';
 
@@ -16,6 +13,7 @@ export type CalibrationMeasurementOptions = {
   outputNode: AudioNode;
   playOutput: () => Promise<void>;
   workletUrl: string | URL;
+  processorName: string;
   deviceId?: string;
   stream?: MediaStream;
 };
@@ -92,7 +90,14 @@ const waitForResult = async (node: AudioWorkletNode) =>
 export const measureRecordingLatency = async (
   options: CalibrationMeasurementOptions,
 ): Promise<CalibrationMeasurementResult | undefined> => {
-  const { context, outputNode, playOutput, workletUrl, deviceId } = options;
+  const {
+    context,
+    outputNode,
+    playOutput,
+    workletUrl,
+    processorName,
+    deviceId,
+  } = options;
   let stream: MediaStream | undefined = undefined;
   let source: MediaStreamAudioSourceNode | undefined = undefined;
   let calibrationNode: AudioWorkletNode | undefined = undefined;
@@ -113,15 +118,11 @@ export const measureRecordingLatency = async (
 
     const schedule = createRecordingLatencyCalibrationSchedule({ context });
     source = context.createMediaStreamSource(stream);
-    calibrationNode = new AudioWorkletNode(
-      context,
-      microphoneCalibrationProcessorName,
-      {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [1],
-      },
-    );
+    calibrationNode = new AudioWorkletNode(context, processorName, {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+    });
     silentGain = context.createGain();
     silentGain.gain.value = 0;
     source.connect(calibrationNode);

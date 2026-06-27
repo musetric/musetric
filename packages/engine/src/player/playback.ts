@@ -1,11 +1,4 @@
-import {
-  playerChannel,
-  playerProcessorName,
-  type Playhead,
-  readPlayhead,
-  type StemType,
-  stemTypes,
-} from '@musetric/audio';
+import { type StemType, stemTypes } from '@musetric/audio/es';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -16,6 +9,8 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
+import { type Playhead, readPlayhead } from './playhead.cross.js';
+import { playerChannel, playerProcessorName } from './protocol.cross.js';
 
 export type EnginePlayback = {
   boot: () => Promise<void>;

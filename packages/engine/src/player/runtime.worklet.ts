@@ -1,11 +1,11 @@
-import { type StemType, stemTypes } from '../../common/stemType.es.js';
-import { type Playhead, writePlayhead } from '../playhead.cross.js';
+import { type StemType, stemTypes } from '@musetric/audio/es';
+import { createTimePitchProcessor } from '@musetric/audio/player';
+import { createMetronome } from './metronome.worklet.js';
+import { type Playhead, writePlayhead } from './playhead.cross.js';
 import {
   type playerChannel,
   type playerDataChannel,
-} from '../protocol.cross.js';
-import { createTimePitchProcessor } from '../timePitchProcessor.js';
-import { createMetronome } from './metronome.worklet.js';
+} from './protocol.cross.js';
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;

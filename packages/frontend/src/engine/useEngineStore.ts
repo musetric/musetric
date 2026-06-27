@@ -1,4 +1,4 @@
-import { type EngineState } from '@musetric/engine/state';
+import { type EngineState } from '@musetric/engine';
 import { useSyncExternalStore } from 'react';
 import { engine } from './engine.js';
 
