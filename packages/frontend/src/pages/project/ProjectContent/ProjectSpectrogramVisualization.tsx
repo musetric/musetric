@@ -108,6 +108,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
     };
 
     element.addEventListener('pointerdown', handlePointerDown);
+    element.addEventListener('pointerup', handlePointerEnd);
+    element.addEventListener('pointercancel', handlePointerEnd);
     document.addEventListener('pointerup', handlePointerEnd);
     document.addEventListener('pointercancel', handlePointerEnd);
 
@@ -440,6 +442,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
 
     return () => {
       element.removeEventListener('pointerdown', handlePointerDown);
+      element.removeEventListener('pointerup', handlePointerEnd);
+      element.removeEventListener('pointercancel', handlePointerEnd);
       document.removeEventListener('pointerup', handlePointerEnd);
       document.removeEventListener('pointercancel', handlePointerEnd);
       spectrogramArea.removeEventListener('wheel', handleWheel);
