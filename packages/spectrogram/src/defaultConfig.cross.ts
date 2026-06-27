@@ -39,9 +39,6 @@ export const defaultSpectrogramVisual: SpectrogramVisualConfig = {
   frequencyTiltMinGain: 0.72,
   frequencyTiltMaxGain: 1.55,
   displayGamma: 1,
-  rowNormalizationStrength: 0.45,
-  rowNormalizationFloorFactor: 0.75,
-  rowNormalizationMinRange: 0.12,
 };
 
 export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
