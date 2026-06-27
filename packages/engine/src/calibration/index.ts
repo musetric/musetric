@@ -19,6 +19,7 @@ import {
   type CalibrationPreview,
   createCalibrationPreview,
 } from './preview.js';
+import { microphoneCalibrationProcessorName } from './protocol.cross.js';
 import {
   type CalibrationLatencyStore,
   createCalibrationLatencyStore,
@@ -148,6 +149,7 @@ export const createEngineCalibration = (
         outputNode: audioOutput.outputNode,
         playOutput: audioOutput.play,
         workletUrl: microphoneCalibrationWorkletUrl,
+        processorName: microphoneCalibrationProcessorName,
         deviceId: inputDevice?.deviceId,
         stream,
       });

@@ -1,10 +1,10 @@
-import { type Playhead } from '@musetric/audio';
 import {
   type ControlledPromise,
   createControlledPromise,
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
+import { type Playhead } from '../player/playhead.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './protocol.cross.js';

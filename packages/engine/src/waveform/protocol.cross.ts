@@ -1,7 +1,6 @@
+import { type StemType, type WaveformColors } from '@musetric/audio/es';
 import { type ViewSize } from '@musetric/utils';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
-import { type StemType } from '../common/stemType.es.js';
-import { type WaveformColors } from './colors.es.js';
 
 export type WaveformOutboundMethods = {
   boot: () => void;

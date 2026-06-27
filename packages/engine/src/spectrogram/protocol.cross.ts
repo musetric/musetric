@@ -1,9 +1,9 @@
+import { type SpectrogramConfig, type TrackKey } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
-import { type SpectrogramConfig, type TrackKey } from './config.cross.js';
 
 // Shared playback position written by the player worklet. Slot 0 holds the
-// current frameIndex (see playhead.cross.ts in @musetric/audio for the layout).
+// current frameIndex (see playhead.cross.ts for the layout).
 // The worker polls it instead of receiving a setTrackProgress postMessage per
 // frame while playing.
 export type SpectrogramPlayhead = Int32Array<SharedArrayBuffer>;

@@ -1,5 +1,5 @@
 import { Box, Slider, Typography } from '@mui/material';
-import { getTrackProgress } from '@musetric/engine/state';
+import { getTrackProgress } from '@musetric/engine';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';

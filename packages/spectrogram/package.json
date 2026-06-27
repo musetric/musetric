@@ -17,12 +17,6 @@
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js",
       "default": "./dist/gpu.js"
-    },
-    "./worker": {
-      "monorepo": "./src/worker/index.worker.ts",
-      "types": "./dist/worker/index.worker.d.ts",
-      "import": "./dist/worker/index.worker.js",
-      "default": "./dist/worker/index.worker.js"
     }
   },
   "scripts": {

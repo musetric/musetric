@@ -1,9 +1,13 @@
-import { type RecordingLatencyCalibrationPeak } from './protocol.cross.js';
-
 export type RecordingLatencyCalibrationSchedule = {
   clickTime: number;
   clickFrames: number[];
   endFrame: number;
+};
+
+export type RecordingLatencyCalibrationPeak = {
+  clickFrame: number;
+  peakFrame: number;
+  peakValue: number;
 };
 
 export type CreateRecordingLatencyCalibrationScheduleOptions = {

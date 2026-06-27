@@ -1,4 +1,3 @@
-import { type Playhead } from '@musetric/audio';
 import { nextNumber } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
@@ -9,6 +8,7 @@ import {
   createEngineStubPlayback,
   type EnginePlayback,
 } from './playback.js';
+import { type Playhead } from './playhead.cross.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 
 export type EnginePlayer = {

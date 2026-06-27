@@ -3,8 +3,8 @@ import {
   playerChannel,
   playerDataChannel,
   playerProcessorName,
-} from '@musetric/audio/player';
-import { createPlayerRuntime } from '@musetric/audio/player/worklet';
+} from './protocol.cross.js';
+import { createPlayerRuntime } from './runtime.worklet.js';
 
 export class PlayerProcessor
   extends AudioWorkletProcessor

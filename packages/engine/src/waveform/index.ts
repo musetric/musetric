@@ -1,4 +1,4 @@
-import { type StemType, waveformChannel } from '@musetric/audio';
+import { type StemType } from '@musetric/audio/es';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -11,6 +11,7 @@ import {
 } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
+import { waveformChannel } from './protocol.cross.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
 type Unmount = () => void;

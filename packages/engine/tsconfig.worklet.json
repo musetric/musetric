@@ -1,5 +1,6 @@
 {
   "extends": "../../tsconfigs/tsconfig.worklet.json",
+  "references": [{ "path": "./tsconfig.cross.json" }],
   "compilerOptions": {
     "types": ["audioworklet", "vite/client"],
     "outDir": "${configDir}/.tsbuildinfo/dist"

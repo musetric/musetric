@@ -1,20 +1,22 @@
-import { type ViewSize, waveformVisualPeakCeilingDb } from '@musetric/utils';
-import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
-import { type StemType, stemTypes } from '../../common/stemType.es.js';
-import { type WaveformColors } from '../colors.es.js';
+import {
+  type StemType,
+  stemTypes,
+  type WaveformColors,
+} from '@musetric/audio/es';
 import {
   createWaveformProcessor,
   type WaveformProcessor,
-} from '../processor.js';
-import { type waveformChannel } from '../protocol.cross.js';
+} from '@musetric/audio/waveform';
+import { type ViewSize, waveformVisualPeakCeilingDb } from '@musetric/utils';
+import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
+import {
+  getDeliveryAudioWave,
+  getRecordingAudioWave,
+} from '../audioRequest/audioRequest.worker.js';
+import { type waveformChannel } from './protocol.cross.js';
 
 export type CreateWaveformRuntimeOptions = {
   port: ReturnType<typeof waveformChannel.inbound<DedicatedWorkerGlobalScope>>;
-  getDeliveryWavePeaks: (
-    projectId: number,
-    stemType: StemType,
-  ) => Promise<Float32Array>;
-  getRecordingWavePeaks: (projectId: number) => Promise<Float32Array>;
 };
 
 type WaveformItem = {
@@ -28,7 +30,7 @@ type WaveformItem = {
 export const createWaveformRuntime = (
   options: CreateWaveformRuntimeOptions,
 ) => {
-  const { port, getDeliveryWavePeaks, getRecordingWavePeaks } = options;
+  const { port } = options;
 
   const deliveryWaveformItems: Partial<Record<StemType, WaveformItem>> = {};
   let recordingWaveformItem: WaveformItem | undefined = undefined;
@@ -95,7 +97,7 @@ export const createWaveformRuntime = (
     if (!item) {
       return;
     }
-    item.wavePeaks = await getDeliveryWavePeaks(item.projectId, stemType);
+    item.wavePeaks = await getDeliveryAudioWave(item.projectId, stemType);
     renderDeliveryItems();
   };
 
@@ -104,7 +106,7 @@ export const createWaveformRuntime = (
     if (!item) {
       return;
     }
-    item.wavePeaks = await getRecordingWavePeaks(item.projectId);
+    item.wavePeaks = await getRecordingAudioWave(item.projectId);
     renderItem(item);
   };
 

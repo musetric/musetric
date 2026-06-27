@@ -1,15 +1,12 @@
-import { type spectrogramDataChannel } from '@musetric/spectrogram';
-import { type StemType } from '../../common/stemType.es.js';
-import { type playerDataChannel } from '../../player/protocol.cross.js';
-import { decodeMp4 } from '../mp4/index.js';
-import { decodeWav } from '../wav/index.js';
+import { decodeMp4, decodeWav } from '@musetric/audio/decoder';
+import {
+  getDeliveryAudioContent,
+  getRecordingAudioContent,
+} from '../audioRequest/audioRequest.worker.js';
+import { type playerDataChannel } from '../player/protocol.cross.js';
+import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 
 export type CreateDecoderRuntimeOptions = {
-  getDeliveryEncodedBuffer: (
-    projectId: number,
-    stemType: StemType,
-  ) => Promise<ArrayBuffer>;
-  getRecordingEncodedBuffer: (projectId: number) => Promise<ArrayBuffer>;
   playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
@@ -53,12 +50,7 @@ const fitChannelsToFrameCount = (
 };
 
 export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
-  const {
-    getDeliveryEncodedBuffer,
-    getRecordingEncodedBuffer,
-    playerPort,
-    spectrogramPort,
-  } = options;
+  const { playerPort, spectrogramPort } = options;
 
   let recordingChannels: Float32Array<SharedArrayBuffer>[] | undefined =
     undefined;
@@ -122,17 +114,17 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
       const [lead, backing, instrumental, recording] = await Promise.all([
-        getDeliveryEncodedBuffer(projectId, 'lead').then(async (buffer) =>
-          decodeMp4(buffer, sampleRate),
+        getDeliveryAudioContent(projectId, 'lead').then(async (content) =>
+          decodeMp4(content.buffer, sampleRate),
         ),
-        getDeliveryEncodedBuffer(projectId, 'backing').then(async (buffer) =>
-          decodeMp4(buffer, sampleRate),
+        getDeliveryAudioContent(projectId, 'backing').then(async (content) =>
+          decodeMp4(content.buffer, sampleRate),
         ),
-        getDeliveryEncodedBuffer(projectId, 'instrumental').then(
-          async (buffer) => decodeMp4(buffer, sampleRate),
+        getDeliveryAudioContent(projectId, 'instrumental').then(
+          async (content) => decodeMp4(content.buffer, sampleRate),
         ),
-        getRecordingEncodedBuffer(projectId).then(async (buffer) =>
-          decodeWav(buffer, sampleRate),
+        getRecordingAudioContent(projectId).then(async (content) =>
+          decodeWav(content.buffer, sampleRate),
         ),
       ]);
       const frameCount = Math.max(

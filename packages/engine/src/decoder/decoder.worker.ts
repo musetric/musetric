@@ -1,23 +1,13 @@
 import { api } from '@musetric/api';
-import {
-  createDecoderRuntime,
-  type DecoderRuntime,
-} from '@musetric/audio/decoder/worker';
-import {
-  playerDataChannel,
-  type Playhead,
-  readPlayhead,
-} from '@musetric/audio/player';
-import { spectrogramDataChannel } from '@musetric/spectrogram';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
-import {
-  getDeliveryAudioContent,
-  getRecordingAudioContent,
-} from '../audioRequest/audioRequest.worker.js';
+import { type Playhead, readPlayhead } from '../player/playhead.cross.js';
+import { playerDataChannel } from '../player/protocol.cross.js';
+import { spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import {
   type DecoderRecordingMessage,
   engineDecoderChannel,
 } from './protocol.cross.js';
+import { createDecoderRuntime, type DecoderRuntime } from './runtime.worker.js';
 
 const port = engineDecoderChannel.inbound(self);
 
@@ -717,14 +707,6 @@ port.bindBoot((message) => {
   decoderRuntime = createDecoderRuntime({
     playerPort,
     spectrogramPort,
-    getDeliveryEncodedBuffer: async (projectId, stemType) => {
-      const encodedBuffer = await getDeliveryAudioContent(projectId, stemType);
-      return encodedBuffer.buffer;
-    },
-    getRecordingEncodedBuffer: async (projectId) => {
-      const encodedBuffer = await getRecordingAudioContent(projectId);
-      return encodedBuffer.buffer;
-    },
   });
   bindRuntimeHandlers();
   port.methods.booted();
