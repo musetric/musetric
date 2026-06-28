@@ -1,5 +1,9 @@
 import { createResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import { createDynamicUniformParams } from '../common/dynamicUniform.js';
+import {
+  type ExtSpectrogramConfig,
+  type SpectrogramColumnRange,
+} from '../common/extConfig.js';
 
 export type DecibelifyParams = {
   halfSize: number;
@@ -10,6 +14,9 @@ export type DecibelifyParams = {
   gateFloorDb: number;
   gateRangeDb: number;
 };
+
+export const slotOffsetByteOffset = 28;
+const paramsByteLength = 32;
 
 export type DecibelifyParamsArg = {
   config: ExtSpectrogramConfig;
@@ -36,31 +43,50 @@ const toParams = (arg: DecibelifyParamsArg): DecibelifyParams => {
 export type StateParams = {
   value: DecibelifyParams;
   buffer: GPUBuffer;
+  byteLength: number;
+  writeRange: (
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => {
+    columnCount: number;
+    byteOffset: number;
+  };
 };
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: DecibelifyParamsArg): StateParams => {
       const value = toParams(arg);
-      const array = new DataView(new ArrayBuffer(32));
-      array.setUint32(0, value.halfSize, true);
-      array.setUint32(4, value.windowCount, true);
-      array.setFloat32(8, value.decibelFactor, true);
-      array.setFloat32(12, value.gain, true);
-      array.setFloat32(16, value.gainOverReferenceMagnitude, true);
-      array.setFloat32(20, value.gateFloorDb, true);
-      array.setFloat32(24, value.gateRangeDb, true);
-
-      const buffer = device.createBuffer({
+      const params = createDynamicUniformParams(device, {
         label: 'decibelify-params-buffer',
-        size: array.buffer.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        byteLength: paramsByteLength,
+        capacity: value.windowCount * 2,
       });
-      device.queue.writeBuffer(buffer, 0, array.buffer);
 
       return {
         value,
-        buffer,
+        buffer: params.buffer,
+        byteLength: params.byteLength,
+        writeRange: (range) => {
+          const columnCount = range ? range.columnCount : value.windowCount;
+          const byteOffset = params.write((view) => {
+            view.setUint32(0, value.halfSize, true);
+            view.setUint32(4, value.windowCount, true);
+            view.setFloat32(8, value.decibelFactor, true);
+            view.setFloat32(12, value.gain, true);
+            view.setFloat32(16, value.gainOverReferenceMagnitude, true);
+            view.setFloat32(20, value.gateFloorDb, true);
+            view.setFloat32(24, value.gateRangeDb, true);
+            view.setUint32(
+              slotOffsetByteOffset,
+              range ? range.slotOffset : 0,
+              true,
+            );
+          });
+          return {
+            columnCount,
+            byteOffset,
+          };
+        },
       };
     },
     dispose: (params) => {

@@ -20,13 +20,13 @@ const writeBandReport = (
   const [first] = summaries;
   const filePath = resolve(
     outputDirectory,
-    `bend${bandCount}_${formatBenchTimestamp(first.timestamp)}.md`,
+    `band${bandCount}_${formatBenchTimestamp(first.timestamp)}.md`,
   );
   writeFileSync(filePath, formatBenchMarkdown(summaries), 'utf-8');
   console.log(`Wrote ${filePath}`);
 };
 
-export const writeBendReports = (
+export const writeBenchReports = (
   summaries: SpectrogramBenchSummary[],
 ): void => {
   if (summaries.length < 1) {
@@ -54,7 +54,7 @@ export const writeBendReports = (
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   try {
-    writeBendReports([]);
+    writeBenchReports([]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed:', message);

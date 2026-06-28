@@ -1,4 +1,6 @@
 import { createResourceCell } from '@musetric/utils';
+import { createDynamicUniformParams } from '../common/dynamicUniform.js';
+import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramBandSpectrum } from '../lane/index.js';
 
@@ -26,6 +28,8 @@ export type RemapParams = {
   frequencyTiltMinGain: number;
   frequencyTiltMaxGain: number;
   displayGamma: number;
+  slotOffset: number;
+  columnCount: number;
   bands: RemapBandParams[];
 };
 
@@ -37,6 +41,8 @@ export type RemapParamsArg = {
 
 const headerByteLength = 64;
 const bandByteLength = 32;
+export const slotOffsetByteOffset = 52;
+export const columnCountByteOffset = 56;
 
 const toParams = (arg: RemapParamsArg): RemapParams => {
   const { sampleRate, minFrequency, maxFrequency, viewSize, minDecibel } =
@@ -59,6 +65,8 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
     frequencyTiltMinGain: visual.frequencyTiltMinGain,
     frequencyTiltMaxGain: visual.frequencyTiltMaxGain,
     displayGamma: visual.displayGamma,
+    slotOffset: 0,
+    columnCount: width,
     bands: arg.spectra.map((spectrum) => ({
       windowSize: spectrum.windowSize,
       halfSize: spectrum.windowSize / 2,
@@ -74,6 +82,13 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
 export type StateParams = {
   value: RemapParams;
   buffer: GPUBuffer;
+  byteLength: number;
+  writeRange: (
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => {
+    columnCount: number;
+    byteOffset: number;
+  };
 };
 
 const areSpectraEqual = (
@@ -98,44 +113,61 @@ export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: RemapParamsArg): StateParams => {
       const value = toParams(arg);
-      const array = new DataView(
-        new ArrayBuffer(headerByteLength + value.bands.length * bandByteLength),
-      );
-      array.setUint32(0, value.width, true);
-      array.setUint32(4, value.height, true);
-      array.setFloat32(8, value.sampleRate, true);
-      array.setFloat32(12, value.logMinFrequency, true);
-      array.setFloat32(16, value.logFrequencyRange, true);
-      array.setFloat32(20, value.decibelFactor, true);
-      array.setFloat32(24, value.gain, true);
-      array.setFloat32(28, value.gateFloorDb, true);
-      array.setFloat32(32, value.gateRangeDb, true);
-      array.setFloat32(36, value.frequencyTiltSlope, true);
-      array.setFloat32(40, value.frequencyTiltMinGain, true);
-      array.setFloat32(44, value.frequencyTiltMaxGain, true);
-      array.setFloat32(48, value.displayGamma, true);
-      // 52..63 padding (16-byte alignment for uniform buffer)
-      value.bands.forEach((band, index) => {
-        const offset = headerByteLength + index * bandByteLength;
-        array.setFloat32(offset, band.windowSize, true);
-        array.setFloat32(offset + 4, band.halfSize, true);
-        array.setFloat32(offset + 8, band.minFrequency, true);
-        array.setFloat32(offset + 12, band.fullMinFrequency, true);
-        array.setFloat32(offset + 16, band.fullMaxFrequency, true);
-        array.setFloat32(offset + 20, band.maxFrequency, true);
-        array.setFloat32(offset + 24, band.inverseReferenceMagnitude, true);
-      });
-
-      const buffer = device.createBuffer({
+      const byteLength = headerByteLength + value.bands.length * bandByteLength;
+      const params = createDynamicUniformParams(device, {
         label: 'remap-params-buffer',
-        size: array.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        byteLength,
+        capacity: value.width,
       });
-      device.queue.writeBuffer(buffer, 0, array.buffer);
 
       return {
         value,
-        buffer,
+        buffer: params.buffer,
+        byteLength: params.byteLength,
+        writeRange: (range) => {
+          const columnCount = range ? range.columnCount : value.width;
+          const byteOffset = params.write((view) => {
+            view.setUint32(0, value.width, true);
+            view.setUint32(4, value.height, true);
+            view.setFloat32(8, value.sampleRate, true);
+            view.setFloat32(12, value.logMinFrequency, true);
+            view.setFloat32(16, value.logFrequencyRange, true);
+            view.setFloat32(20, value.decibelFactor, true);
+            view.setFloat32(24, value.gain, true);
+            view.setFloat32(28, value.gateFloorDb, true);
+            view.setFloat32(32, value.gateRangeDb, true);
+            view.setFloat32(36, value.frequencyTiltSlope, true);
+            view.setFloat32(40, value.frequencyTiltMinGain, true);
+            view.setFloat32(44, value.frequencyTiltMaxGain, true);
+            view.setFloat32(48, value.displayGamma, true);
+            view.setUint32(
+              slotOffsetByteOffset,
+              range ? range.slotOffset : value.slotOffset,
+              true,
+            );
+            view.setUint32(columnCountByteOffset, columnCount, true);
+            view.setUint32(60, 0, true);
+            value.bands.forEach((band, index) => {
+              const offset = headerByteLength + index * bandByteLength;
+              view.setFloat32(offset, band.windowSize, true);
+              view.setFloat32(offset + 4, band.halfSize, true);
+              view.setFloat32(offset + 8, band.minFrequency, true);
+              view.setFloat32(offset + 12, band.fullMinFrequency, true);
+              view.setFloat32(offset + 16, band.fullMaxFrequency, true);
+              view.setFloat32(offset + 20, band.maxFrequency, true);
+              view.setFloat32(
+                offset + 24,
+                band.inverseReferenceMagnitude,
+                true,
+              );
+              view.setFloat32(offset + 28, 0, true);
+            });
+          });
+          return {
+            columnCount,
+            byteOffset,
+          };
+        },
       };
     },
     dispose: (params) => {

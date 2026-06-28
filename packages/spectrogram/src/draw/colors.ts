@@ -14,6 +14,8 @@ const toVec4 = (hex: string): [number, number, number, number] => {
 export type StateColors = {
   buffer: GPUBuffer;
 };
+
+export const drawRingSlotsByteOffset = 160;
 const areLaneConfigsEqual = (
   first: SpectrogramLaneConfig,
   second: SpectrogramLaneConfig,
@@ -63,7 +65,7 @@ const areConfigsEqual = (
 export const createColorsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: SpectrogramConfig): StateColors => {
-      const arrayBuffer = new ArrayBuffer(160);
+      const arrayBuffer = new ArrayBuffer(176);
       const f32 = new Float32Array(arrayBuffer);
       const u32 = new Uint32Array(arrayBuffer);
       const { colors, lanes, comparison } = config;

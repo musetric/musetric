@@ -10,6 +10,7 @@ struct DrawParams {
   comparisonThresholds : vec4f,
   visibility : vec4u,
   relation : vec4u,
+  ringSlots : vec4u,
 };
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
@@ -149,25 +150,48 @@ fn lineMaskAtPixel(
   return mask;
 }
 
+fn slotForScreenX(baseSlot: u32, screenX: u32, width: u32) -> u32 {
+  return (baseSlot + screenX) % width;
+}
+
+fn sampleSpectrogram(slot: u32, y: u32, layer: u32, width: u32, height: u32) -> f32 {
+  let sampleUv = vec2f(
+    (f32(slot) + 0.5) / f32(width),
+    (f32(y) + 0.5) / f32(height),
+  );
+  return textureSampleLevel(
+    spectrogramTextures,
+    valueSampler,
+    sampleUv,
+    layer,
+    0.0,
+  ).r;
+}
+
 @fragment
 fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location(0) vec4f {
   let dimensions = textureDimensions(spectrogramTextures);
   let width = dimensions.x;
   let height = f32(dimensions.y);
+  let textureHeight = dimensions.y;
   let x = min(u32(position.x), width - 1u);
-  let sampleUv = vec2f(uv.x, 1.0 - uv.y);
+  let y = min(u32(position.y), textureHeight - 1u);
+  let layer0Slot = slotForScreenX(drawParams.ringSlots.x, x, width);
+  let layer1Slot = slotForScreenX(drawParams.ringSlots.y, x, width);
+  let referenceSlot = slotForScreenX(drawParams.ringSlots.z, x, width);
+  let targetSlot = slotForScreenX(drawParams.ringSlots.w, x, width);
 
   var intensity = 0.0;
   if (drawParams.visibility.x != 0u) {
     intensity = max(
       intensity,
-      textureSample(spectrogramTextures, valueSampler, sampleUv, 0).r,
+      sampleSpectrogram(layer0Slot, y, 0u, width, textureHeight),
     );
   }
   if (drawParams.visibility.y != 0u) {
     intensity = max(
       intensity,
-      textureSample(spectrogramTextures, valueSampler, sampleUv, 1).r,
+      sampleSpectrogram(layer1Slot, y, 1u, width, textureHeight),
     );
   }
   let baseColor = mix(
@@ -182,14 +206,18 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   var referenceMask = 0.0;
   let referenceVisible = drawParams.visibility.z != 0u;
   if (referenceVisible) {
-    let referenceCenter = referenceFundamentalFrequencies[x];
+    let referenceCenter = referenceFundamentalFrequencies[referenceSlot];
     var referencePrev = 0.0;
     if (x > 0u) {
-      referencePrev = referenceFundamentalFrequencies[x - 1u];
+      referencePrev = referenceFundamentalFrequencies[
+        slotForScreenX(drawParams.ringSlots.z, x - 1u, width)
+      ];
     }
     var referenceNext = 0.0;
     if (x + 1u < width) {
-      referenceNext = referenceFundamentalFrequencies[x + 1u];
+      referenceNext = referenceFundamentalFrequencies[
+        slotForScreenX(drawParams.ringSlots.z, x + 1u, width)
+      ];
     }
     referenceMask = lineMaskAtPixel(
       position.xy,
@@ -207,14 +235,18 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   var targetFreq = 0.0;
   let targetVisible = drawParams.visibility.w != 0u;
   if (targetVisible) {
-    targetFreq = targetFundamentalFrequencies[x];
+    targetFreq = targetFundamentalFrequencies[targetSlot];
     var targetPrev = 0.0;
     if (x > 0u) {
-      targetPrev = targetFundamentalFrequencies[x - 1u];
+      targetPrev = targetFundamentalFrequencies[
+        slotForScreenX(drawParams.ringSlots.w, x - 1u, width)
+      ];
     }
     var targetNext = 0.0;
     if (x + 1u < width) {
-      targetNext = targetFundamentalFrequencies[x + 1u];
+      targetNext = targetFundamentalFrequencies[
+        slotForScreenX(drawParams.ringSlots.w, x + 1u, width)
+      ];
     }
     targetMask = lineMaskAtPixel(
       position.xy,
@@ -234,7 +266,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   if (targetMask > 0.0) {
     var targetColor = drawParams.recordingMissColor.xyz;
     if (referenceVisible) {
-      let referenceFreq = referenceFundamentalFrequencies[x];
+      let referenceFreq = referenceFundamentalFrequencies[referenceSlot];
       if (referenceFreq > 0.0) {
         targetColor = targetLineColor(referenceFreq, targetFreq);
       }

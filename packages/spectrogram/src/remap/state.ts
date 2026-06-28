@@ -49,7 +49,7 @@ export const createStateCell = (
     create: (arg: {
       spectra: SpectrogramBandSpectrum[];
       texture: GPUTextureView;
-      params: GPUBuffer;
+      params: StateParams;
       bindGroupLayout: GPUBindGroupLayout;
     }): GPUBindGroup =>
       device.createBindGroup({
@@ -57,7 +57,13 @@ export const createStateCell = (
         layout: arg.bindGroupLayout,
         entries: [
           { binding: 0, resource: arg.texture },
-          { binding: 1, resource: { buffer: arg.params } },
+          {
+            binding: 1,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
           ...arg.spectra.flatMap((spectrum, index) => [
             {
               binding: 2 + index * 2,
@@ -85,7 +91,7 @@ export const createStateCell = (
       const bindGroup = bindGroupCell.get({
         spectra,
         texture,
-        params: params.buffer,
+        params,
         bindGroupLayout: pipelines.bindGroupLayout,
       });
 

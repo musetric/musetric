@@ -10,8 +10,10 @@ struct FundamentalFrequencyParams {
   minimumFundamentalIntensity: f32,
   minimumScore: f32,
   harmonicCount: u32,
-  pad0: u32,
-  pad1: u32,
+  slotOffset: u32,
+  columnCount: u32,
+  screenBase: u32,
+  baseSlot: u32,
 };
 
 struct CandidateStats {
@@ -25,7 +27,6 @@ struct CandidateStats {
 };
 
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
-@group(0) @binding(1) var<storage, read_write> scores: array<f32>;
 @group(0) @binding(2) var<storage, read_write> rawOutput: array<f32>;
 @group(0) @binding(3) var<uniform> params: FundamentalFrequencyParams;
 
@@ -44,6 +45,9 @@ const harmonicWeights = array<f32, 11>(
 );
 
 const prominenceProbeRatio = 1.041243772;
+
+var<workgroup> workgroupScores: array<f32, 256>;
+var<workgroup> workgroupCandidates: array<u32, 256>;
 
 fn frequencyAtCandidate(candidate: u32) -> f32 {
   return params.minimumFrequency *
@@ -274,41 +278,81 @@ fn refinementScore(windowIndex: u32, frequency: f32) -> f32 {
   return max(stats.score, 0.0);
 }
 
-@compute @workgroup_size(64)
-fn scoreCandidates(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let totalThreads = params.windowCount * params.candidateCount;
-  let index = gid.x;
-  if (index >= totalThreads) {
-    return;
-  }
-
-  let windowIndex = index / params.candidateCount;
-  let candidate = index % params.candidateCount;
-  let frequency = frequencyAtCandidate(candidate);
-  scores[windowIndex * params.candidateCount + candidate] =
-    harmonicScore(windowIndex, frequency);
+fn shouldReplaceBest(
+  score: f32,
+  candidate: u32,
+  bestScore: f32,
+  bestCandidate: u32,
+) -> bool {
+  return score > bestScore || (score == bestScore && candidate < bestCandidate);
 }
 
-@compute @workgroup_size(64)
-fn pickBest(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let windowIndex = gid.x;
-  if (windowIndex >= params.windowCount) {
+@compute @workgroup_size(256)
+fn scoreAndPick(
+  @builtin(workgroup_id) workgroupId: vec3<u32>,
+  @builtin(local_invocation_id) localId: vec3<u32>,
+) {
+  let localWindowIndex = workgroupId.x;
+  let threadIndex = localId.x;
+  if (localWindowIndex >= params.columnCount) {
     return;
   }
-
+  let windowIndex = (params.slotOffset + localWindowIndex) % params.windowCount;
   let candidateCount = params.candidateCount;
-  let base = windowIndex * candidateCount;
 
   var bestScore = 0.0;
   var bestCandidate = 0u;
-  for (var c = 0u; c < candidateCount; c += 1u) {
-    let candidateScore = scores[base + c];
-    if (candidateScore > bestScore) {
+  for (
+    var candidate = threadIndex;
+    candidate < candidateCount;
+    candidate += 256u
+  ) {
+    let candidateScore = harmonicScore(
+      windowIndex,
+      frequencyAtCandidate(candidate),
+    );
+    if (
+      shouldReplaceBest(
+        candidateScore,
+        candidate,
+        bestScore,
+        bestCandidate,
+      )
+    ) {
       bestScore = candidateScore;
-      bestCandidate = c;
+      bestCandidate = candidate;
     }
   }
 
+  workgroupScores[threadIndex] = bestScore;
+  workgroupCandidates[threadIndex] = bestCandidate;
+  workgroupBarrier();
+
+  for (var stride = 128u; stride > 0u; stride = stride / 2u) {
+    if (threadIndex < stride) {
+      let otherScore = workgroupScores[threadIndex + stride];
+      let otherCandidate = workgroupCandidates[threadIndex + stride];
+      if (
+        shouldReplaceBest(
+          otherScore,
+          otherCandidate,
+          workgroupScores[threadIndex],
+          workgroupCandidates[threadIndex],
+        )
+      ) {
+        workgroupScores[threadIndex] = otherScore;
+        workgroupCandidates[threadIndex] = otherCandidate;
+      }
+    }
+    workgroupBarrier();
+  }
+
+  if (threadIndex != 0u) {
+    return;
+  }
+
+  bestScore = workgroupScores[0];
+  bestCandidate = workgroupCandidates[0];
   if (bestScore <= 0.0) {
     rawOutput[windowIndex] = 0.0;
     return;

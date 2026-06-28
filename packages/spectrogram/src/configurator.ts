@@ -1,10 +1,14 @@
 import { applyPatchConfig } from '@musetric/utils';
 import { spectrogramConfigFieldEqual } from './common/configFieldEqual.js';
-import { type ExtSpectrogramConfig } from './common/extConfig.js';
+import {
+  computeColumnStep,
+  type ExtSpectrogramConfig,
+} from './common/extConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {
   allTrackKeys,
   buildSpectrogramConfig,
+  mapTrackKeys,
   type SpectrogramConfig,
   type TrackKey,
 } from './config.cross.js';
@@ -31,7 +35,7 @@ export type SpectrogramTrack = {
 };
 
 export type SpectrogramRuntime = {
-  config: SpectrogramConfig;
+  config: ExtSpectrogramConfig;
   state: SpectrogramState;
   tracks: Record<TrackKey, SpectrogramTrack>;
   draw: SpectrogramDraw;
@@ -61,19 +65,10 @@ export const createSpectrogramConfigurator = (
     markers.getGpuMarker('draw'),
   );
 
-  const trackCells = allTrackKeys.reduce(
-    (acc, key) => {
-      acc[key] = {
-        lane: createSpectrogramLaneCell(device, {
-          label: key,
-        }),
-        remap: createSpectrogramRemapCell(device),
-      };
-      return acc;
-    },
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    {} as Record<TrackKey, TrackCells>,
-  );
+  const trackCells = mapTrackKeys<TrackCells>((key) => ({
+    lane: createSpectrogramLaneCell(device, { label: key }),
+    remap: createSpectrogramRemapCell(device),
+  }));
 
   const buildConfig = (): ExtSpectrogramConfig | undefined => {
     const baseConfig = buildSpectrogramConfig(config, draftConfig);
@@ -81,9 +76,11 @@ export const createSpectrogramConfigurator = (
       return undefined;
     }
     draftConfig = undefined;
+    const windowCount = baseConfig.viewSize.width;
     return {
       ...baseConfig,
-      windowCount: baseConfig.viewSize.width,
+      windowCount,
+      columnStep: computeColumnStep({ ...baseConfig, windowCount }),
     };
   };
 
@@ -102,31 +99,21 @@ export const createSpectrogramConfigurator = (
       const state = stateCell.get(nextConfig);
       const { texture } = state;
 
-      const tracks = allTrackKeys.reduce(
-        (acc, key, index) => {
-          const lane = trackCells[key].lane.get(nextConfig);
-          const remap = nextConfig.lanes[key].showSpectrogram
-            ? trackCells[key].remap.get({
-                spectra: lane.bandSpectra,
-                texture: texture.layerViews[index],
-                config: nextConfig,
-                gainDb: nextConfig.lanes[key].gainDb,
-              })
-            : undefined;
-          acc[key] = { lane, remap };
-          return acc;
-        },
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        {} as Record<TrackKey, SpectrogramTrack>,
-      );
+      const tracks = mapTrackKeys<SpectrogramTrack>((key, index) => {
+        const lane = trackCells[key].lane.get(nextConfig);
+        const remap = nextConfig.lanes[key].showSpectrogram
+          ? trackCells[key].remap.get({
+              spectra: lane.bandSpectra,
+              texture: texture.layerViews[index],
+              config: nextConfig,
+              gainDb: nextConfig.lanes[key].gainDb,
+            })
+          : undefined;
+        return { lane, remap };
+      });
 
-      const fundamentalFrequencies = allTrackKeys.reduce(
-        (acc, key) => {
-          acc[key] = tracks[key].lane.fundamentalFrequencyBuffer;
-          return acc;
-        },
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        {} as Record<TrackKey, GPUBuffer>,
+      const fundamentalFrequencies = mapTrackKeys<GPUBuffer>(
+        (key) => tracks[key].lane.fundamentalFrequencyBuffer,
       );
 
       const draw = drawCell.get({

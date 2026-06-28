@@ -1,10 +1,17 @@
 import { createResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import { createDynamicUniformParams } from '../common/dynamicUniform.js';
+import {
+  type ExtSpectrogramConfig,
+  type SpectrogramColumnRange,
+} from '../common/extConfig.js';
 
 export type MagnitudifyParams = {
   windowSize: number;
   windowCount: number;
 };
+
+export const slotOffsetByteOffset = 8;
+const paramsByteLength = 16;
 
 const toParams = (config: ExtSpectrogramConfig): MagnitudifyParams => ({
   windowSize: config.windowSize * config.zeroPaddingFactor,
@@ -14,26 +21,46 @@ const toParams = (config: ExtSpectrogramConfig): MagnitudifyParams => ({
 export type StateParams = {
   value: MagnitudifyParams;
   buffer: GPUBuffer;
+  byteLength: number;
+  writeRange: (
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => {
+    columnCount: number;
+    byteOffset: number;
+  };
 };
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: ExtSpectrogramConfig): StateParams => {
       const value = toParams(config);
-      const array = new Uint32Array(2);
-      array[0] = value.windowSize;
-      array[1] = value.windowCount;
-
-      const buffer = device.createBuffer({
+      const params = createDynamicUniformParams(device, {
         label: 'magnitudify-params-buffer',
-        size: array.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        byteLength: paramsByteLength,
+        capacity: value.windowCount,
       });
-      device.queue.writeBuffer(buffer, 0, array);
 
       return {
         value,
-        buffer,
+        buffer: params.buffer,
+        byteLength: params.byteLength,
+        writeRange: (range) => {
+          const columnCount = range ? range.columnCount : value.windowCount;
+          const byteOffset = params.write((view) => {
+            view.setUint32(0, value.windowSize, true);
+            view.setUint32(4, value.windowCount, true);
+            view.setUint32(
+              slotOffsetByteOffset,
+              range ? range.slotOffset : 0,
+              true,
+            );
+            view.setUint32(12, 0, true);
+          });
+          return {
+            columnCount,
+            byteOffset,
+          };
+        },
       };
     },
     dispose: (params) => {

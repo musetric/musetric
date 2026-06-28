@@ -1,4 +1,5 @@
 import { type ResourceCell } from '@musetric/utils';
+import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { createPipelines } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -7,9 +8,18 @@ const workgroupSize = 64;
 export type SpectrogramDecibelify = {
   columnEnergy: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
-  dispatchEnergy: (pass: GPUComputePassEncoder) => void;
-  dispatchRun: (pass: GPUComputePassEncoder) => void;
-  dispatch: (pass: GPUComputePassEncoder) => void;
+  dispatchEnergy: (
+    pass: GPUComputePassEncoder,
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => void;
+  dispatchRun: (
+    pass: GPUComputePassEncoder,
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => void;
+  dispatch: (
+    pass: GPUComputePassEncoder,
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => void;
 };
 
 export const createSpectrogramDecibelifyCell = (
@@ -23,26 +33,42 @@ export const createSpectrogramDecibelifyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatchEnergy = (pass: GPUComputePassEncoder) => {
-        const { windowCount } = state.params.value;
+      const dispatchEnergy = (
+        pass: GPUComputePassEncoder,
+        range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+      ) => {
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0) {
+          return;
+        }
 
         pass.setPipeline(state.pipelines.energy);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(windowCount);
+        pass.setBindGroup(0, state.bindGroup, [byteOffset]);
+        pass.dispatchWorkgroups(columnCount);
       };
 
-      const dispatchRun = (pass: GPUComputePassEncoder) => {
-        const { halfSize, windowCount } = state.params.value;
+      const dispatchRun = (
+        pass: GPUComputePassEncoder,
+        range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+      ) => {
+        const { halfSize } = state.params.value;
         const xCount = Math.ceil(halfSize / workgroupSize);
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0) {
+          return;
+        }
 
         pass.setPipeline(state.pipelines.run);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(xCount, windowCount);
+        pass.setBindGroup(0, state.bindGroup, [byteOffset]);
+        pass.dispatchWorkgroups(xCount, columnCount);
       };
 
-      const dispatch = (pass: GPUComputePassEncoder) => {
-        dispatchEnergy(pass);
-        dispatchRun(pass);
+      const dispatch = (
+        pass: GPUComputePassEncoder,
+        range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+      ) => {
+        dispatchEnergy(pass, range);
+        dispatchRun(pass, range);
       };
 
       return {

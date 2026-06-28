@@ -30,7 +30,7 @@ export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
       {
         binding: 1,
         visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' },
+        buffer: { type: 'uniform', hasDynamicOffset: true },
       },
       ...spectrumEntries,
     ],

@@ -1,4 +1,5 @@
 import { type ResourceCell } from '@musetric/utils';
+import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { createPipelines } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -7,7 +8,16 @@ const workgroupSize = 64;
 export type SpectrogramFundamentalFrequency = {
   buffer: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
-  dispatch: (pass: GPUComputePassEncoder) => void;
+
+  dispatchScore: (
+    pass: GPUComputePassEncoder,
+    range?: SpectrogramColumnRange,
+  ) => void;
+
+  dispatchFilter: (
+    pass: GPUComputePassEncoder,
+    range?: SpectrogramColumnRange,
+  ) => void;
 };
 
 export const createSpectrogramFundamentalFrequencyCell = (
@@ -21,25 +31,35 @@ export const createSpectrogramFundamentalFrequencyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatch = (pass: GPUComputePassEncoder) => {
-        const { windowCount, candidateCount } = state.params.value;
-        const scoreThreads = Math.max(1, windowCount * candidateCount);
-        const scoreGroups = Math.ceil(scoreThreads / workgroupSize);
+      const dispatchScore = (
+        pass: GPUComputePassEncoder,
+        range?: SpectrogramColumnRange,
+      ) => {
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0) {
+          return;
+        }
+
+        pass.setPipeline(state.pipelines.scoreAndPick);
+        pass.setBindGroup(0, state.bindGroups.scoreAndPick, [byteOffset]);
+        pass.dispatchWorkgroups(columnCount);
+      };
+
+      const dispatchFilter = (
+        pass: GPUComputePassEncoder,
+        range?: SpectrogramColumnRange,
+      ) => {
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0) {
+          return;
+        }
         const windowGroups = Math.max(
           1,
-          Math.ceil(windowCount / workgroupSize),
+          Math.ceil(columnCount / workgroupSize),
         );
 
-        pass.setPipeline(state.pipelines.scoreCandidates);
-        pass.setBindGroup(0, state.bindGroups.scoreCandidates);
-        pass.dispatchWorkgroups(scoreGroups);
-
-        pass.setPipeline(state.pipelines.pickBest);
-        pass.setBindGroup(0, state.bindGroups.pickBest);
-        pass.dispatchWorkgroups(windowGroups);
-
         pass.setPipeline(state.pipelines.filter);
-        pass.setBindGroup(0, state.bindGroups.filter);
+        pass.setBindGroup(0, state.bindGroups.filter, [byteOffset]);
         pass.dispatchWorkgroups(windowGroups);
       };
 
@@ -50,10 +70,12 @@ export const createSpectrogramFundamentalFrequencyCell = (
             label: 'fundamental-frequency-pass',
             timestampWrites: marker,
           });
-          dispatch(pass);
+          dispatchScore(pass);
+          dispatchFilter(pass);
           pass.end();
         },
-        dispatch,
+        dispatchScore,
+        dispatchFilter,
       };
     },
     dispose: () => {

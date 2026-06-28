@@ -7,7 +7,7 @@ struct DecibelifyParams {
   gainOverReferenceMagnitude: f32,
   gateFloorDb: f32,
   gateRangeDb: f32,
-  padding: f32,
+  slotOffset: u32,
 };
 
 @group(0) @binding(0) var<storage, read> magnitude: array<f32>;
@@ -23,8 +23,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let gainOverReferenceMagnitude = params.gainOverReferenceMagnitude;
 
   let sampleIndex = gid.x;
-  let windowIndex = gid.y;
-  if (sampleIndex >= halfSize || windowIndex >= windowCount) {
+  let localWindowIndex = gid.y;
+  let windowIndex = (params.slotOffset + localWindowIndex) % windowCount;
+  if (sampleIndex >= halfSize || localWindowIndex >= windowCount) {
     return;
   }
   let windowOffset = halfSize * windowIndex + sampleIndex;

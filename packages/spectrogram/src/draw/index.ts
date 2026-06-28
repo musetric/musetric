@@ -1,12 +1,19 @@
 import { type ResourceCell } from '@musetric/utils';
 import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
-import { type SpectrogramConfig, type TrackKey } from '../config.cross.js';
+import {
+  allTrackKeys,
+  type SpectrogramConfig,
+  type TrackKey,
+} from '../config.cross.js';
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';
-import { createColorsCell } from './colors.js';
+import { createColorsCell, drawRingSlotsByteOffset } from './colors.js';
 
 export type SpectrogramDraw = {
-  run: (encoder: GPUCommandEncoder) => void;
+  run: (
+    encoder: GPUCommandEncoder,
+    baseSlots: Record<TrackKey, number>,
+  ) => void;
 };
 
 export type SpectrogramDrawArg = {
@@ -27,6 +34,7 @@ export const createSpectrogramDrawCell = (
     minFilter: 'nearest',
   });
   const bindGroupCell = createBindGroupCell(device, sampler);
+  const ringSlotsScratch = new Uint32Array(4);
 
   return {
     get: (arg) => {
@@ -44,7 +52,16 @@ export const createSpectrogramDrawCell = (
       });
 
       return {
-        run: (encoder) => {
+        run: (encoder, baseSlots) => {
+          ringSlotsScratch[0] = baseSlots[allTrackKeys[0]];
+          ringSlotsScratch[1] = baseSlots[allTrackKeys[1]];
+          ringSlotsScratch[2] = baseSlots[reference];
+          ringSlotsScratch[3] = baseSlots[target];
+          device.queue.writeBuffer(
+            colors.buffer,
+            drawRingSlotsByteOffset,
+            ringSlotsScratch,
+          );
           const targetView = canvas.context.getCurrentTexture().createView({
             label: 'draw-view',
           });

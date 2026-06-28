@@ -6,5 +6,8 @@ export default defineConfig({
     ...defaultConfig.test,
     include: ['**/*.bench.ts'],
     testTimeout: 0,
+    fileParallelism: false,
+    pool: 'forks',
+    maxWorkers: 1,
   },
 });

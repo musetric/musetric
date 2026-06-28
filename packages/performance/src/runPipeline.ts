@@ -126,41 +126,26 @@ export const runPipeline = async (
     onMetrics: metricsArray.push.bind(metricsArray),
   });
 
-  if (params.trackScope !== 'all') {
-    await processor.render(
-      { lead: samples, recording: recordingSamples },
-      progress,
-    );
-    metricsArray.length = 0;
-  }
-
-  const scopeInvalidation =
-    params.trackScope === 'all'
-      ? []
-      : [
-          {
-            trackKey: params.trackScope,
-            frameIndex: 0,
-            frameCount: 0,
-          },
-        ];
+  const renderSamples = () => {
+    const lead = samples.subarray(0);
+    const recording = recordingSamples.subarray(0);
+    if (params.trackScope === 'lead') {
+      return { lead };
+    }
+    if (params.trackScope === 'recording') {
+      return { recording };
+    }
+    return { lead, recording };
+  };
 
   for (let i = 0; i < warmupIters; i++) {
-    processor.invalidateSamples(scopeInvalidation);
-    await processor.render(
-      { lead: samples, recording: recordingSamples },
-      progress,
-    );
+    await processor.render(renderSamples(), progress);
   }
   metricsArray.length = 0;
 
   for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
     for (let i = 0; i < benchBatchSize; i++) {
-      processor.invalidateSamples(scopeInvalidation);
-      await processor.render(
-        { lead: samples, recording: recordingSamples },
-        progress,
-      );
+      await processor.render(renderSamples(), progress);
     }
 
     const totals = metricsArray.map((m) => m.total);

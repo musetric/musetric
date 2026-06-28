@@ -10,14 +10,12 @@ import {
 export type StateArg = {
   out: GPUBuffer;
   config: ExtSpectrogramConfig;
-  sampleOffset: number;
 };
 
 export type State = {
   pipeline: GPUComputePipeline;
   config: ExtSpectrogramConfig;
   out: GPUBuffer;
-  sampleOffset: number;
   params: StateParams;
   samples: StateSamples;
   windowFunction: StateWindowFunction;
@@ -34,7 +32,7 @@ export const createStateCell = (
   const bindGroupCell = createResourceCell({
     create: (arg: {
       out: GPUBuffer;
-      params: GPUBuffer;
+      params: StateParams;
       samples: GPUBuffer;
       windowFunction: GPUBuffer;
     }): GPUBindGroup =>
@@ -44,7 +42,13 @@ export const createStateCell = (
         entries: [
           { binding: 0, resource: { buffer: arg.samples } },
           { binding: 1, resource: { buffer: arg.out } },
-          { binding: 2, resource: { buffer: arg.params } },
+          {
+            binding: 2,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
           { binding: 3, resource: { buffer: arg.windowFunction } },
         ],
       }),
@@ -58,13 +62,13 @@ export const createStateCell = (
 
   return {
     get: (arg) => {
-      const { out, config, sampleOffset } = arg;
+      const { out, config } = arg;
       const params = paramsCell.get(config);
       const samples = samplesCell.get(params.value.visibleSamples);
       const windowFunction = windowFunctionCell.get(config);
       const bindGroup = bindGroupCell.get({
         out,
-        params: params.buffer,
+        params,
         samples: samples.buffer,
         windowFunction: windowFunction.buffer,
       });
@@ -73,7 +77,6 @@ export const createStateCell = (
         pipeline,
         config,
         out,
-        sampleOffset,
         params,
         samples,
         windowFunction,

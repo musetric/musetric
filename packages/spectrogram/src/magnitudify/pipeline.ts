@@ -22,7 +22,7 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
       {
         binding: 2,
         visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' },
+        buffer: { type: 'uniform', hasDynamicOffset: true },
       },
     ],
   });
