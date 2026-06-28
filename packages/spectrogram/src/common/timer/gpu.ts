@@ -8,7 +8,7 @@ export type GpuMarkers<Label extends string> = Record<
 export type GpuTimer<Label extends string> = {
   markers: GpuMarkers<Label>;
   resolve: (encoder: GPUCommandEncoder) => void;
-  read: () => Promise<Record<Label, number>>;
+  read: () => Promise<Record<Label, number> | undefined>;
   dispose: () => void;
 };
 
@@ -32,6 +32,14 @@ export const createGpuTimer = <Labels extends readonly string[]>(
     size,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
+  let disposed = false;
+  let reading = false;
+
+  const destroyResources = () => {
+    querySet.destroy();
+    resolveBuffer.destroy();
+    readBuffer.destroy();
+  };
 
   const markers = labels.reduce(
     (acc, label, i) => {
@@ -54,26 +62,41 @@ export const createGpuTimer = <Labels extends readonly string[]>(
       encoder.copyBufferToBuffer(resolveBuffer, 0, readBuffer, 0, size);
     },
     read: async () => {
-      await readBuffer.mapAsync(GPUMapMode.READ);
-      const times = new BigUint64Array(readBuffer.getMappedRange());
-      const result = labels.reduce(
-        (acc, label, i) => {
-          const start = times[i * 2];
-          const end = times[i * 2 + 1];
-          const duration = Number(end - start) / 1e6;
-          acc[label] = roundDuration(duration);
-          return acc;
-        },
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        {} as Record<Label, number>,
-      );
-      readBuffer.unmap();
-      return result;
+      if (disposed) {
+        return undefined;
+      }
+      reading = true;
+      try {
+        await readBuffer.mapAsync(GPUMapMode.READ);
+        const times = new BigUint64Array(readBuffer.getMappedRange());
+        const result = labels.reduce(
+          (acc, label, i) => {
+            const start = times[i * 2];
+            const end = times[i * 2 + 1];
+            const duration = Number(end - start) / 1e6;
+            acc[label] = roundDuration(duration);
+            return acc;
+          },
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+          {} as Record<Label, number>,
+        );
+        readBuffer.unmap();
+        return result;
+      } catch {
+        return undefined;
+      } finally {
+        reading = false;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (disposed) {
+          destroyResources();
+        }
+      }
     },
     dispose: () => {
-      querySet.destroy();
-      resolveBuffer.destroy();
-      readBuffer.destroy();
+      disposed = true;
+      if (!reading) {
+        destroyResources();
+      }
     },
   };
 };

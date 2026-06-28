@@ -149,6 +149,9 @@ export const createSpectrogramProcessorTimer = (
     },
     finish: async () => {
       const gpuMetrics = await gpu.read();
+      if (!gpuMetrics) {
+        return;
+      }
       const cpuMetrics = cpu.read();
       const metrics: SpectrogramProcessorMetrics = {
         ...gpuMetrics,
