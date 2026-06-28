@@ -23,7 +23,8 @@
     "project:build": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "bench": "node --import tsx ./scripts/bench.ts"
   },
   "peerDependencies": {
     "@musetric/fft": "workspace:*",
