@@ -18,22 +18,20 @@ import { type SpectrogramLaneWork } from './lane/index.js';
 
 export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
 
-export type SpectrogramRenderOptions = {
-  dirtyTracks?: readonly TrackKey[];
-  /**
-   * Tracks whose underlying PCM content changed since the last render (e.g. a
-   * recording write into the shared sample buffer). These force a full re-upload
-   * of the sample ring instead of an incremental playhead-slide upload.
-   */
-  contentChangedTracks?: readonly TrackKey[];
+export type SpectrogramSampleInvalidation = {
+  trackKey: TrackKey;
+  frameIndex: number;
+  frameCount: number;
 };
 
 export type SpectrogramProcessor = {
   render: (
     samples: SpectrogramSamples,
     trackProgress: number,
-    options?: SpectrogramRenderOptions,
   ) => Promise<boolean>;
+  invalidateSamples: (
+    invalidations: readonly SpectrogramSampleInvalidation[],
+  ) => void;
   updateConfig: (config: Partial<SpectrogramConfig>) => void;
   dispose: () => void;
 };
@@ -53,22 +51,6 @@ const createTrackFlags = (): Record<TrackKey, boolean> =>
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     {} as Record<TrackKey, boolean>,
   );
-
-const createTrackSelection = (
-  dirtyTracks?: readonly TrackKey[],
-): Record<TrackKey, boolean> => {
-  const selection = createTrackFlags();
-  if (!dirtyTracks) {
-    for (const key of allTrackKeys) {
-      selection[key] = true;
-    }
-    return selection;
-  }
-  for (const key of dirtyTracks) {
-    selection[key] = true;
-  }
-  return selection;
-};
 
 const createTrackWork = (
   runtime: SpectrogramRuntime,
@@ -306,23 +288,46 @@ export const createSpectrogramProcessor = (
   );
 
   const lastRendered: Record<TrackKey, boolean> = createTrackFlags();
+  const pendingDirty = new Set<TrackKey>();
+  const pendingContentChanged = new Set<TrackKey>();
+  const lastSamples: Record<TrackKey, Float32Array | undefined> =
+    allTrackKeys.reduce(
+      (acc, key) => {
+        acc[key] = undefined;
+        return acc;
+      },
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      {} as Record<TrackKey, Float32Array | undefined>,
+    );
 
   const render = markers.total(
-    async (
-      samples: SpectrogramSamples,
-      trackProgress: number,
-      renderOptions?: SpectrogramRenderOptions,
-    ) => {
+    async (samples: SpectrogramSamples, trackProgress: number) => {
       const runtime = configurator.configure();
       if (!runtime) {
         return false;
       }
       timer.configure();
       const work = createTrackWork(runtime);
-      const dirty = createTrackSelection(renderOptions?.dirtyTracks);
-      const contentChanged = createTrackSelection(
-        renderOptions?.contentChangedTracks ?? [],
-      );
+      for (const key of allTrackKeys) {
+        const current = samples[key];
+        if (current !== undefined && lastSamples[key] !== current) {
+          pendingContentChanged.add(key);
+          pendingDirty.add(key);
+        }
+      }
+      const dirty = createTrackFlags();
+      const contentChanged = createTrackFlags();
+      const noExplicitDirty = pendingDirty.size === 0;
+      for (const key of allTrackKeys) {
+        if (noExplicitDirty) {
+          dirty[key] = samples[key] !== undefined;
+        } else if (pendingDirty.has(key)) {
+          dirty[key] = samples[key] !== undefined;
+        }
+        if (pendingContentChanged.has(key)) {
+          contentChanged[key] = samples[key] !== undefined;
+        }
+      }
       const presence: Record<TrackKey, boolean> = createTrackFlags();
       const clearMissing: Record<TrackKey, boolean> = createTrackFlags();
       for (const key of allTrackKeys) {
@@ -349,20 +354,19 @@ export const createSpectrogramProcessor = (
       for (const key of allTrackKeys) {
         if (dirty[key] || clearMissing[key]) {
           lastRendered[key] = presence[key];
+          lastSamples[key] = samples[key];
         }
       }
+      pendingDirty.clear();
+      pendingContentChanged.clear();
       return true;
     },
   );
 
   return {
     render: createCallLatest(
-      async (
-        samples: SpectrogramSamples,
-        trackProgress: number,
-        renderOptions?: SpectrogramRenderOptions,
-      ) => {
-        const ok = await render(samples, trackProgress, renderOptions);
+      async (samples: SpectrogramSamples, trackProgress: number) => {
+        const ok = await render(samples, trackProgress);
         if (!ok) {
           return false;
         }
@@ -370,6 +374,14 @@ export const createSpectrogramProcessor = (
         return true;
       },
     ),
+    invalidateSamples: (invalidations) => {
+      for (const invalidation of invalidations) {
+        pendingDirty.add(invalidation.trackKey);
+        if (invalidation.frameCount > 0) {
+          pendingContentChanged.add(invalidation.trackKey);
+        }
+      }
+    },
     updateConfig: configurator.updateConfig,
     dispose: () => {
       timer.dispose();
