@@ -1,9 +1,10 @@
-import { allTrackKeys, type TrackKey } from '@musetric/spectrogram';
+import { allTrackKeys } from '@musetric/spectrogram';
 import {
   averageMetrics,
   createSpectrogramProcessor,
   getGpuDevice,
   type SpectrogramProcessorMetrics,
+  type SpectrogramSampleInvalidation,
 } from '@musetric/spectrogram/gpu';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
@@ -23,8 +24,6 @@ export type CreateSpectrogramRuntimeOptions = {
   profiling?: boolean;
 };
 
-// Slot 0 of the shared playhead holds the current frameIndex (layout owned by
-// playhead.cross.ts).
 const playheadFrameIndexSlot = 0;
 
 const emptySamples = (): SpectrogramLaneSamples =>
@@ -33,15 +32,18 @@ const emptySamples = (): SpectrogramLaneSamples =>
     return acc;
   }, {});
 
+const playheadAdvanceInvalidations: readonly SpectrogramSampleInvalidation[] =
+  allTrackKeys.map((trackKey) => ({
+    trackKey,
+    frameIndex: 0,
+    frameCount: 0,
+  }));
+
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
   const { port, dataPort, playhead, profiling } = options;
 
-  // The status is posted to the main thread after every render, but it almost
-  // never changes between frames. Posting an identical 'success' ~60 times per
-  // second was the dominant worker cost (cross-thread postMessage + main-thread
-  // store churn), so only post when the status actually transitions.
   let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
   const setStatus = (status: 'pending' | 'error' | 'success') => {
     if (status === lastStatus) {
@@ -79,26 +81,16 @@ export const createSpectrogramRuntime = async (
   const hasAnySamples = () =>
     allTrackKeys.some((key) => samplesByLane[key] !== undefined);
 
-  const render = async (renderOptions?: {
-    dirtyTracks?: readonly TrackKey[];
-    contentChangedTracks?: readonly TrackKey[];
-  }) => {
+  const render = async () => {
     if (!hasAnySamples()) {
       return;
     }
-
-    const ok = await processor.render(samplesByLane, trackProgress, {
-      dirtyTracks: renderOptions?.dirtyTracks,
-      contentChangedTracks: renderOptions?.contentChangedTracks,
-    });
+    const ok = await processor.render(samplesByLane, trackProgress);
     if (!ok) {
       return;
     }
     setStatus('success');
   };
-
-  const presentTrackKeys = (): TrackKey[] =>
-    allTrackKeys.filter((key) => samplesByLane[key] !== undefined);
 
   const playheadTrackProgress = () => {
     if (frameCount <= 0) {
@@ -108,8 +100,6 @@ export const createSpectrogramRuntime = async (
     return Math.min(1, Math.max(0, frameIndex / frameCount));
   };
 
-  // While playing, the worker reads the shared playhead on its own interval and
-  // re-renders, so the main thread no longer pushes setTrackProgress per frame.
   const renderFromPlayhead = async () => {
     if (rendering) {
       return;
@@ -117,6 +107,7 @@ export const createSpectrogramRuntime = async (
     rendering = true;
     try {
       trackProgress = playheadTrackProgress();
+      processor.invalidateSamples(playheadAdvanceInvalidations);
       await render();
     } finally {
       rendering = false;
@@ -128,17 +119,20 @@ export const createSpectrogramRuntime = async (
   dataPort.bindHandlers({
     mount: async (message) => {
       samplesByLane = { ...emptySamples(), ...message.samples };
-      await render({ contentChangedTracks: presentTrackKeys() });
+      await render();
     },
     unmount: () => {
       samplesByLane = emptySamples();
       setStatus('pending');
     },
     samplesChanged: (message) => {
-      void render({
-        dirtyTracks: [message.trackKey],
-        contentChangedTracks: [message.trackKey],
-      });
+      processor.invalidateSamples([
+        {
+          trackKey: message.trackKey,
+          frameIndex: message.frameIndex,
+          frameCount: message.frameCount,
+        },
+      ]);
     },
   });
 
@@ -179,6 +173,7 @@ export const createSpectrogramRuntime = async (
         renderLoop.start();
       } else {
         renderLoop.stop();
+        void render();
       }
     },
     updateConfig: (message) => {

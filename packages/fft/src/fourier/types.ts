@@ -12,9 +12,14 @@ export type FourierArg = {
   config: FourierConfig;
 };
 
+export type FourierDispatchRange = {
+  slotOffset: number;
+  columnCount: number;
+};
+
 export type Fourier = {
   run: (encoder: GPUCommandEncoder) => void;
-  dispatch: (pass: GPUComputePassEncoder) => void;
+  dispatch: (pass: GPUComputePassEncoder, range?: FourierDispatchRange) => void;
 };
 
 export type CreateFourier = (

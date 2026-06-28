@@ -55,12 +55,19 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
   let recordingChannels: Float32Array<SharedArrayBuffer>[] | undefined =
     undefined;
 
-  const notifyRecordingSamplesChanged = (frameCount: number) => {
-    if (frameCount <= 0) {
+  const notifyRecordingSamplesChanged = (change: {
+    frameIndex: number;
+    frameCount: number;
+  }) => {
+    if (change.frameCount <= 0) {
       return;
     }
 
-    spectrogramPort.methods.samplesChanged({ trackKey: 'recording' });
+    spectrogramPort.methods.samplesChanged({
+      trackKey: 'recording',
+      frameIndex: change.frameIndex,
+      frameCount: change.frameCount,
+    });
   };
 
   const getRecordingFrameCount = (): number => {
@@ -76,15 +83,15 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
   const writeRecordingSamples = (
     frameIndex: number,
     samples: Float32Array,
-  ): number => {
+  ): { frameIndex: number; frameCount: number } => {
     const channels = recordingChannels;
     if (!channels) {
-      return 0;
+      return { frameIndex, frameCount: 0 };
     }
 
     const recordingFrameCount = getRecordingFrameCount();
     if (recordingFrameCount <= 0) {
-      return 0;
+      return { frameIndex, frameCount: 0 };
     }
 
     const skippedFrameCount = Math.max(0, -frameIndex);
@@ -93,7 +100,7 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
       targetFrameIndex >= recordingFrameCount ||
       skippedFrameCount >= samples.length
     ) {
-      return 0;
+      return { frameIndex: targetFrameIndex, frameCount: 0 };
     }
 
     const frameCount = Math.min(
@@ -107,7 +114,7 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
     for (const channel of channels) {
       channel.set(patch, targetFrameIndex);
     }
-    return frameCount;
+    return { frameIndex: targetFrameIndex, frameCount };
   };
 
   return {
@@ -158,11 +165,8 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
       };
     },
     patchRecordingSamples: (message) => {
-      const frameCount = writeRecordingSamples(
-        message.frameIndex,
-        message.samples,
-      );
-      notifyRecordingSamplesChanged(frameCount);
+      const change = writeRecordingSamples(message.frameIndex, message.samples);
+      notifyRecordingSamplesChanged(change);
     },
     unmount: () => {
       recordingChannels = undefined;

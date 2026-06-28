@@ -126,12 +126,7 @@ export const runPipeline = async (
     onMetrics: (metrics) => metricsArray.push(metrics),
   });
 
-  const renderOptions =
-    params.trackScope === 'all'
-      ? undefined
-      : { dirtyTracks: [params.trackScope] };
-
-  if (renderOptions) {
+  if (params.trackScope !== 'all') {
     await processor.render(
       { lead: samples, recording: recordingSamples },
       progress,
@@ -139,21 +134,32 @@ export const runPipeline = async (
     metricsArray.length = 0;
   }
 
+  const scopeInvalidation =
+    params.trackScope === 'all'
+      ? []
+      : [
+          {
+            trackKey: params.trackScope,
+            frameIndex: 0,
+            frameCount: 0,
+          },
+        ];
+
   for (let i = 0; i < warmupIters; i++) {
+    processor.invalidateSamples(scopeInvalidation);
     await processor.render(
       { lead: samples, recording: recordingSamples },
       progress,
-      renderOptions,
     );
   }
   metricsArray.length = 0;
 
   for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
     for (let i = 0; i < benchBatchSize; i++) {
+      processor.invalidateSamples(scopeInvalidation);
       await processor.render(
         { lead: samples, recording: recordingSamples },
         progress,
-        renderOptions,
       );
     }
 
