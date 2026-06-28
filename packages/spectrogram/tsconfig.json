@@ -5,6 +5,7 @@
     { "path": "./tsconfig.cross.json" },
     { "path": "./tsconfig.src.json" },
     { "path": "./tsconfig.worker.json" },
-    { "path": "./tsconfig.script.json" }
+    { "path": "./tsconfig.script.json" },
+    { "path": "./tsconfig.test.json" }
   ]
 }
