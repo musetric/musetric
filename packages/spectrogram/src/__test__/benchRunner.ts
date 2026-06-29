@@ -1,4 +1,4 @@
-import { computeBenchStats } from '@musetric/utils';
+import { computeBenchStats, selectBenchRunsPerSample } from '@musetric/utils';
 import { createGpuContext } from '@musetric/utils/gpu';
 import { type SpectrogramSampleRange } from '../common/extConfig.js';
 import { type SpectrogramProcessorMetrics } from '../common/processorTimer.js';
@@ -12,8 +12,10 @@ import {
   benchBatchSize,
   benchMaxTries,
   benchStableCvPercent,
+  benchStableSampleWindow,
   createBenchBands,
   type SpectrogramBenchCase,
+  spectrogramBenchConfig,
   type SpectrogramBenchMetric,
   type SpectrogramBenchSummary,
   warmupIters,
@@ -27,16 +29,10 @@ const wallDevice = wallContext.device;
 
 const progressStart = 0.2;
 
-const getInvalidatedChunkCount = (benchCase: SpectrogramBenchCase): number =>
-  benchCase.scenario.invalidatedChunkCount ?? 1;
-
 type BenchDriver = {
   config: SpectrogramConfig;
-  framesPerRender: number;
-  invalidatedFrames: number;
   prime: (processor: SpectrogramProcessor) => Promise<void>;
   render: (processor: SpectrogramProcessor) => Promise<void>;
-  sampleSeconds: number;
 };
 
 const buildPresetConfig = (
@@ -61,21 +57,46 @@ const buildPresetConfig = (
     },
   });
 
+const averageMetrics = (
+  metricsList: SpectrogramProcessorMetrics[],
+): SpectrogramProcessorMetrics => {
+  if (metricsList.length < 1) {
+    return {};
+  }
+  const labels = new Set<string>();
+  for (const metrics of metricsList) {
+    for (const label of Object.keys(metrics)) {
+      labels.add(label);
+    }
+  }
+  const result: SpectrogramProcessorMetrics = {};
+  for (const label of labels) {
+    let sum = 0;
+    for (const metrics of metricsList) {
+      sum += metrics[label] ?? 0;
+    }
+    result[label] = sum / metricsList.length;
+  }
+  return result;
+};
+
 const aggregate = (
-  metricsArray: SpectrogramProcessorMetrics[],
+  samples: SpectrogramProcessorMetrics[],
 ): SpectrogramBenchMetric[] => {
   const labels = new Set<string>();
-  for (const metrics of metricsArray) {
+  for (const metrics of samples) {
     for (const label of Object.keys(metrics)) {
       labels.add(label);
     }
   }
   return [...labels].map((label) => {
-    const values = metricsArray.map((metrics) => metrics[label] ?? Number.NaN);
-    const { mean, cv } = computeBenchStats(values);
+    const values = samples.map((metrics) => metrics[label] ?? Number.NaN);
+    const { mean, cv } = computeBenchStats(values, spectrogramBenchConfig);
     return { label, mean, cv };
   });
 };
+
+const pilotSampleCount = 8;
 
 const gpuComputeLabels = [
   'sliceSamples',
@@ -228,12 +249,8 @@ const createDriver = (benchCase: SpectrogramBenchCase): BenchDriver => {
 
   return {
     config,
-    framesPerRender,
-    invalidatedFrames:
-      scenario.invalidatedFrames * getInvalidatedChunkCount(benchCase),
     prime,
     render,
-    sampleSeconds: scenario.sampleSeconds,
   };
 };
 
@@ -255,6 +272,7 @@ const measureProfiled = async (
 }> => {
   const driver = createDriver(benchCase);
   const metricsArray: SpectrogramProcessorMetrics[] = [];
+  const sampleMetrics: SpectrogramProcessorMetrics[] = [];
   const processor = createSpectrogramProcessor({
     device: profiledDevice,
     config: driver.config,
@@ -265,20 +283,38 @@ const measureProfiled = async (
     await warmup(driver, processor);
     metricsArray.length = 0;
 
+    for (let i = 0; i < pilotSampleCount; i += 1) {
+      await driver.render(processor);
+    }
+    const pilotTotals = metricsArray.map((metrics) => metrics.total);
+    const sampleSize = Math.max(
+      1,
+      selectBenchRunsPerSample(pilotTotals, spectrogramBenchConfig),
+    );
+    metricsArray.length = 0;
+
     for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex += 1) {
       for (let i = 0; i < benchBatchSize; i += 1) {
-        await driver.render(processor);
+        const startCount = metricsArray.length;
+        for (let j = 0; j < sampleSize; j += 1) {
+          await driver.render(processor);
+        }
+        const batch = metricsArray.slice(startCount);
+        sampleMetrics.push(averageMetrics(batch));
       }
-      const totals = metricsArray.map((metrics) => metrics.total);
-      const { cv } = computeBenchStats(totals);
+      if (sampleMetrics.length < benchStableSampleWindow) {
+        continue;
+      }
+      const sampleTotals = sampleMetrics.map((metrics) => metrics.total);
+      const { cv } = computeBenchStats(sampleTotals, spectrogramBenchConfig);
       if (cv <= benchStableCvPercent) {
         break;
       }
     }
 
     return {
-      metrics: aggregate(metricsArray),
-      sampleCount: metricsArray.length,
+      metrics: aggregate(sampleMetrics),
+      sampleCount: sampleMetrics.length,
     };
   } finally {
     processor.dispose();
@@ -289,7 +325,8 @@ const measureWall = async (
   benchCase: SpectrogramBenchCase,
 ): Promise<SpectrogramBenchMetric> => {
   const driver = createDriver(benchCase);
-  const durations: number[] = [];
+  const pilotDurations: number[] = [];
+  const sampleDurations: number[] = [];
   const processor = createSpectrogramProcessor({
     device: wallDevice,
     config: driver.config,
@@ -298,19 +335,37 @@ const measureWall = async (
   try {
     await warmup(driver, processor);
 
+    for (let i = 0; i < pilotSampleCount; i += 1) {
+      const start = performance.now();
+      await driver.render(processor);
+      pilotDurations.push(performance.now() - start);
+    }
+    const sampleSize = Math.max(
+      1,
+      selectBenchRunsPerSample(pilotDurations, spectrogramBenchConfig),
+    );
+
     for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex += 1) {
       for (let i = 0; i < benchBatchSize; i += 1) {
         const start = performance.now();
-        await driver.render(processor);
-        durations.push(performance.now() - start);
+        for (let j = 0; j < sampleSize; j += 1) {
+          await driver.render(processor);
+        }
+        sampleDurations.push((performance.now() - start) / sampleSize);
       }
-      const { cv } = computeBenchStats(durations);
+      if (sampleDurations.length < benchStableSampleWindow) {
+        continue;
+      }
+      const { cv } = computeBenchStats(sampleDurations, spectrogramBenchConfig);
       if (cv <= benchStableCvPercent) {
         break;
       }
     }
 
-    const { mean, cv } = computeBenchStats(durations);
+    const { mean, cv } = computeBenchStats(
+      sampleDurations,
+      spectrogramBenchConfig,
+    );
     return {
       label: 'wall',
       mean,
@@ -325,7 +380,6 @@ const measureCase = async (
   benchCase: SpectrogramBenchCase,
   timestamp: string,
 ): Promise<SpectrogramBenchSummary> => {
-  const driver = createDriver(benchCase);
   const wallMetric = await measureWall(benchCase);
   const profiled = await measureProfiled(benchCase);
   const metrics = [wallMetric, ...profiled.metrics];
@@ -342,9 +396,11 @@ const measureCase = async (
     scenario: benchCase.scenario.label,
     windowSize: benchCase.windowSize,
     bandCount: benchCase.bandCount,
-    sampleSeconds: driver.sampleSeconds,
-    framesPerRender: driver.framesPerRender,
-    invalidatedFrames: driver.invalidatedFrames,
+    sampleSeconds: benchCase.scenario.sampleSeconds,
+    framesPerRender: benchCase.scenario.framesPerRender,
+    invalidatedFrames:
+      benchCase.scenario.invalidatedFrames *
+      (benchCase.scenario.invalidatedChunkCount ?? 1),
     metrics,
     sampleCount: profiled.sampleCount,
   };

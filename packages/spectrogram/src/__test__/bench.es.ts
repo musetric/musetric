@@ -6,13 +6,20 @@ import {
 export const spectrogramBenchConfig: BenchStatsConfig = {
   ...defaultBenchStatsConfig,
   batchSize: 16,
-  maxTries: 6,
+  maxTries: 12,
   stableSampleWindow: 48,
+  stableCvPercent: 5,
+  targetSampleMs: 20,
+  maxRunsPerSample: 8,
+  trimFraction: 0.15,
 };
 export const benchBatchSize = spectrogramBenchConfig.batchSize;
 export const benchMaxTries = spectrogramBenchConfig.maxTries;
-export const benchStableCvPercent = spectrogramBenchConfig.stableSampleWindow;
-export const warmupIters = 8;
+export const benchStableCvPercent = spectrogramBenchConfig.stableCvPercent;
+export const benchStableSampleWindow =
+  spectrogramBenchConfig.stableSampleWindow;
+export const warmupIters = 32;
+export const benchMinMeanMsForCv = 0.01;
 
 export type BenchBand = {
   label: string;
@@ -211,6 +218,10 @@ export const formatBenchMarkdown = (
         continue;
       }
       meanCells.push(`${metric.mean.toFixed(3)}ms`);
+      if (!Number.isFinite(metric.cv) || metric.mean < benchMinMeanMsForCv) {
+        cvCells.push('-');
+        continue;
+      }
       cvCells.push(`${metric.cv.toFixed(2)}%`);
     }
     meanRows.push(`| ${meanCells.join(' | ')} |`);
