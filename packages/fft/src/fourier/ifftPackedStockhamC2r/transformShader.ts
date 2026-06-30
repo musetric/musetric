@@ -19,6 +19,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> sm0: array<vec2<f32>, packedWindowSize>;
@@ -58,7 +59,6 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Conjugate twiddle (+sin) turns the forward DIT butterfly into the inverse.
 fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
@@ -85,8 +85,6 @@ fn getResult(index: u32) -> vec2<f32> {
   return sm1[index];
 }
 
-// C2R combine: fold the half-spectrum bin k and its mirror (N-k) into the
-// packed complex sample feeding the size-(N/2) inverse FFT.
 fn complexStride() -> u32 {
   return params.windowSize + 2u;
 }
@@ -129,7 +127,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -138,8 +136,6 @@ fn main(
   let spectrumOffset = complexStride() * windowIndex;
   let signalOffset = params.windowSize * windowIndex;
 
-  // C2R prepack: packed(k) and packed(P-k) share the bin pair {k, P-k} and one
-  // twiddle (packed(P-k) = conj(even - i*odd)), halving global/table reads.
   if (t == 0u) {
     sm0[0u] = loadPackedSpectrum(spectrumOffset, 0u);
     if (packedWindowSize % 2u == 0u) {
@@ -192,7 +188,6 @@ fn main(
           getInvTwiddle(6u * tw));
         let a7 = mul(readStage(base + 7u * butterflyCount, readEven),
           getInvTwiddle(7u * tw));
-        // even-indexed inverse radix-4
         let e0 = a0 + a4;
         let e1 = a0 - a4;
         let e2 = a2 + a6;
@@ -201,7 +196,6 @@ fn main(
         let E1 = e1 + vec2<f32>(-e3.y, e3.x);
         let E2 = e0 - e2;
         let E3 = e1 + vec2<f32>(e3.y, -e3.x);
-        // odd-indexed inverse radix-4
         let f0 = a1 + a5;
         let f1 = a1 - a5;
         let f2 = a3 + a7;
@@ -210,7 +204,6 @@ fn main(
         let O1 = f1 + vec2<f32>(-f3.y, f3.x);
         let O2 = f0 - f2;
         let O3 = f1 + vec2<f32>(f3.y, -f3.x);
-        // combine with conjugate W8^-r
         let p0 = O0;
         let p1 = vec2<f32>(
           sqrt1_2 * (O1.x - O1.y),

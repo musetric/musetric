@@ -13,14 +13,12 @@ override columnRadix2StageCount: u32 = 0u;
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
-// Lane stride padding keeps the four lanes of a warp on distinct shared
-// memory banks now that warps span lanes first. Zero at tileSize 256, where
-// the eight padded arrays would not fit the 32 KB workgroup storage budget.
 override smPad: u32 = 8u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> rowAReal0: array<f32, batchSize * (tileSize + smPad)>;
@@ -117,8 +115,6 @@ fn writeColB(lane: u32, index: u32, readEven: bool, value: vec2<f32>) {
   }
 }
 
-// Small tiles run the original tight scalar radix-2 loops; the generic mixed
-// helpers measurably regress them (~20-30%).
 fn runColumnFftPairRadix2(t: u32, lane: u32) {
   let columnHalfSize = columnSize / 2u;
   for (var stage: u32 = 0u; stage < columnRadix2StageCount; stage++) {
@@ -414,15 +410,13 @@ fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
   spectrum[index + 1u] = value.y;
 }
 
-// Lanes sit on x so a warp spans the batch rows first: spectrum bin writes of
-// adjacent lanes land in the same 32-byte sector.
 @compute @workgroup_size(4, 64)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
   let pairIndex = workgroupId.x * batchSize + localId.x;
-  let windowIndex = workgroupId.y;
+  let windowIndex = params.batchOffset + workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }

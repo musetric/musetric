@@ -9,9 +9,6 @@ override columnRadix4StageCount: u32 = 0u;
 override columnRadix2StageCount: u32 = 0u;
 override columnRadix3StageCount: u32 = 0u;
 override columnRadix5StageCount: u32 = 0u;
-// Lane stride padding keeps the four lanes of a warp on distinct shared
-// memory banks now that warps span lanes first. Zero when the eight padded
-// arrays would not fit the 32 KB workgroup storage budget.
 override smPad: u32 = 8u;
 
 const threadCount: u32 = 64u;
@@ -20,6 +17,7 @@ const batchSize: u32 = 4u;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> rowAReal0: array<f32, batchSize * (tileSize + smPad)>;
@@ -269,7 +267,7 @@ fn main(
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
   let pairIndex = workgroupId.x * batchSize + localId.x;
-  let windowIndex = workgroupId.y;
+  let windowIndex = params.batchOffset + workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }

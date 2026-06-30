@@ -15,7 +15,31 @@ import { createWindowSizes } from './windowSizes.es.js';
 
 export type FourierBenchDirection = 'forward' | 'inverse';
 
-export type FourierBenchMode = 'cufft' | FourierMode | IFourierMode;
+export type FourierBatchRangeBenchScenario = {
+  readonly label: string;
+  readonly rangeCount: 1 | 2 | 3;
+  readonly totalDenominator: 4;
+};
+
+export const fourierBatchRangeBenchScenarios: readonly FourierBatchRangeBenchScenario[] =
+  [
+    { label: '1 range total 25%', rangeCount: 1, totalDenominator: 4 },
+    { label: '2 ranges total 25%', rangeCount: 2, totalDenominator: 4 },
+    { label: '3 ranges total 25%', rangeCount: 3, totalDenominator: 4 },
+  ];
+
+export type FourierBenchRangeMode = `${FourierMode}:range${1 | 2 | 3}q`;
+
+export const createFourierRangeBenchMode = (
+  mode: FourierMode,
+  scenario: FourierBatchRangeBenchScenario,
+): FourierBenchRangeMode => `${mode}:range${scenario.rangeCount}q`;
+
+export type FourierBenchMode =
+  | 'cufft'
+  | FourierMode
+  | IFourierMode
+  | FourierBenchRangeMode;
 
 export type FourierBenchSummary = {
   timestamp: string;
@@ -50,16 +74,74 @@ export const fourierSelectRunsPerSample = (
 export const fourierComputeStats = (values: readonly number[]): BenchStats =>
   computeBenchStats(values, defaultBenchStatsConfig);
 
-export const fourierModeLabels: Record<FourierBenchMode, string> = {
+const baseFourierModeLabels: Record<
+  'cufft' | FourierMode | IFourierMode,
+  string
+> = {
   cufft: 'cuFFT',
   fftPackedStockhamR2c: 'Stockham',
   fftPackedTiledR2c: 'Tiled',
   ifftPackedStockhamC2r: 'Stockham',
 };
 
+const rangeBenchBaseModes: ReadonlyMap<string, FourierMode> = new Map(
+  allFourierModes.flatMap((mode) =>
+    fourierBatchRangeBenchScenarios.map((scenario): [string, FourierMode] => [
+      createFourierRangeBenchMode(mode, scenario),
+      mode,
+    ]),
+  ),
+);
+
+export const isFourierBenchRangeMode = (
+  mode: FourierBenchMode,
+): mode is FourierBenchRangeMode => rangeBenchBaseModes.get(mode) !== undefined;
+
+export const getFourierRangeBenchBaseMode = (
+  mode: FourierBenchRangeMode,
+): FourierMode => {
+  const baseMode = rangeBenchBaseModes.get(mode);
+  if (baseMode === undefined) {
+    throw new Error(`Unknown Fourier range benchmark mode: ${mode}`);
+  }
+  return baseMode;
+};
+
+export const fourierRangeBenchModes: FourierBenchRangeMode[] =
+  allFourierModes.flatMap((mode) =>
+    fourierBatchRangeBenchScenarios.map((scenario) =>
+      createFourierRangeBenchMode(mode, scenario),
+    ),
+  );
+
+const createFourierModeLabels = (): Record<FourierBenchMode, string> => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const labels = { ...baseFourierModeLabels } as Record<
+    FourierBenchMode,
+    string
+  >;
+
+  for (const mode of allFourierModes) {
+    for (const scenario of fourierBatchRangeBenchScenarios) {
+      labels[createFourierRangeBenchMode(mode, scenario)] =
+        `${baseFourierModeLabels[mode]} ${scenario.label}`;
+    }
+  }
+
+  return labels;
+};
+
+export const fourierModeLabels: Record<FourierBenchMode, string> =
+  createFourierModeLabels();
+
 export const benchModeOrder: FourierBenchMode[] = [
   'cufft',
-  ...allFourierModes,
+  ...allFourierModes.flatMap((mode): FourierBenchMode[] => [
+    mode,
+    ...fourierBatchRangeBenchScenarios.map((scenario) =>
+      createFourierRangeBenchMode(mode, scenario),
+    ),
+  ]),
   ...allIFourierModes,
 ];
 
@@ -101,6 +183,9 @@ export const formatBenchMarkdown = (
   const meanRows = [header, separator];
   const cvRows = [header, separator];
   const cufftSummary = summaries.find((summary) => summary.mode === 'cufft');
+  const hasRangeSummary = summaries.some((summary) =>
+    isFourierBenchRangeMode(summary.mode),
+  );
 
   for (const [index, windowSize] of windowSizes.entries()) {
     const factorization = formatRadixStages(windowSize);
@@ -117,16 +202,20 @@ export const formatBenchMarkdown = (
         continue;
       }
 
-      const cufftMean = cufftSummary?.means[index];
+      const referenceMean = isFourierBenchRangeMode(summary.mode)
+        ? summariesByMode[getFourierRangeBenchBaseMode(summary.mode)]?.means[
+            index
+          ]
+        : cufftSummary?.means[index];
       const hasRatio =
         summary.mode !== 'cufft' &&
-        typeof cufftMean === 'number' &&
-        Number.isFinite(cufftMean) &&
-        cufftMean > 0;
+        typeof referenceMean === 'number' &&
+        Number.isFinite(referenceMean) &&
+        referenceMean > 0;
 
       meanCells.push(
         hasRatio
-          ? `${mean.toFixed(3)}ms x${(mean / cufftMean).toFixed(2)}`
+          ? `${mean.toFixed(3)}ms x${(mean / referenceMean).toFixed(2)}`
           : `${mean.toFixed(3)}ms`,
       );
       cvCells.push(`${cv.toFixed(2)}%`);
@@ -136,5 +225,9 @@ export const formatBenchMarkdown = (
     cvRows.push(`| ${cvCells.join(' | ')} |`);
   }
 
-  return `${meanRows.join('\n')}\n\n### CV (%)\n\n${cvRows.join('\n')}\n`;
+  const rangeNote = hasRangeSummary
+    ? '\n\nRange ratios are relative to the matching full WebGPU mode; non-range WebGPU ratios are relative to cuFFT.'
+    : '';
+
+  return `${meanRows.join('\n')}${rangeNote}\n\n### CV (%)\n\n${cvRows.join('\n')}\n`;
 };

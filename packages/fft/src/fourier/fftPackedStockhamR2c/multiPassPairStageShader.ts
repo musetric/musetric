@@ -1,9 +1,3 @@
-// Fused pair of Stockham DIT radix stages: one kernel applies stage A
-// (factor1 at stageStride) and stage B (factor2 at stageStride * factor1)
-// through workgroup shared memory, halving the global-memory round trips.
-// A group of factor1 * factor2 points is closed under both stages: the
-// factor2 stage-A butterflies of a group produce exactly the inputs of its
-// factor1 stage-B butterflies. Eight threads cooperate per group.
 export const multiPassPairStageShader = `
 override packedWindowSize: u32 = 8192u;
 override factor1: u32 = 8u;
@@ -27,6 +21,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 override pairSharedSize: u32 = 512u;
@@ -96,8 +91,6 @@ fn writeScratch(index: u32, value: vec2<f32>) {
   }
 }
 
-// Forward DFT of size f (2, 4 or 8) from xv into yv, bin order matching the
-// single-stage Stockham codelets.
 fn runDft(f: u32) {
   if (f == 8u) {
     let e0 = xv[0] + xv[4];
@@ -176,14 +169,12 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
 
   let t = localId.x;
-  // Consecutive threads take consecutive groups so global reads and writes
-  // stay coalesced; the cooperating role index moves slowly.
   let groupLocal = t % groupsPerWorkgroup;
   let role = t / groupsPerWorkgroup;
   let group = workgroupId.y * groupsPerWorkgroup + groupLocal;
@@ -199,7 +190,6 @@ fn main(
   let scratchOffset = packedWindowSize * windowIndex;
   let shBase = groupLocal * groupSize;
 
-  // Stage A: role = q2 picks one of the factor2 stage-A butterflies.
   if (groupInRange && role < factor2) {
     let blockA = blockB + role * twiddleScaleB;
     let srcBase = blockA * stageStride + kA;
@@ -217,7 +207,6 @@ fn main(
   }
   workgroupBarrier();
 
-  // Stage B: role = r picks one of the factor1 stage-B butterflies.
   if (groupInRange && role < factor1) {
     let kB = role * stageStride + kA;
     for (var q = 0u; q < factor2; q++) {

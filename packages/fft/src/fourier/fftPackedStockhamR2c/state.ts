@@ -1,6 +1,6 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FourierArg } from '../types.js';
-import { createParams, type Params } from './params.js';
+import { createParamsRing, type ParamsRing } from './params.js';
 import {
   createPipeline,
   type MultiPassPipeline,
@@ -27,25 +27,12 @@ type ScratchBuffers = {
   buffer1: GPUBuffer;
 };
 
-type SinglePassBindGroups = {
-  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
-  transform: GPUBindGroup;
-};
-
-type MultiPassBindGroups = {
-  kind: 'multiPass';
-  stages: GPUBindGroup[];
-};
-
-type BindGroups = SinglePassBindGroups | MultiPassBindGroups;
-
 type BaseState = {
   kind: PackedStockhamR2cVariant['kind'];
   variant: PackedStockhamR2cVariant;
   pipeline: Pipeline;
   tables: TrigTables;
-  bindGroups: BindGroups;
-  params: Params;
+  params: ParamsRing;
   dummyInput: GPUBuffer;
   windowCount: number;
 };
@@ -54,14 +41,14 @@ type SinglePassState = BaseState & {
   kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
   pipeline: SinglePassPipeline;
-  bindGroups: SinglePassBindGroups;
+  getBindGroup: (slot: number) => GPUBindGroup;
 };
 
 type MultiPassState = BaseState & {
   kind: 'multiPass';
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
   pipeline: MultiPassPipeline;
-  bindGroups: MultiPassBindGroups;
+  getStageBindGroups: (slot: number) => GPUBindGroup[];
   scratch: ScratchBuffers;
 };
 
@@ -131,7 +118,7 @@ const createScratchBuffers = (
   };
 };
 
-const createSinglePassBindGroups = (
+const createSinglePassBindGroup = (
   device: GPUDevice,
   pipeline: Extract<
     Pipeline,
@@ -139,11 +126,10 @@ const createSinglePassBindGroups = (
   >,
   tables: TrigTables,
   arg: FourierArg,
-  params: Params,
+  params: GPUBufferBinding,
   input: GPUBuffer,
-): SinglePassBindGroups => ({
-  kind: pipeline.kind,
-  transform: device.createBindGroup({
+): GPUBindGroup =>
+  device.createBindGroup({
     label: 'packed-stockham-r2c-transform-bind-group',
     layout: pipeline.transform.getBindGroupLayout(0),
     entries: [
@@ -151,33 +137,29 @@ const createSinglePassBindGroups = (
       { binding: 1, resource: { buffer: arg.spectrum } },
       { binding: 2, resource: { buffer: tables.fft } },
       { binding: 3, resource: { buffer: tables.r2c } },
-      { binding: 4, resource: { buffer: params.buffer } },
+      { binding: 4, resource: params },
     ],
-  }),
-});
+  });
 
-const createMultiPassBindGroups = (
+const createMultiPassStageBindGroups = (
   device: GPUDevice,
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
   pipeline: Extract<Pipeline, { kind: 'multiPass' }>,
   tables: TrigTables,
   scratch: ScratchBuffers,
   arg: FourierArg,
-  params: Params,
+  params: GPUBufferBinding,
   input: GPUBuffer,
-): MultiPassBindGroups => ({
-  kind: 'multiPass',
-  stages: pipeline.stages.map((stagePipeline, index) => {
+): GPUBindGroup[] =>
+  pipeline.stages.map((stagePipeline, index) => {
     const entries: GPUBindGroupEntry[] = [
       { binding: 0, resource: { buffer: input } },
       { binding: 1, resource: { buffer: arg.spectrum } },
       { binding: 2, resource: { buffer: scratch.buffer0 } },
       { binding: 3, resource: { buffer: scratch.buffer1 } },
       { binding: 4, resource: { buffer: tables.fft } },
-      { binding: 5, resource: { buffer: params.buffer } },
+      { binding: 5, resource: params },
     ];
-    // Pair kernels never pack, so their shader (and auto layout) has no
-    // r2c table binding.
     if (variant.kernels[index].kind === 'single') {
       entries.push({ binding: 6, resource: { buffer: tables.r2c } });
     }
@@ -186,8 +168,21 @@ const createMultiPassBindGroups = (
       layout: stagePipeline.getBindGroupLayout(0),
       entries,
     });
-  }),
-});
+  });
+
+const createSlotCache = <T>(
+  build: (slot: number) => T,
+): ((slot: number) => T) => {
+  const cache = new Map<number, T>();
+  return (slot) => {
+    let cached = cache.get(slot);
+    if (cached === undefined) {
+      cached = build(slot);
+      cache.set(slot, cached);
+    }
+    return cached;
+  };
+};
 
 export const createStateCell = (
   device: GPUDevice,
@@ -201,7 +196,7 @@ export const createStateCell = (
           `fftPackedStockhamR2c does not support windowSize=${arg.config.windowSize}`,
         );
       }
-      const params = createParams(device, arg.config);
+      const params = createParamsRing(device, arg.config);
       const dummyInput = createDummyInputBuffer(device);
       const input = inPlace ? dummyInput : arg.wave;
 
@@ -218,15 +213,17 @@ export const createStateCell = (
           variant,
           pipeline,
           tables,
-          bindGroups: createMultiPassBindGroups(
-            device,
-            variant,
-            pipeline,
-            tables,
-            scratch,
-            arg,
-            params,
-            input,
+          getStageBindGroups: createSlotCache((slot) =>
+            createMultiPassStageBindGroups(
+              device,
+              variant,
+              pipeline,
+              tables,
+              scratch,
+              arg,
+              params.binding(slot),
+              input,
+            ),
           ),
           scratch,
           params,
@@ -242,13 +239,15 @@ export const createStateCell = (
         variant,
         pipeline,
         tables,
-        bindGroups: createSinglePassBindGroups(
-          device,
-          pipeline,
-          tables,
-          arg,
-          params,
-          input,
+        getBindGroup: createSlotCache((slot) =>
+          createSinglePassBindGroup(
+            device,
+            pipeline,
+            tables,
+            arg,
+            params.binding(slot),
+            input,
+          ),
         ),
         params,
         dummyInput,
@@ -256,7 +255,7 @@ export const createStateCell = (
       };
     },
     dispose: (state) => {
-      state.params.buffer.destroy();
+      state.params.destroy();
       state.dummyInput.destroy();
       if (state.kind === 'multiPass') {
         state.scratch.buffer0.destroy();

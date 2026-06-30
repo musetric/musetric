@@ -19,6 +19,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> sm0: array<vec2<f32>, packedWindowSize>;
@@ -143,7 +144,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -155,11 +156,6 @@ fn main(
   var stageStride = 1u;
   var firstStage = 0u;
 
-  // Fuse the global load with the first radix-8 stage. That stage has
-  // stageStride == 1 so every twiddle is W^0 = 1 (a twiddle-free radix-8),
-  // letting us read 8 coalesced inputs straight from global into registers and
-  // write the butterfly outputs to shared, skipping one full shared round-trip
-  // and one barrier. Only power-of-two sizes start with a radix-8 stage.
   if (radix8StageCount > 0u) {
     let butterflyCount = packedWindowSize / 8u;
     for (var j = t; j < butterflyCount; j += threadCount) {
@@ -250,7 +246,6 @@ fn main(
           getFftTwiddle(6u * tw));
         let a7 = mul(readStage(base + 7u * butterflyCount, readEven),
           getFftTwiddle(7u * tw));
-        // even-indexed radix-4
         let e0 = a0 + a4;
         let e1 = a0 - a4;
         let e2 = a2 + a6;
@@ -259,7 +254,6 @@ fn main(
         let E1 = e1 + vec2<f32>(e3.y, -e3.x);
         let E2 = e0 - e2;
         let E3 = e1 + vec2<f32>(-e3.y, e3.x);
-        // odd-indexed radix-4
         let f0 = a1 + a5;
         let f1 = a1 - a5;
         let f2 = a3 + a7;
@@ -268,7 +262,6 @@ fn main(
         let O1 = f1 + vec2<f32>(f3.y, -f3.x);
         let O2 = f0 - f2;
         let O3 = f1 + vec2<f32>(-f3.y, f3.x);
-        // combine with W8^r
         let p0 = O0;
         let p1 = vec2<f32>(
           sqrt1_2 * (O1.x + O1.y),
@@ -425,8 +418,6 @@ fn main(
     workgroupBarrier();
   }
 
-  // R2C unpack. Bins k and P-k share the pair {res(k), res(P-k)}, so process
-  // both per iteration over the lower half, halving shared reads and trip count.
   if (t == 0u) {
     let z0 = getResult(0u);
     writeBin(spectrumOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));
