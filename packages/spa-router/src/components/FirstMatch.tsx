@@ -17,6 +17,7 @@ type MatchItem = {
 const getMatchItems = (children?: ReactNode): MatchItem[] => {
   const items: MatchItem[] = [];
 
+  // eslint-disable-next-line @eslint-react/no-children-for-each
   Children.forEach(children, (element) => {
     if (!isValidElement<PropsWithChildren>(element)) {
       return;
