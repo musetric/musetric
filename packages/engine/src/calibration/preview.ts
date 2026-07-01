@@ -1,6 +1,6 @@
 import {
   createMicrophoneAudioConstraints,
-  isLikelyMobileUserAgent,
+  mobileUserAgentPattern,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import { type Store } from '../common/store.js';
@@ -110,7 +110,7 @@ export const createCalibrationPreview = (
         }
         const inputDevice = resolveAudioInputDevice(devices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
         });
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: createMicrophoneAudioConstraints({
@@ -130,7 +130,7 @@ export const createCalibrationPreview = (
         }
         const expectedInputDevice = resolveAudioInputDevice(refreshedDevices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
         });
         const [track] = stream.getAudioTracks();
         const currentDeviceId = track.getSettings().deviceId;

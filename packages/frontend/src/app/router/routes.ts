@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 const toNumber = z.string().transform(Number).pipe(z.number());
 
+const projectIdSchema = z.object({ projectId: toNumber });
+
 export const routes = {
   home: createSpaRoute({
     path: { pattern: '/' },
@@ -16,29 +18,25 @@ export const routes = {
   projectsEdit: createSpaRoute({
     path: {
       pattern: '/projects/rename/:projectId',
-      parseNativeParams: (nativeParams) =>
-        z.object({ projectId: toNumber }).parse(nativeParams),
+      parseNativeParams: projectIdSchema.parse,
     },
   }),
   projectsPreview: createSpaRoute({
     path: {
       pattern: '/projects/preview/:projectId',
-      parseNativeParams: (nativeParams) =>
-        z.object({ projectId: toNumber }).parse(nativeParams),
+      parseNativeParams: projectIdSchema.parse,
     },
   }),
   projectsDelete: createSpaRoute({
     path: {
       pattern: '/projects/delete/:projectId',
-      parseNativeParams: (nativeParams) =>
-        z.object({ projectId: toNumber }).parse(nativeParams),
+      parseNativeParams: projectIdSchema.parse,
     },
   }),
   project: createSpaRoute({
     path: {
       pattern: '/project/:projectId',
-      parseNativeParams: (nativeParams) =>
-        z.object({ projectId: toNumber }).parse(nativeParams),
+      parseNativeParams: projectIdSchema.parse,
     },
   }),
   notFound: createSpaRoute({

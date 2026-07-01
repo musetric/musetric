@@ -1,7 +1,7 @@
 import {
   createMicrophoneAudioConstraints,
   estimateRecordingLatency,
-  isLikelyMobileUserAgent,
+  mobileUserAgentPattern,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import { type Store } from '../common/store.js';
@@ -169,7 +169,7 @@ export const createEngineRecorder = (
       const devices = await getAudioDevices();
       if (store.get().microphoneDeviceId === undefined) {
         const preferredDevice = resolveAudioInputDevice(devices, {
-          preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
         });
         if (preferredDevice) {
           const [currentTrack] = stream.getAudioTracks();

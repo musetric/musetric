@@ -19,6 +19,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-separate-type-imports': 'error',
   'musetric/no-switch-statements': 'error',
   'musetric/no-this-expression': 'error',
+  'musetric/no-trivial-function-wrappers': 'error',
   'musetric/no-type-method-signatures': 'error',
 };
 

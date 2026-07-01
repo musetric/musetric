@@ -123,7 +123,7 @@ export const runPipeline = async (
   const processor = createSpectrogramProcessor({
     device,
     config,
-    onMetrics: (metrics) => metricsArray.push(metrics),
+    onMetrics: metricsArray.push.bind(metricsArray),
   });
 
   if (params.trackScope !== 'all') {

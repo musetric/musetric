@@ -14,7 +14,7 @@ import {
   type AudioInputSourceKind,
   classifyAudioInputDevice,
   getRealAudioInputDevices,
-  isLikelyMobileUserAgent,
+  mobileUserAgentPattern,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import { type FC, type ReactNode } from 'react';
@@ -40,7 +40,7 @@ export const AudioInputSelect: FC = () => {
   const inputDevices = getRealAudioInputDevices(audioDevices);
   const resolvedInputDevice = resolveAudioInputDevice(audioDevices, {
     explicitDeviceId: microphoneDeviceId,
-    preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+    preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
   });
   const inputSelectValue = resolvedInputDevice?.deviceId ?? '';
 

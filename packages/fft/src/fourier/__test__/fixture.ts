@@ -215,5 +215,5 @@ const createDiagnosticFourierFixtures = (
 const windowSizes = createWindowSizes(32, 1024 * 64);
 
 export const fourierFixtures: FourierFixture[] = windowSizes.flatMap(
-  (windowSize) => createDiagnosticFourierFixtures(windowSize),
+  createDiagnosticFourierFixtures,
 );
