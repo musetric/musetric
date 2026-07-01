@@ -32,9 +32,9 @@ jobs:
             eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
       - run: yarn check:security
       - run: yarn check:deps
+      - run: yarn check:editor
+      - run: yarn check:format
+      - run: yarn check:translations
       - run: yarn check:ts
       - run: yarn check:lint
-      - run: yarn check:translations
-      - run: yarn check:format
-      - run: yarn check:editor
       - run: yarn test
