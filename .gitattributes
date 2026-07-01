@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# Generated: collapse in GitHub diffs and exclude from language stats
+yarn.lock linguist-generated=true

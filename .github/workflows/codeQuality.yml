@@ -36,4 +36,5 @@ jobs:
       - run: yarn check:lint
       - run: yarn check:translations
       - run: yarn check:format
+      - run: yarn check:editor
       - run: yarn test

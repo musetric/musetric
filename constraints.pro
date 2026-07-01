@@ -4,7 +4,7 @@ gen_enforced_dependency(WorkspaceCwd, DependencyIdent, DependencyRange, Dependen
   workspace_has_dependency(WorkspaceCwd, DependencyIdent, _, DependencyType),
   WorkspaceCwd \= OtherWorkspaceCwd.
 
-% Ensure consistent peer dependency versions across workspaces  
+% Ensure consistent peer dependency versions across workspaces
 gen_enforced_dependency(WorkspaceCwd, DependencyIdent, DependencyRange, peerDependencies) :-
   workspace_has_dependency(OtherWorkspaceCwd, DependencyIdent, DependencyRange, peerDependencies),
   workspace_has_dependency(WorkspaceCwd, DependencyIdent, _, peerDependencies),

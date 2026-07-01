@@ -1779,6 +1779,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/monorepo@workspace:."
   dependencies:
+    editorconfig-checker: "catalog:"
     grep-cli: "catalog:"
     ncp: "catalog:"
     prettier: "catalog:"
@@ -3652,6 +3653,16 @@ __metadata:
     readable-stream: "npm:^3.1.1"
     stream-shift: "npm:^1.0.2"
   checksum: 10c0/8a7621ae95c89f3937f982fe36d72ea997836a708471a75bb2a0eecde3330311b1e128a6dad510e0fd64ace0c56bff3484ed2e82af0e465600c82117eadfbda5
+  languageName: node
+  linkType: hard
+
+"editorconfig-checker@npm:6.1.1":
+  version: 6.1.1
+  resolution: "editorconfig-checker@npm:6.1.1"
+  bin:
+    ec: dist/index.js
+    editorconfig-checker: dist/index.js
+  checksum: 10c0/0a46ce93e2821041c4b4bbf2ab9dc30e1b4eb03d3f20e5b14bbe45767f6f2aafd5e1310ea737c15402d8e193f702a421a814041e072584250e8a7d5e63d83741
   languageName: node
   linkType: hard
 
