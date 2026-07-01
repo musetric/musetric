@@ -9,6 +9,7 @@ import { noMixedReexportsRule } from './noMixedReexports.js';
 import { noNamedReexportsRule } from './noNamedReexports.js';
 import { noNullLiteralRule } from './noNullLiteral.js';
 import { noObjectMethodsRule } from './noObjectMethods.js';
+import { noProjectionConstantsRule } from './noProjectionConstants.js';
 import { noRenamedImportsRule } from './noRenamedImports.js';
 import { noScreamingSnakeCaseRule } from './noScreamingSnakeCase.js';
 import { noSeparateNamedExportsRule } from './noSeparateNamedExports.js';
@@ -30,6 +31,7 @@ export const musetricRules = {
   'no-named-reexports': noNamedReexportsRule,
   'no-null-literal': noNullLiteralRule,
   'no-object-methods': noObjectMethodsRule,
+  'no-projection-constants': noProjectionConstantsRule,
   'no-renamed-imports': noRenamedImportsRule,
   'no-screaming-snake-case': noScreamingSnakeCaseRule,
   'no-separate-named-exports': noSeparateNamedExportsRule,

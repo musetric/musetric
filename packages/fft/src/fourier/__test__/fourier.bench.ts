@@ -1,3 +1,4 @@
+import { defaultBenchStatsConfig } from '@musetric/utils';
 import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, it } from 'vitest';
 import {
@@ -11,9 +12,6 @@ import { getPackedStockhamC2rVariant } from '../ifftPackedStockhamC2r/support.js
 import { iffts } from '../iffts.js';
 import { type Fourier } from '../types.js';
 import {
-  benchBatchSize,
-  benchMaxTries,
-  benchStableCvPercent,
   benchWindowCounts,
   benchWindowSizes,
   createBenchTimestamp,
@@ -83,7 +81,7 @@ const measureBatch = (
   fourier: Fourier,
   runsPerSample: number,
 ): void => {
-  for (let i = 0; i < benchBatchSize; i++) {
+  for (let i = 0; i < defaultBenchStatsConfig.batchSize; i++) {
     const marker: GPUComputePassTimestampWrites = {
       querySet: timer.querySet,
       beginningOfPassWriteIndex: i * 2,
@@ -158,14 +156,18 @@ const measureOne = async (
   const values: number[] = [];
   let runsPerSample = 1;
 
-  for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
+  for (
+    let tryIndex = 0;
+    tryIndex < defaultBenchStatsConfig.maxTries;
+    tryIndex++
+  ) {
     const fourier = cell.get({
       wave: signal,
       spectrum: signal,
       config: { windowSize, windowCount },
     });
 
-    const timer = createGpuTimer(device, benchBatchSize * 2);
+    const timer = createGpuTimer(device, defaultBenchStatsConfig.batchSize * 2);
     const encoder = device.createCommandEncoder();
 
     measureBatch(encoder, timer, fourier, runsPerSample);
@@ -188,7 +190,7 @@ const measureOne = async (
 
     const { cv } = fourierComputeStats(values);
 
-    if (cv <= benchStableCvPercent) {
+    if (cv <= defaultBenchStatsConfig.stableCvPercent) {
       console.log(
         `${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}%`,
       );
@@ -196,7 +198,7 @@ const measureOne = async (
     }
 
     console.log(
-      `${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${benchMaxTries - 1}`,
+      `${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${defaultBenchStatsConfig.maxTries - 1}`,
     );
   }
 
@@ -249,14 +251,18 @@ const measureOneInverse = async (
   const values: number[] = [];
   let runsPerSample = 1;
 
-  for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
+  for (
+    let tryIndex = 0;
+    tryIndex < defaultBenchStatsConfig.maxTries;
+    tryIndex++
+  ) {
     const fourier = cell.get({
       wave,
       spectrum,
       config: { windowSize, windowCount },
     });
 
-    const timer = createGpuTimer(device, benchBatchSize * 2);
+    const timer = createGpuTimer(device, defaultBenchStatsConfig.batchSize * 2);
     const encoder = device.createCommandEncoder();
 
     measureBatch(encoder, timer, fourier, runsPerSample);
@@ -279,7 +285,7 @@ const measureOneInverse = async (
 
     const { cv } = fourierComputeStats(values);
 
-    if (cv <= benchStableCvPercent) {
+    if (cv <= defaultBenchStatsConfig.stableCvPercent) {
       console.log(
         `i${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}%`,
       );
@@ -287,7 +293,7 @@ const measureOneInverse = async (
     }
 
     console.log(
-      `i${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${benchMaxTries - 1}`,
+      `i${fourierModeLabels[mode]} ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${defaultBenchStatsConfig.maxTries - 1}`,
     );
   }
 

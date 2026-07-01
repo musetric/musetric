@@ -9,10 +9,6 @@ import {
   type SpectrogramProcessor,
 } from '../processor.js';
 import {
-  benchBatchSize,
-  benchMaxTries,
-  benchStableCvPercent,
-  benchStableSampleWindow,
   createBenchBands,
   type SpectrogramBenchCase,
   spectrogramBenchConfig,
@@ -24,8 +20,6 @@ import { buildConfig, createTone } from './common.js';
 
 const profiledContext = await createGpuContext(true);
 const wallContext = await createGpuContext();
-const profiledDevice = profiledContext.device;
-const wallDevice = wallContext.device;
 
 const progressStart = 0.2;
 
@@ -274,7 +268,7 @@ const measureProfiled = async (
   const metricsArray: SpectrogramProcessorMetrics[] = [];
   const sampleMetrics: SpectrogramProcessorMetrics[] = [];
   const processor = createSpectrogramProcessor({
-    device: profiledDevice,
+    device: profiledContext.device,
     config: driver.config,
     onMetrics: (metrics) => metricsArray.push(addDerivedMetrics(metrics)),
   });
@@ -293,8 +287,12 @@ const measureProfiled = async (
     );
     metricsArray.length = 0;
 
-    for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex += 1) {
-      for (let i = 0; i < benchBatchSize; i += 1) {
+    for (
+      let tryIndex = 0;
+      tryIndex < spectrogramBenchConfig.maxTries;
+      tryIndex += 1
+    ) {
+      for (let i = 0; i < spectrogramBenchConfig.batchSize; i += 1) {
         const startCount = metricsArray.length;
         for (let j = 0; j < sampleSize; j += 1) {
           await driver.render(processor);
@@ -302,12 +300,12 @@ const measureProfiled = async (
         const batch = metricsArray.slice(startCount);
         sampleMetrics.push(averageMetrics(batch));
       }
-      if (sampleMetrics.length < benchStableSampleWindow) {
+      if (sampleMetrics.length < spectrogramBenchConfig.stableSampleWindow) {
         continue;
       }
       const sampleTotals = sampleMetrics.map((metrics) => metrics.total);
       const { cv } = computeBenchStats(sampleTotals, spectrogramBenchConfig);
-      if (cv <= benchStableCvPercent) {
+      if (cv <= spectrogramBenchConfig.stableCvPercent) {
         break;
       }
     }
@@ -328,7 +326,7 @@ const measureWall = async (
   const pilotDurations: number[] = [];
   const sampleDurations: number[] = [];
   const processor = createSpectrogramProcessor({
-    device: wallDevice,
+    device: wallContext.device,
     config: driver.config,
   });
 
@@ -345,19 +343,23 @@ const measureWall = async (
       selectBenchRunsPerSample(pilotDurations, spectrogramBenchConfig),
     );
 
-    for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex += 1) {
-      for (let i = 0; i < benchBatchSize; i += 1) {
+    for (
+      let tryIndex = 0;
+      tryIndex < spectrogramBenchConfig.maxTries;
+      tryIndex += 1
+    ) {
+      for (let i = 0; i < spectrogramBenchConfig.batchSize; i += 1) {
         const start = performance.now();
         for (let j = 0; j < sampleSize; j += 1) {
           await driver.render(processor);
         }
         sampleDurations.push((performance.now() - start) / sampleSize);
       }
-      if (sampleDurations.length < benchStableSampleWindow) {
+      if (sampleDurations.length < spectrogramBenchConfig.stableSampleWindow) {
         continue;
       }
       const { cv } = computeBenchStats(sampleDurations, spectrogramBenchConfig);
-      if (cv <= benchStableCvPercent) {
+      if (cv <= spectrogramBenchConfig.stableCvPercent) {
         break;
       }
     }
