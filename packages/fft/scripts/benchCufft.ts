@@ -1,12 +1,10 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defaultBenchStatsConfig } from '@musetric/utils';
 import koffi, { type LibraryHandle } from 'koffi';
 import {
-  benchBatchSize,
   benchConfig,
-  benchMaxTries,
-  benchStableCvPercent,
   createBenchTimestamp,
   createBenchWave,
   type FourierBenchSummary,
@@ -242,7 +240,7 @@ const measureBatch = (
 ): number[] => {
   const values: number[] = [];
 
-  for (let i = 0; i < benchBatchSize; i++) {
+  for (let i = 0; i < defaultBenchStatsConfig.batchSize; i++) {
     const ms = measureOneRun(
       plan,
       deviceInput,
@@ -376,7 +374,11 @@ const measureOne = (
     const values: number[] = [];
     let runsPerSample = 1;
 
-    for (let tryIndex = 0; tryIndex < benchMaxTries; tryIndex++) {
+    for (
+      let tryIndex = 0;
+      tryIndex < defaultBenchStatsConfig.maxTries;
+      tryIndex++
+    ) {
       const batch = measureBatch(
         plan[0],
         deviceInput[0],
@@ -400,13 +402,13 @@ const measureOne = (
 
       const { cv } = fourierComputeStats(values);
 
-      if (cv <= benchStableCvPercent) {
+      if (cv <= defaultBenchStatsConfig.stableCvPercent) {
         console.log(`cuFFT ${windowCount} ${windowSize} cv=${cv.toFixed(1)}%`);
         break;
       }
 
       console.log(
-        `cuFFT ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${benchMaxTries - 1}`,
+        `cuFFT ${windowCount} ${windowSize} cv=${cv.toFixed(1)}% batch=${tryIndex}/${defaultBenchStatsConfig.maxTries - 1}`,
       );
     }
 

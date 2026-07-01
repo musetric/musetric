@@ -13,11 +13,6 @@ export const spectrogramBenchConfig: BenchStatsConfig = {
   maxRunsPerSample: 8,
   trimFraction: 0.15,
 };
-export const benchBatchSize = spectrogramBenchConfig.batchSize;
-export const benchMaxTries = spectrogramBenchConfig.maxTries;
-export const benchStableCvPercent = spectrogramBenchConfig.stableCvPercent;
-export const benchStableSampleWindow =
-  spectrogramBenchConfig.stableSampleWindow;
 export const warmupIters = 32;
 export const benchMinMeanMsForCv = 0.01;
 

@@ -29,12 +29,6 @@ export type FourierBenchSummary = {
   sampleCount: number;
 };
 
-export const benchBatchSize = defaultBenchStatsConfig.batchSize;
-
-export const benchMaxTries = defaultBenchStatsConfig.maxTries;
-
-export const benchStableCvPercent = defaultBenchStatsConfig.stableCvPercent;
-
 export type FourierBenchConfig = {
   windowSizes: number[];
   windowCounts: readonly number[];

@@ -13,6 +13,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-named-reexports': 'error',
   'musetric/no-null-literal': 'error',
   'musetric/no-object-methods': 'error',
+  'musetric/no-projection-constants': 'error',
   'musetric/no-renamed-imports': 'error',
   'musetric/no-screaming-snake-case': 'error',
   'musetric/no-separate-named-exports': 'error',
