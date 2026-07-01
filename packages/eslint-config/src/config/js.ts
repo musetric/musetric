@@ -129,7 +129,6 @@ export const jsConfig: Linter.Config = {
     ],
     'sonarjs/assertions-in-tests': 'off',
     'sonarjs/code-eval': 'off',
-    'sonarjs/cognitive-complexity': 'off',
     'sonarjs/different-types-comparison': 'off',
     'sonarjs/function-return-type': 'off',
     'sonarjs/hashing': 'off',
