@@ -27,12 +27,10 @@ const clickTailSeconds = 1.1;
 const clickDurationSeconds = 0.08;
 const clickFrequencyHz = 1800;
 const peakThreshold = 0.02;
-const minimumLatencyMs = 0;
-const maximumLatencyMs = 1000;
 
 export const recordingLatencyCalibrationTimeoutSeconds = 6.2;
-export const minimumRecordingLatencyMs = minimumLatencyMs;
-export const maximumRecordingLatencyMs = maximumLatencyMs;
+export const minimumRecordingLatencyMs = 0;
+export const maximumRecordingLatencyMs = 1000;
 
 export const createRecordingLatencyCalibrationClick = (
   context: AudioContext,
@@ -90,8 +88,11 @@ export const clampRecordingLatencyFrameCount = (
   sampleRate: number,
 ) =>
   Math.max(
-    Math.round((minimumLatencyMs / 1000) * sampleRate),
-    Math.min(Math.round((maximumLatencyMs / 1000) * sampleRate), frameCount),
+    Math.round((minimumRecordingLatencyMs / 1000) * sampleRate),
+    Math.min(
+      Math.round((maximumRecordingLatencyMs / 1000) * sampleRate),
+      frameCount,
+    ),
   );
 
 export const getRecordingLatencyFrameCount = (

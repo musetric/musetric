@@ -1,3 +1,4 @@
+import { noAliasConstantsRule } from './noAliasConstants.js';
 import { noAliasedReexportsRule } from './noAliasedReexports.js';
 import { noClassesRule } from './noClasses.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
@@ -17,6 +18,7 @@ import { noThisExpressionRule } from './noThisExpression.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
 
 export const musetricRules = {
+  'no-alias-constants': noAliasConstantsRule,
   'no-aliased-reexports': noAliasedReexportsRule,
   'no-classes': noClassesRule,
   'no-component-spacing-prop': noComponentSpacingPropRule,
