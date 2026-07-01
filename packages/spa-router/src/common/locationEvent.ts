@@ -10,8 +10,7 @@ export const onChangeLocation = () => {
 export const useMemoLocation = <T>(callback: () => T) => {
   const event = useLocationStore();
   // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
-  const result = useMemo(callback, [event]);
-  return result;
+  return useMemo(callback, [event]);
 };
 
 export const useSyncHistoryLocation = () => {

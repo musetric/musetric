@@ -79,8 +79,7 @@ export const createBlobStorage = (rootPath: string): BlobStorage => {
     },
     getAllBlobIds: async () => {
       const shardPaths = await getDirectoryShardPaths(rootPath);
-      const blobIds = await getDirectoriesBlobIds(shardPaths);
-      return blobIds;
+      return await getDirectoriesBlobIds(shardPaths);
     },
   };
 
