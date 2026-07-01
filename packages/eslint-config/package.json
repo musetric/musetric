@@ -24,6 +24,7 @@
     "eslint-plugin-react-hooks": "catalog:",
     "eslint-plugin-react-refresh": "catalog:",
     "eslint-plugin-simple-import-sort": "catalog:",
+    "eslint-plugin-sonarjs": "catalog:",
     "globals": "catalog:",
     "jiti": "catalog:",
     "typescript-eslint": "catalog:"

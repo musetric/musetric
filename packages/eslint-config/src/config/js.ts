@@ -1,7 +1,8 @@
-import eslint from '@eslint/js';
+﻿import eslint from '@eslint/js';
 import { type ESLint, type Linter } from 'eslint';
 import importX from 'eslint-plugin-import-x';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import sonarjs from 'eslint-plugin-sonarjs';
 import { musetricPlugin, musetricRecommendedRules } from '../plugin.js';
 
 export const jsConfig: Linter.Config = {
@@ -16,10 +17,12 @@ export const jsConfig: Linter.Config = {
     'import-x': importX as unknown as ESLint.Plugin,
     musetric: musetricPlugin,
     'simple-import-sort': simpleImportSort,
+    sonarjs,
   },
   rules: {
     ...eslint.configs.recommended.rules,
     ...musetricRecommendedRules,
+    ...sonarjs.configs.recommended.rules,
     'import-x/no-extraneous-dependencies': [
       'error',
       {
@@ -31,6 +34,21 @@ export const jsConfig: Linter.Config = {
         peerDependencies: true,
       },
     ],
+    'sonarjs/assertions-in-tests': 'off',
+    'sonarjs/code-eval': 'off',
+    'sonarjs/cognitive-complexity': 'off',
+    'sonarjs/different-types-comparison': 'off',
+    'sonarjs/function-return-type': 'off',
+    'sonarjs/hashing': 'off',
+    'sonarjs/no-duplicated-branches': 'off',
+    'sonarjs/no-identical-functions': 'off',
+    'sonarjs/no-nested-conditional': 'off',
+    'sonarjs/no-nested-functions': 'off',
+    'sonarjs/no-os-command-from-path': 'off',
+    'sonarjs/no-redundant-jump': 'off',
+    'sonarjs/prefer-regexp-exec': 'off',
+    'sonarjs/pseudo-random': 'off',
+    'sonarjs/todo-tag': 'off',
     'func-names': ['error'],
     'func-style': ['error'],
     eqeqeq: ['error', 'always'],
