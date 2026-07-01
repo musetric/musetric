@@ -100,6 +100,8 @@ export const jsConfig: Linter.Config = {
     'object-shorthand': ['error', 'always'],
     'simple-import-sort/exports': 'error',
     'no-nested-ternary': 'error',
+    'no-else-return': ['error', { allowElseIf: false }],
+    'no-lonely-if': 'error',
     'prefer-destructuring': [
       'error',
       {
