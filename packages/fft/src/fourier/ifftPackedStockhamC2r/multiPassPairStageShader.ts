@@ -1,4 +1,4 @@
-﻿// Fused pair of inverse Stockham DIT radix stages (see the forward
+// Fused pair of inverse Stockham DIT radix stages (see the forward
 // multiPassPairStageShader for the group structure). The first kernel can
 // additionally fuse the C2R prepack read.
 export const multiPassPairStageShader = `

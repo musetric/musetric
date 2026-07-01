@@ -1,4 +1,4 @@
-﻿export const firstPassMixedShader = `
+export const firstPassMixedShader = `
 override packedWindowSize: u32 = 2560u;
 override tileSize: u32 = 64u;
 override rowSize: u32 = 64u;

@@ -1,4 +1,4 @@
-﻿export const multiPassStageShader = `
+export const multiPassStageShader = `
 override packedWindowSize: u32 = 2560u;
 override factor: u32 = 5u;
 override stageStride: u32 = 1u;

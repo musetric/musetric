@@ -1,4 +1,4 @@
-﻿// Fused pair of Stockham DIT radix stages: one kernel applies stage A
+// Fused pair of Stockham DIT radix stages: one kernel applies stage A
 // (factor1 at stageStride) and stage B (factor2 at stageStride * factor1)
 // through workgroup shared memory, halving the global-memory round trips.
 // A group of factor1 * factor2 points is closed under both stages: the

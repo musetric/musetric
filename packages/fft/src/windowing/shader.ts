@@ -15,7 +15,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowSize = params.windowSize;
   let signalStride = params.signalStride;
   let windowCount = params.windowCount;
-  
+
   let sampleIndex = gid.x;
   let windowIndex = gid.y;
   if (sampleIndex >= windowSize || windowIndex >= windowCount) {

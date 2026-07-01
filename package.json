@@ -24,9 +24,11 @@
     "fix:translations": "yarn workspaces foreach --all --parallel --interlaced run fix:translations",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
+    "check:editor": "editorconfig-checker",
     "test": "yarn workspaces foreach --all --parallel --interlaced run test"
   },
   "devDependencies": {
+    "editorconfig-checker": "catalog:",
     "grep-cli": "catalog:",
     "ncp": "catalog:",
     "prettier": "catalog:"

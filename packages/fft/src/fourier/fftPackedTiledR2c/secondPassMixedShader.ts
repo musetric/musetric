@@ -1,4 +1,4 @@
-﻿export const secondPassMixedShader = `
+export const secondPassMixedShader = `
 override packedWindowSize: u32 = 2560u;
 override positiveWindowSize: u32 = 2560u;
 override tileSize: u32 = 64u;

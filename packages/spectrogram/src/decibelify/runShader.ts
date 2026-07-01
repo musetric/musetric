@@ -21,7 +21,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowCount = params.windowCount;
   let decibelFactor = params.decibelFactor;
   let gainOverReferenceMagnitude = params.gainOverReferenceMagnitude;
-  
+
   let sampleIndex = gid.x;
   let windowIndex = gid.y;
   if (sampleIndex >= halfSize || windowIndex >= windowCount) {
