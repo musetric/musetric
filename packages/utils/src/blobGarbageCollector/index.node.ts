@@ -15,13 +15,11 @@ export const createBlobGarbageCollector = (
   const { blobStorage, gcIntervalMs, blobRetentionMs, getReferencedBlobIds } =
     options;
 
-  const ref = createScheduler(
+  return createScheduler(
     createCallLatest(async () => {
       const referencedBlobIds = await getReferencedBlobIds();
       await collectGarbage(blobStorage, blobRetentionMs, referencedBlobIds);
     }),
     gcIntervalMs,
   );
-
-  return ref;
 };

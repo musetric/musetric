@@ -10,9 +10,8 @@ export type StateRoute<Params extends object> = Route<Params, unknown>;
 export const createStateRoute = <Params extends object = {}>(
   options?: StateRouteOptions<Params>,
 ): StateRoute<Params> => {
-  const route = createRoute({
+  return createRoute({
     locationNativeParams: () => window.history.state,
     ...options,
   });
-  return route;
 };

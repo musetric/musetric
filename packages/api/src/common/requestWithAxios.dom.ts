@@ -44,8 +44,7 @@ export const requestWithAxios = async <
 
   if (arrayConstructor) {
     const arrayBuffer = response.data as ArrayBuffer;
-    const result = new arrayConstructor(arrayBuffer);
-    return result;
+    return new arrayConstructor(arrayBuffer);
   }
   return response.data;
 };
