@@ -319,9 +319,7 @@ export const createSpectrogramProcessor = (
       const contentChanged = createTrackFlags();
       const noExplicitDirty = pendingDirty.size === 0;
       for (const key of allTrackKeys) {
-        if (noExplicitDirty) {
-          dirty[key] = samples[key] !== undefined;
-        } else if (pendingDirty.has(key)) {
+        if (noExplicitDirty || pendingDirty.has(key)) {
           dirty[key] = samples[key] !== undefined;
         }
         if (pendingContentChanged.has(key)) {
