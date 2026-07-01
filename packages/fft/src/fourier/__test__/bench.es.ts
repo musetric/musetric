@@ -1,6 +1,5 @@
 import {
   type BenchStats,
-  type BenchStatsConfig,
   computeBenchStats,
   defaultBenchStatsConfig,
   selectBenchRunsPerSample,
@@ -30,13 +29,11 @@ export type FourierBenchSummary = {
   sampleCount: number;
 };
 
-export const fourierBenchConfig: BenchStatsConfig = defaultBenchStatsConfig;
+export const benchBatchSize = defaultBenchStatsConfig.batchSize;
 
-export const benchBatchSize = fourierBenchConfig.batchSize;
+export const benchMaxTries = defaultBenchStatsConfig.maxTries;
 
-export const benchMaxTries = fourierBenchConfig.maxTries;
-
-export const benchStableCvPercent = fourierBenchConfig.stableCvPercent;
+export const benchStableCvPercent = defaultBenchStatsConfig.stableCvPercent;
 
 export type FourierBenchConfig = {
   windowSizes: number[];
@@ -54,10 +51,10 @@ export const benchConfig: FourierBenchConfig = {
 
 export const fourierSelectRunsPerSample = (
   durations: readonly number[],
-): number => selectBenchRunsPerSample(durations, fourierBenchConfig);
+): number => selectBenchRunsPerSample(durations, defaultBenchStatsConfig);
 
 export const fourierComputeStats = (values: readonly number[]): BenchStats =>
-  computeBenchStats(values, fourierBenchConfig);
+  computeBenchStats(values, defaultBenchStatsConfig);
 
 export const fourierModeLabels: Record<FourierBenchMode, string> = {
   cufft: 'cuFFT',
