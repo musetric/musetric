@@ -376,7 +376,7 @@ const measureWall = async (
   }
 };
 
-const measureCase = async (
+export const measureCase = async (
   benchCase: SpectrogramBenchCase,
   timestamp: string,
 ): Promise<SpectrogramBenchSummary> => {
@@ -405,8 +405,3 @@ const measureCase = async (
     sampleCount: profiled.sampleCount,
   };
 };
-
-export const runSingleBench = async (
-  benchCase: SpectrogramBenchCase,
-  timestamp: string,
-): Promise<SpectrogramBenchSummary> => measureCase(benchCase, timestamp);

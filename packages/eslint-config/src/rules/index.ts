@@ -15,6 +15,7 @@ import { noSeparateNamedExportsRule } from './noSeparateNamedExports.js';
 import { noSeparateTypeImportsRule } from './noSeparateTypeImports.js';
 import { noSwitchStatementsRule } from './noSwitchStatements.js';
 import { noThisExpressionRule } from './noThisExpression.js';
+import { noTrivialFunctionWrappersRule } from './noTrivialFunctionWrappers.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
 
 export const musetricRules = {
@@ -35,5 +36,6 @@ export const musetricRules = {
   'no-separate-type-imports': noSeparateTypeImportsRule,
   'no-switch-statements': noSwitchStatementsRule,
   'no-this-expression': noThisExpressionRule,
+  'no-trivial-function-wrappers': noTrivialFunctionWrappersRule,
   'no-type-method-signatures': noTypeMethodSignaturesRule,
 };

@@ -24,7 +24,7 @@ export const createStore = <State>(initialState: State): Store<State> => {
     update: (recipe) => {
       store.setState((state) => produce(state, recipe));
     },
-    subscribe: (selector, callback) => store.subscribe(selector, callback),
-    subscribeState: (callback) => store.subscribe(callback),
+    subscribe: store.subscribe,
+    subscribeState: store.subscribe,
   };
 };

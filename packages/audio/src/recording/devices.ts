@@ -22,8 +22,7 @@ export type ResolveAudioOutputDeviceOptions = {
 export const isPseudoDefaultDeviceId = (deviceId: string) =>
   deviceId === 'default' || deviceId === 'communications';
 
-export const isLikelyMobileUserAgent = (userAgent: string) =>
-  /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+export const mobileUserAgentPattern = /Android|iPhone|iPad|iPod|Mobile/i;
 
 export const isLikelyBluetoothAudioDevice = (device: MediaDeviceInfo) => {
   const label = device.label.toLowerCase();
@@ -212,4 +211,4 @@ export const resolveAudioOutputDevice = (
 };
 
 export const hasLikelyBluetoothAudioDevice = (devices: MediaDeviceInfo[]) =>
-  devices.some((device) => isLikelyBluetoothAudioDevice(device));
+  devices.some(isLikelyBluetoothAudioDevice);

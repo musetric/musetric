@@ -4,7 +4,7 @@ import {
 } from '@musetric/audio/calibration';
 import {
   getRecordingLatencyDevicePairKey,
-  isLikelyMobileUserAgent,
+  mobileUserAgentPattern,
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
@@ -80,7 +80,7 @@ export const createEngineCalibration = (
     const state = store.get();
     const inputDevice = resolveAudioInputDevice(state.audioDevices, {
       explicitDeviceId: state.microphoneDeviceId,
-      preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+      preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
     });
     const outputDevice = resolveAudioOutputDevice(state.audioDevices, {
       explicitDeviceId: state.audioOutputDeviceId,
@@ -142,7 +142,7 @@ export const createEngineCalibration = (
 
       const inputDevice = resolveAudioInputDevice(store.get().audioDevices, {
         explicitDeviceId: store.get().microphoneDeviceId,
-        preferBuiltIn: isLikelyMobileUserAgent(navigator.userAgent),
+        preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
       });
       const result = await measureRecordingLatency({
         context,

@@ -198,7 +198,7 @@ const createBandSpectrumCell = (
   });
 
   return {
-    get: (arg) => cell.get(arg),
+    get: cell.get,
     dispose: () => {
       cell.dispose();
       decibelifyCell.dispose();
@@ -427,7 +427,7 @@ export const createSpectrogramLaneCell = (
   });
 
   return {
-    get: (config) => laneCell.get(config),
+    get: laneCell.get,
     dispose: () => {
       laneCell.dispose();
       for (const cell of bandSpectrumCells) {

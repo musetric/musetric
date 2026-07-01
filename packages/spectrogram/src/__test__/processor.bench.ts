@@ -9,7 +9,7 @@ import {
   type SpectrogramBenchCase,
   type SpectrogramBenchPreset,
 } from './bench.es.js';
-import { runSingleBench } from './benchRunner.js';
+import { measureCase } from './benchRunner.js';
 
 const hd1Band: SpectrogramBenchPreset = {
   label: 'hd-1band',
@@ -49,7 +49,7 @@ describe('spectrogram benchmarks', () => {
   describe('hd-1band', () => {
     for (const benchCase of hd1BandBenchCases) {
       it(`render ${benchCase.scenario.label}`, async (context) => {
-        const summary = await runSingleBench(benchCase, benchTimestamp);
+        const summary = await measureCase(benchCase, benchTimestamp);
         Object.assign(context.task.meta, { bench: summary });
       });
     }
@@ -58,7 +58,7 @@ describe('spectrogram benchmarks', () => {
   describe('hd-3band', () => {
     for (const benchCase of hd3BandBenchCases) {
       it(`render ${benchCase.scenario.label}`, async (context) => {
-        const summary = await runSingleBench(benchCase, benchTimestamp);
+        const summary = await measureCase(benchCase, benchTimestamp);
         Object.assign(context.task.meta, { bench: summary });
       });
     }
