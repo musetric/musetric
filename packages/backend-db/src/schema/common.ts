@@ -1,4 +1,4 @@
-import z from 'zod';
+import { z } from 'zod';
 
 export const numericIdSchema = z
   .union([z.number(), z.bigint()])

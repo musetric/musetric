@@ -2,7 +2,7 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBenchTimestamp, defaultBenchStatsConfig } from '@musetric/utils';
-import koffi, { type LibraryHandle } from 'koffi';
+import * as koffi from 'koffi';
 import {
   benchConfig,
   createBenchWave,
@@ -50,7 +50,7 @@ const searchDllDirectories = (): string[] => {
 };
 
 const loadCudaLibs = ():
-  | { cudart: LibraryHandle; cufft: LibraryHandle }
+  | { cudart: koffi.LibraryHandle; cufft: koffi.LibraryHandle }
   | undefined => {
   const directories = searchDllDirectories();
 
@@ -112,8 +112,8 @@ const measureOneRun = (
   plan: number,
   deviceInput: bigint | null,
   deviceOutput: bigint | null,
-  cudart: LibraryHandle,
-  cufft: LibraryHandle,
+  cudart: koffi.LibraryHandle,
+  cufft: koffi.LibraryHandle,
   runsPerSample: number,
   direction: BenchDirection,
 ): number => {
@@ -232,8 +232,8 @@ const measureBatch = (
   plan: number,
   deviceInput: bigint | null,
   deviceOutput: bigint | null,
-  cudart: LibraryHandle,
-  cufft: LibraryHandle,
+  cudart: koffi.LibraryHandle,
+  cufft: koffi.LibraryHandle,
   runsPerSample: number,
   direction: BenchDirection,
 ): number[] => {
@@ -263,8 +263,8 @@ const measureBatch = (
 const measureOne = (
   windowSize: number,
   windowCount: number,
-  cudart: LibraryHandle,
-  cufft: LibraryHandle,
+  cudart: koffi.LibraryHandle,
+  cufft: koffi.LibraryHandle,
   direction: BenchDirection,
 ):
   | {
@@ -422,8 +422,8 @@ const measureOne = (
 const benchDirections: BenchDirection[] = ['forward', 'inverse'];
 
 const runBenchmark = (
-  cudart: LibraryHandle,
-  cufft: LibraryHandle,
+  cudart: koffi.LibraryHandle,
+  cufft: koffi.LibraryHandle,
 ): FourierBenchSummary[] => {
   const timestamp = createBenchTimestamp();
   const results: FourierBenchSummary[] = [];

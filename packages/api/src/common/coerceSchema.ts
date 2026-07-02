@@ -1,4 +1,4 @@
-import z from 'zod';
+import { z } from 'zod';
 
 const unwrap = (schema: z.core.$ZodType): z.core.$ZodType => {
   if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {

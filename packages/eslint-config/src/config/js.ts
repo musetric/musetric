@@ -1,8 +1,12 @@
 import eslint from '@eslint/js';
-import { type ESLint, type Linter } from 'eslint';
-import importX from 'eslint-plugin-import-x';
+import { type Linter } from 'eslint';
+import {
+  createTypeScriptImportResolver,
+  defaultConditionNames,
+} from 'eslint-import-resolver-typescript';
+import { importX } from 'eslint-plugin-import-x';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import sonarjs from 'eslint-plugin-sonarjs';
+import * as sonarjs from 'eslint-plugin-sonarjs';
 import { musetricPlugin, musetricRecommendedRules } from '../plugin.js';
 
 export const jsConfig: Linter.Config = {
@@ -12,20 +16,32 @@ export const jsConfig: Linter.Config = {
     ecmaVersion: 2024,
     sourceType: 'module',
   },
+  settings: {
+    ...importX.configs.typescript.settings,
+    'import-x/ignore': ['\\.(?:worker|worklet)\\.ts$'],
+    'import-x/resolver': undefined,
+    'import-x/resolver-next': createTypeScriptImportResolver({
+      conditionNames: ['monorepo', ...defaultConditionNames],
+      extensions: [
+        ...importX.configs.typescript.settings['import-x/extensions'],
+      ],
+    }),
+  },
   plugins: {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    'import-x': importX as unknown as ESLint.Plugin,
+    'import-x': importX,
     musetric: musetricPlugin,
     'simple-import-sort': simpleImportSort,
     sonarjs,
   },
   rules: {
     ...eslint.configs.recommended.rules,
+    ...importX.flatConfigs.recommended.rules,
     ...musetricRecommendedRules,
     ...sonarjs.configs.recommended.rules,
     eqeqeq: ['error', 'always'],
     'func-names': ['error'],
     'func-style': ['error'],
+    'import-x/no-cycle': ['error', { ignoreExternal: true }],
     'import-x/no-extraneous-dependencies': [
       'error',
       {
@@ -37,6 +53,7 @@ export const jsConfig: Linter.Config = {
         peerDependencies: true,
       },
     ],
+    'import-x/no-self-import': 'error',
     'max-nested-callbacks': ['error', 3],
     'no-duplicate-imports': ['error'],
     'no-else-return': ['error', { allowElseIf: false }],

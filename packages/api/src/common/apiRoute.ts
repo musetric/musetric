@@ -1,4 +1,4 @@
-import type z from 'zod';
+import { type z } from 'zod';
 import { apiEndpoint } from './apiEndpoint.js';
 
 export type RequestMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
