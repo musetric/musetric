@@ -1,3 +1,4 @@
+export * from './assert.js';
 export * from './benchStats.js';
 export * from './benchTimestamp.js';
 export * from './callEvery.js';

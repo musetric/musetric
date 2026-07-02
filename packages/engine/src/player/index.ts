@@ -1,4 +1,4 @@
-import { nextNumber } from '@musetric/utils';
+import { assertDefined, nextNumber } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
@@ -56,13 +56,8 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
 
-  const getEngineRecorder = () => {
-    if (!engineRecorder) {
-      throw new Error('Player is not booted');
-    }
-
-    return engineRecorder;
-  };
+  const getEngineRecorder = () =>
+    assertDefined(engineRecorder, 'Player is not booted');
 
   const getDecoderValue = () => getDecoder();
 

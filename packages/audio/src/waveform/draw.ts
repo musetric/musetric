@@ -1,3 +1,4 @@
+import { assertDefined } from '@musetric/utils';
 import { type WaveformColors } from './colors.es.js';
 import { type WaveformSegment } from './generateSegments.js';
 
@@ -56,10 +57,10 @@ const drawWaveform = (options: DrawWaveformOptions): void => {
 };
 
 export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Context 2D not available on the canvas');
-  }
+  const context = assertDefined(
+    canvas.getContext('2d'),
+    'Context 2D not available on the canvas',
+  );
 
   const ref: WaveformDraw = {
     run: (segments, colors) => {

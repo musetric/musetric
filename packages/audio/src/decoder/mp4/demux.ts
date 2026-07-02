@@ -1,3 +1,4 @@
+import { assertDefined } from '@musetric/utils';
 import {
   BufferSource,
   type EncodedPacket,
@@ -14,20 +15,20 @@ export type DemuxedTrack = {
 };
 
 export const demuxTrack = async (input: Input): Promise<DemuxedTrack> => {
-  const audioTrack = await input.getPrimaryAudioTrack();
-  if (!audioTrack) {
-    throw new Error('Unsupported fMP4: audio track not found');
-  }
+  const audioTrack = assertDefined(
+    await input.getPrimaryAudioTrack(),
+    'Unsupported fMP4: audio track not found',
+  );
 
   const { numberOfChannels } = audioTrack;
   if (numberOfChannels < 1) {
     throw new Error('Unsupported fMP4: audio track has no channels');
   }
 
-  const decoderConfig = await audioTrack.getDecoderConfig();
-  if (!decoderConfig) {
-    throw new Error('Unsupported fMP4: missing audio decoder config');
-  }
+  const decoderConfig = assertDefined(
+    await audioTrack.getDecoderConfig(),
+    'Unsupported fMP4: missing audio decoder config',
+  );
 
   const { codec } = decoderConfig;
   if (!codec.startsWith('mp4a.40.')) {

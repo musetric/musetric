@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import { assertDefined } from '@musetric/utils';
 import { type FC, useEffect, useRef } from 'react';
 import { viewSizePresets } from '../constants.js';
 import { attachCanvas, detachCanvas } from '../processor.js';
@@ -10,10 +11,10 @@ export const BenchmarkCanvas: FC = () => {
 
   useEffect(() => {
     if (!offscreenRef.current) {
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        throw new Error('Canvas element not found');
-      }
+      const canvas = assertDefined(
+        canvasRef.current,
+        'Canvas element not found',
+      );
       // Set initial dimensions before transfer; later resizes are handled
       // inside the processor via setOffscreenCanvasSize on each render.
       const preset =

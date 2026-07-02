@@ -1,4 +1,5 @@
 import {
+  assertDefined,
   type BenchStats,
   computeBenchStats,
   defaultBenchStatsConfig,
@@ -99,13 +100,11 @@ export const isFourierBenchRangeMode = (
 
 export const getFourierRangeBenchBaseMode = (
   mode: FourierBenchRangeMode,
-): FourierMode => {
-  const baseMode = rangeBenchBaseModes.get(mode);
-  if (baseMode === undefined) {
-    throw new Error(`Unknown Fourier range benchmark mode: ${mode}`);
-  }
-  return baseMode;
-};
+): FourierMode =>
+  assertDefined(
+    rangeBenchBaseModes.get(mode),
+    `Unknown Fourier range benchmark mode: ${mode}`,
+  );
 
 export const fourierRangeBenchModes: FourierBenchRangeMode[] =
   allFourierModes.flatMap((mode) =>
