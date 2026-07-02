@@ -1,4 +1,4 @@
-import type z from 'zod';
+import { type z } from 'zod';
 import { type ApiEvent, type UnsubscribeApiEvent } from './apiEvent.js';
 
 export const subscribeEventSource = <

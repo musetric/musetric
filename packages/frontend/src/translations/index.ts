@@ -1,4 +1,4 @@
-import i18next, { type Resource } from 'i18next';
+import { init, type Resource } from 'i18next';
 import en from './en.json' with { type: 'json' };
 
 export const resources: Resource = {
@@ -8,7 +8,7 @@ export const resources: Resource = {
 export const initI18next = async () => {
   const queries = new URLSearchParams(window.location.search);
   const lng = queries.get('lng') ?? 'en';
-  return i18next.init({
+  return init({
     resources,
     lng,
   });

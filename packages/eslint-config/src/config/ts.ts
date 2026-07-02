@@ -1,5 +1,5 @@
 import { type Linter } from 'eslint';
-import tsEslint from 'typescript-eslint';
+import * as tsEslint from 'typescript-eslint';
 import { jsConfig } from './js.js';
 
 export const tsConfig: Linter.Config = {
@@ -23,6 +23,7 @@ export const tsConfig: Linter.Config = {
       (acc, config) => ({ ...acc, ...config.rules }),
       {},
     ),
+    'import-x/no-unresolved': ['error', { ignore: ['\\?(raw|worker&url)$'] }],
     '@typescript-eslint/consistent-type-assertions': [
       'error',
       { assertionStyle: 'never' },
@@ -66,5 +67,6 @@ export const tsConfig: Linter.Config = {
     '@typescript-eslint/await-thenable': 'error',
     '@typescript-eslint/promise-function-async': 'error',
     '@typescript-eslint/require-await': 'error',
+    'import-x/named': 'off',
   },
 };

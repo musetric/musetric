@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createApiEvent } from '../common/apiEvent.js';
 import { createApiRoute } from '../common/apiRoute.js';
-import { preview } from './index.js';
+import * as preview from './preview.js';
 
 export const downloadStatusSchema = z.enum(['processing', 'cached', 'done']);
 export type DownloadStatus = z.infer<typeof downloadStatusSchema>;

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 /* eslint-disable @typescript-eslint/consistent-type-assertions */
 import { type AxiosInstance } from 'axios';
-import type z from 'zod';
+import { type z } from 'zod';
 import { apiMultipart } from './apiMultipart.dom.js';
 import { type ApiRoute, type RequestMethod } from './apiRoute.js';
 import { getArrayBufferViewConstructor } from './arrayBufferView.js';
