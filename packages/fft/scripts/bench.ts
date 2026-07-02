@@ -24,8 +24,13 @@ const devNull = new Writable({
   },
 });
 
+type BenchReporterLog = {
+  content: string;
+  type: string;
+};
+
 const benchReporter = {
-  onUserConsoleLog: (log: { content: string; type: string }) => {
+  onUserConsoleLog: (log: BenchReporterLog) => {
     const stream = log.type === 'stderr' ? process.stderr : process.stdout;
     stream.write(log.content + '\n');
   },

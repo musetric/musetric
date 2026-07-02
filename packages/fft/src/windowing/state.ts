@@ -25,12 +25,13 @@ export const createStateCell = (
 ): ResourceCell<StateArg, State> => {
   const paramsCell = createParamsCell(device);
   const windowFunctionCell = createWindowFunctionCell(device);
+  type WindowingBindGroupArg = {
+    signal: GPUBuffer;
+    params: GPUBuffer;
+    windowFunction: GPUBuffer;
+  };
   const bindGroupCell = createResourceCell({
-    create: (arg: {
-      signal: GPUBuffer;
-      params: GPUBuffer;
-      windowFunction: GPUBuffer;
-    }): GPUBindGroup =>
+    create: (arg: WindowingBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'windowing-bind-group',
         layout: pipeline.getBindGroupLayout(0),

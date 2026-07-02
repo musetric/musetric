@@ -36,13 +36,14 @@ export const createStateCell = (
     equals: (current, next) =>
       current.value.windowCount === next.value.windowCount,
   });
+  type DecibelifyBindGroupArg = {
+    signal: GPUBuffer;
+    magnitude: GPUBuffer;
+    params: StateParams;
+    columnEnergy: GPUBuffer;
+  };
   const bindGroupCell = createResourceCell({
-    create: (arg: {
-      signal: GPUBuffer;
-      magnitude: GPUBuffer;
-      params: StateParams;
-      columnEnergy: GPUBuffer;
-    }): GPUBindGroup =>
+    create: (arg: DecibelifyBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'decibelify-bind-group',
         layout: pipelines.layout,

@@ -9,6 +9,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-dynamic-translation-keys': 'error',
   'musetric/no-immediate-inline-function-calls': 'error',
   'musetric/no-inline-parameter-destructuring': 'error',
+  'musetric/no-inline-parameter-object-types': 'error',
   'musetric/no-mixed-reexports': 'error',
   'musetric/no-named-reexports': 'error',
   'musetric/no-null-literal': 'error',

@@ -121,14 +121,16 @@ export const createBenchSpectrum = (
   return new Float32Array(createBenchWave(windowSize + 2, windowCount));
 };
 
+export type MeasureOneOptions = {
+  logLabel: string;
+  ranges: readonly FourierBatchRange[];
+};
+
 export const measureOne = async (
   mode: FourierMode,
   windowSize: number,
   windowCount: number,
-  options?: {
-    logLabel: string;
-    ranges: readonly FourierBatchRange[];
-  },
+  options?: MeasureOneOptions,
 ): Promise<
   | {
       mean: number;

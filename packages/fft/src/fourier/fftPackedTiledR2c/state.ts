@@ -68,16 +68,18 @@ const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
   });
 };
 
+type CreateBindGroupsOptions = {
+  input: GPUBuffer;
+  params: GPUBufferBinding;
+  pipelines: Pipelines;
+  scratch: GPUBuffer;
+  tables: TrigTables;
+};
+
 const createBindGroups = (
   device: GPUDevice,
   arg: FourierArg,
-  options: {
-    input: GPUBuffer;
-    params: GPUBufferBinding;
-    pipelines: Pipelines;
-    scratch: GPUBuffer;
-    tables: TrigTables;
-  },
+  options: CreateBindGroupsOptions,
 ): BindGroups => ({
   firstPass: device.createBindGroup({
     label: 'packed-tiled-r2c-first-pass-bind-group',

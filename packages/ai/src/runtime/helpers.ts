@@ -12,12 +12,16 @@ export const createBindGroupLayout = (
     })),
   });
 
-export const createComputePipeline = (options: {
+export type CreateComputePipelineOptions = {
   device: GPUDevice;
   layout: GPUBindGroupLayout;
   code: string;
   constants: Record<string, number>;
-}): GPUComputePipeline =>
+};
+
+export const createComputePipeline = (
+  options: CreateComputePipelineOptions,
+): GPUComputePipeline =>
   options.device.createComputePipeline({
     layout: options.device.createPipelineLayout({
       bindGroupLayouts: [options.layout],

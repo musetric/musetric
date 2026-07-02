@@ -190,7 +190,7 @@ const createConfigInvalidationScope = (
 
 const fundamentalFilterRadius = 6;
 
-const createRenderPlans = (options: {
+type CreateRenderPlansOptions = {
   columns: boolean[];
   configInvalidationScope: ConfigInvalidationScope;
   invalidatedSamples: readonly SpectrogramSampleInvalidation[];
@@ -199,7 +199,11 @@ const createRenderPlans = (options: {
   samples: SpectrogramSamples;
   trackProgress: number;
   work: Record<TrackKey, SpectrogramLaneWork>;
-}): Record<TrackKey, TrackRenderPlan> => {
+};
+
+const createRenderPlans = (
+  options: CreateRenderPlansOptions,
+): Record<TrackKey, TrackRenderPlan> => {
   const {
     columns,
     configInvalidationScope,
@@ -362,12 +366,14 @@ const runPass = (
   pass.end();
 };
 
+type DispatchComputeOptions = {
+  ctx: DispatchContext;
+  markers: ComputeMarkers;
+};
+
 const dispatchCompute = (
   encoder: GPUCommandEncoder,
-  options: {
-    ctx: DispatchContext;
-    markers: ComputeMarkers;
-  },
+  options: DispatchComputeOptions,
 ) => {
   const { ctx, markers } = options;
   const spectrumHasWork = allTrackKeys.some((key) => hasSpectrumWork(ctx, key));

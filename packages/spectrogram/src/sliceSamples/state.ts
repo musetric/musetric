@@ -29,13 +29,14 @@ export const createStateCell = (
   const paramsCell = createParamsCell(device);
   const samplesCell = createStateSamplesCell(device);
   const windowFunctionCell = createWindowFunctionCell(device);
+  type SliceSamplesBindGroupArg = {
+    out: GPUBuffer;
+    params: StateParams;
+    samples: GPUBuffer;
+    windowFunction: GPUBuffer;
+  };
   const bindGroupCell = createResourceCell({
-    create: (arg: {
-      out: GPUBuffer;
-      params: StateParams;
-      samples: GPUBuffer;
-      windowFunction: GPUBuffer;
-    }): GPUBindGroup =>
+    create: (arg: SliceSamplesBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'slice-samples-bind-group',
         layout: pipeline.getBindGroupLayout(0),

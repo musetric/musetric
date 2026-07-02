@@ -8,13 +8,15 @@ export type DynamicUniformParams = {
 const alignTo = (value: number, alignment: number): number =>
   Math.ceil(value / alignment) * alignment;
 
+export type CreateDynamicUniformParamsOptions = {
+  label: string;
+  byteLength: number;
+  capacity: number;
+};
+
 export const createDynamicUniformParams = (
   device: GPUDevice,
-  options: {
-    label: string;
-    byteLength: number;
-    capacity: number;
-  },
+  options: CreateDynamicUniformParamsOptions,
 ): DynamicUniformParams => {
   const capacity = Math.max(1, Math.floor(options.capacity));
   const stride = alignTo(
