@@ -55,10 +55,12 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
   let recordingChannels: Float32Array<SharedArrayBuffer>[] | undefined =
     undefined;
 
-  const notifyRecordingSamplesChanged = (change: {
+  type RecordingSamplesChange = {
     frameIndex: number;
     frameCount: number;
-  }) => {
+  };
+
+  const notifyRecordingSamplesChanged = (change: RecordingSamplesChange) => {
     if (change.frameCount <= 0) {
       return;
     }
@@ -83,7 +85,7 @@ export const createDecoderRuntime = (options: CreateDecoderRuntimeOptions) => {
   const writeRecordingSamples = (
     frameIndex: number,
     samples: Float32Array,
-  ): { frameIndex: number; frameCount: number } => {
+  ): RecordingSamplesChange => {
     const channels = recordingChannels;
     if (!channels) {
       return { frameIndex, frameCount: 0 };

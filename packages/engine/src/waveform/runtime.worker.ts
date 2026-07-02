@@ -110,13 +110,17 @@ export const createWaveformRuntime = (
     renderItem(item);
   };
 
-  const createWaveformItem = (message: {
+  type CreateWaveformItemMessage = {
     canvas: OffscreenCanvas;
     colors: WaveformColors;
     viewSize: ViewSize;
     projectId: number;
     frameCount: number;
-  }): WaveformItem => {
+  };
+
+  const createWaveformItem = (
+    message: CreateWaveformItemMessage,
+  ): WaveformItem => {
     setOffscreenCanvasSize(message.canvas, message.viewSize);
     return {
       canvas: message.canvas,

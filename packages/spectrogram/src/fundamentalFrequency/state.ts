@@ -48,12 +48,13 @@ export const createStateCell = (
     device,
     'fundamental-frequency-filtered-output-buffer',
   );
+  type ScoreAndPickBindGroupArg = {
+    signal: GPUBuffer;
+    rawOutput: GPUBuffer;
+    params: StateParams;
+  };
   const scoreAndPickBindGroupCell = createResourceCell({
-    create: (arg: {
-      signal: GPUBuffer;
-      rawOutput: GPUBuffer;
-      params: StateParams;
-    }): GPUBindGroup =>
+    create: (arg: ScoreAndPickBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'fundamental-frequency-score-and-pick-bind-group',
         layout: pipelines.scoreAndPick.getBindGroupLayout(0),
@@ -75,12 +76,13 @@ export const createStateCell = (
       current.rawOutput === next.rawOutput &&
       current.params === next.params,
   });
+  type FilterBindGroupArg = {
+    rawOutput: GPUBuffer;
+    filteredOutput: GPUBuffer;
+    params: StateParams;
+  };
   const filterBindGroupCell = createResourceCell({
-    create: (arg: {
-      rawOutput: GPUBuffer;
-      filteredOutput: GPUBuffer;
-      params: StateParams;
-    }): GPUBindGroup =>
+    create: (arg: FilterBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'fundamental-frequency-filter-bind-group',
         layout: pipelines.filter.getBindGroupLayout(0),

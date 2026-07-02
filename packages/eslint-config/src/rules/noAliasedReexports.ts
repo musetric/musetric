@@ -3,11 +3,13 @@ import { type Rule } from 'eslint';
 const hasTypeImportKind = (node: object): boolean =>
   'importKind' in node && node.importKind === 'type';
 
-const getImportedName = (node: {
+type ImportedNameNode = {
   type: string;
   name?: string;
   value?: unknown;
-}): string | undefined => {
+};
+
+const getImportedName = (node: ImportedNameNode): string | undefined => {
   if (node.type === 'Identifier') {
     return node.name;
   }

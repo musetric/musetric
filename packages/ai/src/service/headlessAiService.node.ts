@@ -68,14 +68,18 @@ const sendFile = async (
   });
 };
 
-const handleModuleRequest = async (options: {
+type HandleModuleRequestOptions = {
   request: IncomingMessage;
   response: ServerResponse;
   viteServer: vite.ViteDevServer;
   modelFiles: Map<string, string>;
   pcm: Buffer;
   logger: Logger;
-}): Promise<void> => {
+};
+
+const handleModuleRequest = async (
+  options: HandleModuleRequestOptions,
+): Promise<void> => {
   const { request, response, viteServer, modelFiles, pcm, logger } = options;
   const requestUrl = request.url ?? '/';
   const url = new URL(requestUrl, 'http://127.0.0.1');
@@ -327,11 +331,13 @@ export const separateAudioHeadless = async (
         ),
       };
 
+      type EvaluateSeparateAudioArgs = {
+        apiName: string;
+        request: BrowserSeparateAudioRequest;
+      };
+
       await page.evaluate(
-        (evaluateArgs: {
-          apiName: string;
-          request: BrowserSeparateAudioRequest;
-        }) => {
+        (evaluateArgs: EvaluateSeparateAudioArgs) => {
           const api: unknown = Reflect.get(globalThis, evaluateArgs.apiName);
           if (typeof api !== 'function') {
             throw new Error('AI browser API is not initialized');

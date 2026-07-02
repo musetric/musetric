@@ -39,12 +39,14 @@ export const createBuffers = (device: GPUDevice, windowSize: number) => {
   return buffers;
 };
 
+export type CreateIFourierBuffersConfig = {
+  windowSize: number;
+  waveSize: number;
+};
+
 export const createIFourierBuffers = (
   device: GPUDevice,
-  config: {
-    windowSize: number;
-    waveSize: number;
-  },
+  config: CreateIFourierBuffersConfig,
 ) => {
   const spectrumSize = (config.windowSize + 2) * Float32Array.BYTES_PER_ELEMENT;
   const buffers = {
@@ -84,11 +86,13 @@ export const createPaddedWave = (
   return output;
 };
 
+export type SplitSpectrum = {
+  real: Float32Array<ArrayBuffer>;
+  imag: Float32Array<ArrayBuffer>;
+};
+
 export const createInterleavedSpectrum = (
-  spectrum: {
-    real: Float32Array<ArrayBuffer>;
-    imag: Float32Array<ArrayBuffer>;
-  },
+  spectrum: SplitSpectrum,
   windowSize: number,
 ): Float32Array<ArrayBuffer> => {
   const output = new Float32Array(windowSize + 2);

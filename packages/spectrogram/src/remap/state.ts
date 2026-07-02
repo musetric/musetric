@@ -45,13 +45,14 @@ export const createStateCell = (
   State
 > => {
   const paramsCell = createParamsCell(device);
+  type RemapBindGroupArg = {
+    spectra: SpectrogramBandSpectrum[];
+    texture: GPUTextureView;
+    params: StateParams;
+    bindGroupLayout: GPUBindGroupLayout;
+  };
   const bindGroupCell = createResourceCell({
-    create: (arg: {
-      spectra: SpectrogramBandSpectrum[];
-      texture: GPUTextureView;
-      params: StateParams;
-      bindGroupLayout: GPUBindGroupLayout;
-    }): GPUBindGroup =>
+    create: (arg: RemapBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'remap-bind-group',
         layout: arg.bindGroupLayout,

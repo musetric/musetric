@@ -39,10 +39,12 @@ const leadVisualPeakCeilingDb = 3;
 const leadVisualMaxBoostDb = 48;
 const leadVisualMaxCutDb = -12;
 
-const calculateSourceGainDb = (analysis: {
+type SourceAnalysis = {
   integratedLoudnessDb: number;
   truePeakDb: number;
-}) =>
+};
+
+const calculateSourceGainDb = (analysis: SourceAnalysis) =>
   clamp(
     Math.min(
       sourceTargetLufs - analysis.integratedLoudnessDb,
@@ -52,10 +54,12 @@ const calculateSourceGainDb = (analysis: {
     sourceMaxBoostDb,
   );
 
-const calculateLeadSpectrogramGainDb = (analysis: {
+type LeadAnalysis = {
   p95RmsDb: number;
   truePeakDb: number;
-}) =>
+};
+
+const calculateLeadSpectrogramGainDb = (analysis: LeadAnalysis) =>
   clamp(
     leadVisualTargetP95RmsDb - analysis.p95RmsDb,
     leadVisualMaxCutDb,

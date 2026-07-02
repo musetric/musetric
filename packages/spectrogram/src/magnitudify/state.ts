@@ -37,12 +37,13 @@ export const createStateCell = (
       current.value.windowSize === next.value.windowSize &&
       current.value.windowCount === next.value.windowCount,
   });
+  type MagnitudifyBindGroupArg = {
+    signal: GPUBuffer;
+    magnitude: GPUBuffer;
+    params: StateParams;
+  };
   const bindGroupCell = createResourceCell({
-    create: (arg: {
-      signal: GPUBuffer;
-      magnitude: GPUBuffer;
-      params: StateParams;
-    }): GPUBindGroup =>
+    create: (arg: MagnitudifyBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
         label: 'magnitudify-bind-group',
         layout: pipelines.layout,

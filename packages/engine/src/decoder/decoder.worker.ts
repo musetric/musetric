@@ -398,7 +398,11 @@ const closeProjectRealtime = () => {
   closeProjectRealtimeSocket(realtime);
 };
 
-const openProjectRealtime = (message: { projectId: number }) => {
+type OpenProjectRealtimeMessage = {
+  projectId: number;
+};
+
+const openProjectRealtime = (message: OpenProjectRealtimeMessage) => {
   if (
     projectRealtime &&
     projectRealtime.projectId === message.projectId &&
@@ -550,7 +554,7 @@ const bindRecordingStreamPort = (stream: RecordingStream) => {
   stream.port.start();
 };
 
-const startRecordingStream = (message: {
+type StartRecordingStreamMessage = {
   projectId: number;
   sampleRate: number;
   frameCount: number;
@@ -558,7 +562,9 @@ const startRecordingStream = (message: {
   samples: Float32Array<SharedArrayBuffer>;
   metadata: Int32Array<SharedArrayBuffer>;
   port: MessagePort;
-}) => {
+};
+
+const startRecordingStream = (message: StartRecordingStreamMessage) => {
   openProjectRealtime({ projectId: message.projectId });
   clearRecordingStream();
   const stream: RecordingStream = {
@@ -603,7 +609,11 @@ finishInterruptedRecordingStream = (stream) => {
   });
 };
 
-const finishRecordingStream = (message: { sequence: number }) => {
+type FinishRecordingStreamMessage = {
+  sequence: number;
+};
+
+const finishRecordingStream = (message: FinishRecordingStreamMessage) => {
   const stream = recordingStream;
   if (!stream) {
     port.methods.recordingStreamFinished();
@@ -645,12 +655,14 @@ const sendPlayerStop = () => {
   sendRealtimeJson({ type: 'player.stop' });
 };
 
-const sendPlayerFrameIndex = (message: {
+type PlayerFrameIndexMessage = {
   frameIndex: number;
   frozen: boolean;
   revision: number;
   source: 'playback' | 'user';
-}) => {
+};
+
+const sendPlayerFrameIndex = (message: PlayerFrameIndexMessage) => {
   sendRealtimeJson({
     type: 'player.frameIndex',
     frameIndex: message.frameIndex,

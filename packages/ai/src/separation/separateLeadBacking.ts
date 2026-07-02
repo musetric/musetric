@@ -87,12 +87,16 @@ const overlapAdd = (
   }
 };
 
-const demix = async (options: {
+type DemixOptions = {
   mixture: Float32Array<ArrayBuffer>;
   samples: number;
   runtime: LeadBackingGpuRuntime;
   onMessage: (message: SeparateLeadBackingMessage) => void | Promise<void>;
-}): Promise<Float32Array<ArrayBuffer>> => {
+};
+
+const demix = async (
+  options: DemixOptions,
+): Promise<Float32Array<ArrayBuffer>> => {
   const { mixture, samples, runtime, onMessage } = options;
   const padSamples = genSamples + trim - (samples % genSamples);
   const mixtureSamples = trim + samples + padSamples;
