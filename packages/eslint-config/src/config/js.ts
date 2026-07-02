@@ -37,6 +37,7 @@ export const jsConfig: Linter.Config = {
         peerDependencies: true,
       },
     ],
+    'max-nested-callbacks': ['error', 3],
     'no-duplicate-imports': ['error'],
     'no-else-return': ['error', { allowElseIf: false }],
     'no-lonely-if': 'error',
