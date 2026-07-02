@@ -1,9 +1,9 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { formatBenchTimestamp } from '@musetric/utils';
 import {
   formatBenchMarkdown,
-  formatBenchTimestamp,
   type FourierBenchDirection,
   type FourierBenchMode,
   type FourierBenchSummary,
