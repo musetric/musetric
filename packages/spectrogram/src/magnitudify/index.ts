@@ -1,4 +1,5 @@
 import { type ResourceCell } from '@musetric/utils';
+import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { createPipelines } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -7,7 +8,10 @@ const workgroupSize = 64;
 export type SpectrogramMagnitudify = {
   magnitude: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
-  dispatch: (pass: GPUComputePassEncoder) => void;
+  dispatch: (
+    pass: GPUComputePassEncoder,
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => void;
 };
 
 export const createSpectrogramMagnitudifyCell = (
@@ -21,14 +25,21 @@ export const createSpectrogramMagnitudifyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatch = (pass: GPUComputePassEncoder) => {
-        const { windowSize, windowCount } = state.params.value;
+      const dispatch = (
+        pass: GPUComputePassEncoder,
+        range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+      ) => {
+        const { windowSize } = state.params.value;
         const halfSize = Math.ceil(windowSize / 2);
         const xCount = Math.ceil(halfSize / workgroupSize);
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0) {
+          return;
+        }
 
         pass.setPipeline(state.pipelines.run);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(xCount, windowCount);
+        pass.setBindGroup(0, state.bindGroup, [byteOffset]);
+        pass.dispatchWorkgroups(xCount, columnCount);
       };
 
       return {

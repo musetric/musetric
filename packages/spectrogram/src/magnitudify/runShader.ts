@@ -2,6 +2,8 @@ export const runShader = `
 struct MagnitudifyParams {
   windowSize: u32,
   windowCount: u32,
+  slotOffset: u32,
+  padding: u32,
 };
 
 @group(0) @binding(0) var<storage, read_write> signal: array<f32>;
@@ -14,9 +16,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let windowCount = params.windowCount;
 
   let sampleIndex = gid.x;
-  let windowIndex = gid.y;
+  let localWindowIndex = gid.y;
+  let windowIndex = (params.slotOffset + localWindowIndex) % windowCount;
   let halfSize = windowSize / 2u;
-  if (sampleIndex >= halfSize || windowIndex >= windowCount) {
+  if (sampleIndex >= halfSize || localWindowIndex >= windowCount) {
     return;
   }
   let complexStride = windowSize + 2u;

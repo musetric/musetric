@@ -59,8 +59,8 @@ struct RemapParams {
   frequencyTiltMinGain: f32,
   frequencyTiltMaxGain: f32,
   displayGamma: f32,
-  padding0: f32,
-  padding1: f32,
+  slotOffset: u32,
+  columnCount: u32,
   padding2: f32,
   bands: array<vec4f, ${spectrumCount * 2}>,
 };
@@ -161,11 +161,12 @@ ${createSpectrumSampling(spectrumCount)}
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let width = params.width;
   let height = params.height;
-  let x = gid.x;
+  let localX = gid.x;
   let y = gid.y;
-  if (x >= width || y >= height) {
+  if (localX >= params.columnCount || y >= height) {
     return;
   }
+  let x = (params.slotOffset + localX) % width;
   let frequency = frequencyAtRow(y);
   let intensity = baseDisplayIntensity(
     x,

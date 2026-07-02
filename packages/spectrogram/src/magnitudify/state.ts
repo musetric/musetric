@@ -41,7 +41,7 @@ export const createStateCell = (
     create: (arg: {
       signal: GPUBuffer;
       magnitude: GPUBuffer;
-      params: GPUBuffer;
+      params: StateParams;
     }): GPUBindGroup =>
       device.createBindGroup({
         label: 'magnitudify-bind-group',
@@ -49,7 +49,13 @@ export const createStateCell = (
         entries: [
           { binding: 0, resource: { buffer: arg.signal } },
           { binding: 1, resource: { buffer: arg.magnitude } },
-          { binding: 2, resource: { buffer: arg.params } },
+          {
+            binding: 2,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
         ],
       }),
     dispose: () => undefined,
@@ -67,7 +73,7 @@ export const createStateCell = (
       const bindGroup = bindGroupCell.get({
         signal,
         magnitude,
-        params: params.buffer,
+        params,
       });
 
       return {

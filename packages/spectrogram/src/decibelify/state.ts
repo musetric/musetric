@@ -40,7 +40,7 @@ export const createStateCell = (
     create: (arg: {
       signal: GPUBuffer;
       magnitude: GPUBuffer;
-      params: GPUBuffer;
+      params: StateParams;
       columnEnergy: GPUBuffer;
     }): GPUBindGroup =>
       device.createBindGroup({
@@ -48,7 +48,13 @@ export const createStateCell = (
         layout: pipelines.layout,
         entries: [
           { binding: 0, resource: { buffer: arg.magnitude } },
-          { binding: 1, resource: { buffer: arg.params } },
+          {
+            binding: 1,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
           { binding: 2, resource: { buffer: arg.columnEnergy } },
           { binding: 3, resource: { buffer: arg.signal } },
         ],
@@ -72,7 +78,7 @@ export const createStateCell = (
       const bindGroup = bindGroupCell.get({
         signal,
         magnitude,
-        params: params.buffer,
+        params,
         columnEnergy,
       });
 

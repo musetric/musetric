@@ -1,6 +1,10 @@
-import { createFourierCell } from '@musetric/fft/gpu';
+import { createFourierCell, type Fourier } from '@musetric/fft/gpu';
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import {
+  type ExtSpectrogramConfig,
+  type SpectrogramColumnRange,
+  type SpectrogramSampleRange,
+} from '../common/extConfig.js';
 import {
   type SpectrogramSpectralBand,
   type TrackKey,
@@ -30,6 +34,7 @@ export type SpectrogramLaneWork = {
 type SpectrogramLaneDispatch = (
   pass: GPUComputePassEncoder,
   work: SpectrogramLaneWork,
+  range: SpectrogramColumnRange,
 ) => void;
 
 export type SpectrogramLane = {
@@ -38,16 +43,23 @@ export type SpectrogramLane = {
   fundamentalFrequencyBuffer: GPUBuffer;
   writeSamples: (
     samples: Float32Array,
-    trackProgress: number,
+    baseColumn: number,
     work: SpectrogramLaneWork,
-    contentChanged: boolean,
+    forceFullUpload: boolean,
+    invalidations: readonly SpectrogramSampleRange[],
   ) => void;
-  clearSignal: (encoder: GPUCommandEncoder, work: SpectrogramLaneWork) => void;
   dispatchSliceSamples: SpectrogramLaneDispatch;
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
   dispatchDecibelify: SpectrogramLaneDispatch;
-  dispatchFundamentalFrequency: (pass: GPUComputePassEncoder) => void;
+  dispatchFundamentalScore: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
+  dispatchFundamentalFilter: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
   clear: (encoder: GPUCommandEncoder) => void;
 };
 
@@ -57,20 +69,36 @@ export type SpectrogramLaneCell = ResourceCell<
 >;
 
 type BandSpectrumPipeline = {
+  signal: GPUBuffer;
   rawMagnitudeBuffer: GPUBuffer;
   columnEnergyBuffer: GPUBuffer;
   windowSize: number;
   writeSamples: (
     samples: Float32Array,
-    trackProgress: number,
-    contentChanged: boolean,
+    baseColumn: number,
+    forceFullUpload: boolean,
+    invalidations: readonly SpectrogramSampleRange[],
   ) => void;
-  clearSignal: (encoder: GPUCommandEncoder) => void;
-  dispatchSliceSamples: (pass: GPUComputePassEncoder) => void;
-  dispatchFourier: (pass: GPUComputePassEncoder) => void;
-  dispatchMagnitudify: (pass: GPUComputePassEncoder) => void;
-  dispatchDecibelEnergy: (pass: GPUComputePassEncoder) => void;
-  dispatchDecibelRun: (pass: GPUComputePassEncoder) => void;
+  dispatchSliceSamples: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
+  dispatchFourier: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
+  dispatchMagnitudify: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
+  dispatchDecibelEnergy: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
+  dispatchDecibelRun: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
   clear: (encoder: GPUCommandEncoder) => void;
 };
 
@@ -87,11 +115,6 @@ const createSpectralBandConfig = (
   ...config,
   windowSize: band.windowSize,
 });
-
-const getSpectralBandSampleOffset = (
-  config: ExtSpectrogramConfig,
-  band: SpectrogramSpectralBand,
-): number => (band.windowSize - config.windowSize) / 2;
 
 const areSpectralBandsEqual = (
   current: SpectrogramSpectralBand,
@@ -111,72 +134,124 @@ const areSpectralBandListsEqual = (
   current.length === next.length &&
   current.every((band, index) => areSpectralBandsEqual(band, next[index]));
 
+type BandPipelineCells = {
+  signalCell: ReturnType<typeof createSignalBufferCell>;
+  sliceSamplesCell: ReturnType<typeof createSpectrogramSliceSamplesCell>;
+  fourierCell: ReturnType<typeof createFourierCell>;
+  magnitudifyCell: ReturnType<typeof createSpectrogramMagnitudifyCell>;
+  decibelifyCell: ReturnType<typeof createSpectrogramDecibelifyCell>;
+};
+
+const createBandPipelineCells = (device: GPUDevice): BandPipelineCells => ({
+  signalCell: createSignalBufferCell(device),
+  sliceSamplesCell: createSpectrogramSliceSamplesCell(device),
+  fourierCell: createFourierCell(device),
+  magnitudifyCell: createSpectrogramMagnitudifyCell(device),
+  decibelifyCell: createSpectrogramDecibelifyCell(device),
+});
+
+const disposeBandPipelineCells = (cells: BandPipelineCells): void => {
+  cells.decibelifyCell.dispose();
+  cells.magnitudifyCell.dispose();
+  cells.fourierCell.dispose();
+  cells.sliceSamplesCell.dispose();
+  cells.signalCell.dispose();
+};
+
+export const dispatchFourierColumnRange = (
+  fourier: Fourier,
+  pass: GPUComputePassEncoder,
+  range: SpectrogramColumnRange,
+  windowCount: number,
+): void => {
+  if (range.columnCount <= 0) {
+    return;
+  }
+  if (range.columnCount >= windowCount) {
+    fourier.dispatch(pass);
+    return;
+  }
+  const firstBatchCount = Math.min(
+    range.columnCount,
+    windowCount - range.slotOffset,
+  );
+  if (firstBatchCount > 0) {
+    fourier.dispatch(pass, {
+      batchOffset: range.slotOffset,
+      batchCount: firstBatchCount,
+    });
+  }
+  const secondBatchCount = range.columnCount - firstBatchCount;
+  if (secondBatchCount > 0) {
+    fourier.dispatch(pass, {
+      batchOffset: 0,
+      batchCount: secondBatchCount,
+    });
+  }
+};
+
+const buildBandSpectrumPipeline = (
+  cells: BandPipelineCells,
+  config: ExtSpectrogramConfig,
+  label: TrackKey,
+): BandSpectrumPipeline => {
+  const paddedWindowSize = config.windowSize * config.zeroPaddingFactor;
+  const laneConfig = config.lanes[label];
+  const signal = cells.signalCell.get({
+    windowSize: paddedWindowSize,
+    windowCount: config.windowCount,
+  });
+  const sliceSamples = cells.sliceSamplesCell.get({ out: signal, config });
+  const fourier = cells.fourierCell.get({ signal, config });
+  const magnitudify = cells.magnitudifyCell.get({ signal, config });
+  const decibelify = cells.decibelifyCell.get({
+    signal,
+    magnitude: magnitudify.magnitude,
+    config,
+    gainDb: laneConfig.gainDb,
+  });
+
+  return {
+    signal,
+    rawMagnitudeBuffer: magnitudify.magnitude,
+    columnEnergyBuffer: decibelify.columnEnergy,
+    windowSize: paddedWindowSize,
+    writeSamples: (samples, baseColumn, forceFullUpload, invalidations) => {
+      sliceSamples.write(
+        samples,
+        baseColumn,
+        laneConfig.truncateAfterPlayhead,
+        forceFullUpload,
+        invalidations,
+      );
+    },
+    dispatchSliceSamples: sliceSamples.dispatch,
+    dispatchFourier: (pass, range) => {
+      dispatchFourierColumnRange(fourier, pass, range, config.windowCount);
+    },
+    dispatchMagnitudify: magnitudify.dispatch,
+    dispatchDecibelEnergy: decibelify.dispatchEnergy,
+    dispatchDecibelRun: decibelify.dispatchRun,
+    clear: (encoder) => {
+      encoder.clearBuffer(signal);
+      encoder.clearBuffer(magnitudify.magnitude);
+      encoder.clearBuffer(decibelify.columnEnergy);
+    },
+  };
+};
+
 const createBandSpectrumCell = (
   device: GPUDevice,
 ): ResourceCell<BandSpectrumCellArg, BandSpectrumPipeline> => {
-  const signalCell = createSignalBufferCell(device);
-  const sliceSamplesCell = createSpectrogramSliceSamplesCell(device);
-  const fourierCell = createFourierCell(device);
-  const magnitudifyCell = createSpectrogramMagnitudifyCell(device);
-  const decibelifyCell = createSpectrogramDecibelifyCell(device);
+  const cells = createBandPipelineCells(device);
 
   const cell = createResourceCell<BandSpectrumCellArg, BandSpectrumPipeline>({
-    create: (arg) => {
-      const { config, band, label } = arg;
-      const bandConfig = createSpectralBandConfig(config, band);
-      const signal = signalCell.get({
-        windowSize: bandConfig.windowSize * bandConfig.zeroPaddingFactor,
-        windowCount: bandConfig.windowCount,
-      });
-      const sliceSamples = sliceSamplesCell.get({
-        out: signal,
-        config: bandConfig,
-        sampleOffset: getSpectralBandSampleOffset(config, band),
-      });
-      const fourier = fourierCell.get({
-        signal,
-        config: bandConfig,
-      });
-      const magnitudify = magnitudifyCell.get({
-        signal,
-        config: bandConfig,
-      });
-      const decibelify = decibelifyCell.get({
-        signal,
-        magnitude: magnitudify.magnitude,
-        config: bandConfig,
-        gainDb: bandConfig.lanes[label].gainDb,
-      });
-
-      return {
-        rawMagnitudeBuffer: magnitudify.magnitude,
-        columnEnergyBuffer: decibelify.columnEnergy,
-        windowSize: bandConfig.windowSize * bandConfig.zeroPaddingFactor,
-        writeSamples: (samples, trackProgress, contentChanged) => {
-          sliceSamples.write(
-            samples,
-            trackProgress,
-            bandConfig.lanes[label].truncateAfterPlayhead,
-            contentChanged,
-          );
-        },
-        dispatchSliceSamples: sliceSamples.dispatch,
-        clearSignal: (encoder) => {
-          if (bandConfig.zeroPaddingFactor > 1) {
-            encoder.clearBuffer(signal);
-          }
-        },
-        dispatchFourier: fourier.dispatch,
-        dispatchMagnitudify: magnitudify.dispatch,
-        dispatchDecibelEnergy: decibelify.dispatchEnergy,
-        dispatchDecibelRun: decibelify.dispatchRun,
-        clear: (encoder) => {
-          encoder.clearBuffer(signal);
-          encoder.clearBuffer(magnitudify.magnitude);
-          encoder.clearBuffer(decibelify.columnEnergy);
-        },
-      };
-    },
+    create: (arg) =>
+      buildBandSpectrumPipeline(
+        cells,
+        createSpectralBandConfig(arg.config, arg.band),
+        arg.label,
+      ),
     dispose: () => undefined,
     equals: (current, next) =>
       current.config.fourierMode === next.config.fourierMode &&
@@ -201,11 +276,7 @@ const createBandSpectrumCell = (
     get: cell.get,
     dispose: () => {
       cell.dispose();
-      decibelifyCell.dispose();
-      magnitudifyCell.dispose();
-      fourierCell.dispose();
-      sliceSamplesCell.dispose();
-      signalCell.dispose();
+      disposeBandPipelineCells(cells);
     },
   };
 };
@@ -214,11 +285,7 @@ export const createSpectrogramLaneCell = (
   device: GPUDevice,
   options: SpectrogramLaneOptions,
 ): SpectrogramLaneCell => {
-  const signalCell = createSignalBufferCell(device);
-  const sliceSamplesCell = createSpectrogramSliceSamplesCell(device);
-  const fourierCell = createFourierCell(device);
-  const magnitudifyCell = createSpectrogramMagnitudifyCell(device);
-  const decibelifyCell = createSpectrogramDecibelifyCell(device);
+  const cells = createBandPipelineCells(device);
   const fundamentalFrequencyCell =
     createSpectrogramFundamentalFrequencyCell(device);
   const bandSpectrumCells: ReturnType<typeof createBandSpectrumCell>[] = [];
@@ -236,107 +303,50 @@ export const createSpectrogramLaneCell = (
   const laneCell = createResourceCell<ExtSpectrogramConfig, SpectrogramLane>({
     create: (config): SpectrogramLane => {
       const laneConfig = config.lanes[options.label];
-      const signal = signalCell.get({
-        windowSize: config.windowSize * config.zeroPaddingFactor,
-        windowCount: config.windowCount,
-      });
-      const sliceSamples = sliceSamplesCell.get({
-        out: signal,
+      const baseBandPipeline = buildBandSpectrumPipeline(
+        cells,
         config,
-        sampleOffset: 0,
-      });
-      const fourier = fourierCell.get({ signal, config });
-      const magnitudify = magnitudifyCell.get({ signal, config });
-      const decibelify = decibelifyCell.get({
-        signal,
-        magnitude: magnitudify.magnitude,
-        config,
-        gainDb: laneConfig.gainDb,
-      });
+        options.label,
+      );
       const fundamentalFrequency = fundamentalFrequencyCell.get({
-        signal,
+        signal: baseBandPipeline.signal,
         config,
       });
-      const baseBandPipeline: BandSpectrumPipeline = {
-        rawMagnitudeBuffer: magnitudify.magnitude,
-        columnEnergyBuffer: decibelify.columnEnergy,
-        windowSize: config.windowSize * config.zeroPaddingFactor,
-        writeSamples: (samples, trackProgress, contentChanged) => {
-          sliceSamples.write(
-            samples,
-            trackProgress,
-            laneConfig.truncateAfterPlayhead,
-            contentChanged,
-          );
-        },
-        dispatchSliceSamples: sliceSamples.dispatch,
-        clearSignal: (encoder) => {
-          if (config.zeroPaddingFactor > 1) {
-            encoder.clearBuffer(signal);
-          }
-        },
-        dispatchFourier: fourier.dispatch,
-        dispatchMagnitudify: magnitudify.dispatch,
-        dispatchDecibelEnergy: decibelify.dispatchEnergy,
-        dispatchDecibelRun: decibelify.dispatchRun,
-        clear: (encoder) => {
-          encoder.clearBuffer(signal);
-          encoder.clearBuffer(magnitudify.magnitude);
-          encoder.clearBuffer(decibelify.columnEnergy);
-        },
-      };
+
       const externalSpectralBands = laneConfig.showSpectrogram
         ? config.spectralBands.filter(
             (band) => band.windowSize !== config.windowSize,
           )
         : [];
-      const bandPipelines = getBandSpectrumCells(externalSpectralBands).map(
-        (cell, index) => {
-          const band = externalSpectralBands[index];
-          return cell.get({
+      const externalPipelines = getBandSpectrumCells(externalSpectralBands).map(
+        (cell, index) =>
+          cell.get({
             config,
-            band,
+            band: externalSpectralBands[index],
             label: options.label,
-          });
-        },
+          }),
       );
-      let externalBandPipelineIndex = 0;
-      const spectrogramBandPipelines: BandSpectrumPipeline[] = [];
-      if (laneConfig.showSpectrogram) {
-        for (const band of config.spectralBands) {
-          const pipeline =
-            band.windowSize === config.windowSize
-              ? baseBandPipeline
-              : bandPipelines[externalBandPipelineIndex];
-          if (band.windowSize !== config.windowSize) {
-            externalBandPipelineIndex += 1;
-          }
-          if (!spectrogramBandPipelines.includes(pipeline)) {
-            spectrogramBandPipelines.push(pipeline);
-          }
-        }
-      }
-      externalBandPipelineIndex = 0;
-      const bandSpectra = laneConfig.showSpectrogram
+      let externalIndex = 0;
+      const bandPipelines = laneConfig.showSpectrogram
         ? config.spectralBands.map((band) => {
-            if (band.windowSize === config.windowSize) {
-              return {
-                rawMagnitudeBuffer: magnitudify.magnitude,
-                columnEnergyBuffer: decibelify.columnEnergy,
-                windowSize: config.windowSize * config.zeroPaddingFactor,
-                band,
-              };
-            }
-            const pipeline = bandPipelines[externalBandPipelineIndex];
-            externalBandPipelineIndex += 1;
-            return {
-              rawMagnitudeBuffer: pipeline.rawMagnitudeBuffer,
-              columnEnergyBuffer: pipeline.columnEnergyBuffer,
-              windowSize: pipeline.windowSize,
-              band,
-            };
+            const pipeline =
+              band.windowSize === config.windowSize
+                ? baseBandPipeline
+                : externalPipelines[externalIndex++];
+            return { band, pipeline };
           })
         : [];
+      const spectrogramBandPipelines = [
+        ...new Set(bandPipelines.map((entry) => entry.pipeline)),
+      ];
+      const bandSpectra: SpectrogramBandSpectrum[] = bandPipelines.map(
+        (entry) => ({
+          rawMagnitudeBuffer: entry.pipeline.rawMagnitudeBuffer,
+          columnEnergyBuffer: entry.pipeline.columnEnergyBuffer,
+          windowSize: entry.pipeline.windowSize,
+          band: entry.band,
+        }),
+      );
 
       const forEachWorkPipeline = (
         work: SpectrogramLaneWork,
@@ -357,48 +367,53 @@ export const createSpectrogramLaneCell = (
       };
 
       return {
-        signal,
+        signal: baseBandPipeline.signal,
         bandSpectra,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
-        writeSamples: (samples, trackProgress, work, contentChanged) => {
+        writeSamples: (
+          samples,
+          baseColumn,
+          work,
+          forceFullUpload,
+          invalidations,
+        ) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.writeSamples(samples, trackProgress, contentChanged);
+            pipeline.writeSamples(
+              samples,
+              baseColumn,
+              forceFullUpload,
+              invalidations,
+            );
           });
         },
-        clearSignal: (encoder, work) => {
+        dispatchSliceSamples: (pass, work, range) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.clearSignal(encoder);
+            pipeline.dispatchSliceSamples(pass, range);
           });
         },
-        dispatchSliceSamples: (pass, work) => {
+        dispatchFourierTransform: (pass, work, range) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.dispatchSliceSamples(pass);
+            pipeline.dispatchFourier(pass, range);
           });
         },
-        dispatchFourierTransform: (pass, work) => {
+        dispatchMagnitudify: (pass, work, range) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.dispatchFourier(pass);
+            pipeline.dispatchMagnitudify(pass, range);
           });
         },
-        dispatchMagnitudify: (pass, work) => {
+        dispatchDecibelify: (pass, work, range) => {
           forEachWorkPipeline(work, (pipeline) => {
-            pipeline.dispatchMagnitudify(pass);
-          });
-        },
-        dispatchDecibelify: (pass, work) => {
-          forEachWorkPipeline(work, (pipeline) => {
-            pipeline.dispatchDecibelEnergy(pass);
+            pipeline.dispatchDecibelEnergy(pass, range);
           });
           if (work.fundamental) {
-            baseBandPipeline.dispatchDecibelRun(pass);
+            baseBandPipeline.dispatchDecibelRun(pass, range);
           }
         },
-        dispatchFundamentalFrequency: fundamentalFrequency.dispatch,
+        dispatchFundamentalScore: fundamentalFrequency.dispatchScore,
+        dispatchFundamentalFilter: fundamentalFrequency.dispatchFilter,
         clear: (encoder) => {
-          encoder.clearBuffer(signal);
-          encoder.clearBuffer(magnitudify.magnitude);
-          encoder.clearBuffer(decibelify.columnEnergy);
-          for (const pipeline of bandPipelines) {
+          baseBandPipeline.clear(encoder);
+          for (const pipeline of externalPipelines) {
             pipeline.clear(encoder);
           }
           encoder.clearBuffer(fundamentalFrequency.buffer);
@@ -434,11 +449,7 @@ export const createSpectrogramLaneCell = (
         cell.dispose();
       }
       fundamentalFrequencyCell.dispose();
-      decibelifyCell.dispose();
-      magnitudifyCell.dispose();
-      fourierCell.dispose();
-      sliceSamplesCell.dispose();
-      signalCell.dispose();
+      disposeBandPipelineCells(cells);
     },
   };
 };

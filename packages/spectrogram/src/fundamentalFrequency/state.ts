@@ -11,40 +11,15 @@ export type StateArg = {
 export type FundamentalFrequencyState = {
   pipelines: FundamentalFrequencyPipelines;
   params: StateParams;
-  scores: GPUBuffer;
   output: {
     raw: GPUBuffer;
     filtered: GPUBuffer;
   };
   bindGroups: {
-    scoreCandidates: GPUBindGroup;
-    pickBest: GPUBindGroup;
+    scoreAndPick: GPUBindGroup;
     filter: GPUBindGroup;
   };
 };
-
-type ScoresBufferArg = {
-  windowCount: number;
-  candidateCount: number;
-};
-
-const createScoresBufferCell = (device: GPUDevice) =>
-  createResourceCell({
-    create: (arg: ScoresBufferArg): GPUBuffer =>
-      device.createBuffer({
-        label: 'fundamental-frequency-scores-buffer',
-        size:
-          Math.max(1, arg.windowCount * arg.candidateCount) *
-          Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-    dispose: (buffer) => {
-      buffer.destroy();
-    },
-    equals: (current, next) =>
-      current.windowCount === next.windowCount &&
-      current.candidateCount === next.candidateCount,
-  });
 
 const createFrequencyBufferCell = (device: GPUDevice, label: string) =>
   createResourceCell({
@@ -65,7 +40,6 @@ export const createStateCell = (
   pipelines: FundamentalFrequencyPipelines,
 ): ResourceCell<StateArg, FundamentalFrequencyState> => {
   const paramsCell = createParamsCell(device);
-  const scoresCell = createScoresBufferCell(device);
   const rawOutputCell = createFrequencyBufferCell(
     device,
     'fundamental-frequency-raw-output-buffer',
@@ -74,48 +48,30 @@ export const createStateCell = (
     device,
     'fundamental-frequency-filtered-output-buffer',
   );
-  const scoreCandidatesBindGroupCell = createResourceCell({
+  const scoreAndPickBindGroupCell = createResourceCell({
     create: (arg: {
       signal: GPUBuffer;
-      scores: GPUBuffer;
-      params: GPUBuffer;
-    }): GPUBindGroup =>
-      device.createBindGroup({
-        label: 'fundamental-frequency-score-candidates-bind-group',
-        layout: pipelines.scoreCandidates.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: arg.signal } },
-          { binding: 1, resource: { buffer: arg.scores } },
-          { binding: 3, resource: { buffer: arg.params } },
-        ],
-      }),
-    dispose: () => undefined,
-    equals: (current, next) =>
-      current.signal === next.signal &&
-      current.scores === next.scores &&
-      current.params === next.params,
-  });
-  const pickBestBindGroupCell = createResourceCell({
-    create: (arg: {
-      signal: GPUBuffer;
-      scores: GPUBuffer;
       rawOutput: GPUBuffer;
-      params: GPUBuffer;
+      params: StateParams;
     }): GPUBindGroup =>
       device.createBindGroup({
-        label: 'fundamental-frequency-pick-best-bind-group',
-        layout: pipelines.pickBest.getBindGroupLayout(0),
+        label: 'fundamental-frequency-score-and-pick-bind-group',
+        layout: pipelines.scoreAndPick.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: arg.signal } },
-          { binding: 1, resource: { buffer: arg.scores } },
           { binding: 2, resource: { buffer: arg.rawOutput } },
-          { binding: 3, resource: { buffer: arg.params } },
+          {
+            binding: 3,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
         ],
       }),
     dispose: () => undefined,
     equals: (current, next) =>
       current.signal === next.signal &&
-      current.scores === next.scores &&
       current.rawOutput === next.rawOutput &&
       current.params === next.params,
   });
@@ -123,7 +79,7 @@ export const createStateCell = (
     create: (arg: {
       rawOutput: GPUBuffer;
       filteredOutput: GPUBuffer;
-      params: GPUBuffer;
+      params: StateParams;
     }): GPUBindGroup =>
       device.createBindGroup({
         label: 'fundamental-frequency-filter-bind-group',
@@ -131,7 +87,13 @@ export const createStateCell = (
         entries: [
           { binding: 0, resource: { buffer: arg.rawOutput } },
           { binding: 1, resource: { buffer: arg.filteredOutput } },
-          { binding: 2, resource: { buffer: arg.params } },
+          {
+            binding: 2,
+            resource: {
+              buffer: arg.params.buffer,
+              size: arg.params.byteLength,
+            },
+          },
         ],
       }),
     dispose: () => undefined,
@@ -144,51 +106,37 @@ export const createStateCell = (
   return {
     get: (arg) => {
       const params = paramsCell.get(arg.config);
-      const scores = scoresCell.get({
-        windowCount: params.value.windowCount,
-        candidateCount: params.value.candidateCount,
-      });
       const rawOutput = rawOutputCell.get(params.value.windowCount);
       const filteredOutput = filteredOutputCell.get(params.value.windowCount);
-      const scoreCandidatesBindGroup = scoreCandidatesBindGroupCell.get({
+      const scoreAndPickBindGroup = scoreAndPickBindGroupCell.get({
         signal: arg.signal,
-        scores,
-        params: params.buffer,
-      });
-      const pickBestBindGroup = pickBestBindGroupCell.get({
-        signal: arg.signal,
-        scores,
         rawOutput,
-        params: params.buffer,
+        params,
       });
       const filterBindGroup = filterBindGroupCell.get({
         rawOutput,
         filteredOutput,
-        params: params.buffer,
+        params,
       });
 
       return {
         pipelines,
         params,
-        scores,
         output: {
           raw: rawOutput,
           filtered: filteredOutput,
         },
         bindGroups: {
-          scoreCandidates: scoreCandidatesBindGroup,
-          pickBest: pickBestBindGroup,
+          scoreAndPick: scoreAndPickBindGroup,
           filter: filterBindGroup,
         },
       };
     },
     dispose: () => {
       filterBindGroupCell.dispose();
-      pickBestBindGroupCell.dispose();
-      scoreCandidatesBindGroupCell.dispose();
+      scoreAndPickBindGroupCell.dispose();
       filteredOutputCell.dispose();
       rawOutputCell.dispose();
-      scoresCell.dispose();
       paramsCell.dispose();
     },
   };

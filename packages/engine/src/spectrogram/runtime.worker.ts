@@ -1,10 +1,9 @@
-import { allTrackKeys } from '@musetric/spectrogram';
+import { allTrackKeys, mapTrackKeys } from '@musetric/spectrogram';
 import {
   averageMetrics,
   createSpectrogramProcessor,
   getGpuDevice,
   type SpectrogramProcessorMetrics,
-  type SpectrogramSampleInvalidation,
 } from '@musetric/spectrogram/gpu';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
@@ -27,17 +26,7 @@ export type CreateSpectrogramRuntimeOptions = {
 const playheadFrameIndexSlot = 0;
 
 const emptySamples = (): SpectrogramLaneSamples =>
-  allTrackKeys.reduce<SpectrogramLaneSamples>((acc, key) => {
-    acc[key] = undefined;
-    return acc;
-  }, {});
-
-const playheadAdvanceInvalidations: readonly SpectrogramSampleInvalidation[] =
-  allTrackKeys.map((trackKey) => ({
-    trackKey,
-    frameIndex: 0,
-    frameCount: 0,
-  }));
+  mapTrackKeys(() => undefined);
 
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
@@ -107,7 +96,6 @@ export const createSpectrogramRuntime = async (
     rendering = true;
     try {
       trackProgress = playheadTrackProgress();
-      processor.invalidateSamples(playheadAdvanceInvalidations);
       await render();
     } finally {
       rendering = false;
@@ -133,6 +121,9 @@ export const createSpectrogramRuntime = async (
           frameCount: message.frameCount,
         },
       ]);
+      if (!playing) {
+        void renderFromPlayhead();
+      }
     },
   });
 
@@ -162,7 +153,13 @@ export const createSpectrogramRuntime = async (
     },
     setTrackProgress: (message) => {
       trackProgress = message.trackProgress;
-      void render();
+      if (frameCount > 0) {
+        const frameIndex = Math.round(message.trackProgress * frameCount);
+        Atomics.store(playhead, playheadFrameIndexSlot, frameIndex);
+      }
+      if (!playing) {
+        void renderFromPlayhead();
+      }
     },
     setFrameCount: (message) => {
       frameCount = message.frameCount;
@@ -171,14 +168,16 @@ export const createSpectrogramRuntime = async (
       playing = message.playing;
       if (playing) {
         renderLoop.start();
-      } else {
-        renderLoop.stop();
-        void render();
+        return;
       }
+      renderLoop.stop();
+      void renderFromPlayhead();
     },
     updateConfig: (message) => {
       processor.updateConfig(message.patch);
-      void render();
+      if (!playing) {
+        void renderFromPlayhead();
+      }
     },
   });
 };

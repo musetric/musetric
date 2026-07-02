@@ -7,7 +7,7 @@ struct DecibelifyParams {
   gainOverReferenceMagnitude: f32,
   gateFloorDb: f32,
   gateRangeDb: f32,
-  padding: f32,
+  slotOffset: u32,
 };
 
 @group(0) @binding(0) var<storage, read> magnitude: array<f32>;
@@ -21,9 +21,10 @@ var<workgroup> localSums: array<f32, 64>;
 fn main(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let halfSize = params.halfSize;
   let windowCount = params.windowCount;
-  let windowIndex = workgroupId.x;
+  let localWindowIndex = workgroupId.x;
+  let windowIndex = (params.slotOffset + localWindowIndex) % windowCount;
   let workerId = lid.x;
-  if (windowIndex >= windowCount) {
+  if (localWindowIndex >= windowCount) {
     return;
   }
 

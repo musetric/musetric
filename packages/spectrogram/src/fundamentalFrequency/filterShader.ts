@@ -10,20 +10,26 @@ struct FundamentalFrequencyParams {
   minimumFundamentalIntensity: f32,
   minimumScore: f32,
   harmonicCount: u32,
-  pad0: u32,
-  pad1: u32,
+  slotOffset: u32,
+  columnCount: u32,
+  screenBase: u32,
+  baseSlot: u32,
 };
 
 @group(0) @binding(0) var<storage, read> rawOutput: array<f32>;
 @group(0) @binding(1) var<storage, read_write> filteredOutput: array<f32>;
 @group(0) @binding(2) var<uniform> params: FundamentalFrequencyParams;
 
-fn frequencyAt(index: i32) -> f32 {
-  if (index < 0 || index >= i32(params.windowCount)) {
+fn slotAtScreenIndex(index: u32) -> u32 {
+  return (params.baseSlot + index) % params.windowCount;
+}
+
+fn frequencyAtScreen(index: i32) -> f32 {
+  if (index < 0i || index >= i32(params.windowCount)) {
     return 0.0;
   }
 
-  return rawOutput[u32(index)];
+  return rawOutput[slotAtScreenIndex(u32(index))];
 }
 
 fn centsDistance(frequency: f32, targetFrequency: f32) -> f32 {
@@ -41,7 +47,7 @@ fn countCompatibleNeighbors(windowIndex: i32, frequency: f32) -> u32 {
       continue;
     }
 
-    let neighborFrequency = frequencyAt(windowIndex + offset);
+    let neighborFrequency = frequencyAtScreen(windowIndex + offset);
     if (centsDistance(frequency, neighborFrequency) <= 160.0) {
       count += 1u;
     }
@@ -52,7 +58,7 @@ fn countCompatibleNeighbors(windowIndex: i32, frequency: f32) -> u32 {
 
 fn nearestPreviousFrequency(windowIndex: i32) -> f32 {
   for (var offset = 1i; offset <= 6i; offset += 1i) {
-    let frequency = frequencyAt(windowIndex - offset);
+    let frequency = frequencyAtScreen(windowIndex - offset);
     if (frequency > 0.0) {
       return frequency;
     }
@@ -63,7 +69,7 @@ fn nearestPreviousFrequency(windowIndex: i32) -> f32 {
 
 fn nearestNextFrequency(windowIndex: i32) -> f32 {
   for (var offset = 1i; offset <= 6i; offset += 1i) {
-    let frequency = frequencyAt(windowIndex + offset);
+    let frequency = frequencyAtScreen(windowIndex + offset);
     if (frequency > 0.0) {
       return frequency;
     }
@@ -91,10 +97,12 @@ fn isUnsupportedJump(windowIndex: i32, frequency: f32) -> bool {
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let windowIndex = gid.x;
-  if (windowIndex >= params.windowCount) {
+  let localWindowIndex = gid.x;
+  if (localWindowIndex >= params.columnCount) {
     return;
   }
+  let screenIndex = params.screenBase + localWindowIndex;
+  let windowIndex = (params.slotOffset + localWindowIndex) % params.windowCount;
 
   let frequency = rawOutput[windowIndex];
   if (frequency <= 0.0) {
@@ -102,7 +110,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let index = i32(windowIndex);
+  let index = i32(screenIndex);
   if (countCompatibleNeighbors(index, frequency) <= 4u) {
     filteredOutput[windowIndex] = 0.0;
     return;

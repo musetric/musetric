@@ -1,5 +1,9 @@
 import { createGpuBufferReader } from '@musetric/utils/gpu';
 import { expect } from 'vitest';
+import {
+  computeColumnStep,
+  type ExtSpectrogramConfig,
+} from '../common/extConfig.js';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 
@@ -13,6 +17,17 @@ export const buildConfig = (
     ...overrides,
     canvas,
     viewSize,
+  };
+};
+
+export const extendConfig = (
+  config: SpectrogramConfig,
+): ExtSpectrogramConfig => {
+  const windowCount = config.viewSize.width;
+  return {
+    ...config,
+    windowCount,
+    columnStep: computeColumnStep({ ...config, windowCount }),
   };
 };
 
@@ -77,6 +92,33 @@ export const brightestRow = (
     }
   }
   return bestRow;
+};
+
+export const countDifferences = (
+  left: Uint8ClampedArray,
+  right: Uint8ClampedArray,
+): number => {
+  let count = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) {
+      count += 1;
+    }
+  }
+  return count;
+};
+
+export const maxAbsDifference = (
+  left: Uint8ClampedArray,
+  right: Uint8ClampedArray,
+): number => {
+  let max = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    const difference = Math.abs(left[i] - right[i]);
+    if (difference > max) {
+      max = difference;
+    }
+  }
+  return max;
 };
 
 export const rowAtFrequency = (

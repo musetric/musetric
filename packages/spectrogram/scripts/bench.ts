@@ -3,7 +3,7 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { experimental_getRunnerTask, startVitest } from 'vitest/node';
 import { type SpectrogramBenchSummary } from '../src/__test__/bench.es.js';
-import { writeBendReports } from './genBenchReport.js';
+import { writeBenchReports } from './genBenchReport.js';
 
 declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
@@ -60,7 +60,7 @@ const runVitest = async (): Promise<SpectrogramBenchSummary[]> => {
 };
 
 const webgpuResults = await runVitest();
-writeBendReports(webgpuResults);
+writeBenchReports(webgpuResults);
 
 const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
 console.log(`Total script time: ${elapsed}s`);

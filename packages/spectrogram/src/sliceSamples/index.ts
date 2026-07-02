@@ -1,18 +1,25 @@
 import { type ResourceCell } from '@musetric/utils';
-import { ringStartByteOffset } from './params.js';
+import {
+  type SpectrogramColumnRange,
+  type SpectrogramSampleRange,
+} from '../common/extConfig.js';
 import { createPipeline } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 64;
 
 export type SpectrogramSliceSamples = {
-  run: (encoder: GPUCommandEncoder) => void;
-  dispatch: (pass: GPUComputePassEncoder) => void;
+  run: (encoder: GPUCommandEncoder, range: SpectrogramColumnRange) => void;
+  dispatch: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
   write: (
     samples: Float32Array,
-    trackProgress: number,
+    baseColumn: number,
     truncateAfterPlayhead: boolean,
-    contentChanged: boolean,
+    forceFullUpload: boolean,
+    invalidations: readonly SpectrogramSampleRange[],
   ) => void;
 };
 
@@ -22,54 +29,56 @@ export const createSpectrogramSliceSamplesCell = (
 ): ResourceCell<StateArg, SpectrogramSliceSamples> => {
   const pipeline = createPipeline(device);
   const stateCell = createStateCell(device, pipeline);
-  const ringStartScratch = new Uint32Array(1);
 
   return {
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatch = (pass: GPUComputePassEncoder) => {
-        const { windowSize, windowCount } = state.params.value;
-        const xGroups = Math.ceil(windowSize / workgroupSize);
+      const dispatch = (
+        pass: GPUComputePassEncoder,
+        range: SpectrogramColumnRange,
+      ) => {
+        if (range.columnCount <= 0) {
+          return;
+        }
+        const { paddedWindowSize } = state.params.value;
+        const byteOffset = state.params.writeRange(range);
+        const xGroups = Math.ceil(paddedWindowSize / workgroupSize);
         pass.setPipeline(state.pipeline);
-        pass.setBindGroup(0, state.bindGroup);
-        pass.dispatchWorkgroups(xGroups, windowCount);
+        pass.setBindGroup(0, state.bindGroup, [byteOffset]);
+        pass.dispatchWorkgroups(xGroups, range.columnCount);
       };
 
       return {
-        run: (encoder) => {
-          const { paddedWindowSize, windowSize } = state.params.value;
-          if (paddedWindowSize > windowSize) {
-            encoder.clearBuffer(state.out);
-          }
+        run: (encoder, range) => {
           const pass = encoder.beginComputePass({
             label: 'slice-samples-pass',
             timestampWrites: marker,
           });
-          dispatch(pass);
+          dispatch(pass, range);
           pass.end();
         },
         dispatch,
         write: (
           samples,
-          trackProgress,
+          baseColumn,
           truncateAfterPlayhead,
-          contentChanged,
+          forceFullUpload,
+          invalidations,
         ) => {
-          const ringStart = state.samples.write(
+          const writeResult = state.samples.write(
             samples,
-            trackProgress,
+            baseColumn,
             state.config,
             truncateAfterPlayhead,
-            state.sampleOffset,
-            contentChanged,
+            forceFullUpload,
+            invalidations,
           );
-          ringStartScratch[0] = ringStart;
-          device.queue.writeBuffer(
-            state.params.buffer,
-            ringStartByteOffset,
-            ringStartScratch,
-          );
+          state.params.setFrame({
+            baseColumn,
+            baseWindowStart: writeResult.baseWindowStart,
+            ringStart: writeResult.ringStart,
+          });
         },
       };
     },

@@ -1,5 +1,10 @@
 import { createResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import { createDynamicUniformParams } from '../common/dynamicUniform.js';
+import {
+  type ExtSpectrogramConfig,
+  floorMod,
+  type SpectrogramColumnRange,
+} from '../common/extConfig.js';
 
 export type FundamentalFrequencyParams = {
   halfSize: number;
@@ -13,6 +18,12 @@ export type FundamentalFrequencyParams = {
   minimumScore: number;
   harmonicCount: number;
 };
+
+export const slotOffsetByteOffset = 40;
+const columnCountByteOffset = 44;
+const screenBaseByteOffset = 48;
+const baseSlotByteOffset = 52;
+const paramsByteLength = 64;
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
@@ -55,34 +66,60 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
 export type StateParams = {
   value: FundamentalFrequencyParams;
   buffer: GPUBuffer;
+  byteLength: number;
+  writeRange: (range?: SpectrogramColumnRange) => {
+    columnCount: number;
+    candidateCount: number;
+    byteOffset: number;
+  };
 };
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: ExtSpectrogramConfig): StateParams => {
       const value = toParams(config);
-      const array = new DataView(new ArrayBuffer(48));
-      array.setUint32(0, value.halfSize, true);
-      array.setUint32(4, value.windowCount, true);
-      array.setUint32(8, value.windowSize, true);
-      array.setUint32(12, value.candidateCount, true);
-      array.setFloat32(16, value.sampleRate, true);
-      array.setFloat32(20, value.minimumFrequency, true);
-      array.setFloat32(24, value.candidateStepCents, true);
-      array.setFloat32(28, value.minimumFundamentalIntensity, true);
-      array.setFloat32(32, value.minimumScore, true);
-      array.setUint32(36, value.harmonicCount, true);
-
-      const buffer = device.createBuffer({
+      const params = createDynamicUniformParams(device, {
         label: 'fundamental-frequency-params-buffer',
-        size: array.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        byteLength: paramsByteLength,
+        capacity: value.windowCount,
       });
-      device.queue.writeBuffer(buffer, 0, array.buffer);
 
       return {
         value,
-        buffer,
+        buffer: params.buffer,
+        byteLength: params.byteLength,
+        writeRange: (range) => {
+          const columnCount = range ? range.columnCount : value.windowCount;
+          const slotOffset = range ? range.slotOffset : 0;
+          const screenBase = range ? range.screenBase : 0;
+          const byteOffset = params.write((view) => {
+            view.setUint32(0, value.halfSize, true);
+            view.setUint32(4, value.windowCount, true);
+            view.setUint32(8, value.windowSize, true);
+            view.setUint32(12, value.candidateCount, true);
+            view.setFloat32(16, value.sampleRate, true);
+            view.setFloat32(20, value.minimumFrequency, true);
+            view.setFloat32(24, value.candidateStepCents, true);
+            view.setFloat32(28, value.minimumFundamentalIntensity, true);
+            view.setFloat32(32, value.minimumScore, true);
+            view.setUint32(36, value.harmonicCount, true);
+            view.setUint32(slotOffsetByteOffset, slotOffset, true);
+            view.setUint32(columnCountByteOffset, columnCount, true);
+            view.setUint32(screenBaseByteOffset, screenBase, true);
+            view.setUint32(
+              baseSlotByteOffset,
+              floorMod(slotOffset - screenBase, value.windowCount),
+              true,
+            );
+            view.setUint32(56, 0, true);
+            view.setUint32(60, 0, true);
+          });
+          return {
+            columnCount,
+            candidateCount: value.candidateCount,
+            byteOffset,
+          };
+        },
       };
     },
     dispose: (params) => {

@@ -1,24 +1,28 @@
 import { createResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
+import {
+  type ExtSpectrogramConfig,
+  floorMod,
+  type SpectrogramSampleRange,
+  windowStartForColumn,
+} from '../common/extConfig.js';
+
+export type StateSamplesWriteResult = {
+  baseWindowStart: number;
+  ringStart: number;
+};
 
 export type StateSamples = {
   buffer: GPUBuffer;
   array: Float32Array;
-  /**
-   * Uploads the visible samples into the GPU ring buffer and returns the
-   * `ringStart` rotation (= absolute window start modulo ring length) that the
-   * slice shader uses to read the buffer. Only the samples that actually
-   * changed since the previous frame are uploaded: the window edge exposed by
-   * the playhead movement plus the region whose truncation flipped.
-   */
+
   write: (
     samples: Float32Array,
-    trackProgress: number,
+    baseColumn: number,
     config: ExtSpectrogramConfig,
     truncateAfterPlayhead: boolean,
-    sampleOffset: number,
-    contentChanged: boolean,
-  ) => number;
+    forceFullUpload: boolean,
+    invalidations: readonly SpectrogramSampleRange[],
+  ) => StateSamplesWriteResult;
 };
 
 type ResidentState = {
@@ -28,9 +32,6 @@ type ResidentState = {
   limit: number;
   samples: Float32Array | undefined;
 };
-
-const floorMod = (value: number, modulus: number): number =>
-  ((value % modulus) + modulus) % modulus;
 
 export const createStateSamplesCell = (device: GPUDevice) =>
   createResourceCell({
@@ -56,40 +57,47 @@ export const createStateSamplesCell = (device: GPUDevice) =>
         array,
         write: (
           samples,
-          trackProgress,
+          baseColumn,
           config,
           truncateAfterPlayhead,
-          sampleOffset,
-          contentChanged,
+          forceFullUpload,
+          invalidations,
         ) => {
           const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
           const beforeSamples =
             visibleTime * playheadRatio * sampleRate + windowSize;
           const totalVisibleSamples = visibleTime * sampleRate + windowSize;
-          const windowStart = Math.floor(
-            trackProgress * samples.length - beforeSamples + sampleOffset,
+          const windowStart = windowStartForColumn(
+            config,
+            windowSize,
+            baseColumn,
           );
           const limit = truncateAfterPlayhead
             ? Math.min(totalVisibleSamples, Math.floor(beforeSamples))
             : totalVisibleSamples;
           const ringStart = floorMod(windowStart, ringLength);
 
-          // Writes effective(windowStart + i) for i in [0, count) into the ring
-          // slots ((windowStart + i) mod ringLength), splitting at the wrap.
           const writeRange = (from: number, count: number): void => {
             if (count <= 0) {
               return;
             }
-            const scratch =
-              count === ringLength ? array : new Float32Array(count);
-            for (let i = 0; i < count; i += 1) {
-              const sampleIndex = from + i;
-              const local = sampleIndex - windowStart;
-              const inside =
-                sampleIndex >= 0 &&
-                sampleIndex < samples.length &&
-                local < limit;
-              scratch[i] = inside ? samples[sampleIndex] : 0;
+            const dataEnd = Math.min(samples.length, windowStart + limit);
+            const inStart = Math.max(from, 0);
+            const inEnd = Math.min(from + count, dataEnd);
+            const localInStart = inStart - from;
+            const localInEnd = inEnd - from;
+            const reused = count === ringLength;
+            const scratch = reused ? array : new Float32Array(count);
+            if (reused) {
+              if (localInStart > 0) {
+                scratch.fill(0, 0, localInStart);
+              }
+              if (localInEnd < count) {
+                scratch.fill(0, localInEnd, count);
+              }
+            }
+            if (localInEnd > localInStart) {
+              scratch.set(samples.subarray(inStart, inEnd), localInStart);
             }
             const startSlot = floorMod(from, ringLength);
             const firstCount = Math.min(count, ringLength - startSlot);
@@ -113,7 +121,7 @@ export const createStateSamplesCell = (device: GPUDevice) =>
 
           const full =
             !resident.valid ||
-            contentChanged ||
+            forceFullUpload ||
             resident.samples !== samples ||
             resident.sampleLength !== samples.length ||
             Math.abs(windowStart - resident.windowStart) >= ringLength;
@@ -123,13 +131,10 @@ export const createStateSamplesCell = (device: GPUDevice) =>
           } else {
             const shift = windowStart - resident.windowStart;
             if (shift > 0) {
-              // New samples exposed on the leading (right) edge.
               writeRange(resident.windowStart + ringLength, shift);
             } else if (shift < 0) {
-              // New samples exposed on the trailing (left) edge (rewind/drag).
               writeRange(windowStart, -shift);
             }
-            // Region whose truncation gate flipped between frames.
             const currentTruncation = windowStart + limit;
             const previousTruncation = resident.windowStart + resident.limit;
             const lo = Math.max(
@@ -141,6 +146,14 @@ export const createStateSamplesCell = (device: GPUDevice) =>
               windowStart + ringLength,
             );
             writeRange(lo, hi - lo);
+            for (const invalidation of invalidations) {
+              const from = Math.max(invalidation.frameIndex, windowStart);
+              const to = Math.min(
+                invalidation.frameIndex + invalidation.frameCount,
+                windowStart + ringLength,
+              );
+              writeRange(from, to - from);
+            }
           }
 
           resident.valid = true;
@@ -149,7 +162,10 @@ export const createStateSamplesCell = (device: GPUDevice) =>
           resident.limit = limit;
           resident.samples = samples;
 
-          return ringStart;
+          return {
+            baseWindowStart: windowStart,
+            ringStart,
+          };
         },
       };
     },
