@@ -36,6 +36,7 @@ export type GesturePinchUpdate = {
 
 export type MultiPointerGestureOptions = InertialDragPhysicsOptions & {
   element: HTMLElement;
+  axis?: GestureAxis;
   pointerTypes?: readonly GesturePointerType[];
   axisLockDistance?: number;
   pinchLockDistance?: number;
@@ -93,6 +94,7 @@ export const createMultiPointerGesture = (
 ): MultiPointerGesture => {
   const {
     element,
+    axis: fixedAxis,
     pointerTypes = defaultPointerTypes,
     axisLockDistance = 6,
     pinchLockDistance = 6,
@@ -327,8 +329,14 @@ export const createMultiPointerGesture = (
       const deltaY = pointer.y - panState.startY;
 
       if (panState.axis === undefined) {
-        if (Math.hypot(deltaX, deltaY) < axisLockDistance) return;
-        panState.axis = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
+        if (fixedAxis) {
+          const axisDelta = fixedAxis === 'x' ? deltaX : deltaY;
+          if (Math.abs(axisDelta) < axisLockDistance) return;
+          panState.axis = fixedAxis;
+        } else {
+          if (Math.hypot(deltaX, deltaY) < axisLockDistance) return;
+          panState.axis = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
+        }
         const startPosition =
           panState.axis === 'x' ? panState.startX : panState.startY;
         panState.lastPosition = startPosition;
