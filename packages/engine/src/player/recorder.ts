@@ -64,6 +64,30 @@ export const createEngineRecorder = (
 
   const isStopRequested = (session: RecordingSession) => session.stopRequested;
 
+  const resolvePreferredStream = async (
+    stream: MediaStream,
+    devices: MediaDeviceInfo[],
+  ): Promise<MediaStream> => {
+    const preferredDevice = resolveAudioInputDevice(devices, {
+      preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+    });
+    if (!preferredDevice) {
+      return stream;
+    }
+    const [currentTrack] = stream.getAudioTracks();
+    const currentDeviceId = currentTrack.getSettings().deviceId;
+    if (preferredDevice.deviceId === currentDeviceId) {
+      return stream;
+    }
+    stopMediaStream(stream);
+    return navigator.mediaDevices.getUserMedia({
+      audio: createMicrophoneAudioConstraints({
+        deviceId: preferredDevice.deviceId,
+        sampleRate: context.sampleRate,
+      }),
+    });
+  };
+
   const cleanupSession = (session: RecordingSession) => {
     session.disconnectPlayerInput?.();
     session.disconnectPlayerInput = undefined;
@@ -168,25 +192,10 @@ export const createEngineRecorder = (
 
       const devices = await getAudioDevices();
       if (store.get().microphoneDeviceId === undefined) {
-        const preferredDevice = resolveAudioInputDevice(devices, {
-          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
-        });
-        if (preferredDevice) {
-          const [currentTrack] = stream.getAudioTracks();
-          const currentDeviceId = currentTrack.getSettings().deviceId;
-          if (preferredDevice.deviceId !== currentDeviceId) {
-            stopMediaStream(stream);
-            stream = await navigator.mediaDevices.getUserMedia({
-              audio: createMicrophoneAudioConstraints({
-                deviceId: preferredDevice.deviceId,
-                sampleRate: context.sampleRate,
-              }),
-            });
-            session.stream = stream;
-            if (isStopRequested(session)) {
-              return;
-            }
-          }
+        stream = await resolvePreferredStream(stream, devices);
+        session.stream = stream;
+        if (isStopRequested(session)) {
+          return;
         }
       }
 

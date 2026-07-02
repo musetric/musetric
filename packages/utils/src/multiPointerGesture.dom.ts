@@ -247,6 +247,23 @@ export const createMultiPointerGesture = (
     };
   };
 
+  const resolvePanAxis = (
+    deltaX: number,
+    deltaY: number,
+  ): GestureAxis | undefined => {
+    if (fixedAxis) {
+      const axisDelta = fixedAxis === 'x' ? deltaX : deltaY;
+      if (Math.abs(axisDelta) < axisLockDistance) {
+        return undefined;
+      }
+      return fixedAxis;
+    }
+    if (Math.hypot(deltaX, deltaY) < axisLockDistance) {
+      return undefined;
+    }
+    return Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
+  };
+
   const handlePointerDown = (event: PointerEvent) => {
     if (
       !isPointerType(event.pointerType) ||
@@ -329,14 +346,11 @@ export const createMultiPointerGesture = (
       const deltaY = pointer.y - panState.startY;
 
       if (panState.axis === undefined) {
-        if (fixedAxis) {
-          const axisDelta = fixedAxis === 'x' ? deltaX : deltaY;
-          if (Math.abs(axisDelta) < axisLockDistance) return;
-          panState.axis = fixedAxis;
-        } else {
-          if (Math.hypot(deltaX, deltaY) < axisLockDistance) return;
-          panState.axis = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
+        const resolvedAxis = resolvePanAxis(deltaX, deltaY);
+        if (resolvedAxis === undefined) {
+          return;
         }
+        panState.axis = resolvedAxis;
         const startPosition =
           panState.axis === 'x' ? panState.startX : panState.startY;
         panState.lastPosition = startPosition;
