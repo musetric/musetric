@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/utils';
+import { assertDefined, createResourceCell } from '@musetric/utils';
 import { createPipeline } from './pipeline.js';
 
 export type CanvasState = {
@@ -8,10 +8,10 @@ export type CanvasState = {
 export const createCanvasCell = (device: GPUDevice) =>
   createResourceCell({
     create: (canvas: OffscreenCanvas): CanvasState => {
-      const context = canvas.getContext('webgpu');
-      if (!context) {
-        throw new Error('WebGPU context not available on the canvas');
-      }
+      const context = assertDefined(
+        canvas.getContext('webgpu'),
+        'WebGPU context not available on the canvas',
+      );
 
       return {
         context,

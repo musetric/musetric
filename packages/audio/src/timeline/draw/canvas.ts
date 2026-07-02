@@ -1,4 +1,4 @@
-import { createResourceCell } from '@musetric/utils';
+import { assertDefined, createResourceCell } from '@musetric/utils';
 
 export type TimelineCanvasState = {
   context: CanvasRenderingContext2D;
@@ -10,10 +10,10 @@ export type TimelineCanvasState = {
 export const createCanvasCell = () =>
   createResourceCell({
     create: (canvas: HTMLCanvasElement): TimelineCanvasState => {
-      const context = canvas.getContext('2d');
-      if (!context) {
-        throw new Error('Context 2D not available on the timeline canvas');
-      }
+      const context = assertDefined(
+        canvas.getContext('2d'),
+        'Context 2D not available on the timeline canvas',
+      );
 
       const rect = canvas.getBoundingClientRect();
       const state: TimelineCanvasState = {

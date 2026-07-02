@@ -1,15 +1,19 @@
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import { assertDefined } from '@musetric/utils';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './components/App.js';
 import { appTheme } from './theme.js';
 
 const run = () => {
-  const rootElement = document.getElementById('root');
-  const splashScreen = document.getElementById('splashScreen');
-  if (!rootElement || !splashScreen) {
-    throw new Error('Root element or splash screen not found');
-  }
+  const rootElement = assertDefined(
+    document.getElementById('root'),
+    'Root element not found',
+  );
+  const splashScreen = assertDefined(
+    document.getElementById('splashScreen'),
+    'Splash screen not found',
+  );
 
   createRoot(rootElement).render(
     <StrictMode>
