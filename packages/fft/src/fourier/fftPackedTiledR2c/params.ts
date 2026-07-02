@@ -1,30 +1,47 @@
 import { type FourierConfig } from '../config.es.js';
 
-export type PackedTiledR2cParams = {
-  windowSize: number;
-  windowCount: number;
-};
+const paramsByteLength = 16;
 
-export type Params = {
-  value: PackedTiledR2cParams;
+export type ParamsRing = {
   buffer: GPUBuffer;
+  binding: (slot: number) => GPUBufferBinding;
+  reserve: (batchOffset: number) => number;
+  destroy: () => void;
 };
 
-export const createParams = (
+export const createParamsRing = (
   device: GPUDevice,
   config: FourierConfig,
-): Params => {
-  const value = {
-    windowSize: config.windowSize,
-    windowCount: config.windowCount,
-  };
-  const array = new Uint32Array([value.windowSize, value.windowCount]);
+): ParamsRing => {
+  const capacity = Math.max(1, config.windowCount);
+  const alignment = device.limits.minUniformBufferOffsetAlignment;
+  const stride = Math.ceil(paramsByteLength / alignment) * alignment;
   const buffer = device.createBuffer({
     label: 'packed-tiled-r2c-params',
-    size: array.byteLength,
+    size: stride * capacity,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  device.queue.writeBuffer(buffer, 0, array);
+  const scratch = new Uint32Array(paramsByteLength / 4);
+  scratch[0] = config.windowSize;
+  scratch[1] = config.windowCount;
+  let cursor = 0;
 
-  return { value, buffer };
+  return {
+    buffer,
+    binding: (slot) => ({
+      buffer,
+      offset: slot * stride,
+      size: paramsByteLength,
+    }),
+    reserve: (batchOffset) => {
+      const slot = cursor;
+      cursor = (cursor + 1) % capacity;
+      scratch[2] = batchOffset;
+      device.queue.writeBuffer(buffer, slot * stride, scratch);
+      return slot;
+    },
+    destroy: () => {
+      buffer.destroy();
+    },
+  };
 };

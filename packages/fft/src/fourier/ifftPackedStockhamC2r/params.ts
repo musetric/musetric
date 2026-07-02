@@ -1,21 +1,47 @@
 import { type FourierConfig } from '../config.es.js';
 
-export type Params = {
+const paramsByteLength = 16;
+
+export type ParamsRing = {
   buffer: GPUBuffer;
+  binding: (slot: number) => GPUBufferBinding;
+  reserve: (batchOffset: number) => number;
+  destroy: () => void;
 };
 
-const paramsSize = 2 * Uint32Array.BYTES_PER_ELEMENT;
-
-export const createParams = (
+export const createParamsRing = (
   device: GPUDevice,
   config: FourierConfig,
-): Params => {
-  const array = new Uint32Array([config.windowSize, config.windowCount]);
+): ParamsRing => {
+  const capacity = Math.max(1, config.windowCount);
+  const alignment = device.limits.minUniformBufferOffsetAlignment;
+  const stride = Math.ceil(paramsByteLength / alignment) * alignment;
   const buffer = device.createBuffer({
-    label: 'packed-stockham-c2r-params-buffer',
-    size: paramsSize,
+    label: 'packed-stockham-c2r-params',
+    size: stride * capacity,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  device.queue.writeBuffer(buffer, 0, array);
-  return { buffer };
+  const scratch = new Uint32Array(paramsByteLength / 4);
+  scratch[0] = config.windowSize;
+  scratch[1] = config.windowCount;
+  let cursor = 0;
+
+  return {
+    buffer,
+    binding: (slot) => ({
+      buffer,
+      offset: slot * stride,
+      size: paramsByteLength,
+    }),
+    reserve: (batchOffset) => {
+      const slot = cursor;
+      cursor = (cursor + 1) % capacity;
+      scratch[2] = batchOffset;
+      device.queue.writeBuffer(buffer, slot * stride, scratch);
+      return slot;
+    },
+    destroy: () => {
+      buffer.destroy();
+    },
+  };
 };

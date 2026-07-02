@@ -19,6 +19,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 @group(0) @binding(0) var<storage, read_write> scratch0: array<vec2<f32>>;
@@ -29,9 +30,6 @@ struct Params {
 @group(0) @binding(5) var<storage, read_write> signal: array<f32>;
 @group(0) @binding(6) var<storage, read> r2cTrigTable: array<f32>;
 
-// Per-invocation window offsets, set once in main so the fused prepack read
-// and signal write paths can recover local indices without changing the
-// butterfly codelets' readScratch/writeScratch call sites.
 var<private> windowScratchOffset: u32;
 var<private> windowSpectrumOffset: u32;
 var<private> windowSignalOffset: u32;
@@ -40,7 +38,6 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Conjugate twiddle (+sin) turns the forward DIT butterfly into the inverse.
 fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
@@ -57,8 +54,6 @@ fn readSpectrumBin(k: u32) -> vec2<f32> {
   return vec2<f32>(readSpectrumFloat(index), readSpectrumFloat(index + 1u));
 }
 
-// C2R combine: fold the half-spectrum bin k and its mirror (N-k) into the
-// packed complex sample feeding the size-(N/2) inverse FFT.
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {
   if (k == 0u) {
     let dc = readSpectrumFloat(0u);
@@ -107,7 +102,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -144,7 +139,6 @@ fn main(
       getInvTwiddle(6u * tw));
     let a7 = mul(readScratch(scratchOffset + base + 7u * butterflyCount),
       getInvTwiddle(7u * tw));
-    // inverse radix-8: conjugate W8 rotations vs the forward.
     let e0 = a0 + a4;
     let e1 = a0 - a4;
     let e2 = a2 + a6;
@@ -212,7 +206,6 @@ fn main(
     let diff02 = a0 - a2;
     let sum13 = a1 + a3;
     let diff13 = a1 - a3;
-    // inverse radix-4: +i and -i rotations swap relative to the forward.
     let plusIDiff13 = vec2<f32>(-diff13.y, diff13.x);
     let minusIDiff13 = vec2<f32>(diff13.y, -diff13.x);
     let i0 = block * (stageStride * 4u) + k;
@@ -234,7 +227,6 @@ fn main(
     let t1 = a1 + a2;
     let m = a0 - 0.5 * t1;
     let d = a2 - a1;
-    // inverse radix-3: i-rotation sign flipped vs the forward.
     let ids = vec2<f32>(sin3 * d.y, -sin3 * d.x);
     let o0 = block * (stageStride * 3u) + k;
     writeScratch(scratchOffset + o0, a0 + t1);
@@ -265,7 +257,6 @@ fn main(
     let o2 = o1 + stageStride;
     let o3 = o2 + stageStride;
     let o4 = o3 + stageStride;
-    // inverse radix-5: i-rotation signs flipped vs the forward.
     writeScratch(scratchOffset + o0, a0 + t1 + t2);
     writeScratch(scratchOffset + o1, b1 + vec2<f32>(-b3.y, b3.x));
     writeScratch(scratchOffset + o2, b2 + vec2<f32>(-b4.y, b4.x));

@@ -1,7 +1,12 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FourierArg } from '../types.js';
-import { createParams, type Params } from './params.js';
-import { createPipeline, type Pipeline } from './pipeline.js';
+import { createParamsRing, type ParamsRing } from './params.js';
+import {
+  createPipeline,
+  type MultiPassPipeline,
+  type Pipeline,
+  type SinglePassPipeline,
+} from './pipeline.js';
 import {
   getPackedStockhamC2rVariant,
   type PackedStockhamC2rVariant,
@@ -17,28 +22,31 @@ type ScratchBuffers = {
   buffer1: GPUBuffer;
 };
 
-type SinglePassBindGroups = {
-  kind: 'singlePass';
-  transform: GPUBindGroup;
-};
-
-type MultiPassBindGroups = {
-  kind: 'multiPass';
-  stages: GPUBindGroup[];
-};
-
-type BindGroups = SinglePassBindGroups | MultiPassBindGroups;
-
-export type State = {
+type BaseState = {
+  kind: Pipeline['kind'];
   variant: PackedStockhamC2rVariant;
   pipeline: Pipeline;
   tables: TrigTables;
-  bindGroups: BindGroups;
-  params: Params;
+  params: ParamsRing;
   windowCount: number;
   dummySpectrum: GPUBuffer;
-  scratch?: ScratchBuffers;
 };
+
+type SinglePassState = BaseState & {
+  kind: 'singlePass';
+  pipeline: SinglePassPipeline;
+  getBindGroup: (slot: number) => GPUBindGroup;
+};
+
+type MultiPassState = BaseState & {
+  kind: 'multiPass';
+  variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>;
+  pipeline: MultiPassPipeline;
+  getStageBindGroups: (slot: number) => GPUBindGroup[];
+  scratch: ScratchBuffers;
+};
+
+export type State = SinglePassState | MultiPassState;
 
 const createDummySpectrumBuffer = (device: GPUDevice): GPUBuffer => {
   return device.createBuffer({
@@ -69,6 +77,20 @@ const createScratchBuffers = (
   };
 };
 
+const createSlotCache = <T>(
+  build: (slot: number) => T,
+): ((slot: number) => T) => {
+  const cache = new Map<number, T>();
+  return (slot) => {
+    let cached = cache.get(slot);
+    if (cached === undefined) {
+      cached = build(slot);
+      cache.set(slot, cached);
+    }
+    return cached;
+  };
+};
+
 export const createStateCell = (
   device: GPUDevice,
 ): ResourceCell<FourierArg, State> =>
@@ -84,41 +106,40 @@ export const createStateCell = (
       const inPlace = arg.wave === arg.spectrum;
       const pipeline = createPipeline(device, variant, inPlace);
       const tables = createTrigTables(device, variant);
-      const params = createParams(device, arg.config);
+      const params = createParamsRing(device, arg.config);
       const { windowCount } = arg.config;
       const dummySpectrum = createDummySpectrumBuffer(device);
       const spectrum = inPlace ? dummySpectrum : arg.spectrum;
 
-      if (pipeline.kind === 'multiPass') {
+      if (variant.kind === 'multiPass' && pipeline.kind === 'multiPass') {
         const scratch = createScratchBuffers(
           device,
           variant.packedWindowSize,
           windowCount,
         );
-        const bindGroups: MultiPassBindGroups = {
-          kind: 'multiPass',
-          stages: pipeline.stages.map((stagePipeline) =>
-            device.createBindGroup({
-              label: 'packed-stockham-c2r-multipass-stage-bind-group',
-              layout: stagePipeline.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: { buffer: scratch.buffer0 } },
-                { binding: 1, resource: { buffer: scratch.buffer1 } },
-                { binding: 2, resource: { buffer: tables.fft } },
-                { binding: 3, resource: { buffer: params.buffer } },
-                { binding: 4, resource: { buffer: spectrum } },
-                { binding: 5, resource: { buffer: arg.wave } },
-                { binding: 6, resource: { buffer: tables.r2c } },
-              ],
-            }),
-          ),
-        };
 
         return {
+          kind: 'multiPass',
           variant,
           pipeline,
           tables,
-          bindGroups,
+          getStageBindGroups: createSlotCache((slot) =>
+            pipeline.stages.map((stagePipeline) =>
+              device.createBindGroup({
+                label: 'packed-stockham-c2r-multipass-stage-bind-group',
+                layout: stagePipeline.getBindGroupLayout(0),
+                entries: [
+                  { binding: 0, resource: { buffer: scratch.buffer0 } },
+                  { binding: 1, resource: { buffer: scratch.buffer1 } },
+                  { binding: 2, resource: { buffer: tables.fft } },
+                  { binding: 3, resource: params.binding(slot) },
+                  { binding: 4, resource: { buffer: spectrum } },
+                  { binding: 5, resource: { buffer: arg.wave } },
+                  { binding: 6, resource: { buffer: tables.r2c } },
+                ],
+              }),
+            ),
+          ),
           params,
           windowCount,
           dummySpectrum,
@@ -126,35 +147,37 @@ export const createStateCell = (
         };
       }
 
-      const bindGroups: SinglePassBindGroups = {
-        kind: 'singlePass',
-        transform: device.createBindGroup({
-          label: 'packed-stockham-c2r-transform-bind-group',
-          layout: pipeline.transform.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: spectrum } },
-            { binding: 1, resource: { buffer: arg.wave } },
-            { binding: 2, resource: { buffer: tables.fft } },
-            { binding: 3, resource: { buffer: tables.r2c } },
-            { binding: 4, resource: { buffer: params.buffer } },
-          ],
-        }),
-      };
+      if (pipeline.kind !== 'singlePass') {
+        throw new Error('ifftPackedStockhamC2r variant/pipeline kind mismatch');
+      }
 
       return {
+        kind: 'singlePass',
         variant,
         pipeline,
         tables,
-        bindGroups,
+        getBindGroup: createSlotCache((slot) =>
+          device.createBindGroup({
+            label: 'packed-stockham-c2r-transform-bind-group',
+            layout: pipeline.transform.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: { buffer: spectrum } },
+              { binding: 1, resource: { buffer: arg.wave } },
+              { binding: 2, resource: { buffer: tables.fft } },
+              { binding: 3, resource: { buffer: tables.r2c } },
+              { binding: 4, resource: params.binding(slot) },
+            ],
+          }),
+        ),
         params,
         windowCount,
         dummySpectrum,
       };
     },
     dispose: (state) => {
-      state.params.buffer.destroy();
+      state.params.destroy();
       state.dummySpectrum.destroy();
-      if (state.scratch) {
+      if (state.kind === 'multiPass') {
         state.scratch.buffer0.destroy();
         state.scratch.buffer1.destroy();
       }

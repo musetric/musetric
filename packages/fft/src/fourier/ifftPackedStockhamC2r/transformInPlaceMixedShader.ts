@@ -19,6 +19,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
@@ -53,7 +54,6 @@ fn getFactor(stage: u32) -> u32 {
   return 5u;
 }
 
-// Mixed-radix digit reversal for the in-place DIT, digits in getFactor order.
 fn reverseMixed(index: u32) -> u32 {
   var rev = 0u;
   var placeIn = packedWindowSize;
@@ -90,7 +90,6 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Conjugate twiddle (+sin) for the inverse DIT.
 fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
@@ -145,7 +144,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -154,8 +153,6 @@ fn main(
   let spectrumOffset = complexStride() * windowIndex;
   let signalOffset = params.windowSize * windowIndex;
 
-  // C2R prepack: packed(k) and packed(P-k) share the bin pair {k, P-k} and one
-  // twiddle (packed(P-k) = conj(even - i*odd)), halving global/table reads.
   if (t == 0u) {
     store(0u, loadPackedSpectrum(spectrumOffset, 0u));
     if (packedWindowSize % 2u == 0u) {

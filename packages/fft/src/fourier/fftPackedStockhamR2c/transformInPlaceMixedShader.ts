@@ -18,6 +18,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
@@ -52,9 +53,6 @@ fn getFactor(stage: u32) -> u32 {
   return 5u;
 }
 
-// Mixed-radix digit reversal for the in-place DIT, processing stage radices in
-// the same order as getFactor (8s, then 4s, 2s, 3s, 5s). The first-stage digit
-// (most significant in the natural index) becomes least significant here.
 fn reverseMixed(index: u32) -> u32 {
   var rev = 0u;
   var placeIn = packedWindowSize;
@@ -87,8 +85,6 @@ fn reverseMixed(index: u32) -> u32 {
   return rev;
 }
 
-// Mixed-radix reversal of the digits that remain after the first radix-8 stage
-// (one fewer radix-8 digit), over the range [0, packedWindowSize/8).
 fn reverseRestMixed(index: u32) -> u32 {
   var rev = 0u;
   var placeIn = packedWindowSize / 8u;
@@ -192,7 +188,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -204,9 +200,6 @@ fn main(
   var stride = 1u;
   var firstStage = 0u;
 
-  // Fuse the global load with the twiddle-free first radix-8 stage (stride 1 =>
-  // all twiddles W^0=1): read 8 coalesced inputs, run the radix-8 in registers,
-  // write the 8 contiguous outputs to the block-reversed destination.
   if (radix8StageCount > 0u) {
     let butterflyCount = packedWindowSize / 8u;
     for (var j = t; j < butterflyCount; j += threadCount) {
@@ -390,7 +383,6 @@ fn main(
     workgroupBarrier();
   }
 
-  // R2C unpack (paired bins, halved shared reads).
   if (t == 0u) {
     let z0 = getResult(0u);
     writeBin(spectrumOffset, 0u, vec2<f32>(z0.x + z0.y, 0.0));

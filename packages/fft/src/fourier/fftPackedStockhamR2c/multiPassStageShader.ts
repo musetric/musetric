@@ -19,6 +19,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
@@ -29,7 +30,6 @@ struct Params {
 @group(0) @binding(5) var<uniform> params: Params;
 @group(0) @binding(6) var<storage, read> r2cTrigTable: array<f32>;
 
-// Output slots for the fused last-stage butterfly (up to radix-8).
 var<private> yOut: array<vec2<f32>, 8>;
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
@@ -108,8 +108,6 @@ fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
   spectrum[index + 1u] = value.y;
 }
 
-// Last-stage butterfly (stageStride == packedWindowSize / factor, twiddle
-// scale 1) for base index k, leaving outputs X[k + m * stageStride] in yOut.
 fn computeLastButterfly(windowIndex: u32, k: u32) {
   let butterflyCount = packedWindowSize / factor;
   let a0 = readStage(windowIndex, k);
@@ -171,7 +169,6 @@ fn computeLastButterfly(windowIndex: u32, k: u32) {
     yOut[4] = b1 + vec2<f32>(-b3.y, b3.x);
     return;
   }
-  // factor == 8
   let a1 = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
   let a2 = mul(readStage(windowIndex, k + 2u * butterflyCount),
     getFftTwiddle(2u * k));
@@ -215,9 +212,6 @@ fn computeLastButterfly(windowIndex: u32, k: u32) {
   yOut[7] = E3 - p3;
 }
 
-// Fused final stage + R2C pack. Bins of butterfly k mirror into the bins of
-// butterfly (stageStride - k), so one thread runs both butterflies and packs
-// all their bins, saving the final scratch write plus the pack read pass.
 fn runFusedLastStage(windowIndex: u32, k: u32) {
   let spectrumOffset = complexStride() * windowIndex;
   computeLastButterfly(windowIndex, k);
@@ -254,7 +248,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }

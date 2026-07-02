@@ -1,6 +1,6 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type FourierArg } from '../types.js';
-import { createParams, type Params } from './params.js';
+import { createParamsRing, type ParamsRing } from './params.js';
 import { createPipelines, type Pipelines } from './pipeline.js';
 import {
   getPackedTiledR2cVariant,
@@ -25,8 +25,8 @@ type Resources = {
 export type State = {
   pipelines: Pipelines;
   tables: TrigTables;
-  bindGroups: BindGroups;
-  params: Params;
+  getBindGroups: (slot: number) => BindGroups;
+  params: ParamsRing;
   dummyInput: GPUBuffer;
   scratch: GPUBuffer;
   windowCount: number;
@@ -68,6 +68,56 @@ const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
   });
 };
 
+const createBindGroups = (
+  device: GPUDevice,
+  arg: FourierArg,
+  options: {
+    input: GPUBuffer;
+    params: GPUBufferBinding;
+    pipelines: Pipelines;
+    scratch: GPUBuffer;
+    tables: TrigTables;
+  },
+): BindGroups => ({
+  firstPass: device.createBindGroup({
+    label: 'packed-tiled-r2c-first-pass-bind-group',
+    layout: options.pipelines.firstPass.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: options.input } },
+      { binding: 1, resource: { buffer: arg.spectrum } },
+      { binding: 2, resource: { buffer: options.scratch } },
+      { binding: 3, resource: { buffer: options.tables.rowFft } },
+      { binding: 4, resource: { buffer: options.tables.fourStep } },
+      { binding: 5, resource: options.params },
+    ],
+  }),
+  secondPass: device.createBindGroup({
+    label: 'packed-tiled-r2c-second-pass-bind-group',
+    layout: options.pipelines.secondPass.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: options.scratch } },
+      { binding: 1, resource: { buffer: arg.spectrum } },
+      { binding: 2, resource: { buffer: options.tables.columnFft } },
+      { binding: 3, resource: { buffer: options.tables.r2c } },
+      { binding: 4, resource: options.params },
+    ],
+  }),
+});
+
+const createSlotCache = <T>(
+  build: (slot: number) => T,
+): ((slot: number) => T) => {
+  const cache = new Map<number, T>();
+  return (slot) => {
+    let cached = cache.get(slot);
+    if (cached === undefined) {
+      cached = build(slot);
+      cache.set(slot, cached);
+    }
+    return cached;
+  };
+};
+
 export const createStateCell = (
   device: GPUDevice,
 ): ResourceCell<FourierArg, State> =>
@@ -89,37 +139,20 @@ export const createStateCell = (
         variant,
         arg.config.windowCount,
       );
-      const params = createParams(device, arg.config);
-      const bindGroups = {
-        firstPass: device.createBindGroup({
-          label: 'packed-tiled-r2c-first-pass-bind-group',
-          layout: pipelines.firstPass.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: input } },
-            { binding: 1, resource: { buffer: arg.spectrum } },
-            { binding: 2, resource: { buffer: scratch } },
-            { binding: 3, resource: { buffer: tables.rowFft } },
-            { binding: 4, resource: { buffer: tables.fourStep } },
-            { binding: 5, resource: { buffer: params.buffer } },
-          ],
-        }),
-        secondPass: device.createBindGroup({
-          label: 'packed-tiled-r2c-second-pass-bind-group',
-          layout: pipelines.secondPass.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: scratch } },
-            { binding: 1, resource: { buffer: arg.spectrum } },
-            { binding: 2, resource: { buffer: tables.columnFft } },
-            { binding: 3, resource: { buffer: tables.r2c } },
-            { binding: 4, resource: { buffer: params.buffer } },
-          ],
-        }),
-      };
+      const params = createParamsRing(device, arg.config);
 
       return {
         pipelines,
         tables,
-        bindGroups,
+        getBindGroups: createSlotCache((slot) =>
+          createBindGroups(device, arg, {
+            input,
+            params: params.binding(slot),
+            pipelines,
+            scratch,
+            tables,
+          }),
+        ),
         params,
         dummyInput,
         scratch,
@@ -129,7 +162,7 @@ export const createStateCell = (
       };
     },
     dispose: (state) => {
-      state.params.buffer.destroy();
+      state.params.destroy();
       state.dummyInput.destroy();
       state.scratch.destroy();
       disposeTrigTables(state.tables);

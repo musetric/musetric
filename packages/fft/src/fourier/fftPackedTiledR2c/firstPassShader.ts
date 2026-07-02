@@ -11,13 +11,12 @@ override inPlace: u32 = 1u;
 const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
-// Lane stride padding keeps the four lanes of a warp on distinct shared
-// memory banks now that warps span lanes first.
 override smPad: u32 = 8u;
 
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> smReal0: array<f32, batchSize * (tileSize + smPad)>;
@@ -96,8 +95,6 @@ fn writeRow(lane: u32, index: u32, readEven: bool, value: vec2<f32>) {
   }
 }
 
-// Small tiles run the original tight scalar radix-2 loops; the generic mixed
-// helpers measurably regress them (~20-30%).
 fn runRowFftRadix2(t: u32, lane: u32) {
   let rowHalfSize = rowSize / 2u;
   for (var stage: u32 = 0u; stage < rowRadix2StageCount; stage++) {
@@ -282,15 +279,13 @@ fn getRowResult(index: u32, lane: u32) -> vec2<f32> {
   );
 }
 
-// Lanes sit on x so a warp spans the batch columns first: per-(lane, i)
-// global accesses of adjacent lanes land in the same 32-byte sector.
 @compute @workgroup_size(4, 64)
 fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
   let n1 = workgroupId.x * batchSize + localId.x;
-  let windowIndex = workgroupId.y;
+  let windowIndex = params.batchOffset + workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }

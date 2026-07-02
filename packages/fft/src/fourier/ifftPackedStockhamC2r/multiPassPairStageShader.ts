@@ -1,6 +1,3 @@
-// Fused pair of inverse Stockham DIT radix stages (see the forward
-// multiPassPairStageShader for the group structure). The first kernel can
-// additionally fuse the C2R prepack read.
 export const multiPassPairStageShader = `
 override packedWindowSize: u32 = 8192u;
 override factor1: u32 = 8u;
@@ -25,6 +22,7 @@ const sin5b: f32 = 0.58778525229247312917;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 override pairSharedSize: u32 = 512u;
@@ -49,7 +47,6 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Conjugate twiddle (+sin) turns the forward DIT butterfly into the inverse.
 fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
@@ -66,8 +63,6 @@ fn readSpectrumBin(k: u32) -> vec2<f32> {
   return vec2<f32>(readSpectrumFloat(index), readSpectrumFloat(index + 1u));
 }
 
-// C2R combine: fold the half-spectrum bin k and its mirror (N-k) into the
-// packed complex sample feeding the size-(N/2) inverse FFT.
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {
   if (k == 0u) {
     let dc = readSpectrumFloat(0u);
@@ -111,7 +106,6 @@ fn writeScratch(index: u32, value: vec2<f32>) {
   }
 }
 
-// Inverse DFT of size f (2, 4 or 8) from xv into yv (conjugate rotations).
 fn runDft(f: u32) {
   if (f == 8u) {
     let e0 = xv[0] + xv[4];
@@ -190,7 +184,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }

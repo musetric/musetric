@@ -9,6 +9,7 @@ const sqrt1_2: f32 = 0.70710678118654752440;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
@@ -29,7 +30,6 @@ fn reverseRadix8(index: u32) -> u32 {
   return result;
 }
 
-// Reverse the (radix8StageCount - 1) base-8 digits of a stage-0 input group.
 fn reverseRest(index: u32) -> u32 {
   var value = index;
   var result = 0u;
@@ -105,7 +105,7 @@ fn main(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
-  let windowIndex = workgroupId.x;
+  let windowIndex = params.batchOffset + workgroupId.x;
   if (windowIndex >= params.windowCount) {
     return;
   }
@@ -116,10 +116,6 @@ fn main(
 
   let butterflyCount = packedWindowSize / 8u;
 
-  // Fused load + twiddle-free first stage (len == 8). Read 8 coalesced inputs
-  // straight from global, run the radix-8 butterfly in registers, and scatter
-  // the 8 contiguous outputs to the block-reversed destination the in-place DIT
-  // stages expect. Avoids the scatter-load + a full shared round-trip.
   for (var j = t; j < butterflyCount; j += threadCount) {
     let a0 = loadPacked(inputOffset, j);
     let a1 = loadPacked(inputOffset, j + butterflyCount);

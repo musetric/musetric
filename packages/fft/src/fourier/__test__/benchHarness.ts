@@ -184,6 +184,14 @@ export const measureOne = async (
 
     if (tryIndex === 0) {
       runsPerSample = fourierSelectRunsPerSample(durations);
+      if (options?.ranges) {
+        const dispatchesPerRun =
+          defaultBenchStatsConfig.batchSize * options.ranges.length;
+        runsPerSample = Math.max(
+          1,
+          Math.min(runsPerSample, Math.floor(windowCount / dispatchesPerRun)),
+        );
+      }
       continue;
     }
 

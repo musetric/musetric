@@ -8,8 +8,6 @@ override rowRadix2StageCount: u32 = 0u;
 override rowRadix3StageCount: u32 = 0u;
 override rowRadix5StageCount: u32 = 0u;
 override inPlace: u32 = 1u;
-// Lane stride padding keeps the four lanes of a warp on distinct shared
-// memory banks now that warps span lanes first.
 override smPad: u32 = 8u;
 
 const threadCount: u32 = 64u;
@@ -18,6 +16,7 @@ const batchSize: u32 = 4u;
 struct Params {
   windowSize: u32,
   windowCount: u32,
+  batchOffset: u32,
 };
 
 var<workgroup> smReal0: array<f32, batchSize * (tileSize + smPad)>;
@@ -202,7 +201,7 @@ fn main(
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
   let n1 = workgroupId.x * batchSize + localId.x;
-  let windowIndex = workgroupId.y;
+  let windowIndex = params.batchOffset + workgroupId.y;
   if (windowIndex >= params.windowCount) {
     return;
   }

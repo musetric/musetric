@@ -13,8 +13,8 @@ export type FourierArg = {
 };
 
 export type FourierBatchRange = {
-  slotOffset: number;
-  columnCount: number;
+  batchOffset: number;
+  batchCount: number;
 };
 
 export type Fourier = {
