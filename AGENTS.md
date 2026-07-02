@@ -65,6 +65,20 @@
 
 - Do not add `minHeight` or `minWidth` without extreme necessity.
 
+**Contracts And Validation**
+
+- TypeScript types are the contract: never re-validate what a type already guarantees, and never guard obvious expectations of a well-named value (a `count` is a valid count by contract). Invalid input is the caller's bug and must fail at the caller, not be absorbed downstream.
+- Never coerce an invalid value into a valid one (clamping a negative count to zero, substituting a default for a broken required argument): silent repair fakes the input and hides the caller's bug.
+- Validate only at real boundaries: API schemas between backend and frontend, user input inside its input or submit handler, and external data such as wire payloads, file contents, and process output.
+- A value that is allowed to be invalid must carry a `raw` name prefix; raw values stay inside the boundary component, handler, or an explicitly raw-named store field, and must not flow into shared functions or public contracts.
+- Non-obvious multi-value invariants that types cannot express (`batchOffset + batchCount <= windowCount`) may throw; single-value shape and sign guards may not.
+- When a contract changes, replace it completely: do not keep wrappers, overloads, optional parameters, or defaults for backward compatibility. Ask before breaking only when the contract is a top-level public API of a package.
+
+**Tests**
+
+- Scale test effort with algorithmic complexity and business criticality: complex algorithmic cores (FFT, spectrogram) require unit tests and benchmarks.
+- Do not write tests for field mappings, pass-through wiring, or anything TypeScript already guarantees.
+
 ## Runtime Boundaries
 
 - Runtime boundaries are defined by `tsconfigs/` and each package `tsconfig.*.json`.
