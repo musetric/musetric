@@ -36,16 +36,12 @@ export const getAudioFrameCount = async (
     processName: 'getAudioFrameCount',
   });
 
-  if (
-    !durationSeconds ||
-    !Number.isFinite(durationSeconds) ||
-    durationSeconds < 0
-  ) {
+  if (!durationSeconds || !Number.isFinite(durationSeconds)) {
     throw new Error('Invalid audio duration');
   }
 
   const frameCount = Math.floor(durationSeconds * sampleRate);
-  if (!frameCount || !Number.isFinite(frameCount) || frameCount < 0) {
+  if (!frameCount || !Number.isFinite(frameCount)) {
     throw new Error('Invalid audio frame count');
   }
   return frameCount;

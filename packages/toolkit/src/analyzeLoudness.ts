@@ -17,7 +17,7 @@ const parseNumber = (value: unknown, label: string): number => {
 const parseLoudnormJson = (output: string): LoudnessAnalysis => {
   const start = output.indexOf('{');
   const end = output.lastIndexOf('}');
-  if (start < 0 || end < start) {
+  if (start === -1 || end < start) {
     throw new Error('ffmpeg loudnorm output is missing JSON');
   }
 

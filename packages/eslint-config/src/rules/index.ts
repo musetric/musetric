@@ -2,6 +2,7 @@ import { noAliasConstantsRule } from './noAliasConstants.js';
 import { noAliasedReexportsRule } from './noAliasedReexports.js';
 import { noClassesRule } from './noClasses.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
+import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
 import { noDynamicTranslationKeysRule } from './noDynamicTranslationKeys.js';
 import { noImmediateInlineFunctionCallsRule } from './noImmediateInlineFunctionCalls.js';
 import { noInlineParameterDestructuringRule } from './noInlineParameterDestructuring.js';
@@ -25,6 +26,7 @@ export const musetricRules = {
   'no-aliased-reexports': noAliasedReexportsRule,
   'no-classes': noClassesRule,
   'no-component-spacing-prop': noComponentSpacingPropRule,
+  'no-defensive-throw-guards': noDefensiveThrowGuardsRule,
   'no-dynamic-translation-keys': noDynamicTranslationKeysRule,
   'no-immediate-inline-function-calls': noImmediateInlineFunctionCallsRule,
   'no-inline-parameter-destructuring': noInlineParameterDestructuringRule,
