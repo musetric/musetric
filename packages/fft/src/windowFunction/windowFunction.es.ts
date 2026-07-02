@@ -21,7 +21,10 @@ export const bartlettHann: WindowFunction = (windowSize) => {
   const filter = new Float32Array(windowSize);
   const last = windowSize - 1;
   for (let i = 0; i < windowSize; i++) {
-    filter[i] = (2 / last) * (last / 2 - Math.abs(i - last / 2));
+    filter[i] =
+      0.62 -
+      0.48 * Math.abs(i / last - 0.5) -
+      0.38 * Math.cos((2 * Math.PI * i) / last);
   }
   return filter;
 };

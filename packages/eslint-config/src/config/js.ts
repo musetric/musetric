@@ -129,7 +129,6 @@ export const jsConfig: Linter.Config = {
     'sonarjs/function-return-type': 'off',
     'sonarjs/hashing': 'off',
     'sonarjs/no-collapsible-if': 'error',
-    'sonarjs/no-identical-functions': 'off',
     'sonarjs/no-nested-conditional': 'off',
     'sonarjs/no-nested-functions': 'off',
     'sonarjs/no-os-command-from-path': 'off',
