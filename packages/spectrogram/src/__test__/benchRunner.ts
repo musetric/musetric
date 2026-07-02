@@ -181,6 +181,16 @@ const writeRecordingChunk = (options: WriteRecordingChunkOptions): number => {
   return end - start;
 };
 
+const renderDriverSamples = async (
+  driver: BenchDriver,
+  processor: SpectrogramProcessor,
+  count: number,
+): Promise<void> => {
+  for (let j = 0; j < count; j += 1) {
+    await driver.render(processor);
+  }
+};
+
 const createDriver = (benchCase: SpectrogramBenchCase): BenchDriver => {
   const config = buildPresetConfig(benchCase);
   const { scenario } = benchCase;
@@ -297,9 +307,7 @@ const measureProfiled = async (
     ) {
       for (let i = 0; i < spectrogramBenchConfig.batchSize; i += 1) {
         const startCount = metricsArray.length;
-        for (let j = 0; j < sampleSize; j += 1) {
-          await driver.render(processor);
-        }
+        await renderDriverSamples(driver, processor, sampleSize);
         const batch = metricsArray.slice(startCount);
         sampleMetrics.push(averageMetrics(batch));
       }
@@ -353,9 +361,7 @@ const measureWall = async (
     ) {
       for (let i = 0; i < spectrogramBenchConfig.batchSize; i += 1) {
         const start = performance.now();
-        for (let j = 0; j < sampleSize; j += 1) {
-          await driver.render(processor);
-        }
+        await renderDriverSamples(driver, processor, sampleSize);
         sampleDurations.push((performance.now() - start) / sampleSize);
       }
       if (sampleDurations.length < spectrogramBenchConfig.stableSampleWindow) {

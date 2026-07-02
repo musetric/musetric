@@ -75,6 +75,17 @@ export type MeasureBatchOptions = {
 
 export const measureBatch = (options: MeasureBatchOptions): void => {
   const { encoder, timer, fourier, runsPerSample, ranges } = options;
+
+  const dispatchOnce = (pass: GPUComputePassEncoder) => {
+    if (ranges) {
+      for (const range of ranges) {
+        fourier.dispatch(pass, range);
+      }
+    } else {
+      fourier.dispatch(pass);
+    }
+  };
+
   for (let i = 0; i < defaultBenchStatsConfig.batchSize; i++) {
     const marker: GPUComputePassTimestampWrites = {
       querySet: timer.querySet,
@@ -84,13 +95,7 @@ export const measureBatch = (options: MeasureBatchOptions): void => {
 
     const pass = encoder.beginComputePass({ timestampWrites: marker });
     for (let runIndex = 0; runIndex < runsPerSample; runIndex++) {
-      if (ranges) {
-        for (const range of ranges) {
-          fourier.dispatch(pass, range);
-        }
-      } else {
-        fourier.dispatch(pass);
-      }
+      dispatchOnce(pass);
     }
     pass.end();
   }

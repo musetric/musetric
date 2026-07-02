@@ -49,6 +49,29 @@ const searchDllDirectories = (): string[] => {
   return directories;
 };
 
+const tryLoadPairAt = (
+  pair: (typeof dllPairs)[number],
+  dir: string,
+): { cudart: koffi.LibraryHandle; cufft: koffi.LibraryHandle } | undefined => {
+  const cudartPath = resolve(dir, `${pair.cudart}.dll`);
+  const cufftPath = resolve(dir, `${pair.cufft}.dll`);
+
+  if (!existsSync(cudartPath) || !existsSync(cufftPath)) {
+    return undefined;
+  }
+
+  try {
+    return {
+      cudart: koffi.load(cudartPath),
+      cufft: koffi.load(cufftPath),
+    };
+  } catch {
+    /* try next location */
+  }
+
+  return undefined;
+};
+
 const loadCudaLibs = ():
   | { cudart: koffi.LibraryHandle; cufft: koffi.LibraryHandle }
   | undefined => {
@@ -56,18 +79,9 @@ const loadCudaLibs = ():
 
   for (const pair of dllPairs) {
     for (const dir of directories) {
-      const cudartPath = resolve(dir, `${pair.cudart}.dll`);
-      const cufftPath = resolve(dir, `${pair.cufft}.dll`);
-
-      if (existsSync(cudartPath) && existsSync(cufftPath)) {
-        try {
-          return {
-            cudart: koffi.load(cudartPath),
-            cufft: koffi.load(cufftPath),
-          };
-        } catch {
-          /* try next location */
-        }
+      const loaded = tryLoadPairAt(pair, dir);
+      if (loaded) {
+        return loaded;
       }
     }
   }
@@ -448,6 +462,83 @@ const measureOne = (
 
 const benchDirections: BenchDirection[] = ['forward', 'inverse'];
 
+type MeasureSeries = {
+  means: number[];
+  cvs: number[];
+  sampleCounts: number[];
+};
+
+const collectMeasureResult = (
+  result: { mean: number; cv: number; sampleCount: number } | undefined,
+  series: MeasureSeries,
+): boolean => {
+  if (result) {
+    series.means.push(result.mean);
+    series.cvs.push(result.cv);
+    series.sampleCounts.push(result.sampleCount);
+    return true;
+  }
+  series.means.push(Number.NaN);
+  series.cvs.push(Number.NaN);
+  series.sampleCounts.push(0);
+  return false;
+};
+
+type SummarizeOptions = {
+  direction: BenchDirection;
+  windowCount: number;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  timestamp: string;
+};
+
+const summarizeWindowCount = (
+  options: SummarizeOptions,
+): FourierBenchSummary | undefined => {
+  const windowSizes: number[] = [];
+  const series: MeasureSeries = {
+    means: [],
+    cvs: [],
+    sampleCounts: [],
+  };
+
+  let hasSupportedResult = false;
+
+  for (const windowSize of benchConfig.windowSizes) {
+    windowSizes.push(windowSize);
+
+    const measureResult = measureOne({
+      windowSize,
+      windowCount: options.windowCount,
+      cudart: options.cudart,
+      cufft: options.cufft,
+      direction: options.direction,
+    });
+
+    if (collectMeasureResult(measureResult, series)) {
+      hasSupportedResult = true;
+    }
+  }
+
+  if (!hasSupportedResult) {
+    return undefined;
+  }
+
+  const maxSampleCount = Math.max(...series.sampleCounts);
+
+  return {
+    timestamp: options.timestamp,
+    direction: options.direction,
+    count: options.windowCount,
+    mode: 'cufft',
+    modeLabel: 'cuFFT',
+    windowSizes,
+    means: series.means,
+    cvs: series.cvs,
+    sampleCount: maxSampleCount,
+  };
+};
+
 const runBenchmark = (
   cudart: koffi.LibraryHandle,
   cufft: koffi.LibraryHandle,
@@ -457,53 +548,16 @@ const runBenchmark = (
 
   for (const direction of benchDirections) {
     for (const windowCount of benchConfig.windowCounts) {
-      const windowSizes: number[] = [];
-      const means: number[] = [];
-      const cvs: number[] = [];
-      const sampleCounts: number[] = [];
-
-      let hasSupportedResult = false;
-
-      for (const windowSize of benchConfig.windowSizes) {
-        windowSizes.push(windowSize);
-
-        const measureResult = measureOne({
-          windowSize,
-          windowCount,
-          cudart,
-          cufft,
-          direction,
-        });
-
-        if (measureResult) {
-          means.push(measureResult.mean);
-          cvs.push(measureResult.cv);
-          sampleCounts.push(measureResult.sampleCount);
-          hasSupportedResult = true;
-        } else {
-          means.push(Number.NaN);
-          cvs.push(Number.NaN);
-          sampleCounts.push(0);
-        }
-      }
-
-      if (!hasSupportedResult) {
-        continue;
-      }
-
-      const maxSampleCount = Math.max(...sampleCounts);
-
-      results.push({
-        timestamp,
+      const summary = summarizeWindowCount({
         direction,
-        count: windowCount,
-        mode: 'cufft',
-        modeLabel: 'cuFFT',
-        windowSizes,
-        means,
-        cvs,
-        sampleCount: maxSampleCount,
+        windowCount,
+        cudart,
+        cufft,
+        timestamp,
       });
+      if (summary) {
+        results.push(summary);
+      }
     }
   }
 
