@@ -118,18 +118,23 @@ const createScratchBuffers = (
   };
 };
 
-const createSinglePassBindGroup = (
-  device: GPUDevice,
+type CreateSinglePassBindGroupOptions = {
+  device: GPUDevice;
   pipeline: Extract<
     Pipeline,
     { kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed' }
-  >,
-  tables: TrigTables,
-  arg: FourierArg,
-  params: GPUBufferBinding,
-  input: GPUBuffer,
-): GPUBindGroup =>
-  device.createBindGroup({
+  >;
+  tables: TrigTables;
+  arg: FourierArg;
+  params: GPUBufferBinding;
+  input: GPUBuffer;
+};
+
+const createSinglePassBindGroup = (
+  options: CreateSinglePassBindGroupOptions,
+): GPUBindGroup => {
+  const { device, pipeline, tables, arg, params, input } = options;
+  return device.createBindGroup({
     label: 'packed-stockham-r2c-transform-bind-group',
     layout: pipeline.transform.getBindGroupLayout(0),
     entries: [
@@ -140,18 +145,25 @@ const createSinglePassBindGroup = (
       { binding: 4, resource: params },
     ],
   });
+};
+
+type CreateMultiPassStageBindGroupsOptions = {
+  device: GPUDevice;
+  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
+  pipeline: Extract<Pipeline, { kind: 'multiPass' }>;
+  tables: TrigTables;
+  scratch: ScratchBuffers;
+  arg: FourierArg;
+  params: GPUBufferBinding;
+  input: GPUBuffer;
+};
 
 const createMultiPassStageBindGroups = (
-  device: GPUDevice,
-  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  pipeline: Extract<Pipeline, { kind: 'multiPass' }>,
-  tables: TrigTables,
-  scratch: ScratchBuffers,
-  arg: FourierArg,
-  params: GPUBufferBinding,
-  input: GPUBuffer,
-): GPUBindGroup[] =>
-  pipeline.stages.map((stagePipeline, index) => {
+  options: CreateMultiPassStageBindGroupsOptions,
+): GPUBindGroup[] => {
+  const { device, variant, pipeline, tables, scratch, arg, params, input } =
+    options;
+  return pipeline.stages.map((stagePipeline, index) => {
     const entries: GPUBindGroupEntry[] = [
       { binding: 0, resource: { buffer: input } },
       { binding: 1, resource: { buffer: arg.spectrum } },
@@ -169,6 +181,7 @@ const createMultiPassStageBindGroups = (
       entries,
     });
   });
+};
 
 const createSlotCache = <T>(
   build: (slot: number) => T,
@@ -214,16 +227,16 @@ export const createStateCell = (
           pipeline,
           tables,
           getStageBindGroups: createSlotCache((slot) =>
-            createMultiPassStageBindGroups(
+            createMultiPassStageBindGroups({
               device,
               variant,
               pipeline,
               tables,
               scratch,
               arg,
-              params.binding(slot),
+              params: params.binding(slot),
               input,
-            ),
+            }),
           ),
           scratch,
           params,
@@ -240,14 +253,14 @@ export const createStateCell = (
         pipeline,
         tables,
         getBindGroup: createSlotCache((slot) =>
-          createSinglePassBindGroup(
+          createSinglePassBindGroup({
             device,
             pipeline,
             tables,
             arg,
-            params.binding(slot),
+            params: params.binding(slot),
             input,
-          ),
+          }),
         ),
         params,
         dummyInput,

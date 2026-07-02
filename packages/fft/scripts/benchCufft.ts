@@ -108,15 +108,26 @@ const checkCufft = (error: number, stage: string): boolean => {
   return false;
 };
 
-const measureOneRun = (
-  plan: number,
-  deviceInput: bigint | null,
-  deviceOutput: bigint | null,
-  cudart: koffi.LibraryHandle,
-  cufft: koffi.LibraryHandle,
-  runsPerSample: number,
-  direction: BenchDirection,
-): number => {
+type MeasureOneRunOptions = {
+  plan: number;
+  deviceInput: bigint | null;
+  deviceOutput: bigint | null;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  runsPerSample: number;
+  direction: BenchDirection;
+};
+
+const measureOneRun = (options: MeasureOneRunOptions): number => {
+  const {
+    plan,
+    deviceInput,
+    deviceOutput,
+    cudart,
+    cufft,
+    runsPerSample,
+    direction,
+  } = options;
   const cudaEventCreate = cudart.func(
     'int cudaEventCreate(_Out_ void **event)',
   );
@@ -228,19 +239,30 @@ const measureOneRun = (
   return ms[0] / runsPerSample;
 };
 
-const measureBatch = (
-  plan: number,
-  deviceInput: bigint | null,
-  deviceOutput: bigint | null,
-  cudart: koffi.LibraryHandle,
-  cufft: koffi.LibraryHandle,
-  runsPerSample: number,
-  direction: BenchDirection,
-): number[] => {
+type MeasureBatchOptions = {
+  plan: number;
+  deviceInput: bigint | null;
+  deviceOutput: bigint | null;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  runsPerSample: number;
+  direction: BenchDirection;
+};
+
+const measureBatch = (options: MeasureBatchOptions): number[] => {
+  const {
+    plan,
+    deviceInput,
+    deviceOutput,
+    cudart,
+    cufft,
+    runsPerSample,
+    direction,
+  } = options;
   const values: number[] = [];
 
   for (let i = 0; i < defaultBenchStatsConfig.batchSize; i++) {
-    const ms = measureOneRun(
+    const ms = measureOneRun({
       plan,
       deviceInput,
       deviceOutput,
@@ -248,7 +270,7 @@ const measureBatch = (
       cufft,
       runsPerSample,
       direction,
-    );
+    });
 
     if (ms < 0) {
       return [];
@@ -260,12 +282,16 @@ const measureBatch = (
   return values;
 };
 
+type MeasureOneOptions = {
+  windowSize: number;
+  windowCount: number;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  direction: BenchDirection;
+};
+
 const measureOne = (
-  windowSize: number,
-  windowCount: number,
-  cudart: koffi.LibraryHandle,
-  cufft: koffi.LibraryHandle,
-  direction: BenchDirection,
+  options: MeasureOneOptions,
 ):
   | {
       mean: number;
@@ -273,6 +299,7 @@ const measureOne = (
       sampleCount: number;
     }
   | undefined => {
+  const { windowSize, windowCount, cudart, cufft, direction } = options;
   const cudaMalloc = cudart.func(
     'int cudaMalloc(_Out_ void **devPtr, size_t size)',
   );
@@ -378,15 +405,15 @@ const measureOne = (
       tryIndex < defaultBenchStatsConfig.maxTries;
       tryIndex++
     ) {
-      const batch = measureBatch(
-        plan[0],
-        deviceInput[0],
-        deviceOutput[0],
+      const batch = measureBatch({
+        plan: plan[0],
+        deviceInput: deviceInput[0],
+        deviceOutput: deviceOutput[0],
         cudart,
         cufft,
         runsPerSample,
         direction,
-      );
+      });
 
       if (batch.length === 0) {
         return undefined;
@@ -440,13 +467,13 @@ const runBenchmark = (
       for (const windowSize of benchConfig.windowSizes) {
         windowSizes.push(windowSize);
 
-        const measureResult = measureOne(
+        const measureResult = measureOne({
           windowSize,
           windowCount,
           cudart,
           cufft,
           direction,
-        );
+        });
 
         if (measureResult) {
           means.push(measureResult.mean);

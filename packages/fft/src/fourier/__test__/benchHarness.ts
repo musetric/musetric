@@ -65,13 +65,16 @@ export const createGpuTimer = (device: GPUDevice, count: number): GpuTimer => {
   };
 };
 
-export const measureBatch = (
-  encoder: GPUCommandEncoder,
-  timer: GpuTimer,
-  fourier: Fourier,
-  runsPerSample: number,
-  ranges?: readonly FourierBatchRange[],
-): void => {
+export type MeasureBatchOptions = {
+  encoder: GPUCommandEncoder;
+  timer: GpuTimer;
+  fourier: Fourier;
+  runsPerSample: number;
+  ranges?: readonly FourierBatchRange[];
+};
+
+export const measureBatch = (options: MeasureBatchOptions): void => {
+  const { encoder, timer, fourier, runsPerSample, ranges } = options;
   for (let i = 0; i < defaultBenchStatsConfig.batchSize; i++) {
     const marker: GPUComputePassTimestampWrites = {
       querySet: timer.querySet,
@@ -173,7 +176,13 @@ export const measureOne = async (
     const timer = createGpuTimer(device, defaultBenchStatsConfig.batchSize * 2);
     const encoder = device.createCommandEncoder();
 
-    measureBatch(encoder, timer, fourier, runsPerSample, options?.ranges);
+    measureBatch({
+      encoder,
+      timer,
+      fourier,
+      runsPerSample,
+      ranges: options?.ranges,
+    });
 
     timer.resolve(encoder);
     device.queue.submit([encoder.finish()]);
@@ -276,7 +285,7 @@ export const measureOneInverse = async (
     const timer = createGpuTimer(device, defaultBenchStatsConfig.batchSize * 2);
     const encoder = device.createCommandEncoder();
 
-    measureBatch(encoder, timer, fourier, runsPerSample);
+    measureBatch({ encoder, timer, fourier, runsPerSample });
 
     timer.resolve(encoder);
     device.queue.submit([encoder.finish()]);

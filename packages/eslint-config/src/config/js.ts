@@ -55,6 +55,7 @@ export const jsConfig: Linter.Config = {
     ],
     'import-x/no-self-import': 'error',
     'max-nested-callbacks': ['error', 3],
+    'max-params': ['error', 4],
     'no-duplicate-imports': ['error'],
     'no-else-return': ['error', { allowElseIf: false }],
     'no-lonely-if': 'error',

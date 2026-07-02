@@ -19,15 +19,16 @@ export type SeparateVocalsResult = {
   instrumental: StereoAudio;
 };
 
-// Chunking and overlap-add follow the Mel-Band RoFormer vocal separation
-// model contract used by the WebGPU ONNX runtime.
-const fillChunk = (
-  chunk: Float32Array<ArrayBuffer>,
-  mix: Float32Array<ArrayBuffer>,
-  samples: number,
-  start: number,
-  length: number,
-): void => {
+type FillChunkOptions = {
+  chunk: Float32Array<ArrayBuffer>;
+  mix: Float32Array<ArrayBuffer>;
+  samples: number;
+  start: number;
+  length: number;
+};
+
+const fillChunk = (options: FillChunkOptions): void => {
+  const { chunk, mix, samples, start, length } = options;
   if (length < vocalsModel.chunkSamples) {
     chunk.fill(0);
   }
@@ -47,15 +48,18 @@ const createHammingWindow = (): Float32Array<ArrayBuffer> => {
   return output;
 };
 
-const overlapAddChunk = (
-  target: Float32Array<ArrayBuffer>,
-  counter: Float32Array<ArrayBuffer>,
-  chunk: Float32Array<ArrayBuffer>,
-  samples: number,
-  start: number,
-  length: number,
-  window: Float32Array<ArrayBuffer>,
-): void => {
+type OverlapAddChunkOptions = {
+  target: Float32Array<ArrayBuffer>;
+  counter: Float32Array<ArrayBuffer>;
+  chunk: Float32Array<ArrayBuffer>;
+  samples: number;
+  start: number;
+  length: number;
+  window: Float32Array<ArrayBuffer>;
+};
+
+const overlapAddChunk = (options: OverlapAddChunkOptions): void => {
+  const { target, counter, chunk, samples, start, length, window } = options;
   for (let channel = 0; channel < vocalsModel.channels; channel++) {
     const outputOffset = channel * samples + start;
     const chunkOffset = channel * vocalsModel.chunkSamples;
@@ -151,26 +155,26 @@ export const separateVocals = async (
     });
 
     const chunkWindow = getChunkWindow(offset, sourceAudio.samples);
-    fillChunk(
+    fillChunk({
       chunk,
-      mixture,
-      sourceAudio.samples,
-      chunkWindow.start,
-      chunkWindow.length,
-    );
+      mix: mixture,
+      samples: sourceAudio.samples,
+      start: chunkWindow.start,
+      length: chunkWindow.length,
+    });
     await options.runtime.processChunk({
       input: chunk,
       output: separatedChunk,
     });
-    overlapAddChunk(
+    overlapAddChunk({
       target,
       counter,
-      separatedChunk,
-      sourceAudio.samples,
-      chunkWindow.start,
-      chunkWindow.length,
+      chunk: separatedChunk,
+      samples: sourceAudio.samples,
+      start: chunkWindow.start,
+      length: chunkWindow.length,
       window,
-    );
+    });
   }
 
   const rawVocals = finalizeOverlap(target, counter);

@@ -237,13 +237,13 @@ const createRenderPlans = (
       } else {
         columns.fill(false);
         markShiftColumns(columns, baseColumn, resident.baseColumn);
-        markInvalidatedColumns(
+        markInvalidatedColumns({
           columns,
-          runtime.config,
+          grid: runtime.config,
           baseColumn,
-          getMaxAnalysisWindowSize(runtime, trackWork),
+          analysisWindowSize: getMaxAnalysisWindowSize(runtime, trackWork),
           invalidations,
-        );
+        });
         ranges = toColumnRanges(runtime.config, baseColumn, columns);
       }
     }
@@ -459,13 +459,13 @@ export const createSpectrogramProcessor = (
           plan.ranges.length > 0 &&
           hasVisibleWork(trackWork)
         ) {
-          runtime.tracks[key].lane.writeSamples(
-            trackSamples,
-            plan.baseColumn,
-            trackWork,
-            plan.forceFullUpload,
-            plan.invalidations,
-          );
+          runtime.tracks[key].lane.writeSamples({
+            samples: trackSamples,
+            baseColumn: plan.baseColumn,
+            work: trackWork,
+            forceFullUpload: plan.forceFullUpload,
+            invalidations: plan.invalidations,
+          });
         }
       }
     },

@@ -14,13 +14,13 @@ export type SpectrogramSliceSamples = {
     pass: GPUComputePassEncoder,
     range: SpectrogramColumnRange,
   ) => void;
-  write: (
-    samples: Float32Array,
-    baseColumn: number,
-    truncateAfterPlayhead: boolean,
-    forceFullUpload: boolean,
-    invalidations: readonly SpectrogramSampleRange[],
-  ) => void;
+  write: (options: {
+    samples: Float32Array;
+    baseColumn: number;
+    truncateAfterPlayhead: boolean;
+    forceFullUpload: boolean;
+    invalidations: readonly SpectrogramSampleRange[];
+  }) => void;
 };
 
 export const createSpectrogramSliceSamplesCell = (
@@ -59,21 +59,22 @@ export const createSpectrogramSliceSamplesCell = (
           pass.end();
         },
         dispatch,
-        write: (
-          samples,
-          baseColumn,
-          truncateAfterPlayhead,
-          forceFullUpload,
-          invalidations,
-        ) => {
-          const writeResult = state.samples.write(
+        write: (options) => {
+          const {
             samples,
             baseColumn,
-            state.config,
             truncateAfterPlayhead,
             forceFullUpload,
             invalidations,
-          );
+          } = options;
+          const writeResult = state.samples.write({
+            samples,
+            baseColumn,
+            config: state.config,
+            truncateAfterPlayhead,
+            forceFullUpload,
+            invalidations,
+          });
           state.params.setFrame({
             baseColumn,
             baseWindowStart: writeResult.baseWindowStart,

@@ -41,13 +41,13 @@ export type SpectrogramLane = {
   signal: GPUBuffer;
   bandSpectra: SpectrogramBandSpectrum[];
   fundamentalFrequencyBuffer: GPUBuffer;
-  writeSamples: (
-    samples: Float32Array,
-    baseColumn: number,
-    work: SpectrogramLaneWork,
-    forceFullUpload: boolean,
-    invalidations: readonly SpectrogramSampleRange[],
-  ) => void;
+  writeSamples: (options: {
+    samples: Float32Array;
+    baseColumn: number;
+    work: SpectrogramLaneWork;
+    forceFullUpload: boolean;
+    invalidations: readonly SpectrogramSampleRange[];
+  }) => void;
   dispatchSliceSamples: SpectrogramLaneDispatch;
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
@@ -217,13 +217,13 @@ const buildBandSpectrumPipeline = (
     columnEnergyBuffer: decibelify.columnEnergy,
     windowSize: paddedWindowSize,
     writeSamples: (samples, baseColumn, forceFullUpload, invalidations) => {
-      sliceSamples.write(
+      sliceSamples.write({
         samples,
         baseColumn,
-        laneConfig.truncateAfterPlayhead,
+        truncateAfterPlayhead: laneConfig.truncateAfterPlayhead,
         forceFullUpload,
         invalidations,
-      );
+      });
     },
     dispatchSliceSamples: sliceSamples.dispatch,
     dispatchFourier: (pass, range) => {
@@ -370,13 +370,9 @@ export const createSpectrogramLaneCell = (
         signal: baseBandPipeline.signal,
         bandSpectra,
         fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
-        writeSamples: (
-          samples,
-          baseColumn,
-          work,
-          forceFullUpload,
-          invalidations,
-        ) => {
+        writeSamples: (writeSamplesOptions) => {
+          const { samples, baseColumn, work, forceFullUpload, invalidations } =
+            writeSamplesOptions;
           forEachWorkPipeline(work, (pipeline) => {
             pipeline.writeSamples(
               samples,

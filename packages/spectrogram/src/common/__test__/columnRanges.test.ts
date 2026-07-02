@@ -126,11 +126,21 @@ describe('markInvalidatedColumns', () => {
 
   it('does nothing without a window or a range', () => {
     const columns = falseColumns(8);
-    markInvalidatedColumns(columns, grid(8, 10), 0, 0, [
-      { frameIndex: 0, frameCount: 100 },
-    ]);
+    markInvalidatedColumns({
+      columns,
+      grid: grid(8, 10),
+      baseColumn: 0,
+      analysisWindowSize: 0,
+      invalidations: [{ frameIndex: 0, frameCount: 100 }],
+    });
     expect(trueIndices(columns)).toEqual([]);
-    markInvalidatedColumns(columns, grid(8, 10), 0, 64, []);
+    markInvalidatedColumns({
+      columns,
+      grid: grid(8, 10),
+      baseColumn: 0,
+      analysisWindowSize: 64,
+      invalidations: [],
+    });
     expect(trueIndices(columns)).toEqual([]);
   });
 
@@ -164,13 +174,13 @@ describe('markInvalidatedColumns', () => {
         item.invalidations,
       );
       const actual = falseColumns(windowCount);
-      markInvalidatedColumns(
-        actual,
-        columnGrid,
-        item.baseColumn,
-        item.windowSize,
-        item.invalidations,
-      );
+      markInvalidatedColumns({
+        columns: actual,
+        grid: columnGrid,
+        baseColumn: item.baseColumn,
+        analysisWindowSize: item.windowSize,
+        invalidations: item.invalidations,
+      });
       expect(trueIndices(actual)).toEqual(trueIndices(expected));
     }
   });
@@ -182,7 +192,13 @@ describe('markInvalidatedColumns', () => {
       { frameIndex: 400, frameCount: 16 },
     ];
     const actual = falseColumns(64);
-    markInvalidatedColumns(actual, columnGrid, 0, 32, invalidations);
+    markInvalidatedColumns({
+      columns: actual,
+      grid: columnGrid,
+      baseColumn: 0,
+      analysisWindowSize: 32,
+      invalidations,
+    });
     const expected = reference(columnGrid, 0, 32, invalidations);
     expect(trueIndices(actual)).toEqual(trueIndices(expected));
     const indices = trueIndices(actual);
