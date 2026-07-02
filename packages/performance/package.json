@@ -11,11 +11,9 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "devDependencies": {
-    "@alexanderolsen/libsamplerate-js": "catalog:",
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@mui/material": "catalog:",
-    "@musetric/audio": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
@@ -24,10 +22,8 @@
     "@types/react": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
-    "mediabunny": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-mkcert": "catalog:",

@@ -30,8 +30,9 @@ jobs:
           key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
           restore-keys: |
             eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
-      - run: yarn check:security
-      - run: yarn check:deps
+      - run: yarn check:deps:security
+      - run: yarn check:deps:dupe
+      - run: yarn check:unused
       - run: yarn check:editor
       - run: yarn check:format
       - run: yarn check:translations

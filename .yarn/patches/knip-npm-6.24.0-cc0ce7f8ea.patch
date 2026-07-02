@@ -1,0 +1,22 @@
+diff --git a/dist/util/resolve.js b/dist/util/resolve.js
+index 8b0b7101966352b8478d487a06fc833ead627e97..2447179d04baefa7595560f0c34f00866eeee1b0 100644
+--- a/dist/util/resolve.js
++++ b/dist/util/resolve.js
+@@ -13,7 +13,7 @@ const createSyncModuleResolver = (extensions, tsConfigFile) => {
+     const baseOptions = {
+         extensions,
+         extensionAlias,
+-        conditionNames: ['require', 'import', 'node', 'default'],
++        conditionNames: ['monorepo', 'require', 'import', 'node', 'default'],
+         nodePath: false,
+     };
+     const resolver = new ResolverFactory({
+@@ -39,7 +39,7 @@ export const _createSyncModuleResolver = (extensions, tsConfigFile) => timerify(
+ const createSyncResolver = (extensions) => {
+     const resolver = new ResolverFactory({
+         extensions,
+-        conditionNames: ['require', 'import', 'node', 'default'],
++        conditionNames: ['monorepo', 'require', 'import', 'node', 'default'],
+         nodePath: false,
+     });
+     resolverInstances.push(resolver);

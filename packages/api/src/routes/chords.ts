@@ -13,7 +13,6 @@ export type ChordSegment = z.infer<typeof chordSegmentSchema>;
 export const chordsSchema = z.object({
   segments: z.array(chordSegmentSchema),
 });
-export type Chords = z.infer<typeof chordsSchema>;
 
 export namespace get {
   export const base = createApiRoute({

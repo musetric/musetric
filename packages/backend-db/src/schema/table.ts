@@ -8,7 +8,6 @@ export namespace project {
     sampleRate: z.number().int().positive(),
     frameCount: z.number().int().positive(),
   });
-  export type Item = z.infer<typeof itemSchema>;
 }
 
 export namespace projectAudioAnalysis {
@@ -26,12 +25,7 @@ export namespace projectAudioAnalysis {
 }
 
 export namespace audioMaster {
-  export const typeSchema = z.enum([
-    'source',
-    'lead',
-    'backing',
-    'instrumental',
-  ]);
+  const typeSchema = z.enum(['source', 'lead', 'backing', 'instrumental']);
   export type Type = z.infer<typeof typeSchema>;
 
   export const itemSchema = z.object({
@@ -44,7 +38,7 @@ export namespace audioMaster {
 }
 
 export namespace audioDelivery {
-  export const stemTypeSchema = z.enum(['lead', 'backing', 'instrumental']);
+  const stemTypeSchema = z.enum(['lead', 'backing', 'instrumental']);
   export type StemType = z.infer<typeof stemTypeSchema>;
 
   export const itemSchema = z.object({
@@ -58,7 +52,7 @@ export namespace audioDelivery {
 }
 
 export namespace wavePeaks {
-  export const stemTypeSchema = z.enum(['lead', 'backing', 'instrumental']);
+  const stemTypeSchema = z.enum(['lead', 'backing', 'instrumental']);
   export type StemType = z.infer<typeof stemTypeSchema>;
 
   export const itemSchema = z.object({

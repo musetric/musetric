@@ -15,7 +15,7 @@
   },
   "peerDependencies": {
     "eslint": "10.5.0",
-    "typescript": "6.0.2"
+    "typescript": "6.0.3"
   },
   "dependencies": {
     "@eslint-react/eslint-plugin": "catalog:",
@@ -26,7 +26,6 @@
     "eslint-plugin-react-refresh": "catalog:",
     "eslint-plugin-simple-import-sort": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",
-    "globals": "catalog:",
     "jiti": "catalog:",
     "typescript-eslint": "catalog:"
   },

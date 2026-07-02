@@ -62,4 +62,5 @@ scopes:
   - github # repo & GitHub Actions settings (workflows, templates)
   - lint # ESLint rules / packages/eslint-config
   - ts # TypeScript config & strictness (tsconfig, types)
+  - unused # unused code & dependency analysis (Knip)
   - license # license headers & third-party notices

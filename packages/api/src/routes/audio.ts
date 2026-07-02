@@ -7,14 +7,12 @@ export const masterTypeSchema = z.enum([
   'backing',
   'instrumental',
 ]);
-export type MasterType = z.infer<typeof masterTypeSchema>;
 
 export const deliveryStemTypeSchema = z.enum([
   'lead',
   'backing',
   'instrumental',
 ]);
-export type DeliveryStemType = z.infer<typeof deliveryStemTypeSchema>;
 
 const masterParamsSchema = z.object({
   projectId: z.number(),

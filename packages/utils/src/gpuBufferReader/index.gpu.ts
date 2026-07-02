@@ -1,10 +1,7 @@
-import {
-  type ComplexCpuBuffer,
-  type ComplexGpuBuffer,
-} from '../complexArray.gpu.js';
-import { copyComplexGpuBuffer, copyGpuBuffer } from './copy.gpu.js';
-import { createComplexGpuBuffer, createGpuBuffer } from './create.gpu.js';
-import { readComplexGpuBuffer, readGpuBuffer } from './read.gpu.js';
+import { type ComplexCpuBuffer } from '../complexArray.gpu.js';
+import { copyGpuBuffer } from './copy.gpu.js';
+import { createGpuBuffer } from './create.gpu.js';
+import { readGpuBuffer } from './read.gpu.js';
 
 export type CreateGpuBufferReaderOptions = {
   device: GPUDevice;
@@ -41,37 +38,6 @@ export const createGpuBufferReader = (
       buffer = createGpuBuffer(device, newSize * typeSize);
     },
     destroy: () => buffer.destroy(),
-  };
-};
-
-export type ComplexGpuBufferReader = {
-  read: (input: ComplexGpuBuffer) => Promise<ComplexCpuBuffer>;
-  resize: (size: number) => void;
-  destroy: () => void;
-};
-
-export const createComplexGpuBufferReader = (
-  options: CreateGpuBufferReaderOptions,
-): ComplexGpuBufferReader => {
-  const { device, typeSize } = options;
-  let { size } = options;
-  let buffer = createComplexGpuBuffer(device, size * typeSize);
-
-  return {
-    read: async (input) => {
-      await copyComplexGpuBuffer(device, input, buffer, size * typeSize);
-      return await readComplexGpuBuffer(buffer);
-    },
-    resize: (newSize: number) => {
-      size = newSize;
-      buffer.real.destroy();
-      buffer.imag.destroy();
-      buffer = createComplexGpuBuffer(device, size * typeSize);
-    },
-    destroy: () => {
-      buffer.real.destroy();
-      buffer.imag.destroy();
-    },
   };
 };
 

@@ -14,9 +14,10 @@
     "project:build": "yarn workspaces foreach --all --parallel --interlaced run project:build",
     "project:init": "yarn workspaces foreach --all --parallel --interlaced run project:init",
     "project:start": "yarn workspaces foreach --all --parallel --interlaced run project:start",
-    "check:security": "yarn npm audit --all --recursive --severity high",
-    "check:deps": "yarn constraints && yarn dedupe --check",
+    "check:deps:security": "yarn npm audit --all --recursive --severity high",
+    "check:deps:dupe": "yarn constraints && yarn dedupe --check",
     "fix:deps": "yarn constraints --fix && yarn && yarn dedupe",
+    "check:unused": "knip",
     "check:editor": "editorconfig-checker",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
@@ -29,8 +30,7 @@
   },
   "devDependencies": {
     "editorconfig-checker": "catalog:",
-    "grep-cli": "catalog:",
-    "ncp": "catalog:",
+    "knip": "patch:knip@npm%3A6.24.0#~/.yarn/patches/knip-npm-6.24.0-cc0ce7f8ea.patch",
     "prettier": "catalog:"
   }
 }

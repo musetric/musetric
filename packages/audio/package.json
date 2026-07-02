@@ -63,7 +63,6 @@
   },
   "peerDependencies": {
     "@alexanderolsen/libsamplerate-js": "2.1.2",
-    "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "mediabunny": "1.35.1",
     "signalsmith-stretch": "1.3.2"
@@ -71,8 +70,6 @@
   "devDependencies": {
     "@alexanderolsen/libsamplerate-js": "catalog:",
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/fft": "workspace:*",
-    "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/audioworklet": "catalog:",
     "@types/node": "catalog:",
