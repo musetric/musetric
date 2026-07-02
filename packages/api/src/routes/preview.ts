@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { createApiRoute } from '../common/apiRoute.js';
 
 export const itemSchema = z.file({});
-export type Item = z.infer<typeof itemSchema>;
 
 export namespace get {
   export const base = createApiRoute({

@@ -10,9 +10,6 @@ export const wavePeakBufferByteLength =
 
 export const emptyWavePeaksBuffer = Buffer.alloc(wavePeakBufferByteLength);
 
-export const createEmptyWavePeaksBuffer = (): Buffer =>
-  Buffer.from(emptyWavePeaksBuffer);
-
 export type GenerateWavePeaksOptions = {
   fromPath: string;
   toPath: string;

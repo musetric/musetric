@@ -209,6 +209,3 @@ export const resolveAudioOutputDevice = (
 
   return resolveDefaultAudioOutputDevice(devices) ?? realDevices[0];
 };
-
-export const hasLikelyBluetoothAudioDevice = (devices: MediaDeviceInfo[]) =>
-  devices.some(isLikelyBluetoothAudioDevice);

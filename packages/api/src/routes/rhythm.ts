@@ -7,7 +7,6 @@ export const rhythmSchema = z.object({
   downbeats: z.array(z.number()),
   meter: z.number().int(),
 });
-export type Rhythm = z.infer<typeof rhythmSchema>;
 
 export namespace get {
   export const base = createApiRoute({

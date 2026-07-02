@@ -1,8 +1,3 @@
-export type ComplexGpuBuffer = {
-  real: GPUBuffer;
-  imag: GPUBuffer;
-};
-
 export type ComplexCpuBuffer = {
   real: ArrayBuffer;
   imag: ArrayBuffer;

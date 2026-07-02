@@ -4,7 +4,6 @@ import { createApiRoute } from '../common/apiRoute.js';
 import * as preview from './preview.js';
 
 export const downloadStatusSchema = z.enum(['processing', 'cached', 'done']);
-export type DownloadStatus = z.infer<typeof downloadStatusSchema>;
 
 export const downloadSchema = z.object({
   label: z.string(),

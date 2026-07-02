@@ -135,17 +135,8 @@ export const rowAtFrequency = (
 export const createSilence = (length: number): Float32Array =>
   new Float32Array(length);
 
-export const createConstant = (length: number, value: number): Float32Array =>
-  new Float32Array(length).fill(value);
-
 export const createRamp = (length: number): Float32Array =>
   Float32Array.from({ length }, (_, index) => index);
-
-export const createImpulse = (length: number, at = 0): Float32Array => {
-  const samples = new Float32Array(length);
-  samples[at] = 1;
-  return samples;
-};
 
 export const createTone = (
   length: number,

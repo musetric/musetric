@@ -29,7 +29,7 @@ export const fourierBatchRangeBenchScenarios: readonly FourierBatchRangeBenchSce
     { label: '3 ranges total 25%', rangeCount: 3, totalDenominator: 4 },
   ];
 
-export type FourierBenchRangeMode = `${FourierMode}:range${1 | 2 | 3}q`;
+type FourierBenchRangeMode = `${FourierMode}:range${1 | 2 | 3}q`;
 
 export const createFourierRangeBenchMode = (
   mode: FourierMode,
@@ -54,7 +54,7 @@ export type FourierBenchSummary = {
   sampleCount: number;
 };
 
-export type FourierBenchConfig = {
+type FourierBenchConfig = {
   windowSizes: number[];
   windowCounts: readonly number[];
 };
@@ -94,23 +94,16 @@ const rangeBenchBaseModes: ReadonlyMap<string, FourierMode> = new Map(
   ),
 );
 
-export const isFourierBenchRangeMode = (
+const isFourierBenchRangeMode = (
   mode: FourierBenchMode,
 ): mode is FourierBenchRangeMode => rangeBenchBaseModes.get(mode) !== undefined;
 
-export const getFourierRangeBenchBaseMode = (
+const getFourierRangeBenchBaseMode = (
   mode: FourierBenchRangeMode,
 ): FourierMode =>
   assertDefined(
     rangeBenchBaseModes.get(mode),
     `Unknown Fourier range benchmark mode: ${mode}`,
-  );
-
-export const fourierRangeBenchModes: FourierBenchRangeMode[] =
-  allFourierModes.flatMap((mode) =>
-    fourierBatchRangeBenchScenarios.map((scenario) =>
-      createFourierRangeBenchMode(mode, scenario),
-    ),
   );
 
 const createFourierModeLabels = (): Record<FourierBenchMode, string> => {
@@ -133,7 +126,7 @@ const createFourierModeLabels = (): Record<FourierBenchMode, string> => {
 export const fourierModeLabels: Record<FourierBenchMode, string> =
   createFourierModeLabels();
 
-export const benchModeOrder: FourierBenchMode[] = [
+const benchModeOrder: FourierBenchMode[] = [
   'cufft',
   ...allFourierModes.flatMap((mode): FourierBenchMode[] => [
     mode,

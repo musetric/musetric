@@ -1,4 +1,4 @@
-export type RadixStage = 2 | 3 | 4 | 5;
+type RadixStage = 2 | 3 | 4 | 5;
 
 export type RadixStageCounts = {
   radix4StageCount: number;
@@ -46,13 +46,6 @@ export const createRadixStages = (
       }
     : undefined;
 };
-
-export const expandRadixStages = (stages: RadixStageCounts): RadixStage[] => [
-  ...new Array<RadixStage>(stages.radix4StageCount).fill(4),
-  ...new Array<RadixStage>(stages.radix2StageCount).fill(2),
-  ...new Array<RadixStage>(stages.radix3StageCount).fill(3),
-  ...new Array<RadixStage>(stages.radix5StageCount).fill(5),
-];
 
 export type MultiPassRadixStage = RadixStage | 8;
 

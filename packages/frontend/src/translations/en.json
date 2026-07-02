@@ -1,6 +1,5 @@
 {
   "common.queryView.error": "Unexpected error",
-  "common.queryView.notFound": "Not found",
   "common.units.bytes.b": "B",
   "common.units.bytes.gb": "GB",
   "common.units.bytes.kb": "KB",
