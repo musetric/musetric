@@ -1,4 +1,5 @@
 import { api } from '@musetric/api';
+import { assertNever } from '@musetric/utils';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { type Playhead, readPlayhead } from '../player/playhead.cross.js';
 import { playerDataChannel } from '../player/protocol.cross.js';
@@ -358,7 +359,13 @@ const handleProjectRealtimeEvent = (event: ProjectRealtimeEvent) => {
     return;
   }
 
-  failRecordingStream(event.error);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (event.type === 'error') {
+    failRecordingStream(event.error);
+    return;
+  }
+
+  assertNever(event, 'Unhandled project realtime event');
 };
 
 const handleProjectRealtimePacket = (data: ArrayBuffer) => {
@@ -546,7 +553,12 @@ const bindRecordingStreamPort = (stream: RecordingStream) => {
         resolveFlushWaiters(stream);
         return;
       }
-      processRecordingChunk(stream, message);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (message.type === 'chunk') {
+        processRecordingChunk(stream, message);
+        return;
+      }
+      assertNever(message, 'Unhandled decoder recording message');
     } catch (error) {
       failRecordingStream(error);
     }

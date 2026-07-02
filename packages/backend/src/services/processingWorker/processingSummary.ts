@@ -1,4 +1,5 @@
 import { type api } from '@musetric/api';
+import { assertNever } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 
 export type ProcessingStepKind =
@@ -90,7 +91,12 @@ export const resolveProcessingEvent = (
     };
   }
 
-  return { done: false, steps: buildSteps(event.step, pendingStep) };
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (event.type === 'error') {
+    return { done: false, steps: buildSteps(event.step, pendingStep) };
+  }
+
+  return assertNever(event, 'Unhandled processing worker event');
 };
 
 export const resolveProcessing = async (
