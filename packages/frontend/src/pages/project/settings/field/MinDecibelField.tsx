@@ -16,9 +16,9 @@ export const MinDecibelField: FC = () => {
       label={t('pages.project.settings.fields.minDecibel.label')}
       defaultValue={minDecibel}
       onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isNaN(value)) return;
-        setMinDecibel(value);
+        const rawValue = Number(event.target.value);
+        if (Number.isNaN(rawValue)) return;
+        setMinDecibel(rawValue);
       }}
       slotProps={{
         input: {

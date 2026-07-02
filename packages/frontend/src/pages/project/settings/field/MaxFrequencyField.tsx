@@ -17,12 +17,12 @@ export const MaxFrequencyField: FC = () => {
       label={t('pages.project.settings.fields.maxFrequency.label')}
       defaultValue={maxFrequency}
       onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isNaN(value)) return;
+        const rawValue = Number(event.target.value);
+        if (Number.isNaN(rawValue)) return;
 
         const { minFrequency } = useSettingsStore.getState();
         const nextMaxFrequency = normalizeSpectrogramMaxFrequency(
-          value,
+          rawValue,
           minFrequency,
         );
         setMaxFrequency(nextMaxFrequency);

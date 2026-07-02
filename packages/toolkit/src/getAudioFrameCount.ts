@@ -27,7 +27,10 @@ export const getAudioFrameCount = async (
       onLine: (line) => {
         const trimmed = line.trim();
         if (trimmed && !durationSeconds) {
-          durationSeconds = Number(trimmed);
+          const rawValue = Number(trimmed);
+          if (Number.isFinite(rawValue)) {
+            durationSeconds = rawValue;
+          }
         }
       },
     },
@@ -36,13 +39,9 @@ export const getAudioFrameCount = async (
     processName: 'getAudioFrameCount',
   });
 
-  if (!durationSeconds || !Number.isFinite(durationSeconds)) {
+  if (!durationSeconds) {
     throw new Error('Invalid audio duration');
   }
 
-  const frameCount = Math.floor(durationSeconds * sampleRate);
-  if (!frameCount || !Number.isFinite(frameCount)) {
-    throw new Error('Invalid audio frame count');
-  }
-  return frameCount;
+  return Math.floor(durationSeconds * sampleRate);
 };

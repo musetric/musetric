@@ -82,9 +82,8 @@ const getTrackLatencySeconds = (stream: MediaStream) => {
 
 const getContextOutputLatencySeconds = (context: AudioContext) => {
   const contextWithOutputLatency: AudioContextWithOutputLatency = context;
-  return typeof contextWithOutputLatency.outputLatency === 'number'
-    ? contextWithOutputLatency.outputLatency
-    : 0;
+  const rawOutputLatency = contextWithOutputLatency.outputLatency;
+  return typeof rawOutputLatency === 'number' ? rawOutputLatency : 0;
 };
 
 export const getRecordingLatencyDevicePairKey = (

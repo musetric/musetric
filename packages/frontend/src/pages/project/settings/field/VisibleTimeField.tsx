@@ -16,9 +16,9 @@ export const VisibleTimeField: FC = () => {
       label={t('pages.project.settings.fields.visibleTime.label')}
       defaultValue={visibleTime}
       onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isNaN(value)) return;
-        setVisibleTime(Math.max(0.1, Math.min(value, 60)));
+        const rawValue = Number(event.target.value);
+        if (Number.isNaN(rawValue)) return;
+        setVisibleTime(Math.max(0.1, Math.min(rawValue, 60)));
       }}
       slotProps={{
         input: {

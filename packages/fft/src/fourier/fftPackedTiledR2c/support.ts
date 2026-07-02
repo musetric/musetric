@@ -114,7 +114,6 @@ const createVariantFromWindowSize = (
 ): PackedTiledR2cVariant | undefined => {
   const packedWindowSize = windowSize / 2;
   if (
-    !Number.isInteger(packedWindowSize) ||
     packedWindowSize < minPackedWindowSize ||
     packedWindowSize > maxPackedWindowSize ||
     createRadixStages(packedWindowSize) === undefined

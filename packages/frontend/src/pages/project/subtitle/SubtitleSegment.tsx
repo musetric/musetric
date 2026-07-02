@@ -38,7 +38,7 @@ const getTimedSubtitleElements = (element: HTMLElement) => {
       '[data-subtitle-word-text]',
     );
 
-    if (textElement && Number.isFinite(start) && Number.isFinite(end)) {
+    if (textElement) {
       timedElements.push({ element: textElement, start, end });
     }
 
@@ -53,13 +53,11 @@ const getTimedSubtitleElements = (element: HTMLElement) => {
     const chordStart = Number(chordElement.dataset.subtitleChordStart);
     const chordEnd = Number(chordElement.dataset.subtitleChordEnd);
 
-    if (Number.isFinite(chordStart) && Number.isFinite(chordEnd)) {
-      timedElements.push({
-        element: chordElement,
-        start: chordStart,
-        end: chordEnd,
-      });
-    }
+    timedElements.push({
+      element: chordElement,
+      start: chordStart,
+      end: chordEnd,
+    });
   }
 
   return timedElements;

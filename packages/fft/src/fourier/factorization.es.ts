@@ -10,7 +10,7 @@ export type RadixStageCounts = {
 export const createRadixStages = (
   size: number,
 ): RadixStageCounts | undefined => {
-  if (!Number.isInteger(size) || size < 1) {
+  if (size < 1) {
     return undefined;
   }
 

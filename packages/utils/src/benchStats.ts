@@ -28,7 +28,7 @@ export const computeMean = (values: readonly number[]): number =>
   values.reduce((sum, v) => sum + v, 0) / values.length;
 
 const collectFiniteSamples = (values: readonly number[]): number[] =>
-  values.filter((value) => Number.isFinite(value) && value >= 0);
+  values.filter((rawValue) => Number.isFinite(rawValue) && rawValue >= 0);
 
 export const computeMedian = (values: readonly number[]): number => {
   const samples = collectFiniteSamples(values).sort(
@@ -77,10 +77,6 @@ export const selectBenchRunsPerSample = (
   }
 
   const median = computeMedian(positiveSamples);
-
-  if (!Number.isFinite(median) || median <= 0) {
-    return 1;
-  }
 
   return Math.max(
     1,
