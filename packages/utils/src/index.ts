@@ -17,4 +17,5 @@ export * from './patchConfig.js';
 export * from './resourceCell.js';
 export * from './sampleRate.js';
 export * from './singletonManager.js';
+export * from './viewportState.js';
 export * from './viewSize.js';
