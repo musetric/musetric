@@ -1,11 +1,10 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defaultBenchStatsConfig } from '@musetric/utils';
+import { createBenchTimestamp, defaultBenchStatsConfig } from '@musetric/utils';
 import koffi, { type LibraryHandle } from 'koffi';
 import {
   benchConfig,
-  createBenchTimestamp,
   createBenchWave,
   type FourierBenchSummary,
   fourierComputeStats,

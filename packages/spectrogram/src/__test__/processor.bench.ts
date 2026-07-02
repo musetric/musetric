@@ -1,6 +1,6 @@
+import { createBenchTimestamp } from '@musetric/utils';
 import { describe, it } from 'vitest';
 import {
-  createBenchTimestamp,
   fullMount,
   playback30Fps,
   playback60Fps,
