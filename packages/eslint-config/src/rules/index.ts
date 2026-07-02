@@ -2,6 +2,7 @@ import { noAliasConstantsRule } from './noAliasConstants.js';
 import { noAliasedReexportsRule } from './noAliasedReexports.js';
 import { noClassesRule } from './noClasses.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
+import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
 import { noDynamicTranslationKeysRule } from './noDynamicTranslationKeys.js';
 import { noImmediateInlineFunctionCallsRule } from './noImmediateInlineFunctionCalls.js';
 import { noInlineParameterDestructuringRule } from './noInlineParameterDestructuring.js';
@@ -19,12 +20,14 @@ import { noSwitchStatementsRule } from './noSwitchStatements.js';
 import { noThisExpressionRule } from './noThisExpression.js';
 import { noTrivialFunctionWrappersRule } from './noTrivialFunctionWrappers.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
+import { noUntrustedValueChecksRule } from './noUntrustedValueChecks.js';
 
 export const musetricRules = {
   'no-alias-constants': noAliasConstantsRule,
   'no-aliased-reexports': noAliasedReexportsRule,
   'no-classes': noClassesRule,
   'no-component-spacing-prop': noComponentSpacingPropRule,
+  'no-defensive-throw-guards': noDefensiveThrowGuardsRule,
   'no-dynamic-translation-keys': noDynamicTranslationKeysRule,
   'no-immediate-inline-function-calls': noImmediateInlineFunctionCallsRule,
   'no-inline-parameter-destructuring': noInlineParameterDestructuringRule,
@@ -42,4 +45,5 @@ export const musetricRules = {
   'no-this-expression': noThisExpressionRule,
   'no-trivial-function-wrappers': noTrivialFunctionWrappersRule,
   'no-type-method-signatures': noTypeMethodSignaturesRule,
+  'no-untrusted-value-checks': noUntrustedValueChecksRule,
 };

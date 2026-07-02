@@ -6,6 +6,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-aliased-reexports': 'error',
   'musetric/no-classes': 'error',
   'musetric/no-component-spacing-prop': 'error',
+  'musetric/no-defensive-throw-guards': 'error',
   'musetric/no-dynamic-translation-keys': 'error',
   'musetric/no-immediate-inline-function-calls': 'error',
   'musetric/no-inline-parameter-destructuring': 'error',
@@ -23,6 +24,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-this-expression': 'error',
   'musetric/no-trivial-function-wrappers': 'error',
   'musetric/no-type-method-signatures': 'error',
+  'musetric/no-untrusted-value-checks': 'error',
 };
 
 export const musetricPlugin: ESLint.Plugin = {
