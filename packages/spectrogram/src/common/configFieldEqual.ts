@@ -38,7 +38,7 @@ const isSpectrogramLanesEqual = (
     );
   });
 
-const isSpectrogramSpectralBandsEqual = (
+export const isSpectrogramSpectralBandsEqual = (
   first: SpectrogramSpectralBand[],
   second: SpectrogramSpectralBand[],
 ) =>

@@ -1,9 +1,24 @@
 import {
   createInertialDragPhysics,
-  type InertialDragInertiaState,
   type InertialDragPhysicsOptions,
-  type InertialDragVelocityTracker,
 } from './inertialDrag.js';
+import {
+  createInertiaRunner,
+  type InertiaRunner,
+} from './multiPointerGesture/inertiaRunner.dom.js';
+import {
+  createPanTracker,
+  type PanTracker,
+} from './multiPointerGesture/panTracker.dom.js';
+import {
+  createPinchTracker,
+  type PinchTracker,
+  type PinchTrackerUpdate,
+} from './multiPointerGesture/pinchTracker.dom.js';
+import {
+  createPointerDispatcher,
+  type PointerDispatcher,
+} from './multiPointerGesture/pointerDispatcher.dom.js';
 
 export type GestureAxis = 'x' | 'y';
 export type GesturePhase = 'drag' | 'inertia';
@@ -61,33 +76,42 @@ type Pointer = {
   y: number;
 };
 
-type PanState = {
-  pointerId: number;
-  pointerType: GesturePointerType;
-  startX: number;
-  startY: number;
-  axis: GestureAxis | undefined;
-  lastPosition: number;
-  velocityTracker: InertialDragVelocityTracker | undefined;
-};
-
-type PinchAxisSeed = {
-  center: number;
-  spread: number;
-};
-
-type PinchState = {
-  pointerA: number;
-  pointerB: number;
-  initialX: PinchAxisSeed;
-  initialY: PinchAxisSeed;
-  axis: GestureAxis | undefined;
-};
-
 const defaultPointerTypes: readonly GesturePointerType[] = ['mouse', 'touch'];
 
-const isPointerType = (value: string): value is GesturePointerType =>
-  value === 'mouse' || value === 'touch';
+const emitPinchUpdate = (
+  onUpdate: ((event: GesturePinchUpdate) => void) | undefined,
+  update: PinchTrackerUpdate,
+) => {
+  onUpdate?.({
+    axis: update.axis,
+    center: update.center,
+    spread: update.spread,
+  });
+};
+
+type PanUpdateFields = {
+  axis: GestureAxis;
+  delta: number;
+  velocity: number;
+};
+
+const emitPanUpdate = (
+  onUpdate: ((event: GesturePanUpdate) => void) | undefined,
+  phase: GesturePhase,
+  update: PanUpdateFields,
+): boolean => {
+  let stopped = false;
+  onUpdate?.({
+    axis: update.axis,
+    phase,
+    delta: update.delta,
+    velocity: update.velocity,
+    stop: () => {
+      stopped = true;
+    },
+  });
+  return stopped;
+};
 
 export const createMultiPointerGesture = (
   options: MultiPointerGestureOptions,
@@ -126,11 +150,19 @@ export const createMultiPointerGesture = (
   const initialUserSelect = element.style.userSelect;
 
   const pointers = new Map<number, Pointer>();
-  let panState: PanState | undefined = undefined;
-  let pinchState: PinchState | undefined = undefined;
-  let inertiaFrame: number | undefined = undefined;
-  let inertiaAxis: GestureAxis | undefined = undefined;
-  let inertiaState: InertialDragInertiaState | undefined = undefined;
+  const panTracker: PanTracker = createPanTracker({
+    fixedAxis,
+    axisLockDistance,
+    physics,
+  });
+  const pinchTracker: PinchTracker = createPinchTracker({
+    pinchLockDistance,
+    minimumPinchSpread,
+  });
+  const inertiaRunner: InertiaRunner = createInertiaRunner(physics, {
+    onUpdate: (info) => emitPanUpdate(onPanUpdate, 'inertia', info),
+    onEnd: () => onPanEnd?.(),
+  });
 
   const releaseCapture = (id: number) => {
     if (element.hasPointerCapture(id)) {
@@ -138,142 +170,23 @@ export const createMultiPointerGesture = (
     }
   };
 
-  const stopInertia = () => {
-    if (inertiaFrame !== undefined) {
-      cancelAnimationFrame(inertiaFrame);
-      inertiaFrame = undefined;
-    }
-    if (inertiaState !== undefined) {
-      inertiaState = undefined;
-      inertiaAxis = undefined;
+  const endPanWithoutInertia = () => {
+    if (panTracker.end()) {
       onPanEnd?.();
     }
-  };
-
-  const runInertia = (time: number) => {
-    if (!inertiaState || !inertiaAxis) {
-      inertiaFrame = undefined;
-      return;
-    }
-
-    const step = physics.advanceInertia(inertiaState, time);
-    if (step.done) {
-      inertiaFrame = undefined;
-      inertiaState = undefined;
-      inertiaAxis = undefined;
-      onPanEnd?.();
-      return;
-    }
-
-    const stopFlag = { value: false };
-    onPanUpdate?.({
-      axis: inertiaAxis,
-      phase: 'inertia',
-      delta: step.delta,
-      velocity: step.velocity,
-      stop: () => {
-        stopFlag.value = true;
-      },
-    });
-
-    if (stopFlag.value) {
-      inertiaFrame = undefined;
-      inertiaState = undefined;
-      inertiaAxis = undefined;
-      onPanEnd?.();
-      return;
-    }
-
-    inertiaFrame = requestAnimationFrame(runInertia);
-  };
-
-  const endPan = (withInertia: boolean) => {
-    const state = panState;
-    panState = undefined;
-    if (!state || state.axis === undefined) {
-      return;
-    }
-
-    if (!withInertia) {
-      onPanEnd?.();
-      return;
-    }
-
-    const velocity =
-      state.velocityTracker?.release(state.lastPosition, performance.now()) ??
-      0;
-    inertiaState =
-      physics.startInertia(velocity, performance.now()) ?? undefined;
-    if (!inertiaState) {
-      onPanEnd?.();
-      return;
-    }
-    inertiaAxis = state.axis;
-    inertiaFrame = requestAnimationFrame(runInertia);
   };
 
   const endPinch = () => {
-    const state = pinchState;
-    pinchState = undefined;
-    if (!state || state.axis === undefined) return;
-    onPinchEnd?.();
-  };
-
-  const startPanFromPointer = (pointer: Pointer) => {
-    panState = {
-      pointerId: pointer.id,
-      pointerType: pointer.type,
-      startX: pointer.x,
-      startY: pointer.y,
-      axis: undefined,
-      lastPosition: 0,
-      velocityTracker: undefined,
-    };
-  };
-
-  const startPinchFromPointers = (a: Pointer, b: Pointer) => {
-    pinchState = {
-      pointerA: a.id,
-      pointerB: b.id,
-      initialX: {
-        center: (a.x + b.x) / 2,
-        spread: Math.max(Math.abs(b.x - a.x), minimumPinchSpread),
-      },
-      initialY: {
-        center: (a.y + b.y) / 2,
-        spread: Math.max(Math.abs(b.y - a.y), minimumPinchSpread),
-      },
-      axis: undefined,
-    };
-  };
-
-  const resolvePanAxis = (
-    deltaX: number,
-    deltaY: number,
-  ): GestureAxis | undefined => {
-    if (fixedAxis) {
-      const axisDelta = fixedAxis === 'x' ? deltaX : deltaY;
-      if (Math.abs(axisDelta) < axisLockDistance) {
-        return undefined;
-      }
-      return fixedAxis;
+    if (pinchTracker.end()) {
+      onPinchEnd?.();
     }
-    if (Math.hypot(deltaX, deltaY) < axisLockDistance) {
-      return undefined;
-    }
-    return Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
   };
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (
-      !isPointerType(event.pointerType) ||
-      !pointerTypes.includes(event.pointerType)
-    ) {
+    if (event.pointerType !== 'mouse' && event.pointerType !== 'touch') {
       return;
     }
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-
-    stopInertia();
+    inertiaRunner.stop(true);
 
     const pointer: Pointer = {
       id: event.pointerId,
@@ -289,12 +202,12 @@ export const createMultiPointerGesture = (
 
     const list = Array.from(pointers.values());
     if (list.length === 1) {
-      startPanFromPointer(list[0]);
+      panTracker.start(list[0]);
       return;
     }
     if (list.length === 2) {
-      endPan(false);
-      startPinchFromPointers(list[0], list[1]);
+      endPanWithoutInertia();
+      pinchTracker.start(list[0], list[1]);
     }
   };
 
@@ -305,90 +218,46 @@ export const createMultiPointerGesture = (
     pointer.x = event.clientX;
     pointer.y = event.clientY;
 
-    if (pinchState) {
-      const a = pointers.get(pinchState.pointerA);
-      const b = pointers.get(pinchState.pointerB);
+    if (pinchTracker.matches(event.pointerId)) {
+      const aId = pinchTracker.pointerA();
+      const bId = pinchTracker.pointerB();
+      if (aId === undefined || bId === undefined) return;
+      const a = pointers.get(aId);
+      const b = pointers.get(bId);
       if (!a || !b) return;
 
-      const spreadX = Math.max(Math.abs(b.x - a.x), minimumPinchSpread);
-      const spreadY = Math.max(Math.abs(b.y - a.y), minimumPinchSpread);
-      const centerX = (a.x + b.x) / 2;
-      const centerY = (a.y + b.y) / 2;
+      const update = pinchTracker.update(a, b);
+      if (!update) return;
 
-      if (pinchState.axis === undefined) {
-        const changeX = Math.abs(spreadX - pinchState.initialX.spread);
-        const changeY = Math.abs(spreadY - pinchState.initialY.spread);
-        if (Math.max(changeX, changeY) < pinchLockDistance) {
-          return;
-        }
-        pinchState.axis = changeX >= changeY ? 'x' : 'y';
-        const seed =
-          pinchState.axis === 'x' ? pinchState.initialX : pinchState.initialY;
+      if (update.justLockedAxis) {
         onPinchStart?.({
-          axis: pinchState.axis,
-          center: seed.center,
-          spread: seed.spread,
+          axis: update.axis,
+          center: update.startCenter,
+          spread: update.startSpread,
         });
       }
-
-      const { axis } = pinchState;
-      onPinchUpdate?.({
-        axis,
-        center: axis === 'x' ? centerX : centerY,
-        spread: axis === 'x' ? spreadX : spreadY,
-      });
+      emitPinchUpdate(onPinchUpdate, update);
       event.preventDefault();
       return;
     }
 
-    if (panState && event.pointerId === panState.pointerId) {
-      const deltaX = pointer.x - panState.startX;
-      const deltaY = pointer.y - panState.startY;
+    if (event.pointerId !== panTracker.pointerId()) return;
 
-      if (panState.axis === undefined) {
-        const resolvedAxis = resolvePanAxis(deltaX, deltaY);
-        if (resolvedAxis === undefined) {
-          return;
-        }
-        panState.axis = resolvedAxis;
-        const startPosition =
-          panState.axis === 'x' ? panState.startX : panState.startY;
-        panState.lastPosition = startPosition;
-        panState.velocityTracker = physics.createVelocityTracker(
-          startPosition,
-          performance.now(),
-        );
-        onPanStart?.({
-          axis: panState.axis,
-          pointerType: panState.pointerType,
-        });
-      }
+    const update = panTracker.update(pointer);
+    if (!update) return;
 
-      const { axis } = panState;
-      const currentPosition = axis === 'x' ? pointer.x : pointer.y;
-      const delta = currentPosition - panState.lastPosition;
-      panState.lastPosition = currentPosition;
-      const velocity = panState.velocityTracker?.add(
-        currentPosition,
-        performance.now(),
-      );
-
-      const stopFlag = { value: false };
-      onPanUpdate?.({
-        axis,
-        phase: 'drag',
-        delta,
-        velocity: velocity ?? 0,
-        stop: () => {
-          stopFlag.value = true;
-        },
+    if (update.justLockedAxis) {
+      onPanStart?.({
+        axis: update.axis,
+        pointerType: update.pointerType,
       });
-
-      if (stopFlag.value) {
-        endPan(false);
-      }
-      event.preventDefault();
     }
+
+    const stopped = emitPanUpdate(onPanUpdate, 'drag', update);
+    if (stopped) {
+      endPanWithoutInertia();
+    }
+    event.preventDefault();
   };
 
   const handlePointerUp = (event: PointerEvent) => {
@@ -398,18 +267,17 @@ export const createMultiPointerGesture = (
     pointers.delete(event.pointerId);
     releaseCapture(event.pointerId);
 
-    if (
-      pinchState &&
-      (event.pointerId === pinchState.pointerA ||
-        event.pointerId === pinchState.pointerB)
-    ) {
+    if (pinchTracker.matches(event.pointerId)) {
       endPinch();
       event.preventDefault();
       return;
     }
 
-    if (panState && event.pointerId === panState.pointerId) {
-      endPan(true);
+    if (event.pointerId === panTracker.pointerId()) {
+      const endInfo = panTracker.end();
+      if (endInfo) {
+        inertiaRunner.start(endInfo.velocity, endInfo.axis, performance.now());
+      }
       event.preventDefault();
     }
   };
@@ -421,31 +289,33 @@ export const createMultiPointerGesture = (
     pointers.delete(event.pointerId);
     releaseCapture(event.pointerId);
 
-    if (
-      pinchState &&
-      (event.pointerId === pinchState.pointerA ||
-        event.pointerId === pinchState.pointerB)
-    ) {
+    if (pinchTracker.matches(event.pointerId)) {
       endPinch();
       return;
     }
 
-    if (panState && event.pointerId === panState.pointerId) {
-      endPan(false);
+    if (event.pointerId === panTracker.pointerId()) {
+      endPanWithoutInertia();
     }
   };
 
+  const dispatcher: PointerDispatcher = createPointerDispatcher({
+    element,
+    pointerTypes,
+    onPointerDown: handlePointerDown,
+    onPointerMove: handlePointerMove,
+    onPointerUp: handlePointerUp,
+    onPointerCancel: handlePointerCancel,
+  });
+
   element.style.touchAction = 'none';
   element.style.userSelect = 'none';
-  element.addEventListener('pointerdown', handlePointerDown);
-  element.addEventListener('pointermove', handlePointerMove);
-  element.addEventListener('pointerup', handlePointerUp);
-  element.addEventListener('pointercancel', handlePointerCancel);
+  dispatcher.attach();
 
   const stop = () => {
-    stopInertia();
-    if (panState) endPan(false);
-    if (pinchState) endPinch();
+    inertiaRunner.stop(true);
+    endPanWithoutInertia();
+    endPinch();
     pointers.forEach((pointer) => releaseCapture(pointer.id));
     pointers.clear();
   };
@@ -454,10 +324,7 @@ export const createMultiPointerGesture = (
     stop,
     dispose: () => {
       stop();
-      element.removeEventListener('pointerdown', handlePointerDown);
-      element.removeEventListener('pointermove', handlePointerMove);
-      element.removeEventListener('pointerup', handlePointerUp);
-      element.removeEventListener('pointercancel', handlePointerCancel);
+      dispatcher.detach();
       element.style.touchAction = initialTouchAction;
       element.style.userSelect = initialUserSelect;
     },

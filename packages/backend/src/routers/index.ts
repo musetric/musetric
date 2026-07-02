@@ -4,7 +4,7 @@ import { chordsRouter } from './chords.js';
 import { keyRouter } from './key.js';
 import { previewRouter } from './preview.js';
 import { projectRouter } from './project.js';
-import { recordingRouter } from './recording.js';
+import { recordingRouter } from './recording/index.js';
 import { rhythmRouter } from './rhythm.js';
 import { subtitleRouter } from './subtitle.js';
 
