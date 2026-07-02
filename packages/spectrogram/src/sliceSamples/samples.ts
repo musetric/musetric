@@ -15,14 +15,14 @@ export type StateSamples = {
   buffer: GPUBuffer;
   array: Float32Array;
 
-  write: (
-    samples: Float32Array,
-    baseColumn: number,
-    config: ExtSpectrogramConfig,
-    truncateAfterPlayhead: boolean,
-    forceFullUpload: boolean,
-    invalidations: readonly SpectrogramSampleRange[],
-  ) => StateSamplesWriteResult;
+  write: (options: {
+    samples: Float32Array;
+    baseColumn: number;
+    config: ExtSpectrogramConfig;
+    truncateAfterPlayhead: boolean;
+    forceFullUpload: boolean;
+    invalidations: readonly SpectrogramSampleRange[];
+  }) => StateSamplesWriteResult;
 };
 
 type ResidentState = {
@@ -55,14 +55,15 @@ export const createStateSamplesCell = (device: GPUDevice) =>
       return {
         buffer,
         array,
-        write: (
-          samples,
-          baseColumn,
-          config,
-          truncateAfterPlayhead,
-          forceFullUpload,
-          invalidations,
-        ) => {
+        write: (options) => {
+          const {
+            samples,
+            baseColumn,
+            config,
+            truncateAfterPlayhead,
+            forceFullUpload,
+            invalidations,
+          } = options;
           const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
           const beforeSamples =
             visibleTime * playheadRatio * sampleRate + windowSize;

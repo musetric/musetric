@@ -67,13 +67,16 @@ export const createBindGroup = (
     })),
   });
 
-export const dispatch2d = (
-  pass: GPUComputePassEncoder,
-  pipeline: GPUComputePipeline,
-  bindGroup: GPUBindGroup,
-  x: number,
-  y: number,
-): void => {
+export type Dispatch2dOptions = {
+  pass: GPUComputePassEncoder;
+  pipeline: GPUComputePipeline;
+  bindGroup: GPUBindGroup;
+  x: number;
+  y: number;
+};
+
+export const dispatch2d = (options: Dispatch2dOptions): void => {
+  const { pass, pipeline, bindGroup, x, y } = options;
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, bindGroup);
   pass.dispatchWorkgroups(Math.ceil(x / 16), Math.ceil(y / 16));

@@ -222,13 +222,18 @@ const targetedBatches = (
   return targeted;
 };
 
+type ExpectOnlyTargetedTransformedOptions = {
+  ranged: Float32Array;
+  full: Float32Array;
+  input: Float32Array;
+  stride: number;
+  targeted: Set<number>;
+};
+
 const expectOnlyTargetedTransformed = (
-  ranged: Float32Array,
-  full: Float32Array,
-  input: Float32Array,
-  stride: number,
-  targeted: Set<number>,
+  options: ExpectOnlyTargetedTransformedOptions,
 ): void => {
+  const { ranged, full, input, stride, targeted } = options;
   for (let w = 0; w < windowCount; w += 1) {
     const offset = w * stride;
     const expected = targeted.has(w) ? full : input;
@@ -311,13 +316,13 @@ describe.each(fourierCases)('$label batch range', (fourierCase) => {
       async (range) => {
         const full = await transformCase();
         const ranged = await transformCase([range]);
-        expectOnlyTargetedTransformed(
+        expectOnlyTargetedTransformed({
           ranged,
           full,
-          makeInput(windowSize, stride),
+          input: makeInput(windowSize, stride),
           stride,
-          targetedBatches([range]),
-        );
+          targeted: targetedBatches([range]),
+        });
       },
     );
 
@@ -328,13 +333,13 @@ describe.each(fourierCases)('$label batch range', (fourierCase) => {
       ];
       const full = await transformCase();
       const ranged = await transformCase(multiRanges);
-      expectOnlyTargetedTransformed(
+      expectOnlyTargetedTransformed({
         ranged,
         full,
-        makeInput(windowSize, stride),
+        input: makeInput(windowSize, stride),
         stride,
-        targetedBatches(multiRanges),
-      );
+        targeted: targetedBatches(multiRanges),
+      });
     });
 
     it('treats a zero-count range as a no-op', async () => {
@@ -342,7 +347,13 @@ describe.each(fourierCases)('$label batch range', (fourierCase) => {
         { batchOffset: 2, batchCount: 0 },
       ]);
       const input = makeInput(windowSize, stride);
-      expectOnlyTargetedTransformed(untouched, input, input, stride, new Set());
+      expectOnlyTargetedTransformed({
+        ranged: untouched,
+        full: input,
+        input,
+        stride,
+        targeted: new Set(),
+      });
     });
   });
 
@@ -361,13 +372,13 @@ describe.each(fourierCases)('$label batch range', (fourierCase) => {
         windowSize,
         [[range]],
       );
-      expectOnlyTargetedTransformed(
+      expectOnlyTargetedTransformed({
         ranged,
         full,
-        zeros,
+        input: zeros,
         stride,
-        targetedBatches([range]),
-      );
+        targeted: targetedBatches([range]),
+      });
     });
 
     it('reuses ring slots correctly across submits', async () => {
@@ -381,13 +392,13 @@ describe.each(fourierCases)('$label batch range', (fourierCase) => {
         windowSize,
         rangesPerSubmit,
       );
-      expectOnlyTargetedTransformed(
+      expectOnlyTargetedTransformed({
         ranged,
         full,
-        zeros,
+        input: zeros,
         stride,
-        targetedBatches(rangesPerSubmit.flat()),
-      );
+        targeted: targetedBatches(rangesPerSubmit.flat()),
+      });
     });
   });
 
@@ -418,13 +429,13 @@ describe('ifftPackedStockhamC2r batch range', () => {
       async (range) => {
         const full = await inverseTransform(windowSize);
         const ranged = await inverseTransform(windowSize, [range]);
-        expectOnlyTargetedTransformed(
+        expectOnlyTargetedTransformed({
           ranged,
           full,
-          zeros,
-          windowSize,
-          targetedBatches([range]),
-        );
+          input: zeros,
+          stride: windowSize,
+          targeted: targetedBatches([range]),
+        });
       },
     );
 
@@ -435,13 +446,13 @@ describe('ifftPackedStockhamC2r batch range', () => {
       ];
       const full = await inverseTransform(windowSize);
       const ranged = await inverseTransform(windowSize, multiRanges);
-      expectOnlyTargetedTransformed(
+      expectOnlyTargetedTransformed({
         ranged,
         full,
-        zeros,
-        windowSize,
-        targetedBatches(multiRanges),
-      );
+        input: zeros,
+        stride: windowSize,
+        targeted: targetedBatches(multiRanges),
+      });
     });
   });
 

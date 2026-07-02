@@ -5,13 +5,16 @@ export type WaveformDraw = {
   run: (segments: WaveformSegment[], colors: WaveformColors) => void;
 };
 
-const drawWaveform = (
-  context: OffscreenCanvasRenderingContext2D,
-  segments: WaveformSegment[],
-  width: number,
-  height: number,
-  color: string,
-) => {
+type DrawWaveformOptions = {
+  context: OffscreenCanvasRenderingContext2D;
+  segments: WaveformSegment[];
+  width: number;
+  height: number;
+  color: string;
+};
+
+const drawWaveform = (options: DrawWaveformOptions): void => {
+  const { context, segments, width, height, color } = options;
   context.strokeStyle = color;
   context.lineWidth = 1;
   context.beginPath();
@@ -68,7 +71,13 @@ export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {
         return;
       }
 
-      drawWaveform(context, segments, width, height, colors.foreground);
+      drawWaveform({
+        context,
+        segments,
+        width,
+        height,
+        color: colors.foreground,
+      });
     },
   };
   return ref;

@@ -108,13 +108,16 @@ const expectMatchesReference = (
   expect(maxAbsDifference(actual, reference)).toBeLessThan(8);
 };
 
-const writeToneRange = (
-  samples: Float32Array,
-  frameIndex: number,
-  frameCount: number,
-  frequency: number,
-  sampleRate: number,
-): void => {
+type WriteToneRangeOptions = {
+  samples: Float32Array;
+  frameIndex: number;
+  frameCount: number;
+  frequency: number;
+  sampleRate: number;
+};
+
+const writeToneRange = (options: WriteToneRangeOptions): void => {
+  const { samples, frameIndex, frameCount, frequency, sampleRate } = options;
   const start = Math.max(0, frameIndex);
   const end = Math.min(samples.length, frameIndex + frameCount);
   for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
@@ -130,7 +133,13 @@ const writeCentreTone = (
 ): { trackKey: 'lead'; frameIndex: number; frameCount: number } => {
   const chunkLength = windowSize * 2;
   const chunkStart = Math.floor(lead.length * 0.5 - chunkLength * 0.5);
-  writeToneRange(lead, chunkStart, chunkLength, toneFrequency, sampleRate);
+  writeToneRange({
+    samples: lead,
+    frameIndex: chunkStart,
+    frameCount: chunkLength,
+    frequency: toneFrequency,
+    sampleRate,
+  });
   return { trackKey: 'lead', frameIndex: chunkStart, frameCount: chunkLength };
 };
 
@@ -144,28 +153,40 @@ const progressForColumns = (
   return (columns * step) / sampleLength;
 };
 
+type WriteRecordingChunksOptions = {
+  recording: Float32Array;
+  firstChunkFrameIndex: number;
+  chunkCount: number;
+  chunkFrameCount: number;
+  sampleRate: number;
+};
+
 const writeRecordingChunks = (
-  recording: Float32Array,
-  firstChunkFrameIndex: number,
-  chunkCount: number,
-  chunkFrameCount: number,
-  sampleRate: number,
-): { trackKey: 'recording'; frameIndex: number; frameCount: number }[] =>
-  Array.from({ length: chunkCount }, (_, index) => {
+  options: WriteRecordingChunksOptions,
+): { trackKey: 'recording'; frameIndex: number; frameCount: number }[] => {
+  const {
+    recording,
+    firstChunkFrameIndex,
+    chunkCount,
+    chunkFrameCount,
+    sampleRate,
+  } = options;
+  return Array.from({ length: chunkCount }, (_, index) => {
     const chunkFrameIndex = firstChunkFrameIndex + index * chunkFrameCount;
-    writeToneRange(
-      recording,
-      chunkFrameIndex,
-      chunkFrameCount,
-      440,
+    writeToneRange({
+      samples: recording,
+      frameIndex: chunkFrameIndex,
+      frameCount: chunkFrameCount,
+      frequency: 440,
       sampleRate,
-    );
+    });
     return {
       trackKey: 'recording' as const,
       frameIndex: chunkFrameIndex,
       frameCount: chunkFrameCount,
     };
   });
+};
 
 describe('spectrogram processor', () => {
   it('renders a tone into its expected frequency row', async () => {
@@ -332,13 +353,13 @@ describe('spectrogram processor', () => {
         const chunkCount = 3;
         const frameIndex = Math.round((start + slide) * length);
         const firstChunkFrameIndex = frameIndex - chunkFrameCount * chunkCount;
-        const invalidatedSamples = writeRecordingChunks(
+        const invalidatedSamples = writeRecordingChunks({
           recording,
           firstChunkFrameIndex,
           chunkCount,
           chunkFrameCount,
-          incrementalConfig.sampleRate,
-        );
+          sampleRate: incrementalConfig.sampleRate,
+        });
 
         incremental.invalidateSamples(invalidatedSamples);
         await incremental.render({ lead, recording }, start + slide);
@@ -386,13 +407,13 @@ describe('spectrogram processor', () => {
 
         const chunkLength = windowSize * 6;
         const chunkStart = Math.floor(length * 0.5 - chunkLength * 0.5);
-        writeToneRange(
-          lead,
-          chunkStart,
-          chunkLength,
-          toneFrequency * 1.5,
-          incrementalConfig.sampleRate,
-        );
+        writeToneRange({
+          samples: lead,
+          frameIndex: chunkStart,
+          frameCount: chunkLength,
+          frequency: toneFrequency * 1.5,
+          sampleRate: incrementalConfig.sampleRate,
+        });
         const invalidation = {
           trackKey: 'lead' as const,
           frameIndex: chunkStart,

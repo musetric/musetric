@@ -68,15 +68,19 @@ const fillChunk = (
   return length;
 };
 
-const overlapAdd = (
-  target: Float32Array<ArrayBuffer>,
-  divider: Float32Array<ArrayBuffer>,
-  chunk: Float32Array<ArrayBuffer>,
-  window: Float32Array<ArrayBuffer>,
-  mixtureSamples: number,
-  start: number,
-  length: number,
-): void => {
+type OverlapAddOptions = {
+  target: Float32Array<ArrayBuffer>;
+  divider: Float32Array<ArrayBuffer>;
+  chunk: Float32Array<ArrayBuffer>;
+  window: Float32Array<ArrayBuffer>;
+  mixtureSamples: number;
+  start: number;
+  length: number;
+};
+
+const overlapAdd = (options: OverlapAddOptions): void => {
+  const { target, divider, chunk, window, mixtureSamples, start, length } =
+    options;
   for (let channel = 0; channel < channels; channel++) {
     for (let i = 0; i < length; i++) {
       const weight = window[i];
@@ -130,15 +134,15 @@ const demix = async (
     const length = fillChunk(chunk, padded, mixtureSamples, start);
     const separated = await runtime.processChunk(chunk);
     const window = length === chunkSamples ? fullWindow : createHanning(length);
-    overlapAdd(
-      result,
+    overlapAdd({
+      target: result,
       divider,
-      separated,
+      chunk: separated,
       window,
       mixtureSamples,
       start,
       length,
-    );
+    });
   }
 
   const target = new Float32Array(channels * samples);

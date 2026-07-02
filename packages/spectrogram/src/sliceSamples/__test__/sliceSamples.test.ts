@@ -129,7 +129,13 @@ const runSlice = async (
   baseColumn: number,
   range: SpectrogramColumnRange,
 ): Promise<Float32Array> => {
-  slice.write(samples, baseColumn, false, false, []);
+  slice.write({
+    samples,
+    baseColumn,
+    truncateAfterPlayhead: false,
+    forceFullUpload: false,
+    invalidations: [],
+  });
   const encoder = device.createCommandEncoder();
   slice.run(encoder, range);
   device.queue.submit([encoder.finish()]);
@@ -223,13 +229,13 @@ describe('sliceSamples', () => {
     const secondBase = firstBase + 2;
     const columns = new Array<boolean>(fractionalWidth).fill(false);
     markShiftColumns(columns, secondBase, firstBase);
-    markInvalidatedColumns(
+    markInvalidatedColumns({
       columns,
-      fractionalConfig,
-      secondBase,
-      fractionalWindowSize,
-      [chunk],
-    );
+      grid: fractionalConfig,
+      baseColumn: secondBase,
+      analysisWindowSize: fractionalWindowSize,
+      invalidations: [chunk],
+    });
     const ranges = toColumnRanges(fractionalConfig, secondBase, columns);
     expect(ranges.length).toBeGreaterThan(1);
 
@@ -258,7 +264,13 @@ describe('sliceSamples', () => {
       fractionalWindowSize,
       fractionalWidth,
       async (incremental, incrementalSignal, full, fullSignal) => {
-        incremental.write(incrementalSamples, firstBase, false, true, []);
+        incremental.write({
+          samples: incrementalSamples,
+          baseColumn: firstBase,
+          truncateAfterPlayhead: false,
+          forceFullUpload: true,
+          invalidations: [],
+        });
         await dispatchRanges(incremental, [fullRangeAt(firstBase)]);
 
         for (
@@ -269,18 +281,22 @@ describe('sliceSamples', () => {
           incrementalSamples[index] = index / 100;
         }
 
-        incremental.write(incrementalSamples, secondBase, false, false, [
-          chunk,
-        ]);
+        incremental.write({
+          samples: incrementalSamples,
+          baseColumn: secondBase,
+          truncateAfterPlayhead: false,
+          forceFullUpload: false,
+          invalidations: [chunk],
+        });
         await dispatchRanges(incremental, ranges);
 
-        full.write(
-          Float32Array.from(incrementalSamples),
-          secondBase,
-          false,
-          true,
-          [],
-        );
+        full.write({
+          samples: Float32Array.from(incrementalSamples),
+          baseColumn: secondBase,
+          truncateAfterPlayhead: false,
+          forceFullUpload: true,
+          invalidations: [],
+        });
         await dispatchRanges(full, [fullRangeAt(secondBase)]);
 
         const count = fractionalSignalStride * fractionalWidth;

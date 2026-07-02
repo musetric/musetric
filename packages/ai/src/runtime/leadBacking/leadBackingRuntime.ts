@@ -142,11 +142,23 @@ export const createLeadBackingGpuRuntime = async (
     device.queue.writeBuffer(rawAudio, 0, input);
     const stftEncoder = device.createCommandEncoder();
     const framePass = stftEncoder.beginComputePass();
-    dispatch2d(framePass, framePipeline, frameBindGroup, nFft, windowCount);
+    dispatch2d({
+      pass: framePass,
+      pipeline: framePipeline,
+      bindGroup: frameBindGroup,
+      x: nFft,
+      y: windowCount,
+    });
     framePass.end();
     fft.run(stftEncoder);
     const packPass = stftEncoder.beginComputePass();
-    dispatch2d(packPass, packPipeline, packBindGroup, dimF, windowCount);
+    dispatch2d({
+      pass: packPass,
+      pipeline: packPipeline,
+      bindGroup: packBindGroup,
+      x: dimF,
+      y: windowCount,
+    });
     packPass.end();
     device.queue.submit([stftEncoder.finish()]);
 
@@ -168,7 +180,13 @@ export const createLeadBackingGpuRuntime = async (
 
     const istftEncoder = device.createCommandEncoder();
     const unpackPass = istftEncoder.beginComputePass();
-    dispatch2d(unpackPass, unpackPipeline, unpackBindGroup, freqs, windowCount);
+    dispatch2d({
+      pass: unpackPass,
+      pipeline: unpackPipeline,
+      bindGroup: unpackBindGroup,
+      x: freqs,
+      y: windowCount,
+    });
     unpackPass.end();
     ifft.run(istftEncoder);
     const overlapAddPass = istftEncoder.beginComputePass();

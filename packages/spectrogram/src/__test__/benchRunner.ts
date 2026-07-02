@@ -160,13 +160,16 @@ const toRenderInvalidations = (
     ? coalesceInvalidations(invalidations)
     : [...invalidations];
 
-const writeRecordingChunk = (
-  samples: Float32Array,
-  frameIndex: number,
-  frameCount: number,
-  sampleRate: number,
-  renderIndex: number,
-): number => {
+type WriteRecordingChunkOptions = {
+  samples: Float32Array;
+  frameIndex: number;
+  frameCount: number;
+  sampleRate: number;
+  renderIndex: number;
+};
+
+const writeRecordingChunk = (options: WriteRecordingChunkOptions): number => {
+  const { samples, frameIndex, frameCount, sampleRate, renderIndex } = options;
   const start = Math.max(0, Math.min(samples.length, frameIndex));
   const end = Math.max(start, Math.min(samples.length, start + frameCount));
   const phase = renderIndex * 0.13;
@@ -213,13 +216,13 @@ const createDriver = (benchCase: SpectrogramBenchCase): BenchDriver => {
       const writtenChunks = chunks
         .map((invalidation, invalidationIndex) => ({
           frameIndex: invalidation.frameIndex,
-          frameCount: writeRecordingChunk(
-            recording,
-            invalidation.frameIndex,
-            invalidation.frameCount,
-            config.sampleRate,
-            renderIndex + invalidationIndex,
-          ),
+          frameCount: writeRecordingChunk({
+            samples: recording,
+            frameIndex: invalidation.frameIndex,
+            frameCount: invalidation.frameCount,
+            sampleRate: config.sampleRate,
+            renderIndex: renderIndex + invalidationIndex,
+          }),
         }))
         .filter((invalidation) => invalidation.frameCount > 0);
       const renderInvalidations = toRenderInvalidations(

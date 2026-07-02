@@ -152,11 +152,23 @@ export const createVocalsGpuRuntime = async (
     device.queue.writeBuffer(rawAudio, 0, input);
     const stftEncoder = device.createCommandEncoder();
     const framePass = stftEncoder.beginComputePass();
-    dispatch2d(framePass, framePipeline, frameBindGroup, nFft, windowCount);
+    dispatch2d({
+      pass: framePass,
+      pipeline: framePipeline,
+      bindGroup: frameBindGroup,
+      x: nFft,
+      y: windowCount,
+    });
     framePass.end();
     fft.run(stftEncoder);
     const packPass = stftEncoder.beginComputePass();
-    dispatch2d(packPass, packPipeline, packBindGroup, packedBins, frames);
+    dispatch2d({
+      pass: packPass,
+      pipeline: packPipeline,
+      bindGroup: packBindGroup,
+      x: packedBins,
+      y: frames,
+    });
     packPass.end();
     device.queue.submit([stftEncoder.finish()]);
 
@@ -178,13 +190,13 @@ export const createVocalsGpuRuntime = async (
 
     const istftEncoder = device.createCommandEncoder();
     const applyMasksPass = istftEncoder.beginComputePass();
-    dispatch2d(
-      applyMasksPass,
-      applyMasksPipeline,
-      applyMasksBindGroup,
-      packedBins,
-      frames,
-    );
+    dispatch2d({
+      pass: applyMasksPass,
+      pipeline: applyMasksPipeline,
+      bindGroup: applyMasksBindGroup,
+      x: packedBins,
+      y: frames,
+    });
     applyMasksPass.end();
     ifft.run(istftEncoder);
     const overlapAddPass = istftEncoder.beginComputePass();

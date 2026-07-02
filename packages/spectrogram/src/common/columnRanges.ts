@@ -38,13 +38,19 @@ export const markShiftColumns = (
   markColumns(columns, 0, -delta);
 };
 
+type MarkInvalidatedColumnsOptions = {
+  columns: boolean[];
+  grid: ColumnGrid;
+  baseColumn: number;
+  analysisWindowSize: number;
+  invalidations: readonly SpectrogramSampleRange[];
+};
+
 export const markInvalidatedColumns = (
-  columns: boolean[],
-  grid: ColumnGrid,
-  baseColumn: number,
-  analysisWindowSize: number,
-  invalidations: readonly SpectrogramSampleRange[],
+  options: MarkInvalidatedColumnsOptions,
 ): void => {
+  const { columns, grid, baseColumn, analysisWindowSize, invalidations } =
+    options;
   if (analysisWindowSize <= 0) {
     return;
   }
