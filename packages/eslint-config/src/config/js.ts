@@ -55,6 +55,10 @@ export const jsConfig: Linter.Config = {
     ],
     'import-x/no-self-import': 'error',
     'max-depth': ['error', 3],
+    'max-lines': [
+      'error',
+      { max: 400, skipBlankLines: true, skipComments: true },
+    ],
     'max-nested-callbacks': ['error', 3],
     'max-params': ['error', 4],
     'no-duplicate-imports': ['error'],

@@ -18,6 +18,12 @@ export const config = () => {
         'no-restricted-exports': 'off',
       },
     },
+    {
+      files: ['**/*.wgsl.ts'],
+      rules: {
+        'max-lines': 'off',
+      },
+    },
   ];
 
   return configs;
