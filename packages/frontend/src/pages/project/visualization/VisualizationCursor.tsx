@@ -36,9 +36,7 @@ export const VisualizationCursor: FC = () => {
       const { visualizationMode } = useProjectStore.getState();
       const waveformCursorRatio = frameCount ? frameIndex / frameCount : 0;
       const cursorRatio =
-        visualizationMode === 'spectrogram'
-          ? playheadRatio
-          : waveformCursorRatio;
+        visualizationMode === 'tracks' ? waveformCursorRatio : playheadRatio;
       const cursorX = alignPixel(
         cursorRatio * parentWidth,
         window.devicePixelRatio,

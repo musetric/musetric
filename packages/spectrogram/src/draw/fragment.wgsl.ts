@@ -7,17 +7,27 @@ struct DrawParams {
   recordingMatchColor : vec4f,
   recordingCloseColor : vec4f,
   recordingMissColor : vec4f,
+  recordingTimingMissColor : vec4f,
+  recordingForeground : vec4f,
   comparisonThresholds : vec4f,
+  lineWidths : vec4f,
   visibility : vec4u,
-  relation : vec4u,
+  noteVisibility : vec4u,
   ringSlots : vec4u,
 };
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
 @group(0) @binding(1) var valueSampler : sampler;
 @group(0) @binding(2) var spectrogramTextures : texture_2d_array<f32>;
-@group(0) @binding(3) var<storage, read> referenceFundamentalFrequencies : array<f32>;
-@group(0) @binding(4) var<storage, read> targetFundamentalFrequencies : array<f32>;
+@group(0) @binding(3) var<storage, read> referenceLine : array<f32>;
+@group(0) @binding(4) var<storage, read> targetLine : array<f32>;
+@group(0) @binding(5) var<storage, read> targetVerdicts : array<vec2f>;
+
+const noteGridStripeAmount = 0.12;
+
+fn midiAtFrequency(frequency: f32) -> f32 {
+  return 69.0 + 12.0 * log2(frequency / 440.0);
+}
 
 fn frequencyAtPixel(pixelY: u32, height: f32) -> f32 {
   let ratio = 1.0 - f32(pixelY) / max(1.0, height - 1.0);
@@ -79,21 +89,32 @@ fn segmentLineMask(
   return exp(-0.5 * normalizedDistance * normalizedDistance);
 }
 
-fn targetLineColor(referenceFreq: f32, targetFreq: f32) -> vec3f {
-  let distance = centsDistance(referenceFreq, targetFreq);
-  let matchThreshold = drawParams.comparisonThresholds.x;
-  let closeThreshold = drawParams.comparisonThresholds.y;
-  if (distance <= matchThreshold) {
-    return drawParams.recordingMatchColor.xyz;
-  }
-  if (distance >= closeThreshold) {
-    return drawParams.recordingMissColor.xyz;
-  }
-  let blend = (distance - matchThreshold) / (closeThreshold - matchThreshold);
-  return mix(
+fn verdictColor(distance: f32) -> vec3f {
+  let matchThreshold = max(drawParams.comparisonThresholds.x, 0.0);
+  let closeThreshold = max(
+    drawParams.comparisonThresholds.y,
+    matchThreshold + 0.001,
+  );
+  let missThreshold = max(
+    drawParams.comparisonThresholds.z,
+    closeThreshold + 0.001,
+  );
+  let closeBlend = smoothstep(matchThreshold, closeThreshold, distance);
+  let missBlend = smoothstep(closeThreshold, missThreshold, distance);
+  let color = mix(
     drawParams.recordingMatchColor.xyz,
     drawParams.recordingCloseColor.xyz,
-    blend,
+    closeBlend,
+  );
+  return mix(color, drawParams.recordingMissColor.xyz, missBlend);
+}
+
+fn targetTint(verdict: vec2f) -> vec3f {
+  let pitchColor = verdictColor(verdict.x);
+  return mix(
+    pitchColor,
+    drawParams.recordingTimingMissColor.xyz,
+    clamp(verdict.y, 0.0, 1.0),
   );
 }
 
@@ -181,41 +202,45 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let referenceSlot = slotForScreenX(drawParams.ringSlots.z, x, width);
   let targetSlot = slotForScreenX(drawParams.ringSlots.w, x, width);
 
-  var intensity = 0.0;
+  let referenceFrequency = referenceLine[referenceSlot];
+  let targetFrequency = targetLine[targetSlot];
+  let targetVerdict = targetVerdicts[targetSlot];
+
+  let pixelFrequency = frequencyAtPixel(y, height);
+  let pixelMidiRow = i32(floor(midiAtFrequency(pixelFrequency) + 0.5));
+
+  var color = drawParams.background.xyz;
+  if (drawParams.noteVisibility.x != 0u && pixelMidiRow % 2 == 0) {
+    color = mix(color, drawParams.foreground.xyz, noteGridStripeAmount);
+  }
   if (drawParams.visibility.x != 0u) {
-    intensity = max(
-      intensity,
-      sampleSpectrogram(layer0Slot, y, 0u, width, textureHeight),
-    );
+    let intensity = sampleSpectrogram(layer0Slot, y, 0u, width, textureHeight);
+    color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));
   }
   if (drawParams.visibility.y != 0u) {
-    intensity = max(
-      intensity,
-      sampleSpectrogram(layer1Slot, y, 1u, width, textureHeight),
-    );
+    let intensity = sampleSpectrogram(layer1Slot, y, 1u, width, textureHeight);
+    var tint = drawParams.recordingForeground.xyz;
+    if (targetFrequency > 0.0) {
+      tint = targetTint(targetVerdict);
+    }
+    color = mix(color, tint, clamp(intensity * 1.15, 0.0, 1.0));
   }
-  let baseColor = mix(
-    drawParams.background.xyz,
-    drawParams.foreground.xyz,
-    intensity,
-  );
 
-  let referenceLineWidthCents = drawParams.comparisonThresholds.w;
-  let targetLineWidthCents = drawParams.comparisonThresholds.z;
+  let referenceLineWidthCents = drawParams.lineWidths.y;
+  let targetLineWidthCents = drawParams.lineWidths.x;
 
   var referenceMask = 0.0;
   let referenceVisible = drawParams.visibility.z != 0u;
   if (referenceVisible) {
-    let referenceCenter = referenceFundamentalFrequencies[referenceSlot];
     var referencePrev = 0.0;
     if (x > 0u) {
-      referencePrev = referenceFundamentalFrequencies[
+      referencePrev = referenceLine[
         slotForScreenX(drawParams.ringSlots.z, x - 1u, width)
       ];
     }
     var referenceNext = 0.0;
     if (x + 1u < width) {
-      referenceNext = referenceFundamentalFrequencies[
+      referenceNext = referenceLine[
         slotForScreenX(drawParams.ringSlots.z, x + 1u, width)
       ];
     }
@@ -224,7 +249,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       width,
       height,
       x,
-      referenceCenter,
+      referenceFrequency,
       referencePrev,
       referenceNext,
       referenceLineWidthCents,
@@ -232,19 +257,17 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   }
 
   var targetMask = 0.0;
-  var targetFreq = 0.0;
   let targetVisible = drawParams.visibility.w != 0u;
   if (targetVisible) {
-    targetFreq = targetFundamentalFrequencies[targetSlot];
     var targetPrev = 0.0;
     if (x > 0u) {
-      targetPrev = targetFundamentalFrequencies[
+      targetPrev = targetLine[
         slotForScreenX(drawParams.ringSlots.w, x - 1u, width)
       ];
     }
     var targetNext = 0.0;
     if (x + 1u < width) {
-      targetNext = targetFundamentalFrequencies[
+      targetNext = targetLine[
         slotForScreenX(drawParams.ringSlots.w, x + 1u, width)
       ];
     }
@@ -253,26 +276,20 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       width,
       height,
       x,
-      targetFreq,
+      targetFrequency,
       targetPrev,
       targetNext,
       targetLineWidthCents,
     );
   }
 
-  let referenceLineColor = mix(drawParams.primary.xyz, vec3f(0.0), 0.12);
-  var color = mix(baseColor, referenceLineColor, referenceMask);
-
-  if (targetMask > 0.0) {
-    var targetColor = drawParams.recordingMissColor.xyz;
-    if (referenceVisible) {
-      let referenceFreq = referenceFundamentalFrequencies[referenceSlot];
-      if (referenceFreq > 0.0) {
-        targetColor = targetLineColor(referenceFreq, targetFreq);
-      }
-    }
-    color = mix(color, targetColor, targetMask);
+  let referenceLineColor = vec3f(1.0);
+  color = mix(color, referenceLineColor, referenceMask);
+  var targetLineColor = drawParams.primary.xyz;
+  if (targetFrequency > 0.0) {
+    targetLineColor = targetTint(targetVerdict);
   }
+  color = mix(color, targetLineColor, targetMask);
 
   return vec4f(color, 1.0);
 }

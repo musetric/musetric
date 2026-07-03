@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { engine } from '../../engine/engine.js';
 
-export type VisualizationMode = 'spectrogram' | 'tracks';
+export type VisualizationMode = 'notes' | 'spectrum' | 'tracks';
 
 export type ProjectState = {
   visualizationMode: VisualizationMode;
@@ -12,7 +13,7 @@ export type ProjectState = {
 };
 
 const initialState: ProjectState = {
-  visualizationMode: 'spectrogram',
+  visualizationMode: 'spectrum',
   subtitlesOpen: true,
   audioSettingsOpen: false,
 };
@@ -31,7 +32,14 @@ export const useProjectStore = create<State>()(
   subscribeWithSelector((set) => {
     return {
       ...initialState,
-      setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
+      setVisualizationMode: (visualizationMode) => {
+        set({ visualizationMode });
+        if (visualizationMode !== 'tracks') {
+          engine.store.update((state) => {
+            state.spectrogramView = visualizationMode;
+          });
+        }
+      },
       setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
       setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
       setTransposeAnchorEl: (transposeAnchorEl) =>

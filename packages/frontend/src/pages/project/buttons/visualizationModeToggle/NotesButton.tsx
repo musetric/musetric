@@ -2,10 +2,10 @@ import { Stack, ToggleButton, Tooltip, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../../engine/useEngineStore.js';
-import { SpectrogramIcon } from '../../../../icons/SpectrogramIcon.js';
+import { NoteBarsIcon } from '../../../../icons/NoteBarsIcon.js';
 import { useProjectStore } from '../../store.js';
 
-export const SpectrogramButton: FC = () => {
+export const NotesButton: FC = () => {
   const { t } = useTranslation();
   const visualizationMode = useProjectStore((state) => state.visualizationMode);
   const realtimeFailed = useEngineStore(
@@ -16,24 +16,24 @@ export const SpectrogramButton: FC = () => {
   );
 
   return (
-    <Tooltip title={t('pages.project.visualizationMode.spectrogram')}>
+    <Tooltip title={t('pages.project.visualizationMode.notes')}>
       <ToggleButton
         disabled={realtimeFailed}
-        selected={visualizationMode === 'spectrogram'}
-        value='spectrogram'
+        selected={visualizationMode === 'notes'}
+        value='notes'
         onClick={() => {
-          setVisualizationMode('spectrogram');
+          setVisualizationMode('notes');
         }}
       >
         <Stack alignItems='center'>
-          <SpectrogramIcon fontSize='small' />
+          <NoteBarsIcon fontSize='small' />
           <Typography
             variant='caption'
             fontSize={10}
             lineHeight={1}
             textTransform='none'
           >
-            {t('pages.project.visualizationMode.spectrogram')}
+            {t('pages.project.visualizationMode.notes')}
           </Typography>
         </Stack>
       </ToggleButton>

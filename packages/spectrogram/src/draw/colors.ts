@@ -15,13 +15,14 @@ export type StateColors = {
   buffer: GPUBuffer;
 };
 
-export const drawRingSlotsByteOffset = 160;
+export const drawRingSlotsByteOffset = 208;
 const areLaneConfigsEqual = (
   first: SpectrogramLaneConfig,
   second: SpectrogramLaneConfig,
 ) =>
   first.showSpectrogram === second.showSpectrogram &&
   first.showFundamental === second.showFundamental &&
+  first.showNotes === second.showNotes &&
   first.lineWidthCents === second.lineWidthCents &&
   first.gainDb === second.gainDb;
 
@@ -32,7 +33,8 @@ const areComparisonsEqual = (
   first.reference === second.reference &&
   first.target === second.target &&
   first.matchThresholdCents === second.matchThresholdCents &&
-  first.closeThresholdCents === second.closeThresholdCents;
+  first.closeThresholdCents === second.closeThresholdCents &&
+  first.missThresholdCents === second.missThresholdCents;
 
 const areConfigsEqual = (
   current: SpectrogramConfig,
@@ -42,15 +44,18 @@ const areConfigsEqual = (
     current.colors.foreground !== next.colors.foreground ||
     current.colors.background !== next.colors.background ||
     current.colors.primary !== next.colors.primary ||
+    current.colors.recordingForeground !== next.colors.recordingForeground ||
     current.colors.recordingMatch !== next.colors.recordingMatch ||
     current.colors.recordingClose !== next.colors.recordingClose ||
-    current.colors.recordingMiss !== next.colors.recordingMiss
+    current.colors.recordingMiss !== next.colors.recordingMiss ||
+    current.colors.recordingTimingMiss !== next.colors.recordingTimingMiss
   ) {
     return false;
   }
   if (
     current.minFrequency !== next.minFrequency ||
-    current.maxFrequency !== next.maxFrequency
+    current.maxFrequency !== next.maxFrequency ||
+    current.visibleTime !== next.visibleTime
   ) {
     return false;
   }
@@ -65,7 +70,7 @@ const areConfigsEqual = (
 export const createColorsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: SpectrogramConfig): StateColors => {
-      const arrayBuffer = new ArrayBuffer(176);
+      const arrayBuffer = new ArrayBuffer(224);
       const f32 = new Float32Array(arrayBuffer);
       const u32 = new Uint32Array(arrayBuffer);
       const { colors, lanes, comparison } = config;
@@ -80,8 +85,14 @@ export const createColorsCell = (device: GPUDevice) =>
       const comparisonThresholds = [
         comparison.matchThresholdCents,
         comparison.closeThresholdCents,
+        comparison.missThresholdCents,
+        0,
+      ] as const;
+      const lineWidths = [
         targetLane.lineWidthCents,
         referenceLane.lineWidthCents,
+        0,
+        0,
       ] as const;
       f32.set([
         ...toVec4(colors.foreground),
@@ -91,16 +102,19 @@ export const createColorsCell = (device: GPUDevice) =>
         ...toVec4(colors.recordingMatch),
         ...toVec4(colors.recordingClose),
         ...toVec4(colors.recordingMiss),
+        ...toVec4(colors.recordingTimingMiss),
+        ...toVec4(colors.recordingForeground),
         ...comparisonThresholds,
+        ...lineWidths,
       ]);
       const layer0 = lanes[allTrackKeys[0]];
       const layer1 = lanes[allTrackKeys[1]];
-      u32[32] = layer0.showSpectrogram ? 1 : 0;
-      u32[33] = layer1.showSpectrogram ? 1 : 0;
-      u32[34] = referenceLane.showFundamental ? 1 : 0;
-      u32[35] = targetLane.showFundamental ? 1 : 0;
-      u32[36] = allTrackKeys.indexOf(comparison.reference);
-      u32[37] = allTrackKeys.indexOf(comparison.target);
+      u32[44] = layer0.showSpectrogram ? 1 : 0;
+      u32[45] = layer1.showSpectrogram ? 1 : 0;
+      u32[46] = referenceLane.showFundamental ? 1 : 0;
+      u32[47] = targetLane.showFundamental ? 1 : 0;
+      u32[48] = referenceLane.showNotes ? 1 : 0;
+      u32[49] = targetLane.showNotes ? 1 : 0;
 
       const buffer = device.createBuffer({
         label: 'draw-colors-buffer',

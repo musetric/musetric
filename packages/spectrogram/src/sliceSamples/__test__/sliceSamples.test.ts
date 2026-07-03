@@ -310,4 +310,42 @@ describe('sliceSamples', () => {
       },
     );
   });
+
+  it('keeps partial sample uploads byte-aligned for fractional visible time', async () => {
+    const fractionalVisibleConfig = extendConfig(
+      buildConfig({
+        windowSize: 16,
+        zeroPaddingFactor: 1,
+        windowName: 'hamming',
+        sampleRate: 31,
+        visibleTime: 1.05,
+        playheadRatio: 0,
+        viewSize: { width: 7, height: 4 },
+      }),
+    );
+    const sampleData = createRamp(256);
+    const firstBase = computeBaseColumn(fractionalVisibleConfig, 0.3, 256);
+    const secondBase = firstBase + 1;
+
+    await withSlice(fractionalVisibleConfig, 16, 7, async (slice) => {
+      device.pushErrorScope('validation');
+      slice.write({
+        samples: sampleData,
+        baseColumn: firstBase,
+        truncateAfterPlayhead: false,
+        forceFullUpload: true,
+        invalidations: [],
+      });
+      slice.write({
+        samples: sampleData,
+        baseColumn: secondBase,
+        truncateAfterPlayhead: false,
+        forceFullUpload: false,
+        invalidations: [],
+      });
+
+      const error = await device.popErrorScope();
+      expect(error?.message).toBeUndefined();
+    });
+  });
 });

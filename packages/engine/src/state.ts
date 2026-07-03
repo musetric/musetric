@@ -33,10 +33,13 @@ export type EngineSeekEvent = {
 
 export type RecordingLatencySource = 'estimated' | 'manual' | 'calibrated';
 
+export type SpectrogramViewMode = 'notes' | 'spectrum';
+
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
   colors: SpectrogramColors;
+  spectrogramView: SpectrogramViewMode;
   duration: number;
   playing: boolean;
   frozen: boolean;

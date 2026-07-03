@@ -13,6 +13,7 @@ import {
 import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidations.js';
 import {
   allTrackKeys,
+  hasSpectrogramComparison,
   mapTrackKeys,
   type SpectrogramConfig,
   type TrackKey,
@@ -66,8 +67,19 @@ const isLaneComputeConfigEqual = (
 ): boolean =>
   current.showSpectrogram === next.showSpectrogram &&
   current.showFundamental === next.showFundamental &&
+  current.showNotes === next.showNotes &&
   current.truncateAfterPlayhead === next.truncateAfterPlayhead &&
   current.gainDb === next.gainDb;
+
+const isColorComputeConfigEqual = (
+  current: SpectrogramConfig['comparison'],
+  next: SpectrogramConfig['comparison'],
+): boolean =>
+  current.reference === next.reference &&
+  current.target === next.target &&
+  current.colorWindowLeftSeconds === next.colorWindowLeftSeconds &&
+  current.colorWindowRightSeconds === next.colorWindowRightSeconds &&
+  current.colorFalloffSigmaSeconds === next.colorFalloffSigmaSeconds;
 
 export const hasVisibleWork = (work: SpectrogramLaneWork): boolean =>
   work.spectrogram || work.fundamental;
@@ -87,7 +99,10 @@ export const createTrackWork = (
     const lane = runtime.config.lanes[key];
     return {
       spectrogram: lane.showSpectrogram,
-      fundamental: lane.showFundamental,
+      fundamental:
+        lane.showFundamental ||
+        lane.showNotes ||
+        hasSpectrogramComparison(runtime.config),
     };
   });
 
@@ -135,6 +150,9 @@ export const createConfigInvalidationScope = (
     if (current[key] !== next[key]) {
       return 'all';
     }
+  }
+  if (!isColorComputeConfigEqual(current.comparison, next.comparison)) {
+    return 'all';
   }
 
   const changedTracks = new Set<TrackKey>();

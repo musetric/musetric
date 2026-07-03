@@ -1,16 +1,16 @@
-import { filterShader } from './filter.wgsl.js';
 import { shader } from './fundamentalFrequency.wgsl.js';
+import { trackShader } from './track.wgsl.js';
 
 export type FundamentalFrequencyPipelines = {
-  scoreAndPick: GPUComputePipeline;
-  filter: GPUComputePipeline;
+  observe: GPUComputePipeline;
+  track: GPUComputePipeline;
 };
 
 export const createPipelines = (
   device: GPUDevice,
 ): FundamentalFrequencyPipelines => {
-  const scoreAndPickLayout = device.createBindGroupLayout({
-    label: 'fundamental-frequency-score-and-pick-bind-group-layout',
+  const observeLayout = device.createBindGroupLayout({
+    label: 'fundamental-frequency-observe-bind-group-layout',
     entries: [
       {
         binding: 0,
@@ -29,8 +29,8 @@ export const createPipelines = (
       },
     ],
   });
-  const filterLayout = device.createBindGroupLayout({
-    label: 'fundamental-frequency-filter-bind-group-layout',
+  const trackLayout = device.createBindGroupLayout({
+    label: 'fundamental-frequency-track-bind-group-layout',
     entries: [
       {
         binding: 0,
@@ -49,38 +49,38 @@ export const createPipelines = (
       },
     ],
   });
-  const scoreAndPickPipelineLayout = device.createPipelineLayout({
-    label: 'fundamental-frequency-score-and-pick-pipeline-layout',
-    bindGroupLayouts: [scoreAndPickLayout],
+  const observePipelineLayout = device.createPipelineLayout({
+    label: 'fundamental-frequency-observe-pipeline-layout',
+    bindGroupLayouts: [observeLayout],
   });
-  const filterPipelineLayout = device.createPipelineLayout({
-    label: 'fundamental-frequency-filter-pipeline-layout',
-    bindGroupLayouts: [filterLayout],
+  const trackPipelineLayout = device.createPipelineLayout({
+    label: 'fundamental-frequency-track-pipeline-layout',
+    bindGroupLayouts: [trackLayout],
   });
-  const module = device.createShaderModule({
-    label: 'fundamental-frequency-shader',
+  const observeModule = device.createShaderModule({
+    label: 'fundamental-frequency-observe-shader',
     code: shader,
   });
-  const filterModule = device.createShaderModule({
-    label: 'fundamental-frequency-filter-shader',
-    code: filterShader,
+  const trackModule = device.createShaderModule({
+    label: 'fundamental-frequency-track-shader',
+    code: trackShader,
   });
 
   return {
-    scoreAndPick: device.createComputePipeline({
-      label: 'fundamental-frequency-score-and-pick-pipeline',
-      layout: scoreAndPickPipelineLayout,
+    observe: device.createComputePipeline({
+      label: 'fundamental-frequency-observe-pipeline',
+      layout: observePipelineLayout,
       compute: {
-        module,
-        entryPoint: 'scoreAndPick',
+        module: observeModule,
+        entryPoint: 'observe',
       },
     }),
-    filter: device.createComputePipeline({
-      label: 'fundamental-frequency-filter-pipeline',
-      layout: filterPipelineLayout,
+    track: device.createComputePipeline({
+      label: 'fundamental-frequency-track-pipeline',
+      layout: trackPipelineLayout,
       compute: {
-        module: filterModule,
-        entryPoint: 'main',
+        module: trackModule,
+        entryPoint: 'track',
       },
     }),
   };

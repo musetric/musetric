@@ -18,7 +18,8 @@ export type SpectrogramDraw = {
 
 export type SpectrogramDrawArg = {
   arrayView: GPUTextureView;
-  fundamentalFrequencies: Record<TrackKey, GPUBuffer>;
+  fundamentalLines: Record<TrackKey, GPUBuffer>;
+  verdict: GPUBuffer;
   config: SpectrogramConfig;
 };
 
@@ -38,15 +39,16 @@ export const createSpectrogramDrawCell = (
 
   return {
     get: (arg) => {
-      const { arrayView, fundamentalFrequencies, config } = arg;
+      const { arrayView, fundamentalLines, verdict, config } = arg;
       const { reference, target } = config.comparison;
       const canvas = canvasCell.get(config.canvas);
       setOffscreenCanvasSize(config.canvas, config.viewSize);
       const colors = colorsCell.get(config);
       const bindGroup = bindGroupCell.get({
         arrayView,
-        referenceFundamentalFrequencies: fundamentalFrequencies[reference],
-        targetFundamentalFrequencies: fundamentalFrequencies[target],
+        referenceLine: fundamentalLines[reference],
+        targetLine: fundamentalLines[target],
+        verdict,
         colors: colors.buffer,
         layout: canvas.pipeline.getBindGroupLayout(0),
       });

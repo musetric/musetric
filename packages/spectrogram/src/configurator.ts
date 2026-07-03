@@ -6,6 +6,10 @@ import {
 } from './common/extConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {
+  createSpectrogramComparisonColorCell,
+  type SpectrogramComparisonColor,
+} from './comparison/index.js';
+import {
   allTrackKeys,
   buildSpectrogramConfig,
   mapTrackKeys,
@@ -39,6 +43,7 @@ export type SpectrogramRuntime = {
   state: SpectrogramState;
   tracks: Record<TrackKey, SpectrogramTrack>;
   draw: SpectrogramDraw;
+  comparisonColor: SpectrogramComparisonColor;
 };
 
 export type SpectrogramConfigurator = {
@@ -64,6 +69,7 @@ export const createSpectrogramConfigurator = (
   const drawCell = createSpectrogramDrawCell(device, () =>
     markers.getGpuMarker('draw'),
   );
+  const colorCell = createSpectrogramComparisonColorCell(device);
 
   const trackCells = mapTrackKeys<TrackCells>((key) => ({
     lane: createSpectrogramLaneCell(device, { label: key }),
@@ -112,13 +118,20 @@ export const createSpectrogramConfigurator = (
         return { lane, remap };
       });
 
-      const fundamentalFrequencies = mapTrackKeys<GPUBuffer>(
-        (key) => tracks[key].lane.fundamentalFrequencyBuffer,
+      const fundamentalLines = mapTrackKeys<GPUBuffer>(
+        (key) => tracks[key].lane.fundamentalLineBuffer,
       );
+      const { reference, target } = nextConfig.comparison;
+      const comparisonColor = colorCell.get({
+        config: nextConfig,
+        referenceLine: fundamentalLines[reference],
+        targetLine: fundamentalLines[target],
+      });
 
       const draw = drawCell.get({
         arrayView: texture.arrayView,
-        fundamentalFrequencies,
+        fundamentalLines,
+        verdict: comparisonColor.verdictBuffer,
         config: nextConfig,
       });
 
@@ -127,6 +140,7 @@ export const createSpectrogramConfigurator = (
         state,
         tracks,
         draw,
+        comparisonColor,
       };
       return runtime;
     }),
@@ -141,6 +155,7 @@ export const createSpectrogramConfigurator = (
     dispose: () => {
       stateCell.dispose();
       drawCell.dispose();
+      colorCell.dispose();
       for (const key of allTrackKeys) {
         trackCells[key].lane.dispose();
         trackCells[key].remap.dispose();

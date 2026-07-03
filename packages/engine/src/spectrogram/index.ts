@@ -9,7 +9,11 @@ import {
 import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
 import { type Playhead } from '../player/playhead.cross.js';
-import { type EngineState, getTrackProgress } from '../state.js';
+import {
+  type EngineState,
+  getTrackProgress,
+  type SpectrogramViewMode,
+} from '../state.js';
 import { spectrogramChannel } from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
 
@@ -107,18 +111,34 @@ export const createEngineSpectrogram = (
       const engineState = store.get();
 
       const buildLanes = (
+        view: SpectrogramViewMode,
         recording: boolean,
         leadSpectrogramGainDb: number,
-      ) => ({
-        lead: {
-          ...defaultSpectrogramConfig.lanes.lead,
-          gainDb: leadSpectrogramGainDb,
-        },
-        recording: {
-          ...defaultSpectrogramConfig.lanes.recording,
-          truncateAfterPlayhead: recording,
-        },
-      });
+      ) => {
+        const notes = view === 'notes';
+        return {
+          lead: {
+            ...defaultSpectrogramConfig.lanes.lead,
+            showSpectrogram: !notes,
+            showFundamental: notes,
+            showNotes: notes,
+            gainDb: leadSpectrogramGainDb,
+          },
+          recording: {
+            ...defaultSpectrogramConfig.lanes.recording,
+            showSpectrogram: !notes,
+            showFundamental: notes,
+            showNotes: notes,
+            truncateAfterPlayhead: recording,
+          },
+        };
+      };
+      const buildStateLanes = (state: EngineState) =>
+        buildLanes(
+          state.spectrogramView,
+          state.recording,
+          state.leadSpectrogramGainDb,
+        );
 
       port.methods.setFrameCount({ frameCount: engineState.frameCount ?? 0 });
       port.methods.mount({
@@ -129,10 +149,7 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: engineState.colors,
           sampleRate,
-          lanes: buildLanes(
-            engineState.recording,
-            engineState.leadSpectrogramGainDb,
-          ),
+          lanes: buildStateLanes(engineState),
         },
         trackProgress: getTrackProgress(engineState),
       });
@@ -144,29 +161,18 @@ export const createEngineSpectrogram = (
         });
       });
 
-      const unsubscribeRecording = store.subscribe(
-        (state) => state.recording,
-        (recording) => {
-          const { leadSpectrogramGainDb } = store.get();
+      const unsubscribeLanes = store.subscribe(
+        (state) =>
+          `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}`,
+        () => {
           port.methods.updateConfig({
-            patch: { lanes: buildLanes(recording, leadSpectrogramGainDb) },
-          });
-        },
-      );
-      const unsubscribeLeadSpectrogramGain = store.subscribe(
-        (state) => state.leadSpectrogramGainDb,
-        (leadSpectrogramGainDb) => {
-          port.methods.updateConfig({
-            patch: {
-              lanes: buildLanes(store.get().recording, leadSpectrogramGainDb),
-            },
+            patch: { lanes: buildStateLanes(store.get()) },
           });
         },
       );
 
       return () => {
-        unsubscribeLeadSpectrogramGain();
-        unsubscribeRecording();
+        unsubscribeLanes();
         unsubscribeResizeObserver();
         port.methods.unmount();
         store.update((state) => {
