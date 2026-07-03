@@ -1,5 +1,5 @@
-import { filterShader } from './filterShader.js';
-import { shader } from './shader.js';
+import { filterShader } from './filter.wgsl.js';
+import { shader } from './fundamentalFrequency.wgsl.js';
 
 export type FundamentalFrequencyPipelines = {
   scoreAndPick: GPUComputePipeline;

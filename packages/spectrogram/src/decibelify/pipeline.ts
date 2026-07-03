@@ -1,5 +1,5 @@
-import { energyShader } from './energyShader.js';
-import { runShader } from './runShader.js';
+import { energyShader } from './energy.wgsl.js';
+import { runShader } from './run.wgsl.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;

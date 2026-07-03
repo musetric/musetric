@@ -1,13 +1,13 @@
-import { multiPassPairStageShader } from './multiPassPairStageShader.js';
-import { multiPassStageShader } from './multiPassStageShader.js';
+import { multiPassPairStageShader } from './multiPassPairStage.wgsl.js';
+import { multiPassStageShader } from './multiPassStage.wgsl.js';
 import {
   type PackedStockhamR2cKernel,
   type PackedStockhamR2cVariant,
 } from './support.js';
-import { transformInPlaceMixedShader } from './transformInPlaceMixedShader.js';
-import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4Shader.js';
-import { transformInPlaceRadix8Shader } from './transformInPlaceRadix8Shader.js';
-import { transformShader } from './transformShader.js';
+import { transformShader } from './transform.wgsl.js';
+import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
+import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4.wgsl.js';
+import { transformInPlaceRadix8Shader } from './transformInPlaceRadix8.wgsl.js';
 
 export type SinglePassPipeline = {
   kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';

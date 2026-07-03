@@ -1,5 +1,5 @@
-import { fragmentShader } from './fragmentShader.js';
-import { vertexShader } from './vertexShader.js';
+import { fragmentShader } from './fragment.wgsl.js';
+import { vertexShader } from './vertex.wgsl.js';
 
 export const createPipeline = (
   device: GPUDevice,

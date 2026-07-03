@@ -1,4 +1,4 @@
-import { runShader } from './runShader.js';
+import { runShader } from './run.wgsl.js';
 
 export type Pipelines = {
   layout: GPUBindGroupLayout;

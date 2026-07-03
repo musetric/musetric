@@ -1,11 +1,11 @@
-import { multiPassPairStageShader } from './multiPassPairStageShader.js';
-import { multiPassStageShader } from './multiPassStageShader.js';
+import { multiPassPairStageShader } from './multiPassPairStage.wgsl.js';
+import { multiPassStageShader } from './multiPassStage.wgsl.js';
 import {
   type PackedStockhamC2rKernel,
   type PackedStockhamC2rVariant,
 } from './support.js';
-import { transformInPlaceMixedShader } from './transformInPlaceMixedShader.js';
-import { transformShader } from './transformShader.js';
+import { transformShader } from './transform.wgsl.js';
+import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
 
 export type SinglePassPipeline = {
   kind: 'singlePass';
