@@ -22,6 +22,7 @@ export const config = () => {
       files: ['**/*.wgsl.ts'],
       rules: {
         'max-lines': 'off',
+        'sonarjs/max-lines': 'off',
       },
     },
   ];
