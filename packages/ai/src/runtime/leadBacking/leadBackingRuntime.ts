@@ -13,10 +13,10 @@ import {
   dispatch1d,
   dispatch2d,
 } from '../helpers.js';
-import { leadBackingFrameShader } from './frameShader.js';
-import { leadBackingOverlapAddShader } from './overlapAddShader.js';
-import { leadBackingPackShader } from './packShader.js';
-import { leadBackingUnpackShader } from './unpackShader.js';
+import { leadBackingFrameShader } from './frame.wgsl.js';
+import { leadBackingOverlapAddShader } from './overlapAdd.wgsl.js';
+import { leadBackingPackShader } from './pack.wgsl.js';
+import { leadBackingUnpackShader } from './unpack.wgsl.js';
 
 ort.env.logLevel = 'error';
 

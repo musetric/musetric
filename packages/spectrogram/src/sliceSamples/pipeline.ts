@@ -1,4 +1,4 @@
-import { shader } from './shader.js';
+import { shader } from './sliceSamples.wgsl.js';
 
 export const createPipeline = (device: GPUDevice) => {
   const layout = device.createBindGroupLayout({

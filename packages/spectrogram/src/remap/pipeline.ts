@@ -1,4 +1,4 @@
-import { createShader } from './shader.js';
+import { createShader } from './remap.wgsl.js';
 
 export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
   const spectrumEntries = Array.from({ length: spectrumCount }).flatMap(

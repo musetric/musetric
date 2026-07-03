@@ -1,8 +1,8 @@
 import { createPrefixedRadixStageConstants } from '../radixStageConstants.js';
-import { firstPassMixedShader } from './firstPassMixedShader.js';
-import { firstPassShader } from './firstPassShader.js';
-import { secondPassMixedShader } from './secondPassMixedShader.js';
-import { secondPassShader } from './secondPassShader.js';
+import { firstPassShader } from './firstPass.wgsl.js';
+import { firstPassMixedShader } from './firstPassMixed.wgsl.js';
+import { secondPassShader } from './secondPass.wgsl.js';
+import { secondPassMixedShader } from './secondPassMixed.wgsl.js';
 import { type PackedTiledR2cVariant } from './support.js';
 
 export type Pipelines = {

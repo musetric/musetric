@@ -13,10 +13,10 @@ import {
   dispatch1d,
   dispatch2d,
 } from '../helpers.js';
-import { vocalsApplyMasksShader } from './applyMasksShader.js';
-import { vocalsFrameShader } from './frameShader.js';
-import { vocalsOverlapAddShader } from './overlapAddShader.js';
-import { vocalsPackShader } from './packShader.js';
+import { vocalsApplyMasksShader } from './applyMasks.wgsl.js';
+import { vocalsFrameShader } from './frame.wgsl.js';
+import { vocalsOverlapAddShader } from './overlapAdd.wgsl.js';
+import { vocalsPackShader } from './pack.wgsl.js';
 
 ort.env.logLevel = 'error';
 
