@@ -52,7 +52,7 @@ export const createTimeStretchWasmModule =
     const wrapperIndex = timeStretchSource.indexOf(
       'function registerWorkletProcessor',
     );
-    if (wrapperIndex < 0) {
+    if (wrapperIndex === -1) {
       throw new Error('Time stretch worklet wrapper was not found.');
     }
 

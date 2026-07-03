@@ -8,12 +8,12 @@ export const resolveFourierBatchRange = (
     return { batchOffset: 0, batchCount: windowCount };
   }
   const { batchOffset, batchCount } = range;
-  if (!Number.isInteger(batchOffset) || batchOffset < 0) {
+  if (!Number.isInteger(batchOffset)) {
     throw new RangeError(
       `Fourier batch range batchOffset must be a non-negative integer, got ${batchOffset}`,
     );
   }
-  if (!Number.isInteger(batchCount) || batchCount < 0) {
+  if (!Number.isInteger(batchCount)) {
     throw new RangeError(
       `Fourier batch range batchCount must be a non-negative integer, got ${batchCount}`,
     );
