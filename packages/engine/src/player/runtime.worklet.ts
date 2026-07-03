@@ -23,6 +23,46 @@ export type PlayerRuntime = {
   process: (inputs: Float32Array[][], outputs: Float32Array[]) => void;
 };
 
+type MixTrackIntoBuffersOptions = {
+  inputBuffers: Float32Array[];
+  outputFrameIndex: number;
+  inputFrameOffset: number;
+  inputFrameCount: number;
+  channelCount: number;
+  track: Float32Array[] | undefined;
+  volume: number;
+};
+
+const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
+  const {
+    inputBuffers,
+    outputFrameIndex,
+    inputFrameOffset,
+    inputFrameCount,
+    channelCount,
+    track,
+    volume,
+  } = options;
+  if (!track) {
+    return;
+  }
+
+  for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
+    const input = inputBuffers[channelIndex];
+    const samples = track[channelIndex];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!samples) {
+      continue;
+    }
+
+    const frameBase = outputFrameIndex + inputFrameOffset;
+    for (let offset = 0; offset < inputFrameCount; offset += 1) {
+      const sample = samples[frameBase + offset] ?? 0;
+      input[offset] += sample * volume;
+    }
+  }
+};
+
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
 ): Promise<PlayerRuntime> => {
@@ -212,56 +252,29 @@ export const createPlayerRuntime = async (
       const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
+          const channelCount = outputs.length;
+          const baseOptions = {
+            inputBuffers,
+            outputFrameIndex: currentOutputFrameIndex,
+            inputFrameOffset,
+            inputFrameCount,
+            channelCount,
+          };
+
           for (const stemType of stemTypes) {
-            const track = currentTracks[stemType];
-            const volume = trackVolumes[stemType] ?? 1;
-
-            for (
-              let channelIndex = 0;
-              channelIndex < outputs.length;
-              channelIndex += 1
-            ) {
-              const input = inputBuffers[channelIndex];
-              const samples = track[channelIndex];
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-              if (!samples) {
-                continue;
-              }
-
-              for (let offset = 0; offset < inputFrameCount; offset += 1) {
-                const sample =
-                  samples[
-                    currentOutputFrameIndex + inputFrameOffset + offset
-                  ] ?? 0;
-                input[offset] += sample * volume;
-              }
-            }
+            mixTrackIntoBuffers({
+              ...baseOptions,
+              track: currentTracks[stemType],
+              volume: trackVolumes[stemType] ?? 1,
+            });
           }
 
-          const recordingTrack = recordingRuntime.isActive()
-            ? undefined
-            : tracks?.recording;
-          if (recordingTrack) {
-            for (
-              let channelIndex = 0;
-              channelIndex < outputs.length;
-              channelIndex += 1
-            ) {
-              const input = inputBuffers[channelIndex];
-              const samples = recordingTrack[channelIndex];
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-              if (!samples) {
-                continue;
-              }
-
-              for (let offset = 0; offset < inputFrameCount; offset += 1) {
-                const sample =
-                  samples[
-                    currentOutputFrameIndex + inputFrameOffset + offset
-                  ] ?? 0;
-                input[offset] += sample * recordingVolume;
-              }
-            }
+          if (!recordingRuntime.isActive()) {
+            mixTrackIntoBuffers({
+              ...baseOptions,
+              track: tracks?.recording,
+              volume: recordingVolume,
+            });
           }
         },
       );
