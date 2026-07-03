@@ -7,11 +7,11 @@ export type LoudnessAnalysis = {
 };
 
 const parseNumber = (value: unknown, label: string): number => {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(parsed)) {
+  const rawNumber = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(rawNumber)) {
     throw new Error(`Invalid loudness ${label}`);
   }
-  return parsed;
+  return rawNumber;
 };
 
 const parseLoudnormJson = (output: string): LoudnessAnalysis => {

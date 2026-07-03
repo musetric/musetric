@@ -17,12 +17,12 @@ export const MinFrequencyField: FC = () => {
       label={t('pages.project.settings.fields.minFrequency.label')}
       defaultValue={minFrequency}
       onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isNaN(value)) return;
+        const rawValue = Number(event.target.value);
+        if (Number.isNaN(rawValue)) return;
 
         const { maxFrequency } = useSettingsStore.getState();
         const nextMinFrequency = normalizeSpectrogramMinFrequency(
-          value,
+          rawValue,
           maxFrequency,
         );
         setMinFrequency(nextMinFrequency);

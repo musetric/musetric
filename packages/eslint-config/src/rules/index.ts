@@ -20,6 +20,7 @@ import { noSwitchStatementsRule } from './noSwitchStatements.js';
 import { noThisExpressionRule } from './noThisExpression.js';
 import { noTrivialFunctionWrappersRule } from './noTrivialFunctionWrappers.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
+import { noUntrustedValueChecksRule } from './noUntrustedValueChecks.js';
 
 export const musetricRules = {
   'no-alias-constants': noAliasConstantsRule,
@@ -44,4 +45,5 @@ export const musetricRules = {
   'no-this-expression': noThisExpressionRule,
   'no-trivial-function-wrappers': noTrivialFunctionWrappersRule,
   'no-type-method-signatures': noTypeMethodSignaturesRule,
+  'no-untrusted-value-checks': noUntrustedValueChecksRule,
 };

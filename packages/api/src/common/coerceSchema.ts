@@ -8,12 +8,12 @@ const unwrap = (schema: z.core.$ZodType): z.core.$ZodType => {
 };
 
 const coerceValues = {
-  number: (value: unknown) => {
-    if (typeof value === 'string') {
-      const parsed = Number(value);
-      return Number.isNaN(parsed) ? value : parsed;
+  number: (rawValue: unknown) => {
+    if (typeof rawValue === 'string') {
+      const rawNumber = Number(rawValue);
+      return Number.isNaN(rawNumber) ? rawValue : rawNumber;
     }
-    return value;
+    return rawValue;
   },
   boolean: (value: unknown) => {
     if (typeof value === 'string') {

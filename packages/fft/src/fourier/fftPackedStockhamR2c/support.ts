@@ -181,7 +181,6 @@ export const getPackedStockhamR2cVariant = (
   const packedWindowSize = config.windowSize / 2;
   const radixStageCounts = createRadixStages(packedWindowSize);
   if (
-    !Number.isInteger(packedWindowSize) ||
     radixStageCounts === undefined ||
     packedWindowSize < minPackedWindowSize
   ) {

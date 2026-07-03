@@ -24,6 +24,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-this-expression': 'error',
   'musetric/no-trivial-function-wrappers': 'error',
   'musetric/no-type-method-signatures': 'error',
+  'musetric/no-untrusted-value-checks': 'error',
 };
 
 export const musetricPlugin: ESLint.Plugin = {

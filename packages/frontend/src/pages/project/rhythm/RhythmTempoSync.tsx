@@ -16,7 +16,7 @@ export const RhythmTempoSync: FC<RhythmTempoSyncProps> = (props) => {
     if (appliedRef.current) return;
     if (rhythmQuery.status !== 'success') return;
     const detectedBpm = Math.round(rhythmQuery.data.bpm);
-    if (!Number.isFinite(detectedBpm) || detectedBpm <= 0) return;
+    if (detectedBpm <= 0) return;
     appliedRef.current = true;
     const { beats, downbeats } = rhythmQuery.data;
     engine.store.update((state) => {

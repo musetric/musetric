@@ -16,9 +16,9 @@ export const PlayheadRatioField: FC = () => {
       label={t('pages.project.settings.fields.playheadRatio.label')}
       defaultValue={playheadRatio}
       onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isNaN(value)) return;
-        setPlayheadRatio(Math.max(0, Math.min(value, 1)));
+        const rawValue = Number(event.target.value);
+        if (Number.isNaN(rawValue)) return;
+        setPlayheadRatio(Math.max(0, Math.min(rawValue, 1)));
       }}
       slotProps={{
         input: {

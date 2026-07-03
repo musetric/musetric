@@ -169,9 +169,7 @@ export const runPipeline = async (
     const stats = computeBenchStats(values, benchStatsConfig);
     median[key] = stats.mean;
 
-    const sorted = values
-      .filter((v) => Number.isFinite(v) && v >= 0)
-      .sort((a, b) => a - b);
+    const sorted = [...values].sort((a, b) => a - b);
     const cv = computeCvPercent(sorted);
     const halfRange = (stats.mean * cv) / 100 / 2;
     spread[key] = { low: halfRange, high: halfRange };

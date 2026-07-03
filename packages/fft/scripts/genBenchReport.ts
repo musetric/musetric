@@ -28,11 +28,11 @@ const groupKey = (summary: FourierBenchSummary): string =>
   `${summary.direction}_${summary.count}`;
 
 const normalizeSummary = (summary: FourierBenchSummary): void => {
-  summary.means = summary.means.map((value) =>
-    typeof value === 'number' ? value : Number.NaN,
+  summary.means = summary.means.map((rawValue) =>
+    typeof rawValue === 'number' ? rawValue : Number.NaN,
   );
-  summary.cvs = summary.cvs.map((value) =>
-    typeof value === 'number' ? value : Number.NaN,
+  summary.cvs = summary.cvs.map((rawValue) =>
+    typeof rawValue === 'number' ? rawValue : Number.NaN,
   );
 };
 

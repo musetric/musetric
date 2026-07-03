@@ -124,10 +124,6 @@ export const PlayerProgress: FC = () => {
             return;
           }
 
-          if (typeof value !== 'number') {
-            return;
-          }
-
           const frameIndex = Math.round((value / progressScale) * frameCount);
           engine.player.seek(frameIndex, 'playerProgress');
         }}

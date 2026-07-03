@@ -82,11 +82,11 @@ export const isClientRealtimeMessage = (
   );
 };
 
-const readNonZeroInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value !== 0;
+const readNonZeroInteger = (rawValue: unknown): rawValue is number =>
+  typeof rawValue === 'number' && Number.isInteger(rawValue) && rawValue !== 0;
 
-const readNonNegativeInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+const readNonNegativeInteger = (rawValue: unknown): rawValue is number =>
+  typeof rawValue === 'number' && Number.isInteger(rawValue) && rawValue >= 0;
 
 export const validateRecordingStart = (
   message: RecordingStartMessage,
