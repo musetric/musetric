@@ -57,7 +57,7 @@ export const jsConfig: Linter.Config = {
     'max-depth': ['error', 3],
     'max-lines': [
       'error',
-      { max: 400, skipBlankLines: true, skipComments: true },
+      { max: 400, skipBlankLines: false, skipComments: false },
     ],
     'max-nested-callbacks': ['error', 3],
     'max-params': ['error', 4],
@@ -133,6 +133,7 @@ export const jsConfig: Linter.Config = {
     'sonarjs/different-types-comparison': 'off',
     'sonarjs/function-return-type': 'off',
     'sonarjs/hashing': 'off',
+    'sonarjs/max-lines': ['warn', { maximum: 350 }],
     'sonarjs/no-collapsible-if': 'error',
     'sonarjs/no-nested-conditional': 'off',
     'sonarjs/no-nested-functions': 'off',
