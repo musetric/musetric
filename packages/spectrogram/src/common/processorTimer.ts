@@ -10,11 +10,7 @@ export const spectrumStages = [
   'magnitudify',
   'decibelify',
 ] as const;
-export type SpectrumStage = (typeof spectrumStages)[number];
-
 const aggregateStages = ['fundamentalFrequency', 'remap'] as const;
-type AggregateStage = (typeof aggregateStages)[number];
-
 const cpuRootLabels = [
   'configure',
   'writeBuffers',
@@ -22,12 +18,22 @@ const cpuRootLabels = [
   'submitCommand',
   'total',
 ] as const;
-type CpuRootLabel = (typeof cpuRootLabels)[number];
-
 const gpuRootLabels = ['draw'] as const;
 type GpuRootLabel = (typeof gpuRootLabels)[number];
 
+export type SpectrumStage = (typeof spectrumStages)[number];
+
+type AggregateStage = (typeof aggregateStages)[number];
+
 export type GpuLabel = GpuRootLabel | SpectrumStage | AggregateStage;
+
+const gpuLabels: GpuLabel[] = [
+  ...gpuRootLabels,
+  ...spectrumStages,
+  ...aggregateStages,
+];
+
+type CpuRootLabel = (typeof cpuRootLabels)[number];
 
 export type SpectrogramTimerLabel =
   | CpuRootLabel
@@ -35,14 +41,6 @@ export type SpectrogramTimerLabel =
   | SpectrumStage
   | AggregateStage
   | 'other';
-
-export type SpectrogramProcessorMetrics = Record<string, number>;
-
-const gpuLabels: GpuLabel[] = [
-  ...gpuRootLabels,
-  ...spectrumStages,
-  ...aggregateStages,
-];
 
 const createTimerLabels = (
   labels: readonly GpuLabel[],
@@ -52,6 +50,8 @@ const createTimerLabels = (
   'other',
   'total',
 ];
+
+export type SpectrogramProcessorMetrics = Record<string, number>;
 
 const createFallbackMetricsLabels = (
   metrics: SpectrogramProcessorMetrics[],
@@ -70,23 +70,6 @@ const createFallbackMetricsLabels = (
   return labels;
 };
 
-export type SpectrogramMarkers = {
-  configure: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  writeBuffers: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  createCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  submitCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  total: <T extends (...args: never[]) => unknown>(fn: T) => T;
-  getGpuMarker: (label: GpuLabel) => GPUComputePassTimestampWrites | undefined;
-};
-
-export type SpectrogramProcessorTimer = {
-  markers: SpectrogramMarkers;
-  configure: () => void;
-  resolve: (encoder: GPUCommandEncoder) => void;
-  finish: () => Promise<void>;
-  dispose: () => void;
-};
-
 export const averageMetrics = (
   buffer: SpectrogramProcessorMetrics[],
 ): SpectrogramProcessorMetrics => {
@@ -98,6 +81,15 @@ export const averageMetrics = (
     );
     return acc;
   }, {});
+};
+
+export type SpectrogramMarkers = {
+  configure: <T extends (...args: never[]) => unknown>(fn: T) => T;
+  writeBuffers: <T extends (...args: never[]) => unknown>(fn: T) => T;
+  createCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
+  submitCommand: <T extends (...args: never[]) => unknown>(fn: T) => T;
+  total: <T extends (...args: never[]) => unknown>(fn: T) => T;
+  getGpuMarker: (label: GpuLabel) => GPUComputePassTimestampWrites | undefined;
 };
 
 const createCpuMarkers = () =>
@@ -112,6 +104,14 @@ const createCpuMarkers = () =>
       'configure' | 'writeBuffers' | 'createCommand' | 'submitCommand' | 'total'
     >,
   );
+
+export type SpectrogramProcessorTimer = {
+  markers: SpectrogramMarkers;
+  configure: () => void;
+  resolve: (encoder: GPUCommandEncoder) => void;
+  finish: () => Promise<void>;
+  dispose: () => void;
+};
 
 export const createSpectrogramProcessorTimer = (
   device: GPUDevice,

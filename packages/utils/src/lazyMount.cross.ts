@@ -1,3 +1,10 @@
+const defaultArgumentsEqual = <Args extends unknown[]>(
+  left: Args,
+  right: Args,
+) =>
+  left.length === right.length &&
+  left.every((value, index) => Object.is(value, right[index]));
+
 export type Unmount = () => void;
 
 type MountFunction<Args extends unknown[]> = (...args: Args) => Unmount;
@@ -21,13 +28,6 @@ type Pending<Args extends unknown[]> = {
   args: Args;
   timerId: ReturnType<typeof setTimeout>;
 };
-
-const defaultArgumentsEqual = <Args extends unknown[]>(
-  left: Args,
-  right: Args,
-) =>
-  left.length === right.length &&
-  left.every((value, index) => Object.is(value, right[index]));
 
 const createLazyMountInternal = <Args extends unknown[]>(
   mount: MountFunction<Args>,

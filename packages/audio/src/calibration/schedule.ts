@@ -1,25 +1,3 @@
-export type RecordingLatencyCalibrationPeak = {
-  clickFrame: number;
-  peakFrame: number;
-  peakValue: number;
-};
-
-export type RecordingLatencyCalibrationSchedule = {
-  clickTime: number;
-  clickFrames: number[];
-  endFrame: number;
-};
-
-export type CreateRecordingLatencyCalibrationScheduleOptions = {
-  context: AudioContext;
-  startDelaySeconds?: number;
-};
-
-export type GetRecordingLatencyFrameCountOptions = {
-  measuredLatencyFrameCounts: number[];
-  sampleRate: number;
-};
-
 const clickDelaySeconds = 0.25;
 const clickCount = 5;
 const clickIntervalSeconds = 1;
@@ -49,6 +27,17 @@ export const createRecordingLatencyCalibrationClick = (
   return buffer;
 };
 
+export type RecordingLatencyCalibrationSchedule = {
+  clickTime: number;
+  clickFrames: number[];
+  endFrame: number;
+};
+
+export type CreateRecordingLatencyCalibrationScheduleOptions = {
+  context: AudioContext;
+  startDelaySeconds?: number;
+};
+
 export const createRecordingLatencyCalibrationSchedule = (
   options: CreateRecordingLatencyCalibrationScheduleOptions,
 ): RecordingLatencyCalibrationSchedule => {
@@ -67,6 +56,12 @@ export const createRecordingLatencyCalibrationSchedule = (
     clickFrames,
     endFrame,
   };
+};
+
+export type RecordingLatencyCalibrationPeak = {
+  clickFrame: number;
+  peakFrame: number;
+  peakValue: number;
 };
 
 export const getRecordingLatencyCalibrationFrameCounts = (
@@ -94,6 +89,11 @@ export const clampRecordingLatencyFrameCount = (
       frameCount,
     ),
   );
+
+export type GetRecordingLatencyFrameCountOptions = {
+  measuredLatencyFrameCounts: number[];
+  sampleRate: number;
+};
 
 export const getRecordingLatencyFrameCount = (
   options: GetRecordingLatencyFrameCountOptions,

@@ -9,12 +9,6 @@ export type CreateGpuBufferReaderOptions = {
   size: number;
 };
 
-export type CreateInterleavedGpuBufferReaderOptions = {
-  device: GPUDevice;
-  windowSize: number;
-  windowCount: number;
-};
-
 export type GpuBufferReader = {
   read: (input: GPUBuffer) => Promise<ArrayBuffer>;
   resize: (size: number) => void;
@@ -78,6 +72,12 @@ export type InterleavedGpuBufferReader = {
   read: (input: GPUBuffer) => Promise<ComplexCpuBuffer>;
   resize: (windowSize: number, windowCount: number) => void;
   destroy: () => void;
+};
+
+export type CreateInterleavedGpuBufferReaderOptions = {
+  device: GPUDevice;
+  windowSize: number;
+  windowCount: number;
 };
 
 export const createInterleavedGpuBufferReader = (

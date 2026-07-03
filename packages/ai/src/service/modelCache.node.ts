@@ -8,26 +8,6 @@ import { leadBackingModel } from '../models/leadBackingModel.js';
 import { resolveVocalsModelUrl, vocalsModel } from '../models/vocalsModel.js';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';
 
-export type SeparationModelFiles = {
-  vocalsModelPath: string;
-  vocalsModelDataPath: string;
-  leadBackingModelPath: string;
-};
-
-type ModelFileOptions = {
-  label: string;
-  file: string;
-  url: string;
-  sha256: string;
-  path: string;
-  handlers: MessageHandlers<SeparateAudioMessage>;
-};
-
-type EnsureSeparationModelFilesOptions = {
-  modelsPath: string;
-  handlers: MessageHandlers<SeparateAudioMessage>;
-};
-
 // Checksums are verified once per process; later runs trust the cached file
 // instead of re-reading hundreds of megabytes on every separation.
 const verifiedPaths = new Set<string>();
@@ -80,6 +60,15 @@ const closeWriteStream = async (
 ): Promise<void> => {
   stream.end();
   await Promise.race([once(stream, 'finish'), streamError]);
+};
+
+type ModelFileOptions = {
+  label: string;
+  file: string;
+  url: string;
+  sha256: string;
+  path: string;
+  handlers: MessageHandlers<SeparateAudioMessage>;
 };
 
 const ensureCachedModelFile = async (
@@ -178,6 +167,17 @@ const ensureCachedModelFile = async (
   });
 
   return path;
+};
+
+export type SeparationModelFiles = {
+  vocalsModelPath: string;
+  vocalsModelDataPath: string;
+  leadBackingModelPath: string;
+};
+
+type EnsureSeparationModelFilesOptions = {
+  modelsPath: string;
+  handlers: MessageHandlers<SeparateAudioMessage>;
 };
 
 export const ensureSeparationModelFiles = async (

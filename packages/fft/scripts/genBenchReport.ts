@@ -13,12 +13,6 @@ const cwd = process.cwd();
 const tmpCufftJsonPath = resolve(cwd, '.bench-cufft.json');
 const outputDirectory = resolve(cwd, 'tmp/bench');
 
-type BenchGroup = {
-  direction: FourierBenchDirection;
-  count: number;
-  summariesByMode: Partial<Record<FourierBenchMode, FourierBenchSummary>>;
-};
-
 const directionPrefix: Record<FourierBenchDirection, string> = {
   forward: 'f',
   inverse: 'i',
@@ -34,6 +28,12 @@ const normalizeSummary = (summary: FourierBenchSummary): void => {
   summary.cvs = summary.cvs.map((rawValue) =>
     typeof rawValue === 'number' ? rawValue : Number.NaN,
   );
+};
+
+type BenchGroup = {
+  direction: FourierBenchDirection;
+  count: number;
+  summariesByMode: Partial<Record<FourierBenchMode, FourierBenchSummary>>;
 };
 
 const collectBenchSummaries = (

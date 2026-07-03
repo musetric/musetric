@@ -5,11 +5,6 @@ import { type FourierBenchSummary } from '../src/fourier/__test__/bench.es.js';
 import { runBenchmark } from './benchCufft/benchmark.js';
 import { type CudaLibs, loadCudaLibs } from './benchCufft/cudaLibs.js';
 
-type CufftBenchResult = {
-  available: boolean;
-  results: FourierBenchSummary[];
-};
-
 const cufftSummaryPath = resolve(process.cwd(), '.bench-cufft.json');
 
 const removeStaleSummary = (): void => {
@@ -33,6 +28,11 @@ export const runCufftBenchmark = (): FourierBenchSummary[] | undefined => {
     removeStaleSummary();
     throw error;
   }
+};
+
+type CufftBenchResult = {
+  available: boolean;
+  results: FourierBenchSummary[];
 };
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

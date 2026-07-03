@@ -7,44 +7,6 @@ import {
   type GesturePointerType,
 } from '../multiPointerGesture.dom.js';
 
-type PanPointer = {
-  id: number;
-  type: GesturePointerType;
-  x: number;
-  y: number;
-};
-
-type PanState = {
-  pointerId: number;
-  pointerType: GesturePointerType;
-  startX: number;
-  startY: number;
-  axis: GestureAxis | undefined;
-  lastPosition: number;
-  velocityTracker: InertialDragVelocityTracker | undefined;
-};
-
-export type PanTrackerUpdate = {
-  justLockedAxis: boolean;
-  axis: GestureAxis;
-  pointerType: GesturePointerType;
-  delta: number;
-  velocity: number;
-};
-
-export type PanTrackerEnd = {
-  axis: GestureAxis;
-  velocity: number;
-};
-
-export type PanTracker = {
-  start: (pointer: PanPointer) => void;
-  update: (pointer: PanPointer) => PanTrackerUpdate | undefined;
-  end: () => PanTrackerEnd | undefined;
-  cancel: () => void;
-  pointerId: () => number | undefined;
-};
-
 const resolveAxis = (
   fixedAxis: GestureAxis | undefined,
   axisLockDistance: number,
@@ -68,6 +30,44 @@ export type CreatePanTrackerOptions = {
   fixedAxis: GestureAxis | undefined;
   axisLockDistance: number;
   physics: InertialDragPhysics;
+};
+
+type PanState = {
+  pointerId: number;
+  pointerType: GesturePointerType;
+  startX: number;
+  startY: number;
+  axis: GestureAxis | undefined;
+  lastPosition: number;
+  velocityTracker: InertialDragVelocityTracker | undefined;
+};
+
+type PanPointer = {
+  id: number;
+  type: GesturePointerType;
+  x: number;
+  y: number;
+};
+
+export type PanTrackerUpdate = {
+  justLockedAxis: boolean;
+  axis: GestureAxis;
+  pointerType: GesturePointerType;
+  delta: number;
+  velocity: number;
+};
+
+export type PanTrackerEnd = {
+  axis: GestureAxis;
+  velocity: number;
+};
+
+export type PanTracker = {
+  start: (pointer: PanPointer) => void;
+  update: (pointer: PanPointer) => PanTrackerUpdate | undefined;
+  end: () => PanTrackerEnd | undefined;
+  cancel: () => void;
+  pointerId: () => number | undefined;
 };
 
 export const createPanTracker = (

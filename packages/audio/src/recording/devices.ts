@@ -1,24 +1,3 @@
-export type AudioInputSourceKind =
-  | 'builtIn'
-  | 'wiredHeadset'
-  | 'bluetooth'
-  | 'unknown';
-
-export type AudioOutputSourceKind =
-  | 'builtIn'
-  | 'wiredHeadset'
-  | 'bluetooth'
-  | 'unknown';
-
-export type ResolveAudioInputDeviceOptions = {
-  explicitDeviceId?: string;
-  preferBuiltIn: boolean;
-};
-
-export type ResolveAudioOutputDeviceOptions = {
-  explicitDeviceId?: string;
-};
-
 export const isPseudoDefaultDeviceId = (deviceId: string) =>
   deviceId === 'default' || deviceId === 'communications';
 
@@ -87,6 +66,12 @@ export const isLikelyBuiltInAudioOutputDevice = (device: MediaDeviceInfo) => {
   );
 };
 
+export type AudioInputSourceKind =
+  | 'builtIn'
+  | 'wiredHeadset'
+  | 'bluetooth'
+  | 'unknown';
+
 export const classifyAudioInputDevice = (
   device: MediaDeviceInfo,
 ): AudioInputSourceKind => {
@@ -95,6 +80,12 @@ export const classifyAudioInputDevice = (
   if (isLikelyBuiltInMicrophoneDevice(device)) return 'builtIn';
   return 'unknown';
 };
+
+export type AudioOutputSourceKind =
+  | 'builtIn'
+  | 'wiredHeadset'
+  | 'bluetooth'
+  | 'unknown';
 
 export const classifyAudioOutputDevice = (
   device: MediaDeviceInfo,
@@ -164,6 +155,11 @@ export const resolveDefaultAudioOutputDevice = (
   );
 };
 
+export type ResolveAudioInputDeviceOptions = {
+  explicitDeviceId?: string;
+  preferBuiltIn: boolean;
+};
+
 export const resolveAudioInputDevice = (
   devices: MediaDeviceInfo[],
   options: ResolveAudioInputDeviceOptions,
@@ -190,6 +186,10 @@ export const resolveAudioInputDevice = (
   }
 
   return resolveDefaultAudioInputDevice(devices) ?? realDevices[0];
+};
+
+export type ResolveAudioOutputDeviceOptions = {
+  explicitDeviceId?: string;
 };
 
 export const resolveAudioOutputDevice = (

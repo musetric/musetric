@@ -16,6 +16,14 @@ import {
 } from './bandPipelineCells.js';
 import { dispatchFourierColumnRange } from './fourierDispatch.js';
 
+const createSpectralBandConfig = (
+  config: ExtSpectrogramConfig,
+  band: SpectrogramSpectralBand,
+): ExtSpectrogramConfig => ({
+  ...config,
+  windowSize: band.windowSize,
+});
+
 type BandDispatchRange = (
   pass: GPUComputePassEncoder,
   range: SpectrogramColumnRange,
@@ -39,20 +47,6 @@ export type BandSpectrumPipeline = {
   dispatchDecibelRun: BandDispatchRange;
   clear: (encoder: GPUCommandEncoder) => void;
 };
-
-type BandSpectrumCellArg = {
-  config: ExtSpectrogramConfig;
-  band: SpectrogramSpectralBand;
-  label: TrackKey;
-};
-
-const createSpectralBandConfig = (
-  config: ExtSpectrogramConfig,
-  band: SpectrogramSpectralBand,
-): ExtSpectrogramConfig => ({
-  ...config,
-  windowSize: band.windowSize,
-});
 
 export const buildBandSpectrumPipeline = (
   cells: BandPipelineCells,
@@ -102,6 +96,12 @@ export const buildBandSpectrumPipeline = (
       encoder.clearBuffer(decibelify.columnEnergy);
     },
   };
+};
+
+type BandSpectrumCellArg = {
+  config: ExtSpectrogramConfig;
+  band: SpectrogramSpectralBand;
+  label: TrackKey;
 };
 
 export const createBandSpectrumCell = (

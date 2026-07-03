@@ -37,28 +37,6 @@ import {
   writeTrackSamples,
 } from './processor/renderPlan.js';
 
-export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
-
-export type SpectrogramProcessor = {
-  render: (
-    samples: SpectrogramSamples,
-    trackProgress: number,
-  ) => Promise<boolean>;
-
-  invalidateSamples: (
-    invalidations: readonly SpectrogramSampleInvalidation[],
-  ) => void;
-  updateConfig: (config: Partial<SpectrogramConfig>) => void;
-  dispose: () => void;
-};
-
-export type CreateSpectrogramProcessorOptions = {
-  device: GPUDevice;
-  config?: Partial<SpectrogramConfig>;
-
-  onMetrics?: (metrics: SpectrogramProcessorMetrics) => void;
-};
-
 const createComputeMarkers = (
   getGpuMarker: SpectrogramMarkers['getGpuMarker'],
 ): ComputeMarkers => ({
@@ -104,6 +82,28 @@ const encodeRenderCommand =
   };
 
 const noConfigInvalidations: ReadonlySet<TrackKey> = new Set();
+
+export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
+
+export type SpectrogramProcessor = {
+  render: (
+    samples: SpectrogramSamples,
+    trackProgress: number,
+  ) => Promise<boolean>;
+
+  invalidateSamples: (
+    invalidations: readonly SpectrogramSampleInvalidation[],
+  ) => void;
+  updateConfig: (config: Partial<SpectrogramConfig>) => void;
+  dispose: () => void;
+};
+
+export type CreateSpectrogramProcessorOptions = {
+  device: GPUDevice;
+  config?: Partial<SpectrogramConfig>;
+
+  onMetrics?: (metrics: SpectrogramProcessorMetrics) => void;
+};
 
 export const createSpectrogramProcessor = (
   options: CreateSpectrogramProcessorOptions,

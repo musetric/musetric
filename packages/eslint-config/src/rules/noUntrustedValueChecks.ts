@@ -12,13 +12,6 @@ import {
   rawNamePattern,
 } from './untrustedNames.js';
 
-type TsParserServices = {
-  program?: Program;
-  esTreeNodeToTSNodeMap?: {
-    get: (node: Expression | SpreadElement) => Node | undefined;
-  };
-};
-
 const numberCheckNames = new Set(['isInteger', 'isFinite', 'isNaN']);
 const globalCheckNames = new Set(['isNaN', 'isFinite']);
 const equalityOperators = new Set(['==', '!=', '===', '!==']);
@@ -76,6 +69,13 @@ const isPlainPrimitiveType = (type: Type, flags: TypeFlags): boolean => {
     return type.types.every((member) => isPlainPrimitiveType(member, flags));
   }
   return (type.flags & flags) !== 0;
+};
+
+type TsParserServices = {
+  program?: Program;
+  esTreeNodeToTSNodeMap?: {
+    get: (node: Expression | SpreadElement) => Node | undefined;
+  };
 };
 
 export const noUntrustedValueChecksRule: Rule.RuleModule = {

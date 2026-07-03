@@ -1,11 +1,3 @@
-export type EngineAudioOutput = {
-  outputNode: AudioNode;
-  supportsDeviceSelection: boolean;
-  getDeviceId: () => string | undefined;
-  setDeviceId: (deviceId: string | undefined) => Promise<void>;
-  play: () => Promise<void>;
-};
-
 type SetSinkId = (sinkId: string) => Promise<void>;
 
 const getAudioContextSetSinkId = (
@@ -19,6 +11,14 @@ const getAudioContextSetSinkId = (
   }
 
   return undefined;
+};
+
+export type EngineAudioOutput = {
+  outputNode: AudioNode;
+  supportsDeviceSelection: boolean;
+  getDeviceId: () => string | undefined;
+  setDeviceId: (deviceId: string | undefined) => Promise<void>;
+  play: () => Promise<void>;
 };
 
 export const createEngineAudioOutput = (

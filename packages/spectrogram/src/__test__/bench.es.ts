@@ -16,15 +16,6 @@ export const spectrogramBenchConfig: BenchStatsConfig = {
 export const warmupIters = 32;
 export const benchMinMeanMsForCv = 0.01;
 
-export type BenchBand = {
-  label: string;
-  windowSize: number;
-  minFrequency: number;
-  fullMinFrequency: number;
-  fullMaxFrequency: number;
-  maxFrequency: number;
-};
-
 export type SpectrogramBenchPreset = {
   label: string;
   width: number;
@@ -90,6 +81,15 @@ export const recording30Fps: SpectrogramBenchScenario = {
   invalidatedFrames: 1470,
 };
 
+export type BenchBand = {
+  label: string;
+  windowSize: number;
+  minFrequency: number;
+  fullMinFrequency: number;
+  fullMaxFrequency: number;
+  maxFrequency: number;
+};
+
 export const createBenchBands = (
   windowSize: number,
   bandCount: 1 | 3,
@@ -136,6 +136,25 @@ export const createBenchBands = (
   ];
 };
 
+export const benchStageOrder = [
+  'sliceSamples',
+  'fourierTransform',
+  'magnitudify',
+  'decibelify',
+  'fundamentalFrequency',
+  'remap',
+  'draw',
+  'gpuCompute',
+  'gpuWork',
+  'configure',
+  'writeBuffers',
+  'createCommand',
+  'submitCommand',
+  'other',
+  'total',
+  'wall',
+] as const;
+
 export type SpectrogramBenchMetric = {
   label: string;
   mean: number;
@@ -155,25 +174,6 @@ export type SpectrogramBenchSummary = {
   metrics: SpectrogramBenchMetric[];
   sampleCount: number;
 };
-
-export const benchStageOrder = [
-  'sliceSamples',
-  'fourierTransform',
-  'magnitudify',
-  'decibelify',
-  'fundamentalFrequency',
-  'remap',
-  'draw',
-  'gpuCompute',
-  'gpuWork',
-  'configure',
-  'writeBuffers',
-  'createCommand',
-  'submitCommand',
-  'other',
-  'total',
-  'wall',
-] as const;
 
 const metricMap = (
   summary: SpectrogramBenchSummary,

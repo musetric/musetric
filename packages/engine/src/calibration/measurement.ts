@@ -8,25 +8,6 @@ import {
 import { createMicrophoneAudioConstraints } from '@musetric/audio/recording';
 import { microphoneCalibrationChannel } from './protocol.cross.js';
 
-export type CalibrationMeasurementOptions = {
-  context: AudioContext;
-  outputNode: AudioNode;
-  playOutput: () => Promise<void>;
-  workletUrl: string | URL;
-  processorName: string;
-  deviceId?: string;
-  stream?: MediaStream;
-};
-
-export type CalibrationMeasurementResult = {
-  latencyFrameCount: number;
-  measuredLatencyFrameCounts: number[];
-};
-
-type WorkletResult = {
-  peaks: { clickFrame: number; peakFrame: number; peakValue: number }[];
-};
-
 const workletPromises = new Map<string, Promise<void>>();
 
 const stopStream = (stream: MediaStream) => {
@@ -51,6 +32,10 @@ const loadWorklet = async (
     workletPromises.set(key, promise);
   }
   return promise;
+};
+
+type WorkletResult = {
+  peaks: { clickFrame: number; peakFrame: number; peakValue: number }[];
 };
 
 const waitForResult = async (
@@ -80,6 +65,21 @@ const waitForResult = async (
       },
     });
   });
+
+export type CalibrationMeasurementOptions = {
+  context: AudioContext;
+  outputNode: AudioNode;
+  playOutput: () => Promise<void>;
+  workletUrl: string | URL;
+  processorName: string;
+  deviceId?: string;
+  stream?: MediaStream;
+};
+
+export type CalibrationMeasurementResult = {
+  latencyFrameCount: number;
+  measuredLatencyFrameCounts: number[];
+};
 
 export const measureRecordingLatency = async (
   options: CalibrationMeasurementOptions,

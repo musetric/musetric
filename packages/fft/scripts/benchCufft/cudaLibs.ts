@@ -12,17 +12,17 @@ const dllPairs: readonly { cudart: string; cufft: string }[] = [
   { cudart: 'cudart64_100', cufft: 'cufft64_10' },
 ];
 
-export type CudaLibs = {
-  cudart: koffi.LibraryHandle;
-  cufft: koffi.LibraryHandle;
-};
-
 const searchDllDirectories = (): string[] => {
   if (!process.env.CUDA_PATH) {
     return [];
   }
   const base = resolve(process.env.CUDA_PATH);
   return [resolve(base, 'bin', 'x64'), resolve(base, 'bin')];
+};
+
+export type CudaLibs = {
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
 };
 
 const tryLoadPairAt = (

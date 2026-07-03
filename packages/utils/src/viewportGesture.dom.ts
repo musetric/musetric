@@ -15,96 +15,21 @@ import {
   zoomViewportState,
 } from './viewportState.js';
 
-export type ViewportGestureAxis = GestureAxis;
-
-export type ViewportGestureSource = 'pan' | 'pinch' | 'wheel';
-
-export type ViewportGestureUpdatePhase = GesturePhase | 'zoom';
-
-export type ViewportGestureStateRequest = {
-  axis: ViewportGestureAxis;
-  source: ViewportGestureSource;
-};
-
-export type ViewportGestureStart = {
-  axis: ViewportGestureAxis;
-  source: 'pan' | 'pinch';
-};
-
-export type ViewportGestureEnd = {
-  axis: ViewportGestureAxis | undefined;
-  source: 'pan' | 'pinch';
-};
-
-export type ViewportGestureUpdate = {
-  axis: ViewportGestureAxis;
-  source: ViewportGestureSource;
-  phase: ViewportGestureUpdatePhase;
-  state: ViewportState;
-  stop: () => void;
-};
-
-export type ViewportGestureElements = {
-  target: HTMLElement;
-  viewport?: HTMLElement;
-};
-
-export type ViewportGesturePointerOptions = {
-  pointerTypes?: readonly GesturePointerType[];
-  axisLockDistance?: number;
-  pinchLockDistance?: number;
-  minimumPinchSpread?: number;
-};
-
-export type ViewportGestureWheelOptions = {
-  zoomSensitivity?: number;
-  linePixels?: number;
-  pagePixels?: number;
-};
-
-export type ViewportGestureInputOptions = {
-  pointer?: ViewportGesturePointerOptions;
-  wheel?: ViewportGestureWheelOptions | false;
-};
-
-export type ViewportGestureHandlers = {
-  getState: (request: ViewportGestureStateRequest) => ViewportState | undefined;
-  onStart?: (event: ViewportGestureStart) => void;
-  onUpdate: (event: ViewportGestureUpdate) => void;
-  onEnd?: (event: ViewportGestureEnd) => void;
-};
-
-export type ViewportGestureOptions = {
-  elements: ViewportGestureElements;
-  input?: ViewportGestureInputOptions;
-  inertia?: InertialDragPhysicsOptions;
-  handlers: ViewportGestureHandlers;
-};
-
-export type ViewportGesture = {
-  stop: () => void;
-  dispose: () => void;
-};
-
-type ActivePan = {
-  axis: ViewportGestureAxis;
-  state: ViewportState;
-};
-
-type ActivePinch = {
-  axis: ViewportGestureAxis;
-  initialSpread: number;
-  state: ViewportState;
-};
-
 const defaultWheelZoomSensitivity = 0.002;
 const defaultWheelLinePixels = 16;
 const defaultWheelPagePixels = 400;
 
 const noop = () => undefined;
 
+export type ViewportGestureElements = {
+  target: HTMLElement;
+  viewport?: HTMLElement;
+};
+
 const getViewportElement = (elements: ViewportGestureElements) =>
   elements.viewport ?? elements.target;
+
+export type ViewportGestureAxis = GestureAxis;
 
 const getAxisSize = (rect: DOMRect, axis: ViewportGestureAxis) => {
   if (axis === 'x') {
@@ -139,6 +64,12 @@ const getWheelAxis = (event: WheelEvent): ViewportGestureAxis | undefined => {
   return undefined;
 };
 
+export type ViewportGestureWheelOptions = {
+  zoomSensitivity?: number;
+  linePixels?: number;
+  pagePixels?: number;
+};
+
 const getWheelDelta = (
   event: WheelEvent,
   wheelOptions: ViewportGestureWheelOptions,
@@ -157,6 +88,18 @@ const getWheelDelta = (
   return event.deltaY;
 };
 
+export type ViewportGesturePointerOptions = {
+  pointerTypes?: readonly GesturePointerType[];
+  axisLockDistance?: number;
+  pinchLockDistance?: number;
+  minimumPinchSpread?: number;
+};
+
+export type ViewportGestureInputOptions = {
+  pointer?: ViewportGesturePointerOptions;
+  wheel?: ViewportGestureWheelOptions | false;
+};
+
 const getWheelOptions = (
   input: ViewportGestureInputOptions | undefined,
 ): ViewportGestureWheelOptions | undefined => {
@@ -165,6 +108,63 @@ const getWheelOptions = (
   }
 
   return input?.wheel ?? {};
+};
+
+export type ViewportGestureSource = 'pan' | 'pinch' | 'wheel';
+
+export type ViewportGestureStateRequest = {
+  axis: ViewportGestureAxis;
+  source: ViewportGestureSource;
+};
+
+export type ViewportGestureStart = {
+  axis: ViewportGestureAxis;
+  source: 'pan' | 'pinch';
+};
+
+export type ViewportGestureEnd = {
+  axis: ViewportGestureAxis | undefined;
+  source: 'pan' | 'pinch';
+};
+
+export type ViewportGestureUpdatePhase = GesturePhase | 'zoom';
+
+export type ViewportGestureUpdate = {
+  axis: ViewportGestureAxis;
+  source: ViewportGestureSource;
+  phase: ViewportGestureUpdatePhase;
+  state: ViewportState;
+  stop: () => void;
+};
+
+export type ViewportGestureHandlers = {
+  getState: (request: ViewportGestureStateRequest) => ViewportState | undefined;
+  onStart?: (event: ViewportGestureStart) => void;
+  onUpdate: (event: ViewportGestureUpdate) => void;
+  onEnd?: (event: ViewportGestureEnd) => void;
+};
+
+export type ViewportGestureOptions = {
+  elements: ViewportGestureElements;
+  input?: ViewportGestureInputOptions;
+  inertia?: InertialDragPhysicsOptions;
+  handlers: ViewportGestureHandlers;
+};
+
+export type ViewportGesture = {
+  stop: () => void;
+  dispose: () => void;
+};
+
+type ActivePan = {
+  axis: ViewportGestureAxis;
+  state: ViewportState;
+};
+
+type ActivePinch = {
+  axis: ViewportGestureAxis;
+  initialSpread: number;
+  state: ViewportState;
 };
 
 export const createViewportGesture = (

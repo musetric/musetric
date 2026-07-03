@@ -3,31 +3,6 @@ import {
   type TimeStretchWasmModule,
 } from './timeStretchWasmModule.js';
 
-type TimePitchProcessorInputFiller = (
-  inputs: Float32Array[],
-  inputFrameOffset: number,
-  inputFrameCount: number,
-) => void;
-
-export type TimePitchProcessor = {
-  process: (
-    outputs: Float32Array[],
-    fillInput: TimePitchProcessorInputFiller,
-  ) => number;
-  reset: () => void;
-  setTransposeSemitones: (transposeSemitones: number) => void;
-  setTempoRatio: (tempoRatio: number) => void;
-};
-
-type TimePitchProcessorState = {
-  bufferLength: number;
-  channelCount: number;
-  inputLatency: number;
-  outputLatency: number;
-  inputBuffers: Float32Array[];
-  outputBuffers: Float32Array[];
-};
-
 const getFrameCounts = (
   outputFrameCount: number,
   tempoRatio: number,
@@ -44,6 +19,15 @@ const getFrameCounts = (
 };
 
 const tonalityLimitHz = 8000;
+
+type TimePitchProcessorState = {
+  bufferLength: number;
+  channelCount: number;
+  inputLatency: number;
+  outputLatency: number;
+  inputBuffers: Float32Array[];
+  outputBuffers: Float32Array[];
+};
 
 const createState = (
   wasmModule: TimeStretchWasmModule,
@@ -87,6 +71,22 @@ const createState = (
     inputBuffers,
     outputBuffers,
   };
+};
+
+type TimePitchProcessorInputFiller = (
+  inputs: Float32Array[],
+  inputFrameOffset: number,
+  inputFrameCount: number,
+) => void;
+
+export type TimePitchProcessor = {
+  process: (
+    outputs: Float32Array[],
+    fillInput: TimePitchProcessorInputFiller,
+  ) => number;
+  reset: () => void;
+  setTransposeSemitones: (transposeSemitones: number) => void;
+  setTempoRatio: (tempoRatio: number) => void;
 };
 
 export const createTimePitchProcessor = async (

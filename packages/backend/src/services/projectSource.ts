@@ -6,17 +6,6 @@ import {
 import { defaultSampleRate, type Logger } from '@musetric/utils';
 import { type BlobFile, type BlobStorage } from '@musetric/utils/node';
 
-export type ProjectSource = BlobFile & {
-  sampleRate: number;
-  frameCount: number;
-};
-
-export type CreateProjectSourceOptions = {
-  blobStorage: BlobStorage;
-  file: File;
-  logger: Logger;
-};
-
 const removeBlobIfExists = async (
   blobStorage: BlobStorage,
   blobId: string,
@@ -37,6 +26,17 @@ const createInvalidAudioError = (cause: unknown) => {
     statusCode: 400,
     cause,
   });
+};
+
+export type ProjectSource = BlobFile & {
+  sampleRate: number;
+  frameCount: number;
+};
+
+export type CreateProjectSourceOptions = {
+  blobStorage: BlobStorage;
+  file: File;
+  logger: Logger;
 };
 
 export const createProjectSource = async (

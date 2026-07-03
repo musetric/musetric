@@ -4,15 +4,6 @@ import {
   getMidiLabel,
 } from './notePitch.js';
 
-export type NoteLineTone = 'primary' | 'secondary' | 'gray';
-
-export type NoteMarker = {
-  label: string;
-  midi: number;
-  tone: NoteLineTone;
-  topRatio: number;
-};
-
 const naturalNoteSteps = new Set([0, 2, 4, 5, 7, 9, 11]);
 
 export const isNaturalMidi = (midi: number): boolean =>
@@ -29,6 +20,8 @@ const getPrimaryLineStep = (noteCount: number) =>
     const distance = Math.abs(noteCount / step - targetPrimaryLineCount);
     return distance < bestDistance ? step : bestStep;
   });
+
+export type NoteLineTone = 'primary' | 'secondary' | 'gray';
 
 const getNoteLineTone = (
   midi: number,
@@ -58,6 +51,13 @@ const getFrequencyYRatio = (
 
   const frequencyRatio = (Math.log(frequency) - logMin) / logRange;
   return 1 - frequencyRatio;
+};
+
+export type NoteMarker = {
+  label: string;
+  midi: number;
+  tone: NoteLineTone;
+  topRatio: number;
 };
 
 export const getNoteMarkers = (

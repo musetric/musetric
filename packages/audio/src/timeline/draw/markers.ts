@@ -7,24 +7,18 @@ const secondSteps = [
   1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600,
 ] as const;
 
-export type TimelineMarker = {
-  time: number;
-  ratio: number;
-  isMajor: boolean;
-};
-
-type TimelineWindow = {
-  start: number;
-  end: number;
-  duration: number;
-};
-
 const getCurrentTime = (config: TimelineConfig) => {
   if (!config.frameCount) {
     return 0;
   }
 
   return (config.frameIndex / config.frameCount) * config.duration;
+};
+
+type TimelineWindow = {
+  start: number;
+  end: number;
+  duration: number;
 };
 
 const getTimelineWindow = (config: TimelineConfig): TimelineWindow => {
@@ -57,6 +51,12 @@ const getMajorStep = (duration: number, width: number) => {
   }
 
   return secondSteps[secondSteps.length - 1];
+};
+
+export type TimelineMarker = {
+  time: number;
+  ratio: number;
+  isMajor: boolean;
 };
 
 export const getTimelineMarkers = (

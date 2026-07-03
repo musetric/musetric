@@ -25,10 +25,6 @@ import { createSpectrogramSliceSamplesCell } from '../index.js';
 
 const { device } = await createGpuContext();
 
-type SliceHandle = ReturnType<
-  ReturnType<typeof createSpectrogramSliceSamplesCell>['get']
->;
-
 const windowSize = 8;
 const width = 5;
 const sampleRate = 16;
@@ -48,6 +44,10 @@ const config = extendConfig(
     viewSize: { width, height: 4 },
   }),
 );
+
+type SliceHandle = ReturnType<
+  ReturnType<typeof createSpectrogramSliceSamplesCell>['get']
+>;
 
 const withSlice = async <T>(
   sliceConfig: ExtSpectrogramConfig,

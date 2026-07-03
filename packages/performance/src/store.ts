@@ -9,11 +9,6 @@ import {
 } from './constants.js';
 import { type BenchmarkData, type MetricsData } from './runBenchmarks.js';
 
-export type Task = {
-  fourierMode: FourierMode;
-  windowSize: number;
-};
-
 const buildInitialData = (): BenchmarkData =>
   fourierModes.reduce(
     (acc, fourierMode) => {
@@ -23,6 +18,11 @@ const buildInitialData = (): BenchmarkData =>
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     {} as BenchmarkData,
   );
+
+export type Task = {
+  fourierMode: FourierMode;
+  windowSize: number;
+};
 
 const buildAllTasks = (): Task[] =>
   fourierModes.flatMap((fourierMode) =>

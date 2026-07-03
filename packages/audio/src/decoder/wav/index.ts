@@ -1,16 +1,16 @@
 import { AudioSampleSink, BufferSource, Input, WAVE } from 'mediabunny';
 import { resampleChannel } from '../resample.js';
 
-export type DecodedWav = {
-  channels: Float32Array<SharedArrayBuffer>[];
-  frameCount: number;
-};
-
 const createSharedChannel = (samples: Float32Array) => {
   const shared = new SharedArrayBuffer(samples.byteLength);
   const sharedSamples = new Float32Array(shared);
   sharedSamples.set(samples);
   return sharedSamples;
+};
+
+export type DecodedWav = {
+  channels: Float32Array<SharedArrayBuffer>[];
+  frameCount: number;
 };
 
 const createEmptyDecodedWav = (): DecodedWav => {

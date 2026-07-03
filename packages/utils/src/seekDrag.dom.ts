@@ -1,5 +1,23 @@
 export type SeekDragPointerType = 'mouse' | 'touch';
 
+const isSeekDragPointerType = (
+  pointerType: string,
+): pointerType is SeekDragPointerType =>
+  pointerType === 'mouse' || pointerType === 'touch';
+
+const getRatio = (element: HTMLElement, clientX: number) => {
+  const rect = element.getBoundingClientRect();
+  const width = element.clientWidth;
+  if (width <= 0) return 0;
+  return Math.max(0, Math.min(1, (clientX - rect.left) / width));
+};
+
+const getOffsetRatio = (element: HTMLElement, offset: number) => {
+  const width = element.clientWidth;
+  if (width <= 0) return 0;
+  return offset / width;
+};
+
 export type SeekDragUpdate = {
   pointerType: SeekDragPointerType;
   ratio: number;
@@ -23,24 +41,6 @@ type SeekDragInternalState = {
   pointerId: number;
   pointerType: SeekDragPointerType;
   startX: number;
-};
-
-const isSeekDragPointerType = (
-  pointerType: string,
-): pointerType is SeekDragPointerType =>
-  pointerType === 'mouse' || pointerType === 'touch';
-
-const getRatio = (element: HTMLElement, clientX: number) => {
-  const rect = element.getBoundingClientRect();
-  const width = element.clientWidth;
-  if (width <= 0) return 0;
-  return Math.max(0, Math.min(1, (clientX - rect.left) / width));
-};
-
-const getOffsetRatio = (element: HTMLElement, offset: number) => {
-  const width = element.clientWidth;
-  if (width <= 0) return 0;
-  return offset / width;
 };
 
 export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {

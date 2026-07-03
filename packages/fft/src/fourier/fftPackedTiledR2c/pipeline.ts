@@ -5,11 +5,6 @@ import { secondPassShader } from './secondPass.wgsl.js';
 import { secondPassMixedShader } from './secondPassMixed.wgsl.js';
 import { type PackedTiledR2cVariant } from './support.js';
 
-export type Pipelines = {
-  firstPass: GPUComputePipeline;
-  secondPass: GPUComputePipeline;
-};
-
 // Power-of-two tile FFTs of >= 128 points prefer radix-8 stages to minimise
 // the shared-memory round-trip/barrier count (e.g. 128 -> 8,8,2 = 3 stages
 // instead of 7). Smaller tiles keep radix-2: their butterfly count is already
@@ -89,6 +84,11 @@ const createSecondPassConstants = (
     smPad: variant.tileSize <= 248 ? 8 : 0,
     ...createRadix8StageCounts(variant.log2ColumnSize, 'column'),
   };
+};
+
+export type Pipelines = {
+  firstPass: GPUComputePipeline;
+  secondPass: GPUComputePipeline;
 };
 
 export const createPipelines = (

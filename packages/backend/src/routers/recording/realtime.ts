@@ -1,43 +1,5 @@
 import { type WebSocket } from '@fastify/websocket';
 
-export type PlayerRuntimeState = {
-  masterSocket: WebSocket | undefined;
-  active: boolean;
-  recording: boolean;
-  frozen: boolean;
-  frameIndex: number;
-  revision: number;
-};
-
-export type ProjectRealtimeEvent =
-  | { type: 'recording.started' }
-  | {
-      type: 'recording.peaksChanged';
-      startPeakIndex: number;
-      peaks: number[];
-    }
-  | { type: 'recording.finished' }
-  | { type: 'error'; error: string }
-  | { type: 'player.play' }
-  | { type: 'player.record' }
-  | { type: 'player.stop' }
-  | {
-      type: 'player.frameIndex';
-      frameIndex: number;
-      frozen: boolean;
-      revision: number;
-      source: 'playback' | 'user';
-    }
-  | { type: 'player.revision'; revision: number }
-  | {
-      type: 'player.sync.state';
-      active: boolean;
-      recording: boolean;
-      frozen: boolean;
-      frameIndex: number;
-      revision: number;
-    };
-
 export type RecordingStartMessage = {
   type: 'recording.start';
   sampleRate?: unknown;
@@ -61,11 +23,6 @@ export type ClientRealtimeMessage =
   | { type: 'player.stop' }
   | PlayerFrameIndexMessage
   | { type: 'player.sync.request' };
-
-export type ProjectRealtime = {
-  projectPlayerStates: Map<number, PlayerRuntimeState>;
-  projectRealtimeSockets: Map<number, Set<WebSocket>>;
-};
 
 export const isClientRealtimeMessage = (
   message: Record<string, unknown>,
@@ -125,6 +82,35 @@ export const isRealtimeMessage = (
 ): message is Record<string, unknown> =>
   typeof message === 'object' && Boolean(message);
 
+export type ProjectRealtimeEvent =
+  | { type: 'recording.started' }
+  | {
+      type: 'recording.peaksChanged';
+      startPeakIndex: number;
+      peaks: number[];
+    }
+  | { type: 'recording.finished' }
+  | { type: 'error'; error: string }
+  | { type: 'player.play' }
+  | { type: 'player.record' }
+  | { type: 'player.stop' }
+  | {
+      type: 'player.frameIndex';
+      frameIndex: number;
+      frozen: boolean;
+      revision: number;
+      source: 'playback' | 'user';
+    }
+  | { type: 'player.revision'; revision: number }
+  | {
+      type: 'player.sync.state';
+      active: boolean;
+      recording: boolean;
+      frozen: boolean;
+      frameIndex: number;
+      revision: number;
+    };
+
 export const sendRealtimeEvent = (
   socket: WebSocket,
   event: ProjectRealtimeEvent,
@@ -155,6 +141,15 @@ export const broadcastRealtime = (
       sender(socket);
     }
   }
+};
+
+export type PlayerRuntimeState = {
+  masterSocket: WebSocket | undefined;
+  active: boolean;
+  recording: boolean;
+  frozen: boolean;
+  frameIndex: number;
+  revision: number;
 };
 
 export const createPlayerState = (): PlayerRuntimeState => ({
@@ -191,6 +186,11 @@ export const sendPlayerSyncState = (
     frameIndex: state?.frameIndex ?? 0,
     revision: state?.revision ?? 0,
   });
+};
+
+export type ProjectRealtime = {
+  projectPlayerStates: Map<number, PlayerRuntimeState>;
+  projectRealtimeSockets: Map<number, Set<WebSocket>>;
 };
 
 export const claimPlayerMaster = (

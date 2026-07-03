@@ -1,17 +1,17 @@
 import { type Logger } from '@musetric/utils';
 import { spawnScript } from '@musetric/utils/node';
 
-export type LoudnessAnalysis = {
-  integratedLoudnessDb: number;
-  truePeakDb: number;
-};
-
 const parseNumber = (value: unknown, label: string): number => {
   const rawNumber = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(rawNumber)) {
     throw new Error(`Invalid loudness ${label}`);
   }
   return rawNumber;
+};
+
+export type LoudnessAnalysis = {
+  integratedLoudnessDb: number;
+  truePeakDb: number;
 };
 
 const parseLoudnormJson = (output: string): LoudnessAnalysis => {

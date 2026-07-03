@@ -6,24 +6,6 @@ import {
 import { type playerDataChannel } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 
-export type CreateAudioDecodeOptions = {
-  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
-  spectrogramPort: ReturnType<
-    typeof spectrogramDataChannel.outbound<MessagePort>
-  >;
-};
-
-export type AudioDecode = {
-  mount: (message: { projectId: number; sampleRate: number }) => Promise<{
-    frameCount: number;
-  }>;
-  patchRecordingSamples: (message: {
-    frameIndex: number;
-    samples: Float32Array;
-  }) => void;
-  unmount: () => void;
-};
-
 const createSharedChannel = (samples: Float32Array, frameCount: number) => {
   const shared = new SharedArrayBuffer(
     frameCount * Float32Array.BYTES_PER_ELEMENT,
@@ -50,6 +32,24 @@ const fitChannelsToFrameCount = (
 type RecordingSamplesChange = {
   frameIndex: number;
   frameCount: number;
+};
+
+export type CreateAudioDecodeOptions = {
+  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
+  spectrogramPort: ReturnType<
+    typeof spectrogramDataChannel.outbound<MessagePort>
+  >;
+};
+
+export type AudioDecode = {
+  mount: (message: { projectId: number; sampleRate: number }) => Promise<{
+    frameCount: number;
+  }>;
+  patchRecordingSamples: (message: {
+    frameIndex: number;
+    samples: Float32Array;
+  }) => void;
+  unmount: () => void;
 };
 
 export const createAudioDecode = (

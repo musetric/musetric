@@ -14,10 +14,10 @@ import { type EngineState } from '../state.js';
 import { waveformChannel } from './protocol.cross.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
-type Unmount = () => void;
-
 const getWaveformSourceGainDb = (sourceGainDb: number) =>
   sourceGainDb - sourceTargetLufs;
+
+type Unmount = () => void;
 
 export type EngineWaveform = {
   port: ReturnType<typeof waveformChannel.outbound<Worker>>;

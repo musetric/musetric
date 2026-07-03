@@ -12,28 +12,6 @@ import {
   type TrigTables,
 } from './trigTables.js';
 
-type BindGroups = {
-  firstPass: GPUBindGroup;
-  secondPass: GPUBindGroup;
-};
-
-type Resources = {
-  pipelines: Pipelines;
-  tables: TrigTables;
-};
-
-export type State = {
-  pipelines: Pipelines;
-  tables: TrigTables;
-  getBindGroups: (slot: number) => BindGroups;
-  params: ParamsRing;
-  dummyInput: GPUBuffer;
-  scratch: GPUBuffer;
-  windowCount: number;
-  firstPassXGroups: number;
-  secondPassXGroups: number;
-};
-
 const batchSize = 4;
 
 const createScratchBuffer = (
@@ -49,6 +27,11 @@ const createScratchBuffer = (
     size: byteSize,
     usage: GPUBufferUsage.STORAGE,
   });
+};
+
+type Resources = {
+  pipelines: Pipelines;
+  tables: TrigTables;
 };
 
 const createResources = (
@@ -74,6 +57,11 @@ type CreateBindGroupsOptions = {
   pipelines: Pipelines;
   scratch: GPUBuffer;
   tables: TrigTables;
+};
+
+type BindGroups = {
+  firstPass: GPUBindGroup;
+  secondPass: GPUBindGroup;
 };
 
 const createBindGroups = (
@@ -118,6 +106,18 @@ const createSlotCache = <T>(
     }
     return cached;
   };
+};
+
+export type State = {
+  pipelines: Pipelines;
+  tables: TrigTables;
+  getBindGroups: (slot: number) => BindGroups;
+  params: ParamsRing;
+  dummyInput: GPUBuffer;
+  scratch: GPUBuffer;
+  windowCount: number;
+  firstPassXGroups: number;
+  secondPassXGroups: number;
 };
 
 export const createStateCell = (

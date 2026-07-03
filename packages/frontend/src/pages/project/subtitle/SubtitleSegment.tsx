@@ -8,17 +8,6 @@ import { getSubtitlePlaybackTimeFromState } from './subtitlePlayback.js';
 import { SubtitleSegmentText } from './SubtitleSegmentText.js';
 import { useSubtitleSegmentStatus } from './useSubtitleSegmentStatus.js';
 
-type ActiveSubtitleSegmentProps = {
-  segment: api.subtitle.Segment;
-  chordSegments: api.chords.ChordSegment[];
-};
-
-type TimedSubtitleColors = {
-  active: string;
-  inactive: string;
-  past: string;
-};
-
 type TimedSubtitleElement = {
   element: HTMLElement;
   end: number;
@@ -63,6 +52,12 @@ const getTimedSubtitleElements = (element: HTMLElement) => {
   return timedElements;
 };
 
+type TimedSubtitleColors = {
+  active: string;
+  inactive: string;
+  past: string;
+};
+
 const getTimedSubtitleColor = (
   start: number,
   end: number,
@@ -87,6 +82,11 @@ const setElementColor = (element: HTMLElement, color: string) => {
 
   element.dataset.subtitleColor = color;
   element.style.color = color;
+};
+
+type ActiveSubtitleSegmentProps = {
+  segment: api.subtitle.Segment;
+  chordSegments: api.chords.ChordSegment[];
 };
 
 const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {

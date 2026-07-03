@@ -12,17 +12,6 @@ import {
   type RecordingRuntime,
 } from './recording.worklet.js';
 
-export type CreatePlayerRuntimeOptions = {
-  port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
-  dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
-  playhead: Playhead;
-};
-
-export type PlayerRuntime = {
-  port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
-  process: (inputs: Float32Array[][], outputs: Float32Array[]) => void;
-};
-
 type MixTrackIntoBuffersOptions = {
   inputBuffers: Float32Array[];
   outputFrameIndex: number;
@@ -61,6 +50,17 @@ const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
       input[offset] += sample * volume;
     }
   }
+};
+
+export type CreatePlayerRuntimeOptions = {
+  port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
+  dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
+  playhead: Playhead;
+};
+
+export type PlayerRuntime = {
+  port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
+  process: (inputs: Float32Array[][], outputs: Float32Array[]) => void;
 };
 
 export const createPlayerRuntime = async (

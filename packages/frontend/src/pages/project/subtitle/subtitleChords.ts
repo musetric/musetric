@@ -1,13 +1,13 @@
 import { type api } from '@musetric/api';
 import { getActiveChordIndex } from '../chords/chordTiming.js';
 
+const isNamedChord = (label: string) => label !== 'N' && label !== 'X';
+
 export type WordChord = {
   label: string;
   start: number;
   end: number;
 };
-
-const isNamedChord = (label: string) => label !== 'N' && label !== 'X';
 
 export const getWordChordLabels = (
   words: api.subtitle.Word[],

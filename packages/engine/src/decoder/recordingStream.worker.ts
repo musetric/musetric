@@ -5,30 +5,6 @@ import {
 
 export const recordingPacketHeaderByteLength = 8;
 
-type ChunkSamples = { frameIndex: number; samples: Float32Array };
-
-export type RecordingStreamOptions = {
-  port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
-  samples: Float32Array<SharedArrayBuffer>;
-  metadata: Int32Array<SharedArrayBuffer>;
-  onChunk: (chunk: ChunkSamples) => void;
-  onError: (error: unknown) => void;
-};
-
-export type RecordingStream = {
-  start: Promise<void>;
-  finish: Promise<void>;
-  notifyStarted: () => void;
-  notifyFinished: () => void;
-  waitForFlush: (sequence: number) => Promise<void>;
-  close: () => void;
-};
-
-type FlushWaiter = {
-  sequence: number;
-  resolve: () => void;
-};
-
 type ControlledPromise = {
   promise: Promise<void>;
   resolve: () => void;
@@ -91,6 +67,11 @@ export const createRecordingPacket = (
   return packet;
 };
 
+type FlushWaiter = {
+  sequence: number;
+  resolve: () => void;
+};
+
 const resolveFlushWaiters = (
   processedFlushSequence: number,
   waiters: FlushWaiter[],
@@ -104,6 +85,25 @@ const resolveFlushWaiters = (
     remaining.push(waiter);
   }
   return remaining;
+};
+
+type ChunkSamples = { frameIndex: number; samples: Float32Array };
+
+export type RecordingStreamOptions = {
+  port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
+  samples: Float32Array<SharedArrayBuffer>;
+  metadata: Int32Array<SharedArrayBuffer>;
+  onChunk: (chunk: ChunkSamples) => void;
+  onError: (error: unknown) => void;
+};
+
+export type RecordingStream = {
+  start: Promise<void>;
+  finish: Promise<void>;
+  notifyStarted: () => void;
+  notifyFinished: () => void;
+  waitForFlush: (sequence: number) => Promise<void>;
+  close: () => void;
 };
 
 export const createRecordingStream = (

@@ -84,6 +84,7 @@
 
 If code was changed, run the relevant repository-root scripts before finishing.
 
+- `yarn check:unused`: detect unused files, dependencies, and exports.
 - `yarn check:ts`: TypeScript checks across the monorepo.
 - `yarn fix:lint`: lint checks with automatic fixes.
 - `yarn fix:translations`: update translation extraction results.

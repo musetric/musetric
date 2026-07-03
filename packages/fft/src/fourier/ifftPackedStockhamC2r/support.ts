@@ -6,6 +6,18 @@ import {
   type RadixStageCounts,
 } from '../factorization.es.js';
 
+const pairThreadsPerGroup = 8;
+const maxPairGroupSize = 64;
+
+// Builds the kernel plan: adjacent stages with a combined group of at most 64
+// points are fused into pair kernels (two stages through shared memory per
+// global round trip). The first kernel fuses the C2R prepack read, the last
+// one (single or pair) the scaled unpack write. Full radix-64 pairs and
+// single stages measured fastest with 64-thread workgroups; narrower pairs
+// prefer 128.
+const selectPairThreadCount = (groupSize: number): number =>
+  groupSize === 64 ? 64 : 128;
+
 export type ScratchBufferIndex = 0 | 1;
 
 type MultiPassKernelBase = {
@@ -28,34 +40,6 @@ export type PackedStockhamC2rKernel =
       factor1: MultiPassRadixStage;
       factor2: MultiPassRadixStage;
     });
-
-type BaseVariant = {
-  windowSize: number;
-  packedWindowSize: number;
-  positiveWindowSize: number;
-};
-
-export type PackedStockhamC2rVariant =
-  | (BaseVariant & {
-      kind: 'singlePass' | 'inPlaceMixed';
-      radixStageCounts: RadixStageCounts;
-    })
-  | (BaseVariant & {
-      kind: 'multiPass';
-      kernels: PackedStockhamC2rKernel[];
-    });
-
-const pairThreadsPerGroup = 8;
-const maxPairGroupSize = 64;
-
-// Builds the kernel plan: adjacent stages with a combined group of at most 64
-// points are fused into pair kernels (two stages through shared memory per
-// global round trip). The first kernel fuses the C2R prepack read, the last
-// one (single or pair) the scaled unpack write. Full radix-64 pairs and
-// single stages measured fastest with 64-thread workgroups; narrower pairs
-// prefer 128.
-const selectPairThreadCount = (groupSize: number): number =>
-  groupSize === 64 ? 64 : 128;
 
 const createMultiPassKernels = (
   packedWindowSize: number,
@@ -122,6 +106,22 @@ const createMultiPassKernels = (
 
   return kernels;
 };
+
+type BaseVariant = {
+  windowSize: number;
+  packedWindowSize: number;
+  positiveWindowSize: number;
+};
+
+export type PackedStockhamC2rVariant =
+  | (BaseVariant & {
+      kind: 'singlePass' | 'inPlaceMixed';
+      radixStageCounts: RadixStageCounts;
+    })
+  | (BaseVariant & {
+      kind: 'multiPass';
+      kernels: PackedStockhamC2rKernel[];
+    });
 
 export const getPackedStockhamC2rVariant = (
   device: GPUDevice,

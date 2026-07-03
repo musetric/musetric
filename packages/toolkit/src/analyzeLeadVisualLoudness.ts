@@ -2,16 +2,6 @@ import { type Logger } from '@musetric/utils';
 import { analyzeLoudness, type LoudnessAnalysis } from './analyzeLoudness.js';
 import { readPcm } from './generateWavePeaks/readPcm.js';
 
-export type LeadVisualLoudnessAnalysis = LoudnessAnalysis & {
-  p95RmsDb: number;
-};
-
-export type AnalyzeLeadVisualLoudnessOptions = {
-  fromPath: string;
-  sampleRate: number;
-  logger: Logger;
-};
-
 const epsilon = 1e-12;
 const windowSeconds = 0.1;
 const hopSeconds = 0.025;
@@ -30,6 +20,16 @@ const percentile = (values: number[], ratio: number): number | undefined => {
     Math.max(0, Math.ceil(sorted.length * ratio) - 1),
   );
   return sorted[index];
+};
+
+export type LeadVisualLoudnessAnalysis = LoudnessAnalysis & {
+  p95RmsDb: number;
+};
+
+export type AnalyzeLeadVisualLoudnessOptions = {
+  fromPath: string;
+  sampleRate: number;
+  logger: Logger;
 };
 
 export const analyzeLeadVisualLoudness = async (

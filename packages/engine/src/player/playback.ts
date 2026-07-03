@@ -56,6 +56,8 @@ export const createEngineStubPlayback = (): EnginePlayback => ({
   flushRecording: async () => Promise.resolve(0),
 });
 
+const dbToGain = (db: number) => 10 ** (db / 20);
+
 export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
@@ -69,8 +71,6 @@ type PlayingWaiter = {
   revision: number;
   resolve: (frameIndex: number) => void;
 };
-
-const dbToGain = (db: number) => 10 ** (db / 20);
 
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,

@@ -14,6 +14,11 @@ import {
   type SpectrogramPlayhead,
 } from './protocol.cross.js';
 
+const playheadFrameIndexSlot = 0;
+
+const emptySamples = (): SpectrogramLaneSamples =>
+  mapTrackKeys(() => undefined);
+
 export type CreateSpectrogramRuntimeOptions = {
   port: ReturnType<
     typeof spectrogramChannel.inbound<DedicatedWorkerGlobalScope>
@@ -22,11 +27,6 @@ export type CreateSpectrogramRuntimeOptions = {
   playhead: SpectrogramPlayhead;
   profiling?: boolean;
 };
-
-const playheadFrameIndexSlot = 0;
-
-const emptySamples = (): SpectrogramLaneSamples =>
-  mapTrackKeys(() => undefined);
 
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,

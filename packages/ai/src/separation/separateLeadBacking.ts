@@ -3,22 +3,6 @@ import { leadBackingModel } from '../models/leadBackingModel.js';
 import { type LeadBackingGpuRuntime } from '../runtime/leadBacking/leadBackingRuntime.js';
 import { type StereoAudio } from './stereoAudio.js';
 
-export type SeparateLeadBackingMessage = {
-  type: 'progress';
-  progress: number;
-};
-
-export type SeparateLeadBackingOptions = {
-  audio: StereoAudio;
-  runtime: LeadBackingGpuRuntime;
-  onMessage: (message: SeparateLeadBackingMessage) => void | Promise<void>;
-};
-
-export type SeparateLeadBackingResult = {
-  lead: StereoAudio;
-  backing: StereoAudio;
-};
-
 const { nFft, compensate, channels, chunkSamples } = leadBackingModel;
 const trim = nFft / 2;
 const genSamples = chunkSamples - 2 * trim;
@@ -89,6 +73,11 @@ const overlapAdd = (options: OverlapAddOptions): void => {
       divider[targetIndex] += weight;
     }
   }
+};
+
+export type SeparateLeadBackingMessage = {
+  type: 'progress';
+  progress: number;
 };
 
 type DemixOptions = {
@@ -171,6 +160,17 @@ const getPeak = (audio: StereoAudio): number => {
     peak = Math.max(peak, Math.abs(sample));
   }
   return peak;
+};
+
+export type SeparateLeadBackingOptions = {
+  audio: StereoAudio;
+  runtime: LeadBackingGpuRuntime;
+  onMessage: (message: SeparateLeadBackingMessage) => void | Promise<void>;
+};
+
+export type SeparateLeadBackingResult = {
+  lead: StereoAudio;
+  backing: StereoAudio;
 };
 
 export const separateLeadBacking = async (

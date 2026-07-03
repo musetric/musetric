@@ -13,11 +13,11 @@ const noteNames = [
   'B',
 ] as const;
 
-type NoteName = (typeof noteNames)[number];
-
 const a4Midi = 69;
 const a4Frequency = 440;
 const semitonesPerOctave = 12;
+
+type NoteName = (typeof noteNames)[number];
 
 const getNoteName = (midi: number): NoteName => noteNames[midi % 12];
 

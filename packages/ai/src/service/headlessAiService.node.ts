@@ -20,26 +20,6 @@ import {
 } from './browserApi.js';
 import { type SeparationModelFiles } from './modelCache.node.js';
 
-type ProgressMessageHandler = (
-  message: Extract<SeparateAudioMessage, { type: 'progress' }>,
-) => void | Promise<void>;
-
-type HeadlessSeparateAudioOptions = {
-  logger: Logger;
-  pcm: Buffer;
-  sampleRate: number;
-  modelFiles: SeparationModelFiles;
-  rawStemPaths: Record<StemKey, string>;
-  onMessage: ProgressMessageHandler;
-};
-
-type ModuleServer = {
-  baseUrl: string;
-  registerModelFile: (path: string) => string;
-  pcmUrl: string;
-  close: () => Promise<void>;
-};
-
 const browserLaunchArgs = [
   '--enable-unsafe-webgpu',
   '--disable-webgpu-blocklist',
@@ -121,6 +101,13 @@ const handleModuleRequest = async (
     response.writeHead(404);
     response.end('not found');
   });
+};
+
+type ModuleServer = {
+  baseUrl: string;
+  registerModelFile: (path: string) => string;
+  pcmUrl: string;
+  close: () => Promise<void>;
 };
 
 const createModuleServer = async (
@@ -248,6 +235,10 @@ const ensureWebGpu = async (page: Page): Promise<void> => {
   }
 };
 
+type ProgressMessageHandler = (
+  message: Extract<SeparateAudioMessage, { type: 'progress' }>,
+) => void | Promise<void>;
+
 const createPage = async (
   browser: Browser,
   baseUrl: string,
@@ -301,6 +292,15 @@ const registerStemDownloads = async (
     };
     page.on('download', onDownload);
   });
+};
+
+type HeadlessSeparateAudioOptions = {
+  logger: Logger;
+  pcm: Buffer;
+  sampleRate: number;
+  modelFiles: SeparationModelFiles;
+  rawStemPaths: Record<StemKey, string>;
+  onMessage: ProgressMessageHandler;
 };
 
 export const separateAudioHeadless = async (

@@ -3,24 +3,6 @@ import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { createParamsCell, type StateParams } from './params.js';
 import { type FundamentalFrequencyPipelines } from './pipeline.js';
 
-export type StateArg = {
-  signal: GPUBuffer;
-  config: ExtSpectrogramConfig;
-};
-
-export type FundamentalFrequencyState = {
-  pipelines: FundamentalFrequencyPipelines;
-  params: StateParams;
-  output: {
-    lattice: GPUBuffer;
-    line: GPUBuffer;
-  };
-  bindGroups: {
-    observe: GPUBindGroup;
-    track: GPUBindGroup;
-  };
-};
-
 type LatticeBufferArg = {
   windowCount: number;
   latticeCount: number;
@@ -58,6 +40,24 @@ const createLineBufferCell = (device: GPUDevice) =>
     },
     equals: (current, next) => current === next,
   });
+
+export type StateArg = {
+  signal: GPUBuffer;
+  config: ExtSpectrogramConfig;
+};
+
+export type FundamentalFrequencyState = {
+  pipelines: FundamentalFrequencyPipelines;
+  params: StateParams;
+  output: {
+    lattice: GPUBuffer;
+    line: GPUBuffer;
+  };
+  bindGroups: {
+    observe: GPUBindGroup;
+    track: GPUBindGroup;
+  };
+};
 
 export const createStateCell = (
   device: GPUDevice,

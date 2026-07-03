@@ -1,3 +1,15 @@
+const requiredTimelineConfigKeys = [
+  'canvas',
+  'mode',
+  'duration',
+  'frameIndex',
+  'visibleTime',
+  'playheadRatio',
+  'markerColor',
+  'labelColor',
+  'font',
+] as const;
+
 export type TimelineMode = 'spectrogram' | 'tracks';
 
 export type TimelineConfig = {
@@ -12,18 +24,6 @@ export type TimelineConfig = {
   labelColor: string;
   font: string;
 };
-
-const requiredTimelineConfigKeys = [
-  'canvas',
-  'mode',
-  'duration',
-  'frameIndex',
-  'visibleTime',
-  'playheadRatio',
-  'markerColor',
-  'labelColor',
-  'font',
-] as const;
 
 const isTimelineConfigComplete = (
   config: Partial<TimelineConfig>,

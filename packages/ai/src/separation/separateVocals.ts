@@ -3,22 +3,6 @@ import { vocalsModel } from '../models/vocalsModel.js';
 import { type VocalsGpuRuntime } from '../runtime/vocals/vocalsRuntime.js';
 import { type StereoAudio } from './stereoAudio.js';
 
-export type SeparateVocalsMessage = {
-  type: 'progress';
-  progress: number;
-};
-
-export type SeparateVocalsOptions = {
-  audio: StereoAudio;
-  runtime: VocalsGpuRuntime;
-  onMessage: (message: SeparateVocalsMessage) => void | Promise<void>;
-};
-
-export type SeparateVocalsResult = {
-  vocals: StereoAudio;
-  instrumental: StereoAudio;
-};
-
 type FillChunkOptions = {
   chunk: Float32Array<ArrayBuffer>;
   mix: Float32Array<ArrayBuffer>;
@@ -122,6 +106,22 @@ const getChunkWindow = (
     };
   }
   return { start: 0, length: samples };
+};
+
+export type SeparateVocalsMessage = {
+  type: 'progress';
+  progress: number;
+};
+
+export type SeparateVocalsOptions = {
+  audio: StereoAudio;
+  runtime: VocalsGpuRuntime;
+  onMessage: (message: SeparateVocalsMessage) => void | Promise<void>;
+};
+
+export type SeparateVocalsResult = {
+  vocals: StereoAudio;
+  instrumental: StereoAudio;
 };
 
 export const separateVocals = async (

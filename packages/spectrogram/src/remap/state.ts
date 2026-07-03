@@ -3,6 +3,19 @@ import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramBandSpectrum } from '../lane/index.js';
 import { createParamsCell, type StateParams } from './params.js';
 
+const areSpectraBuffersEqual = (
+  current: SpectrogramBandSpectrum[],
+  next: SpectrogramBandSpectrum[],
+) =>
+  current.length === next.length &&
+  current.every((spectrum, index) => {
+    const nextSpectrum = next[index];
+    return (
+      spectrum.rawMagnitudeBuffer === nextSpectrum.rawMagnitudeBuffer &&
+      spectrum.columnEnergyBuffer === nextSpectrum.columnEnergyBuffer
+    );
+  });
+
 export type StateArg = {
   spectra: SpectrogramBandSpectrum[];
   texture: GPUTextureView;
@@ -19,19 +32,6 @@ export type State = {
   params: StateParams;
   bindGroup: GPUBindGroup;
 };
-
-const areSpectraBuffersEqual = (
-  current: SpectrogramBandSpectrum[],
-  next: SpectrogramBandSpectrum[],
-) =>
-  current.length === next.length &&
-  current.every((spectrum, index) => {
-    const nextSpectrum = next[index];
-    return (
-      spectrum.rawMagnitudeBuffer === nextSpectrum.rawMagnitudeBuffer &&
-      spectrum.columnEnergyBuffer === nextSpectrum.columnEnergyBuffer
-    );
-  });
 
 export const createStateCell = (
   device: GPUDevice,

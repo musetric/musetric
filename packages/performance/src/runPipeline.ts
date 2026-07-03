@@ -19,16 +19,6 @@ import {
   warmupIters,
 } from './constants.js';
 
-export type RunPipelineOptions = {
-  device: GPUDevice;
-  canvas: OffscreenCanvas;
-  fourierMode: FourierMode;
-  windowSize: number;
-  params: BenchmarkParams;
-};
-
-type Spread = { low: number; high: number };
-
 const createSpectralBands = (
   windowSize: number,
   bandCount: BenchmarkBandCount,
@@ -84,6 +74,16 @@ const benchStatsConfig = {
   stableSampleWindow: benchBatchSize * 3,
   trimFraction: 0.1,
 } as const;
+
+export type RunPipelineOptions = {
+  device: GPUDevice;
+  canvas: OffscreenCanvas;
+  fourierMode: FourierMode;
+  windowSize: number;
+  params: BenchmarkParams;
+};
+
+type Spread = { low: number; high: number };
 
 export const runPipeline = async (
   options: RunPipelineOptions,

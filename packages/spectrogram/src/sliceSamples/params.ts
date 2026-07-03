@@ -5,6 +5,13 @@ import {
   type SpectrogramColumnRange,
 } from '../common/extConfig.js';
 
+export const ringStartByteOffset = 24;
+export const slotOffsetByteOffset = 28;
+export const screenBaseByteOffset = 32;
+export const baseColumnByteOffset = 36;
+export const baseWindowStartByteOffset = 40;
+const paramsByteLength = 48;
+
 export type SliceSamplesParams = {
   windowSize: number;
   paddedWindowSize: number;
@@ -13,13 +20,6 @@ export type SliceSamplesParams = {
   visibleSamples: number;
   step: number;
 };
-
-export const ringStartByteOffset = 24;
-export const slotOffsetByteOffset = 28;
-export const screenBaseByteOffset = 32;
-export const baseColumnByteOffset = 36;
-export const baseWindowStartByteOffset = 40;
-const paramsByteLength = 48;
 
 const toParams = (config: ExtSpectrogramConfig): SliceSamplesParams => {
   const {

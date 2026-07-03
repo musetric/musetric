@@ -4,6 +4,11 @@ import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramBandSpectrum } from '../lane/index.js';
 
+const headerByteLength = 64;
+const bandByteLength = 32;
+export const slotOffsetByteOffset = 52;
+export const columnCountByteOffset = 56;
+
 export type RemapBandParams = {
   windowSize: number;
   halfSize: number;
@@ -38,11 +43,6 @@ export type RemapParamsArg = {
   gainDb: number;
   spectra: SpectrogramBandSpectrum[];
 };
-
-const headerByteLength = 64;
-const bandByteLength = 32;
-export const slotOffsetByteOffset = 52;
-export const columnCountByteOffset = 56;
 
 const toParams = (arg: RemapParamsArg): RemapParams => {
   const { sampleRate, minFrequency, maxFrequency, viewSize, minDecibel } =
@@ -79,18 +79,6 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
   };
 };
 
-export type StateParams = {
-  value: RemapParams;
-  buffer: GPUBuffer;
-  byteLength: number;
-  writeRange: (
-    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
-  ) => {
-    columnCount: number;
-    byteOffset: number;
-  };
-};
-
 const areSpectraEqual = (
   current: SpectrogramBandSpectrum[],
   next: SpectrogramBandSpectrum[],
@@ -108,6 +96,18 @@ const areSpectraEqual = (
       spectrum.band.maxFrequency === nextSpectrum.band.maxFrequency
     );
   });
+
+export type StateParams = {
+  value: RemapParams;
+  buffer: GPUBuffer;
+  byteLength: number;
+  writeRange: (
+    range?: Pick<SpectrogramColumnRange, 'slotOffset' | 'columnCount'>,
+  ) => {
+    columnCount: number;
+    byteOffset: number;
+  };
+};
 
 export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({

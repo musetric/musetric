@@ -1,3 +1,6 @@
+const clamp = (value: number, minimum: number, maximum: number) =>
+  Math.min(maximum, Math.max(minimum, value));
+
 export type ViewportPositionState = {
   kind: 'position';
   position: number;
@@ -24,30 +27,10 @@ export type ViewportRangeState = {
 
 export type ViewportState = ViewportPositionState | ViewportRangeState;
 
-export type ViewportPanOptions = {
-  state: ViewportState;
-  delta: number;
-  viewportSize: number;
-};
-
-export type ViewportZoomOptions = {
-  state: ViewportState;
-  anchorRatio: number;
-  scale: number;
-};
-
 export type ViewportStateUpdate = {
   state: ViewportState;
   clamped: boolean;
 };
-
-type RangeClampResult = {
-  lower: number;
-  upper: number;
-};
-
-const clamp = (value: number, minimum: number, maximum: number) =>
-  Math.min(maximum, Math.max(minimum, value));
 
 const panPositionViewport = (
   state: ViewportPositionState,
@@ -119,6 +102,11 @@ const zoomPositionViewport = (
   };
 };
 
+type RangeClampResult = {
+  lower: number;
+  upper: number;
+};
+
 const clampRangeViewport = (
   lower: number,
   upper: number,
@@ -171,6 +159,12 @@ const zoomRangeViewport = (
   };
 };
 
+export type ViewportPanOptions = {
+  state: ViewportState;
+  delta: number;
+  viewportSize: number;
+};
+
 export const panViewportState = (
   options: ViewportPanOptions,
 ): ViewportStateUpdate => {
@@ -183,6 +177,12 @@ export const panViewportState = (
   }
 
   return panRangeViewport(options.state, options.delta, options.viewportSize);
+};
+
+export type ViewportZoomOptions = {
+  state: ViewportState;
+  anchorRatio: number;
+  scale: number;
 };
 
 export const zoomViewportState = (
