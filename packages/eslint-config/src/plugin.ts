@@ -8,6 +8,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-component-spacing-prop': 'error',
   'musetric/no-defensive-throw-guards': 'error',
   'musetric/no-dynamic-translation-keys': 'error',
+  'musetric/no-function-declarations': 'error',
   'musetric/no-immediate-inline-function-calls': 'error',
   'musetric/no-inline-parameter-destructuring': 'error',
   'musetric/no-inline-parameter-object-types': 'error',

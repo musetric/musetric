@@ -197,23 +197,13 @@ const createMultiPassPipeline = (
   };
 };
 
-export function createPipeline(
-  device: GPUDevice,
-  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  inPlace: boolean,
-): MultiPassPipeline;
-export function createPipeline(
-  device: GPUDevice,
-  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  inPlace: boolean,
-): SinglePassPipeline;
-export function createPipeline(
+export const createPipeline = (
   device: GPUDevice,
   variant: PackedStockhamR2cVariant,
   inPlace: boolean,
-): Pipeline {
+): Pipeline => {
   if (variant.kind === 'multiPass') {
     return createMultiPassPipeline(device, variant, inPlace);
   }
   return createSinglePassPipeline(device, variant, inPlace);
-}
+};

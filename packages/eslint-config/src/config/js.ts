@@ -40,7 +40,6 @@ export const jsConfig: Linter.Config = {
     ...sonarjs.configs.recommended.rules,
     eqeqeq: ['error', 'always'],
     'func-names': ['error'],
-    'func-style': ['error'],
     'import-x/no-cycle': ['error', { ignoreExternal: true }],
     'import-x/no-extraneous-dependencies': [
       'error',
