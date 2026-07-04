@@ -1,11 +1,10 @@
 import {
-  type RecordingLatencyCalibrationDoneMessage,
+  type microphoneCalibrationChannel,
   type RecordingLatencyCalibrationPeak,
-  type RecordingLatencyCalibrationStartMessage,
 } from './protocol.cross.js';
 
 export type MicrophoneCalibrationRuntime = {
-  handleMessage: (message: unknown) => void;
+  handleStart: (message: { clickFrames: number[]; endFrame: number }) => void;
   process: (
     inputs: (Float32Array[] | undefined)[],
     outputs: Float32Array[][],
@@ -14,30 +13,13 @@ export type MicrophoneCalibrationRuntime = {
 };
 
 export type CreateMicrophoneCalibrationRuntimeOptions = {
-  postMessage: (message: RecordingLatencyCalibrationDoneMessage) => void;
-};
-
-const isStartMessage = (
-  message: unknown,
-): message is RecordingLatencyCalibrationStartMessage => {
-  if (typeof message !== 'object' || !message) {
-    return false;
-  }
-
-  return (
-    'type' in message &&
-    message.type === 'start' &&
-    'clickFrames' in message &&
-    Array.isArray(message.clickFrames) &&
-    'endFrame' in message &&
-    typeof message.endFrame === 'number'
-  );
+  port: ReturnType<typeof microphoneCalibrationChannel.inbound<MessagePort>>;
 };
 
 export const createMicrophoneCalibrationRuntime = (
   options: CreateMicrophoneCalibrationRuntimeOptions,
 ): MicrophoneCalibrationRuntime => {
-  const { postMessage } = options;
+  const { port } = options;
   let clickFrames: number[] = [];
   let clickIndex = 0;
   let collecting = false;
@@ -46,10 +28,7 @@ export const createMicrophoneCalibrationRuntime = (
 
   const finish = () => {
     collecting = false;
-    postMessage({
-      type: 'done',
-      peaks,
-    });
+    port.methods.done({ peaks });
   };
 
   const advanceClickIndex = (frame: number) => {
@@ -98,11 +77,7 @@ export const createMicrophoneCalibrationRuntime = (
   };
 
   return {
-    handleMessage: (message) => {
-      if (!isStartMessage(message)) {
-        return;
-      }
-
+    handleStart: (message) => {
       clickFrames = message.clickFrames;
       clickIndex = 0;
       endFrame = message.endFrame;

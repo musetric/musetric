@@ -3,7 +3,10 @@ import {
   createMicrophoneCalibrationRuntime,
   type MicrophoneCalibrationRuntime,
 } from './microphoneRuntime.worklet.js';
-import { microphoneCalibrationProcessorName } from './protocol.cross.js';
+import {
+  microphoneCalibrationChannel,
+  microphoneCalibrationProcessorName,
+} from './protocol.cross.js';
 
 export class MicrophoneCalibrationProcessor
   extends AudioWorkletProcessor
@@ -13,14 +16,15 @@ export class MicrophoneCalibrationProcessor
 
   constructor() {
     super();
+    const port = microphoneCalibrationChannel.inbound(this.port);
     this.runtime = createMicrophoneCalibrationRuntime({
-      postMessage: (message) => {
-        this.port.postMessage(message);
+      port,
+    });
+    port.bindHandlers({
+      start: (message) => {
+        this.runtime.handleStart(message);
       },
     });
-    this.port.onmessage = (event: MessageEvent<unknown>) => {
-      this.runtime.handleMessage(event.data);
-    };
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {

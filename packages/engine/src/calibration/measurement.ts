@@ -1,12 +1,12 @@
-import { createMicrophoneAudioConstraints } from '../recording/constraints.js';
 import {
   createRecordingLatencyCalibrationClick,
   createRecordingLatencyCalibrationSchedule,
   getRecordingLatencyCalibrationFrameCounts,
   getRecordingLatencyFrameCount,
-  type RecordingLatencyCalibrationPeak,
   recordingLatencyCalibrationTimeoutSeconds,
-} from './schedule.js';
+} from '@musetric/audio/calibration';
+import { createMicrophoneAudioConstraints } from '@musetric/audio/recording';
+import { microphoneCalibrationChannel } from './protocol.cross.js';
 
 export type CalibrationMeasurementOptions = {
   context: AudioContext;
@@ -24,7 +24,7 @@ export type CalibrationMeasurementResult = {
 };
 
 type WorkletResult = {
-  peaks: RecordingLatencyCalibrationPeak[];
+  peaks: { clickFrame: number; peakFrame: number; peakValue: number }[];
 };
 
 const workletPromises = new Map<string, Promise<void>>();
@@ -53,7 +53,9 @@ const loadWorklet = async (
   return promise;
 };
 
-const waitForResult = async (node: AudioWorkletNode) =>
+const waitForResult = async (
+  port: ReturnType<typeof microphoneCalibrationChannel.outbound<MessagePort>>,
+): Promise<WorkletResult | undefined> =>
   new Promise<WorkletResult | undefined>((resolve) => {
     let settled = false;
     const timeout = window.setTimeout(
@@ -67,24 +69,16 @@ const waitForResult = async (node: AudioWorkletNode) =>
       Math.round(recordingLatencyCalibrationTimeoutSeconds * 1000),
     );
 
-    node.port.onmessage = (
-      event: MessageEvent<{
-        type: string;
-        peaks?: RecordingLatencyCalibrationPeak[];
-      }>,
-    ) => {
-      if (
-        event.data.type !== 'done' ||
-        settled ||
-        !Array.isArray(event.data.peaks)
-      ) {
-        return;
-      }
-
-      settled = true;
-      window.clearTimeout(timeout);
-      resolve({ peaks: event.data.peaks });
-    };
+    port.bindHandlers({
+      done: (message) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve({ peaks: message.peaks });
+      },
+    });
   });
 
 export const measureRecordingLatency = async (
@@ -129,9 +123,9 @@ export const measureRecordingLatency = async (
     calibrationNode.connect(silentGain);
     silentGain.connect(outputNode);
 
-    const resultPromise = waitForResult(calibrationNode);
-    calibrationNode.port.postMessage({
-      type: 'start',
+    const port = microphoneCalibrationChannel.outbound(calibrationNode.port);
+    const resultPromise = waitForResult(port);
+    port.methods.start({
       clickFrames: schedule.clickFrames,
       endFrame: schedule.endFrame,
     });

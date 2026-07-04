@@ -1,13 +1,13 @@
-export type RecordingLatencyCalibrationSchedule = {
-  clickTime: number;
-  clickFrames: number[];
-  endFrame: number;
-};
-
 export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
   peakFrame: number;
   peakValue: number;
+};
+
+export type RecordingLatencyCalibrationSchedule = {
+  clickTime: number;
+  clickFrames: number[];
+  endFrame: number;
 };
 
 export type CreateRecordingLatencyCalibrationScheduleOptions = {
