@@ -43,13 +43,12 @@ const createResources = (
   tables: createTrigTables(device, variant),
 });
 
-const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
-  return device.createBuffer({
+const createDummyInputBuffer = (device: GPUDevice): GPUBuffer =>
+  device.createBuffer({
     label: 'packed-tiled-r2c-dummy-input',
     size: Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
-};
 
 type CreateBindGroupsOptions = {
   input: GPUBuffer;

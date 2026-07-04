@@ -24,12 +24,13 @@ export const PreviewField: FC<PreviewFieldProps> = (props) => {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (!value?.url) return;
       URL.revokeObjectURL(value.url);
-    };
-  }, [value?.url]);
+    },
+    [value?.url],
+  );
 
   return (
     <Stack>

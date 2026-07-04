@@ -13,11 +13,10 @@ export const applyRhythmResult = (database: DatabaseSync) => {
      ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId`,
   );
 
-  return async (arg: ApplyRhythmResultArg): Promise<void> => {
-    return await transaction(database, async () => {
+  return async (arg: ApplyRhythmResultArg): Promise<void> =>
+    await transaction(database, async () => {
       await Promise.resolve(
         insertRhythmStatement.run(arg.projectId, arg.blobId),
       );
     });
-  };
 };

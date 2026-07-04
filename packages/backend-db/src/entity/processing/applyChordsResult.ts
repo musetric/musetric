@@ -13,11 +13,10 @@ export const applyChordsResult = (database: DatabaseSync) => {
      ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId`,
   );
 
-  return async (arg: ApplyChordsResultArg): Promise<void> => {
-    return await transaction(database, async () => {
+  return async (arg: ApplyChordsResultArg): Promise<void> =>
+    await transaction(database, async () => {
       await Promise.resolve(
         insertChordsStatement.run(arg.projectId, arg.blobId),
       );
     });
-  };
 };

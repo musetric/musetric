@@ -7,12 +7,11 @@ import { getSubtitleActiveSegmentIndex } from './subtitleTiming.js';
 
 const getCurrentSubtitleActiveSegmentIndex = (
   subtitle: api.subtitle.Segment[],
-) => {
-  return getSubtitleActiveSegmentIndex(
+) =>
+  getSubtitleActiveSegmentIndex(
     subtitle,
     getSubtitlePlaybackTimeFromState(engine.store.get()),
   );
-};
 
 export const useSubtitleCursor = (
   subtitle: api.subtitle.Segment[],
@@ -27,18 +26,20 @@ export const useSubtitleCursor = (
     );
   }, [subtitle, subtitleCursor]);
 
-  useEffect(() => {
-    return engine.store.subscribe(
-      (state) =>
-        getSubtitleActiveSegmentIndex(
-          subtitle,
-          getSubtitlePlaybackTimeFromState(state),
-        ),
-      (activeSegmentIndex) => {
-        subtitleCursor.setActiveSegmentIndex(activeSegmentIndex);
-      },
-    );
-  }, [subtitle, subtitleCursor]);
+  useEffect(
+    () =>
+      engine.store.subscribe(
+        (state) =>
+          getSubtitleActiveSegmentIndex(
+            subtitle,
+            getSubtitlePlaybackTimeFromState(state),
+          ),
+        (activeSegmentIndex) => {
+          subtitleCursor.setActiveSegmentIndex(activeSegmentIndex);
+        },
+      ),
+    [subtitle, subtitleCursor],
+  );
 
   return subtitleCursor;
 };

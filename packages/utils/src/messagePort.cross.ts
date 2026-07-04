@@ -84,11 +84,9 @@ export const createMessagePort = <
   instance: Port,
   methodKeys: readonly (keyof Methods)[],
   methodTransfers: PortTransfers<Methods> = {},
-): TypedMessagePort<Port, Handlers, Methods> => {
-  return {
-    instance,
-    methods: createMethods(instance, methodKeys, methodTransfers),
-    bindBoot: (boot) => bindHandlers(instance, { boot }),
-    bindHandlers: (handlers) => bindHandlers(instance, handlers),
-  };
-};
+): TypedMessagePort<Port, Handlers, Methods> => ({
+  instance,
+  methods: createMethods(instance, methodKeys, methodTransfers),
+  bindBoot: (boot) => bindHandlers(instance, { boot }),
+  bindHandlers: (handlers) => bindHandlers(instance, handlers),
+});

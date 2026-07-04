@@ -125,9 +125,8 @@ export const createPaddedBenchWave = (
 export const createBenchSpectrum = (
   windowSize: number,
   windowCount: number,
-): Float32Array<ArrayBuffer> => {
-  return new Float32Array(createBenchWave(windowSize + 2, windowCount));
-};
+): Float32Array<ArrayBuffer> =>
+  new Float32Array(createBenchWave(windowSize + 2, windowCount));
 
 export type MeasureOneOptions = {
   logLabel: string;

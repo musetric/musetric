@@ -45,10 +45,8 @@ export const createEngineStubPlayback = (): EnginePlayback => ({
   seek: () => {
     // nothing
   },
-  connectRecordingSource: () => {
-    return () => {
-      // nothing
-    };
+  connectRecordingSource: () => () => {
+    // nothing
   },
   startRecording: () => {
     // nothing

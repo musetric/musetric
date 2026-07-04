@@ -29,27 +29,25 @@ export type ProjectActions = {
 type State = ProjectState & ProjectActions;
 
 export const useProjectStore = create<State>()(
-  subscribeWithSelector((set) => {
-    return {
-      ...initialState,
-      setVisualizationMode: (visualizationMode) => {
-        set({ visualizationMode });
-        if (visualizationMode !== 'tracks') {
-          engine.store.update((state) => {
-            state.spectrogramView = visualizationMode;
-          });
-        }
-      },
-      setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
-      setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
-      setTransposeAnchorEl: (transposeAnchorEl) =>
-        set({
-          transposeAnchorEl,
-        }),
-      setTempoAnchorEl: (tempoAnchorEl) =>
-        set({
-          tempoAnchorEl,
-        }),
-    };
-  }),
+  subscribeWithSelector((set) => ({
+    ...initialState,
+    setVisualizationMode: (visualizationMode) => {
+      set({ visualizationMode });
+      if (visualizationMode !== 'tracks') {
+        engine.store.update((state) => {
+          state.spectrogramView = visualizationMode;
+        });
+      }
+    },
+    setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
+    setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
+    setTransposeAnchorEl: (transposeAnchorEl) =>
+      set({
+        transposeAnchorEl,
+      }),
+    setTempoAnchorEl: (tempoAnchorEl) =>
+      set({
+        tempoAnchorEl,
+      }),
+  })),
 );

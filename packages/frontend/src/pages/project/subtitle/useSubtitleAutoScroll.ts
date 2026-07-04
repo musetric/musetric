@@ -54,54 +54,56 @@ export const useSubtitleAutoScroll = (
     }
   }, [subtitle, subtitleCursor, subtitleListRef]);
 
-  useEffect(() => {
-    return engine.store.subscribe(
-      (state) => state.seekEvent.revision,
-      (nextSeekRevision) => {
-        const { seekEvent } = engine.store.get();
-        seekRevisionRef.current = nextSeekRevision;
+  useEffect(
+    () =>
+      engine.store.subscribe(
+        (state) => state.seekEvent.revision,
+        (nextSeekRevision) => {
+          const { seekEvent } = engine.store.get();
+          seekRevisionRef.current = nextSeekRevision;
 
-        if (skippedSeekRevisionRef.current === nextSeekRevision) {
-          skippedSeekRevisionRef.current = undefined;
-          return;
-        }
+          if (skippedSeekRevisionRef.current === nextSeekRevision) {
+            skippedSeekRevisionRef.current = undefined;
+            return;
+          }
 
-        if (isVisualizationSeekOrigin(seekEvent.origin)) {
-          return;
-        }
+          if (isVisualizationSeekOrigin(seekEvent.origin)) {
+            return;
+          }
 
-        const subtitleListElement = subtitleListRef.current;
-        if (!subtitleListElement || subtitleScrollHeldRef.current) {
-          return;
-        }
+          const subtitleListElement = subtitleListRef.current;
+          if (!subtitleListElement || subtitleScrollHeldRef.current) {
+            return;
+          }
 
-        const activeSegmentElement = getSubtitleSegmentElement(
-          subtitleListElement,
-          subtitleCursor.getActiveSegmentIndex(),
-        );
-
-        if (
-          activeSegmentElement &&
-          shouldCenterSoughtSubtitleSegment(
+          const activeSegmentElement = getSubtitleSegmentElement(
             subtitleListElement,
-            activeSegmentElement,
-          )
-        ) {
-          scheduleSubtitleSegmentCentering(
-            activeSegmentElement,
-            scrollFrameRef,
-            'smooth',
+            subtitleCursor.getActiveSegmentIndex(),
           );
-        }
-      },
-    );
-  }, [
-    scrollFrameRef,
-    skippedSeekRevisionRef,
-    subtitleCursor,
-    subtitleListRef,
-    subtitleScrollHeldRef,
-  ]);
+
+          if (
+            activeSegmentElement &&
+            shouldCenterSoughtSubtitleSegment(
+              subtitleListElement,
+              activeSegmentElement,
+            )
+          ) {
+            scheduleSubtitleSegmentCentering(
+              activeSegmentElement,
+              scrollFrameRef,
+              'smooth',
+            );
+          }
+        },
+      ),
+    [
+      scrollFrameRef,
+      skippedSeekRevisionRef,
+      subtitleCursor,
+      subtitleListRef,
+      subtitleScrollHeldRef,
+    ],
+  );
 
   useEffect(() => {
     activeSegmentIndexRef.current = subtitleCursor.getActiveSegmentIndex();

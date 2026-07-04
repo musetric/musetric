@@ -30,8 +30,8 @@ export const update = (database: DatabaseSync) => {
     `DELETE FROM Preview WHERE projectId = ?`,
   );
 
-  return async (arg: UpdateArg): Promise<UpdateItem | undefined> => {
-    return await transaction(database, async () => {
+  return async (arg: UpdateArg): Promise<UpdateItem | undefined> =>
+    await transaction(database, async () => {
       const current = await getProject(arg.projectId);
       if (!current) {
         return undefined;
@@ -97,5 +97,4 @@ export const update = (database: DatabaseSync) => {
         preview: existingPreview,
       });
     });
-  };
 };

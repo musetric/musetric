@@ -167,9 +167,7 @@ export const createProjectRealtime = (
       current.closed = true;
       closeSocket(current);
     },
-    ready: async () => {
-      return realtime ? realtime.openPromise : Promise.resolve();
-    },
+    ready: async () => (realtime ? realtime.openPromise : Promise.resolve()),
     sendJson: (message) => {
       if (!realtime || realtime.closed) {
         return;

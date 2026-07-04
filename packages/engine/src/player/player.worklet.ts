@@ -31,9 +31,7 @@ export class PlayerProcessor
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleProcess = (_inputs: Float32Array[][], _output: Float32Array[]) => {
-    return true;
-  };
+  handleProcess = (_inputs: Float32Array[][], _output: Float32Array[]) => true;
 
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     return this.handleProcess(inputs, outputs[0]);

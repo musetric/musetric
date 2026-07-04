@@ -24,11 +24,10 @@ const getSubtitleSegmentCenterY = (segmentElement: HTMLElement) => {
 export const getSubtitleSegmentElement = (
   subtitleListElement: HTMLDivElement,
   segmentIndex: number,
-) => {
-  return subtitleListElement.querySelector<HTMLElement>(
+) =>
+  subtitleListElement.querySelector<HTMLElement>(
     `[${subtitleSegmentIndexAttribute}="${segmentIndex}"]`,
   );
-};
 
 export const getClickedSubtitleWordElement = (eventTarget: EventTarget) => {
   const targetElement = getEventTargetElement(eventTarget);
@@ -45,9 +44,8 @@ export const getSubtitleWordStart = (wordElement: HTMLElement) => {
   return wordStart === undefined ? undefined : Number(wordStart);
 };
 
-export const getSubtitleSegmentElementFromWord = (wordElement: HTMLElement) => {
-  return wordElement.closest<HTMLElement>(`[${subtitleSegmentIndexAttribute}]`);
-};
+export const getSubtitleSegmentElementFromWord = (wordElement: HTMLElement) =>
+  wordElement.closest<HTMLElement>(`[${subtitleSegmentIndexAttribute}]`);
 
 export const getSubtitleSegmentElementIndex = (segmentElement: HTMLElement) => {
   const segmentIndex = segmentElement.dataset.subtitleSegmentIndex;

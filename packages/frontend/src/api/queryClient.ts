@@ -11,9 +11,7 @@ export const mutationOptions = <
   TContext = unknown,
 >(
   options: UseMutationOptions<TData, TError, TVariables, TContext>,
-): UseMutationOptions<TData, TError, TVariables, TContext> => {
-  return options;
-};
+): UseMutationOptions<TData, TError, TVariables, TContext> => options;
 
 export const queryClient = new QueryClient({
   defaultOptions: {

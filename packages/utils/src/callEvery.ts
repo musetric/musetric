@@ -27,8 +27,8 @@ const createCallEveryInternal = <Args extends unknown[], Result>(
       });
   };
 
-  return async (...args: Args): Promise<Result> => {
-    return new Promise<Result>((resolve, reject) => {
+  return async (...args: Args): Promise<Result> =>
+    new Promise<Result>((resolve, reject) => {
       const item: QueueItem<Args, Result> = { args, reject, resolve };
       if (!currentItem) {
         currentItem = item;
@@ -37,7 +37,6 @@ const createCallEveryInternal = <Args extends unknown[], Result>(
       }
       queue.push(item);
     });
-  };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

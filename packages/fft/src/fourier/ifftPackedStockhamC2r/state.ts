@@ -17,13 +17,12 @@ import {
   type TrigTables,
 } from './trigTables.js';
 
-const createDummySpectrumBuffer = (device: GPUDevice): GPUBuffer => {
-  return device.createBuffer({
+const createDummySpectrumBuffer = (device: GPUDevice): GPUBuffer =>
+  device.createBuffer({
     label: 'packed-stockham-c2r-dummy-spectrum',
     size: Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
-};
 
 type ScratchBuffers = {
   buffer0: GPUBuffer;

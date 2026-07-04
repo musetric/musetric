@@ -13,9 +13,8 @@ export const applyKeyResult = (database: DatabaseSync) => {
      ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId`,
   );
 
-  return async (arg: ApplyKeyResultArg): Promise<void> => {
-    return await transaction(database, async () => {
+  return async (arg: ApplyKeyResultArg): Promise<void> =>
+    await transaction(database, async () => {
       await Promise.resolve(insertKeyStatement.run(arg.projectId, arg.blobId));
     });
-  };
 };

@@ -13,11 +13,10 @@ export const applyTranscriptionResult = (database: DatabaseSync) => {
      ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId`,
   );
 
-  return async (arg: ApplyTranscriptionResultArg): Promise<void> => {
-    return await transaction(database, async () => {
+  return async (arg: ApplyTranscriptionResultArg): Promise<void> =>
+    await transaction(database, async () => {
       await Promise.resolve(
         insertSubtitleStatement.run(arg.projectId, arg.blobId),
       );
     });
-  };
 };
