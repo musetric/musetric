@@ -62,8 +62,8 @@ export const applySeparationResult = (database: DatabaseSync) => {
        leadSpectrogramGainDb = excluded.leadSpectrogramGainDb`,
   );
 
-  return async (arg: ApplySeparationResultArg): Promise<void> => {
-    return await transaction(database, async () => {
+  return async (arg: ApplySeparationResultArg): Promise<void> =>
+    await transaction(database, async () => {
       await Promise.resolve(
         upsertProjectAudioAnalysisStatement.run(
           arg.projectId,
@@ -128,5 +128,4 @@ export const applySeparationResult = (database: DatabaseSync) => {
         ),
       );
     });
-  };
 };

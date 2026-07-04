@@ -6,10 +6,9 @@ export type MessageHandlers<Message extends { type: string }> = {
   [Type in Message['type']]: MessageHandler<Message, Type>;
 };
 
-export const createMessageHandler = <Message extends { type: string }>(
-  handlers: MessageHandlers<Message>,
-) => {
-  return async (raw: Message): Promise<boolean> => {
+export const createMessageHandler =
+  <Message extends { type: string }>(handlers: MessageHandlers<Message>) =>
+  async (raw: Message): Promise<boolean> => {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const message = raw as Extract<Message, { type: Message['type'] }>;
     const handler = handlers[message.type];
@@ -18,4 +17,3 @@ export const createMessageHandler = <Message extends { type: string }>(
     await handler(message);
     return true;
   };
-};

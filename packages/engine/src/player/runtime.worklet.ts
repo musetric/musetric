@@ -143,9 +143,7 @@ export const createPlayerRuntime = async (
     );
   };
 
-  const getCurrentOutputFrameIndex = () => {
-    return frameIndex + outputOffsetFrameIndex;
-  };
+  const getCurrentOutputFrameIndex = () => frameIndex + outputOffsetFrameIndex;
 
   dataPort.bindHandlers({
     mount: (message) => {

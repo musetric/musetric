@@ -14,11 +14,10 @@ export type SearchRoute<Params extends object> = Route<Params, NativeParams>;
 
 export const createSearchRoute = <Params extends object = {}>(
   options?: SearchRouteOptions<Params>,
-): SearchRoute<Params> => {
-  return createRoute({
+): SearchRoute<Params> =>
+  createRoute({
     locationNativeParams: getLocationSearchParams,
     urlByNativeParams: (params) => new URLSearchParams(params).toString(),
     toNativeParams: () => ({}),
     ...options,
   });
-};

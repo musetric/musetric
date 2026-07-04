@@ -68,14 +68,11 @@ export const createProcessingWorker = (
   return {
     ...worker,
     emitter,
-    getProcessingState: (projectId) => {
-      return (
-        transcriptionWorker.getState(projectId) ??
-        rhythmWorker.getState(projectId) ??
-        keyWorker.getState(projectId) ??
-        chordsWorker.getState(projectId) ??
-        separationWorker.getState(projectId)
-      );
-    },
+    getProcessingState: (projectId) =>
+      transcriptionWorker.getState(projectId) ??
+      rhythmWorker.getState(projectId) ??
+      keyWorker.getState(projectId) ??
+      chordsWorker.getState(projectId) ??
+      separationWorker.getState(projectId),
   };
 };

@@ -9,7 +9,6 @@ export namespace apiError {
   export const isResponse = (value: unknown): value is AxiosError<Response> =>
     axios.isAxiosError(value) &&
     responseSchema.safeParse(value.response?.data).success;
-  export const getMessage = (value: unknown) => {
-    return isResponse(value) ? value.response?.data.message : undefined;
-  };
+  export const getMessage = (value: unknown) =>
+    isResponse(value) ? value.response?.data.message : undefined;
 }

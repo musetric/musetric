@@ -38,9 +38,7 @@ export const createGpuBufferReader = (
 const interleavedFloatCount = (
   windowSize: number,
   windowCount: number,
-): number => {
-  return (windowSize + 2) * windowCount;
-};
+): number => (windowSize + 2) * windowCount;
 
 const deinterleaveSpectrum = (
   input: ArrayBuffer,

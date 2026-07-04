@@ -38,6 +38,4 @@ export const transposeKeyRoot = (root: string, semitones: number): string => {
 export const formatKeyCompact = (
   root: string,
   mode: 'major' | 'minor',
-): string => {
-  return mode === 'minor' ? `${root}m` : `${root}maj`;
-};
+): string => (mode === 'minor' ? `${root}m` : `${root}maj`);

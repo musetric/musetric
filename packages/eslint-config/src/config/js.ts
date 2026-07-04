@@ -38,6 +38,7 @@ export const jsConfig: Linter.Config = {
     ...importX.flatConfigs.recommended.rules,
     ...musetricRecommendedRules,
     ...sonarjs.configs.recommended.rules,
+    'arrow-body-style': ['error', 'as-needed'],
     eqeqeq: ['error', 'always'],
     'func-names': ['error'],
     'import-x/no-cycle': ['error', { ignoreExternal: true }],

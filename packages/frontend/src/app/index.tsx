@@ -7,15 +7,13 @@ import { queryClient } from '../api/queryClient.js';
 import { AppRouter } from './router/AppRouter.js';
 import { appTheme } from './theme/index.js';
 
-export const App: FC = () => {
-  return (
-    <I18nextProvider i18n={i18next} defaultNS={'translation'}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={appTheme}>
-          <CssBaseline />
-          <AppRouter />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </I18nextProvider>
-  );
-};
+export const App: FC = () => (
+  <I18nextProvider i18n={i18next} defaultNS={'translation'}>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <AppRouter />
+      </ThemeProvider>
+    </QueryClientProvider>
+  </I18nextProvider>
+);

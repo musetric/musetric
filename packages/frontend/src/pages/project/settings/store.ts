@@ -57,23 +57,21 @@ export type SettingsActions = {
 
 type State = SettingsState & SettingsActions;
 export const useSettingsStore = create<State>()(
-  subscribeWithSelector((set) => {
-    return {
-      ...initialState,
-      setFourierMode: (fourierMode) => set({ fourierMode }),
-      setWindowName: (windowName) => set({ windowName }),
-      setWindowSize: (windowSize) => set({ windowSize }),
-      setMinFrequency: (minFrequency) => set({ minFrequency }),
-      setMaxFrequency: (maxFrequency) => set({ maxFrequency }),
-      setFrequencyRange: (minFrequency, maxFrequency) =>
-        set({ minFrequency, maxFrequency }),
-      setMinDecibel: (minDecibel) => set({ minDecibel }),
-      setVisibleTime: (visibleTime) => set({ visibleTime }),
-      setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
-      setZeroPaddingFactor: (zeroPaddingFactor) => set({ zeroPaddingFactor }),
-      setOpen: (open) => set({ open }),
-    };
-  }),
+  subscribeWithSelector((set) => ({
+    ...initialState,
+    setFourierMode: (fourierMode) => set({ fourierMode }),
+    setWindowName: (windowName) => set({ windowName }),
+    setWindowSize: (windowSize) => set({ windowSize }),
+    setMinFrequency: (minFrequency) => set({ minFrequency }),
+    setMaxFrequency: (maxFrequency) => set({ maxFrequency }),
+    setFrequencyRange: (minFrequency, maxFrequency) =>
+      set({ minFrequency, maxFrequency }),
+    setMinDecibel: (minDecibel) => set({ minDecibel }),
+    setVisibleTime: (visibleTime) => set({ visibleTime }),
+    setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
+    setZeroPaddingFactor: (zeroPaddingFactor) => set({ zeroPaddingFactor }),
+    setOpen: (open) => set({ open }),
+  })),
 );
 
 export const subscribeSettingsStore = () =>

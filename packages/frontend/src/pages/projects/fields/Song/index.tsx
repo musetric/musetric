@@ -15,12 +15,13 @@ export const SongField: FC<SongFieldProps> = (props) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (!value) return;
       URL.revokeObjectURL(value.url);
-    };
-  }, [value]);
+    },
+    [value],
+  );
 
   return (
     <Stack

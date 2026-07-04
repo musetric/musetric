@@ -31,9 +31,8 @@ const wasmFunctionKeys = [
   '_seek',
 ] satisfies (keyof TimeStretchWasmModule)[];
 
-const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
-  return Object.prototype.toString.call(value) === '[object Object]';
-};
+const isUnknownRecord = (value: unknown): value is Record<string, unknown> =>
+  Object.prototype.toString.call(value) === '[object Object]';
 
 const isEmscriptenTimeStretchWasmModule = (
   value: unknown,
@@ -42,9 +41,7 @@ const isEmscriptenTimeStretchWasmModule = (
     return false;
   }
 
-  return wasmFunctionKeys.every((key) => {
-    return typeof value[key] === 'function';
-  });
+  return wasmFunctionKeys.every((key) => typeof value[key] === 'function');
 };
 
 export const createTimeStretchWasmModule =

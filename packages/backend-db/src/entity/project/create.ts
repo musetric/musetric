@@ -29,8 +29,8 @@ export const create = (database: DatabaseSync) => {
     `INSERT INTO Preview (projectId, blobId, filename, contentType) VALUES (?, ?, ?, ?)`,
   );
 
-  return async (arg: CreateArg): Promise<CreateItem> => {
-    return await transaction(database, async () => {
+  return async (arg: CreateArg): Promise<CreateItem> =>
+    await transaction(database, async () => {
       const projectResult = await Promise.resolve(
         insertProjectStatement.run(arg.name, arg.sampleRate, arg.frameCount),
       );
@@ -69,5 +69,4 @@ export const create = (database: DatabaseSync) => {
 
       return createItemSchema.parse({ project, preview });
     });
-  };
 };

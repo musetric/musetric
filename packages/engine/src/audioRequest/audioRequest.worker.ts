@@ -6,39 +6,35 @@ import axios from 'axios';
 export const getDeliveryAudioContent = async (
   projectId: number,
   stemType: StemType,
-) => {
-  return await requestWithAxios(axios, api.audio.deliveryContent.base, {
+) =>
+  await requestWithAxios(axios, api.audio.deliveryContent.base, {
     params: {
       projectId,
       stemType,
     },
   });
-};
 
-export const getRecordingAudioContent = async (projectId: number) => {
-  return await requestWithAxios(axios, api.audio.recordingContent.base, {
+export const getRecordingAudioContent = async (projectId: number) =>
+  await requestWithAxios(axios, api.audio.recordingContent.base, {
     params: {
       projectId,
     },
   });
-};
 
 export const getDeliveryAudioWave = async (
   projectId: number,
   stemType: StemType,
-) => {
-  return await requestWithAxios(axios, api.audio.deliveryWave.base, {
+) =>
+  await requestWithAxios(axios, api.audio.deliveryWave.base, {
     params: {
       projectId,
       stemType,
     },
   });
-};
 
-export const getRecordingAudioWave = async (projectId: number) => {
-  return await requestWithAxios(axios, api.audio.recordingWave.base, {
+export const getRecordingAudioWave = async (projectId: number) =>
+  await requestWithAxios(axios, api.audio.recordingWave.base, {
     params: {
       projectId,
     },
   });
-};

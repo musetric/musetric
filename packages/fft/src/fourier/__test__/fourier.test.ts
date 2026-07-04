@@ -30,12 +30,11 @@ const isFourierFixtureSupported = (
   device: GPUDevice,
   mode: FourierMode,
   windowSize: number,
-): boolean => {
-  return isFourierModeSupported(device, mode, {
+): boolean =>
+  isFourierModeSupported(device, mode, {
     windowSize,
     windowCount,
   });
-};
 
 const ifourierFixtureSupports: Record<
   IFourierMode,
