@@ -2,6 +2,7 @@ import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
+import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { type AudioDecode, createAudioDecode } from './audioDecode.worker.js';
 import { createPlayerFrameIndexStream } from './playerFrameIndexStream.worker.js';
@@ -276,7 +277,7 @@ export const createDecoderWorkerRuntime = (
       realtime.open(message.projectId);
       recordingController.clearRecordingStream();
       recordingStream = createRecordingStream({
-        port: message.port,
+        port: recordingStreamChannel.outbound(message.port),
         samples: message.samples,
         metadata: message.metadata,
         onChunk: (chunk) => {

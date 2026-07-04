@@ -5,24 +5,6 @@ import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 // module stays free of DOM-dependent imports.
 type Playhead = Int32Array<SharedArrayBuffer>;
 
-export type DecoderRecordingChunkMessage = {
-  type: 'chunk';
-  sequence: number;
-  frameIndex: number;
-  bufferFrameIndex: number;
-  bufferOffset: number;
-  frameCount: number;
-};
-
-export type DecoderRecordingFlushMessage = {
-  type: 'flush';
-  sequence: number;
-};
-
-export type DecoderRecordingMessage =
-  | DecoderRecordingChunkMessage
-  | DecoderRecordingFlushMessage;
-
 export type EngineDecoderOutboundMethods = {
   boot: (message: {
     playerPort: MessagePort;

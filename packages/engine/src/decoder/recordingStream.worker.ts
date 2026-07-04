@@ -1,16 +1,14 @@
-import { assertNever } from '@musetric/utils';
 import {
-  type DecoderRecordingChunkMessage,
-  type DecoderRecordingMessage,
-} from './protocol.cross.js';
+  type recordingStreamChannel,
+  type RecordingStreamChunkMessage,
+} from '../player/recordingStream.cross.js';
 
 export const recordingPacketHeaderByteLength = 8;
 
-type RecordingChunkMessage = DecoderRecordingChunkMessage;
 type ChunkSamples = { frameIndex: number; samples: Float32Array };
 
 export type RecordingStreamOptions = {
-  port: MessagePort;
+  port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
   samples: Float32Array<SharedArrayBuffer>;
   metadata: Int32Array<SharedArrayBuffer>;
   onChunk: (chunk: ChunkSamples) => void;
@@ -47,7 +45,7 @@ const createControlledPromise = (): ControlledPromise => {
 const readSamplesFromRingBuffer = (
   buffer: Float32Array<SharedArrayBuffer>,
   metadata: Int32Array<SharedArrayBuffer>,
-  message: RecordingChunkMessage,
+  message: RecordingStreamChunkMessage,
 ): Float32Array => {
   const currentBufferFrameIndex = Atomics.load(metadata, 0);
   if (currentBufferFrameIndex - message.bufferFrameIndex > buffer.length) {
@@ -123,7 +121,7 @@ export const createRecordingStream = (
       return;
     }
     closed = true;
-    port.close();
+    port.instance.close();
     start.resolve();
     finish.resolve();
     for (const waiter of flushWaiters) {
@@ -132,22 +130,16 @@ export const createRecordingStream = (
     flushWaiters = [];
   };
 
-  port.onmessage = (event: MessageEvent<DecoderRecordingMessage>) => {
-    try {
-      const message = event.data;
-      if (message.type === 'flush') {
-        processedFlushSequence = Math.max(
-          processedFlushSequence,
-          message.sequence,
-        );
-        flushWaiters = resolveFlushWaiters(
-          processedFlushSequence,
-          flushWaiters,
-        );
-        return;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (message.type === 'chunk') {
+  port.bindHandlers({
+    flush: (message) => {
+      processedFlushSequence = Math.max(
+        processedFlushSequence,
+        message.sequence,
+      );
+      flushWaiters = resolveFlushWaiters(processedFlushSequence, flushWaiters);
+    },
+    chunk: (message) => {
+      try {
         const samples = readSamplesFromRingBuffer(
           sampleBuffer,
           metadata,
@@ -162,14 +154,13 @@ export const createRecordingStream = (
           frameIndex: Math.max(0, message.frameIndex),
           samples: alignedSamples,
         });
-        return;
+      } catch (error) {
+        onError(error);
       }
-      assertNever(message, 'Unhandled decoder recording message');
-    } catch (error) {
-      onError(error);
-    }
-  };
-  port.start();
+    },
+  });
+
+  port.instance.start();
 
   return {
     start: start.promise,

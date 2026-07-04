@@ -1,7 +1,4 @@
-import {
-  clampRecordingLatencyFrameCount,
-  measureRecordingLatency,
-} from '@musetric/audio/calibration';
+import { clampRecordingLatencyFrameCount } from '@musetric/audio/calibration';
 import {
   getRecordingLatencyDevicePairKey,
   mobileUserAgentPattern,
@@ -14,6 +11,7 @@ import { type EnginePlayer } from '../player/index.js';
 import { type EngineState } from '../state.js';
 import { createCalibrationDevices } from './devices.js';
 import { applyRecordingLatencyEstimate } from './estimate.js';
+import { measureRecordingLatency } from './measurement.js';
 import microphoneCalibrationWorkletUrl from './microphone.worklet.ts?worker&url';
 import {
   type CalibrationPreview,

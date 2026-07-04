@@ -1,17 +1,7 @@
 import { type playerChannel } from './protocol.cross.js';
+import { recordingStreamChannel } from './recordingStream.cross.js';
 
 export const chunkFrameCount = 256;
-
-type RecordingStreamMessage =
-  | {
-      type: 'chunk';
-      sequence: number;
-      frameIndex: number;
-      bufferFrameIndex: number;
-      bufferOffset: number;
-      frameCount: number;
-    }
-  | { type: 'flush'; sequence: number };
 
 export type LatencyFrameCounts = {
   latencyFrameCount: number;
@@ -27,6 +17,10 @@ export type StartRecordingMessage = {
   metadata: Int32Array<SharedArrayBuffer>;
   notificationPort: MessagePort;
 };
+
+export type RecordingStreamPort = ReturnType<
+  typeof recordingStreamChannel.inbound<MessagePort>
+>;
 
 export type RecordingRuntimePort = ReturnType<
   typeof playerChannel.inbound<MessagePort>
@@ -68,7 +62,7 @@ export const createRecordingRuntime = (
   let recordingChunkBufferFrameIndex = 0;
   let recordingChunkFrameIndex = 0;
   let recordingSequence = 0;
-  let recordingNotificationPort: MessagePort | undefined = undefined;
+  let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
   let inputOffsetFrameIndex = 0;
 
   const setRecordingWriteFrameIndex = (nextFrameIndex: number) => {
@@ -84,8 +78,7 @@ export const createRecordingRuntime = (
     }
 
     recordingSequence += 1;
-    recordingNotificationPort?.postMessage({
-      type: 'chunk',
+    recordingNotificationPort?.methods.chunk({
       sequence: recordingSequence,
       frameIndex: recordingChunkFrameIndex,
       bufferFrameIndex: recordingChunkBufferFrameIndex,
@@ -94,7 +87,7 @@ export const createRecordingRuntime = (
           ? recordingChunkBufferFrameIndex % recordingSamples.length
           : 0,
       frameCount: recordingOffset,
-    } satisfies RecordingStreamMessage);
+    });
     recordingOffset = 0;
     recordingChunkFrameIndex = recordingWriteFrameIndex;
     recordingChunkBufferFrameIndex = recordingBufferFrameIndex;
@@ -159,7 +152,9 @@ export const createRecordingRuntime = (
       flushRecordingBuffer();
       recordingSamples = message.samples;
       recordingMetadata = message.metadata;
-      recordingNotificationPort = message.notificationPort;
+      recordingNotificationPort = recordingStreamChannel.inbound(
+        message.notificationPort,
+      );
       applyLatencyFrameCounts(message);
       recordingBufferFrameIndex = 0;
       recordingOffset = 0;
@@ -171,10 +166,7 @@ export const createRecordingRuntime = (
     flush: (): number => {
       const sequence = flushRecordingBuffer() + 1;
       recordingSequence = sequence;
-      recordingNotificationPort?.postMessage({
-        type: 'flush',
-        sequence,
-      } satisfies RecordingStreamMessage);
+      recordingNotificationPort?.methods.flush({ sequence });
       recordingNotificationPort = undefined;
       recordingSamples = undefined;
       recordingMetadata = undefined;
