@@ -10,6 +10,13 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 
+const enumerateAudioDevices = async () => {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices.filter(
+    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
+  );
+};
+
 export type CalibrationDevicesOptions = {
   store: Store<EngineState>;
   audioOutput: EngineAudioOutput;
@@ -21,13 +28,6 @@ export type CalibrationDevicesOptions = {
 export type CalibrationDevices = {
   refresh: () => Promise<MediaDeviceInfo[]>;
   start: () => () => void;
-};
-
-const enumerateAudioDevices = async () => {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter(
-    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
-  );
 };
 
 export const createCalibrationDevices = (

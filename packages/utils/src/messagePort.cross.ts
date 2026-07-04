@@ -12,13 +12,6 @@ export type PortMethods = Record<string, (message: any) => unknown>;
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type EmptyPortMethods = {};
 
-type PortMessage<Methods extends PortMethods> = {
-  [Type in keyof Methods]: {
-    type: Type;
-    payload: Parameters<Methods[Type]>[0];
-  };
-}[keyof Methods];
-
 export type PortTransfers<Methods extends PortMethods> = Partial<{
   [Type in keyof Methods]: (
     payload: Parameters<Methods[Type]>[0],
@@ -43,6 +36,13 @@ const createMethods = <Methods extends PortMethods>(
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   return methods as Methods;
 };
+
+type PortMessage<Methods extends PortMethods> = {
+  [Type in keyof Methods]: {
+    type: Type;
+    payload: Parameters<Methods[Type]>[0];
+  };
+}[keyof Methods];
 
 const bindHandlers = <Handlers extends PortMethods>(
   instance: MessagePortLike,

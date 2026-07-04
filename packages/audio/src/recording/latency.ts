@@ -8,14 +8,6 @@ import {
   resolveDefaultAudioInputDevice,
 } from './devices.js';
 
-type AudioTrackSettingsWithLatency = MediaTrackSettings & {
-  latency?: number;
-};
-
-type AudioContextWithOutputLatency = AudioContext & {
-  outputLatency?: number;
-};
-
 const inputLatencyPresetSecondsByKind: Record<AudioInputSourceKind, number> = {
   builtIn: 0.03,
   wiredHeadset: 0.025,
@@ -30,25 +22,6 @@ const outputLatencyPresetSecondsByKind: Record<AudioOutputSourceKind, number> =
     bluetooth: 0.18,
     unknown: 0.04,
   };
-
-export type RecordingLatencyEstimateInput = {
-  context: AudioContext;
-  stream: MediaStream;
-  devices: MediaDeviceInfo[];
-  outputDeviceId?: string;
-};
-
-export type RecordingLatencyEstimate = {
-  latencySeconds: number;
-  frameCount: number;
-  inputKind: AudioInputSourceKind;
-  inputLatencySeconds: number;
-  inputLatencyFrameCount: number;
-  outputKind: AudioOutputSourceKind;
-  outputLatencySeconds: number;
-  outputLatencyFrameCount: number;
-  devicePairKey: string;
-};
 
 const resolveStreamInputDevice = (
   stream: MediaStream,
@@ -74,10 +47,18 @@ const resolveStreamInputDevice = (
   return resolveDefaultAudioInputDevice(devices);
 };
 
+type AudioTrackSettingsWithLatency = MediaTrackSettings & {
+  latency?: number;
+};
+
 const getTrackLatencySeconds = (stream: MediaStream) => {
   const [track] = stream.getAudioTracks();
   const settings: AudioTrackSettingsWithLatency = track.getSettings();
   return typeof settings.latency === 'number' ? settings.latency : 0;
+};
+
+type AudioContextWithOutputLatency = AudioContext & {
+  outputLatency?: number;
 };
 
 const getContextOutputLatencySeconds = (context: AudioContext) => {
@@ -97,6 +78,25 @@ export const getRecordingLatencyDevicePairKey = (
     ? `${outputDevice.kind}:${outputDevice.deviceId}`
     : 'audiooutput:unknown';
   return `${inputKey}|${outputKey}`;
+};
+
+export type RecordingLatencyEstimateInput = {
+  context: AudioContext;
+  stream: MediaStream;
+  devices: MediaDeviceInfo[];
+  outputDeviceId?: string;
+};
+
+export type RecordingLatencyEstimate = {
+  latencySeconds: number;
+  frameCount: number;
+  inputKind: AudioInputSourceKind;
+  inputLatencySeconds: number;
+  inputLatencyFrameCount: number;
+  outputKind: AudioOutputSourceKind;
+  outputLatencySeconds: number;
+  outputLatencyFrameCount: number;
+  devicePairKey: string;
 };
 
 export const estimateRecordingLatency = (

@@ -11,10 +11,6 @@ const toVec4 = (hex: string): [number, number, number, number] => {
   return [red / 255, green / 255, blue / 255, 1];
 };
 
-export type StateColors = {
-  buffer: GPUBuffer;
-};
-
 export const drawRingSlotsByteOffset = 208;
 const areLaneConfigsEqual = (
   first: SpectrogramLaneConfig,
@@ -65,6 +61,10 @@ const areConfigsEqual = (
   return allTrackKeys.every((key) =>
     areLaneConfigsEqual(current.lanes[key], next.lanes[key]),
   );
+};
+
+export type StateColors = {
+  buffer: GPUBuffer;
 };
 
 export const createColorsCell = (device: GPUDevice) =>

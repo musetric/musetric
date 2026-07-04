@@ -14,8 +14,6 @@ import {
 import { formatRadixStages } from './formatRadixStages.es.js';
 import { createWindowSizes } from './windowSizes.es.js';
 
-export type FourierBenchDirection = 'forward' | 'inverse';
-
 export type FourierBatchRangeBenchScenario = {
   readonly label: string;
   readonly rangeCount: 1 | 2 | 3;
@@ -36,32 +34,14 @@ export const createFourierRangeBenchMode = (
   scenario: FourierBatchRangeBenchScenario,
 ): FourierBenchRangeMode => `${mode}:range${scenario.rangeCount}q`;
 
-export type FourierBenchMode =
-  | 'cufft'
-  | FourierMode
-  | IFourierMode
-  | FourierBenchRangeMode;
+export const benchWindowSizes = createWindowSizes(512, 1024 * 64);
 
-export type FourierBenchSummary = {
-  timestamp: string;
-  direction: FourierBenchDirection;
-  count: number;
-  mode: FourierBenchMode;
-  modeLabel: string;
-  windowSizes: number[];
-  means: number[];
-  cvs: number[];
-  sampleCount: number;
-};
+export const benchWindowCounts: readonly number[] = [512, 1920];
 
 type FourierBenchConfig = {
   windowSizes: number[];
   windowCounts: readonly number[];
 };
-
-export const benchWindowSizes = createWindowSizes(512, 1024 * 64);
-
-export const benchWindowCounts: readonly number[] = [512, 1920];
 
 export const benchConfig: FourierBenchConfig = {
   windowSizes: benchWindowSizes,
@@ -93,6 +73,12 @@ const rangeBenchBaseModes: ReadonlyMap<string, FourierMode> = new Map(
     ]),
   ),
 );
+
+export type FourierBenchMode =
+  | 'cufft'
+  | FourierMode
+  | IFourierMode
+  | FourierBenchRangeMode;
 
 const isFourierBenchRangeMode = (
   mode: FourierBenchMode,
@@ -155,6 +141,20 @@ export const createBenchWave = (
   }
 
   return input;
+};
+
+export type FourierBenchDirection = 'forward' | 'inverse';
+
+export type FourierBenchSummary = {
+  timestamp: string;
+  direction: FourierBenchDirection;
+  count: number;
+  mode: FourierBenchMode;
+  modeLabel: string;
+  windowSizes: number[];
+  means: number[];
+  cvs: number[];
+  sampleCount: number;
 };
 
 export const formatBenchMarkdown = (

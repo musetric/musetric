@@ -9,18 +9,6 @@ import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
 import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4.wgsl.js';
 import { transformInPlaceRadix8Shader } from './transformInPlaceRadix8.wgsl.js';
 
-export type SinglePassPipeline = {
-  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
-  transform: GPUComputePipeline;
-};
-
-export type MultiPassPipeline = {
-  kind: 'multiPass';
-  stages: GPUComputePipeline[];
-};
-
-export type Pipeline = SinglePassPipeline | MultiPassPipeline;
-
 const selectStockhamThreadCount = (packedWindowSize: number): number => {
   if (packedWindowSize <= 768) {
     return 64;
@@ -127,6 +115,11 @@ const createMultiPassKernelConstants = (
   };
 };
 
+export type SinglePassPipeline = {
+  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  transform: GPUComputePipeline;
+};
+
 const createSinglePassPipeline = (
   device: GPUDevice,
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
@@ -167,6 +160,11 @@ const createSinglePassPipeline = (
   };
 };
 
+export type MultiPassPipeline = {
+  kind: 'multiPass';
+  stages: GPUComputePipeline[];
+};
+
 const createMultiPassPipeline = (
   device: GPUDevice,
   variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
@@ -196,6 +194,8 @@ const createMultiPassPipeline = (
     ),
   };
 };
+
+export type Pipeline = SinglePassPipeline | MultiPassPipeline;
 
 export const createPipeline = (
   device: GPUDevice,

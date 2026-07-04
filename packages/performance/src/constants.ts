@@ -39,8 +39,6 @@ export const viewSizePresetKeys: readonly ViewSizePresetKey[] = [
 ];
 
 export const visibleTimes = [1, 4, 16] as const;
-export type VisibleTime = (typeof visibleTimes)[number];
-
 export type BenchmarkTrackScope = 'all' | TrackKey;
 export const benchmarkTrackScopes: readonly BenchmarkTrackScope[] = [
   'all',
@@ -53,6 +51,8 @@ export const benchmarkBandCounts: readonly BenchmarkBandCount[] = [1, 3];
 export const zeroPaddingFactors = [
   1, 2, 4,
 ] as const satisfies readonly SpectrogramZeroPaddingFactor[];
+
+export type VisibleTime = (typeof visibleTimes)[number];
 
 export type BenchmarkParams = {
   viewSizeKey: ViewSizePresetKey;

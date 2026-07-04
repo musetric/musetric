@@ -23,22 +23,6 @@ import {
   createCalibrationLatencyStore,
 } from './storage.js';
 
-export type EngineCalibration = {
-  selectInputDevice: (deviceId: string) => Promise<void>;
-  selectOutputDevice: (deviceId: string) => Promise<void>;
-  setManualLatencyMs: (latencyMs: number) => void;
-  calibrate: () => Promise<boolean>;
-  openPreview: () => () => void;
-  isOutputSelectionSupported: () => boolean;
-};
-
-export type CreateEngineCalibrationOptions = {
-  context: AudioContext;
-  audioOutput: EngineAudioOutput;
-  store: Store<EngineState>;
-  getPlayer: () => EnginePlayer;
-};
-
 const restoreLatencyState = (
   store: Store<EngineState>,
   latencyStore: CalibrationLatencyStore,
@@ -66,6 +50,22 @@ const stopActivePlayback = async (
   if (store.get().playing) {
     await player.stop();
   }
+};
+
+export type EngineCalibration = {
+  selectInputDevice: (deviceId: string) => Promise<void>;
+  selectOutputDevice: (deviceId: string) => Promise<void>;
+  setManualLatencyMs: (latencyMs: number) => void;
+  calibrate: () => Promise<boolean>;
+  openPreview: () => () => void;
+  isOutputSelectionSupported: () => boolean;
+};
+
+export type CreateEngineCalibrationOptions = {
+  context: AudioContext;
+  audioOutput: EngineAudioOutput;
+  store: Store<EngineState>;
+  getPlayer: () => EnginePlayer;
 };
 
 export const createEngineCalibration = (

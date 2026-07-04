@@ -17,44 +17,17 @@ import {
   type TrigTables,
 } from './trigTables.js';
 
-type ScratchBuffers = {
-  buffer0: GPUBuffer;
-  buffer1: GPUBuffer;
-};
-
-type BaseState = {
-  kind: PackedStockhamR2cVariant['kind'];
-  variant: PackedStockhamR2cVariant;
-  pipeline: Pipeline;
-  tables: TrigTables;
-  params: ParamsRing;
-  dummyInput: GPUBuffer;
-  windowCount: number;
-};
-
-type SinglePassState = BaseState & {
-  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
-  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
-  pipeline: SinglePassPipeline;
-  getBindGroup: (slot: number) => GPUBindGroup;
-};
-
-type MultiPassState = BaseState & {
-  kind: 'multiPass';
-  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
-  pipeline: MultiPassPipeline;
-  getStageBindGroups: (slot: number) => GPUBindGroup[];
-  scratch: ScratchBuffers;
-};
-
-export type State = SinglePassState | MultiPassState;
-
 const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
   return device.createBuffer({
     label: 'packed-stockham-r2c-dummy-input',
     size: Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
+};
+
+type ScratchBuffers = {
+  buffer0: GPUBuffer;
+  buffer1: GPUBuffer;
 };
 
 const createScratchBuffers = (
@@ -157,6 +130,33 @@ const createSlotCache = <T>(
     return cached;
   };
 };
+
+type BaseState = {
+  kind: PackedStockhamR2cVariant['kind'];
+  variant: PackedStockhamR2cVariant;
+  pipeline: Pipeline;
+  tables: TrigTables;
+  params: ParamsRing;
+  dummyInput: GPUBuffer;
+  windowCount: number;
+};
+
+type SinglePassState = BaseState & {
+  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
+  pipeline: SinglePassPipeline;
+  getBindGroup: (slot: number) => GPUBindGroup;
+};
+
+type MultiPassState = BaseState & {
+  kind: 'multiPass';
+  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
+  pipeline: MultiPassPipeline;
+  getStageBindGroups: (slot: number) => GPUBindGroup[];
+  scratch: ScratchBuffers;
+};
+
+export type State = SinglePassState | MultiPassState;
 
 export const createStateCell = (
   device: GPUDevice,

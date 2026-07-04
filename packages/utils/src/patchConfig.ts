@@ -1,3 +1,5 @@
+const isDefaultEqual = (first: unknown, second: unknown) => first === second;
+
 type IsValueEqual<Value> = (first: Value, second: Value) => boolean;
 
 export type ApplyPatchConfigOptions<Config> = {
@@ -8,8 +10,6 @@ export type ApplyPatchConfigOptions<Config> = {
     [Key in keyof Config]?: IsValueEqual<Config[Key]>;
   };
 };
-
-const isDefaultEqual = (first: unknown, second: unknown) => first === second;
 
 export const applyPatchConfig = <Config>(
   options: ApplyPatchConfigOptions<Config>,

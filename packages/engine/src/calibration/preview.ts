@@ -7,17 +7,6 @@ import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import { applyRecordingLatencyEstimate } from './estimate.js';
 
-export type CalibrationPreviewOptions = {
-  context: AudioContext;
-  store: Store<EngineState>;
-  refreshDevices: () => Promise<MediaDeviceInfo[]>;
-};
-
-export type CalibrationPreview = {
-  open: () => () => void;
-  getStream: () => MediaStream | undefined;
-};
-
 const meterScale = 8;
 
 const stopMediaStream = (stream: MediaStream) => {
@@ -35,6 +24,17 @@ const computeRmsLevel = (analyser: AnalyserNode) => {
   }
   const rms = Math.sqrt(sum / samples.length);
   return Math.min(1, rms * meterScale);
+};
+
+export type CalibrationPreviewOptions = {
+  context: AudioContext;
+  store: Store<EngineState>;
+  refreshDevices: () => Promise<MediaDeviceInfo[]>;
+};
+
+export type CalibrationPreview = {
+  open: () => () => void;
+  getStream: () => MediaStream | undefined;
 };
 
 export const createCalibrationPreview = (

@@ -1,25 +1,18 @@
 import { type ComplexArray } from '@musetric/utils/gpu';
 import { createWindowSizes } from './windowSizes.es.js';
 
-export type FourierFixture = {
-  caseName: string;
-  windowSize: number;
-  wave: Float32Array<ArrayBuffer>;
-  spectrum: ComplexArray;
-};
-
-type ExpectedBin = {
-  index: number;
-  real?: number;
-  imag?: number;
-};
-
 const positiveSize = (windowSize: number): number => windowSize / 2 + 1;
 
 const createZeroComplexArray = (size: number): ComplexArray => ({
   real: new Float32Array(size),
   imag: new Float32Array(size),
 });
+
+type ExpectedBin = {
+  index: number;
+  real?: number;
+  imag?: number;
+};
 
 const createExpectedOutput = (
   windowSize: number,
@@ -47,6 +40,13 @@ const createSignal = (
   Float32Array.from(
     Array.from({ length: size }, (_, sampleIndex) => createSample(sampleIndex)),
   );
+
+export type FourierFixture = {
+  caseName: string;
+  windowSize: number;
+  wave: Float32Array<ArrayBuffer>;
+  spectrum: ComplexArray;
+};
 
 const createUnitImpulseFixture = (windowSize: number): FourierFixture => ({
   caseName: 'unit impulse produces flat spectrum',

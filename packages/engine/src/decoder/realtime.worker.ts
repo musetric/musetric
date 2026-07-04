@@ -1,5 +1,38 @@
 import { api } from '@musetric/api';
 
+const createWebSocketUrl = (projectId: number) => {
+  const url = new URL(
+    api.project.realtime.base.endpoint({ projectId }),
+    self.location.href,
+  );
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.href;
+};
+
+type InternalRealtime = {
+  projectId: number;
+  socket: WebSocket;
+  pendingMessages: (string | ArrayBuffer)[];
+  openPromise: Promise<void>;
+  closed: boolean;
+};
+
+const closeSocket = (realtime: InternalRealtime) => {
+  if (
+    realtime.socket.readyState === WebSocket.CLOSED ||
+    realtime.socket.readyState === WebSocket.CLOSING
+  ) {
+    return;
+  }
+  if (realtime.socket.readyState === WebSocket.CONNECTING) {
+    void realtime.openPromise.finally(() => {
+      closeSocket(realtime);
+    });
+    return;
+  }
+  realtime.socket.close();
+};
+
 export type ProjectRealtimeEvent =
   | {
       type: 'recording.peaksChanged';
@@ -37,14 +70,6 @@ export type ProjectRealtimeOptions = {
   onClose: (error: Error) => void;
 };
 
-type InternalRealtime = {
-  projectId: number;
-  socket: WebSocket;
-  pendingMessages: (string | ArrayBuffer)[];
-  openPromise: Promise<void>;
-  closed: boolean;
-};
-
 export type ProjectRealtime = {
   open: (projectId: number) => void;
   close: () => void;
@@ -52,31 +77,6 @@ export type ProjectRealtime = {
   sendJson: (message: object) => void;
   sendBinary: (packet: ArrayBuffer) => void;
   flush: () => void;
-};
-
-const createWebSocketUrl = (projectId: number) => {
-  const url = new URL(
-    api.project.realtime.base.endpoint({ projectId }),
-    self.location.href,
-  );
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  return url.href;
-};
-
-const closeSocket = (realtime: InternalRealtime) => {
-  if (
-    realtime.socket.readyState === WebSocket.CLOSED ||
-    realtime.socket.readyState === WebSocket.CLOSING
-  ) {
-    return;
-  }
-  if (realtime.socket.readyState === WebSocket.CONNECTING) {
-    void realtime.openPromise.finally(() => {
-      closeSocket(realtime);
-    });
-    return;
-  }
-  realtime.socket.close();
 };
 
 export const createProjectRealtime = (

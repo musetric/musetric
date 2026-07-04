@@ -15,8 +15,6 @@ import { getMetric } from '../getMetric.js';
 import { type MetricsData } from '../runBenchmarks.js';
 import { useProcessingStore } from '../store.js';
 
-type Row = { label: string; metric: SpectrogramTimerLabel };
-
 const rowLabels: SpectrogramTimerLabel[] = [
   'configure',
   'writeBuffers',
@@ -32,6 +30,8 @@ const rowLabels: SpectrogramTimerLabel[] = [
   'other',
   'total',
 ];
+
+type Row = { label: string; metric: SpectrogramTimerLabel };
 
 const rows: Row[] = rowLabels.map((metric) => ({ label: metric, metric }));
 

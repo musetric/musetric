@@ -5,11 +5,6 @@ import { getTimelineMarkers } from './markers.js';
 const labelOffset = 4;
 const maxLabelMetricsCacheSize = 4096;
 
-export type TimelineDraw = {
-  run: (config: TimelineConfig) => void;
-  dispose: () => void;
-};
-
 const resizeCanvas = (
   canvas: HTMLCanvasElement,
   state: TimelineCanvasState,
@@ -35,6 +30,11 @@ const formatTime = (timeInSeconds: number) => {
   const seconds = Math.floor(normalizedTime - minutes * 60);
 
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+export type TimelineDraw = {
+  run: (config: TimelineConfig) => void;
+  dispose: () => void;
 };
 
 export const createTimelineDraw = (): TimelineDraw => {

@@ -17,16 +17,6 @@ import {
   type ProcessingWorkerProgressEvent,
 } from './processingSummary.js';
 
-export type SeparationTask = {
-  projectId: number;
-  blobId: string;
-};
-
-export type SeparationWorker = {
-  run: (task: SeparationTask) => Promise<void>;
-  getState: (projectId: number) => ProcessingWorkerProgressEvent | undefined;
-};
-
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -68,6 +58,16 @@ const calculateLeadSpectrogramGainDb = (analysis: LeadAnalysis) =>
       leadVisualPeakCeilingDb - analysis.truePeakDb,
     ),
   );
+
+export type SeparationTask = {
+  projectId: number;
+  blobId: string;
+};
+
+export type SeparationWorker = {
+  run: (task: SeparationTask) => Promise<void>;
+  getState: (projectId: number) => ProcessingWorkerProgressEvent | undefined;
+};
 
 export const createSeparationWorker = (
   app: FastifyInstance,

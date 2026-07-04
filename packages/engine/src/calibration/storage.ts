@@ -12,11 +12,6 @@ const storedLatencyMapSchema = z.record(z.string(), storedLatencySchema);
 
 export type StoredLatency = z.infer<typeof storedLatencySchema>;
 
-export type CalibrationLatencyStore = {
-  get: (devicePairKey: string) => StoredLatency | undefined;
-  set: (devicePairKey: string, value: StoredLatency) => void;
-};
-
 const load = (): Record<string, StoredLatency> => {
   try {
     const raw = localStorage.getItem(storageKey);
@@ -29,6 +24,11 @@ const load = (): Record<string, StoredLatency> => {
     console.error('Failed to load calibration latency store', error);
     return {};
   }
+};
+
+export type CalibrationLatencyStore = {
+  get: (devicePairKey: string) => StoredLatency | undefined;
+  set: (devicePairKey: string, value: StoredLatency) => void;
 };
 
 export const createCalibrationLatencyStore = (): CalibrationLatencyStore => {

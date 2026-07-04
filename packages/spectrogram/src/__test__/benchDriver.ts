@@ -9,20 +9,6 @@ import {
 } from './bench.es.js';
 import { buildConfig, createTone } from './common.js';
 
-export type BenchDriver = {
-  config: SpectrogramConfig;
-  prime: (processor: SpectrogramProcessor) => Promise<void>;
-  render: (processor: SpectrogramProcessor) => Promise<void>;
-};
-
-export type WriteRecordingChunkOptions = {
-  samples: Float32Array;
-  frameIndex: number;
-  frameCount: number;
-  sampleRate: number;
-  renderIndex: number;
-};
-
 export const buildPresetConfig = (
   benchCase: SpectrogramBenchCase,
 ): SpectrogramConfig =>
@@ -44,6 +30,14 @@ export const buildPresetConfig = (
       },
     },
   });
+
+export type WriteRecordingChunkOptions = {
+  samples: Float32Array;
+  frameIndex: number;
+  frameCount: number;
+  sampleRate: number;
+  renderIndex: number;
+};
 
 export const writeRecordingChunk = (
   options: WriteRecordingChunkOptions,
@@ -104,6 +98,12 @@ export const toRenderInvalidations = (
   scenario.coalesceInvalidations
     ? coalesceInvalidations(invalidations)
     : [...invalidations];
+
+export type BenchDriver = {
+  config: SpectrogramConfig;
+  prime: (processor: SpectrogramProcessor) => Promise<void>;
+  render: (processor: SpectrogramProcessor) => Promise<void>;
+};
 
 export const renderDriverSamples = async (
   driver: BenchDriver,

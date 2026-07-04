@@ -21,8 +21,46 @@ import {
   createBandSpectrumCell,
 } from './bandSpectrumPipeline.js';
 
+export type SpectrogramLaneWork = {
+  spectrogram: boolean;
+  fundamental: boolean;
+};
+
+const forEachWorkPipeline = (
+  work: SpectrogramLaneWork,
+  spectrogramBandPipelines: readonly BandSpectrumPipeline[],
+  baseBandPipeline: BandSpectrumPipeline,
+  fn: (pipeline: BandSpectrumPipeline) => void,
+): void => {
+  if (work.spectrogram) {
+    for (const pipeline of spectrogramBandPipelines) {
+      fn(pipeline);
+    }
+  }
+  if (
+    work.fundamental &&
+    (!work.spectrogram || !spectrogramBandPipelines.includes(baseBandPipeline))
+  ) {
+    fn(baseBandPipeline);
+  }
+};
+
+type BandSpectrumCell = ReturnType<typeof createBandSpectrumCell>;
+
 export type SpectrogramLaneOptions = {
   label: TrackKey;
+};
+
+type BuildSpectrogramLaneArgs = {
+  cells: BandPipelineCells;
+  fundamentalFrequencyCell: ReturnType<
+    typeof createSpectrogramFundamentalFrequencyCell
+  >;
+  getBandSpectrumCells: (
+    spectralBands: readonly SpectrogramSpectralBand[],
+  ) => BandSpectrumCell[];
+  options: SpectrogramLaneOptions;
+  config: ExtSpectrogramConfig;
 };
 
 export type SpectrogramBandSpectrum = {
@@ -30,11 +68,6 @@ export type SpectrogramBandSpectrum = {
   columnEnergyBuffer: GPUBuffer;
   windowSize: number;
   band: SpectrogramSpectralBand;
-};
-
-export type SpectrogramLaneWork = {
-  spectrogram: boolean;
-  fundamental: boolean;
 };
 
 export type SpectrogramLaneDispatch = (
@@ -67,44 +100,6 @@ export type SpectrogramLane = {
     range: SpectrogramColumnRange,
   ) => void;
   clear: (encoder: GPUCommandEncoder) => void;
-};
-
-export type SpectrogramLaneCell = ResourceCell<
-  ExtSpectrogramConfig,
-  SpectrogramLane
->;
-
-const forEachWorkPipeline = (
-  work: SpectrogramLaneWork,
-  spectrogramBandPipelines: readonly BandSpectrumPipeline[],
-  baseBandPipeline: BandSpectrumPipeline,
-  fn: (pipeline: BandSpectrumPipeline) => void,
-): void => {
-  if (work.spectrogram) {
-    for (const pipeline of spectrogramBandPipelines) {
-      fn(pipeline);
-    }
-  }
-  if (
-    work.fundamental &&
-    (!work.spectrogram || !spectrogramBandPipelines.includes(baseBandPipeline))
-  ) {
-    fn(baseBandPipeline);
-  }
-};
-
-type BandSpectrumCell = ReturnType<typeof createBandSpectrumCell>;
-
-type BuildSpectrogramLaneArgs = {
-  cells: BandPipelineCells;
-  fundamentalFrequencyCell: ReturnType<
-    typeof createSpectrogramFundamentalFrequencyCell
-  >;
-  getBandSpectrumCells: (
-    spectralBands: readonly SpectrogramSpectralBand[],
-  ) => BandSpectrumCell[];
-  options: SpectrogramLaneOptions;
-  config: ExtSpectrogramConfig;
 };
 
 const buildSpectrogramLane = (
@@ -240,6 +235,11 @@ const buildSpectrogramLane = (
     },
   };
 };
+
+export type SpectrogramLaneCell = ResourceCell<
+  ExtSpectrogramConfig,
+  SpectrogramLane
+>;
 
 export const createSpectrogramLaneCell = (
   device: GPUDevice,

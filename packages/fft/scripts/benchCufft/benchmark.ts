@@ -20,20 +20,6 @@ const benchDirections: readonly FourierBenchDirection[] = [
   'inverse',
 ];
 
-type MeasureStats = {
-  mean: number;
-  cv: number;
-  sampleCount: number;
-};
-
-type MeasureOneOptions = {
-  windowSize: number;
-  windowCount: number;
-  cudart: koffi.LibraryHandle;
-  cufft: koffi.LibraryHandle;
-  direction: FourierBenchDirection;
-};
-
 type ForeignFunction = ReturnType<koffi.LibraryHandle['func']>;
 
 type CudaFunctions = {
@@ -41,42 +27,6 @@ type CudaFunctions = {
   free: ForeignFunction;
   memcpy: ForeignFunction;
   getErrorString: ForeignFunction;
-};
-
-type CufftFunctions = {
-  planMany: ForeignFunction;
-  destroy: ForeignFunction;
-};
-
-type DirectionSpec = {
-  input: Float32Array;
-  outputBytes: number;
-  n: Int32Array;
-  inembed: Int32Array;
-  onembed: Int32Array;
-  idist: number;
-  odist: number;
-  cufftType: number;
-};
-
-type AllocateBuffersOptions = {
-  cuda: CudaFunctions;
-  check: (error: number, stage: string) => boolean;
-  input: Float32Array;
-  outputBytes: number;
-  deviceInput: Array<bigint | null>;
-  deviceOutput: Array<bigint | null>;
-};
-
-type RunMeasurementsOptions = {
-  plan: number;
-  deviceInput: bigint;
-  deviceOutput: bigint;
-  cudart: koffi.LibraryHandle;
-  cufft: koffi.LibraryHandle;
-  direction: FourierBenchDirection;
-  windowCount: number;
-  windowSize: number;
 };
 
 const createCudaFunctions = (cudart: koffi.LibraryHandle): CudaFunctions => ({
@@ -88,12 +38,28 @@ const createCudaFunctions = (cudart: koffi.LibraryHandle): CudaFunctions => ({
   getErrorString: cudart.func('const char *cudaGetErrorString(int error)'),
 });
 
+type CufftFunctions = {
+  planMany: ForeignFunction;
+  destroy: ForeignFunction;
+};
+
 const createCufftFunctions = (cufft: koffi.LibraryHandle): CufftFunctions => ({
   planMany: cufft.func(
     'int cufftPlanMany(_Out_ int *plan, int rank, int *n, int *inembed, int istride, int idist, int *onembed, int ostride, int odist, int type, int batch)',
   ),
   destroy: cufft.func('int cufftDestroy(int plan)'),
 });
+
+type DirectionSpec = {
+  input: Float32Array;
+  outputBytes: number;
+  n: Int32Array;
+  inembed: Int32Array;
+  onembed: Int32Array;
+  idist: number;
+  odist: number;
+  cufftType: number;
+};
 
 const computeDirectionSpec = (
   windowSize: number,
@@ -116,6 +82,15 @@ const computeDirectionSpec = (
     odist: inverse ? windowSize : positiveSize,
     cufftType: inverse ? cufftC2r : cufftR2c,
   };
+};
+
+type AllocateBuffersOptions = {
+  cuda: CudaFunctions;
+  check: (error: number, stage: string) => boolean;
+  input: Float32Array;
+  outputBytes: number;
+  deviceInput: Array<bigint | null>;
+  deviceOutput: Array<bigint | null>;
 };
 
 const allocateDeviceBuffers = (options: AllocateBuffersOptions): boolean => {
@@ -161,6 +136,23 @@ const createCufftPlan = (
     'cufftPlanMany',
   );
   return ok ? plan[0] : undefined;
+};
+
+type MeasureStats = {
+  mean: number;
+  cv: number;
+  sampleCount: number;
+};
+
+type RunMeasurementsOptions = {
+  plan: number;
+  deviceInput: bigint;
+  deviceOutput: bigint;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  direction: FourierBenchDirection;
+  windowCount: number;
+  windowSize: number;
 };
 
 const runMeasurements = (
@@ -216,6 +208,14 @@ const runMeasurements = (
   }
 
   return fourierComputeStats(values);
+};
+
+type MeasureOneOptions = {
+  windowSize: number;
+  windowCount: number;
+  cudart: koffi.LibraryHandle;
+  cufft: koffi.LibraryHandle;
+  direction: FourierBenchDirection;
 };
 
 const measureOne = (options: MeasureOneOptions): MeasureStats | undefined => {

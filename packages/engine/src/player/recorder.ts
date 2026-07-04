@@ -9,6 +9,21 @@ import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineState } from '../state.js';
 import { type EnginePlayback } from './playback.js';
 
+const recordingBufferSeconds = 10;
+
+const stopMediaStream = (stream: MediaStream) => {
+  for (const track of stream.getTracks()) {
+    track.stop();
+  }
+};
+
+const getAudioDevices = async () => {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices.filter(
+    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
+  );
+};
+
 type RecordingSession = {
   projectId: number;
   initializePromise: Promise<void>;
@@ -33,21 +48,6 @@ export type CreateEngineRecorderOptions = {
   store: Store<EngineState>;
   getDecoder: () => EngineDecoder;
   getEnginePlayback: () => EnginePlayback;
-};
-
-const recordingBufferSeconds = 10;
-
-const stopMediaStream = (stream: MediaStream) => {
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-};
-
-const getAudioDevices = async () => {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter(
-    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
-  );
 };
 
 export const createEngineRecorder = (

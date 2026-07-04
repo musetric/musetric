@@ -24,25 +24,6 @@ import { type SpectrogramSamples } from '../processor.js';
 
 const emptyInvalidations: readonly SpectrogramSampleInvalidation[] = [];
 
-type ConfigInvalidationScope = 'all' | ReadonlySet<TrackKey>;
-
-export type TrackResident = {
-  valid: boolean;
-  samples: Float32Array | undefined;
-  sampleLength: number;
-  baseColumn: number;
-};
-
-export type TrackRenderPlan = {
-  present: boolean;
-  clearMissing: boolean;
-  baseColumn: number;
-  baseSlot: number;
-  ranges: readonly SpectrogramColumnRange[];
-  forceFullUpload: boolean;
-  invalidations: readonly SpectrogramSampleRange[];
-};
-
 export type RenderResult = { ok: boolean };
 
 const computeInvalidatingConfigKeys: readonly (keyof SpectrogramConfig)[] = [
@@ -84,6 +65,13 @@ const isColorComputeConfigEqual = (
 export const hasVisibleWork = (work: SpectrogramLaneWork): boolean =>
   work.spectrogram || work.fundamental;
 
+export type TrackResident = {
+  valid: boolean;
+  samples: Float32Array | undefined;
+  sampleLength: number;
+  baseColumn: number;
+};
+
 export const createTrackResidents = (): Record<TrackKey, TrackResident> =>
   mapTrackKeys(() => ({
     valid: false,
@@ -116,6 +104,8 @@ const getTrackInvalidations = (
       frameIndex: invalidation.frameIndex,
       frameCount: invalidation.frameCount,
     }));
+
+type ConfigInvalidationScope = 'all' | ReadonlySet<TrackKey>;
 
 const isTrackConfigInvalidated = (
   scope: ConfigInvalidationScope,
@@ -173,6 +163,16 @@ type CreateRenderPlansOptions = {
   samples: SpectrogramSamples;
   trackProgress: number;
   work: Record<TrackKey, SpectrogramLaneWork>;
+};
+
+export type TrackRenderPlan = {
+  present: boolean;
+  clearMissing: boolean;
+  baseColumn: number;
+  baseSlot: number;
+  ranges: readonly SpectrogramColumnRange[];
+  forceFullUpload: boolean;
+  invalidations: readonly SpectrogramSampleRange[];
 };
 
 export const createRenderPlans = (

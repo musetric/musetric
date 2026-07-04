@@ -6,57 +6,6 @@ import {
   type RadixStageCounts,
 } from '../factorization.es.js';
 
-export type ScratchBufferIndex = 0 | 1;
-
-type MultiPassKernelBase = {
-  stageStride: number;
-  readFromInput: boolean;
-  readBufferIndex: ScratchBufferIndex;
-  writeBufferIndex: ScratchBufferIndex;
-  workgroupCount: number;
-  threadCount: number;
-};
-
-export type PackedStockhamR2cKernel =
-  | (MultiPassKernelBase & {
-      kind: 'single';
-      factor: MultiPassRadixStage;
-      fuseR2cPack: boolean;
-    })
-  | (MultiPassKernelBase & {
-      kind: 'pair';
-      factor1: MultiPassRadixStage;
-      factor2: MultiPassRadixStage;
-    });
-
-export type InPlaceMixedStageCounts = {
-  radix8StageCount: number;
-  radix4StageCount: number;
-  radix2StageCount: number;
-  radix3StageCount: number;
-  radix5StageCount: number;
-};
-
-type PackedStockhamR2cBaseVariant = {
-  windowSize: number;
-  packedWindowSize: number;
-  log2PackedWindowSize: number;
-  radixStageCounts: RadixStageCounts;
-};
-
-export type PackedStockhamR2cVariant =
-  | (PackedStockhamR2cBaseVariant & {
-      kind: 'stockham' | 'inPlaceRadix4';
-    })
-  | (PackedStockhamR2cBaseVariant & {
-      kind: 'inPlaceMixed';
-      inPlaceStageCounts: InPlaceMixedStageCounts;
-    })
-  | (PackedStockhamR2cBaseVariant & {
-      kind: 'multiPass';
-      kernels: PackedStockhamR2cKernel[];
-    });
-
 const minPackedWindowSize = 2;
 const pairThreadsPerGroup = 8;
 
@@ -65,6 +14,14 @@ const isPowerOfTwo = (value: number): boolean =>
 
 // Greedy radix-8-preferring factorization (then 4, 2, 3, 5) used by the
 // in-place single-pass kernel to minimise the stage/barrier count.
+export type InPlaceMixedStageCounts = {
+  radix8StageCount: number;
+  radix4StageCount: number;
+  radix2StageCount: number;
+  radix3StageCount: number;
+  radix5StageCount: number;
+};
+
 const createRadix8PreferredCounts = (
   packedWindowSize: number,
 ): InPlaceMixedStageCounts | undefined => {
@@ -102,6 +59,29 @@ const maxPairGroupSize = 64;
 // prefer 128.
 const selectPairThreadCount = (groupSize: number): number =>
   groupSize === 64 ? 64 : 128;
+
+export type ScratchBufferIndex = 0 | 1;
+
+type MultiPassKernelBase = {
+  stageStride: number;
+  readFromInput: boolean;
+  readBufferIndex: ScratchBufferIndex;
+  writeBufferIndex: ScratchBufferIndex;
+  workgroupCount: number;
+  threadCount: number;
+};
+
+export type PackedStockhamR2cKernel =
+  | (MultiPassKernelBase & {
+      kind: 'single';
+      factor: MultiPassRadixStage;
+      fuseR2cPack: boolean;
+    })
+  | (MultiPassKernelBase & {
+      kind: 'pair';
+      factor1: MultiPassRadixStage;
+      factor2: MultiPassRadixStage;
+    });
 
 const createMultiPassKernels = (
   packedWindowSize: number,
@@ -173,6 +153,26 @@ const createMultiPassKernels = (
 
   return kernels;
 };
+
+type PackedStockhamR2cBaseVariant = {
+  windowSize: number;
+  packedWindowSize: number;
+  log2PackedWindowSize: number;
+  radixStageCounts: RadixStageCounts;
+};
+
+export type PackedStockhamR2cVariant =
+  | (PackedStockhamR2cBaseVariant & {
+      kind: 'stockham' | 'inPlaceRadix4';
+    })
+  | (PackedStockhamR2cBaseVariant & {
+      kind: 'inPlaceMixed';
+      inPlaceStageCounts: InPlaceMixedStageCounts;
+    })
+  | (PackedStockhamR2cBaseVariant & {
+      kind: 'multiPass';
+      kernels: PackedStockhamR2cKernel[];
+    });
 
 export const getPackedStockhamR2cVariant = (
   device: GPUDevice,

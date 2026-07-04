@@ -2,10 +2,6 @@ import { assertDefined } from '@musetric/utils';
 import { type WaveformColors } from './colors.es.js';
 import { type WaveformSegment } from './generateSegments.js';
 
-export type WaveformDraw = {
-  run: (segments: WaveformSegment[], colors: WaveformColors) => void;
-};
-
 type DrawWaveformOptions = {
   context: OffscreenCanvasRenderingContext2D;
   segments: WaveformSegment[];
@@ -54,6 +50,10 @@ const drawWaveform = (options: DrawWaveformOptions): void => {
   }
   context.closePath();
   context.fill();
+};
+
+export type WaveformDraw = {
+  run: (segments: WaveformSegment[], colors: WaveformColors) => void;
 };
 
 export const createWaveformDraw = (canvas: OffscreenCanvas): WaveformDraw => {

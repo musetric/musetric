@@ -1,10 +1,3 @@
-export type DynamicUniformParams = {
-  buffer: GPUBuffer;
-  byteLength: number;
-  write: (fill: (view: DataView) => void) => number;
-  destroy: () => void;
-};
-
 const alignTo = (value: number, alignment: number): number =>
   Math.ceil(value / alignment) * alignment;
 
@@ -12,6 +5,13 @@ export type CreateDynamicUniformParamsOptions = {
   label: string;
   byteLength: number;
   capacity: number;
+};
+
+export type DynamicUniformParams = {
+  buffer: GPUBuffer;
+  byteLength: number;
+  write: (fill: (view: DataView) => void) => number;
+  destroy: () => void;
 };
 
 export const createDynamicUniformParams = (

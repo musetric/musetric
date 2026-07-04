@@ -6,24 +6,6 @@ import {
   type SpectrogramColumnRange,
 } from '../common/extConfig.js';
 
-export type FundamentalFrequencyParams = {
-  halfSize: number;
-  windowCount: number;
-  windowSize: number;
-  candidateCount: number;
-  sampleRate: number;
-  minimumFrequency: number;
-  candidateStepCents: number;
-  minimumFundamentalIntensity: number;
-  minimumScore: number;
-  harmonicCount: number;
-  latticeCount: number;
-  trackWindow: number;
-  jumpCostCents: number;
-  unvoicedCost: number;
-  voicedTransitionCost: number;
-};
-
 export const slotOffsetByteOffset = 40;
 const columnCountByteOffset = 44;
 const screenBaseByteOffset = 48;
@@ -43,6 +25,24 @@ const unvoicedCost = 0.12;
 const voicedTransitionCost = 0.09;
 
 export const fundamentalTrackWindow = 8;
+
+export type FundamentalFrequencyParams = {
+  halfSize: number;
+  windowCount: number;
+  windowSize: number;
+  candidateCount: number;
+  sampleRate: number;
+  minimumFrequency: number;
+  candidateStepCents: number;
+  minimumFundamentalIntensity: number;
+  minimumScore: number;
+  harmonicCount: number;
+  latticeCount: number;
+  trackWindow: number;
+  jumpCostCents: number;
+  unvoicedCost: number;
+  voicedTransitionCost: number;
+};
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
   const windowSize = config.windowSize * config.zeroPaddingFactor;

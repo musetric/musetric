@@ -1,11 +1,11 @@
-export type NativeParams = Record<string, string>;
-
 export const getLocationHash = (): string => {
   const { hash } = window.location;
   const urlWithoutHash = hash.startsWith('#') ? hash.slice(1) : hash;
   const [urlWithoutSearch] = urlWithoutHash.split('?');
   return urlWithoutSearch;
 };
+
+export type NativeParams = Record<string, string>;
 
 export const getLocationSearchParams = (): NativeParams =>
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions, @typescript-eslint/no-explicit-any

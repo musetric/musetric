@@ -18,12 +18,6 @@ export const defaultBenchStatsConfig: BenchStatsConfig = {
   trimFraction: 0.1,
 };
 
-export type BenchStats = {
-  mean: number;
-  cv: number;
-  sampleCount: number;
-};
-
 export const computeMean = (values: readonly number[]): number =>
   values.reduce((sum, v) => sum + v, 0) / values.length;
 
@@ -109,6 +103,12 @@ const collectStableSamples = (
   return [...window]
     .sort((left, right) => left - right)
     .slice(trimCount, window.length - trimCount);
+};
+
+export type BenchStats = {
+  mean: number;
+  cv: number;
+  sampleCount: number;
 };
 
 export const computeBenchStats = (

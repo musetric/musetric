@@ -18,30 +18,6 @@ import {
   type RecordingStream,
 } from './recordingStream.worker.js';
 
-export type CreateDecoderWorkerRuntimeOptions = {
-  port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
-  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
-  spectrogramPort: ReturnType<
-    typeof spectrogramDataChannel.outbound<MessagePort>
-  >;
-  playhead: Playhead;
-};
-
-type RecordingController = {
-  clearRecordingStream: () => void;
-  failRecordingStream: (error: unknown) => void;
-  finishCurrentRecordingStream: (stream: RecordingStream) => Promise<void>;
-};
-
-type RecordingControllerDeps = {
-  getRecordingStream: () => RecordingStream | undefined;
-  setRecordingStream: (stream: RecordingStream | undefined) => void;
-  getRecordingReady: () => boolean;
-  setRecordingReady: (ready: boolean) => void;
-  realtime: ProjectRealtime;
-  port: CreateDecoderWorkerRuntimeOptions['port'];
-};
-
 const sanitizeLogMessage = (message: string) =>
   message
     .split('\r')
@@ -86,6 +62,30 @@ const handleRealtimePacket = (audioDecode: AudioDecode, data: ArrayBuffer) => {
       frameCount,
     ),
   });
+};
+
+type RecordingController = {
+  clearRecordingStream: () => void;
+  failRecordingStream: (error: unknown) => void;
+  finishCurrentRecordingStream: (stream: RecordingStream) => Promise<void>;
+};
+
+export type CreateDecoderWorkerRuntimeOptions = {
+  port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
+  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
+  spectrogramPort: ReturnType<
+    typeof spectrogramDataChannel.outbound<MessagePort>
+  >;
+  playhead: Playhead;
+};
+
+type RecordingControllerDeps = {
+  getRecordingStream: () => RecordingStream | undefined;
+  setRecordingStream: (stream: RecordingStream | undefined) => void;
+  getRecordingReady: () => boolean;
+  setRecordingReady: (ready: boolean) => void;
+  realtime: ProjectRealtime;
+  port: CreateDecoderWorkerRuntimeOptions['port'];
 };
 
 const createRecordingController = (

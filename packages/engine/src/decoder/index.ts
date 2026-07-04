@@ -9,6 +9,9 @@ import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './protocol.cross.js';
 
+const sanitizeLogMessage = (message: string) =>
+  message.replace(/[\r\n\u2028\u2029]/g, ' ');
+
 type Unmount = () => void;
 
 export type EngineDecoder = {
@@ -67,9 +70,6 @@ export type CreateEngineDecoderOptions = {
     revision: number;
   }) => void;
 };
-
-const sanitizeLogMessage = (message: string) =>
-  message.replace(/[\r\n\u2028\u2029]/g, ' ');
 
 export const createEngineDecoder = (
   options: CreateEngineDecoderOptions,

@@ -8,33 +8,6 @@ export type ProcessingStepKind =
   | 'rhythm'
   | 'key'
   | 'chords';
-export type ProcessingWorkerProgressEvent = {
-  type: 'progress';
-  projectId: number;
-  step: ProcessingStepKind;
-  progress: number;
-  download?: api.project.Download;
-};
-
-export type ProcessingWorkerCompleteEvent = {
-  type: 'complete';
-  projectId: number;
-  step: ProcessingStepKind;
-};
-
-export type ProcessingWorkerErrorEvent = {
-  type: 'error';
-  projectId: number;
-  step: ProcessingStepKind;
-};
-
-export type ProcessingWorkerEvent =
-  | ProcessingWorkerProgressEvent
-  | ProcessingWorkerCompleteEvent
-  | ProcessingWorkerErrorEvent;
-
-type Steps = api.project.Processing['steps'];
-
 const stepOrder: ProcessingStepKind[] = [
   'separation',
   'transcription',
@@ -45,6 +18,8 @@ const stepOrder: ProcessingStepKind[] = [
 
 const doneStep: api.project.ProcessingStep = { status: 'done', progress: 1 };
 const pendingStep: api.project.ProcessingStep = { status: 'pending' };
+
+type Steps = api.project.Processing['steps'];
 
 const buildSteps = (
   step: ProcessingStepKind,
@@ -71,6 +46,31 @@ const buildSteps = (
 };
 
 const lastStep = stepOrder[stepOrder.length - 1];
+
+export type ProcessingWorkerProgressEvent = {
+  type: 'progress';
+  projectId: number;
+  step: ProcessingStepKind;
+  progress: number;
+  download?: api.project.Download;
+};
+
+export type ProcessingWorkerCompleteEvent = {
+  type: 'complete';
+  projectId: number;
+  step: ProcessingStepKind;
+};
+
+export type ProcessingWorkerErrorEvent = {
+  type: 'error';
+  projectId: number;
+  step: ProcessingStepKind;
+};
+
+export type ProcessingWorkerEvent =
+  | ProcessingWorkerProgressEvent
+  | ProcessingWorkerCompleteEvent
+  | ProcessingWorkerErrorEvent;
 
 export const resolveProcessingEvent = (
   event: ProcessingWorkerEvent,

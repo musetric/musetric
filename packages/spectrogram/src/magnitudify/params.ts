@@ -5,13 +5,13 @@ import {
   type SpectrogramColumnRange,
 } from '../common/extConfig.js';
 
+export const slotOffsetByteOffset = 8;
+const paramsByteLength = 16;
+
 export type MagnitudifyParams = {
   windowSize: number;
   windowCount: number;
 };
-
-export const slotOffsetByteOffset = 8;
-const paramsByteLength = 16;
 
 const toParams = (config: ExtSpectrogramConfig): MagnitudifyParams => ({
   windowSize: config.windowSize * config.zeroPaddingFactor,

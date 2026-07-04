@@ -1,3 +1,40 @@
+type PointerSample = {
+  position: number;
+  time: number;
+};
+
+const appendPointerSample = (
+  samples: PointerSample[],
+  position: number,
+  time: number,
+  velocitySampleDurationMs: number,
+) => {
+  samples.push({ position, time });
+
+  while (
+    samples.length > 1 &&
+    time - samples[0].time > velocitySampleDurationMs
+  ) {
+    samples.shift();
+  }
+};
+
+const getVelocity = (samples: PointerSample[]) => {
+  if (samples.length < 2) {
+    return 0;
+  }
+
+  const [firstSample] = samples;
+  const lastSample = samples[samples.length - 1];
+  const duration = lastSample.time - firstSample.time;
+
+  if (duration <= 0) {
+    return 0;
+  }
+
+  return ((lastSample.position - firstSample.position) / duration) * 1000;
+};
+
 export type InertialDragPhysicsOptions = {
   inertiaTimeConstantMs?: number;
   inertiaMinimumVelocity?: number;
@@ -37,43 +74,6 @@ export type InertialDragPhysics = {
     state: InertialDragInertiaState,
     time: number,
   ) => InertialDragInertiaStep;
-};
-
-type PointerSample = {
-  position: number;
-  time: number;
-};
-
-const appendPointerSample = (
-  samples: PointerSample[],
-  position: number,
-  time: number,
-  velocitySampleDurationMs: number,
-) => {
-  samples.push({ position, time });
-
-  while (
-    samples.length > 1 &&
-    time - samples[0].time > velocitySampleDurationMs
-  ) {
-    samples.shift();
-  }
-};
-
-const getVelocity = (samples: PointerSample[]) => {
-  if (samples.length < 2) {
-    return 0;
-  }
-
-  const [firstSample] = samples;
-  const lastSample = samples[samples.length - 1];
-  const duration = lastSample.time - firstSample.time;
-
-  if (duration <= 0) {
-    return 0;
-  }
-
-  return ((lastSample.position - firstSample.position) / duration) * 1000;
 };
 
 export const createInertialDragPhysics = (

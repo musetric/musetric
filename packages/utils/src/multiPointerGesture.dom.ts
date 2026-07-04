@@ -20,14 +20,36 @@ import {
   type PointerDispatcher,
 } from './multiPointerGesture/pointerDispatcher.dom.js';
 
-export type GestureAxis = 'x' | 'y';
-export type GesturePhase = 'drag' | 'inertia';
 export type GesturePointerType = 'mouse' | 'touch';
 
-export type GesturePanStart = {
+const defaultPointerTypes: readonly GesturePointerType[] = ['mouse', 'touch'];
+
+export type GestureAxis = 'x' | 'y';
+
+export type GesturePinchUpdate = {
   axis: GestureAxis;
-  pointerType: GesturePointerType;
+  center: number;
+  spread: number;
 };
+
+const emitPinchUpdate = (
+  onUpdate: ((event: GesturePinchUpdate) => void) | undefined,
+  update: PinchTrackerUpdate,
+) => {
+  onUpdate?.({
+    axis: update.axis,
+    center: update.center,
+    spread: update.spread,
+  });
+};
+
+type PanUpdateFields = {
+  axis: GestureAxis;
+  delta: number;
+  velocity: number;
+};
+
+export type GesturePhase = 'drag' | 'inertia';
 
 export type GesturePanUpdate = {
   axis: GestureAxis;
@@ -37,13 +59,30 @@ export type GesturePanUpdate = {
   stop: () => void;
 };
 
-export type GesturePinchStart = {
-  axis: GestureAxis;
-  center: number;
-  spread: number;
+const emitPanUpdate = (
+  onUpdate: ((event: GesturePanUpdate) => void) | undefined,
+  phase: GesturePhase,
+  update: PanUpdateFields,
+): boolean => {
+  let stopped = false;
+  onUpdate?.({
+    axis: update.axis,
+    phase,
+    delta: update.delta,
+    velocity: update.velocity,
+    stop: () => {
+      stopped = true;
+    },
+  });
+  return stopped;
 };
 
-export type GesturePinchUpdate = {
+export type GesturePanStart = {
+  axis: GestureAxis;
+  pointerType: GesturePointerType;
+};
+
+export type GesturePinchStart = {
   axis: GestureAxis;
   center: number;
   spread: number;
@@ -74,43 +113,6 @@ type Pointer = {
   type: GesturePointerType;
   x: number;
   y: number;
-};
-
-const defaultPointerTypes: readonly GesturePointerType[] = ['mouse', 'touch'];
-
-const emitPinchUpdate = (
-  onUpdate: ((event: GesturePinchUpdate) => void) | undefined,
-  update: PinchTrackerUpdate,
-) => {
-  onUpdate?.({
-    axis: update.axis,
-    center: update.center,
-    spread: update.spread,
-  });
-};
-
-type PanUpdateFields = {
-  axis: GestureAxis;
-  delta: number;
-  velocity: number;
-};
-
-const emitPanUpdate = (
-  onUpdate: ((event: GesturePanUpdate) => void) | undefined,
-  phase: GesturePhase,
-  update: PanUpdateFields,
-): boolean => {
-  let stopped = false;
-  onUpdate?.({
-    axis: update.axis,
-    phase,
-    delta: update.delta,
-    velocity: update.velocity,
-    stop: () => {
-      stopped = true;
-    },
-  });
-  return stopped;
 };
 
 export const createMultiPointerGesture = (

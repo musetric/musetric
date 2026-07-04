@@ -14,29 +14,10 @@ import { type RecordingRuntime } from './runtime.js';
 export const streamPacketHeaderByteLength = 8;
 export const maxStreamPacketByteLength = 1024 * 1024;
 
-export type RecordingSession = {
-  id: string;
-  projectId: number;
-  sampleRate: number;
-  frameCount: number;
-  audioPath: string;
-  waveBlobId: string;
-  file: FileHandle;
-  waveFile: FileHandle;
-  writePromise: Promise<void>;
-};
-
 type ReservedRecordingBlobs = {
   audioBlobPath: string;
   waveBlobId: string;
   waveBlobPath: string;
-  sampleRate: number;
-  frameCount: number;
-};
-
-type ExistingRecording = {
-  blobId: string;
-  waveBlobId: string;
   sampleRate: number;
   frameCount: number;
 };
@@ -72,6 +53,13 @@ const reserveNewRecordingBlobs = async (
   };
 };
 
+type ExistingRecording = {
+  blobId: string;
+  waveBlobId: string;
+  sampleRate: number;
+  frameCount: number;
+};
+
 const reuseRecordingBlobs = async (
   runtime: RecordingRuntime,
   existing: ExistingRecording,
@@ -96,6 +84,18 @@ const reuseRecordingBlobs = async (
     sampleRate: existing.sampleRate,
     frameCount: existing.frameCount,
   };
+};
+
+export type RecordingSession = {
+  id: string;
+  projectId: number;
+  sampleRate: number;
+  frameCount: number;
+  audioPath: string;
+  waveBlobId: string;
+  file: FileHandle;
+  waveFile: FileHandle;
+  writePromise: Promise<void>;
 };
 
 export const createSession = async (

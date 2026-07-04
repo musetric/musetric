@@ -7,18 +7,6 @@ import {
 import { transformShader } from './transform.wgsl.js';
 import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
 
-export type SinglePassPipeline = {
-  kind: 'singlePass';
-  transform: GPUComputePipeline;
-};
-
-export type MultiPassPipeline = {
-  kind: 'multiPass';
-  stages: GPUComputePipeline[];
-};
-
-export type Pipeline = SinglePassPipeline | MultiPassPipeline;
-
 type TransformStageCounts = {
   radix8StageCount: number;
   radix4StageCount: number;
@@ -148,6 +136,11 @@ const createKernelConstants = (
   };
 };
 
+export type SinglePassPipeline = {
+  kind: 'singlePass';
+  transform: GPUComputePipeline;
+};
+
 const createSinglePassPipeline = (
   device: GPUDevice,
   variant: Extract<
@@ -175,6 +168,11 @@ const createSinglePassPipeline = (
       },
     }),
   };
+};
+
+export type MultiPassPipeline = {
+  kind: 'multiPass';
+  stages: GPUComputePipeline[];
 };
 
 const createMultiPassPipeline = (
@@ -206,6 +204,8 @@ const createMultiPassPipeline = (
     ),
   };
 };
+
+export type Pipeline = SinglePassPipeline | MultiPassPipeline;
 
 export const createPipeline = (
   device: GPUDevice,

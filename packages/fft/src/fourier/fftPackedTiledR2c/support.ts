@@ -5,6 +5,18 @@ import {
 } from '../factorization.es.js';
 import { selectBalancedTileShape } from '../tileShape.js';
 
+const batchSize = 4;
+const maxTileSize = 256;
+const maxWindowSize = 65536;
+const minPackedWindowSize = 4;
+const maxPackedWindowSize = maxWindowSize / 2;
+
+const isPowerOfTwo = (value: number): boolean =>
+  Number.isInteger(Math.log2(value));
+
+// The second pass holds 8 padded arrays (pad 8 up to tileSize 248; larger
+// tiles drop the padding so they still fit the 32 KB budget); the first pass
+// only holds 4.
 type BaseVariant = {
   windowSize: number;
   packedWindowSize: number;
@@ -28,18 +40,6 @@ export type PackedTiledR2cVariant =
       columnStageCounts: RadixStageCounts;
     });
 
-const batchSize = 4;
-const maxTileSize = 256;
-const maxWindowSize = 65536;
-const minPackedWindowSize = 4;
-const maxPackedWindowSize = maxWindowSize / 2;
-
-const isPowerOfTwo = (value: number): boolean =>
-  Number.isInteger(Math.log2(value));
-
-// The second pass holds 8 padded arrays (pad 8 up to tileSize 248; larger
-// tiles drop the padding so they still fit the 32 KB budget); the first pass
-// only holds 4.
 const getRequiredWorkgroupStorageSize = (
   variant: PackedTiledR2cVariant,
 ): number => {

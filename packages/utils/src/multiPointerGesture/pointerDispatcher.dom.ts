@@ -1,5 +1,8 @@
 import { type GesturePointerType } from '../multiPointerGesture.dom.js';
 
+const isPointerType = (value: string): value is GesturePointerType =>
+  value === 'mouse' || value === 'touch';
+
 export type PointerDispatcher = {
   attach: () => void;
   detach: () => void;
@@ -13,9 +16,6 @@ type PointerDispatcherDeps = {
   onPointerUp: (event: PointerEvent) => void;
   onPointerCancel: (event: PointerEvent) => void;
 };
-
-const isPointerType = (value: string): value is GesturePointerType =>
-  value === 'mouse' || value === 'touch';
 
 export const createPointerDispatcher = (
   deps: PointerDispatcherDeps,

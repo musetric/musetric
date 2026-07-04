@@ -5,6 +5,12 @@ import {
   type SpectrogramColumnRange,
 } from '../common/extConfig.js';
 
+export const slotOffsetByteOffset = 28;
+const paramsByteLength = 32;
+
+const gateFloorDb = -64;
+const gateRangeDb = 24;
+
 export type DecibelifyParams = {
   halfSize: number;
   windowCount: number;
@@ -15,16 +21,10 @@ export type DecibelifyParams = {
   gateRangeDb: number;
 };
 
-export const slotOffsetByteOffset = 28;
-const paramsByteLength = 32;
-
 export type DecibelifyParamsArg = {
   config: ExtSpectrogramConfig;
   gainDb: number;
 };
-
-const gateFloorDb = -64;
-const gateRangeDb = 24;
 
 const toParams = (arg: DecibelifyParamsArg): DecibelifyParams => {
   const halfSize = (arg.config.windowSize * arg.config.zeroPaddingFactor) / 2;

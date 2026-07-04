@@ -23,14 +23,6 @@ export type DispatchContext = {
   work: Record<TrackKey, { spectrogram: boolean; fundamental: boolean }>;
 };
 
-export type ComputeMarkers = {
-  spectrum: Readonly<
-    Record<SpectrumStage, GPUComputePassTimestampWrites | undefined>
-  >;
-  fundamental: GPUComputePassTimestampWrites | undefined;
-  remap: GPUComputePassTimestampWrites | undefined;
-};
-
 const hasSpectrumWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.plans[key].ranges.length > 0 &&
   (ctx.work[key].spectrogram || ctx.work[key].fundamental);
@@ -191,6 +183,14 @@ const runPass = (
   const pass = encoder.beginComputePass({ label, timestampWrites });
   body(pass);
   pass.end();
+};
+
+export type ComputeMarkers = {
+  spectrum: Readonly<
+    Record<SpectrumStage, GPUComputePassTimestampWrites | undefined>
+  >;
+  fundamental: GPUComputePassTimestampWrites | undefined;
+  remap: GPUComputePassTimestampWrites | undefined;
 };
 
 export type DispatchComputeOptions = {

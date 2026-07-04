@@ -5,11 +5,6 @@ import {
   windowStartForColumn,
 } from './extConfig.js';
 
-export type ColumnGrid = {
-  windowCount: number;
-  columnStep: number;
-};
-
 const markColumns = (columns: boolean[], from: number, count: number): void => {
   const start = Math.max(0, from);
   const end = Math.min(columns.length, from + count);
@@ -36,6 +31,11 @@ export const markShiftColumns = (
     return;
   }
   markColumns(columns, 0, -delta);
+};
+
+export type ColumnGrid = {
+  windowCount: number;
+  columnStep: number;
 };
 
 type MarkInvalidatedColumnsOptions = {

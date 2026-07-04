@@ -1,17 +1,5 @@
 import { type SpectrogramConfig } from '../config.cross.js';
 
-export type ExtSpectrogramConfig = SpectrogramConfig & {
-  windowCount: number;
-
-  columnStep: number;
-};
-
-export type SpectrogramColumnRange = {
-  screenBase: number;
-  slotOffset: number;
-  columnCount: number;
-};
-
 export type SpectrogramSampleRange = {
   frameIndex: number;
   frameCount: number;
@@ -28,6 +16,12 @@ export const computeColumnStep = (
 
 export const floorMod = (value: number, modulus: number): number =>
   ((value % modulus) + modulus) % modulus;
+
+export type ExtSpectrogramConfig = SpectrogramConfig & {
+  windowCount: number;
+
+  columnStep: number;
+};
 
 export const computeBaseColumn = (
   config: ExtSpectrogramConfig,
@@ -46,6 +40,12 @@ export const windowStartForColumn = (
   bandWindowSize: number,
   column: number,
 ): number => Math.round(column * config.columnStep - bandWindowSize / 2);
+
+export type SpectrogramColumnRange = {
+  screenBase: number;
+  slotOffset: number;
+  columnCount: number;
+};
 
 export const fullColumnRange = (
   config: ExtSpectrogramConfig,

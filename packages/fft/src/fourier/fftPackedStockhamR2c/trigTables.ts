@@ -1,10 +1,5 @@
 import { type PackedStockhamR2cVariant } from './support.js';
 
-export type TrigTables = {
-  fft: GPUBuffer;
-  r2c: GPUBuffer;
-};
-
 const createBuffer = (
   device: GPUDevice,
   label: string,
@@ -42,6 +37,11 @@ const createR2cTrigTable = (
     table[2 * k + 1] = Math.sin(angle);
   }
   return table;
+};
+
+export type TrigTables = {
+  fft: GPUBuffer;
+  r2c: GPUBuffer;
 };
 
 export const createTrigTables = (
