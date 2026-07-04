@@ -1,15 +1,21 @@
 import { expandColumnRanges } from '../common/columnRanges.js';
-import { fullColumnRange } from '../common/extConfig.js';
+import {
+  fullColumnRange,
+  type SpectrogramColumnRange,
+} from '../common/extConfig.js';
 import {
   type SpectrumStage,
   spectrumStages,
 } from '../common/processorTimer.js';
-import { allTrackKeys, type TrackKey } from '../config.cross.js';
+import {
+  allTrackKeys,
+  hasSpectrogramComparison,
+  type TrackKey,
+} from '../config.cross.js';
 import { type SpectrogramRuntime } from '../configurator.js';
+import { fundamentalTrackWindow } from '../fundamentalFrequency/params.js';
 import { type SpectrogramLane } from '../lane/index.js';
 import { type TrackRenderPlan } from './renderPlan.js';
-
-const fundamentalFilterRadius = 6;
 
 export type DispatchContext = {
   plans: Record<TrackKey, TrackRenderPlan>;
@@ -29,9 +35,15 @@ const hasSpectrumWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.plans[key].ranges.length > 0 &&
   (ctx.work[key].spectrogram || ctx.work[key].fundamental);
 
-const hasFundamentalWork = (ctx: DispatchContext, key: TrackKey): boolean =>
-  ctx.plans[key].ranges.length > 0 &&
-  ctx.runtime.config.lanes[key].showFundamental;
+const hasFundamentalWork = (ctx: DispatchContext, key: TrackKey): boolean => {
+  const lane = ctx.runtime.config.lanes[key];
+  return (
+    ctx.plans[key].ranges.length > 0 &&
+    (lane.showFundamental ||
+      lane.showNotes ||
+      hasSpectrogramComparison(ctx.runtime.config))
+  );
+};
 
 const hasRemapWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.runtime.config.lanes[key].showSpectrogram &&
@@ -62,6 +74,65 @@ const dispatchSpectrumStage = (
   }
 };
 
+const colorLaneShown = (ctx: DispatchContext, key: TrackKey): boolean => {
+  const lane = ctx.runtime.config.lanes[key];
+  return (
+    lane.showFundamental ||
+    lane.showNotes ||
+    hasSpectrogramComparison(ctx.runtime.config)
+  );
+};
+
+const unionColorRanges = (
+  ctx: DispatchContext,
+  keys: readonly TrackKey[],
+  radius: number,
+): SpectrogramColumnRange[] => {
+  const { windowCount } = ctx.runtime.config;
+  const intervals: [number, number][] = [];
+  for (const key of keys) {
+    for (const range of ctx.plans[key].ranges) {
+      intervals.push([
+        Math.max(0, range.screenBase - radius),
+        Math.min(windowCount, range.screenBase + range.columnCount + radius),
+      ]);
+    }
+  }
+  intervals.sort((first, second) => first[0] - second[0]);
+
+  const merged: SpectrogramColumnRange[] = [];
+  for (const [start, end] of intervals) {
+    const previous = merged.at(-1);
+    if (previous && start <= previous.screenBase + previous.columnCount) {
+      previous.columnCount =
+        Math.max(previous.screenBase + previous.columnCount, end) -
+        previous.screenBase;
+      continue;
+    }
+    merged.push({ screenBase: start, columnCount: end - start, slotOffset: 0 });
+  }
+  return merged;
+};
+
+const dispatchColor = (
+  pass: GPUComputePassEncoder,
+  ctx: DispatchContext,
+): void => {
+  const { runtime } = ctx;
+  const color = runtime.comparisonColor;
+  const { reference, target } = runtime.config.comparison;
+  if (!colorLaneShown(ctx, target)) {
+    return;
+  }
+
+  const ranges = unionColorRanges(ctx, [reference, target], color.colorRadius);
+  const referenceBaseSlot = ctx.plans[reference].baseSlot;
+  const targetBaseSlot = ctx.plans[target].baseSlot;
+  for (const range of ranges) {
+    color.dispatch(pass, { referenceBaseSlot, targetBaseSlot, range });
+  }
+};
+
 const dispatchFundamental = (
   pass: GPUComputePassEncoder,
   ctx: DispatchContext,
@@ -72,7 +143,7 @@ const dispatchFundamental = (
       continue;
     }
     for (const range of plans[key].ranges) {
-      runtime.tracks[key].lane.dispatchFundamentalScore(pass, range);
+      runtime.tracks[key].lane.dispatchFundamentalObserve(pass, range);
     }
   }
   for (const key of allTrackKeys) {
@@ -83,12 +154,13 @@ const dispatchFundamental = (
       runtime.config,
       plans[key].baseColumn,
       plans[key].ranges,
-      fundamentalFilterRadius,
+      fundamentalTrackWindow,
     );
     for (const range of expanded) {
-      runtime.tracks[key].lane.dispatchFundamentalFilter(pass, range);
+      runtime.tracks[key].lane.dispatchFundamentalTrack(pass, range);
     }
   }
+  dispatchColor(pass, ctx);
 };
 
 const dispatchRemap = (

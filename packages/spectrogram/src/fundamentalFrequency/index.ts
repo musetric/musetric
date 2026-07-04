@@ -6,15 +6,15 @@ import { createStateCell, type StateArg } from './state.js';
 const workgroupSize = 64;
 
 export type SpectrogramFundamentalFrequency = {
-  buffer: GPUBuffer;
+  lineBuffer: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
 
-  dispatchScore: (
+  dispatchObserve: (
     pass: GPUComputePassEncoder,
     range?: SpectrogramColumnRange,
   ) => void;
 
-  dispatchFilter: (
+  dispatchTrack: (
     pass: GPUComputePassEncoder,
     range?: SpectrogramColumnRange,
   ) => void;
@@ -31,7 +31,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
     get: (arg) => {
       const state = stateCell.get(arg);
 
-      const dispatchScore = (
+      const dispatchObserve = (
         pass: GPUComputePassEncoder,
         range?: SpectrogramColumnRange,
       ) => {
@@ -40,12 +40,12 @@ export const createSpectrogramFundamentalFrequencyCell = (
           return;
         }
 
-        pass.setPipeline(state.pipelines.scoreAndPick);
-        pass.setBindGroup(0, state.bindGroups.scoreAndPick, [byteOffset]);
+        pass.setPipeline(state.pipelines.observe);
+        pass.setBindGroup(0, state.bindGroups.observe, [byteOffset]);
         pass.dispatchWorkgroups(columnCount);
       };
 
-      const dispatchFilter = (
+      const dispatchTrack = (
         pass: GPUComputePassEncoder,
         range?: SpectrogramColumnRange,
       ) => {
@@ -58,24 +58,24 @@ export const createSpectrogramFundamentalFrequencyCell = (
           Math.ceil(columnCount / workgroupSize),
         );
 
-        pass.setPipeline(state.pipelines.filter);
-        pass.setBindGroup(0, state.bindGroups.filter, [byteOffset]);
+        pass.setPipeline(state.pipelines.track);
+        pass.setBindGroup(0, state.bindGroups.track, [byteOffset]);
         pass.dispatchWorkgroups(windowGroups);
       };
 
       return {
-        buffer: state.output.filtered,
+        lineBuffer: state.output.line,
         run: (encoder) => {
           const pass = encoder.beginComputePass({
             label: 'fundamental-frequency-pass',
             timestampWrites: marker,
           });
-          dispatchScore(pass);
-          dispatchFilter(pass);
+          dispatchObserve(pass);
+          dispatchTrack(pass);
           pass.end();
         },
-        dispatchScore,
-        dispatchFilter,
+        dispatchObserve,
+        dispatchTrack,
       };
     },
     dispose: () => {

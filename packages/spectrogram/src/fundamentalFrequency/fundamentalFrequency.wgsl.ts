@@ -14,6 +14,11 @@ struct FundamentalFrequencyParams {
   columnCount: u32,
   screenBase: u32,
   baseSlot: u32,
+  latticeCount: u32,
+  trackWindow: u32,
+  jumpCostCents: f32,
+  unvoicedCost: f32,
+  voicedTransitionCost: f32,
 };
 
 struct CandidateStats {
@@ -27,8 +32,12 @@ struct CandidateStats {
 };
 
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
-@group(0) @binding(2) var<storage, read_write> rawOutput: array<f32>;
+@group(0) @binding(2) var<storage, read_write> lattice: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: FundamentalFrequencyParams;
+
+const workgroupWidth = 64u;
+const localPeakCount = 2u;
+const maxLatticeCount = 8u;
 
 const harmonicWeights = array<f32, 11>(
   0.0,
@@ -46,8 +55,8 @@ const harmonicWeights = array<f32, 11>(
 
 const prominenceProbeRatio = 1.041243772;
 
-var<workgroup> workgroupScores: array<f32, 256>;
-var<workgroup> workgroupCandidates: array<u32, 256>;
+var<workgroup> workgroupScores: array<f32, 128>;
+var<workgroup> workgroupCandidates: array<u32, 128>;
 
 fn frequencyAtCandidate(candidate: u32) -> f32 {
   return params.minimumFrequency *
@@ -278,17 +287,27 @@ fn refinementScore(windowIndex: u32, frequency: f32) -> f32 {
   return max(stats.score, 0.0);
 }
 
-fn shouldReplaceBest(
-  score: f32,
-  candidate: u32,
-  bestScore: f32,
-  bestCandidate: u32,
-) -> bool {
-  return score > bestScore || (score == bestScore && candidate < bestCandidate);
+fn refinePeak(windowIndex: u32, candidate: u32) -> f32 {
+  let coarse = frequencyAtCandidate(candidate);
+  if (candidate == 0u || candidate + 1u >= params.candidateCount) {
+    return coarse;
+  }
+
+  let fineStepRatio = exp2(params.candidateStepCents / 1200.0);
+  let centerScore = refinementScore(windowIndex, coarse);
+  let previousScore = refinementScore(windowIndex, coarse / fineStepRatio);
+  let nextScore = refinementScore(windowIndex, coarse * fineStepRatio);
+  let denominator = previousScore - 2.0 * centerScore + nextScore;
+  if (abs(denominator) <= 0.000001) {
+    return coarse;
+  }
+
+  let offset = clamp(0.5 * (previousScore - nextScore) / denominator, -1.0, 1.0);
+  return coarse * exp2(offset * params.candidateStepCents / 1200.0);
 }
 
-@compute @workgroup_size(256)
-fn scoreAndPick(
+@compute @workgroup_size(64)
+fn observe(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
   @builtin(local_invocation_id) localId: vec3<u32>,
 ) {
@@ -299,104 +318,85 @@ fn scoreAndPick(
   }
   let windowIndex = (params.slotOffset + localWindowIndex) % params.windowCount;
   let candidateCount = params.candidateCount;
+  let latticeCount = min(params.latticeCount, maxLatticeCount);
 
-  var bestScore = 0.0;
-  var bestCandidate = 0u;
+  var localScore = array<f32, 2>(0.0, 0.0);
+  var localCandidate = array<u32, 2>(candidateCount, candidateCount);
   for (
     var candidate = threadIndex;
     candidate < candidateCount;
-    candidate += 256u
+    candidate += workgroupWidth
   ) {
-    let candidateScore = harmonicScore(
-      windowIndex,
-      frequencyAtCandidate(candidate),
-    );
-    if (
-      shouldReplaceBest(
-        candidateScore,
-        candidate,
-        bestScore,
-        bestCandidate,
-      )
-    ) {
-      bestScore = candidateScore;
-      bestCandidate = candidate;
+    let score = harmonicScore(windowIndex, frequencyAtCandidate(candidate));
+    if (score <= 0.0) {
+      continue;
+    }
+
+    if (score > localScore[0]) {
+      localScore[1] = localScore[0];
+      localCandidate[1] = localCandidate[0];
+      localScore[0] = score;
+      localCandidate[0] = candidate;
+    } else if (score > localScore[1]) {
+      localScore[1] = score;
+      localCandidate[1] = candidate;
     }
   }
 
-  workgroupScores[threadIndex] = bestScore;
-  workgroupCandidates[threadIndex] = bestCandidate;
+  for (var slot = 0u; slot < localPeakCount; slot += 1u) {
+    let sharedIndex = threadIndex * localPeakCount + slot;
+    workgroupScores[sharedIndex] = localScore[slot];
+    workgroupCandidates[sharedIndex] = localCandidate[slot];
+  }
   workgroupBarrier();
-
-  for (var stride = 128u; stride > 0u; stride = stride / 2u) {
-    if (threadIndex < stride) {
-      let otherScore = workgroupScores[threadIndex + stride];
-      let otherCandidate = workgroupCandidates[threadIndex + stride];
-      if (
-        shouldReplaceBest(
-          otherScore,
-          otherCandidate,
-          workgroupScores[threadIndex],
-          workgroupCandidates[threadIndex],
-        )
-      ) {
-        workgroupScores[threadIndex] = otherScore;
-        workgroupCandidates[threadIndex] = otherCandidate;
-      }
-    }
-    workgroupBarrier();
-  }
 
   if (threadIndex != 0u) {
     return;
   }
 
-  bestScore = workgroupScores[0];
-  bestCandidate = workgroupCandidates[0];
-  if (bestScore <= 0.0) {
-    rawOutput[windowIndex] = 0.0;
-    return;
-  }
+  let entryCount = workgroupWidth * localPeakCount;
+  let separationCandidates = u32(max(1.0, 60.0 / params.candidateStepCents));
+  var pickedCandidate = array<u32, 8>();
+  let latticeBase = windowIndex * params.latticeCount;
 
-  let fineStepRatio = exp2(params.candidateStepCents * 0.5 / 1200.0);
-  let coarseBestFrequency = frequencyAtCandidate(bestCandidate);
-  var bestFrequency = coarseBestFrequency;
+  for (var picked = 0u; picked < latticeCount; picked += 1u) {
+    var bestScore = 0.0;
+    var bestEntry = entryCount;
+    for (var entry = 0u; entry < entryCount; entry += 1u) {
+      let score = workgroupScores[entry];
+      if (score <= 0.0) {
+        continue;
+      }
 
-  if (bestCandidate > 0u) {
-    let previousFrequency = coarseBestFrequency / fineStepRatio;
-    let previousScore = harmonicScore(windowIndex, previousFrequency);
-    if (previousScore > bestScore) {
-      bestScore = previousScore;
-      bestFrequency = previousFrequency;
+      let candidate = workgroupCandidates[entry];
+      var tooClose = false;
+      for (var prior = 0u; prior < picked; prior += 1u) {
+        let distance = u32(abs(i32(candidate) - i32(pickedCandidate[prior])));
+        if (distance < separationCandidates) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) {
+        continue;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestEntry = entry;
+      }
     }
-  }
 
-  if (bestCandidate + 1u < candidateCount) {
-    let nextFrequency = coarseBestFrequency * fineStepRatio;
-    let nextScore = harmonicScore(windowIndex, nextFrequency);
-    if (nextScore > bestScore) {
-      bestScore = nextScore;
-      bestFrequency = nextFrequency;
+    if (bestEntry == entryCount) {
+      lattice[latticeBase + picked] = vec2<f32>(0.0, 0.0);
+      continue;
     }
-  }
 
-  var refinedFrequency = bestFrequency;
-  if (bestCandidate > 0u && bestCandidate + 1u < candidateCount) {
-    let centerScore = refinementScore(windowIndex, bestFrequency);
-    let previousScore = refinementScore(windowIndex, bestFrequency / fineStepRatio);
-    let nextScore = refinementScore(windowIndex, bestFrequency * fineStepRatio);
-    let denominator = previousScore - 2.0 * centerScore + nextScore;
-    if (abs(denominator) > 0.000001) {
-      let offset = clamp(
-        0.5 * (previousScore - nextScore) / denominator,
-        -1.0,
-        1.0,
-      );
-      refinedFrequency = bestFrequency *
-        exp2(offset * params.candidateStepCents * 0.5 / 1200.0);
-    }
+    let candidate = workgroupCandidates[bestEntry];
+    pickedCandidate[picked] = candidate;
+    workgroupScores[bestEntry] = 0.0;
+    lattice[latticeBase + picked] =
+      vec2<f32>(refinePeak(windowIndex, candidate), bestScore);
   }
-
-  rawOutput[windowIndex] = refinedFrequency;
 }
 `;

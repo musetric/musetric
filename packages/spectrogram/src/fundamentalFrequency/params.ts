@@ -17,13 +17,18 @@ export type FundamentalFrequencyParams = {
   minimumFundamentalIntensity: number;
   minimumScore: number;
   harmonicCount: number;
+  latticeCount: number;
+  trackWindow: number;
+  jumpCostCents: number;
+  unvoicedCost: number;
+  voicedTransitionCost: number;
 };
 
 export const slotOffsetByteOffset = 40;
 const columnCountByteOffset = 44;
 const screenBaseByteOffset = 48;
 const baseSlotByteOffset = 52;
-const paramsByteLength = 64;
+const paramsByteLength = 80;
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
@@ -31,6 +36,13 @@ const candidateStepCents = 20;
 const minimumFundamentalIntensity = 0.075;
 const minimumScore = 0.145;
 const harmonicCount = 10;
+
+const latticeCount = 5;
+const jumpCostCents = 0.0009;
+const unvoicedCost = 0.12;
+const voicedTransitionCost = 0.09;
+
+export const fundamentalTrackWindow = 8;
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
   const windowSize = config.windowSize * config.zeroPaddingFactor;
@@ -60,6 +72,11 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     minimumFundamentalIntensity,
     minimumScore,
     harmonicCount,
+    latticeCount,
+    trackWindow: fundamentalTrackWindow,
+    jumpCostCents,
+    unvoicedCost,
+    voicedTransitionCost,
   };
 };
 
@@ -111,8 +128,11 @@ export const createParamsCell = (device: GPUDevice) =>
               floorMod(slotOffset - screenBase, value.windowCount),
               true,
             );
-            view.setUint32(56, 0, true);
-            view.setUint32(60, 0, true);
+            view.setUint32(56, value.latticeCount, true);
+            view.setUint32(60, value.trackWindow, true);
+            view.setFloat32(64, value.jumpCostCents, true);
+            view.setFloat32(68, value.unvoicedCost, true);
+            view.setFloat32(72, value.voicedTransitionCost, true);
           });
           return {
             columnCount,

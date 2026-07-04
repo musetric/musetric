@@ -18,9 +18,11 @@ const isSpectrogramColorsEqual = (
   first.background === second.background &&
   first.foreground === second.foreground &&
   first.primary === second.primary &&
+  first.recordingForeground === second.recordingForeground &&
   first.recordingMatch === second.recordingMatch &&
   first.recordingClose === second.recordingClose &&
-  first.recordingMiss === second.recordingMiss;
+  first.recordingMiss === second.recordingMiss &&
+  first.recordingTimingMiss === second.recordingTimingMiss;
 
 const isSpectrogramLanesEqual = (
   first: Record<string, SpectrogramLaneConfig>,
@@ -32,6 +34,7 @@ const isSpectrogramLanesEqual = (
     return (
       a.showSpectrogram === b.showSpectrogram &&
       a.showFundamental === b.showFundamental &&
+      a.showNotes === b.showNotes &&
       a.lineWidthCents === b.lineWidthCents &&
       a.truncateAfterPlayhead === b.truncateAfterPlayhead &&
       a.gainDb === b.gainDb
@@ -73,7 +76,11 @@ const isSpectrogramComparisonEqual = (
   first.reference === second.reference &&
   first.target === second.target &&
   first.matchThresholdCents === second.matchThresholdCents &&
-  first.closeThresholdCents === second.closeThresholdCents;
+  first.closeThresholdCents === second.closeThresholdCents &&
+  first.missThresholdCents === second.missThresholdCents &&
+  first.colorWindowLeftSeconds === second.colorWindowLeftSeconds &&
+  first.colorWindowRightSeconds === second.colorWindowRightSeconds &&
+  first.colorFalloffSigmaSeconds === second.colorFalloffSigmaSeconds;
 
 export const spectrogramConfigFieldEqual = {
   viewSize: isSpectrogramViewSizeEqual,

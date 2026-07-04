@@ -22,6 +22,7 @@ export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 export type SpectrogramLaneConfig = {
   showSpectrogram: boolean;
   showFundamental: boolean;
+  showNotes: boolean;
   lineWidthCents: number;
   truncateAfterPlayhead: boolean;
   gainDb: number;
@@ -50,6 +51,10 @@ export type SpectrogramComparison = {
   target: TrackKey;
   matchThresholdCents: number;
   closeThresholdCents: number;
+  missThresholdCents: number;
+  colorWindowLeftSeconds: number;
+  colorWindowRightSeconds: number;
+  colorFalloffSigmaSeconds: number;
 };
 
 export type SpectrogramConfig = {
@@ -93,6 +98,10 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
   extractConfig<SpectrogramConfig>(config, allSpectrogramConfigKeys);
+
+export const hasSpectrogramComparison = (
+  config: Pick<SpectrogramConfig, 'lanes' | 'comparison'>,
+): boolean => config.lanes[config.comparison.target].showSpectrogram;
 
 const isConfigComplete = (
   config: Partial<SpectrogramConfig>,

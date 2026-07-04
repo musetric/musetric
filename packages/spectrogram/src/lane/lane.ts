@@ -46,7 +46,7 @@ export type SpectrogramLaneDispatch = (
 export type SpectrogramLane = {
   signal: GPUBuffer;
   bandSpectra: SpectrogramBandSpectrum[];
-  fundamentalFrequencyBuffer: GPUBuffer;
+  fundamentalLineBuffer: GPUBuffer;
   writeSamples: (options: {
     samples: Float32Array;
     baseColumn: number;
@@ -58,11 +58,11 @@ export type SpectrogramLane = {
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
   dispatchDecibelify: SpectrogramLaneDispatch;
-  dispatchFundamentalScore: (
+  dispatchFundamentalObserve: (
     pass: GPUComputePassEncoder,
     range: SpectrogramColumnRange,
   ) => void;
-  dispatchFundamentalFilter: (
+  dispatchFundamentalTrack: (
     pass: GPUComputePassEncoder,
     range: SpectrogramColumnRange,
   ) => void;
@@ -168,7 +168,7 @@ const buildSpectrogramLane = (
   return {
     signal: baseBandPipeline.signal,
     bandSpectra,
-    fundamentalFrequencyBuffer: fundamentalFrequency.buffer,
+    fundamentalLineBuffer: fundamentalFrequency.lineBuffer,
     writeSamples: (writeSamplesOptions) => {
       const { samples, baseColumn, work, forceFullUpload, invalidations } =
         writeSamplesOptions;
@@ -229,14 +229,14 @@ const buildSpectrogramLane = (
         baseBandPipeline.dispatchDecibelRun(pass, range);
       }
     },
-    dispatchFundamentalScore: fundamentalFrequency.dispatchScore,
-    dispatchFundamentalFilter: fundamentalFrequency.dispatchFilter,
+    dispatchFundamentalObserve: fundamentalFrequency.dispatchObserve,
+    dispatchFundamentalTrack: fundamentalFrequency.dispatchTrack,
     clear: (encoder) => {
       baseBandPipeline.clear(encoder);
       for (const pipeline of externalPipelines) {
         pipeline.clear(encoder);
       }
-      encoder.clearBuffer(fundamentalFrequency.buffer);
+      encoder.clearBuffer(fundamentalFrequency.lineBuffer);
     },
   };
 };

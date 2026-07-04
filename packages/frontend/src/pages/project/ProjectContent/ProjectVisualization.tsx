@@ -6,9 +6,9 @@ import { ProjectTracksVisualization } from './ProjectTracksVisualization.js';
 export const ProjectVisualization: FC = () => {
   const visualizationMode = useProjectStore((state) => state.visualizationMode);
 
-  if (visualizationMode === 'spectrogram') {
-    return <ProjectSpectrogramVisualization />;
+  if (visualizationMode === 'tracks') {
+    return <ProjectTracksVisualization />;
   }
 
-  return <ProjectTracksVisualization />;
+  return <ProjectSpectrogramVisualization />;
 };

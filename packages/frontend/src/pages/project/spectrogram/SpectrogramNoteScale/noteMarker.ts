@@ -13,6 +13,11 @@ export type NoteMarker = {
   topRatio: number;
 };
 
+const naturalNoteSteps = new Set([0, 2, 4, 5, 7, 9, 11]);
+
+export const isNaturalMidi = (midi: number): boolean =>
+  naturalNoteSteps.has(midi % 12);
+
 const primaryLineSteps = [2, 4, 6, 8] as const;
 const targetPrimaryLineCount = 10;
 

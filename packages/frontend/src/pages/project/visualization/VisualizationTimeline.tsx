@@ -43,7 +43,7 @@ export const VisualizationTimeline: FC = () => {
       const { visualizationMode } = useProjectStore.getState();
 
       processor.updateConfig({
-        mode: visualizationMode,
+        mode: visualizationMode === 'tracks' ? 'tracks' : 'spectrogram',
         duration,
         frameIndex,
         frameCount,

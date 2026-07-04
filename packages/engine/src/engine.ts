@@ -32,6 +32,7 @@ const initialState: EngineState = {
     },
   },
   colors: defaultSpectrogramConfig.colors,
+  spectrogramView: 'spectrum',
   duration: 0,
   playing: false,
   frozen: false,

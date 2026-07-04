@@ -67,15 +67,14 @@ export const createStateSamplesCell = (device: GPUDevice) =>
           const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
           const beforeSamples =
             visibleTime * playheadRatio * sampleRate + windowSize;
-          const totalVisibleSamples = visibleTime * sampleRate + windowSize;
           const windowStart = windowStartForColumn(
             config,
             windowSize,
             baseColumn,
           );
           const limit = truncateAfterPlayhead
-            ? Math.min(totalVisibleSamples, Math.floor(beforeSamples))
-            : totalVisibleSamples;
+            ? Math.min(ringLength, Math.floor(beforeSamples))
+            : ringLength;
           const ringStart = floorMod(windowStart, ringLength);
 
           const writeRange = (from: number, count: number): void => {
