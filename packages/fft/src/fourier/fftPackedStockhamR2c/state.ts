@@ -17,11 +17,6 @@ import {
   type TrigTables,
 } from './trigTables.js';
 
-type Resources = {
-  pipeline: Pipeline;
-  tables: TrigTables;
-};
-
 type ScratchBuffers = {
   buffer0: GPUBuffer;
   buffer1: GPUBuffer;
@@ -53,40 +48,6 @@ type MultiPassState = BaseState & {
 };
 
 export type State = SinglePassState | MultiPassState;
-
-function createResources(
-  device: GPUDevice,
-  variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  inPlace: boolean,
-): {
-  pipeline: SinglePassPipeline;
-  tables: TrigTables;
-};
-function createResources(
-  device: GPUDevice,
-  variant: Extract<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
-  inPlace: boolean,
-): {
-  pipeline: MultiPassPipeline;
-  tables: TrigTables;
-};
-function createResources(
-  device: GPUDevice,
-  variant: PackedStockhamR2cVariant,
-  inPlace: boolean,
-): Resources {
-  if (variant.kind === 'multiPass') {
-    return {
-      pipeline: createPipeline(device, variant, inPlace),
-      tables: createTrigTables(device, variant),
-    };
-  }
-
-  return {
-    pipeline: createPipeline(device, variant, inPlace),
-    tables: createTrigTables(device, variant),
-  };
-}
 
 const createDummyInputBuffer = (device: GPUDevice): GPUBuffer => {
   return device.createBuffer({
@@ -212,9 +173,10 @@ export const createStateCell = (
       const params = createParamsRing(device, arg.config);
       const dummyInput = createDummyInputBuffer(device);
       const input = inPlace ? dummyInput : arg.wave;
+      const pipeline = createPipeline(device, variant, inPlace);
+      const tables = createTrigTables(device, variant);
 
-      if (variant.kind === 'multiPass') {
-        const { pipeline, tables } = createResources(device, variant, inPlace);
+      if (variant.kind === 'multiPass' && pipeline.kind === 'multiPass') {
         const scratch = createScratchBuffers(
           device,
           variant,
@@ -245,7 +207,9 @@ export const createStateCell = (
         };
       }
 
-      const { pipeline, tables } = createResources(device, variant, inPlace);
+      if (variant.kind === 'multiPass' || pipeline.kind === 'multiPass') {
+        throw new Error('fftPackedStockhamR2c variant/pipeline kind mismatch');
+      }
 
       return {
         kind: variant.kind,

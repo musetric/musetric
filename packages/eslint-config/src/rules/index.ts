@@ -4,6 +4,7 @@ import { noClassesRule } from './noClasses.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
 import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
 import { noDynamicTranslationKeysRule } from './noDynamicTranslationKeys.js';
+import { noFunctionDeclarationsRule } from './noFunctionDeclarations.js';
 import { noImmediateInlineFunctionCallsRule } from './noImmediateInlineFunctionCalls.js';
 import { noInlineParameterDestructuringRule } from './noInlineParameterDestructuring.js';
 import { noInlineParameterObjectTypesRule } from './noInlineParameterObjectTypes.js';
@@ -29,6 +30,7 @@ export const musetricRules = {
   'no-component-spacing-prop': noComponentSpacingPropRule,
   'no-defensive-throw-guards': noDefensiveThrowGuardsRule,
   'no-dynamic-translation-keys': noDynamicTranslationKeysRule,
+  'no-function-declarations': noFunctionDeclarationsRule,
   'no-immediate-inline-function-calls': noImmediateInlineFunctionCallsRule,
   'no-inline-parameter-destructuring': noInlineParameterDestructuringRule,
   'no-inline-parameter-object-types': noInlineParameterObjectTypesRule,
