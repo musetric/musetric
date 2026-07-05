@@ -11,7 +11,13 @@ const toVec4 = (hex: string): [number, number, number, number] => {
   return [red / 255, green / 255, blue / 255, 1];
 };
 
-export const drawRingSlotsByteOffset = 208;
+export const drawRingSlotsByteOffset = 224;
+
+const noteGridStripeAmount = 0.12;
+const recordingTintScale = 1.15;
+const fundamentalLineMaskBoost = 1.18;
+const maxSegmentSpanCents = 720;
+
 const areLaneConfigsEqual = (
   first: SpectrogramLaneConfig,
   second: SpectrogramLaneConfig,
@@ -70,7 +76,7 @@ export type StateColors = {
 export const createColorsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: SpectrogramConfig): StateColors => {
-      const arrayBuffer = new ArrayBuffer(224);
+      const arrayBuffer = new ArrayBuffer(240);
       const f32 = new Float32Array(arrayBuffer);
       const u32 = new Uint32Array(arrayBuffer);
       const { colors, lanes, comparison } = config;
@@ -94,6 +100,12 @@ export const createColorsCell = (device: GPUDevice) =>
         0,
         0,
       ] as const;
+      const overlayTuning = [
+        noteGridStripeAmount,
+        recordingTintScale,
+        fundamentalLineMaskBoost,
+        maxSegmentSpanCents,
+      ] as const;
       f32.set([
         ...toVec4(colors.foreground),
         ...toVec4(colors.background),
@@ -106,15 +118,16 @@ export const createColorsCell = (device: GPUDevice) =>
         ...toVec4(colors.recordingForeground),
         ...comparisonThresholds,
         ...lineWidths,
+        ...overlayTuning,
       ]);
       const layer0 = lanes[allTrackKeys[0]];
       const layer1 = lanes[allTrackKeys[1]];
-      u32[44] = layer0.showSpectrogram ? 1 : 0;
-      u32[45] = layer1.showSpectrogram ? 1 : 0;
-      u32[46] = referenceLane.showFundamental ? 1 : 0;
-      u32[47] = targetLane.showFundamental ? 1 : 0;
-      u32[48] = referenceLane.showNotes ? 1 : 0;
-      u32[49] = targetLane.showNotes ? 1 : 0;
+      u32[48] = layer0.showSpectrogram ? 1 : 0;
+      u32[49] = layer1.showSpectrogram ? 1 : 0;
+      u32[50] = referenceLane.showFundamental ? 1 : 0;
+      u32[51] = targetLane.showFundamental ? 1 : 0;
+      u32[52] = referenceLane.showNotes ? 1 : 0;
+      u32[53] = targetLane.showNotes ? 1 : 0;
 
       const buffer = device.createBuffer({
         label: 'draw-colors-buffer',

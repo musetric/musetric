@@ -1,3 +1,5 @@
+import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
+
 export const fragmentShader = `
 struct DrawParams {
   foreground : vec4f,
@@ -11,6 +13,7 @@ struct DrawParams {
   recordingForeground : vec4f,
   comparisonThresholds : vec4f,
   lineWidths : vec4f,
+  overlayTuning : vec4f,
   visibility : vec4u,
   noteVisibility : vec4u,
   ringSlots : vec4u,
@@ -22,8 +25,6 @@ struct DrawParams {
 @group(0) @binding(3) var<storage, read> referenceLine : array<f32>;
 @group(0) @binding(4) var<storage, read> targetLine : array<f32>;
 @group(0) @binding(5) var<storage, read> targetVerdicts : array<vec2f>;
-
-const noteGridStripeAmount = 0.12;
 
 fn midiAtFrequency(frequency: f32) -> f32 {
   return 69.0 + 12.0 * log2(frequency / 440.0);
@@ -40,13 +41,7 @@ fn pixelYAtFrequency(frequency: f32, height: f32) -> f32 {
   return (1.0 - ratio) * max(1.0, height - 1.0);
 }
 
-fn centsDistance(frequency: f32, centerFrequency: f32) -> f32 {
-  if (frequency <= 0.0 || centerFrequency <= 0.0) {
-    return 100000.0;
-  }
-
-  return abs(1200.0 * log2(frequency / centerFrequency));
-}
+${centsDistanceWgsl}
 
 fn distanceToSegment(point: vec2f, start: vec2f, end: vec2f) -> f32 {
   let offset = point - start;
@@ -72,7 +67,7 @@ fn segmentLineMask(
   if (
     startFrequency <= 0.0 ||
     endFrequency <= 0.0 ||
-    centsDistance(startFrequency, endFrequency) > 720.0
+    centsDistance(startFrequency, endFrequency) > drawParams.overlayTuning.w
   ) {
     return 0.0;
   }
@@ -136,7 +131,7 @@ fn lineMaskAtPixel(
   let distance = centsDistance(frequency, centerFrequency);
   let normalizedDistance = distance / widthCents;
   var mask = clamp(
-    exp(-0.5 * normalizedDistance * normalizedDistance) * 1.18,
+    exp(-0.5 * normalizedDistance * normalizedDistance) * drawParams.overlayTuning.z,
     0.0,
     1.0,
   );
@@ -211,7 +206,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
 
   var color = drawParams.background.xyz;
   if (drawParams.noteVisibility.x != 0u && pixelMidiRow % 2 == 0) {
-    color = mix(color, drawParams.foreground.xyz, noteGridStripeAmount);
+    color = mix(color, drawParams.foreground.xyz, drawParams.overlayTuning.x);
   }
   if (drawParams.visibility.x != 0u) {
     let intensity = sampleSpectrogram(layer0Slot, y, 0u, width, textureHeight);
@@ -223,7 +218,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     if (targetFrequency > 0.0) {
       tint = targetTint(targetVerdict);
     }
-    color = mix(color, tint, clamp(intensity * 1.15, 0.0, 1.0));
+    color = mix(color, tint, clamp(intensity * drawParams.overlayTuning.y, 0.0, 1.0));
   }
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
