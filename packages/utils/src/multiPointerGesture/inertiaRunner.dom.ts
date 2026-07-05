@@ -3,31 +3,30 @@ import {
   type InertialDragInertiaStep,
   type InertialDragPhysics,
 } from '../inertialDrag.js';
-import { type GestureAxis } from '../multiPointerGesture.dom.js';
 
-export type InertiaRunnerUpdate = {
-  axis: GestureAxis;
+export type InertiaRunnerUpdate<Axis extends string> = {
+  axis: Axis;
   delta: number;
   velocity: number;
 };
 
-export type InertiaRunnerHandlers = {
-  onUpdate: (update: InertiaRunnerUpdate) => boolean;
+export type InertiaRunnerHandlers<Axis extends string> = {
+  onUpdate: (update: InertiaRunnerUpdate<Axis>) => boolean;
   onEnd: () => void;
 };
 
-export type InertiaRunner = {
-  start: (velocity: number, axis: GestureAxis, time: number) => void;
+export type InertiaRunner<Axis extends string> = {
+  start: (velocity: number, axis: Axis, time: number) => void;
   stop: (notifyEnd: boolean) => void;
 };
 
-export const createInertiaRunner = (
+export const createInertiaRunner = <Axis extends string>(
   physics: InertialDragPhysics,
-  handlers: InertiaRunnerHandlers,
-): InertiaRunner => {
+  handlers: InertiaRunnerHandlers<Axis>,
+): InertiaRunner<Axis> => {
   let frame: number | undefined = undefined;
   let state: InertialDragInertiaState | undefined = undefined;
-  let axis: GestureAxis | undefined = undefined;
+  let axis: Axis | undefined = undefined;
 
   const clear = () => {
     state = undefined;
@@ -77,7 +76,7 @@ export const createInertiaRunner = (
     }
   };
 
-  const start = (velocity: number, nextAxis: GestureAxis, time: number) => {
+  const start = (velocity: number, nextAxis: Axis, time: number) => {
     stop(false);
     const nextState = physics.startInertia(velocity, time);
     if (!nextState) {
