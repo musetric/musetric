@@ -23,6 +23,7 @@ const latticeCount = 5;
 const jumpCostCents = 0.0009;
 const unvoicedCost = 0.12;
 const voicedTransitionCost = 0.09;
+const peakSeparationCents = 60;
 
 export const fundamentalTrackWindow = 8;
 
@@ -42,6 +43,7 @@ export type FundamentalFrequencyParams = {
   jumpCostCents: number;
   unvoicedCost: number;
   voicedTransitionCost: number;
+  peakSeparationCents: number;
 };
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
@@ -77,6 +79,7 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     jumpCostCents,
     unvoicedCost,
     voicedTransitionCost,
+    peakSeparationCents,
   };
 };
 
@@ -133,6 +136,7 @@ export const createParamsCell = (device: GPUDevice) =>
             view.setFloat32(64, value.jumpCostCents, true);
             view.setFloat32(68, value.unvoicedCost, true);
             view.setFloat32(72, value.voicedTransitionCost, true);
+            view.setFloat32(76, value.peakSeparationCents, true);
           });
           return {
             columnCount,

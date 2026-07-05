@@ -1,3 +1,5 @@
+import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
+
 export const colorShader = `
 struct ColorParams {
   windowCount: u32,
@@ -15,13 +17,7 @@ struct ColorParams {
 @group(0) @binding(2) var<storage, read_write> verdict: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: ColorParams;
 
-fn centsDistance(frequency: f32, targetFrequency: f32) -> f32 {
-  if (frequency <= 0.0 || targetFrequency <= 0.0) {
-    return 100000.0;
-  }
-
-  return abs(1200.0 * log2(frequency / targetFrequency));
-}
+${centsDistanceWgsl}
 
 fn referenceSlot(screenIndex: i32) -> u32 {
   return (params.referenceBaseSlot + u32(screenIndex)) % params.windowCount;

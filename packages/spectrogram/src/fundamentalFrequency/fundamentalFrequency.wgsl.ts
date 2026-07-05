@@ -1,25 +1,7 @@
+import { fundamentalFrequencyParamsStruct } from './paramsStruct.wgsl.js';
+
 export const shader = `
-struct FundamentalFrequencyParams {
-  halfSize: u32,
-  windowCount: u32,
-  windowSize: u32,
-  candidateCount: u32,
-  sampleRate: f32,
-  minimumFrequency: f32,
-  candidateStepCents: f32,
-  minimumFundamentalIntensity: f32,
-  minimumScore: f32,
-  harmonicCount: u32,
-  slotOffset: u32,
-  columnCount: u32,
-  screenBase: u32,
-  baseSlot: u32,
-  latticeCount: u32,
-  trackWindow: u32,
-  jumpCostCents: f32,
-  unvoicedCost: f32,
-  voicedTransitionCost: f32,
-};
+${fundamentalFrequencyParamsStruct}
 
 struct CandidateStats {
   score: f32,
@@ -355,7 +337,8 @@ fn observe(
   }
 
   let entryCount = workgroupWidth * localPeakCount;
-  let separationCandidates = u32(max(1.0, 60.0 / params.candidateStepCents));
+  let separationCandidates =
+    u32(max(1.0, params.peakSeparationCents / params.candidateStepCents));
   var pickedCandidate = array<u32, 8>();
   let latticeBase = windowIndex * params.latticeCount;
 

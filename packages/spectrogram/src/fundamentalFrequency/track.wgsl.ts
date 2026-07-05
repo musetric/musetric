@@ -1,25 +1,8 @@
+import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
+import { fundamentalFrequencyParamsStruct } from './paramsStruct.wgsl.js';
+
 export const trackShader = `
-struct FundamentalFrequencyParams {
-  halfSize: u32,
-  windowCount: u32,
-  windowSize: u32,
-  candidateCount: u32,
-  sampleRate: f32,
-  minimumFrequency: f32,
-  candidateStepCents: f32,
-  minimumFundamentalIntensity: f32,
-  minimumScore: f32,
-  harmonicCount: u32,
-  slotOffset: u32,
-  columnCount: u32,
-  screenBase: u32,
-  baseSlot: u32,
-  latticeCount: u32,
-  trackWindow: u32,
-  jumpCostCents: f32,
-  unvoicedCost: f32,
-  voicedTransitionCost: f32,
-};
+${fundamentalFrequencyParamsStruct}
 
 @group(0) @binding(0) var<storage, read> lattice: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> line: array<f32>;
@@ -29,13 +12,7 @@ const maxStates = 9u;
 const maxWindow = 16;
 const infinity = 1.0e30;
 
-fn centsDistance(frequency: f32, targetFrequency: f32) -> f32 {
-  if (frequency <= 0.0 || targetFrequency <= 0.0) {
-    return 100000.0;
-  }
-
-  return abs(1200.0 * log2(frequency / targetFrequency));
-}
+${centsDistanceWgsl}
 
 fn slotAtScreen(index: i32) -> u32 {
   return (params.baseSlot + u32(index)) % params.windowCount;
