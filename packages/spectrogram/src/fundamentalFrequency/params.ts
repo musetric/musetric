@@ -10,7 +10,7 @@ export const slotOffsetByteOffset = 40;
 const columnCountByteOffset = 44;
 const screenBaseByteOffset = 48;
 const baseSlotByteOffset = 52;
-const paramsByteLength = 80;
+const paramsByteLength = 108;
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
@@ -24,6 +24,15 @@ const jumpCostCents = 0.0009;
 const unvoicedCost = 0.12;
 const voicedTransitionCost = 0.09;
 const peakSeparationCents = 60;
+
+const swipeMixWeight = 0.24;
+const swipeNegativeScale = 1.6;
+const swipeNormalizeBias = 0.5;
+const swipeGate = -1.0;
+
+const twmMixWeight = 0.25;
+const twmReverseWeight = 1.0;
+const twmReverseSigmaCents = 110;
 
 export const fundamentalTrackWindow = 8;
 
@@ -44,6 +53,13 @@ export type FundamentalFrequencyParams = {
   unvoicedCost: number;
   voicedTransitionCost: number;
   peakSeparationCents: number;
+  swipeMixWeight: number;
+  swipeNegativeScale: number;
+  swipeNormalizeBias: number;
+  swipeGate: number;
+  twmMixWeight: number;
+  twmReverseWeight: number;
+  twmReverseSigmaCents: number;
 };
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
@@ -80,6 +96,13 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     unvoicedCost,
     voicedTransitionCost,
     peakSeparationCents,
+    swipeMixWeight,
+    swipeNegativeScale,
+    swipeNormalizeBias,
+    swipeGate,
+    twmMixWeight,
+    twmReverseWeight,
+    twmReverseSigmaCents,
   };
 };
 
@@ -137,6 +160,13 @@ export const createParamsCell = (device: GPUDevice) =>
             view.setFloat32(68, value.unvoicedCost, true);
             view.setFloat32(72, value.voicedTransitionCost, true);
             view.setFloat32(76, value.peakSeparationCents, true);
+            view.setFloat32(80, value.swipeMixWeight, true);
+            view.setFloat32(84, value.swipeNegativeScale, true);
+            view.setFloat32(88, value.swipeNormalizeBias, true);
+            view.setFloat32(92, value.swipeGate, true);
+            view.setFloat32(96, value.twmMixWeight, true);
+            view.setFloat32(100, value.twmReverseWeight, true);
+            view.setFloat32(104, value.twmReverseSigmaCents, true);
           });
           return {
             columnCount,
