@@ -1,13 +1,6 @@
 import {
-  createInertialDragPhysics,
-  type InertialDragPhysicsOptions,
-} from './inertialDrag.js';
-import {
-  createInertiaRunner,
-  type InertiaRunner,
-} from './multiPointerGesture/inertiaRunner.dom.js';
-import {
   createPanTracker,
+  type CreatePanVelocityTracker,
   type PanTracker,
 } from './multiPointerGesture/panTracker.dom.js';
 import {
@@ -24,7 +17,48 @@ export type GesturePointerType = 'mouse' | 'touch';
 
 const defaultPointerTypes: readonly GesturePointerType[] = ['mouse', 'touch'];
 
+export type GestureModifiers = {
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+};
+
+const readModifiers = (event: PointerEvent): GestureModifiers => ({
+  shiftKey: event.shiftKey,
+  ctrlKey: event.ctrlKey,
+  metaKey: event.metaKey,
+});
+
 export type GestureAxis = 'x' | 'y';
+
+export type GesturePanUpdate = {
+  axis: GestureAxis;
+  delta: number;
+  velocity: number;
+  stop: () => void;
+};
+
+type PanUpdateFields = {
+  axis: GestureAxis;
+  delta: number;
+  velocity: number;
+};
+
+const emitPanUpdate = (
+  onUpdate: (event: GesturePanUpdate) => void,
+  fields: PanUpdateFields,
+): boolean => {
+  let stopped = false;
+  onUpdate({
+    axis: fields.axis,
+    delta: fields.delta,
+    velocity: fields.velocity,
+    stop: () => {
+      stopped = true;
+    },
+  });
+  return stopped;
+};
 
 export type GesturePinchUpdate = {
   axis: GestureAxis;
@@ -43,64 +77,40 @@ const emitPinchUpdate = (
   });
 };
 
-type PanUpdateFields = {
-  axis: GestureAxis;
-  delta: number;
-  velocity: number;
-};
-
-export type GesturePhase = 'drag' | 'inertia';
-
-export type GesturePanUpdate = {
-  axis: GestureAxis;
-  phase: GesturePhase;
-  delta: number;
-  velocity: number;
-  stop: () => void;
-};
-
-const emitPanUpdate = (
-  onUpdate: ((event: GesturePanUpdate) => void) | undefined,
-  phase: GesturePhase,
-  update: PanUpdateFields,
-): boolean => {
-  let stopped = false;
-  onUpdate?.({
-    axis: update.axis,
-    phase,
-    delta: update.delta,
-    velocity: update.velocity,
-    stop: () => {
-      stopped = true;
-    },
-  });
-  return stopped;
-};
-
 export type GesturePanStart = {
   axis: GestureAxis;
   pointerType: GesturePointerType;
+  startClientX: number;
+  startClientY: number;
+  modifiers: GestureModifiers;
+};
+
+export type GesturePanEnd = {
+  axis: GestureAxis;
+  velocity: number;
 };
 
 export type GesturePinchStart = {
   axis: GestureAxis;
-  center: number;
-  spread: number;
+  startCenter: number;
+  startSpread: number;
 };
 
-export type MultiPointerGestureOptions = InertialDragPhysicsOptions & {
+export type MultiPointerGestureOptions = {
   element: HTMLElement;
   axis?: GestureAxis;
   pointerTypes?: readonly GesturePointerType[];
   axisLockDistance?: number;
+  createVelocityTracker?: CreatePanVelocityTracker;
   pinchLockDistance?: number;
   minimumPinchSpread?: number;
-  onPanStart?: (event: GesturePanStart) => void;
-  onPanUpdate?: (event: GesturePanUpdate) => void;
-  onPanEnd?: () => void;
-  onPinchStart?: (event: GesturePinchStart) => void;
-  onPinchUpdate?: (event: GesturePinchUpdate) => void;
-  onPinchEnd?: () => void;
+  onPanStart: (event: GesturePanStart) => void;
+  onPanUpdate: (event: GesturePanUpdate) => void;
+  onPanEnd: (event: GesturePanEnd) => void;
+  onPanAbort: () => void;
+  onPinchStart: (event: GesturePinchStart) => void;
+  onPinchUpdate: (event: GesturePinchUpdate) => void;
+  onPinchEnd: () => void;
 };
 
 export type MultiPointerGesture = {
@@ -123,30 +133,17 @@ export const createMultiPointerGesture = (
     axis: fixedAxis,
     pointerTypes = defaultPointerTypes,
     axisLockDistance = 6,
+    createVelocityTracker,
     pinchLockDistance = 6,
     minimumPinchSpread = 1,
-    inertiaTimeConstantMs,
-    inertiaMinimumVelocity,
-    inertiaVelocityMultiplier,
-    stationaryDistance,
-    stationaryVelocityResetMs,
-    velocitySampleDurationMs,
     onPanStart,
     onPanUpdate,
     onPanEnd,
+    onPanAbort,
     onPinchStart,
     onPinchUpdate,
     onPinchEnd,
   } = options;
-
-  const physics = createInertialDragPhysics({
-    inertiaTimeConstantMs,
-    inertiaMinimumVelocity,
-    inertiaVelocityMultiplier,
-    stationaryDistance,
-    stationaryVelocityResetMs,
-    velocitySampleDurationMs,
-  });
 
   const initialTouchAction = element.style.touchAction;
   const initialUserSelect = element.style.userSelect;
@@ -155,15 +152,11 @@ export const createMultiPointerGesture = (
   const panTracker: PanTracker = createPanTracker({
     fixedAxis,
     axisLockDistance,
-    physics,
+    createVelocityTracker,
   });
   const pinchTracker: PinchTracker = createPinchTracker({
     pinchLockDistance,
     minimumPinchSpread,
-  });
-  const inertiaRunner: InertiaRunner = createInertiaRunner(physics, {
-    onUpdate: (info) => emitPanUpdate(onPanUpdate, 'inertia', info),
-    onEnd: () => onPanEnd?.(),
   });
 
   const releaseCapture = (id: number) => {
@@ -172,15 +165,23 @@ export const createMultiPointerGesture = (
     }
   };
 
-  const endPanWithoutInertia = () => {
-    if (panTracker.end()) {
-      onPanEnd?.();
+  const endPan = (): void => {
+    const endInfo = panTracker.end();
+    if (endInfo) {
+      onPanEnd({ axis: endInfo.axis, velocity: endInfo.velocity });
     }
   };
 
-  const endPinch = () => {
+  const abortPan = (): void => {
+    const endInfo = panTracker.end();
+    if (endInfo) {
+      onPanAbort();
+    }
+  };
+
+  const endPinch = (): void => {
     if (pinchTracker.end()) {
-      onPinchEnd?.();
+      onPinchEnd();
     }
   };
 
@@ -188,7 +189,6 @@ export const createMultiPointerGesture = (
     if (event.pointerType !== 'mouse' && event.pointerType !== 'touch') {
       return;
     }
-    inertiaRunner.stop(true);
 
     const pointer: Pointer = {
       id: event.pointerId,
@@ -208,7 +208,7 @@ export const createMultiPointerGesture = (
       return;
     }
     if (list.length === 2) {
-      endPanWithoutInertia();
+      endPan();
       pinchTracker.start(list[0], list[1]);
     }
   };
@@ -232,10 +232,10 @@ export const createMultiPointerGesture = (
       if (!update) return;
 
       if (update.justLockedAxis) {
-        onPinchStart?.({
+        onPinchStart({
           axis: update.axis,
-          center: update.startCenter,
-          spread: update.startSpread,
+          startCenter: update.startCenter,
+          startSpread: update.startSpread,
         });
       }
       emitPinchUpdate(onPinchUpdate, update);
@@ -249,15 +249,22 @@ export const createMultiPointerGesture = (
     if (!update) return;
 
     if (update.justLockedAxis) {
-      onPanStart?.({
+      onPanStart({
         axis: update.axis,
         pointerType: update.pointerType,
+        startClientX: update.startClientX,
+        startClientY: update.startClientY,
+        modifiers: readModifiers(event),
       });
     }
 
-    const stopped = emitPanUpdate(onPanUpdate, 'drag', update);
+    const stopped = emitPanUpdate(onPanUpdate, {
+      axis: update.axis,
+      delta: update.delta,
+      velocity: update.velocity,
+    });
     if (stopped) {
-      endPanWithoutInertia();
+      abortPan();
     }
     event.preventDefault();
   };
@@ -276,10 +283,7 @@ export const createMultiPointerGesture = (
     }
 
     if (event.pointerId === panTracker.pointerId()) {
-      const endInfo = panTracker.end();
-      if (endInfo) {
-        inertiaRunner.start(endInfo.velocity, endInfo.axis, performance.now());
-      }
+      endPan();
       event.preventDefault();
     }
   };
@@ -297,7 +301,7 @@ export const createMultiPointerGesture = (
     }
 
     if (event.pointerId === panTracker.pointerId()) {
-      endPanWithoutInertia();
+      abortPan();
     }
   };
 
@@ -315,8 +319,7 @@ export const createMultiPointerGesture = (
   dispatcher.attach();
 
   const stop = () => {
-    inertiaRunner.stop(true);
-    endPanWithoutInertia();
+    abortPan();
     endPinch();
     pointers.forEach((pointer) => releaseCapture(pointer.id));
     pointers.clear();
