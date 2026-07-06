@@ -19,4 +19,11 @@ export const fundamentalFrequencyParamsStruct = `struct FundamentalFrequencyPara
   unvoicedCost: f32,
   voicedTransitionCost: f32,
   peakSeparationCents: f32,
+  swipeMixWeight: f32,
+  swipeNegativeScale: f32,
+  swipeNormalizeBias: f32,
+  swipeGate: f32,
+  twmMixWeight: f32,
+  twmReverseWeight: f32,
+  twmReverseSigmaCents: f32,
 };`;

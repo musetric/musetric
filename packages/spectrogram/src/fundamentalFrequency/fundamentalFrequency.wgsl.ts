@@ -11,6 +11,7 @@ struct CandidateStats {
   supportCount: u32,
   oddMean: f32,
   evenMean: f32,
+  swipe: f32,
 };
 
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
@@ -37,8 +38,24 @@ const harmonicWeights = array<f32, 11>(
 
 const prominenceProbeRatio = 1.041243772;
 
+const swipeTapCount = 4u;
+const swipeTapOffsets = array<f32, 4>(
+  -0.416666667,
+  -0.083333333,
+  0.083333333,
+  0.416666667,
+);
+const swipeTapCosines = array<f32, 4>(
+  -0.866025404,
+  0.866025404,
+  0.866025404,
+  -0.866025404,
+);
+
 var<workgroup> workgroupScores: array<f32, 128>;
 var<workgroup> workgroupCandidates: array<u32, 128>;
+
+const twmPoolCount = 5u;
 
 fn frequencyAtCandidate(candidate: u32) -> f32 {
   return params.minimumFrequency *
@@ -65,12 +82,114 @@ fn sampleIntensity(windowIndex: u32, frequency: f32) -> f32 {
   return mix(lowerIntensity, upperIntensity, blend);
 }
 
+fn loudnessAt(windowIndex: u32, frequency: f32) -> f32 {
+  return sqrt(sqrt(max(sampleIntensity(windowIndex, frequency), 0.0)));
+}
+
+fn swipeSalience(windowIndex: u32, frequency: f32) -> f32 {
+  var numerator = 0.0;
+  var kernelEnergy = 0.0;
+  var loudnessEnergy = 0.0;
+  let nyquistFrequency = params.sampleRate * 0.5;
+
+  for (var harmonic = 1u; harmonic <= params.harmonicCount; harmonic += 1u) {
+    let weight = harmonicWeights[harmonic];
+    for (var tap = 0u; tap < swipeTapCount; tap += 1u) {
+      var kernel = swipeTapCosines[tap] * weight;
+      if (kernel < 0.0) {
+        kernel *= params.swipeNegativeScale;
+      }
+
+      let sampleFrequency = frequency * (f32(harmonic) + swipeTapOffsets[tap]);
+      if (sampleFrequency <= 0.0 || sampleFrequency >= nyquistFrequency) {
+        continue;
+      }
+
+      let loudness = loudnessAt(windowIndex, sampleFrequency);
+      numerator += kernel * loudness;
+      kernelEnergy += kernel * kernel;
+      loudnessEnergy += loudness * loudness;
+    }
+  }
+
+  let denominator =
+    sqrt(kernelEnergy * loudnessEnergy) + params.swipeNormalizeBias;
+  if (denominator <= 0.0) {
+    return 0.0;
+  }
+
+  return numerator / denominator;
+}
+
 fn spectralProminence(windowIndex: u32, frequency: f32) -> f32 {
   let center = sampleIntensity(windowIndex, frequency);
   let lower = sampleIntensity(windowIndex, frequency / prominenceProbeRatio);
   let upper = sampleIntensity(windowIndex, frequency * prominenceProbeRatio);
   let localFloor = max(lower, upper) * 0.5;
   return max(center - localFloor, 0.0);
+}
+
+fn centsBetween(left: f32, right: f32) -> f32 {
+  if (left <= 0.0 || right <= 0.0) {
+    return 0.0;
+  }
+  return abs(1200.0 * log2(left / right));
+}
+
+fn nearestHarmonicCents(windowIndex: u32, frequency: f32, candidate: f32) -> f32 {
+  var best = 1000000.0;
+  for (var harmonic = 1u; harmonic <= params.harmonicCount; harmonic += 1u) {
+    let harmonicFrequency = candidate * f32(harmonic);
+    if (harmonicFrequency >= params.sampleRate * 0.5) {
+      break;
+    }
+    let centsOff = centsBetween(frequency, harmonicFrequency);
+    if (centsOff < best) {
+      best = centsOff;
+    }
+  }
+  return best;
+}
+
+fn reverseMismatchPenalty(
+  windowIndex: u32,
+  frequency: f32,
+) -> f32 {
+  let nyquistFrequency = params.sampleRate * 0.5;
+  let lower = max(params.minimumFrequency, frequency * 0.5);
+  let upper = min(nyquistFrequency, frequency * 2.0);
+  if (upper <= lower) {
+    return 1.0;
+  }
+
+  let maxSteps = 128u;
+  let centsRange = 1200.0 * log2(upper / lower);
+  let rawSteps = u32(centsRange / params.candidateStepCents) + 1u;
+  let steps = min(rawSteps, maxSteps);
+
+  let sigma = max(params.twmReverseSigmaCents, 1.0);
+  var onGridEnergy = 0.0;
+  var offGridEnergy = 0.0;
+  for (var step = 0u; step < steps; step += 1u) {
+    let position = lower * exp2(f32(step) * params.candidateStepCents / 1200.0);
+    if (position >= upper) {
+      break;
+    }
+    let prom = spectralProminence(windowIndex, position);
+    if (prom < params.minimumFundamentalIntensity) {
+      continue;
+    }
+    let centsOff = nearestHarmonicCents(windowIndex, position, frequency);
+    let sigmaRatio = centsOff / sigma;
+    let sigmaTerm = 1.0 - exp(-0.5 * sigmaRatio * sigmaRatio);
+    onGridEnergy += prom * (1.0 - sigmaTerm);
+    offGridEnergy += prom * sigmaTerm;
+  }
+  let totalEnergy = onGridEnergy + offGridEnergy;
+  if (totalEnergy <= 0.0) {
+    return 1.0;
+  }
+  return clamp(onGridEnergy / totalEnergy, 0.0, 1.0);
 }
 
 fn baseCandidateStats(windowIndex: u32, frequency: f32) -> CandidateStats {
@@ -144,11 +263,14 @@ fn baseCandidateStats(windowIndex: u32, frequency: f32) -> CandidateStats {
     noiseScore = noiseWeighted / noiseWeight;
   }
 
+  let swipe = swipeSalience(windowIndex, frequency);
+
   let score = harmonicMean * 0.62 +
     oddMean * 0.28 +
     fundamentalProminence * 0.22 +
     min(evenMean, oddMean + 0.08) * 0.08 -
-    noiseScore * 0.34;
+    noiseScore * 0.34 +
+    swipe * params.swipeMixWeight;
 
   return CandidateStats(
     score,
@@ -158,6 +280,7 @@ fn baseCandidateStats(windowIndex: u32, frequency: f32) -> CandidateStats {
     supportCount,
     oddMean,
     evenMean,
+    swipe,
   );
 }
 
@@ -179,6 +302,10 @@ fn candidatePasses(frequency: f32, stats: CandidateStats) -> bool {
   }
 
   if (stats.score < params.minimumScore) {
+    return false;
+  }
+
+  if (stats.swipe < params.swipeGate) {
     return false;
   }
 
@@ -339,10 +466,13 @@ fn observe(
   let entryCount = workgroupWidth * localPeakCount;
   let separationCandidates =
     u32(max(1.0, params.peakSeparationCents / params.candidateStepCents));
-  var pickedCandidate = array<u32, 8>();
+  var pickedCandidate = array<u32, 8>(0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u);
+  var poolCheapScore =
+    array<f32, 8>(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   let latticeBase = windowIndex * params.latticeCount;
 
-  for (var picked = 0u; picked < latticeCount; picked += 1u) {
+  var poolFilled = 0u;
+  for (var picked = 0u; picked < twmPoolCount; picked += 1u) {
     var bestScore = 0.0;
     var bestEntry = entryCount;
     for (var entry = 0u; entry < entryCount; entry += 1u) {
@@ -353,7 +483,7 @@ fn observe(
 
       let candidate = workgroupCandidates[entry];
       var tooClose = false;
-      for (var prior = 0u; prior < picked; prior += 1u) {
+      for (var prior = 0u; prior < poolFilled; prior += 1u) {
         let distance = u32(abs(i32(candidate) - i32(pickedCandidate[prior])));
         if (distance < separationCandidates) {
           tooClose = true;
@@ -371,15 +501,58 @@ fn observe(
     }
 
     if (bestEntry == entryCount) {
+      break;
+    }
+
+    let candidate = workgroupCandidates[bestEntry];
+    pickedCandidate[poolFilled] = candidate;
+    poolCheapScore[poolFilled] = bestScore;
+    workgroupScores[bestEntry] = 0.0;
+    poolFilled += 1u;
+  }
+
+  var poolAdjusted =
+    array<f32, 8>(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+  for (var i = 0u; i < poolFilled; i += 1u) {
+    let cand = pickedCandidate[i];
+    let f = frequencyAtCandidate(cand);
+    let stats = baseCandidateStats(windowIndex, f);
+    let forwardFit = clamp(stats.harmonicMean - stats.noiseScore, -1.0, 1.0);
+    let harmonicFit = reverseMismatchPenalty(windowIndex, f);
+    let reverseTerm = (2.0 * harmonicFit - 1.0) * params.twmReverseWeight;
+    let twmBonus = clamp(forwardFit + reverseTerm, -1.0, 1.0);
+    poolAdjusted[i] = poolCheapScore[i] + params.twmMixWeight * twmBonus;
+  }
+
+  var usedMask = array<u32, 8>(0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u);
+  for (var picked = 0u; picked < latticeCount; picked += 1u) {
+    var bestIdx = 0xffffffffu;
+    var bestCand = 0xffffffffu;
+    var bestScore = -1.0;
+    for (var i = 0u; i < poolFilled; i += 1u) {
+      if (usedMask[i] != 0u) {
+        continue;
+      }
+      let cand = pickedCandidate[i];
+      let score = poolAdjusted[i];
+      if (
+        score > bestScore ||
+        (score == bestScore && cand < bestCand)
+      ) {
+        bestIdx = i;
+        bestCand = cand;
+        bestScore = score;
+      }
+    }
+
+    if (bestIdx == 0xffffffffu) {
       lattice[latticeBase + picked] = vec2<f32>(0.0, 0.0);
       continue;
     }
 
-    let candidate = workgroupCandidates[bestEntry];
-    pickedCandidate[picked] = candidate;
-    workgroupScores[bestEntry] = 0.0;
+    usedMask[bestIdx] = 1u;
     lattice[latticeBase + picked] =
-      vec2<f32>(refinePeak(windowIndex, candidate), bestScore);
+      vec2<f32>(refinePeak(windowIndex, bestCand), bestScore);
   }
 }
 `;
