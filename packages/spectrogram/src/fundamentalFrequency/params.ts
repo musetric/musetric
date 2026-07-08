@@ -6,35 +6,30 @@ import {
   type SpectrogramColumnRange,
 } from '../common/extConfig.js';
 
-export const slotOffsetByteOffset = 40;
-const columnCountByteOffset = 44;
-const screenBaseByteOffset = 48;
-const baseSlotByteOffset = 52;
-const paramsByteLength = 108;
+export const slotOffsetByteOffset = 32;
+const columnCountByteOffset = 36;
+const screenBaseByteOffset = 40;
+const baseSlotByteOffset = 44;
+const paramsByteLength = 88;
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
 const candidateStepCents = 20;
-const minimumFundamentalIntensity = 0.075;
-const minimumScore = 0.145;
 const harmonicCount = 10;
 
 const latticeCount = 5;
-const jumpCostCents = 0.0009;
-const unvoicedCost = 0.12;
-const voicedTransitionCost = 0.09;
-const peakSeparationCents = 60;
+const peakSeparationCents = 240;
 
-const swipeMixWeight = 0.24;
-const swipeNegativeScale = 1.6;
-const swipeNormalizeBias = 0.5;
-const swipeGate = -1.0;
+const loudnessExponent = 0.35;
+const fundamentalWeight = 0.4;
+const antiWeight = 0.9;
 
-const twmMixWeight = 0.25;
-const twmReverseWeight = 1.0;
-const twmReverseSigmaCents = 110;
+const jumpCostCents = 0.006;
+const jumpCapCents = 500;
+const unvoicedCost = 0.54;
+const voicedTransitionCost = 1.8;
 
-export const fundamentalTrackWindow = 8;
+export const fundamentalTrackWindow = 72;
 
 export type FundamentalFrequencyParams = {
   halfSize: number;
@@ -44,22 +39,17 @@ export type FundamentalFrequencyParams = {
   sampleRate: number;
   minimumFrequency: number;
   candidateStepCents: number;
-  minimumFundamentalIntensity: number;
-  minimumScore: number;
   harmonicCount: number;
   latticeCount: number;
   trackWindow: number;
+  peakSeparationCents: number;
+  loudnessExponent: number;
+  fundamentalWeight: number;
+  antiWeight: number;
   jumpCostCents: number;
+  jumpCapCents: number;
   unvoicedCost: number;
   voicedTransitionCost: number;
-  peakSeparationCents: number;
-  swipeMixWeight: number;
-  swipeNegativeScale: number;
-  swipeNormalizeBias: number;
-  swipeGate: number;
-  twmMixWeight: number;
-  twmReverseWeight: number;
-  twmReverseSigmaCents: number;
 };
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
@@ -87,22 +77,17 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     sampleRate: config.sampleRate,
     minimumFrequency,
     candidateStepCents,
-    minimumFundamentalIntensity,
-    minimumScore,
     harmonicCount,
     latticeCount,
     trackWindow: fundamentalTrackWindow,
+    peakSeparationCents,
+    loudnessExponent,
+    fundamentalWeight,
+    antiWeight,
     jumpCostCents,
+    jumpCapCents,
     unvoicedCost,
     voicedTransitionCost,
-    peakSeparationCents,
-    swipeMixWeight,
-    swipeNegativeScale,
-    swipeNormalizeBias,
-    swipeGate,
-    twmMixWeight,
-    twmReverseWeight,
-    twmReverseSigmaCents,
   };
 };
 
@@ -143,9 +128,7 @@ export const createParamsCell = (device: GPUDevice) =>
             view.setFloat32(16, value.sampleRate, true);
             view.setFloat32(20, value.minimumFrequency, true);
             view.setFloat32(24, value.candidateStepCents, true);
-            view.setFloat32(28, value.minimumFundamentalIntensity, true);
-            view.setFloat32(32, value.minimumScore, true);
-            view.setUint32(36, value.harmonicCount, true);
+            view.setUint32(28, value.harmonicCount, true);
             view.setUint32(slotOffsetByteOffset, slotOffset, true);
             view.setUint32(columnCountByteOffset, columnCount, true);
             view.setUint32(screenBaseByteOffset, screenBase, true);
@@ -154,19 +137,16 @@ export const createParamsCell = (device: GPUDevice) =>
               floorMod(slotOffset - screenBase, value.windowCount),
               true,
             );
-            view.setUint32(56, value.latticeCount, true);
-            view.setUint32(60, value.trackWindow, true);
-            view.setFloat32(64, value.jumpCostCents, true);
-            view.setFloat32(68, value.unvoicedCost, true);
-            view.setFloat32(72, value.voicedTransitionCost, true);
-            view.setFloat32(76, value.peakSeparationCents, true);
-            view.setFloat32(80, value.swipeMixWeight, true);
-            view.setFloat32(84, value.swipeNegativeScale, true);
-            view.setFloat32(88, value.swipeNormalizeBias, true);
-            view.setFloat32(92, value.swipeGate, true);
-            view.setFloat32(96, value.twmMixWeight, true);
-            view.setFloat32(100, value.twmReverseWeight, true);
-            view.setFloat32(104, value.twmReverseSigmaCents, true);
+            view.setUint32(48, value.latticeCount, true);
+            view.setUint32(52, value.trackWindow, true);
+            view.setFloat32(56, value.peakSeparationCents, true);
+            view.setFloat32(60, value.loudnessExponent, true);
+            view.setFloat32(64, value.fundamentalWeight, true);
+            view.setFloat32(68, value.antiWeight, true);
+            view.setFloat32(72, value.jumpCostCents, true);
+            view.setFloat32(76, value.jumpCapCents, true);
+            view.setFloat32(80, value.unvoicedCost, true);
+            view.setFloat32(84, value.voicedTransitionCost, true);
           });
           return {
             columnCount,
