@@ -9,7 +9,7 @@ ${fundamentalFrequencyParamsStruct}
 @group(0) @binding(2) var<uniform> params: FundamentalFrequencyParams;
 
 const maxStates = 9u;
-const maxWindow = 16;
+const maxWindow = 96;
 const infinity = 1.0e30;
 
 ${centsDistanceWgsl}
@@ -46,7 +46,8 @@ fn transitionCost(freqA: f32, freqB: f32) -> f32 {
   let aVoiced = freqA > 0.0;
   let bVoiced = freqB > 0.0;
   if (aVoiced && bVoiced) {
-    return params.jumpCostCents * centsDistance(freqA, freqB);
+    return params.jumpCostCents *
+      min(centsDistance(freqA, freqB), params.jumpCapCents);
   }
   if (aVoiced || bVoiced) {
     return params.voicedTransitionCost;
