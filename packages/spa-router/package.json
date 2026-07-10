@@ -20,7 +20,7 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "react": "19.2.4",
+    "react": "19.2.7",
     "zustand": "5.0.11"
   },
   "devDependencies": {
