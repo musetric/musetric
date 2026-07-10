@@ -34,6 +34,7 @@
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@musetric/utils": "workspace:*",
+    "@typescript/native": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@webgpu/types": "catalog:",

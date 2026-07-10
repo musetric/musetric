@@ -47,6 +47,7 @@
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

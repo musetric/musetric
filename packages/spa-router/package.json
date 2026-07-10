@@ -27,6 +27,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",

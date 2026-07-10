@@ -15,7 +15,7 @@
   },
   "peerDependencies": {
     "eslint": "10.5.0",
-    "typescript": "6.0.3"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@eslint-react/eslint-plugin": "catalog:",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@types/estree": "catalog:",
     "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:"
   }
