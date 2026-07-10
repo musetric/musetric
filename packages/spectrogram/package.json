@@ -35,6 +35,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
+    "@typescript/native": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@webgpu/types": "catalog:",

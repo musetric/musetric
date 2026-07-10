@@ -33,6 +33,7 @@
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "onnxruntime-web": "catalog:",

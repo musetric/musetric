@@ -33,6 +33,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

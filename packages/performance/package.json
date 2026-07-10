@@ -20,6 +20,7 @@
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "react": "catalog:",

@@ -73,6 +73,7 @@
     "@musetric/utils": "workspace:*",
     "@types/audioworklet": "catalog:",
     "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "mediabunny": "catalog:",
