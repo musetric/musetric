@@ -24,6 +24,7 @@ fn loadColumn(
   freqs: ptr<function, array<f32, 9>>,
   emits: ptr<function, array<f32, 9>>,
 ) {
+  var bestScore = 0.0;
   for (var state = 0u; state < latticeCount; state += 1u) {
     (*freqs)[state] = 0.0;
     (*emits)[state] = infinity;
@@ -35,11 +36,14 @@ fn loadColumn(
       if (entry.y > 0.0) {
         (*freqs)[state] = entry.x;
         (*emits)[state] = -entry.y;
+        bestScore = max(bestScore, entry.y);
       }
     }
   }
+  let evidence =
+    params.unvoicedEvidenceCost * max(bestScore - params.unvoicedCost, 0.0);
   (*freqs)[latticeCount] = -1.0;
-  (*emits)[latticeCount] = -params.unvoicedCost;
+  (*emits)[latticeCount] = -params.unvoicedCost + evidence;
 }
 
 fn transitionCost(freqA: f32, freqB: f32) -> f32 {

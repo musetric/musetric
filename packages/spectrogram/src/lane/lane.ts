@@ -95,6 +95,10 @@ export type SpectrogramLane = {
     pass: GPUComputePassEncoder,
     range: SpectrogramColumnRange,
   ) => void;
+  dispatchFundamentalAutocorr: (
+    pass: GPUComputePassEncoder,
+    range: SpectrogramColumnRange,
+  ) => void;
   dispatchFundamentalTrack: (
     pass: GPUComputePassEncoder,
     range: SpectrogramColumnRange,
@@ -120,6 +124,7 @@ const buildSpectrogramLane = (
   );
   const fundamentalFrequency = fundamentalFrequencyCell.get({
     signal: baseBandPipeline.signal,
+    magnitude: baseBandPipeline.rawMagnitudeBuffer,
     config,
   });
 
@@ -224,6 +229,7 @@ const buildSpectrogramLane = (
         baseBandPipeline.dispatchDecibelRun(pass, range);
       }
     },
+    dispatchFundamentalAutocorr: fundamentalFrequency.dispatchAutocorr,
     dispatchFundamentalObserve: fundamentalFrequency.dispatchObserve,
     dispatchFundamentalTrack: fundamentalFrequency.dispatchTrack,
     clear: (encoder) => {

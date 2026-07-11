@@ -9,6 +9,11 @@ export type SpectrogramFundamentalFrequency = {
   lineBuffer: GPUBuffer;
   run: (encoder: GPUCommandEncoder) => void;
 
+  dispatchAutocorr: (
+    pass: GPUComputePassEncoder,
+    range?: SpectrogramColumnRange,
+  ) => void;
+
   dispatchObserve: (
     pass: GPUComputePassEncoder,
     range?: SpectrogramColumnRange,
@@ -30,6 +35,20 @@ export const createSpectrogramFundamentalFrequencyCell = (
   return {
     get: (arg) => {
       const state = stateCell.get(arg);
+
+      const dispatchAutocorr = (
+        pass: GPUComputePassEncoder,
+        range?: SpectrogramColumnRange,
+      ) => {
+        const { columnCount, byteOffset } = state.params.writeRange(range);
+        if (columnCount <= 0 || state.params.value.lagCount <= 0) {
+          return;
+        }
+
+        pass.setPipeline(state.pipelines.autocorr);
+        pass.setBindGroup(0, state.bindGroups.autocorr, [byteOffset]);
+        pass.dispatchWorkgroups(state.params.value.lagCount, columnCount);
+      };
 
       const dispatchObserve = (
         pass: GPUComputePassEncoder,
@@ -70,10 +89,12 @@ export const createSpectrogramFundamentalFrequencyCell = (
             label: 'fundamental-frequency-pass',
             timestampWrites: marker,
           });
+          dispatchAutocorr(pass);
           dispatchObserve(pass);
           dispatchTrack(pass);
           pass.end();
         },
+        dispatchAutocorr,
         dispatchObserve,
         dispatchTrack,
       };
