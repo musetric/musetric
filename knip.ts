@@ -1,6 +1,7 @@
 import type { KnipConfig } from 'knip';
 
 const config: KnipConfig = {
+  conditions: ['monorepo', 'require', 'import', 'node', 'default'],
   includeEntryExports: true,
   ignoreExportsUsedInFile: true,
   ignoreIssues: {
