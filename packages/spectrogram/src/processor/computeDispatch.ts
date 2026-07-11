@@ -135,6 +135,14 @@ const dispatchFundamental = (
       continue;
     }
     for (const range of plans[key].ranges) {
+      runtime.tracks[key].lane.dispatchFundamentalAutocorr(pass, range);
+    }
+  }
+  for (const key of allTrackKeys) {
+    if (!hasFundamentalWork(ctx, key)) {
+      continue;
+    }
+    for (const range of plans[key].ranges) {
       runtime.tracks[key].lane.dispatchFundamentalObserve(pass, range);
     }
   }

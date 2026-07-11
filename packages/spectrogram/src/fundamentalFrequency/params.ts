@@ -10,24 +10,31 @@ export const slotOffsetByteOffset = 32;
 const columnCountByteOffset = 36;
 const screenBaseByteOffset = 40;
 const baseSlotByteOffset = 44;
-const paramsByteLength = 88;
+const paramsByteLength = 128;
 
 const minimumVocalFrequency = 55;
 const maximumVocalFrequency = 1100;
 const candidateStepCents = 20;
 const harmonicCount = 10;
+const autocorrMaxLagCount = 384;
+const autocorrBinStride = 4;
 
-const latticeCount = 5;
+export const fundamentalLatticeCount = 5;
 const peakSeparationCents = 240;
 
 const loudnessExponent = 0.35;
 const fundamentalWeight = 0.4;
 const antiWeight = 0.9;
+const periodicityGain = 2.0;
+const periodicityFloor = 0.3;
+const agreementPower = 1.0;
+const agreementBoostCap = 1.25;
 
 const jumpCostCents = 0.006;
 const jumpCapCents = 500;
 const unvoicedCost = 0.54;
 const voicedTransitionCost = 1.8;
+const unvoicedEvidenceCost = 0;
 
 export const fundamentalTrackWindow = 72;
 
@@ -50,6 +57,16 @@ export type FundamentalFrequencyParams = {
   jumpCapCents: number;
   unvoicedCost: number;
   voicedTransitionCost: number;
+  unvoicedEvidenceCost: number;
+  lagCount: number;
+  minimumLag: number;
+  lagStep: number;
+  autocorrBinStride: number;
+  autocorrMaxBin: number;
+  periodicityGain: number;
+  periodicityFloor: number;
+  agreementPower: number;
+  agreementBoostCap: number;
 };
 
 const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
@@ -68,6 +85,24 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
             candidateStepCents,
         ) + 1
       : 0;
+  const minimumLag = config.sampleRate / maximumFrequency;
+  const maximumLag = config.sampleRate / minimumFrequency;
+  const lagSpan = Math.max(0, maximumLag - minimumLag);
+  const lagCount =
+    candidateCount === 0
+      ? 0
+      : Math.min(autocorrMaxLagCount, Math.floor(lagSpan) + 1);
+  const lagStep =
+    lagCount > 1 ? lagSpan / Math.max(1, lagCount - 1) : Math.max(1, lagSpan);
+  const autocorrMaxBin = Math.max(
+    1,
+    Math.min(
+      halfSize - 1,
+      Math.ceil(
+        ((maximumFrequency * harmonicCount) / config.sampleRate) * windowSize,
+      ),
+    ),
+  );
 
   return {
     halfSize,
@@ -78,7 +113,7 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     minimumFrequency,
     candidateStepCents,
     harmonicCount,
-    latticeCount,
+    latticeCount: fundamentalLatticeCount,
     trackWindow: fundamentalTrackWindow,
     peakSeparationCents,
     loudnessExponent,
@@ -88,6 +123,16 @@ const toParams = (config: ExtSpectrogramConfig): FundamentalFrequencyParams => {
     jumpCapCents,
     unvoicedCost,
     voicedTransitionCost,
+    unvoicedEvidenceCost,
+    lagCount,
+    minimumLag,
+    lagStep,
+    autocorrBinStride,
+    autocorrMaxBin,
+    periodicityGain,
+    periodicityFloor,
+    agreementPower,
+    agreementBoostCap,
   };
 };
 
@@ -147,6 +192,16 @@ export const createParamsCell = (device: GPUDevice) =>
             view.setFloat32(76, value.jumpCapCents, true);
             view.setFloat32(80, value.unvoicedCost, true);
             view.setFloat32(84, value.voicedTransitionCost, true);
+            view.setFloat32(88, value.unvoicedEvidenceCost, true);
+            view.setUint32(92, value.lagCount, true);
+            view.setFloat32(96, value.minimumLag, true);
+            view.setFloat32(100, value.lagStep, true);
+            view.setUint32(104, value.autocorrBinStride, true);
+            view.setUint32(108, value.autocorrMaxBin, true);
+            view.setFloat32(112, value.periodicityGain, true);
+            view.setFloat32(116, value.periodicityFloor, true);
+            view.setFloat32(120, value.agreementPower, true);
+            view.setFloat32(124, value.agreementBoostCap, true);
           });
           return {
             columnCount,

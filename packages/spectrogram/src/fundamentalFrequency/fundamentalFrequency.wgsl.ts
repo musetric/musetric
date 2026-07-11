@@ -4,6 +4,7 @@ export const shader = `
 ${fundamentalFrequencyParamsStruct}
 
 @group(0) @binding(0) var<storage, read> signal: array<f32>;
+@group(0) @binding(1) var<storage, read> periodicity: array<f32>;
 @group(0) @binding(2) var<storage, read_write> lattice: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: FundamentalFrequencyParams;
 
@@ -99,6 +100,46 @@ fn harmonicSalience(windowIndex: u32, frequency: f32) -> f32 {
     params.fundamentalWeight * fundamentalLoudness;
 }
 
+fn periodicityAt(windowIndex: u32, frequency: f32) -> f32 {
+  if (params.lagCount == 0u || frequency <= 0.0 || params.lagStep <= 0.0) {
+    return 0.0;
+  }
+
+  let lag = params.sampleRate / frequency;
+  let rawIndex = (lag - params.minimumLag) / params.lagStep;
+  if (rawIndex < 0.0) {
+    return 0.0;
+  }
+
+  let lowerIndex = u32(floor(rawIndex));
+  if (lowerIndex >= params.lagCount) {
+    return 0.0;
+  }
+
+  let upperIndex = min(lowerIndex + 1u, params.lagCount - 1u);
+  let blend = fract(rawIndex);
+  let offset = windowIndex * params.lagCount;
+  let lower = periodicity[offset + lowerIndex];
+  let upper = periodicity[offset + upperIndex];
+  return mix(lower, upper, blend);
+}
+
+fn agreementSalience(windowIndex: u32, frequency: f32) -> f32 {
+  let spectral = harmonicSalience(windowIndex, frequency);
+  if (spectral <= 0.0) {
+    return 0.0;
+  }
+
+  let period = clamp(periodicityAt(windowIndex, frequency), 0.0, 1.0);
+  let periodGate = pow(period, params.agreementPower);
+  let agreement =
+    params.periodicityFloor + (1.0 - params.periodicityFloor) * periodGate;
+  let neutral =
+    params.periodicityFloor + (1.0 - params.periodicityFloor) * 0.5;
+  let factor = min(agreement / max(neutral, 0.000001), params.agreementBoostCap);
+  return spectral * factor;
+}
+
 @compute @workgroup_size(64)
 fn observe(
   @builtin(workgroup_id) workgroupId: vec3<u32>,
@@ -119,7 +160,7 @@ fn observe(
     candidate += workgroupWidth
   ) {
     workgroupSalience[candidate] =
-      harmonicSalience(windowIndex, frequencyAtCandidate(candidate));
+      agreementSalience(windowIndex, frequencyAtCandidate(candidate));
   }
   workgroupBarrier();
 
