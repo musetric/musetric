@@ -1832,7 +1832,7 @@ __metadata:
   resolution: "@musetric/monorepo@workspace:."
   dependencies:
     editorconfig-checker: "catalog:"
-    knip: "patch:knip@npm%3A6.24.0#~/.yarn/patches/knip-npm-6.24.0-cc0ce7f8ea.patch"
+    knip: "patch:knip@npm%3A6.26.0#~/.yarn/patches/knip-npm-6.26.0-monorepo.patch"
     prettier: "catalog:"
   languageName: unknown
   linkType: soft
@@ -5816,9 +5816,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"knip@npm:6.24.0":
-  version: 6.24.0
-  resolution: "knip@npm:6.24.0"
+"knip@npm:6.26.0":
+  version: 6.26.0
+  resolution: "knip@npm:6.26.0"
   dependencies:
     fdir: "npm:^6.5.0"
     formatly: "npm:^0.3.0"
@@ -5836,13 +5836,13 @@ __metadata:
   bin:
     knip: bin/knip.js
     knip-bun: bin/knip-bun.js
-  checksum: 10c0/fe55ed075fd240e678a0064895d5361b2758fdfbe40a53823cbb2b59f1e2a6fb67e7f6f1f12d7312c525c8c910afbe93c8368d3e61eeac876effe80f4bbd4c45
+  checksum: 10c0/bdac0b7a878c17c887bc0aadbb51c243fc88bb0c95cc3bb90560387a68a96416df57b2972e647cf2af36aa930554664b214b4f2300918469c637ed934cc79a6e
   languageName: node
   linkType: hard
 
-"knip@patch:knip@npm%3A6.24.0#~/.yarn/patches/knip-npm-6.24.0-cc0ce7f8ea.patch":
-  version: 6.24.0
-  resolution: "knip@patch:knip@npm%3A6.24.0#~/.yarn/patches/knip-npm-6.24.0-cc0ce7f8ea.patch::version=6.24.0&hash=c3ebba"
+"knip@patch:knip@npm%3A6.26.0#~/.yarn/patches/knip-npm-6.26.0-monorepo.patch":
+  version: 6.26.0
+  resolution: "knip@patch:knip@npm%3A6.26.0#~/.yarn/patches/knip-npm-6.26.0-monorepo.patch::version=6.26.0&hash=812d8d"
   dependencies:
     fdir: "npm:^6.5.0"
     formatly: "npm:^0.3.0"
@@ -5860,7 +5860,7 @@ __metadata:
   bin:
     knip: bin/knip.js
     knip-bun: bin/knip-bun.js
-  checksum: 10c0/4343aaa252a961a32c0cad53c66001a335c00956ce8d02b5f06c66b702c8d7813efca77264fb76c7ec7418911def66292502afa1aac5d39d4adb949b6a3f236b
+  checksum: 10c0/ac716c9ecbc13d51dd87cebb22ec3738215781664b16f7a5ed2b7a18f5f92dca9261795b9784cfb9be58bc3b6e03c2d3ba913be147b849889b58435be90e8d6f
   languageName: node
   linkType: hard
 
