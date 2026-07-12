@@ -6,14 +6,10 @@ const config: KnipConfig = {
   ignoreIssues: {
     'packages/engine/src/engine.ts': ['exports'],
   },
-  ignoreBinaries: ['ffmpeg', 'ps', 'powershell.exe'],
+  ignoreBinaries: ['ffmpeg', 'ps'],
   ignoreUnresolved: ['vite/client', '^tsx$'],
   ignoreDependencies: ['@vitest/browser'],
-  ignoreFiles: [
-    '**/i18next.config.ts',
-    '**/vitest.bench.config.ts',
-    '**/src/vite-env.d.ts',
-  ],
+  ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
   workspaces: {
     'packages/ai': {
       entry: ['src/service/browserEntry.ts'],

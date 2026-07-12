@@ -1,5 +1,5 @@
 diff --git a/dist/util/resolve.js b/dist/util/resolve.js
-index 8b0b7101966352b8478d487a06fc833ead627e97..2447179d04baefa7595560f0c34f00866eeee1b0 100644
+index 68625206d92e705ad6a16bf6e2c9fc43881cfb94..13d6fbc570d0b4897270168b2330aa10fd8b1559 100644
 --- a/dist/util/resolve.js
 +++ b/dist/util/resolve.js
 @@ -13,7 +13,7 @@ const createSyncModuleResolver = (extensions, tsConfigFile) => {
@@ -11,7 +11,7 @@ index 8b0b7101966352b8478d487a06fc833ead627e97..2447179d04baefa7595560f0c34f0086
          nodePath: false,
      };
      const resolver = new ResolverFactory({
-@@ -39,7 +39,7 @@ export const _createSyncModuleResolver = (extensions, tsConfigFile) => timerify(
+@@ -42,7 +42,7 @@ export const _createSyncModuleResolver = (extensions, tsConfigFile) => timerify(
  const createSyncResolver = (extensions) => {
      const resolver = new ResolverFactory({
          extensions,
