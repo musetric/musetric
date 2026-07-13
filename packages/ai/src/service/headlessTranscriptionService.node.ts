@@ -158,6 +158,12 @@ const createModuleServer = async (
       return;
     }
 
+    if (url.pathname === '/favicon.ico') {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+
     if (url.pathname.startsWith('/hf/')) {
       await serveHfFile({
         relPath: url.pathname.slice('/hf/'.length),
