@@ -90,6 +90,42 @@ export const decodeInterleavedPcm = async (
   return output;
 };
 
+export const decodeMonoPcm = async (
+  options: DecodeOptions,
+): Promise<Buffer> => {
+  const { sourcePath, sampleRate, logger } = options;
+  const output = await runFfmpeg({
+    args: [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      sourcePath,
+      '-map',
+      '0:a:0',
+      '-sn',
+      '-dn',
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      sampleRate.toString(),
+      '-f',
+      'f32le',
+      '-c:a',
+      'pcm_f32le',
+      'pipe:1',
+    ],
+    captureStdout: true,
+    logger,
+    processName: 'ai.decodeMonoPcm',
+  });
+  if (output.byteLength === 0) {
+    throw new Error('ffmpeg produced no audio data');
+  }
+  return output;
+};
+
 type EncodeOptions = {
   rawPath: string;
   inputSampleRate: number;

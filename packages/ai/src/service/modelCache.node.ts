@@ -8,8 +8,6 @@ import { leadBackingModel } from '../models/leadBackingModel.js';
 import { resolveVocalsModelUrl, vocalsModel } from '../models/vocalsModel.js';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';
 
-// Checksums are verified once per process; later runs trust the cached file
-// instead of re-reading hundreds of megabytes on every separation.
 const verifiedPaths = new Set<string>();
 
 const hashFile = async (path: string): Promise<string> => {
@@ -28,13 +26,6 @@ const getFileSize = async (path: string): Promise<number | undefined> => {
   } catch {
     return undefined;
   }
-};
-
-const sendDownloadMessage = async (
-  handlers: MessageHandlers<SeparateAudioMessage>,
-  message: Extract<SeparateAudioMessage, { type: 'download' }>,
-): Promise<void> => {
-  await handlers.download(message);
 };
 
 const waitForStreamDrain = async (
@@ -62,24 +53,33 @@ const closeWriteStream = async (
   await Promise.race([once(stream, 'finish'), streamError]);
 };
 
-type ModelFileOptions = {
+export type ModelDownloadMessage = {
+  type: 'download';
+  label: string;
+  file?: string;
+  downloaded: number;
+  total?: number;
+  status?: 'processing' | 'cached' | 'done';
+};
+
+export type ModelFileOptions = {
   label: string;
   file: string;
   url: string;
   sha256: string;
   path: string;
-  handlers: MessageHandlers<SeparateAudioMessage>;
+  onDownload: (message: ModelDownloadMessage) => Promise<void>;
 };
 
-const ensureCachedModelFile = async (
+export const ensureCachedModelFile = async (
   options: ModelFileOptions,
 ): Promise<string> => {
-  const { label, file, path, sha256, handlers } = options;
+  const { label, file, path, sha256, onDownload } = options;
   const existingSize = await getFileSize(path);
   if (existingSize !== undefined) {
     if (verifiedPaths.has(path) || (await hashFile(path)) === sha256) {
       verifiedPaths.add(path);
-      await sendDownloadMessage(handlers, {
+      await onDownload({
         type: 'download',
         label,
         file,
@@ -114,7 +114,7 @@ const ensureCachedModelFile = async (
     target.on('error', reject);
   });
 
-  await sendDownloadMessage(handlers, {
+  await onDownload({
     type: 'download',
     label,
     file,
@@ -133,7 +133,7 @@ const ensureCachedModelFile = async (
       hash.update(chunk);
       await writeStreamChunk(target, streamError, chunk);
       downloaded += chunk.byteLength;
-      await sendDownloadMessage(handlers, {
+      await onDownload({
         type: 'download',
         label,
         file,
@@ -157,7 +157,7 @@ const ensureCachedModelFile = async (
 
   await rename(tempPath, path);
   verifiedPaths.add(path);
-  await sendDownloadMessage(handlers, {
+  await onDownload({
     type: 'download',
     label,
     file,
@@ -184,6 +184,9 @@ export const ensureSeparationModelFiles = async (
   options: EnsureSeparationModelFilesOptions,
 ): Promise<SeparationModelFiles> => {
   const { modelsPath, handlers } = options;
+  const onDownload = async (message: ModelDownloadMessage): Promise<void> => {
+    await handlers.download(message);
+  };
   const vocalsDir = join(modelsPath, 'vocal-separation-roformer-onnx');
   const vocalsModelPath = await ensureCachedModelFile({
     label: 'Vocals separation model',
@@ -191,7 +194,7 @@ export const ensureSeparationModelFiles = async (
     url: resolveVocalsModelUrl(vocalsModel.files.model),
     sha256: vocalsModel.sha256.model,
     path: join(vocalsDir, vocalsModel.files.model),
-    handlers,
+    onDownload,
   });
   const vocalsModelDataPath = await ensureCachedModelFile({
     label: 'Vocals separation model data',
@@ -199,7 +202,7 @@ export const ensureSeparationModelFiles = async (
     url: resolveVocalsModelUrl(vocalsModel.files.data),
     sha256: vocalsModel.sha256.data,
     path: join(vocalsDir, vocalsModel.files.data),
-    handlers,
+    onDownload,
   });
   const leadBackingModelPath = await ensureCachedModelFile({
     label: 'Lead/backing separation model',
@@ -207,7 +210,7 @@ export const ensureSeparationModelFiles = async (
     url: leadBackingModel.sourceUrl,
     sha256: leadBackingModel.sha256,
     path: join(modelsPath, leadBackingModel.relativePath),
-    handlers,
+    onDownload,
   });
 
   return {
