@@ -1,4 +1,5 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { whisperModel } from '../models/whisperModel.js';
 import { decodeMonoPcm } from '../service/audioCodec.node.js';
@@ -58,5 +59,6 @@ export const transcribeAudio = async (
     },
   });
 
+  await mkdir(dirname(resultPath), { recursive: true });
   await writeFile(resultPath, JSON.stringify(segments, undefined, 2), 'utf-8');
 };
