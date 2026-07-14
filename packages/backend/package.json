@@ -21,6 +21,7 @@
     "@musetric/ai": "workspace:*",
     "@musetric/api": "workspace:*",
     "@musetric/backend-db": "workspace:*",
+    "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/toolkit": "workspace:*",
     "@musetric/utils": "workspace:*",

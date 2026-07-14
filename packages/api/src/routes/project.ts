@@ -28,15 +28,18 @@ export const processingStepSchema = z.object({
 });
 export type ProcessingStep = z.infer<typeof processingStepSchema>;
 
+export const processingStepsSchema = z.object({
+  separation: processingStepSchema,
+  transcription: processingStepSchema,
+  rhythm: processingStepSchema,
+  key: processingStepSchema,
+  chords: processingStepSchema,
+});
+export type ProcessingSteps = z.infer<typeof processingStepsSchema>;
+
 export const processingSchema = z.object({
   done: z.boolean().optional(),
-  steps: z.object({
-    separation: processingStepSchema,
-    transcription: processingStepSchema,
-    rhythm: processingStepSchema,
-    key: processingStepSchema,
-    chords: processingStepSchema,
-  }),
+  steps: processingStepsSchema,
 });
 export type Processing = z.infer<typeof processingSchema>;
 

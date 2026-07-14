@@ -50,6 +50,45 @@ SOFTWARE.
 - License: MIT.
 - License source: Hugging Face model card metadata.
 
+## ChordMini
+
+- Source: https://github.com/ptnghia-j/ChordMini
+- Usage: ChordNet "2E1D" chord recognizer. The `2e1d_model_best.pth` checkpoint is the basis of the ONNX classifier this project runs, and the 170-label chord vocabulary reproduces the index ordering of upstream `idx2voca_chord()`, which is the exported graph's output contract. The recursive constant-Q transform that produces its features, the temporal smoothing/argmax passes and the segment grouping are independent implementations.
+- Local files: `packages/ai/src/chords/chordVocab.ts`, `packages/ai/src/models/chordNetModel.ts`, `packages/ai/src/runtime/chords/chordNetGpuRuntime.ts`, `packages/ai/src/service/chordNetModelCache.node.ts`.
+- License: MIT.
+- License source: upstream `LICENSE`.
+- Vendoring details: the inference subset is vendored in `musetric-toolkit`; see its `thirdPartyNotices.md` and `musetric_toolkit/chords_audio/chordmini/NOTICE.md`.
+
+MIT License
+
+Copyright (c) 2026 ChordMini contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Musetric ChordMini ONNX
+
+- Source: https://huggingface.co/musetric/chordmini-onnx
+- Usage: ChordNet classifier ONNX and its matched CQT plan, downloaded at runtime.
+- Local files: `packages/ai/src/models/chordNetModel.ts`, `packages/ai/src/service/chordNetModelCache.node.ts`.
+- License: MIT, inherited from the upstream ChordMini weights; conversion to ONNX does not change the weight license.
+- License source: Hugging Face model card metadata.
+
 ## Musetric Toolkit
 
 - Source: https://github.com/popelenkow/musetric-toolkit

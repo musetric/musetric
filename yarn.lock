@@ -1832,6 +1832,7 @@ __metadata:
   resolution: "@musetric/ai@workspace:packages/ai"
   dependencies:
     "@huggingface/transformers": "catalog:"
+    "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
@@ -1845,6 +1846,7 @@ __metadata:
     vite: "catalog:"
     vitest: "catalog:"
   peerDependencies:
+    "@musetric/cqt": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     onnxruntime-web: 1.26.0
@@ -1920,6 +1922,7 @@ __metadata:
     "@musetric/ai": "workspace:*"
     "@musetric/api": "workspace:*"
     "@musetric/backend-db": "workspace:*"
+    "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/toolkit": "workspace:*"
@@ -1942,7 +1945,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@musetric/cqt@workspace:packages/cqt":
+"@musetric/cqt@workspace:*, @musetric/cqt@workspace:packages/cqt":
   version: 0.0.0-use.local
   resolution: "@musetric/cqt@workspace:packages/cqt"
   dependencies:

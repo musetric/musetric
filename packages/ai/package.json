@@ -26,11 +26,13 @@
     "vite": "catalog:"
   },
   "peerDependencies": {
+    "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
     "onnxruntime-web": "1.26.0"
   },
   "devDependencies": {
+    "@musetric/cqt": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",

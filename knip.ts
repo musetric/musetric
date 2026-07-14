@@ -15,6 +15,7 @@ const config: KnipConfig = {
     'packages/ai': {
       entry: [
         'src/service/browserEntry.ts',
+        'src/service/browserChordsEntry.ts',
         'src/service/browserTranscribeEntry.ts',
       ],
     },

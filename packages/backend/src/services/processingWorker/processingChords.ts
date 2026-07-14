@@ -1,4 +1,4 @@
-import { analyzeChords } from '@musetric/toolkit';
+import { analyzeChords } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
