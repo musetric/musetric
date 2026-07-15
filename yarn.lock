@@ -1942,6 +1942,27 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/cqt@workspace:packages/cqt":
+  version: 0.0.0-use.local
+  resolution: "@musetric/cqt@workspace:packages/cqt"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    "@typescript/native": "catalog:"
+    "@vitest/browser": "catalog:"
+    "@vitest/browser-playwright": "catalog:"
+    "@webgpu/types": "catalog:"
+    eslint: "catalog:"
+    playwright: "catalog:"
+    typescript: "catalog:"
+    vitest: "catalog:"
+  peerDependencies:
+    "@musetric/fft": "workspace:*"
+    "@musetric/utils": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/engine@workspace:*, @musetric/engine@workspace:packages/engine":
   version: 0.0.0-use.local
   resolution: "@musetric/engine@workspace:packages/engine"
