@@ -37,42 +37,45 @@ const sendFile = async (
   });
 };
 
-type ChordsFileRoute = {
-  prefix: string;
-  files: Map<string, string>;
-  missingMessage: string;
-};
+const filesRoute = '/files/';
 
 const serveRegisteredFile = async (
   pathname: string,
   response: ServerResponse,
-  route: ChordsFileRoute,
+  files: Map<string, string>,
 ): Promise<boolean> => {
-  if (!pathname.startsWith(route.prefix)) {
+  if (!pathname.startsWith(filesRoute)) {
     return false;
   }
-  const [token] = pathname.slice(route.prefix.length).split('/');
-  const path = token ? route.files.get(token) : undefined;
+  const [token] = pathname.slice(filesRoute.length).split('/');
+  const path = token ? files.get(token) : undefined;
   if (path === undefined) {
     response.writeHead(404);
-    response.end(route.missingMessage);
+    response.end('file not found');
     return true;
   }
   await sendFile(path, response);
   return true;
 };
 
-const serveChordsPage = async (
+type GpuPage = {
+  route: string;
+  entryModule: string;
+  label: string;
+};
+
+const servePage = async (
   pathname: string,
   response: ServerResponse,
   viteServer: vite.ViteDevServer,
+  page: GpuPage,
 ): Promise<boolean> => {
-  if (pathname !== '/chords-service') {
+  if (pathname !== page.route) {
     return false;
   }
   const html = await viteServer.transformIndexHtml(
     pathname,
-    '<!doctype html><script type="module" src="/src/service/browserChordsEntry.ts"></script>',
+    `<!doctype html><script type="module" src="/${page.entryModule}"></script>`,
   );
   response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   response.end(html);
@@ -105,7 +108,8 @@ type HandleModuleRequestOptions = {
   request: IncomingMessage;
   response: ServerResponse;
   viteServer: vite.ViteDevServer;
-  fileRoutes: ChordsFileRoute[];
+  page: GpuPage;
+  files: Map<string, string>;
   getPcm: () => Buffer | undefined;
   logger: Logger;
 };
@@ -113,19 +117,18 @@ type HandleModuleRequestOptions = {
 const handleModuleRequest = async (
   options: HandleModuleRequestOptions,
 ): Promise<void> => {
-  const { request, response, viteServer, fileRoutes, getPcm, logger } = options;
+  const { request, response, viteServer, page, files, getPcm, logger } =
+    options;
   const requestUrl = request.url ?? '/';
   const url = new URL(requestUrl, 'http://127.0.0.1');
-  if (await serveChordsPage(url.pathname, response, viteServer)) {
+  if (await servePage(url.pathname, response, viteServer, page)) {
     return;
   }
   if (servePcm(url.pathname, response, getPcm)) {
     return;
   }
-  for (const route of fileRoutes) {
-    if (await serveRegisteredFile(url.pathname, response, route)) {
-      return;
-    }
+  if (await serveRegisteredFile(url.pathname, response, files)) {
+    return;
   }
   if (url.pathname === '/favicon.ico') {
     response.writeHead(204);
@@ -133,82 +136,24 @@ const handleModuleRequest = async (
     return;
   }
   viteServer.middlewares(request, response, () => {
-    logger.warn({ url: requestUrl }, 'Chords service route not found');
+    logger.warn({ url: requestUrl }, `${page.label} route not found`);
     response.writeHead(404);
     response.end('not found');
   });
 };
 
-type RegisterChordsFileOptions = {
-  path: string;
-  files: Map<string, string>;
-  baseUrl: string;
-  route: string;
-  label: string;
-};
-
-const registerFile = (options: RegisterChordsFileOptions): string => {
-  const { path, files, baseUrl, route, label } = options;
-  if (!existsSync(path)) {
-    throw new Error(`${label} not found at ${path}`);
-  }
-  const token = getFileToken(path);
-  files.set(token, path);
-  return `${baseUrl}${route}${token}`;
-};
-
-export type ChordsModuleServer = {
-  baseUrl: string;
-  pcmUrl: string;
-  setPcm: (pcm: Buffer) => void;
-  registerModelFile: (path: string) => string;
-  registerPlanFile: (path: string) => string;
-  registerPlanManifestFile: (path: string) => string;
-  close: () => Promise<void>;
-};
-
-type CreateChordsModuleServerOptions = {
-  logger: Logger;
-};
-
-export const createChordsModuleServer = async (
-  options: CreateChordsModuleServerOptions,
-): Promise<ChordsModuleServer> => {
-  const { logger } = options;
-  const packageRoot = getPackageRoot();
+const createViteServer = async (
+  packageRoot: string,
+): Promise<vite.ViteDevServer> => {
   const packagesRoot = dirname(packageRoot);
   const repositoryRoot = dirname(packagesRoot);
-  const browserEntry = join(packageRoot, 'src/service/browserChordsEntry.ts');
-  if (!existsSync(browserEntry)) {
-    throw new Error(`AI chords browser entry not found at ${browserEntry}`);
-  }
-  const modelFiles = new Map<string, string>();
-  const planFiles = new Map<string, string>();
-  const planManifestFiles = new Map<string, string>();
-  const fileRoutes: ChordsFileRoute[] = [
-    {
-      prefix: '/models/',
-      files: modelFiles,
-      missingMessage: 'model not found',
-    },
-    {
-      prefix: '/plans/',
-      files: planFiles,
-      missingMessage: 'plan not found',
-    },
-    {
-      prefix: '/plan-manifests/',
-      files: planManifestFiles,
-      missingMessage: 'plan manifest not found',
-    },
-  ];
-  let pcm: Buffer | undefined = undefined;
-  const viteServer = await vite.createServer({
+  return vite.createServer({
     root: packageRoot,
     appType: 'custom',
     logLevel: 'error',
     server: {
       middlewareMode: true,
+      hmr: false,
       watch: { ignored: ['**'] },
       fs: { allow: [repositoryRoot] },
     },
@@ -238,16 +183,47 @@ export const createChordsModuleServer = async (
     },
     optimizeDeps: { include: ['onnxruntime-web/webgpu'] },
   });
+};
+
+export type GpuModuleServer = {
+  baseUrl: string;
+  pageUrl: string;
+  pcmUrl: string;
+  setPcm: (pcm: Buffer) => void;
+  registerFile: (path: string) => string;
+  close: () => Promise<void>;
+};
+
+export type CreateGpuModuleServerOptions = {
+  logger: Logger;
+  label: string;
+  pageRoute: string;
+  entryModule: string;
+};
+
+export const createGpuModuleServer = async (
+  options: CreateGpuModuleServerOptions,
+): Promise<GpuModuleServer> => {
+  const { logger, label, pageRoute, entryModule } = options;
+  const packageRoot = getPackageRoot();
+  const entryPath = join(packageRoot, entryModule);
+  if (!existsSync(entryPath)) {
+    throw new Error(`${label} browser entry not found at ${entryPath}`);
+  }
+  const files = new Map<string, string>();
+  let pcm: Buffer | undefined = undefined;
+  const viteServer = await createViteServer(packageRoot);
   const server = createServer((request, response) => {
     void handleModuleRequest({
       request,
       response,
       viteServer,
-      fileRoutes,
+      page: { route: pageRoute, entryModule, label },
+      files,
       getPcm: () => pcm,
       logger,
     }).catch((error: unknown) => {
-      logger.error({ error }, 'Chords service request failed');
+      logger.error({ error }, `${label} request failed`);
       if (!response.headersSent) {
         response.writeHead(500);
       }
@@ -259,39 +235,24 @@ export const createChordsModuleServer = async (
   });
   const address = server.address();
   if (!address || typeof address === 'string') {
-    throw new Error('Chords service failed to bind a local HTTP port');
+    throw new Error(`${label} failed to bind a local HTTP port`);
   }
   const baseUrl = `http://127.0.0.1:${address.port}`;
   return {
     baseUrl,
+    pageUrl: `${baseUrl}${pageRoute}`,
     pcmUrl: `${baseUrl}/pcm`,
     setPcm: (nextPcm) => {
       pcm = nextPcm;
     },
-    registerModelFile: (path) =>
-      registerFile({
-        path,
-        files: modelFiles,
-        baseUrl,
-        route: '/models/',
-        label: 'ChordNet model',
-      }),
-    registerPlanFile: (path) =>
-      registerFile({
-        path,
-        files: planFiles,
-        baseUrl,
-        route: '/plans/',
-        label: 'CQT plan',
-      }),
-    registerPlanManifestFile: (path) =>
-      registerFile({
-        path,
-        files: planManifestFiles,
-        baseUrl,
-        route: '/plan-manifests/',
-        label: 'CQT plan manifest',
-      }),
+    registerFile: (path) => {
+      if (!existsSync(path)) {
+        throw new Error(`${label} file not found at ${path}`);
+      }
+      const token = getFileToken(path);
+      files.set(token, path);
+      return `${baseUrl}${filesRoute}${token}`;
+    },
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));

@@ -158,6 +158,44 @@ SOFTWARE.
 - License: MIT, inherited from the upstream S-KEY weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 
+## Beat This!
+
+- Source: https://github.com/CPJKU/beat_this
+- Usage: Beat This! beat and downbeat tracker. The `final0` checkpoint is the basis of the ONNX graph this project runs, its mel filterbank is the basis of the WebGPU log-mel front end, and the chunking, aggregation and peak picking around them reproduce the upstream `split_piece`, `aggregate_prediction` and `minimal` `Postprocessor`, which are the exported graph's input and output contract. The audio decoding and the tempo/meter estimation are independent implementations.
+- Local files: `packages/ai/src/rhythm/analyzeRhythm.node.ts`, `packages/ai/src/rhythm/beatPeaks.ts`, `packages/ai/src/rhythm/rhythmSummary.ts`, `packages/ai/src/rhythm/types.ts`, `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/runtime/rhythm/`, `packages/ai/src/service/beatThisModelCache.node.ts`, `packages/ai/src/service/browserRhythmEntry.ts`, `packages/ai/src/service/headlessRhythmService.node.ts`.
+- License: MIT.
+- License source: upstream `LICENSE`.
+
+MIT License
+
+Copyright (c) 2024 Institute of Computational Perception, JKU Linz, Austria
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Musetric Beat This! ONNX
+
+- Source: https://huggingface.co/musetric/beat-this-onnx
+- Usage: rhythm ONNX graph (`beat_this.onnx`: spectrogram windows → beat/downbeat logits), the `mel-filterbank.bin` its WebGPU log-mel front end projects onto, and their `config.json` descriptor, downloaded at runtime.
+- Local files: `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/service/beatThisModelCache.node.ts`.
+- License: MIT, inherited from the upstream Beat This! weights; conversion to ONNX does not change the weight license.
+- License source: Hugging Face model card metadata.
+
 ## Musetric Toolkit
 
 - Source: https://github.com/popelenkow/musetric-toolkit

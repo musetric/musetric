@@ -15,6 +15,7 @@ const config: KnipConfig = {
       entry: [
         'src/service/browserEntry.ts',
         'src/service/browserChordsEntry.ts',
+        'src/service/browserRhythmEntry.ts',
         'src/service/browserTranscribeEntry.ts',
       ],
     },
