@@ -24,6 +24,9 @@ const config: KnipConfig = {
     'packages/fft': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },
+    'packages/cqt': {
+      entry: ['src/**/*.bench.ts'],
+    },
     'packages/spectrogram': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },

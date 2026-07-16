@@ -16,6 +16,7 @@
 - `packages/backend`: the Fastify server, orchestration, and runtime services.
 - `packages/audio`: browser-side audio, waveform, spectrogram, workers, and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
+- `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/backend-db`: backend data access, entities, and schema-related code.
 - `packages/utils`: low-level shared utilities used across packages.
