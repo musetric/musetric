@@ -119,6 +119,45 @@ follows the source the weights are downloaded from.
 - License: Apache-2.0, inherited from the base weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 
+## S-KEY
+
+- Source: https://github.com/deezer/skey
+- Usage: S-KEY key detector (harmonic VQT + ChromaNet). The `skey.pt` checkpoint is the basis of the ONNX graph this project runs, and the 24-entry key map reproduces the index ordering of the upstream `key_map`, which is the exported graph's output contract. The audio decoding, peak normalization and argmax around the graph are independent implementations.
+- Local files: `packages/ai/src/key/analyzeKey.node.ts`, `packages/ai/src/key/keyMap.ts`, `packages/ai/src/key/types.ts`, `packages/ai/src/models/skeyModel.ts`, `packages/ai/src/runtime/key/skeyRuntime.ts`, `packages/ai/src/service/skeyModelCache.node.ts`.
+- License: MIT.
+- License source: upstream `LICENSE`.
+- Vendoring details: the inference subset is vendored in `musetric-toolkit`; see its `thirdPartyNotices.md`.
+
+MIT License
+
+Copyright (c) 2019-present, Deezer SA.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Musetric S-KEY ONNX
+
+- Source: https://huggingface.co/musetric/skey-onnx
+- Usage: self-contained key-detection ONNX (`audio` → 24 key probabilities) and its `config.json` descriptor, downloaded at runtime.
+- Local files: `packages/ai/src/models/skeyModel.ts`, `packages/ai/src/service/skeyModelCache.node.ts`.
+- License: MIT, inherited from the upstream S-KEY weights; conversion to ONNX does not change the weight license.
+- License source: Hugging Face model card metadata.
+
 ## Musetric Toolkit
 
 - Source: https://github.com/popelenkow/musetric-toolkit
