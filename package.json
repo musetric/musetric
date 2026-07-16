@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "editorconfig-checker": "catalog:",
-    "knip": "patch:knip@npm%3A6.26.0#~/.yarn/patches/knip-npm-6.26.0-bbeba470d6.patch",
+    "knip": "catalog:",
     "prettier": "catalog:"
   }
 }
