@@ -1,4 +1,4 @@
-import { analyzeRhythm } from '@musetric/toolkit';
+import { analyzeRhythm } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
