@@ -6,7 +6,7 @@ This project includes or adapts portions of the following third-party works.
 
 - Source: https://github.com/Anjok07/ultimatevocalremovergui
 - Usage: UVR MDX-Net karaoke model, model parameters, tensor layout, and demix overlap-add behavior reimplemented in TypeScript/WebGPU.
-- Local files: `packages/ai/src/models/leadBackingModel.ts`, `packages/ai/src/separation/separateLeadBacking.ts`, `packages/ai/src/runtime/leadBacking/leadBackingRuntime.ts`, `packages/ai/src/runtime/leadBacking/packShader.ts`, `packages/ai/src/runtime/leadBacking/unpackShader.ts`.
+- Local files: `packages/ai/src/models/leadBackingModel.ts`, `packages/ai/src/separation/separateLeadBacking.ts`, `packages/ai/src/runtime/leadBacking/leadBackingRuntime.ts`, `packages/ai/src/runtime/leadBacking/pack.wgsl.ts`, `packages/ai/src/runtime/leadBacking/unpack.wgsl.ts`.
 - License: MIT, as stated in the upstream README.
 - Credit: Ultimate Vocal Remover GUI / UVR developers, including Anjok07 and aufr33; original MDX-Net AI code credited upstream to Kuielab and Woosung Choi.
 
@@ -16,7 +16,7 @@ The upstream repository README asks third-party application developers who use U
 
 - Source: https://github.com/lucidrains/BS-RoFormer
 - Usage: Mel-Band RoFormer source-separation architecture and model contract used by the vocal separation ONNX pipeline.
-- Local files: `packages/ai/src/models/vocalsModel.ts`, `packages/ai/src/separation/separateVocals.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasksShader.ts`, `packages/ai/src/runtime/vocals/packShader.ts`.
+- Local files: `packages/ai/src/models/vocalsModel.ts`, `packages/ai/src/separation/separateVocals.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
@@ -87,6 +87,36 @@ SOFTWARE.
 - Usage: ChordNet classifier ONNX and its matched CQT plan, downloaded at runtime.
 - Local files: `packages/ai/src/models/chordNetModel.ts`, `packages/ai/src/service/chordNetModelCache.node.ts`.
 - License: MIT, inherited from the upstream ChordMini weights; conversion to ONNX does not change the weight license.
+- License source: Hugging Face model card metadata.
+
+## OpenAI Whisper
+
+- Source: https://huggingface.co/openai/whisper-large-v3
+- Usage: base speech-to-text weights behind lyric transcription. The `musetric/whisper-large-v3-onnx` export is an inference-only re-export of these weights with no fine-tuning.
+- Local files: `packages/ai/src/models/whisperModel.ts`, `packages/ai/src/runtime/whisper/whisperRuntime.ts`, `packages/ai/src/service/whisperModelCache.node.ts`, `packages/ai/src/service/browserTranscribeEntry.ts`, `packages/ai/src/service/headlessTranscriptionService.node.ts`.
+- License: Apache-2.0. Full text: https://www.apache.org/licenses/LICENSE-2.0
+- License source: Hugging Face model card metadata of the repository the weights are downloaded from.
+
+This notice covers the **weights only**. The local files above are this project's
+own MIT code: they fetch the weights and drive them through
+`@huggingface/transformers`, and the audio compaction, spectral chunking,
+temperature ladder, collapse repair, hallucination/silence filtering and lyric
+splitting around them are independent implementations carrying no upstream code.
+Word timestamps come from Whisper's own cross-attention heads, so no third-party
+forced aligner is involved.
+
+Upstream is inconsistent about this and it is worth knowing: the
+https://github.com/openai/whisper repository states that "Whisper's code and
+model weights are released under the MIT License", while the Hugging Face model
+card the weights are actually fetched from declares `apache-2.0`. This notice
+follows the source the weights are downloaded from.
+
+## Musetric Whisper large-v3 ONNX
+
+- Source: https://huggingface.co/musetric/whisper-large-v3-onnx
+- Usage: word-timestamped q4 ONNX export of Whisper large-v3 in the transformers.js layout, downloaded at runtime.
+- Local files: `packages/ai/src/models/whisperModel.ts`, `packages/ai/src/service/whisperModelCache.node.ts`.
+- License: Apache-2.0, inherited from the base weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 
 ## Musetric Toolkit
