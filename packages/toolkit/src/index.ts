@@ -1,4 +1,3 @@
-export * from './analyzeChords.js';
 export * from './analyzeKey.js';
 export * from './analyzeLeadVisualLoudness.js';
 export * from './analyzeLoudness.js';

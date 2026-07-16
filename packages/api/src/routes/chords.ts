@@ -6,7 +6,7 @@ export const chordSegmentSchema = z.object({
   end: z.number(),
   label: z.string(),
   root: z.string(),
-  quality: z.string().nullable(),
+  quality: z.string().optional(),
 });
 export type ChordSegment = z.infer<typeof chordSegmentSchema>;
 
