@@ -2,8 +2,6 @@ import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
 import { type table } from '../../schema/index.js';
 
-export type UpsertProjectAudioAnalysisArg = table.projectAudioAnalysis.Item;
-
 export const upsert = (database: DatabaseSync) => {
   const statement = database.prepare(
     `INSERT INTO ProjectAudioAnalysis (
@@ -26,7 +24,7 @@ export const upsert = (database: DatabaseSync) => {
        leadSpectrogramGainDb = excluded.leadSpectrogramGainDb`,
   );
 
-  return async (arg: UpsertProjectAudioAnalysisArg): Promise<void> => {
+  return async (arg: table.projectAudioAnalysis.Item): Promise<void> => {
     await transaction(database, async () => {
       await Promise.resolve(
         statement.run(

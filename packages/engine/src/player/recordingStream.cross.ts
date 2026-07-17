@@ -18,11 +18,9 @@ export type RecordingStreamInboundMethods = {
   flush: (message: RecordingStreamFlushMessage) => void;
 };
 
-export type RecordingStreamOutboundMethods = EmptyPortMethods;
-
 export const recordingStreamChannel = createMessageChannel<
   RecordingStreamInboundMethods,
-  RecordingStreamOutboundMethods
+  EmptyPortMethods
 >({
   inbound: {
     keys: ['chunk', 'flush'],
