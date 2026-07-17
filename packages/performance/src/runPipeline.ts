@@ -85,13 +85,15 @@ export type RunPipelineOptions = {
 
 type Spread = { low: number; high: number };
 
-export const runPipeline = async (
-  options: RunPipelineOptions,
-): Promise<{
+export type RunPipelineResult = {
   first: Record<string, number>;
   median: Record<string, number>;
   spread: Record<string, Spread>;
-}> => {
+};
+
+export const runPipeline = async (
+  options: RunPipelineOptions,
+): Promise<RunPipelineResult> => {
   const { device, canvas, fourierMode, windowSize, params } = options;
   const viewSize = viewSizePresets[params.viewSizeKey];
   const metricsArray: Record<string, number>[] = [];

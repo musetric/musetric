@@ -64,7 +64,12 @@ export const hanningWindow = (size: number): Float64Array => {
   return window;
 };
 
-const bandBins = (): { lo: number; hi: number } => {
+type BandBins = {
+  lo: number;
+  hi: number;
+};
+
+const bandBins = (): BandBins => {
   const binHz = sampleRate / win;
   let lo = Math.ceil(bandHz[0] / binHz);
   let hi = Math.floor(bandHz[1] / binHz);

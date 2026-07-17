@@ -117,10 +117,16 @@ export const writeToneRange = (options: WriteToneRangeOptions): void => {
   }
 };
 
+export type CentreTone = {
+  trackKey: 'lead';
+  frameIndex: number;
+  frameCount: number;
+};
+
 export const writeCentreTone = (
   lead: Float32Array,
   sampleRate: number,
-): { trackKey: 'lead'; frameIndex: number; frameCount: number } => {
+): CentreTone => {
   const chunkLength = windowSize * 2;
   const chunkStart = Math.floor(lead.length * 0.5 - chunkLength * 0.5);
   writeToneRange({

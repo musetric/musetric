@@ -22,12 +22,14 @@ import {
 const profiledContext = await createGpuContext(true);
 const wallContext = await createGpuContext();
 
-const measureProfiled = async (
-  benchCase: SpectrogramBenchCase,
-): Promise<{
+type ProfiledMeasurement = {
   metrics: SpectrogramBenchMetric[];
   sampleCount: number;
-}> => {
+};
+
+const measureProfiled = async (
+  benchCase: SpectrogramBenchCase,
+): Promise<ProfiledMeasurement> => {
   const driver = createDriver(benchCase);
   const metricsArray: SpectrogramProcessorMetrics[] = [];
   const sampleMetrics: SpectrogramProcessorMetrics[] = [];

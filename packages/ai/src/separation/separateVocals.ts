@@ -89,10 +89,12 @@ const validateAudio = (audio: StereoAudio): void => {
   }
 };
 
-const getChunkWindow = (
-  offset: number,
-  samples: number,
-): { start: number; length: number } => {
+type ChunkWindow = {
+  start: number;
+  length: number;
+};
+
+const getChunkWindow = (offset: number, samples: number): ChunkWindow => {
   if (offset + vocalsModel.chunkSamples <= samples) {
     return {
       start: offset,
