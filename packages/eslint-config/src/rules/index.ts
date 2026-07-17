@@ -10,6 +10,7 @@ import { noFunctionDeclarationsRule } from './noFunctionDeclarations.js';
 import { noImmediateInlineFunctionCallsRule } from './noImmediateInlineFunctionCalls.js';
 import { noInlineParameterDestructuringRule } from './noInlineParameterDestructuring.js';
 import { noInlineParameterObjectTypesRule } from './noInlineParameterObjectTypes.js';
+import { noInlineReturnObjectTypesRule } from './noInlineReturnObjectTypes.js';
 import { noMixedReexportsRule } from './noMixedReexports.js';
 import { noNamedReexportsRule } from './noNamedReexports.js';
 import { noNullLiteralRule } from './noNullLiteral.js';
@@ -38,6 +39,7 @@ export const musetricRules = {
   'no-immediate-inline-function-calls': noImmediateInlineFunctionCallsRule,
   'no-inline-parameter-destructuring': noInlineParameterDestructuringRule,
   'no-inline-parameter-object-types': noInlineParameterObjectTypesRule,
+  'no-inline-return-object-types': noInlineReturnObjectTypesRule,
   'no-mixed-reexports': noMixedReexportsRule,
   'no-named-reexports': noNamedReexportsRule,
   'no-null-literal': noNullLiteralRule,

@@ -2,9 +2,12 @@ import { chordLabelAt, noChordLabel, unknownChordLabel } from './chordVocab.js';
 
 const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
-const splitLabel = (
-  label: string,
-): { root: string; quality: string | undefined } => {
+type SplitLabel = {
+  root: string;
+  quality: string | undefined;
+};
+
+const splitLabel = (label: string): SplitLabel => {
   if (label === noChordLabel || label === unknownChordLabel) {
     return { root: label, quality: undefined };
   }

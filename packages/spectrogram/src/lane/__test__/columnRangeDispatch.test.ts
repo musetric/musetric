@@ -5,7 +5,12 @@ import { dispatchFourierColumnRange } from '../index.js';
 
 type RecordedDispatch = FourierBatchRange | 'full';
 
-const record = (): { fourier: Fourier; calls: RecordedDispatch[] } => {
+type RecordedFourier = {
+  fourier: Fourier;
+  calls: RecordedDispatch[];
+};
+
+const record = (): RecordedFourier => {
   const calls: RecordedDispatch[] = [];
   const fourier: Fourier = {
     run: () => undefined,
