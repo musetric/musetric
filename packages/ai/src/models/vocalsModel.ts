@@ -13,7 +13,7 @@ export const vocalsModel = {
     data: 'syhft_core_folded_fp16_webgpu.onnx.data',
   },
   sha256: {
-    model: 'dde2bfe8f85d2c12efa24ce4d45cc13e8709b8a72e277a93f130d496d948e918',
+    model: 'e22f33a2895f8cc244e28494197a7c77d7a65101d0aa00dbafc626ed16a0cbdb',
     data: 'b08cfc80905e3560a4dd5d30f641299a47dd96d309ebbe9524d9d6c9d2a0356f',
   },
   inputName: 'stft_repr',
