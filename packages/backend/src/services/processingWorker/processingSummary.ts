@@ -19,12 +19,10 @@ const stepOrder: ProcessingStepKind[] = [
 const doneStep: api.project.ProcessingStep = { status: 'done', progress: 1 };
 const pendingStep: api.project.ProcessingStep = { status: 'pending' };
 
-type Steps = api.project.ProcessingSteps;
-
 const buildSteps = (
   step: ProcessingStepKind,
   current: api.project.ProcessingStep,
-): Steps => {
+): api.project.ProcessingSteps => {
   const targetIndex = stepOrder.indexOf(step);
   const stepValue = (name: ProcessingStepKind): api.project.ProcessingStep => {
     const index = stepOrder.indexOf(name);
