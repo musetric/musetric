@@ -32,5 +32,8 @@
     "editorconfig-checker": "catalog:",
     "knip": "catalog:",
     "prettier": "catalog:"
+  },
+  "resolutions": {
+    "adm-zip": "^0.6.0"
   }
 }
