@@ -5,7 +5,7 @@ import { Resvg } from '@resvg/resvg-js';
 import pngToIco from 'png-to-ico';
 import { type Plugin } from 'vite';
 
-const backgroundColor = '#0c0c0c';
+const backgroundColor = '#111111';
 
 const renderPng = (svg: string, size: number): Buffer =>
   Buffer.from(
