@@ -28,6 +28,9 @@ const config: KnipConfig = {
     'packages/cqt': {
       entry: ['src/**/*.bench.ts'],
     },
+    'packages/script': {
+      entry: ['src/**/*.ts'],
+    },
     'packages/spectrogram': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },

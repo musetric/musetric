@@ -16,6 +16,7 @@
     "@mui/material": "catalog:",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/script": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",

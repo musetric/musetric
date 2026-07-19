@@ -3,7 +3,7 @@ import { Button, CardMedia, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../app/router/routes.js';
-import favicon from '../../favicon.ico';
+import favicon from '../../favicon.svg';
 
 export const ProjectsTitle: FC = () => {
   const { t } = useTranslation();
