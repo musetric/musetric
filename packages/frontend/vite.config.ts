@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import { favicons } from '@musetric/script/faviconsPlugin';
 import react from '@vitejs/plugin-react';
 import { defaultClientConditions, defineConfig } from 'vite';
 import mkcert from 'vite-plugin-mkcert';
@@ -5,7 +7,14 @@ import mkcert from 'vite-plugin-mkcert';
 export default defineConfig({
   base: '/',
   mode: 'production',
-  plugins: [react(), mkcert()],
+  plugins: [
+    react(),
+    mkcert(),
+    favicons({
+      svgPath: fileURLToPath(new URL('./src/favicon.svg', import.meta.url)),
+      name: 'Musetric',
+    }),
+  ],
   envPrefix: ['VITE_', 'frontend'],
   resolve: {
     conditions: defaultClientConditions.concat('monorepo'),
