@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "yarn project:init && node --import tsx --watch src/index.ts",
-    "project:build": "tsc --build",
+    "build:project": "tsc --build",
     "project:init": "node --import tsx ./scripts/init.js",
     "project:start": "node dist/index.js",
     "check:ts": "tsc --build",

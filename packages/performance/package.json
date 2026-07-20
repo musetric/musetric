@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "project:build": "tsc --build",
+    "build:project": "tsc --build",
     "dev": "vite",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",

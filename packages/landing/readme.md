@@ -13,7 +13,7 @@ Open `http://localhost:3003`.
 ## Build
 
 ```sh
-yarn workspace @musetric/landing project:build
+yarn workspace @musetric/landing build:project
 ```
 
 The static output is created in `packages/landing/dist`.
@@ -25,7 +25,7 @@ Public policy pages are available at `/privacy` and `/support`.
 Use Git deployment from the repository root.
 
 - Framework preset: `Vite`
-- Build command: `yarn workspace @musetric/landing project:build`
+- Build command: `yarn workspace @musetric/landing build:project`
 - Build output directory: `packages/landing/dist`
 - Production branch: your main production branch
 

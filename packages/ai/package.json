@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "project:build": "tsc --build",
+    "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
