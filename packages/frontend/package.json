@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "project:build": "vite build && cpx \"dist/**/*\" ../backend/storage/public --clean",
+    "build:project": "vite build && cpx \"dist/**/*\" ../backend/storage/public --clean",
     "check:translations": "i18next-cli extract --config ./i18next.config.ts --ci --dry-run",
     "fix:translations": "i18next-cli extract --config ./i18next.config.ts",
     "check:ts": "tsc --build",
