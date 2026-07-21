@@ -52,6 +52,7 @@ scopes:
   - utils # packages/utils low-level shared utilities
   # App
   - backend # packages/backend Fastify server & orchestration
+  - desktop # packages/desktop Electron app
   - frontend # packages/frontend app shell (cross-feature)
   - landing # packages/landing marketing site
   # Quality & tooling

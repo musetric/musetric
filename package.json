@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "dev": "yarn workspaces foreach --all --parallel --interlaced run dev",
-    "build:project": "yarn workspaces foreach --all --parallel --interlaced run build:project",
+    "build:project": "yarn workspaces foreach --all --topological-dev --parallel --interlaced run build:project",
+    "dev:desktop": "yarn build:project && yarn workspace @musetric/desktop dev:desktop",
+    "build:desktop": "yarn build:project && yarn workspace @musetric/desktop build:desktop",
     "project:init": "yarn workspaces foreach --all --parallel --interlaced run project:init",
     "project:start": "yarn workspaces foreach --all --parallel --interlaced run project:start",
     "check:deps:security": "yarn npm audit --all --recursive --severity high",

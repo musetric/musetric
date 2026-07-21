@@ -19,6 +19,14 @@ export const config = () => {
       },
     },
     {
+      files: ['**/*.{cjs,cts}'],
+      rules: {
+        '@typescript-eslint/consistent-type-imports': 'off',
+        '@typescript-eslint/no-require-imports': 'off',
+        'no-restricted-globals': 'off',
+      },
+    },
+    {
       files: ['**/*.wgsl.ts'],
       rules: {
         'max-lines': 'off',

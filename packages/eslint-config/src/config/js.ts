@@ -14,6 +14,7 @@ export const jsConfig: Linter.Config = {
   ignores: [
     '**/dist/**/*',
     '**/dist-browser/**/*',
+    '**/build/**/*',
     '.tsbuildinfo/**/*',
     'storage/**/*',
   ],

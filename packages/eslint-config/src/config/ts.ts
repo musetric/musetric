@@ -4,7 +4,7 @@ import { jsConfig } from './js.js';
 
 export const tsConfig: Linter.Config = {
   ...jsConfig,
-  files: ['**/*.{ts,tsx}'],
+  files: ['**/*.{ts,tsx,cts,mts}'],
   languageOptions: {
     ...jsConfig.languageOptions,
     parser: tsEslint.parser,

@@ -1,0 +1,43 @@
+appId: com.musetric.desktop
+productName: Musetric
+executableName: Musetric
+electronVersion: 43.1.1
+directories:
+  output: build
+  buildResources: assets
+win:
+  icon: assets/icon.png
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Musetric
+mac:
+  target:
+    - dmg
+  category: public.app-category.music
+linux:
+  target:
+    - AppImage
+  category: Audio
+files:
+  - dist/**/*
+  - package.json
+  - '!**/node_modules/@musetric/*/storage/**'
+  - '!**/node_modules/@musetric/*/src/**'
+  - '!**/node_modules/@musetric/*/scripts/**'
+  - '!**/node_modules/@musetric/*/.tsbuildinfo/**'
+  - '!**/node_modules/@musetric/*/tsconfig*.json'
+  - '!**/node_modules/@musetric/*/eslint.config.ts'
+  - '!**/node_modules/@musetric/backend/dist-browser/**'
+extraResources:
+  - from: ../backend/storage/public
+    to: backend/public
+  - from: ../backend/dist-browser
+    to: backend/dist-browser
+asarUnpack:
+  - node_modules/**/*.node
