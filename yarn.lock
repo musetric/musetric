@@ -1843,7 +1843,6 @@ __metadata:
     onnxruntime-web: "catalog:"
     playwright: "catalog:"
     typescript: "catalog:"
-    vite: "catalog:"
     vitest: "catalog:"
   peerDependencies:
     "@musetric/cqt": "workspace:*"
@@ -1941,6 +1940,7 @@ __metadata:
     selfsigned: "catalog:"
     tsx: "catalog:"
     typescript: "catalog:"
+    vite: "catalog:"
     zod: "catalog:"
   languageName: unknown
   linkType: soft

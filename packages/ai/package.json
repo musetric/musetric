@@ -21,9 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@huggingface/transformers": "catalog:",
-    "playwright": "catalog:",
-    "vite": "catalog:"
+    "@huggingface/transformers": "catalog:"
   },
   "peerDependencies": {
     "@musetric/cqt": "workspace:*",
@@ -41,6 +39,7 @@
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "onnxruntime-web": "catalog:",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

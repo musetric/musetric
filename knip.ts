@@ -12,12 +12,7 @@ const config: KnipConfig = {
   ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
   workspaces: {
     'packages/ai': {
-      entry: [
-        'src/service/browserEntry.ts',
-        'src/service/browserChordsEntry.ts',
-        'src/service/browserRhythmEntry.ts',
-        'src/service/browserTranscribeEntry.ts',
-      ],
+      entry: ['src/service/browserEntry.ts'],
     },
     'packages/backend': {
       entry: ['scripts/**/*.ts'],

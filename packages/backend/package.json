@@ -4,8 +4,9 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "yarn project:init && node --import tsx --watch src/index.ts",
-    "build:project": "tsc --build",
+    "dev": "yarn project:init && yarn build:browser && node --import tsx --watch src/index.ts",
+    "build:project": "tsc --build && vite build",
+    "build:browser": "vite build",
     "project:init": "node --import tsx ./scripts/init.js",
     "project:start": "node dist/index.js",
     "check:ts": "tsc --build",
@@ -42,6 +43,7 @@
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

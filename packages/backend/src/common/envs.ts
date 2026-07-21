@@ -19,6 +19,7 @@ export const envs = {
   publicPath: join(rootPath, 'storage/public'),
   databasePath: join(rootPath, 'storage/db/app.db'),
   modelsPath: join(rootPath, 'storage/models'),
+  browserBundlePath: join(rootPath, 'dist-browser'),
   gcIntervalMs: 5 * 60 * 1000,
   blobRetentionMs: 5 * 60 * 1000,
   processingIntervalMs: 10 * 1000,

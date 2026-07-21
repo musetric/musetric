@@ -1,21 +1,18 @@
 import { type Logger } from '@musetric/utils';
-import { type GpuProgressHandler } from './headlessGpuBrowser.node.js';
-import {
-  createHeadlessGpuService,
-  type HeadlessGpuService,
-} from './headlessGpuService.node.js';
+import { type GpuPageProgressHandler } from './gpuPageHost.node.js';
+import { runGpuAnalysis } from './headlessGpuPage.node.js';
 import {
   analyzeRhythmApiName,
   type BrowserAnalyzeRhythmRequest,
   type BrowserAnalyzeRhythmResult,
-  releaseRhythmApiName,
 } from './rhythmApi.js';
 
 export type HeadlessRhythmAnalysisOptions = {
+  logger: Logger;
   pcm: Buffer;
   modelPath: string;
   filterbankPath: string;
-  onProgress: GpuProgressHandler;
+  onProgress: GpuPageProgressHandler;
 };
 
 export type RhythmLogits = {
@@ -23,53 +20,28 @@ export type RhythmLogits = {
   downbeat: Float32Array;
 };
 
-export type HeadlessRhythmService = {
-  analyze: (options: HeadlessRhythmAnalysisOptions) => Promise<RhythmLogits>;
-  close: () => Promise<void>;
-};
-
-export type CreateHeadlessRhythmServiceOptions = {
-  logger: Logger;
-};
-
-type RhythmGpuService = HeadlessGpuService<
-  BrowserAnalyzeRhythmRequest,
-  BrowserAnalyzeRhythmResult
->;
-
-export const createHeadlessRhythmService = async (
-  options: CreateHeadlessRhythmServiceOptions,
-): Promise<HeadlessRhythmService> => {
-  const service: RhythmGpuService = await createHeadlessGpuService({
-    logger: options.logger,
-    label: 'Headless rhythm service',
-    pageRoute: '/rhythm-service',
-    entryModule: 'src/service/browserRhythmEntry.ts',
-    analyzeApiName: analyzeRhythmApiName,
-    releaseApiName: releaseRhythmApiName,
+export const analyzeRhythmHeadless = async (
+  options: HeadlessRhythmAnalysisOptions,
+): Promise<RhythmLogits> => {
+  const { logger, pcm, modelPath, filterbankPath } = options;
+  const logits = await runGpuAnalysis<
+    BrowserAnalyzeRhythmRequest,
+    BrowserAnalyzeRhythmResult
+  >({
+    logger,
+    label: 'Headless rhythm analysis',
+    apiName: analyzeRhythmApiName,
+    requireShaderF16: false,
+    pcm,
+    onProgress: options.onProgress,
+    buildRequest: (server) => ({
+      pcmUrl: server.pcmUrl,
+      modelUrl: server.registerFile(modelPath),
+      filterbankUrl: server.registerFile(filterbankPath),
+    }),
   });
-
-  const analyze = async (
-    analysisOptions: HeadlessRhythmAnalysisOptions,
-  ): Promise<RhythmLogits> => {
-    const { pcm, modelPath, filterbankPath, onProgress } = analysisOptions;
-    const logits = await service.run({
-      pcm,
-      onProgress,
-      buildRequest: (urls) => {
-        const { pcmUrl, registerFile } = urls;
-        return {
-          pcmUrl,
-          modelUrl: registerFile(modelPath),
-          filterbankUrl: registerFile(filterbankPath),
-        };
-      },
-    });
-    return {
-      beat: Float32Array.from(logits.beat),
-      downbeat: Float32Array.from(logits.downbeat),
-    };
+  return {
+    beat: Float32Array.from(logits.beat),
+    downbeat: Float32Array.from(logits.downbeat),
   };
-
-  return { analyze, close: service.close };
 };

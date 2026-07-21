@@ -11,7 +11,12 @@ import { musetricPlugin, musetricRecommendedRules } from '../plugin.js';
 
 export const jsConfig: Linter.Config = {
   files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-  ignores: ['**/dist/**/*', '.tsbuildinfo/**/*', 'storage/**/*'],
+  ignores: [
+    '**/dist/**/*',
+    '**/dist-browser/**/*',
+    '.tsbuildinfo/**/*',
+    'storage/**/*',
+  ],
   languageOptions: {
     ecmaVersion: 2024,
     sourceType: 'module',

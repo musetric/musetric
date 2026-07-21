@@ -1,6 +1,8 @@
 import websocket from '@fastify/websocket';
+import { setBrowserBundleDir } from '@musetric/ai/node';
 import { fastify, type FastifyInstance } from 'fastify';
 import { FastifySSEPlugin } from 'fastify-sse-v2';
+import { envs } from './common/envs.js';
 import { registerRouters } from './routers/index.js';
 import {
   disableRequestLogging,
@@ -18,6 +20,7 @@ import { registerSchemaCompiler } from './services/schemaCompiler.js';
 import { registerSwagger } from './services/swagger.js';
 
 export const createServerApp = async (): Promise<FastifyInstance> => {
+  setBrowserBundleDir(envs.browserBundlePath);
   const https = await getHttps();
   const app: FastifyInstance = fastify({
     logger,
