@@ -1,5 +1,4 @@
 export const analyzeChordsApiName = 'musetricAiAnalyzeChords';
-export const releaseChordsApiName = 'musetricAiReleaseChords';
 
 export type BrowserAnalyzeChordsRequest = {
   pcmUrl: string;

@@ -4,30 +4,10 @@ import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { beatThisModel } from '../models/beatThisModel.js';
 import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureBeatThisModelFiles } from '../service/beatThisModelCache.node.js';
-import {
-  createHeadlessRhythmService,
-  type HeadlessRhythmService,
-} from '../service/headlessRhythmService.node.js';
+import { analyzeRhythmHeadless } from '../service/headlessRhythmService.node.js';
 import { pickBeatTimes } from './beatPeaks.js';
 import { estimateBpm, estimateMeter } from './rhythmSummary.js';
 import { type RhythmResult } from './types.js';
-
-let rhythmServicePromise: Promise<HeadlessRhythmService> | undefined =
-  undefined;
-
-const getRhythmService = async (
-  logger: Logger,
-): Promise<HeadlessRhythmService> => {
-  if (rhythmServicePromise === undefined) {
-    rhythmServicePromise = createHeadlessRhythmService({ logger });
-  }
-  try {
-    return await rhythmServicePromise;
-  } catch (error) {
-    rhythmServicePromise = undefined;
-    throw error;
-  }
-};
 
 export type AnalyzeRhythmMessage =
   | {
@@ -66,8 +46,8 @@ export const analyzeRhythm = async (
     downmix: 'mean',
     logger,
   });
-  const service = await getRhythmService(logger);
-  const logits = await service.analyze({
+  const logits = await analyzeRhythmHeadless({
+    logger,
     pcm,
     modelPath: modelFiles.modelPath,
     filterbankPath: modelFiles.filterbankPath,

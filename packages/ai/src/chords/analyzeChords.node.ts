@@ -4,28 +4,8 @@ import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { chordNetModel } from '../models/chordNetModel.js';
 import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureChordNetModelFiles } from '../service/chordNetModelCache.node.js';
-import {
-  createHeadlessChordsService,
-  type HeadlessChordsService,
-} from '../service/headlessChordsService.node.js';
+import { analyzeChordsHeadless } from '../service/headlessChordsService.node.js';
 import { buildChordSegments } from './chordSegments.js';
-
-let chordsServicePromise: Promise<HeadlessChordsService> | undefined =
-  undefined;
-
-const getChordsService = async (
-  logger: Logger,
-): Promise<HeadlessChordsService> => {
-  if (chordsServicePromise === undefined) {
-    chordsServicePromise = createHeadlessChordsService({ logger });
-  }
-  try {
-    return await chordsServicePromise;
-  } catch (error) {
-    chordsServicePromise = undefined;
-    throw error;
-  }
-};
 
 export type AnalyzeChordsMessage =
   | {
@@ -64,8 +44,8 @@ export const analyzeChords = async (
     downmix: 'mean',
     logger,
   });
-  const service = await getChordsService(logger);
-  const indices = await service.analyze({
+  const indices = await analyzeChordsHeadless({
+    logger,
     pcm,
     modelPath: modelFiles.modelPath,
     planPath: modelFiles.planPath,

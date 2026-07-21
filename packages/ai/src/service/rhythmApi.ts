@@ -1,5 +1,4 @@
 export const analyzeRhythmApiName = 'musetricAiAnalyzeRhythm';
-export const releaseRhythmApiName = 'musetricAiReleaseRhythm';
 
 export type BrowserAnalyzeRhythmRequest = {
   pcmUrl: string;

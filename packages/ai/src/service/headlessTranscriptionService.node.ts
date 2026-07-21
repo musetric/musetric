@@ -1,21 +1,14 @@
-import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rename } from 'node:fs/promises';
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from 'node:http';
+import { type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { fileURLToPath } from 'node:url';
 import { type Logger } from '@musetric/utils';
-import { type Browser, chromium, type Page } from 'playwright';
-import * as vite from 'vite';
-import {
-  type BrowserProgressMessage,
-  reportProgressApiName,
-} from './browserApi.js';
+import { type GpuPageProgressHandler } from './gpuPageHost.node.js';
+import { type GpuModuleRoute } from './headlessGpuModuleServer.node.js';
+import { runGpuAnalysis } from './headlessGpuPage.node.js';
+import { sendFile } from './httpFile.node.js';
 import {
   type BrowserTranscribeRequest,
   type BrowserTranscribeResult,
@@ -23,30 +16,7 @@ import {
 } from './transcribeApi.js';
 import { whisperCacheDirName } from './whisperModelCache.node.js';
 
-const browserLaunchArgs = [
-  '--enable-unsafe-webgpu',
-  '--disable-webgpu-blocklist',
-  '--ignore-gpu-blocklist',
-];
-
-const getPackageRoot = (): string =>
-  dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-
-const sendFile = async (
-  path: string,
-  response: ServerResponse,
-): Promise<void> => {
-  response.writeHead(200, {
-    'content-type': 'application/octet-stream',
-    'cache-control': 'no-store',
-  });
-  await new Promise<void>((resolve, reject) => {
-    const stream = createReadStream(path);
-    stream.on('error', reject);
-    stream.on('end', resolve);
-    stream.pipe(response);
-  });
-};
+const hfRoute = '/hf/';
 
 type ServeHfFileOptions = {
   relPath: string;
@@ -87,203 +57,21 @@ const serveHfFile = async (options: ServeHfFileOptions): Promise<void> => {
   await sendFile(filePath, response);
 };
 
-type ModuleServer = {
-  baseUrl: string;
-  pcmUrl: string;
-  close: () => Promise<void>;
-};
-
-const createModuleServer = async (
-  logger: Logger,
-  pcm: Buffer,
-  cacheDir: string,
-): Promise<ModuleServer> => {
-  const packageRoot = getPackageRoot();
-  const packagesRoot = dirname(packageRoot);
-  const repositoryRoot = dirname(packagesRoot);
-
-  const viteServer = await vite.createServer({
-    root: packageRoot,
-    appType: 'custom',
-    logLevel: 'error',
-    server: {
-      middlewareMode: true,
-      watch: { ignored: ['**'] },
-      fs: { allow: [repositoryRoot] },
-    },
-    resolve: {
-      alias: [
-        {
-          find: '@musetric/fft/gpu',
-          replacement: join(packagesRoot, 'fft/src/index.ts'),
-        },
-        {
-          find: '@musetric/utils/gpu',
-          replacement: join(packagesRoot, 'utils/src/index.gpu.ts'),
-        },
-        {
-          find: '@musetric/utils',
-          replacement: join(packagesRoot, 'utils/src/index.ts'),
-        },
-      ],
-    },
-    optimizeDeps: {
-      include: ['@huggingface/transformers'],
-    },
-  });
-
-  const handle = async (
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> => {
-    const requestUrl = request.url ?? '/';
-    const url = new URL(requestUrl, 'http://127.0.0.1');
-
-    if (url.pathname === '/transcribe-service') {
-      const html = await viteServer.transformIndexHtml(
-        url.pathname,
-        '<!doctype html><script type="module" src="/src/service/browserTranscribeEntry.ts"></script>',
-      );
-      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end(html);
-      return;
+const createHfCacheRoute =
+  (cacheDir: string, logger: Logger): GpuModuleRoute =>
+  async (url, response) => {
+    if (!url.pathname.startsWith(hfRoute)) {
+      return false;
     }
-
-    if (url.pathname === '/pcm') {
-      response.writeHead(200, {
-        'content-type': 'application/octet-stream',
-        'cache-control': 'no-store',
-      });
-      response.end(pcm);
-      return;
-    }
-
-    if (url.pathname === '/favicon.ico') {
-      response.writeHead(204);
-      response.end();
-      return;
-    }
-
-    if (url.pathname.startsWith('/hf/')) {
-      await serveHfFile({
-        relPath: url.pathname.slice('/hf/'.length),
-        search: url.search,
-        cacheDir,
-        response,
-        logger,
-      });
-      return;
-    }
-
-    viteServer.middlewares(request, response, () => {
-      logger.warn({ url: requestUrl }, 'Transcription service route not found');
-      response.writeHead(404);
-      response.end('not found');
+    await serveHfFile({
+      relPath: url.pathname.slice(hfRoute.length),
+      search: url.search,
+      cacheDir,
+      response,
+      logger,
     });
+    return true;
   };
-
-  const server = createServer((request, response) => {
-    void handle(request, response).catch((error: unknown) => {
-      logger.error({ error }, 'Transcription service request failed');
-      if (!response.headersSent) {
-        response.writeHead(500);
-      }
-      response.end('error');
-    });
-  });
-
-  await new Promise<void>((resolve) => {
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Transcription service failed to bind a local HTTP port');
-  }
-
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-  return {
-    baseUrl,
-    pcmUrl: `${baseUrl}/pcm`,
-    close: async () => {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      });
-      await viteServer.close();
-    },
-  };
-};
-
-const launchBrowser = async (): Promise<Browser> =>
-  chromium.launch({
-    headless: true,
-    channel: 'chromium',
-    args: browserLaunchArgs,
-  });
-
-const ensureWebGpu = async (page: Page): Promise<void> => {
-  const support = await page.evaluate(async () => {
-    const gpu: unknown = Reflect.get(navigator, 'gpu');
-    if (typeof gpu !== 'object' || !gpu) {
-      return { adapter: false, shaderF16: false };
-    }
-    const requestAdapter: unknown = Reflect.get(gpu, 'requestAdapter');
-    if (typeof requestAdapter !== 'function') {
-      return { adapter: false, shaderF16: false };
-    }
-    const adapter: unknown = await Reflect.apply(requestAdapter, gpu, []);
-    if (typeof adapter !== 'object' || !adapter) {
-      return { adapter: false, shaderF16: false };
-    }
-    const features: unknown = Reflect.get(adapter, 'features');
-    const has =
-      typeof features === 'object' && features
-        ? Reflect.get(features, 'has')
-        : undefined;
-    const shaderF16 =
-      typeof has === 'function'
-        ? Boolean(Reflect.apply(has, features, ['shader-f16']))
-        : false;
-    return { adapter: true, shaderF16 };
-  });
-  if (!support.adapter) {
-    throw new Error(
-      'Headless transcription browser could not get a WebGPU adapter',
-    );
-  }
-  if (!support.shaderF16) {
-    throw new Error(
-      'WebGPU adapter does not support shader-f16 required by the Whisper model',
-    );
-  }
-};
-
-const createPage = async (
-  browser: Browser,
-  baseUrl: string,
-  onProgress: (progress: number) => void | Promise<void>,
-  logger: Logger,
-): Promise<Page> => {
-  const page = await browser.newPage();
-  page.on('console', (message) => {
-    logger.info({ browser: true }, `[browser] ${message.text()}`);
-  });
-  page.on('pageerror', (error) => {
-    logger.error({ browser: true }, `[browser] ${error.message}`);
-  });
-  await page.exposeFunction(
-    reportProgressApiName,
-    async (message: BrowserProgressMessage) => {
-      await onProgress(message.progress);
-    },
-  );
-  await page.goto(`${baseUrl}/transcribe-service`);
-  await ensureWebGpu(page);
-  await page.waitForFunction(
-    (apiName) => typeof Reflect.get(globalThis, apiName) === 'function',
-    transcribeAudioApiName,
-  );
-  return page;
-};
 
 export type HeadlessTranscribeOptions = {
   logger: Logger;
@@ -295,12 +83,7 @@ export type HeadlessTranscribeOptions = {
   language?: string;
 
   modelsPath: string;
-  onProgress: (progress: number) => void | Promise<void>;
-};
-
-type TranscribeEvaluateArgs = {
-  apiName: string;
-  request: BrowserTranscribeRequest;
+  onProgress: GpuPageProgressHandler;
 };
 
 export const transcribeAudioHeadless = async (
@@ -308,44 +91,27 @@ export const transcribeAudioHeadless = async (
 ): Promise<BrowserTranscribeResult> => {
   const { logger, pcm, sampleRate, modelId, revision, language } = options;
   const cacheDir = join(options.modelsPath, whisperCacheDirName);
-  const moduleServer = await createModuleServer(logger, pcm, cacheDir);
-  try {
-    const browser = await launchBrowser();
-    try {
-      const page = await createPage(
-        browser,
-        moduleServer.baseUrl,
-        options.onProgress,
-        logger,
-      );
-      const request: BrowserTranscribeRequest = {
-        pcmUrl: moduleServer.pcmUrl,
-        sampleRate,
-        modelHost: `${moduleServer.baseUrl}/hf`,
-        modelId,
-        revision,
-        language,
-      };
-      return await page.evaluate(
-        async (
-          evaluateArgs: TranscribeEvaluateArgs,
-        ): Promise<BrowserTranscribeResult> => {
-          const api: unknown = Reflect.get(globalThis, evaluateArgs.apiName);
-          if (typeof api !== 'function') {
-            throw new Error('Transcription browser API is not initialized');
-          }
-
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-          return (await Reflect.apply(api, undefined, [
-            evaluateArgs.request,
-          ])) as BrowserTranscribeResult;
-        },
-        { apiName: transcribeAudioApiName, request },
-      );
-    } finally {
-      await browser.close();
-    }
-  } finally {
-    await moduleServer.close();
-  }
+  return runGpuAnalysis<BrowserTranscribeRequest, BrowserTranscribeResult>({
+    logger,
+    label: 'Headless transcription',
+    apiName: transcribeAudioApiName,
+    requireShaderF16: true,
+    pcm,
+    routes: [createHfCacheRoute(cacheDir, logger)],
+    onProgress: options.onProgress,
+    onConsole: (text) => {
+      logger.info({ browser: true }, `[browser] ${text}`);
+    },
+    onPageError: (message) => {
+      logger.error({ browser: true }, `[browser] ${message}`);
+    },
+    buildRequest: (server) => ({
+      pcmUrl: server.pcmUrl,
+      sampleRate,
+      modelHost: `${server.baseUrl}${hfRoute.slice(0, -1)}`,
+      modelId,
+      revision,
+      language,
+    }),
+  });
 };
