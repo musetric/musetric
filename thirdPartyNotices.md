@@ -198,7 +198,7 @@ SOFTWARE.
 
 ## Musetric Toolkit
 
-- Source: https://github.com/popelenkow/musetric-toolkit
+- Source: https://github.com/musetric/musetric-toolkit
 - Usage: Companion CLI for running audio processing workflows and worker scripts.
 - Local files: `packages/toolkit/`.
 - License: MIT.

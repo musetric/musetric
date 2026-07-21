@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "monorepo": "./src/app.ts",
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js",
+      "default": "./dist/app.js"
+    }
+  },
   "scripts": {
     "dev": "yarn project:init && yarn build:browser && node --import tsx --watch src/index.ts",
     "build:project": "tsc --build && vite build",

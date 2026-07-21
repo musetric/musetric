@@ -2,8 +2,10 @@ node_modules/
 dist/
 dist-browser/
 build/
+*.tgz
 tmp/
 **/backend/storage/
+packages/desktop/assets/
 .eslintrc.local.json
 yarn-error.log
 .eslintcache

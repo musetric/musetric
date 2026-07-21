@@ -4,12 +4,16 @@ import {
   type GpuPageHostFactory,
 } from './gpuPageHost.node.js';
 
-const factory: GpuPageHostFactory = async (
+let factory: GpuPageHostFactory = async (
   options: CreateGpuPageOptions,
 ): Promise<GpuPage> => {
   const { createPlaywrightGpuPage } =
     await import('./playwrightGpuHost.node.js');
   return createPlaywrightGpuPage(options);
+};
+
+export const setGpuPageHostFactory = (next: GpuPageHostFactory): void => {
+  factory = next;
 };
 
 export const getGpuPageHostFactory = (): GpuPageHostFactory => factory;

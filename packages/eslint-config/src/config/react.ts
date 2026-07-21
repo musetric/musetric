@@ -8,7 +8,7 @@ const reactRecommended = eslintReact.configs['recommended-typescript'];
 
 export const reactConfig: Linter.Config = {
   ...tsConfig,
-  files: ['**/*.{ts,tsx}'],
+  files: ['**/*.{ts,tsx,cts,mts}'],
   plugins: {
     ...tsConfig.plugins,
     ...reactRecommended.plugins,

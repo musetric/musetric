@@ -1,0 +1,39 @@
+{
+  "name": "@musetric/desktop",
+  "version": "0.1.0",
+  "description": "Musetric — audio separation, transcription and analysis desktop app",
+  "author": "Musetric <musetric@gmail.com>",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev:desktop": "yarn build:desktop && node ./scripts/startElectron.mjs",
+    "build:desktop": "node ./scripts/buildIcons.ts && tsc --build",
+    "pack:app": "electron-builder --dir",
+    "pack:installer": "electron-builder --publish never",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+  },
+  "dependencies": {
+    "@musetric/ai": "workspace:*",
+    "@musetric/backend": "workspace:*",
+    "@musetric/backend-db": "workspace:*",
+    "@musetric/cqt": "workspace:*",
+    "@musetric/fft": "workspace:*",
+    "@musetric/utils": "workspace:*",
+    "onnxruntime-web": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@musetric/eslint-config": "workspace:*",
+    "@resvg/resvg-js": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
+    "electron": "catalog:",
+    "electron-builder": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}
