@@ -39,6 +39,7 @@ export const createChordsWorker = (
         const chords = app.blobStorage.createPath();
 
         await analyzeChords({
+          gpuHost: app.gpuHost,
           sourcePath,
           resultPath: chords.blobPath,
           handlers: {

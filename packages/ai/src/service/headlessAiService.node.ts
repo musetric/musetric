@@ -7,6 +7,7 @@ import {
   stemDownloadNames,
   type StemKey,
 } from './browserApi.js';
+import { type GpuHost } from './gpuHost.node.js';
 import { runGpuAnalysis } from './headlessGpuPage.node.js';
 import { type SeparationModelFiles } from './modelCache.node.js';
 
@@ -15,6 +16,7 @@ type ProgressMessageHandler = (
 ) => void | Promise<void>;
 
 type HeadlessSeparateAudioOptions = {
+  gpuHost: GpuHost;
   logger: Logger;
   pcm: Buffer;
   sampleRate: number;
@@ -26,14 +28,16 @@ type HeadlessSeparateAudioOptions = {
 export const separateAudioHeadless = async (
   options: HeadlessSeparateAudioOptions,
 ): Promise<void> => {
-  const { logger, pcm, sampleRate, modelFiles, rawStemPaths, onMessage } =
+  const { gpuHost, logger, pcm, sampleRate, modelFiles, rawStemPaths } =
     options;
+  const { onMessage } = options;
   const stemTargets = new Map<string, string>([
     [stemDownloadNames.lead, rawStemPaths.lead],
     [stemDownloadNames.backing, rawStemPaths.backing],
     [stemDownloadNames.instrumental, rawStemPaths.instrumental],
   ]);
   await runGpuAnalysis<BrowserSeparateAudioRequest, void>({
+    gpuHost,
     logger,
     label: 'Headless AI separation',
     apiName: separateAudioApiName,

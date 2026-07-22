@@ -39,6 +39,7 @@ export const createTranscriptionWorker = (
         const transcription = app.blobStorage.createPath();
 
         await transcribeAudio({
+          gpuHost: app.gpuHost,
           sourcePath,
           resultPath: transcription.blobPath,
           handlers: {

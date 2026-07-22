@@ -1,5 +1,9 @@
 import websocket from '@fastify/websocket';
-import { setBrowserBundleDir } from '@musetric/ai/node';
+import {
+  defaultGpuPageHostFactory,
+  type GpuHost,
+  type GpuPageHostFactory,
+} from '@musetric/ai/node';
 import { fastify, type FastifyInstance } from 'fastify';
 import { FastifySSEPlugin } from 'fastify-sse-v2';
 import { envs } from './common/envs.js';
@@ -19,13 +23,29 @@ import { registerProcessingWorker } from './services/processingWorker/registerPr
 import { registerSchemaCompiler } from './services/schemaCompiler.js';
 import { registerSwagger } from './services/swagger.js';
 
-export const createServerApp = async (): Promise<FastifyInstance> => {
-  setBrowserBundleDir(envs.browserBundlePath);
+declare module 'fastify' {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface FastifyInstance {
+    gpuHost: GpuHost;
+  }
+}
+
+export type CreateServerAppOptions = {
+  gpuPageHostFactory?: GpuPageHostFactory;
+};
+
+export const createServerApp = async (
+  options: CreateServerAppOptions = {},
+): Promise<FastifyInstance> => {
   const https = await getHttps();
   const app: FastifyInstance = fastify({
     logger,
     disableRequestLogging,
     https,
+  });
+  app.decorate('gpuHost', {
+    createGpuPage: options.gpuPageHostFactory ?? defaultGpuPageHostFactory,
+    browserBundlePath: envs.browserBundlePath,
   });
   registerApiLogger(app);
   await registerDb(app);

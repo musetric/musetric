@@ -1,5 +1,5 @@
 import { type Logger } from '@musetric/utils';
-import { getGpuPageHostFactory } from './gpuHostRegistry.node.js';
+import { type GpuHost } from './gpuHost.node.js';
 import {
   type GpuPage,
   type GpuPageProgressHandler,
@@ -11,6 +11,7 @@ import {
 } from './headlessGpuModuleServer.node.js';
 
 export type RunGpuAnalysisOptions<Request, Result> = {
+  gpuHost: GpuHost;
   logger: Logger;
   label: string;
   apiName: string;
@@ -27,18 +28,19 @@ export type RunGpuAnalysisOptions<Request, Result> = {
 export const runGpuAnalysis = async <Request, Result>(
   options: RunGpuAnalysisOptions<Request, Result>,
 ): Promise<Result> => {
-  const { logger, label, apiName, requireShaderF16, pcm, routes } = options;
+  const { gpuHost, logger, label, apiName, requireShaderF16, pcm, routes } =
+    options;
   const { onProgress, onConsole, onPageError, buildRequest, run } = options;
   const moduleServer = await createGpuModuleServer({
     logger,
     label,
     pcm,
     routes,
+    browserBundlePath: gpuHost.browserBundlePath,
   });
   try {
     const request = buildRequest(moduleServer);
-    const factory = getGpuPageHostFactory();
-    const page = await factory({
+    const page = await gpuHost.createGpuPage({
       label,
       pageUrl: moduleServer.pageUrl,
       apiName,

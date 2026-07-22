@@ -5,6 +5,7 @@ import {
   decodeInterleavedPcm,
   encodeFlacFromRawFile,
 } from '../service/audioCodec.node.js';
+import { type GpuHost } from '../service/gpuHost.node.js';
 import { separateAudioHeadless } from '../service/headlessAiService.node.js';
 import { ensureSeparationModelFiles } from '../service/modelCache.node.js';
 
@@ -23,6 +24,7 @@ export type SeparateAudioMessage =
     };
 
 export type SeparateAudioOptions = {
+  gpuHost: GpuHost;
   sourcePath: string;
   leadPath: string;
   backingPath: string;
@@ -37,6 +39,7 @@ export const separateAudio = async (
   options: SeparateAudioOptions,
 ): Promise<void> => {
   const {
+    gpuHost,
     sourcePath,
     leadPath,
     backingPath,
@@ -62,6 +65,7 @@ export const separateAudio = async (
   };
   try {
     await separateAudioHeadless({
+      gpuHost,
       logger,
       pcm,
       sampleRate: vocalsModel.sampleRate,

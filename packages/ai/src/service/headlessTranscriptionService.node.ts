@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { type Logger } from '@musetric/utils';
+import { type GpuHost } from './gpuHost.node.js';
 import { type GpuPageProgressHandler } from './gpuPageHost.node.js';
 import { type GpuModuleRoute } from './headlessGpuModuleServer.node.js';
 import { runGpuAnalysis } from './headlessGpuPage.node.js';
@@ -74,6 +75,7 @@ const createHfCacheRoute =
   };
 
 export type HeadlessTranscribeOptions = {
+  gpuHost: GpuHost;
   logger: Logger;
 
   pcm: Buffer;
@@ -89,9 +91,11 @@ export type HeadlessTranscribeOptions = {
 export const transcribeAudioHeadless = async (
   options: HeadlessTranscribeOptions,
 ): Promise<BrowserTranscribeResult> => {
-  const { logger, pcm, sampleRate, modelId, revision, language } = options;
+  const { gpuHost, logger, pcm, sampleRate, modelId, revision, language } =
+    options;
   const cacheDir = join(options.modelsPath, whisperCacheDirName);
   return runGpuAnalysis<BrowserTranscribeRequest, BrowserTranscribeResult>({
+    gpuHost,
     logger,
     label: 'Headless transcription',
     apiName: transcribeAudioApiName,

@@ -102,6 +102,7 @@ export const createSeparationWorker = (
         const masterInstrumental = app.blobStorage.createPath();
 
         await separateAudio({
+          gpuHost: app.gpuHost,
           sourcePath: masterSourcePath,
           leadPath: masterLead.blobPath,
           backingPath: masterBacking.blobPath,

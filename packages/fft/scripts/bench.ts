@@ -13,30 +13,27 @@ declare module '@vitest/runner' {
   }
 }
 
-const startTime = performance.now();
-
-const currentDir = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(currentDir, '..');
-
-const devNull = new Writable({
-  write: (_chunk, _encoding, callback) => {
-    callback();
-  },
-});
-
 type BenchReporterLog = {
   content: string;
   type: string;
 };
 
-const benchReporter = {
-  onUserConsoleLog: (log: BenchReporterLog) => {
-    const stream = log.type === 'stderr' ? process.stderr : process.stdout;
-    stream.write(log.content + '\n');
-  },
-};
-
-const runVitest = async (): Promise<FourierBenchSummary[]> => {
+const main = async (): Promise<void> => {
+  const startTime = performance.now();
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const packageRoot = resolve(currentDir, '..');
+  const devNull = new Writable({
+    write: (_chunk, _encoding, callback) => {
+      callback();
+    },
+  });
+  const benchReporter = {
+    onUserConsoleLog: (log: BenchReporterLog) => {
+      const stream = log.type === 'stderr' ? process.stderr : process.stdout;
+      stream.write(log.content + '\n');
+    },
+  };
+  const cufftResults = runCufftBenchmark() ?? [];
   const vitest = await startVitest(
     'test',
     [],
@@ -48,31 +45,30 @@ const runVitest = async (): Promise<FourierBenchSummary[]> => {
     undefined,
     { stdout: devNull, stderr: devNull },
   );
+  const collectWebgpuResults = (): FourierBenchSummary[] => {
+    const webgpuResults: FourierBenchSummary[] = [];
 
-  const summaries: FourierBenchSummary[] = [];
-
-  for (const module of vitest.state.getTestModules()) {
-    for (const testCase of module.children.allTests()) {
-      const task = experimental_getRunnerTask(testCase);
-      const { bench } = task.meta;
-      if (bench !== undefined) {
-        summaries.push(bench);
+    for (const module of vitest.state.getTestModules()) {
+      for (const testCase of module.children.allTests()) {
+        const task = experimental_getRunnerTask(testCase);
+        const { bench } = task.meta;
+        if (bench !== undefined) {
+          webgpuResults.push(bench);
+        }
       }
     }
+
+    return webgpuResults;
+  };
+
+  try {
+    writeBenchReport(collectWebgpuResults(), cufftResults);
+  } finally {
+    await vitest.close();
   }
 
-  await vitest.close();
-  return summaries;
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+  console.log(`Total script time: ${elapsed}s`);
 };
 
-let cufftResults = runCufftBenchmark();
-
-if (cufftResults === undefined) {
-  cufftResults = [];
-}
-
-const webgpuResults = await runVitest();
-writeBenchReport(webgpuResults, cufftResults);
-
-const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
-console.log(`Total script time: ${elapsed}s`);
+await main();

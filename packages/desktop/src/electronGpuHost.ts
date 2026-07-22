@@ -1,21 +1,15 @@
 import { fileURLToPath } from 'node:url';
-import { type CreateGpuPageOptions, type GpuPage } from '@musetric/ai/node';
+import {
+  type CreateGpuPageOptions,
+  type GpuPage,
+  type GpuPageHostFactory,
+} from '@musetric/ai/node';
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { gpuPageErrorChannel, gpuProgressChannel } from './electronGpuIpc.js';
 
 const preloadPath = fileURLToPath(
   new URL('./electronGpuPreload.cjs', import.meta.url),
 );
-
-const progressHandlers = new Map<
-  number,
-  NonNullable<CreateGpuPageOptions['onProgress']>
->();
-const pageErrorHandlers = new Map<
-  number,
-  NonNullable<CreateGpuPageOptions['onPageError']>
->();
-let nextGpuPageId = 0;
 
 const getWebContentsId = (event: IpcMainInvokeEvent): number => event.sender.id;
 
@@ -26,21 +20,6 @@ const getProgress = (message: unknown): number | undefined => {
   const progress: unknown = Reflect.get(message, 'progress');
   return typeof progress === 'number' ? progress : undefined;
 };
-
-ipcMain.handle(gpuProgressChannel, async (event, message: unknown) => {
-  const handler = progressHandlers.get(getWebContentsId(event));
-  const progress = getProgress(message);
-  if (handler !== undefined && progress !== undefined) {
-    await handler(progress);
-  }
-});
-
-ipcMain.on(gpuPageErrorChannel, (event, message: unknown) => {
-  const handler = pageErrorHandlers.get(event.sender.id);
-  if (handler !== undefined) {
-    handler(String(message));
-  }
-});
 
 const delay = async (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -168,54 +147,79 @@ const captureDownloads = async (
   });
 };
 
-const closeGpuPage = async (window: BrowserWindow): Promise<void> => {
-  progressHandlers.delete(window.webContents.id);
-  pageErrorHandlers.delete(window.webContents.id);
-  if (!window.isDestroyed()) {
-    const closed = new Promise<void>((resolve) => {
-      window.once('closed', resolve);
-    });
-    window.destroy();
-    await closed;
-  }
-};
+export const createElectronGpuHost = (): GpuPageHostFactory => {
+  const progressHandlers = new Map<
+    number,
+    NonNullable<CreateGpuPageOptions['onProgress']>
+  >();
+  const pageErrorHandlers = new Map<
+    number,
+    NonNullable<CreateGpuPageOptions['onPageError']>
+  >();
+  let nextGpuPageId = 0;
 
-export const createElectronGpuPage = async (
-  options: CreateGpuPageOptions,
-): Promise<GpuPage> => {
-  const { apiName, onConsole, onPageError, onProgress, pageUrl } = options;
-  const window = new BrowserWindow({
-    show: false,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      partition: `musetric-ai-${nextGpuPageId++}`,
-      preload: preloadPath,
-    },
+  ipcMain.handle(gpuProgressChannel, async (event, message: unknown) => {
+    const handler = progressHandlers.get(getWebContentsId(event));
+    const progress = getProgress(message);
+    if (handler !== undefined && progress !== undefined) {
+      await handler(progress);
+    }
   });
-  const webContentsId = window.webContents.id;
-  if (onProgress !== undefined) {
-    progressHandlers.set(webContentsId, onProgress);
-  }
-  if (onPageError !== undefined) {
-    pageErrorHandlers.set(webContentsId, onPageError);
-  }
-  if (onConsole !== undefined) {
-    window.webContents.on('console-message', (details) => {
-      onConsole(details.message);
+
+  ipcMain.on(gpuPageErrorChannel, (event, message: unknown) => {
+    const handler = pageErrorHandlers.get(event.sender.id);
+    if (handler !== undefined) {
+      handler(String(message));
+    }
+  });
+
+  const closeGpuPage = async (window: BrowserWindow): Promise<void> => {
+    progressHandlers.delete(window.webContents.id);
+    pageErrorHandlers.delete(window.webContents.id);
+    if (!window.isDestroyed()) {
+      const closed = new Promise<void>((resolve) => {
+        window.once('closed', resolve);
+      });
+      window.destroy();
+      await closed;
+    }
+  };
+
+  return async (options: CreateGpuPageOptions): Promise<GpuPage> => {
+    const { apiName, onConsole, onPageError, onProgress, pageUrl } = options;
+    const window = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        partition: `musetric-ai-${nextGpuPageId++}`,
+        preload: preloadPath,
+      },
     });
-  }
-  try {
-    await window.loadURL(pageUrl);
-    await waitForReady(window, options);
-    return {
-      evaluate: async <Result>(request: unknown) =>
-        evaluateApi<Result>(window, apiName, request),
-      captureDownloads: async (targets) => captureDownloads(window, targets),
-      close: async () => closeGpuPage(window),
-    };
-  } catch (error) {
-    await closeGpuPage(window);
-    throw error;
-  }
+    const webContentsId = window.webContents.id;
+    if (onProgress !== undefined) {
+      progressHandlers.set(webContentsId, onProgress);
+    }
+    if (onPageError !== undefined) {
+      pageErrorHandlers.set(webContentsId, onPageError);
+    }
+    if (onConsole !== undefined) {
+      window.webContents.on('console-message', (details) => {
+        onConsole(details.message);
+      });
+    }
+    try {
+      await window.loadURL(pageUrl);
+      await waitForReady(window, options);
+      return {
+        evaluate: async <Result>(request: unknown) =>
+          evaluateApi<Result>(window, apiName, request),
+        captureDownloads: async (targets) => captureDownloads(window, targets),
+        close: async () => closeGpuPage(window),
+      };
+    } catch (error) {
+      await closeGpuPage(window);
+      throw error;
+    }
+  };
 };
