@@ -41,24 +41,15 @@ export const createSubtitleCursor = (
   return {
     getActiveSegmentIndex: () => activeSegmentIndex,
     getSegmentStatus: (segmentIndex) => {
-      if (segmentIndex === activeSegmentIndex) {
-        return 'active';
-      }
-
-      if (segmentIndex < activeSegmentIndex) {
-        return 'past';
-      }
-
+      if (segmentIndex === activeSegmentIndex) return 'active';
+      if (segmentIndex < activeSegmentIndex) return 'past';
       return 'future';
     },
     setActiveSegmentIndex: (nextActiveSegmentIndex) => {
-      if (nextActiveSegmentIndex === activeSegmentIndex) {
-        return;
-      }
+      if (nextActiveSegmentIndex === activeSegmentIndex) return;
 
       const startIndex = Math.min(activeSegmentIndex, nextActiveSegmentIndex);
       const endIndex = Math.max(activeSegmentIndex, nextActiveSegmentIndex);
-
       activeSegmentIndex = nextActiveSegmentIndex;
       activeSegmentIndexCallbacks.forEach((callback) => {
         callback();
@@ -67,7 +58,6 @@ export const createSubtitleCursor = (
     },
     subscribeActiveSegmentIndex: (callback) => {
       activeSegmentIndexCallbacks.add(callback);
-
       return () => {
         activeSegmentIndexCallbacks.delete(callback);
       };
@@ -80,7 +70,6 @@ export const createSubtitleCursor = (
 
       return () => {
         callbacks.delete(callback);
-
         if (callbacks.size === 0) {
           segmentStatusCallbacks.delete(segmentIndex);
         }

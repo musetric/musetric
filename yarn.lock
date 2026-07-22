@@ -2256,6 +2256,7 @@ __metadata:
     "@musetric/engine": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
+    "@musetric/interaction": "workspace:*"
     "@musetric/script": "workspace:*"
     "@musetric/spa-router": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
@@ -2285,6 +2286,18 @@ __metadata:
     vite-plugin-mkcert: "catalog:"
     zod: "catalog:"
     zustand: "catalog:"
+  languageName: unknown
+  linkType: soft
+
+"@musetric/interaction@workspace:*, @musetric/interaction@workspace:packages/interaction":
+  version: 0.0.0-use.local
+  resolution: "@musetric/interaction@workspace:packages/interaction"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@typescript/native": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+    vitest: "catalog:"
   languageName: unknown
   linkType: soft
 

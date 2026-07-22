@@ -24,6 +24,7 @@
     "@musetric/engine": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/interaction": "workspace:*",
     "@musetric/script": "workspace:*",
     "@musetric/spa-router": "workspace:*",
     "@musetric/spectrogram": "workspace:*",

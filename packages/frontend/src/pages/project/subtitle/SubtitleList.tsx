@@ -21,11 +21,7 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
   const chordSegments = chordsQuery.data?.segments ?? emptyChordSegments;
   const subtitleListRef = useRef<HTMLDivElement>(null);
   const subtitleCursor = useSubtitleCursor(subtitle);
-  const followClickedSubtitleSegment = useSubtitleFollowScroll(
-    subtitle,
-    subtitleCursor,
-    subtitleListRef,
-  );
+  useSubtitleFollowScroll(subtitle, subtitleCursor, subtitleListRef);
 
   return (
     <Stack
@@ -36,7 +32,6 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
       height='100%'
       minHeight={0}
       overflow='auto'
-      onClick={followClickedSubtitleSegment}
       sx={{
         scrollbarGutter: 'stable',
       }}

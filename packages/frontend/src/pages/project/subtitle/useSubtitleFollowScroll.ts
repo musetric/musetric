@@ -1,37 +1,37 @@
 import { type api } from '@musetric/api';
-import { type RefObject, useRef } from 'react';
+import { type RefObject, useLayoutEffect } from 'react';
+import { engine } from '../../../engine/engine.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
-import { useSubtitleAutoScroll } from './useSubtitleAutoScroll.js';
-import { useSubtitleScrollHold } from './useSubtitleScrollHold.js';
-import { useSubtitleWordSeek } from './useSubtitleWordSeek.js';
+import { createSubtitleFollowController } from './subtitleFollowController.js';
+import { getSubtitleSeekFrameIndex } from './subtitleSeek.js';
 
 export const useSubtitleFollowScroll = (
   subtitle: api.subtitle.Segment[],
   subtitleCursor: SubtitleCursor,
   subtitleListRef: RefObject<HTMLDivElement | null>,
 ) => {
-  const scrollFrameRef = useRef<number | undefined>(undefined);
-  const skippedFollowScrollSegmentIndexRef = useRef<number | undefined>(
-    undefined,
-  );
-  const skippedSeekRevisionRef = useRef<number | undefined>(undefined);
-  const subtitleScrollHeldRef = useSubtitleScrollHold(subtitleListRef);
+  useLayoutEffect(() => {
+    const element = subtitleListRef.current;
+    if (!element) return;
 
-  useSubtitleAutoScroll({
-    scrollFrameRef,
-    skippedFollowScrollSegmentIndexRef,
-    skippedSeekRevisionRef,
-    subtitle,
-    subtitleCursor,
-    subtitleListRef,
-    subtitleScrollHeldRef,
-  });
+    const controller = createSubtitleFollowController({
+      element,
+      cursor: subtitleCursor,
+      subtitleLength: subtitle.length,
+      getSeekEvent: () => engine.store.get().seekEvent,
+      subscribeSeekRevision: (callback) =>
+        engine.store.subscribe((state) => state.seekEvent.revision, callback),
+      getSeekFrameIndex: (playbackTime) =>
+        getSubtitleSeekFrameIndex(playbackTime, engine.store.get()),
+      seek: (frameIndex) => {
+        engine.player.seek(frameIndex, 'subtitle');
+      },
+      isIgnoredSeekOrigin: (origin) =>
+        origin === 'spectrogramVisualization' ||
+        origin === 'tracksVisualization',
+    });
+    controller.reset();
 
-  return useSubtitleWordSeek({
-    scrollFrameRef,
-    skippedFollowScrollSegmentIndexRef,
-    skippedSeekRevisionRef,
-    subtitle,
-    subtitleListRef,
-  });
+    return controller.dispose;
+  }, [subtitle, subtitleCursor, subtitleListRef]);
 };
