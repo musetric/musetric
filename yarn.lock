@@ -2330,6 +2330,7 @@ __metadata:
   resolution: "@musetric/monorepo@workspace:."
   dependencies:
     editorconfig-checker: "catalog:"
+    jscpd: "catalog:"
     knip: "catalog:"
     prettier: "catalog:"
   languageName: unknown
@@ -7248,6 +7249,77 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 10c0/058b30473d6915ca5b4feb11e2f7d4d97242f98d00a798ed48dd90b46b7c640398afe9128c5db22c5300f8c6528fe2a174b9a93f351a70ebc28c6203938d8bff
+  languageName: node
+  linkType: hard
+
+"jscpd-darwin-arm64@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-darwin-arm64@npm:5.0.12"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"jscpd-darwin-x64@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-darwin-x64@npm:5.0.12"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"jscpd-linux-arm64-gnu@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-linux-arm64-gnu@npm:5.0.12"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"jscpd-linux-x64-gnu@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-linux-x64-gnu@npm:5.0.12"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"jscpd-linux-x64-musl@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-linux-x64-musl@npm:5.0.12"
+  conditions: os=linux & cpu=x64 & libc=musl
+  languageName: node
+  linkType: hard
+
+"jscpd-windows-x64-msvc@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd-windows-x64-msvc@npm:5.0.12"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"jscpd@npm:5.0.12":
+  version: 5.0.12
+  resolution: "jscpd@npm:5.0.12"
+  dependencies:
+    jscpd-darwin-arm64: "npm:5.0.12"
+    jscpd-darwin-x64: "npm:5.0.12"
+    jscpd-linux-arm64-gnu: "npm:5.0.12"
+    jscpd-linux-x64-gnu: "npm:5.0.12"
+    jscpd-linux-x64-musl: "npm:5.0.12"
+    jscpd-windows-x64-msvc: "npm:5.0.12"
+  dependenciesMeta:
+    jscpd-darwin-arm64:
+      optional: true
+    jscpd-darwin-x64:
+      optional: true
+    jscpd-linux-arm64-gnu:
+      optional: true
+    jscpd-linux-x64-gnu:
+      optional: true
+    jscpd-linux-x64-musl:
+      optional: true
+    jscpd-windows-x64-msvc:
+      optional: true
+  bin:
+    jscpd: run-jscpd.js
+  checksum: 10c0/b3e214b7ac1d492fa288158c789f73a5fcd622ba63cef67c716399d0fbcc6367bc2a4eb124977db19dab4c199b568b09d55d7f06e386e3a938a56cf503acc305
   languageName: node
   linkType: hard
 

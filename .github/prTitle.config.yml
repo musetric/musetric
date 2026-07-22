@@ -59,6 +59,7 @@ scopes:
   - agent # agent guidance & config (AGENTS.md, AI tooling)
   - bench # benchmarks & perf measurement (packages/performance)
   - deps # dependency add / update / remove
+  - dupe # duplicate-code analysis (JSCPD)
   - format # Prettier formatting and editorconfig
   - github # repo & GitHub Actions settings (workflows, templates)
   - lint # ESLint rules / packages/eslint-config
