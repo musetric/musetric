@@ -2,51 +2,59 @@ import { createGpuContext } from '@musetric/utils/gpu';
 import { runBenchmark } from './runBenchmarks.js';
 import { useProcessingStore } from './store.js';
 
-const { device } = await createGpuContext(true);
-
-let canvas: OffscreenCanvas | undefined = undefined;
-let running = false;
-
-const drain = async () => {
-  if (running) return;
-  running = true;
-  try {
-    while (canvas !== undefined) {
-      const state = useProcessingStore.getState();
-      const [task] = state.toDo;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!task) break;
-
-      const taskEpoch = state.epoch;
-      const { params } = state;
-
-      const metrics = await runBenchmark({
-        device,
-        canvas,
-        fourierMode: task.fourierMode,
-        windowSize: task.windowSize,
-        params,
-      });
-
-      useProcessingStore.getState().recordResult(task, taskEpoch, metrics);
-    }
-  } finally {
-    running = false;
-  }
+export type BenchmarkProcessor = {
+  attachCanvas: (canvas: OffscreenCanvas) => void;
+  detachCanvas: () => void;
 };
 
-export const attachCanvas = (next: OffscreenCanvas) => {
-  canvas = next;
-  void drain();
-};
+export const createBenchmarkProcessor =
+  async (): Promise<BenchmarkProcessor> => {
+    const { device } = await createGpuContext(true);
+    let canvas: OffscreenCanvas | undefined = undefined;
+    let running = false;
 
-export const detachCanvas = () => {
-  canvas = undefined;
-};
+    const drain = async () => {
+      if (running) return;
+      running = true;
+      try {
+        while (canvas !== undefined) {
+          const state = useProcessingStore.getState();
+          const [task] = state.toDo;
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (!task) break;
 
-useProcessingStore.subscribe(
-  (state) => state.epoch,
-  () => {
-    void drain();
-  },
-);
+          const taskEpoch = state.epoch;
+          const { params } = state;
+
+          const metrics = await runBenchmark({
+            device,
+            canvas,
+            fourierMode: task.fourierMode,
+            windowSize: task.windowSize,
+            params,
+          });
+
+          useProcessingStore.getState().recordResult(task, taskEpoch, metrics);
+        }
+      } finally {
+        running = false;
+      }
+    };
+
+    useProcessingStore.subscribe(
+      (state) => state.epoch,
+      () => {
+        void drain();
+      },
+    );
+
+    return {
+      attachCanvas: (next) => {
+        canvas = next;
+        void drain();
+      },
+      detachCanvas: () => {
+        canvas = undefined;
+      },
+    };
+  };
