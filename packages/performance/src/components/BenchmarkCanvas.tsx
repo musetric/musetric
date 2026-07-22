@@ -2,10 +2,15 @@ import { Box } from '@mui/material';
 import { assertDefined } from '@musetric/utils';
 import { type FC, useEffect, useRef } from 'react';
 import { viewSizePresets } from '../constants.js';
-import { attachCanvas, detachCanvas } from '../processor.js';
+import { type BenchmarkProcessor } from '../processor.js';
 import { useProcessingStore } from '../store.js';
 
-export const BenchmarkCanvas: FC = () => {
+type BenchmarkCanvasProps = {
+  processor: BenchmarkProcessor;
+};
+
+export const BenchmarkCanvas: FC<BenchmarkCanvasProps> = (props) => {
+  const { processor } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
 
@@ -21,12 +26,12 @@ export const BenchmarkCanvas: FC = () => {
       canvas.height = preset.height;
       offscreenRef.current = canvas.transferControlToOffscreen();
     }
-    attachCanvas(offscreenRef.current);
+    processor.attachCanvas(offscreenRef.current);
 
     return () => {
-      detachCanvas();
+      processor.detachCanvas();
     };
-  }, []);
+  }, [processor]);
 
   return (
     <Box

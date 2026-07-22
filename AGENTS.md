@@ -7,7 +7,7 @@
 
 ## Commits & PR Titles
 
-- Name commits and PR titles per `.github/prTitle.config.yml`.
+- All commit and PR titles must comply with `.github/prTitle.config.yml`.
 
 ## Repository Map
 
