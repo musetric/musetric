@@ -1,0 +1,22 @@
+{
+  "threshold": 1.2,
+  "reporters": ["console"],
+  "minLines": 10,
+  "minTokens": 80,
+  "ignore": [
+    "**/.git/**",
+    "**/.yarn/**",
+    "**/dist/**",
+    "**/dist-browser/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/__test__/**",
+    "**/eslint.config.ts",
+    "**/vitest.config.ts",
+    "**/vitest.bench.config.ts",
+    "**/index.html",
+    "**/*.bench.*",
+    "**/*.test.*"
+  ]
+}
