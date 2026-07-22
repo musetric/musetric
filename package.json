@@ -36,6 +36,7 @@
     "prettier": "catalog:"
   },
   "resolutions": {
-    "adm-zip": "^0.6.0"
+    "adm-zip": "^0.6.0",
+    "sharp": "^0.35.3"
   }
 }
