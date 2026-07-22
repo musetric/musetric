@@ -45,6 +45,7 @@ export const jsConfig: Linter.Config = {
     ...musetricRecommendedRules,
     ...sonarjs.configs.recommended.rules,
     'arrow-body-style': ['error', 'as-needed'],
+    complexity: ['error', 15],
     eqeqeq: ['error', 'always'],
     'func-names': ['error'],
     'import-x/no-cycle': ['error', { ignoreExternal: true }],

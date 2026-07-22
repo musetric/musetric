@@ -17,6 +17,88 @@ const enumerateAudioDevices = async () => {
   );
 };
 
+type DeviceAvailability = {
+  inputDeviceAvailable: boolean;
+  outputDeviceAvailable: boolean;
+  outputSelectionAvailable: boolean;
+};
+
+const getDeviceAvailability = (
+  state: EngineState,
+  devices: MediaDeviceInfo[],
+  outputSelectionSupported: boolean,
+): DeviceAvailability => {
+  const realInputDevices = getRealAudioInputDevices(devices);
+  const realOutputDevices = getRealAudioOutputDevices(devices);
+  const inputDeviceAvailable =
+    state.microphoneDeviceId === undefined ||
+    realInputDevices.some(
+      (device) => device.deviceId === state.microphoneDeviceId,
+    );
+  const outputDeviceAvailable =
+    state.audioOutputDeviceId === undefined ||
+    realOutputDevices.some(
+      (device) => device.deviceId === state.audioOutputDeviceId,
+    );
+  const outputSelectionAvailable =
+    outputSelectionSupported || state.audioOutputDeviceId === undefined;
+  return {
+    inputDeviceAvailable,
+    outputDeviceAvailable,
+    outputSelectionAvailable,
+  };
+};
+
+const resolveNextDevices = (
+  state: EngineState,
+  devices: MediaDeviceInfo[],
+  availability: DeviceAvailability,
+) => {
+  const nextMicrophoneDeviceId = availability.inputDeviceAvailable
+    ? state.microphoneDeviceId
+    : undefined;
+  const nextOutputDeviceId =
+    availability.outputDeviceAvailable && availability.outputSelectionAvailable
+      ? state.audioOutputDeviceId
+      : undefined;
+  const nextInputDevice = resolveAudioInputDevice(devices, {
+    explicitDeviceId: nextMicrophoneDeviceId,
+    preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+  });
+  const nextOutputDevice = resolveAudioOutputDevice(devices, {
+    explicitDeviceId: nextOutputDeviceId,
+  });
+  return { nextInputDevice, nextOutputDevice };
+};
+
+const resetLostDevices = async (
+  audioOutput: EngineAudioOutput,
+  store: Store<EngineState>,
+  availability: DeviceAvailability,
+): Promise<void> => {
+  const {
+    inputDeviceAvailable,
+    outputDeviceAvailable,
+    outputSelectionAvailable,
+  } = availability;
+  const resetOutput = !outputDeviceAvailable || !outputSelectionAvailable;
+  if (resetOutput) {
+    try {
+      await audioOutput.setDeviceId(undefined);
+    } catch (outputError) {
+      console.error('Failed to reset audio output', outputError);
+    }
+  }
+  store.update((draft) => {
+    if (!inputDeviceAvailable) {
+      draft.microphoneDeviceId = undefined;
+    }
+    if (resetOutput) {
+      draft.audioOutputDeviceId = undefined;
+    }
+  });
+};
+
 export type CalibrationDevicesOptions = {
   store: Store<EngineState>;
   audioOutput: EngineAudioOutput;
@@ -47,35 +129,16 @@ export const createCalibrationDevices = (
   const apply = async (): Promise<MediaDeviceInfo[]> => {
     const devices = await enumerateAudioDevices();
     const state = store.get();
-    const realInputDevices = getRealAudioInputDevices(devices);
-    const realOutputDevices = getRealAudioOutputDevices(devices);
-    const outputSelectionSupported = audioOutput.supportsDeviceSelection;
-    const inputDeviceAvailable =
-      state.microphoneDeviceId === undefined ||
-      realInputDevices.some(
-        (device) => device.deviceId === state.microphoneDeviceId,
-      );
-    const outputDeviceAvailable =
-      state.audioOutputDeviceId === undefined ||
-      realOutputDevices.some(
-        (device) => device.deviceId === state.audioOutputDeviceId,
-      );
-    const outputSelectionAvailable =
-      outputSelectionSupported || state.audioOutputDeviceId === undefined;
-    const nextMicrophoneDeviceId = inputDeviceAvailable
-      ? state.microphoneDeviceId
-      : undefined;
-    const nextOutputDeviceId =
-      outputDeviceAvailable && outputSelectionAvailable
-        ? state.audioOutputDeviceId
-        : undefined;
-    const nextInputDevice = resolveAudioInputDevice(devices, {
-      explicitDeviceId: nextMicrophoneDeviceId,
-      preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
-    });
-    const nextOutputDevice = resolveAudioOutputDevice(devices, {
-      explicitDeviceId: nextOutputDeviceId,
-    });
+    const availability = getDeviceAvailability(
+      state,
+      devices,
+      audioOutput.supportsDeviceSelection,
+    );
+    const { nextInputDevice, nextOutputDevice } = resolveNextDevices(
+      state,
+      devices,
+      availability,
+    );
     const nextDevicePairKey = getRecordingLatencyDevicePairKey(
       nextInputDevice,
       nextOutputDevice,
@@ -98,26 +161,12 @@ export const createCalibrationDevices = (
       onActiveDeviceChanged(nextDevicePairKey);
     }
 
-    if (
-      !inputDeviceAvailable ||
-      !outputDeviceAvailable ||
-      !outputSelectionAvailable
-    ) {
-      if (!outputDeviceAvailable || !outputSelectionAvailable) {
-        try {
-          await audioOutput.setDeviceId(undefined);
-        } catch (outputError) {
-          console.error('Failed to reset audio output', outputError);
-        }
-      }
-      store.update((draft) => {
-        if (!inputDeviceAvailable) {
-          draft.microphoneDeviceId = undefined;
-        }
-        if (!outputDeviceAvailable || !outputSelectionAvailable) {
-          draft.audioOutputDeviceId = undefined;
-        }
-      });
+    const deviceLost =
+      !availability.inputDeviceAvailable ||
+      !availability.outputDeviceAvailable ||
+      !availability.outputSelectionAvailable;
+    if (deviceLost) {
+      await resetLostDevices(audioOutput, store, availability);
       onDeviceLost(nextDevicePairKey);
     }
 
