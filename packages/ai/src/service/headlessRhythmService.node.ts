@@ -1,4 +1,5 @@
 import { type Logger } from '@musetric/utils';
+import { type GpuHost } from './gpuHost.node.js';
 import { type GpuPageProgressHandler } from './gpuPageHost.node.js';
 import { runGpuAnalysis } from './headlessGpuPage.node.js';
 import {
@@ -8,6 +9,7 @@ import {
 } from './rhythmApi.js';
 
 export type HeadlessRhythmAnalysisOptions = {
+  gpuHost: GpuHost;
   logger: Logger;
   pcm: Buffer;
   modelPath: string;
@@ -23,11 +25,12 @@ export type RhythmLogits = {
 export const analyzeRhythmHeadless = async (
   options: HeadlessRhythmAnalysisOptions,
 ): Promise<RhythmLogits> => {
-  const { logger, pcm, modelPath, filterbankPath } = options;
+  const { gpuHost, logger, pcm, modelPath, filterbankPath } = options;
   const logits = await runGpuAnalysis<
     BrowserAnalyzeRhythmRequest,
     BrowserAnalyzeRhythmResult
   >({
+    gpuHost,
     logger,
     label: 'Headless rhythm analysis',
     apiName: analyzeRhythmApiName,

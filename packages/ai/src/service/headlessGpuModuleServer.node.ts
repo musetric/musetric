@@ -78,13 +78,15 @@ type HandleModuleRequestOptions = {
   files: Map<string, string>;
   pcm: Buffer;
   routes: GpuModuleRoute[];
+  browserBundlePath: string;
   logger: Logger;
 };
 
 const handleModuleRequest = async (
   options: HandleModuleRequestOptions,
 ): Promise<void> => {
-  const { request, response, label, files, pcm, routes, logger } = options;
+  const { request, response, label, files, pcm, routes } = options;
+  const { browserBundlePath, logger } = options;
   const requestUrl = request.url ?? '/';
   const url = new URL(requestUrl, 'http://127.0.0.1');
   if (servePage(url.pathname, response)) {
@@ -106,7 +108,7 @@ const handleModuleRequest = async (
       return;
     }
   }
-  if (await serveBundleAsset(url.pathname, response)) {
+  if (await serveBundleAsset(browserBundlePath, url.pathname, response)) {
     return;
   }
   logger.warn({ url: requestUrl }, `${label} route not found`);
@@ -127,12 +129,13 @@ export type CreateGpuModuleServerOptions = {
   label: string;
   pcm: Buffer;
   routes?: GpuModuleRoute[];
+  browserBundlePath: string;
 };
 
 export const createGpuModuleServer = async (
   options: CreateGpuModuleServerOptions,
 ): Promise<GpuModuleServer> => {
-  const { logger, label, pcm, routes = [] } = options;
+  const { logger, label, pcm, routes = [], browserBundlePath } = options;
   const files = new Map<string, string>();
   const server = createServer((request, response) => {
     void handleModuleRequest({
@@ -142,6 +145,7 @@ export const createGpuModuleServer = async (
       files,
       pcm,
       routes,
+      browserBundlePath,
       logger,
     }).catch((error: unknown) => {
       logger.error({ error }, `${label} request failed`);

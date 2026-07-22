@@ -4,10 +4,12 @@ import {
   type BrowserAnalyzeChordsRequest,
   type BrowserAnalyzeChordsResult,
 } from './chordsApi.js';
+import { type GpuHost } from './gpuHost.node.js';
 import { type GpuPageProgressHandler } from './gpuPageHost.node.js';
 import { runGpuAnalysis } from './headlessGpuPage.node.js';
 
 export type HeadlessChordAnalysisOptions = {
+  gpuHost: GpuHost;
   logger: Logger;
   pcm: Buffer;
   modelPath: string;
@@ -19,11 +21,13 @@ export type HeadlessChordAnalysisOptions = {
 export const analyzeChordsHeadless = async (
   options: HeadlessChordAnalysisOptions,
 ): Promise<Int32Array> => {
-  const { logger, pcm, modelPath, planPath, planManifestPath } = options;
+  const { gpuHost, logger, pcm, modelPath, planPath, planManifestPath } =
+    options;
   const indices = await runGpuAnalysis<
     BrowserAnalyzeChordsRequest,
     BrowserAnalyzeChordsResult
   >({
+    gpuHost,
     logger,
     label: 'Headless chords analysis',
     apiName: analyzeChordsApiName,

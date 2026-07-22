@@ -23,6 +23,7 @@ import { noSeparateNamedExportsRule } from './noSeparateNamedExports.js';
 import { noSeparateTypeImportsRule } from './noSeparateTypeImports.js';
 import { noSwitchStatementsRule } from './noSwitchStatements.js';
 import { noThisExpressionRule } from './noThisExpression.js';
+import { noTopLevelLetRule } from './noTopLevelLet.js';
 import { noTrivialFunctionWrappersRule } from './noTrivialFunctionWrappers.js';
 import { noTypeMethodSignaturesRule } from './noTypeMethodSignatures.js';
 import { noUntrustedValueChecksRule } from './noUntrustedValueChecks.js';
@@ -53,6 +54,7 @@ export const musetricRules = {
   'no-separate-type-imports': noSeparateTypeImportsRule,
   'no-switch-statements': noSwitchStatementsRule,
   'no-this-expression': noThisExpressionRule,
+  'no-top-level-let': noTopLevelLetRule,
   'no-trivial-function-wrappers': noTrivialFunctionWrappersRule,
   'no-type-method-signatures': noTypeMethodSignaturesRule,
   'no-untrusted-value-checks': noUntrustedValueChecksRule,

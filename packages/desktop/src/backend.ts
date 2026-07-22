@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
+import { type GpuPageHostFactory } from '@musetric/ai/node';
 import { DB } from '@musetric/backend-db';
 import { createTables } from '@musetric/backend-db/migrations';
 import { createStoragePaths } from '@musetric/utils/node';
@@ -34,11 +35,19 @@ export type DesktopBackend = {
   close: () => Promise<void>;
 };
 
-export const startBackend = async (): Promise<DesktopBackend> => {
+export type StartBackendOptions = {
+  gpuPageHostFactory: GpuPageHostFactory;
+};
+
+export const startBackend = async (
+  options: StartBackendOptions,
+): Promise<DesktopBackend> => {
   configureBackendEnvironment();
   await initDatabase();
   const { createServerApp } = await import('@musetric/backend');
-  const backend = await createServerApp();
+  const backend = await createServerApp({
+    gpuPageHostFactory: options.gpuPageHostFactory,
+  });
   await backend.listen({
     port,
     host: '127.0.0.1',

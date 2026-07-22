@@ -1,7 +1,6 @@
 import { statSync } from 'node:fs';
 import { type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
-import { getBrowserBundleDir } from './gpuHostRegistry.node.js';
 import { sendFile } from './httpFile.node.js';
 
 const contentTypes: Record<string, string> = {
@@ -15,10 +14,10 @@ export const browserLoaderHtml =
   '</body></html>';
 
 export const serveBundleAsset = async (
+  bundleDir: string,
   pathname: string,
   response: ServerResponse,
 ): Promise<boolean> => {
-  const bundleDir = getBrowserBundleDir();
   const filePath = normalize(join(bundleDir, pathname));
   if (!filePath.startsWith(normalize(bundleDir))) {
     return false;

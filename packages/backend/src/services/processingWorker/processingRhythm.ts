@@ -39,6 +39,7 @@ export const createRhythmWorker = (
         const rhythm = app.blobStorage.createPath();
 
         await analyzeRhythm({
+          gpuHost: app.gpuHost,
           sourcePath,
           resultPath: rhythm.blobPath,
           handlers: {

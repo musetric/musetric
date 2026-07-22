@@ -4,6 +4,7 @@ import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { chordNetModel } from '../models/chordNetModel.js';
 import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureChordNetModelFiles } from '../service/chordNetModelCache.node.js';
+import { type GpuHost } from '../service/gpuHost.node.js';
 import { analyzeChordsHeadless } from '../service/headlessChordsService.node.js';
 import { buildChordSegments } from './chordSegments.js';
 
@@ -22,6 +23,7 @@ export type AnalyzeChordsMessage =
     };
 
 export type AnalyzeChordsOptions = {
+  gpuHost: GpuHost;
   sourcePath: string;
   resultPath: string;
   handlers: MessageHandlers<AnalyzeChordsMessage>;
@@ -32,7 +34,8 @@ export type AnalyzeChordsOptions = {
 export const analyzeChords = async (
   options: AnalyzeChordsOptions,
 ): Promise<void> => {
-  const { sourcePath, resultPath, handlers, logger, modelsPath } = options;
+  const { gpuHost, sourcePath, resultPath, handlers, logger, modelsPath } =
+    options;
 
   await handlers.progress({ type: 'progress', progress: 0 });
 
@@ -45,6 +48,7 @@ export const analyzeChords = async (
     logger,
   });
   const indices = await analyzeChordsHeadless({
+    gpuHost,
     logger,
     pcm,
     modelPath: modelFiles.modelPath,
