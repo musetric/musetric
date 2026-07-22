@@ -1,396 +1,111 @@
 import {
-  panViewportState,
-  type ViewportState,
-  zoomViewportState,
-} from '@musetric/utils';
-import {
-  createInertiaRunner,
-  createMultiPointerGesture,
-  createWheelHandler,
+  createViewportGesture,
   type GestureAxis,
-  type GestureModifiers,
-  type GesturePanEnd,
-  type GesturePanStart,
-  type GesturePanUpdate,
-  type GesturePinchStart,
-  type GesturePinchUpdate,
-  type InertiaRunner,
-  type WheelUpdate,
-} from '@musetric/utils/dom';
-import { createSpectrogramGestureInertiaPhysics } from './spectrogramGestureInertia.js';
+  type ViewportGesture,
+  type ViewportPositionState,
+  type ViewportRangeState,
+  type ViewportState,
+} from '@musetric/interaction';
 import {
-  type ActiveDragZoom,
-  type ActivePan,
-  type ActivePinchZoom,
-  type ActiveZoom,
-  type SpectrogramGesture,
-  type SpectrogramGestureMode,
-  type SpectrogramGestureOptions,
-} from './spectrogramGestureState.js';
-import {
-  applySpectrogramViewportState,
-  getSpectrogramDragZoomScale,
-  getSpectrogramViewportAxisSize,
-  getSpectrogramViewportCoordinateAnchorRatio,
-  getSpectrogramViewportPointAnchorRatio,
-  readSpectrogramViewportState,
-} from './spectrogramGestureViewport.js';
+  maximumSpectrogramFrequency,
+  minimumSpectrogramFrequency,
+  minimumSpectrogramFrequencyRatio,
+} from '@musetric/spectrogram';
 
-const defaultZoomSensitivity = 0.002;
+const logMinFrequency = Math.log(minimumSpectrogramFrequency);
+const logMaxFrequency = Math.log(maximumSpectrogramFrequency);
+const logMinRange = Math.log(minimumSpectrogramFrequencyRatio);
+const logMaxRange = logMaxFrequency - logMinFrequency;
+const minVisibleTime = 0.1;
+const maxVisibleTime = 60;
 
-const isZoomDragModifier = (modifiers: GestureModifiers): boolean =>
-  modifiers.shiftKey || modifiers.ctrlKey || modifiers.metaKey;
+export type SpectrogramGestureContext = {
+  getSampleRate: () => number;
+  getFrameCount: () => number;
+  getFrameIndex: () => number;
+  getVisibleTime: () => number;
+  getPlayheadRatio: () => number;
+  getMinFrequency: () => number;
+  getMaxFrequency: () => number;
+};
+
+const readPositionState = (
+  context: SpectrogramGestureContext,
+): ViewportPositionState | undefined => {
+  const frameCount = context.getFrameCount();
+  if (!frameCount) return undefined;
+  const sampleRate = context.getSampleRate();
+  return {
+    kind: 'position',
+    position: context.getFrameIndex(),
+    size: context.getVisibleTime() * sampleRate,
+    originRatio: context.getPlayheadRatio(),
+    minimumPosition: 0,
+    maximumPosition: frameCount,
+    minimumSize: minVisibleTime * sampleRate,
+    maximumSize: maxVisibleTime * sampleRate,
+    panDirection: -1,
+  };
+};
+
+const readRangeState = (
+  context: SpectrogramGestureContext,
+): ViewportRangeState => ({
+  kind: 'range',
+  lower: Math.log(context.getMinFrequency()),
+  upper: Math.log(context.getMaxFrequency()),
+  minimumValue: logMinFrequency,
+  maximumValue: logMaxFrequency,
+  minimumSize: logMinRange,
+  maximumSize: logMaxRange,
+  panDirection: 1,
+  reverse: true,
+});
+
+const readState = (
+  context: SpectrogramGestureContext,
+  axis: GestureAxis,
+): ViewportState | undefined =>
+  axis === 'x' ? readPositionState(context) : readRangeState(context);
+
+export type SpectrogramGestureControls = {
+  setVisibleTime: (visibleTime: number) => void;
+  setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
+  seek: (frameIndex: number) => void;
+  setFreeze: (freeze: boolean) => void;
+};
+
+const applyState = (
+  context: SpectrogramGestureContext,
+  controls: SpectrogramGestureControls,
+  state: ViewportState,
+) => {
+  if (state.kind === 'position') {
+    const sampleRate = context.getSampleRate();
+    controls.setVisibleTime(state.size / sampleRate);
+    controls.seek(state.position);
+    return;
+  }
+
+  controls.setFrequencyRange(Math.exp(state.lower), Math.exp(state.upper));
+};
+
+export type SpectrogramGestureOptions = {
+  element: HTMLElement;
+  context: SpectrogramGestureContext;
+  controls: SpectrogramGestureControls;
+  zoomSensitivity?: number;
+};
 
 export const createSpectrogramGesture = (
   options: SpectrogramGestureOptions,
-): SpectrogramGesture => {
-  const {
+): ViewportGesture => {
+  const { element, context, controls, zoomSensitivity } = options;
+  return createViewportGesture({
     element,
-    context,
-    controls,
-    zoomSensitivity = defaultZoomSensitivity,
-  } = options;
-
-  const physics = createSpectrogramGestureInertiaPhysics();
-
-  let mode: SpectrogramGestureMode = 'idle';
-  let pointerFrozen = false;
-  let activePan: ActivePan | undefined = undefined;
-  let activePinchZoom: ActivePinchZoom | undefined = undefined;
-  let activeDragZoom: ActiveDragZoom | undefined = undefined;
-  let inertiaRunner: InertiaRunner<GestureAxis> | undefined = undefined;
-
-  const freeze = () => {
-    if (pointerFrozen) return;
-    pointerFrozen = true;
-    controls.setFreeze(true);
-  };
-
-  const releaseFrozen = () => {
-    if (!pointerFrozen) return;
-    pointerFrozen = false;
-    controls.setFreeze(false);
-  };
-
-  const readState = (axis: GestureAxis): ViewportState | undefined =>
-    readSpectrogramViewportState(context, axis);
-
-  const applyStateUpdate = (state: ViewportState) =>
-    applySpectrogramViewportState(context, controls, state);
-
-  const axisSize = (axis: GestureAxis): number =>
-    getSpectrogramViewportAxisSize(element, axis);
-
-  const getStateAnchorRatio = (
-    state: ViewportState,
-    axis: GestureAxis,
-    coordinate: number,
-  ): number | undefined =>
-    getSpectrogramViewportCoordinateAnchorRatio(
-      element,
-      state,
-      axis,
-      coordinate,
-    );
-
-  const getPointAnchorRatio = (
-    state: ViewportState,
-    axis: GestureAxis,
-    clientX: number,
-    clientY: number,
-  ): number | undefined =>
-    getSpectrogramViewportPointAnchorRatio({
-      element,
-      state,
-      axis,
-      clientX,
-      clientY,
-    });
-
-  const applyPan = (pan: ActivePan, delta: number): boolean => {
-    const viewportSize = axisSize(pan.axis);
-    if (viewportSize <= 0) return true;
-    const result = panViewportState({
-      state: pan.state,
-      delta,
-      viewportSize,
-    });
-    pan.state = result.state;
-    applyStateUpdate(result.state);
-    return result.clamped;
-  };
-
-  const applyZoom = (zoom: ActiveZoom, scale: number) => {
-    const result = zoomViewportState({
-      state: zoom.startState,
-      anchorRatio: zoom.anchorRatio,
-      scale,
-    });
-    applyStateUpdate(result.state);
-  };
-
-  const clearActiveGesture = () => {
-    activePan = undefined;
-    activePinchZoom = undefined;
-    activeDragZoom = undefined;
-  };
-
-  const stopInertia = () => {
-    if (!inertiaRunner) return;
-    inertiaRunner.stop(false);
-    inertiaRunner = undefined;
-    if (mode === 'pan-inertia') {
-      mode = 'idle';
-    }
-    activePan = undefined;
-  };
-
-  const startPanInertia = (axis: GestureAxis, velocity: number) => {
-    mode = 'pan-inertia';
-    inertiaRunner = createInertiaRunner(physics, {
-      onUpdate: (info) => {
-        if (mode !== 'pan-inertia' || !activePan || activePan.axis !== axis) {
-          return true;
-        }
-
-        return applyPan(activePan, info.delta);
-      },
-      onEnd: () => {
-        inertiaRunner = undefined;
-        mode = 'idle';
-        activePan = undefined;
-        releaseFrozen();
-      },
-    });
-    inertiaRunner.start(velocity, axis, performance.now());
-  };
-
-  const startPan = (event: GesturePanStart) => {
-    const state = readState(event.axis);
-    if (!state) {
-      activePan = undefined;
-      mode = 'idle';
-      return;
-    }
-
-    activePan = {
-      axis: event.axis,
-      state,
-    };
-    mode = 'pan';
-  };
-
-  const startDragZoom = (event: GesturePanStart) => {
-    const state = readState(event.axis);
-    if (!state) {
-      activeDragZoom = undefined;
-      mode = 'idle';
-      return;
-    }
-
-    const anchorRatio = getPointAnchorRatio(
-      state,
-      event.axis,
-      event.startClientX,
-      event.startClientY,
-    );
-
-    if (anchorRatio === undefined) {
-      activeDragZoom = undefined;
-      mode = 'idle';
-      return;
-    }
-
-    activeDragZoom = {
-      axis: event.axis,
-      anchorRatio,
-      startState: state,
-      totalDelta: 0,
-    };
-    mode = 'drag-zoom';
-  };
-
-  const handlePanStart = (event: GesturePanStart) => {
-    stopInertia();
-    if (isZoomDragModifier(event.modifiers)) {
-      startDragZoom(event);
-    } else {
-      startPan(event);
-    }
-    freeze();
-  };
-
-  const handlePanUpdate = (event: GesturePanUpdate) => {
-    if (mode === 'pan' && activePan && activePan.axis === event.axis) {
-      applyPan(activePan, event.delta);
-      return;
-    }
-
-    if (
-      mode === 'drag-zoom' &&
-      activeDragZoom &&
-      activeDragZoom.axis === event.axis
-    ) {
-      activeDragZoom.totalDelta += event.delta;
-      applyZoom(
-        activeDragZoom,
-        getSpectrogramDragZoomScale(
-          activeDragZoom.axis,
-          activeDragZoom.totalDelta,
-          zoomSensitivity,
-        ),
-      );
-      return;
-    }
-
-    event.stop();
-  };
-
-  const handlePanEnd = (event: GesturePanEnd) => {
-    if (mode === 'pan' && activePan && activePan.axis === event.axis) {
-      if (Math.abs(event.velocity) >= physics.inertiaMinimumVelocity) {
-        startPanInertia(event.axis, event.velocity);
-        return;
-      }
-
-      activePan = undefined;
-    }
-
-    if (mode === 'drag-zoom') {
-      activeDragZoom = undefined;
-    }
-
-    mode = 'idle';
-    releaseFrozen();
-  };
-
-  const handlePanAbort = () => {
-    mode = 'idle';
-    clearActiveGesture();
-    releaseFrozen();
-  };
-
-  const handlePinchStart = (event: GesturePinchStart) => {
-    stopInertia();
-    const state = readState(event.axis);
-    if (!state) {
-      activePinchZoom = undefined;
-      mode = 'idle';
-      return;
-    }
-
-    const anchorRatio = getStateAnchorRatio(
-      state,
-      event.axis,
-      event.startCenter,
-    );
-
-    if (anchorRatio === undefined) {
-      activePinchZoom = undefined;
-      mode = 'idle';
-      return;
-    }
-
-    activePinchZoom = {
-      axis: event.axis,
-      anchorRatio,
-      startSpread: event.startSpread,
-      startState: state,
-    };
-    mode = 'pinch-zoom';
-    freeze();
-  };
-
-  const handlePinchUpdate = (event: GesturePinchUpdate) => {
-    if (
-      mode !== 'pinch-zoom' ||
-      !activePinchZoom ||
-      activePinchZoom.axis !== event.axis
-    ) {
-      return;
-    }
-
-    applyZoom(activePinchZoom, event.spread / activePinchZoom.startSpread);
-  };
-
-  const handlePinchEnd = () => {
-    mode = 'idle';
-    activePinchZoom = undefined;
-    releaseFrozen();
-  };
-
-  const handleWheel = (event: WheelUpdate) => {
-    stopInertia();
-    const state = readState(event.axis);
-    if (!state) return;
-    const anchorRatio = getPointAnchorRatio(
-      state,
-      event.axis,
-      event.clientX,
-      event.clientY,
-    );
-    if (anchorRatio === undefined) return;
-
-    freeze();
-    applyZoom(
-      {
-        axis: event.axis,
-        anchorRatio,
-        startState: state,
-      },
-      Math.exp(-event.delta * zoomSensitivity),
-    );
-    releaseFrozen();
-  };
-
-  const handlePointerDown = (event: PointerEvent) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (!event.isPrimary) return;
-    stopInertia();
-    freeze();
-  };
-
-  const handlePointerEnd = () => {
-    if (mode === 'idle' && !inertiaRunner) {
-      releaseFrozen();
-    }
-  };
-
-  element.addEventListener('pointerdown', handlePointerDown, true);
-  document.addEventListener('pointerup', handlePointerEnd, true);
-  document.addEventListener('pointercancel', handlePointerEnd, true);
-
-  const multiPointer = createMultiPointerGesture({
-    element,
-    createVelocityTracker: physics.createVelocityTracker,
-    onPanStart: handlePanStart,
-    onPanUpdate: handlePanUpdate,
-    onPanEnd: handlePanEnd,
-    onPanAbort: handlePanAbort,
-    onPinchStart: handlePinchStart,
-    onPinchUpdate: handlePinchUpdate,
-    onPinchEnd: handlePinchEnd,
+    readState: (axis) => readState(context, axis),
+    applyState: (state) => applyState(context, controls, state),
+    setFreeze: controls.setFreeze,
+    zoomSensitivity,
   });
-
-  const wheel = createWheelHandler(element, handleWheel);
-
-  const abort = () => {
-    stopInertia();
-    multiPointer.stop();
-    mode = 'idle';
-    clearActiveGesture();
-    releaseFrozen();
-  };
-
-  return {
-    abort,
-    dispose: () => {
-      abort();
-      multiPointer.dispose();
-      wheel.dispose();
-      element.removeEventListener('pointerdown', handlePointerDown, true);
-      document.removeEventListener('pointerup', handlePointerEnd, true);
-      document.removeEventListener('pointercancel', handlePointerEnd, true);
-    },
-  };
 };

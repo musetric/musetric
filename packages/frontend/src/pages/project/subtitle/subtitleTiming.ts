@@ -1,8 +1,17 @@
-import { type api } from '@musetric/api';
+export type SubtitleTimedWord = {
+  end: number;
+};
+
+export type SubtitleTimedSegment = {
+  end: number;
+  words: readonly SubtitleTimedWord[];
+};
 
 export type SubtitleSegmentStatus = 'active' | 'future' | 'past';
 
-export const getSubtitleSegmentEndTime = (segment: api.subtitle.Segment) => {
+export const getSubtitleSegmentEndTime = <Segment extends SubtitleTimedSegment>(
+  segment: Segment,
+) => {
   const { words } = segment;
   if (words.length > 0) {
     return words[words.length - 1].end;
@@ -11,8 +20,10 @@ export const getSubtitleSegmentEndTime = (segment: api.subtitle.Segment) => {
   return segment.end;
 };
 
-export const getSubtitleActiveSegmentIndex = (
-  subtitle: api.subtitle.Segment[],
+export const getSubtitleActiveSegmentIndex = <
+  Segment extends SubtitleTimedSegment,
+>(
+  subtitle: readonly Segment[],
   playbackTime: number,
 ): number => {
   if (subtitle.length === 0) {

@@ -2,7 +2,7 @@ import {
   type InertialDragInertiaState,
   type InertialDragInertiaStep,
   type InertialDragPhysics,
-} from '../inertialDrag.js';
+} from './inertialDrag.js';
 
 export type InertiaRunnerUpdate<Axis extends string> = {
   axis: Axis;
@@ -34,7 +34,7 @@ export const createInertiaRunner = <Axis extends string>(
   };
 
   const runFrame = (time: number) => {
-    if (!state || !axis) {
+    if (state === undefined || axis === undefined) {
       frame = undefined;
       return;
     }
@@ -52,7 +52,6 @@ export const createInertiaRunner = <Axis extends string>(
       delta: step.delta,
       velocity: step.velocity,
     });
-
     if (stopped) {
       frame = undefined;
       clear();
@@ -63,30 +62,32 @@ export const createInertiaRunner = <Axis extends string>(
     frame = requestAnimationFrame(runFrame);
   };
 
-  const stop = (notifyEnd: boolean) => {
-    if (frame !== undefined) {
-      cancelAnimationFrame(frame);
-      frame = undefined;
-    }
-    if (state !== undefined) {
-      clear();
-      if (notifyEnd) {
-        handlers.onEnd();
+  return {
+    start: (velocity, nextAxis, time) => {
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
       }
-    }
+      clear();
+      const nextState = physics.startInertia(velocity, time);
+      if (!nextState) {
+        handlers.onEnd();
+        return;
+      }
+      state = nextState;
+      axis = nextAxis;
+      frame = requestAnimationFrame(runFrame);
+    },
+    stop: (notifyEnd) => {
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+        frame = undefined;
+      }
+      if (state !== undefined) {
+        clear();
+        if (notifyEnd) {
+          handlers.onEnd();
+        }
+      }
+    },
   };
-
-  const start = (velocity: number, nextAxis: Axis, time: number) => {
-    stop(false);
-    const nextState = physics.startInertia(velocity, time);
-    if (!nextState) {
-      handlers.onEnd();
-      return;
-    }
-    state = nextState;
-    axis = nextAxis;
-    frame = requestAnimationFrame(runFrame);
-  };
-
-  return { start, stop };
 };

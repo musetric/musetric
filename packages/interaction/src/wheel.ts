@@ -16,12 +16,8 @@ const resolveWheelDelta = (
   linePixels: number,
   pagePixels: number,
 ): number => {
-  if (event.deltaMode === 1) {
-    return event.deltaY * linePixels;
-  }
-  if (event.deltaMode === 2) {
-    return event.deltaY * pagePixels;
-  }
+  if (event.deltaMode === 1) return event.deltaY * linePixels;
+  if (event.deltaMode === 2) return event.deltaY * pagePixels;
   return event.deltaY;
 };
 
@@ -53,11 +49,7 @@ export const createWheelHandler = (
 
   const handleWheel = (event: WheelEvent) => {
     const axis = resolveAxis(event);
-
-    if (!axis) {
-      return;
-    }
-
+    if (axis === undefined) return;
     event.preventDefault();
     onWheel({
       axis,

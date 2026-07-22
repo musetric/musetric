@@ -1,0 +1,30 @@
+{
+  "name": "@musetric/interaction",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "monorepo": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build:project": "tsc --build",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@musetric/eslint-config": "workspace:*",
+    "@typescript/native": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

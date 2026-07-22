@@ -1,77 +1,15 @@
 import { Box, Paper, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
-import { createNumberLimit } from '@musetric/utils';
-import { createSeekDrag } from '@musetric/utils/dom';
-import { type FC, useEffect, useRef } from 'react';
-import { engine } from '../../../engine/engine.js';
+import { type FC, useRef } from 'react';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { TrackVolumeControl } from '../waveform/TrackVolumeControl.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
+import { useTracksSeekDrag } from './useTracksSeekDrag.js';
 
 export const ProjectTracksVisualization: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const element = ref.current;
-
-    if (!element) return;
-
-    let startFrameIndex = 0;
-    let releaseFrozenOnEnd = true;
-
-    const drag = createSeekDrag({
-      element,
-      onStart: () => {
-        releaseFrozenOnEnd = true;
-        engine.player.setFrozen(true);
-        startFrameIndex = engine.store.get().frameIndex;
-      },
-      onUpdate: (event) => {
-        const { frameCount } = engine.store.get();
-        if (!frameCount) {
-          event.stop();
-          return;
-        }
-
-        const frameIndex =
-          event.pointerType === 'mouse'
-            ? event.ratio * frameCount
-            : startFrameIndex + event.offsetRatio * frameCount;
-        const frameLimit = createNumberLimit({
-          minimum: 0,
-          maximum: frameCount,
-        });
-        const newFrameIndex = frameLimit.clamp(Math.round(frameIndex));
-
-        engine.player.seek(newFrameIndex, 'tracksVisualization');
-      },
-      onEnd: () => {
-        if (releaseFrozenOnEnd) {
-          engine.player.setFrozen(false);
-        }
-        releaseFrozenOnEnd = true;
-      },
-    });
-    const unsubscribeSeek = engine.store.subscribe(
-      (state) => state.seekEvent.revision,
-      () => {
-        const { seekEvent } = engine.store.get();
-        if (seekEvent.origin === 'tracksVisualization') {
-          return;
-        }
-
-        releaseFrozenOnEnd = false;
-        drag.stop();
-      },
-    );
-
-    return () => {
-      unsubscribeSeek();
-      drag.dispose();
-      engine.player.setFrozen(false);
-    };
-  }, []);
+  useTracksSeekDrag(ref);
 
   return (
     <Box

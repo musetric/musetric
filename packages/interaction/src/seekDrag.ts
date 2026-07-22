@@ -1,9 +1,8 @@
-export type SeekDragPointerType = 'mouse' | 'touch';
-
-const isSeekDragPointerType = (
-  pointerType: string,
-): pointerType is SeekDragPointerType =>
-  pointerType === 'mouse' || pointerType === 'touch';
+import {
+  isPointerInputType,
+  isPrimaryPointerButton,
+  type PointerInputType,
+} from './pointerType.js';
 
 const getRatio = (element: HTMLElement, clientX: number) => {
   const rect = element.getBoundingClientRect();
@@ -19,7 +18,7 @@ const getOffsetRatio = (element: HTMLElement, offset: number) => {
 };
 
 export type SeekDragUpdate = {
-  pointerType: SeekDragPointerType;
+  pointerType: PointerInputType;
   ratio: number;
   offsetRatio: number;
   stop: () => void;
@@ -39,22 +38,21 @@ export type SeekDrag = {
 
 type SeekDragInternalState = {
   pointerId: number;
-  pointerType: SeekDragPointerType;
+  pointerType: PointerInputType;
   startX: number;
 };
 
 export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
   const { element, onStart, onUpdate, onEnd } = options;
-
   const initialTouchAction = element.style.touchAction;
   const initialUserSelect = element.style.userSelect;
   let state: SeekDragInternalState | undefined = undefined;
   let ended = true;
 
   const releasePointerCapture = (pointerId: number) => {
-    if (!element.hasPointerCapture(pointerId)) return;
-
-    element.releasePointerCapture(pointerId);
+    if (element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
   };
 
   const finish = () => {
@@ -68,32 +66,29 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     if (currentState) {
       releasePointerCapture(currentState.pointerId);
     }
-
     state = undefined;
     finish();
   };
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (!isSeekDragPointerType(event.pointerType)) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (!isPointerInputType(event.pointerType)) return;
+    if (!isPrimaryPointerButton(event)) return;
     if (!event.isPrimary) return;
 
     stop();
     ended = false;
-
     state = {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
       startX: event.clientX,
     };
-
     element.setPointerCapture(event.pointerId);
     event.preventDefault();
     onStart?.();
 
-    if (event.pointerType === 'mouse') {
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
       onUpdate({
-        pointerType: 'mouse',
+        pointerType: event.pointerType,
         ratio: getRatio(element, event.clientX),
         offsetRatio: 0,
         stop,
@@ -103,8 +98,12 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
 
   const handlePointerMove = (event: PointerEvent) => {
     const currentState = state;
-    if (!currentState || event.pointerId !== currentState.pointerId) return;
-
+    if (
+      currentState === undefined ||
+      event.pointerId !== currentState.pointerId
+    ) {
+      return;
+    }
     event.preventDefault();
     onUpdate({
       pointerType: currentState.pointerType,
@@ -117,7 +116,6 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
   const handlePointerUp = (event: PointerEvent) => {
     const currentState = state;
     if (!currentState || event.pointerId !== currentState.pointerId) return;
-
     releasePointerCapture(event.pointerId);
     state = undefined;
     finish();
@@ -127,7 +125,6 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
   const handlePointerCancel = (event: PointerEvent) => {
     const currentState = state;
     if (!currentState || event.pointerId !== currentState.pointerId) return;
-
     releasePointerCapture(event.pointerId);
     state = undefined;
     finish();

@@ -2,20 +2,23 @@ import {
   createPanTracker,
   type CreatePanVelocityTracker,
   type PanTracker,
-} from './multiPointerGesture/panTracker.dom.js';
+} from './panTracker.js';
 import {
   createPinchTracker,
   type PinchTracker,
   type PinchTrackerUpdate,
-} from './multiPointerGesture/pinchTracker.dom.js';
+} from './pinchTracker.js';
 import {
-  createPointerDispatcher,
-  type PointerDispatcher,
-} from './multiPointerGesture/pointerDispatcher.dom.js';
+  isPointerInputType,
+  isPrimaryPointerButton,
+  type PointerInputType,
+} from './pointerType.js';
 
-export type GesturePointerType = 'mouse' | 'touch';
-
-const defaultPointerTypes: readonly GesturePointerType[] = ['mouse', 'touch'];
+const defaultPointerTypes: readonly PointerInputType[] = [
+  'mouse',
+  'pen',
+  'touch',
+];
 
 export type GestureModifiers = {
   shiftKey: boolean;
@@ -79,7 +82,7 @@ const emitPinchUpdate = (
 
 export type GesturePanStart = {
   axis: GestureAxis;
-  pointerType: GesturePointerType;
+  pointerType: PointerInputType;
   startClientX: number;
   startClientY: number;
   modifiers: GestureModifiers;
@@ -99,7 +102,7 @@ export type GesturePinchStart = {
 export type MultiPointerGestureOptions = {
   element: HTMLElement;
   axis?: GestureAxis;
-  pointerTypes?: readonly GesturePointerType[];
+  pointerTypes?: readonly PointerInputType[];
   axisLockDistance?: number;
   createVelocityTracker?: CreatePanVelocityTracker;
   pinchLockDistance?: number;
@@ -120,7 +123,7 @@ export type MultiPointerGesture = {
 
 type Pointer = {
   id: number;
-  type: GesturePointerType;
+  type: PointerInputType;
   x: number;
   y: number;
 };
@@ -147,7 +150,6 @@ export const createMultiPointerGesture = (
 
   const initialTouchAction = element.style.touchAction;
   const initialUserSelect = element.style.userSelect;
-
   const pointers = new Map<number, Pointer>();
   const panTracker: PanTracker = createPanTracker({
     fixedAxis,
@@ -186,9 +188,9 @@ export const createMultiPointerGesture = (
   };
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (event.pointerType !== 'mouse' && event.pointerType !== 'touch') {
-      return;
-    }
+    if (!isPointerInputType(event.pointerType)) return;
+    if (!pointerTypes.includes(event.pointerType)) return;
+    if (!isPrimaryPointerButton(event)) return;
 
     const pointer: Pointer = {
       id: event.pointerId,
@@ -226,7 +228,7 @@ export const createMultiPointerGesture = (
       if (aId === undefined || bId === undefined) return;
       const a = pointers.get(aId);
       const b = pointers.get(bId);
-      if (!a || !b) return;
+      if (a === undefined || b === undefined) return;
 
       const update = pinchTracker.update(a, b);
       if (!update) return;
@@ -244,7 +246,6 @@ export const createMultiPointerGesture = (
     }
 
     if (event.pointerId !== panTracker.pointerId()) return;
-
     const update = panTracker.update(pointer);
     if (!update) return;
 
@@ -305,18 +306,12 @@ export const createMultiPointerGesture = (
     }
   };
 
-  const dispatcher: PointerDispatcher = createPointerDispatcher({
-    element,
-    pointerTypes,
-    onPointerDown: handlePointerDown,
-    onPointerMove: handlePointerMove,
-    onPointerUp: handlePointerUp,
-    onPointerCancel: handlePointerCancel,
-  });
-
   element.style.touchAction = 'none';
   element.style.userSelect = 'none';
-  dispatcher.attach();
+  element.addEventListener('pointerdown', handlePointerDown);
+  element.addEventListener('pointermove', handlePointerMove);
+  element.addEventListener('pointerup', handlePointerUp);
+  element.addEventListener('pointercancel', handlePointerCancel);
 
   const stop = () => {
     abortPan();
@@ -329,7 +324,10 @@ export const createMultiPointerGesture = (
     stop,
     dispose: () => {
       stop();
-      dispatcher.detach();
+      element.removeEventListener('pointerdown', handlePointerDown);
+      element.removeEventListener('pointermove', handlePointerMove);
+      element.removeEventListener('pointerup', handlePointerUp);
+      element.removeEventListener('pointercancel', handlePointerCancel);
       element.style.touchAction = initialTouchAction;
       element.style.userSelect = initialUserSelect;
     },

@@ -1,7 +1,9 @@
 import { Box, Slider, Typography } from '@mui/material';
 import { getTrackProgress } from '@musetric/engine';
+import { isPrimaryPointerButton } from '@musetric/interaction';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
+import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 const progressScale = 1000;
@@ -64,29 +66,15 @@ export const PlayerProgress: FC = () => {
       return;
     }
 
-    let sliderFrozen = false;
+    const freeze = createInteractionFreeze();
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (event.pointerType === 'mouse' && event.button !== 0) {
-        return;
-      }
-
-      if (!event.isPrimary) {
-        return;
-      }
-
-      sliderFrozen = true;
-      engine.player.setFrozen(true);
+      if (!isPrimaryPointerButton(event)) return;
+      if (!event.isPrimary) return;
+      freeze.freeze();
     };
 
-    const handlePointerUp = () => {
-      if (!sliderFrozen) {
-        return;
-      }
-
-      sliderFrozen = false;
-      engine.player.setFrozen(false);
-    };
+    const handlePointerUp = freeze.release;
 
     element.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('pointerup', handlePointerUp);
@@ -96,10 +84,7 @@ export const PlayerProgress: FC = () => {
       element.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('pointerup', handlePointerUp);
       document.removeEventListener('pointercancel', handlePointerUp);
-
-      if (sliderFrozen) {
-        engine.player.setFrozen(false);
-      }
+      freeze.release();
     };
   }, []);
 
