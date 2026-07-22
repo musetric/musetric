@@ -12,9 +12,7 @@ const createCallLatestInternal = <Args extends unknown[], Result>(
 ): AsyncFunction<Args, Result> => {
   let currentPromise: ControlledPromise<Result> | undefined = undefined;
   let nextPromise: ControlledPromise<Result> | undefined = undefined;
-  let call = () => {
-    /** Nothing */
-  };
+  let call: () => void = () => undefined;
 
   const getPromise = () => {
     if (!currentPromise) {

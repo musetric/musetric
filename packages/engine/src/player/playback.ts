@@ -12,6 +12,8 @@ import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { type Playhead, readPlayhead } from './playhead.cross.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
 
+const noop = (): void => undefined;
+
 export type EnginePlayback = {
   boot: () => Promise<void>;
   play: () => Promise<void>;
@@ -32,25 +34,13 @@ export type EnginePlayback = {
 };
 
 export const createEngineStubPlayback = (): EnginePlayback => ({
-  boot: async () => {
-    // nothing
-  },
-  play: async () => {
-    // nothing
-  },
+  boot: async () => Promise.resolve(),
+  play: async () => Promise.resolve(),
   stop: async () => Promise.resolve(0),
-  setFrozen: () => {
-    // nothing
-  },
-  seek: () => {
-    // nothing
-  },
-  connectRecordingSource: () => () => {
-    // nothing
-  },
-  startRecording: () => {
-    // nothing
-  },
+  setFrozen: noop,
+  seek: noop,
+  connectRecordingSource: () => noop,
+  startRecording: noop,
   flushRecording: async () => Promise.resolve(0),
 });
 

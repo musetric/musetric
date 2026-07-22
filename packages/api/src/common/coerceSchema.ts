@@ -32,7 +32,7 @@ const coerceValues = {
           return parsed;
         }
       } catch {
-        // Ignore JSON parse errors
+        return value;
       }
     }
     return value;

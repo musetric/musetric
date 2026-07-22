@@ -1,8 +1,5 @@
 import { type DatabaseSync } from 'node:sqlite';
 
-// Do not attempt to migrate or preserve old tables/data.
-// Project is still early in development.
-
 const createProject = `
   CREATE TABLE IF NOT EXISTS Project (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

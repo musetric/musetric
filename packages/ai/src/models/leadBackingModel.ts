@@ -3,9 +3,6 @@ const hop = 1024;
 const dimF = 2048;
 const dimT = 256;
 
-// UVR MDX-Net karaoke model and inference parameters. The model is trained for
-// the MDX tensor contract used by Ultimate Vocal Remover GUI (MIT); see
-// thirdPartyNotices.md.
 export const leadBackingModel = {
   sourceUrl:
     'https://huggingface.co/AI4future/RVC/resolve/main/UVR_MDXNET_KARA_2.onnx',

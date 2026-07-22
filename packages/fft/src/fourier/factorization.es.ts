@@ -49,8 +49,6 @@ type RadixStage = 2 | 3 | 4 | 5;
 
 export type MultiPassRadixStage = RadixStage | 8;
 
-// Greedy radix-8-preferring stage list (then 4, 2, 3, 5) to minimise the
-// number of global-memory passes in the multi-pass pipelines.
 export const expandRadix8PreferredStages = (
   size: number,
 ): MultiPassRadixStage[] | undefined => {

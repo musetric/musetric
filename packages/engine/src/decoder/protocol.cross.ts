@@ -1,8 +1,5 @@
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
-// Int32Array<SharedArrayBuffer>; slot 0 = frameIndex (layout owned by
-// playhead.cross.ts in @musetric/audio). Typed locally so this cross-thread
-// module stays free of DOM-dependent imports.
 type Playhead = Int32Array<SharedArrayBuffer>;
 
 export type EngineDecoderOutboundMethods = {

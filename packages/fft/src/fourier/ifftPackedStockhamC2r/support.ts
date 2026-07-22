@@ -9,12 +9,6 @@ import {
 const pairThreadsPerGroup = 8;
 const maxPairGroupSize = 64;
 
-// Builds the kernel plan: adjacent stages with a combined group of at most 64
-// points are fused into pair kernels (two stages through shared memory per
-// global round trip). The first kernel fuses the C2R prepack read, the last
-// one (single or pair) the scaled unpack write. Full radix-64 pairs and
-// single stages measured fastest with 64-thread workgroups; narrower pairs
-// prefer 128.
 const selectPairThreadCount = (groupSize: number): number =>
   groupSize === 64 ? 64 : 128;
 
@@ -139,8 +133,6 @@ export const getPackedStockhamC2rVariant = (
     positiveWindowSize: packedWindowSize + 1,
   };
 
-  // Any factorization that fits the ping-pong shared budget (16 B/elem) runs
-  // the generic mixed-radix single-pass inverse.
   const maxSinglePassPacked = Math.floor(
     device.limits.maxComputeWorkgroupStorageSize / 16,
   );
@@ -148,8 +140,6 @@ export const getPackedStockhamC2rVariant = (
     return { kind: 'singlePass', ...base, radixStageCounts };
   }
 
-  // Sizes that still fit one shared buffer (8 B/elem) run an in-place
-  // mixed-radix single pass instead of the global multi-pass path.
   const maxInPlacePacked = Math.floor(
     device.limits.maxComputeWorkgroupStorageSize / 8,
   );
@@ -157,8 +147,6 @@ export const getPackedStockhamC2rVariant = (
     return { kind: 'inPlaceMixed', ...base, radixStageCounts };
   }
 
-  // Larger sizes run a generic multi-pass inverse through two global scratch
-  // buffers.
   const radixStageList = expandRadix8PreferredStages(packedWindowSize);
   if (radixStageList === undefined) {
     return undefined;

@@ -5,16 +5,13 @@ import { secondPassShader } from './secondPass.wgsl.js';
 import { secondPassMixedShader } from './secondPassMixed.wgsl.js';
 import { type PackedTiledR2cVariant } from './support.js';
 
-// Power-of-two tile FFTs of >= 128 points prefer radix-8 stages to minimise
-// the shared-memory round-trip/barrier count (e.g. 128 -> 8,8,2 = 3 stages
-// instead of 7). Smaller tiles keep radix-2: their butterfly count is already
-// below the thread count, so wider codelets only serialise work into fewer
-// threads (measured regressions at 64-point tiles under low window counts).
+const minRadix8Log2TileSize = 7;
+
 const createRadix8StageCounts = (
   log2Size: number,
   prefix: 'row' | 'column',
 ): Record<string, number> => {
-  if (log2Size < 7) {
+  if (log2Size < minRadix8Log2TileSize) {
     return {
       [`${prefix}Radix8StageCount`]: 0,
       [`${prefix}Radix4StageCount`]: 0,

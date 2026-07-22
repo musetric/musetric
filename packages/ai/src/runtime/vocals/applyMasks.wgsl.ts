@@ -1,6 +1,3 @@
-// Applies the complex masks predicted by the model to the source STFT and
-// scatters the result back into the packed (nFft + 2) spectrum layout for the
-// inverse FFT.
 export const vocalsApplyMasksShader = `
 override nFft: u32;
 override frames: u32;

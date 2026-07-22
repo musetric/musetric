@@ -1,5 +1,3 @@
-// Overlap-adds the inverse-FFT frames with the synthesis Hann window and
-// normalizes by the squared-window envelope, undoing the analysis padding.
 export const leadBackingOverlapAddShader = `
 override nFft: u32;
 override hop: u32;

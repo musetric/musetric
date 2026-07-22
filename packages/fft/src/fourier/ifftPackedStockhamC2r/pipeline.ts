@@ -24,8 +24,6 @@ const stageCount = (counts: TransformStageCounts): number =>
 
 const isPowerOfTwo = (value: number): boolean => (value & (value - 1)) === 0;
 
-// Greedy radix-8-preferring factorization (then 4, 2, 3, 5) to minimise the
-// stage/barrier count, mirroring the forward pipeline.
 const createRadix8PreferredCounts = (
   packedWindowSize: number,
 ): TransformStageCounts => {
@@ -69,9 +67,6 @@ const selectTransformThreadCount = (
   counts: TransformStageCounts,
 ): number => {
   if (variant.kind === 'inPlaceMixed') {
-    // Power-of-two in-place sizes (packed 4096) prefer the wide 256-thread
-    // groups like the forward radix-8 path; non-power-of-two keeps the
-    // stage-count rule tuned on 2560/3072/3840.
     if (isPowerOfTwo(variant.packedWindowSize)) {
       return 256;
     }
@@ -103,8 +98,6 @@ const createTransformConstants = (
   };
 };
 
-// The first kernel fuses the C2R prepack read and the last kernel fuses the
-// scaled unpack write, dropping two full global-memory passes.
 const createKernelConstants = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
   kernel: PackedStockhamC2rKernel,

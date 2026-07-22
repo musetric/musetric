@@ -32,12 +32,8 @@ export const createEngineAudioOutput = (
       outputNode: context.destination,
       supportsDeviceSelection: false,
       getDeviceId: () => deviceId,
-      setDeviceId: async () => {
-        // Device selection is not supported by this browser.
-      },
-      play: async () => {
-        // The AudioContext destination is driven directly.
-      },
+      setDeviceId: async () => Promise.resolve(),
+      play: async () => Promise.resolve(),
     };
   }
 
@@ -49,8 +45,6 @@ export const createEngineAudioOutput = (
       await setSinkId(nextDeviceId ?? '');
       deviceId = nextDeviceId;
     },
-    play: async () => {
-      // The AudioContext destination is driven directly.
-    },
+    play: async () => Promise.resolve(),
   };
 };

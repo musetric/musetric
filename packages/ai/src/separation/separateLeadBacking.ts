@@ -8,8 +8,6 @@ const trim = nFft / 2;
 const genSamples = chunkSamples - 2 * trim;
 const overlap = 0.25;
 
-// Chunking and overlap-add follow the MDX-Net demix flow used by Ultimate
-// Vocal Remover GUI, reimplemented for the browser runtime.
 const createHanning = (size: number): Float32Array<ArrayBuffer> => {
   const window = new Float32Array(size);
   if (size === 1) {
@@ -194,13 +192,10 @@ export const separateLeadBacking = async (
   const backingData = new Float32Array(primary.length);
   const leadData = new Float32Array(primary.length);
   for (let i = 0; i < primary.length; i++) {
-    const backingSample = primary[i];
-    // UVR/MDX residual separation is mix - primary * compensate. Since this
-    // path normalizes mix before demix, compute that residual before restoring
-    // the original peak to avoid mixing normalized and denormalized amplitudes.
-    const leadSample = mixture[i] - backingSample * compensate;
-    backingData[i] = backingSample * peak;
-    leadData[i] = leadSample * peak;
+    const normalizedBacking = primary[i];
+    const normalizedLeadResidual = mixture[i] - normalizedBacking * compensate;
+    backingData[i] = normalizedBacking * peak;
+    leadData[i] = normalizedLeadResidual * peak;
   }
 
   return {

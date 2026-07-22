@@ -66,7 +66,6 @@ const computeDirectionSpec = (
   windowCount: number,
   inverse: boolean,
 ): DirectionSpec => {
-  // Forward R2C: real (windowSize) -> complex (N/2+1). Inverse C2R reverses it.
   const positiveSize = Math.floor(windowSize / 2) + 1;
   return {
     input: inverse

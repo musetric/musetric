@@ -40,11 +40,6 @@ export type ProcessingState = {
 
   data: BenchmarkData;
   toDo: Task[];
-  /**
-   * Bumped each time the queue is reset (e.g. on param change). The processor
-   * captures it before a benchmark run and the reducer rejects results whose
-   * epoch is stale — no off-by-one possible.
-   */
   epoch: number;
 
   setParam: <K extends keyof BenchmarkParams>(

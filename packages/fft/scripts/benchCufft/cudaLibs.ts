@@ -63,7 +63,7 @@ export const loadCudaLibs = (): CudaLibs | undefined => {
         cufft: koffi.load(`${pair.cufft}.dll`),
       };
     } catch {
-      /* try next pair */
+      continue;
     }
   }
 
