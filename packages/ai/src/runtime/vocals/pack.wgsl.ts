@@ -1,6 +1,3 @@
-// Packs the FFT half-spectra into the model input tensor
-// [1, packedBins, frames, 2] where packedBins interleaves frequency bins of
-// both channels: packed = 2 * freq + channel.
 export const vocalsPackShader = `
 override nFft: u32;
 override frames: u32;

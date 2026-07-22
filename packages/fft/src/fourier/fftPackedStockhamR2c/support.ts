@@ -12,8 +12,6 @@ const pairThreadsPerGroup = 8;
 const isPowerOfTwo = (value: number): boolean =>
   Number.isInteger(Math.log2(value));
 
-// Greedy radix-8-preferring factorization (then 4, 2, 3, 5) used by the
-// in-place single-pass kernel to minimise the stage/barrier count.
 export type InPlaceMixedStageCounts = {
   radix8StageCount: number;
   radix4StageCount: number;
@@ -51,12 +49,6 @@ const createRadix8PreferredCounts = (
 
 const maxPairGroupSize = 64;
 
-// Builds the kernel plan: adjacent stages with a combined group of at most 64
-// points are fused into pair kernels (two stages through shared memory per
-// global round trip); the last stage stays single because it fuses the R2C
-// pack instead. Full radix-64 pairs and single stages measured fastest with
-// 64-thread workgroups; narrower pairs (fewer butterflies per group set)
-// prefer 128.
 const selectPairThreadCount = (groupSize: number): number =>
   groupSize === 64 ? 64 : 128;
 
@@ -128,9 +120,8 @@ const createMultiPassKernels = (
 
     const isLast = stageIndex === radixStageList.length - 1;
     const singleThreadCount = 64;
-    // The fused-pack last stage runs the butterfly pair (k, stageStride - k)
-    // per thread, so it only needs threads for k in [0, stride / 2].
-    const threadTotal = isLast
+    const fusedPackHalvesButterflyThreads = isLast;
+    const threadTotal = fusedPackHalvesButterflyThreads
       ? Math.floor(packedWindowSize / factor / 2) + 1
       : packedWindowSize / factor;
     kernels.push({
@@ -218,9 +209,6 @@ export const getPackedStockhamR2cVariant = (
     };
   }
 
-  // Non-power-of-two sizes that still fit a single shared buffer (8 B/elem) run
-  // as an in-place mixed-radix single pass instead of the global-memory-bound
-  // multi-pass path, keeping the whole transform resident in shared memory.
   const inPlaceStageCounts = createRadix8PreferredCounts(packedWindowSize);
   if (
     packedWindowSize <= maxInPlacePackedWindowSize &&

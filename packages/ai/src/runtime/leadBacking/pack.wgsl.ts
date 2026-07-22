@@ -1,6 +1,3 @@
-// Packs the FFT half-spectra into the model input tensor [1, 4, dimF, dimT]
-// (planar [channel, re/im, freq, frame]); the first 3 frequency bins are
-// zeroed to match the UVR MDX-Net reference contract.
 export const leadBackingPackShader = `
 override nFft: u32;
 override frames: u32;

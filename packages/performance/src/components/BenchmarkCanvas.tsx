@@ -15,8 +15,6 @@ export const BenchmarkCanvas: FC = () => {
         canvasRef.current,
         'Canvas element not found',
       );
-      // Set initial dimensions before transfer; later resizes are handled
-      // inside the processor via setOffscreenCanvasSize on each render.
       const preset =
         viewSizePresets[useProcessingStore.getState().params.viewSizeKey];
       canvas.width = preset.width;

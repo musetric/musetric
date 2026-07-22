@@ -20,8 +20,6 @@ import { vocalsPackShader } from './pack.wgsl.js';
 
 ort.env.logLevel = 'error';
 
-// WebGPU host stages around the Mel-Band RoFormer / SYHFT ONNX core.
-// See thirdPartyNotices.md for source and license details.
 export type VocalsProcessChunkOptions = {
   input: Float32Array<ArrayBuffer>;
   output: Float32Array<ArrayBuffer>;

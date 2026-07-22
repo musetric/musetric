@@ -24,8 +24,6 @@ export const PlayerProgress: FC = () => {
 
   const initialProgress = getTrackProgress(engine.store.get());
 
-  // High-frequency progress is driven straight into the DOM, bypassing React
-  // render: the Slider stays uncontrolled and we move its thumb/track manually.
   useEffect(() => {
     const root = ref.current;
 

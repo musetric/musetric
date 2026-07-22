@@ -1,7 +1,3 @@
-// Cuts the spectrogram into the tracker's overlapping windows, zero-filling
-// outside the piece. Ports split_piece: a window starting at starts[w] reads
-// spect[starts[w] + i], and the caller shifts the final start left so it ends
-// at the piece end.
 export const rhythmWindowsShader = `
 override melBins: u32;
 override frames: i32;

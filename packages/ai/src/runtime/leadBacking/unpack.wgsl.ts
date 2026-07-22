@@ -1,5 +1,3 @@
-// Unpacks the model output tensor into the packed (nFft + 2) half-spectrum
-// for the inverse FFT; bins at or above dimF are zero.
 export const leadBackingUnpackShader = `
 override nFft: u32;
 override frames: u32;

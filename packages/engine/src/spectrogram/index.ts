@@ -60,10 +60,9 @@ export const createEngineSpectrogram = (
     },
   });
 
-  // While playing, the spectrogram worker polls the shared playhead itself, so
-  // only push discrete progress changes (e.g. seeks while paused) from here.
   store.subscribe(getTrackProgress, (trackProgress) => {
-    if (store.get().playing) {
+    const spectrogramWorkerPollsPlayheadWhilePlaying = store.get().playing;
+    if (spectrogramWorkerPollsPlayheadWhilePlaying) {
       return;
     }
     port.methods.setTrackProgress({

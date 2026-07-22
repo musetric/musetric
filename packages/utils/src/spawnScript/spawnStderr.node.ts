@@ -29,9 +29,7 @@ export type StderrOptions =
 
 const defaultStderr: StderrOptions = {
   mode: 'binary',
-  onChunk: () => {
-    /* ignore */
-  },
+  onChunk: () => undefined,
 };
 
 export type AttachStderrOptions = {

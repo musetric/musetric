@@ -21,8 +21,6 @@ const selectStockhamThreadCount = (packedWindowSize: number): number => {
 
 const isPowerOfTwo = (value: number): boolean => (value & (value - 1)) === 0;
 
-// For power-of-two sizes prefer radix-8 stages to reduce stage/barrier count
-// (e.g. 2^11 -> 8,8,8,4 = 4 stages instead of 4,4,4,4,4,2 = 6 stages).
 const createRadix8StageCounts = (
   packedWindowSize: number,
 ): Record<string, number> => {
@@ -73,8 +71,6 @@ const createInPlaceMixedConstants = (
     counts.radix2StageCount +
     counts.radix3StageCount +
     counts.radix5StageCount;
-  // Fewer-stage transforms favour more, smaller workgroups; deeper ones favour
-  // the wider 256-thread groups for the high-butterfly-count radix-2/4 stages.
   const threadCount = stageCount <= 4 ? 128 : 256;
   return {
     packedWindowSize: variant.packedWindowSize,

@@ -1,9 +1,3 @@
-// Shared playback position between the audio worklet (writer) and the main
-// thread / workers (readers). The worklet stores the current frameIndex every
-// render quantum via Atomics; readers poll it from requestAnimationFrame instead
-// of receiving a postMessage per quantum. The revision lets readers ignore
-// values produced before the latest seek/play command.
-
 const frameIndexSlot = 0;
 const revisionSlot = 1;
 const slotCount = 2;

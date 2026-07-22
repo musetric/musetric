@@ -28,9 +28,7 @@ export type StdoutOptions<Message extends { type: string }> =
 
 const defaultStdout: StdoutOptions<never> = {
   mode: 'binary',
-  onChunk: () => {
-    /* ignore */
-  },
+  onChunk: () => undefined,
 };
 
 export type AttachStdoutOptions<Message extends { type: string }> = {

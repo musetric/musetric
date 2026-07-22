@@ -1,7 +1,3 @@
-// Projects the FFT half-spectra onto the mel filterbank and takes log1p, the
-// torchaudio MelSpectrogram(normalized='frame_length', power=1) contract.
-// WGSL has no log1p, so it is evaluated in the form that stays accurate as the
-// magnitude approaches zero.
 export const rhythmMelShader = `
 override nFft: u32;
 override bins: u32;

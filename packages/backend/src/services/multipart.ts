@@ -1,7 +1,7 @@
 import { fastifyMultipart } from '@fastify/multipart';
 import { type FastifyInstance } from 'fastify';
 
-// https://github.com/fastify/fastify-multipart/issues/574
+// @see https://github.com/fastify/fastify-multipart/issues/574
 declare module '@fastify/multipart' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface MultipartFile {

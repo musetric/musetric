@@ -3,8 +3,6 @@ const hop = 441;
 const frames = 1101;
 const packedBins = (nFft / 2 + 1) * 2;
 
-// Mel-Band RoFormer / SYHFT vocal separation ONNX artifact and tensor contract.
-// See thirdPartyNotices.md for source and license details.
 export const vocalsModel = {
   repo: 'https://huggingface.co/musetric/vocal-separation-roformer-onnx',
   revision: 'main',

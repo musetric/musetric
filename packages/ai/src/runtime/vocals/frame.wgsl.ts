@@ -1,5 +1,3 @@
-// Cuts the chunk into reflect-padded, Hann-windowed frames laid out in the
-// packed (nFft + 2) complex stride expected by the FFT.
 export const vocalsFrameShader = `
 override nFft: u32;
 override hop: u32;
