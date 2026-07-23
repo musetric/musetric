@@ -1,3 +1,4 @@
+import { isPowerOfTwo } from '../../factorization.es.js';
 import { multiPassPairStageShader } from './multiPassPairStage.wgsl.js';
 import { multiPassStageShader } from './multiPassStage.wgsl.js';
 import {
@@ -18,8 +19,6 @@ const selectStockhamThreadCount = (packedWindowSize: number): number => {
   }
   return 256;
 };
-
-const isPowerOfTwo = (value: number): boolean => (value & (value - 1)) === 0;
 
 const createRadix8StageCounts = (
   packedWindowSize: number,

@@ -1,6 +1,7 @@
 import { type FourierConfig } from '../config.es.js';
 import {
   createRadixStages,
+  isPowerOfTwo,
   type RadixStageCounts,
 } from '../factorization.es.js';
 import { selectBalancedTileShape } from '../tileShape.js';
@@ -10,9 +11,6 @@ const maxTileSize = 256;
 const maxWindowSize = 65536;
 const minPackedWindowSize = 4;
 const maxPackedWindowSize = maxWindowSize / 2;
-
-const isPowerOfTwo = (value: number): boolean =>
-  Number.isInteger(Math.log2(value));
 
 const maxPaddedSecondPassTileSize = 248;
 const secondPassPadColumns = 8;
