@@ -1,8 +1,8 @@
 import { type WebSocket } from '@fastify/websocket';
+import { type api } from '@musetric/api';
 import {
   broadcastRealtime,
   claimPlayerMaster,
-  type ProjectRealtimeEvent,
   type RecordingStartMessage,
   sendRealtimeEvent,
   sendRealtimePacket,
@@ -28,7 +28,7 @@ export type RecordingRealtimeContext = {
   isSocketClosed: () => boolean;
   setIgnoringRecordingStream: (value: boolean) => void;
   isIgnoringRecordingStream: () => boolean;
-  send: (event: ProjectRealtimeEvent) => void;
+  send: (event: api.project.realtime.Event) => void;
   closeWithError: (error: unknown, reason: string) => void;
   enqueueSessionAction: (reason: string, action: () => Promise<void>) => void;
 };

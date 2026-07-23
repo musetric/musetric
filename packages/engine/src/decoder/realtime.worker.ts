@@ -33,39 +33,10 @@ const closeSocket = (realtime: InternalRealtime) => {
   realtime.socket.close();
 };
 
-export type ProjectRealtimeEvent =
-  | {
-      type: 'recording.peaksChanged';
-      startPeakIndex: number;
-      peaks: number[];
-    }
-  | { type: 'recording.finished' }
-  | { type: 'recording.started' }
-  | { type: 'error'; error: string }
-  | { type: 'player.play' }
-  | { type: 'player.record' }
-  | { type: 'player.stop' }
-  | {
-      type: 'player.frameIndex';
-      frameIndex: number;
-      frozen: boolean;
-      revision: number;
-      source: 'playback' | 'user';
-    }
-  | { type: 'player.revision'; revision: number }
-  | {
-      type: 'player.sync.state';
-      active: boolean;
-      recording: boolean;
-      frozen: boolean;
-      frameIndex: number;
-      revision: number;
-    };
-
 export type ProjectRealtimeOptions = {
   isRecordingReady: () => boolean;
   onOpen: () => void;
-  onEvent: (event: ProjectRealtimeEvent) => void;
+  onEvent: (event: api.project.realtime.Event) => void;
   onPacket: (data: ArrayBuffer) => void;
   onClose: (error: Error) => void;
 };

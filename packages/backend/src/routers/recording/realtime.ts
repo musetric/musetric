@@ -1,4 +1,5 @@
 import { type WebSocket } from '@fastify/websocket';
+import { type api } from '@musetric/api';
 
 export type RecordingStartMessage = {
   type: 'recording.start';
@@ -82,38 +83,9 @@ export const isRealtimeMessage = (
 ): message is Record<string, unknown> =>
   typeof message === 'object' && Boolean(message);
 
-export type ProjectRealtimeEvent =
-  | { type: 'recording.started' }
-  | {
-      type: 'recording.peaksChanged';
-      startPeakIndex: number;
-      peaks: number[];
-    }
-  | { type: 'recording.finished' }
-  | { type: 'error'; error: string }
-  | { type: 'player.play' }
-  | { type: 'player.record' }
-  | { type: 'player.stop' }
-  | {
-      type: 'player.frameIndex';
-      frameIndex: number;
-      frozen: boolean;
-      revision: number;
-      source: 'playback' | 'user';
-    }
-  | { type: 'player.revision'; revision: number }
-  | {
-      type: 'player.sync.state';
-      active: boolean;
-      recording: boolean;
-      frozen: boolean;
-      frameIndex: number;
-      revision: number;
-    };
-
 export const sendRealtimeEvent = (
   socket: WebSocket,
-  event: ProjectRealtimeEvent,
+  event: api.project.realtime.Event,
 ): void => {
   if (socket.readyState !== 1) {
     return;

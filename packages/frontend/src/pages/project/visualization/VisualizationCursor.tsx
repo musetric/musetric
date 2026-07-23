@@ -1,16 +1,12 @@
 import { Box } from '@mui/material';
-import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
 import { useProjectStore } from '../store.js';
-
-const engineRenderKeys = ['frameCount', 'frameIndex'] as const;
-const projectRenderKeys = ['visualizationMode'] as const;
-const settingsRenderKeys = ['playheadRatio'] as const;
-
-const alignPixel = (value: number, pixelRatio: number) =>
-  Math.round(value * pixelRatio) / pixelRatio;
+import {
+  alignPixel,
+  subscribeVisualizationRender,
+} from './visualizationRender.js';
 
 export const VisualizationCursor: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
@@ -52,24 +48,14 @@ export const VisualizationCursor: FC = () => {
 
     render();
 
-    const unsubscribes = [
-      subscribeResizeObserver(parentElement, resize),
-      ...engineRenderKeys.map((key) =>
-        engine.store.subscribe((state) => state[key], render),
-      ),
-      ...projectRenderKeys.map((key) =>
-        useProjectStore.subscribe((state) => state[key], render),
-      ),
-      ...settingsRenderKeys.map((key) =>
-        useSettingsStore.subscribe((state) => state[key], render),
-      ),
-    ];
-
-    return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
-      }
-    };
+    return subscribeVisualizationRender({
+      resizeTarget: parentElement,
+      onResize: resize,
+      render,
+      engineKeys: ['frameCount', 'frameIndex'],
+      projectKeys: ['visualizationMode'],
+      settingsKeys: ['playheadRatio'],
+    });
   }, []);
 
   return (

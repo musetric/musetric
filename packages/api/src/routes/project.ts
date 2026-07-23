@@ -123,6 +123,35 @@ export namespace realtime {
   export type Params = z.infer<typeof base.paramsSchema>;
   export type Request = z.infer<typeof base.requestSchema>;
   export type Response = z.infer<typeof base.responseSchema>;
+
+  export type Event =
+    | { type: 'recording.started' }
+    | {
+        type: 'recording.peaksChanged';
+        startPeakIndex: number;
+        peaks: number[];
+      }
+    | { type: 'recording.finished' }
+    | { type: 'error'; error: string }
+    | { type: 'player.play' }
+    | { type: 'player.record' }
+    | { type: 'player.stop' }
+    | {
+        type: 'player.frameIndex';
+        frameIndex: number;
+        frozen: boolean;
+        revision: number;
+        source: 'playback' | 'user';
+      }
+    | { type: 'player.revision'; revision: number }
+    | {
+        type: 'player.sync.state';
+        active: boolean;
+        recording: boolean;
+        frozen: boolean;
+        frameIndex: number;
+        revision: number;
+      };
 }
 
 export namespace create {
