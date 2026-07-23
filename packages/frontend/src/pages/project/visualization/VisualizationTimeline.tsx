@@ -1,14 +1,14 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { createTimelineProcessor } from '@musetric/audio/timeline';
-import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
 import { useProjectStore } from '../store.js';
-
-const alignPixel = (value: number, pixelRatio: number) =>
-  Math.round(value * pixelRatio) / pixelRatio;
+import {
+  alignPixel,
+  subscribeVisualizationRender,
+} from './visualizationRender.js';
 
 export const VisualizationTimeline: FC = () => {
   const theme = useTheme();
@@ -22,10 +22,6 @@ export const VisualizationTimeline: FC = () => {
     if (!canvas || !handle) {
       return;
     }
-
-    const engineRenderKeys = ['duration', 'frameCount', 'frameIndex'] as const;
-    const projectRenderKeys = ['visualizationMode'] as const;
-    const settingsRenderKeys = ['visibleTime', 'playheadRatio'] as const;
 
     const processor = createTimelineProcessor({
       config: {
@@ -73,23 +69,17 @@ export const VisualizationTimeline: FC = () => {
 
     render();
 
-    const unsubscribes = [
-      subscribeResizeObserver(canvas, resize),
-      ...engineRenderKeys.map((key) =>
-        engine.store.subscribe((state) => state[key], render),
-      ),
-      ...projectRenderKeys.map((key) =>
-        useProjectStore.subscribe((state) => state[key], render),
-      ),
-      ...settingsRenderKeys.map((key) =>
-        useSettingsStore.subscribe((state) => state[key], render),
-      ),
-    ];
+    const unsubscribe = subscribeVisualizationRender({
+      resizeTarget: canvas,
+      onResize: resize,
+      render,
+      engineKeys: ['duration', 'frameCount', 'frameIndex'],
+      projectKeys: ['visualizationMode'],
+      settingsKeys: ['visibleTime', 'playheadRatio'],
+    });
 
     return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
-      }
+      unsubscribe();
       processor.dispose();
     };
   }, [theme]);

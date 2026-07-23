@@ -2,97 +2,40 @@ import { analyzeChords } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
-import {
-  type ProcessingWorkerEvent,
-  type ProcessingWorkerProgressEvent,
-} from './processingSummary.js';
+import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
+import { type ProcessingWorkerEvent } from './processingSummary.js';
 
 export type ChordsTask = {
   projectId: number;
   blobId: string;
 };
 
-export type ChordsWorker = {
-  run: (task: ChordsTask) => Promise<void>;
-  getState: (projectId: number) => ProcessingWorkerProgressEvent | undefined;
-};
+export type ChordsWorker = AnalysisWorker<ChordsTask>;
 
 export const createChordsWorker = (
   app: FastifyInstance,
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
-): ChordsWorker => {
-  let state: ProcessingWorkerProgressEvent | undefined = undefined;
+): ChordsWorker =>
+  createAnalysisWorker<ChordsTask>(emitter, logger, {
+    step: 'chords',
+    errorMessage: 'Chord detection failed',
+    process: async (task, handlers) => {
+      const sourcePath = app.blobStorage.getPath(task.blobId);
+      const chords = app.blobStorage.createPath();
 
-  return {
-    run: async (task) => {
-      try {
-        state = {
-          type: 'progress',
-          projectId: task.projectId,
-          step: 'chords',
-          progress: 0,
-        };
-        emitter.emit(state);
+      await analyzeChords({
+        gpuHost: app.gpuHost,
+        sourcePath,
+        resultPath: chords.blobPath,
+        handlers,
+        modelsPath: envs.modelsPath,
+        logger,
+      });
 
-        const sourcePath = app.blobStorage.getPath(task.blobId);
-        const chords = app.blobStorage.createPath();
-
-        await analyzeChords({
-          gpuHost: app.gpuHost,
-          sourcePath,
-          resultPath: chords.blobPath,
-          handlers: {
-            progress: (message) => {
-              if (!state) {
-                return;
-              }
-              state = {
-                ...state,
-                progress: message.progress,
-              };
-              emitter.emit(state);
-            },
-            download: (message) => {
-              if (!state) {
-                return;
-              }
-              state = {
-                ...state,
-                download: message,
-              };
-              emitter.emit(state);
-            },
-          },
-          modelsPath: envs.modelsPath,
-          logger,
-        });
-
-        await app.db.processing.applyChordsResult({
-          projectId: task.projectId,
-          blobId: chords.blobId,
-        });
-
-        emitter.emit({
-          type: 'complete',
-          projectId: task.projectId,
-          step: 'chords',
-        });
-        state = undefined;
-      } catch (error) {
-        emitter.emit({
-          type: 'error',
-          projectId: task.projectId,
-          step: 'chords',
-        });
-        state = undefined;
-        logger.error(
-          { projectId: task.projectId, error },
-          'Chord detection failed',
-        );
-      }
+      await app.db.processing.applyChordsResult({
+        projectId: task.projectId,
+        blobId: chords.blobId,
+      });
     },
-    getState: (projectId) =>
-      state && state.projectId === projectId ? state : undefined,
-  };
-};
+  });

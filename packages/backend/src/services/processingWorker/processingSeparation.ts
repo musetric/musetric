@@ -12,10 +12,8 @@ import {
 } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
 import { envs } from '../../common/envs.js';
-import {
-  type ProcessingWorkerEvent,
-  type ProcessingWorkerProgressEvent,
-} from './processingSummary.js';
+import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
+import { type ProcessingWorkerEvent } from './processingSummary.js';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -64,178 +62,126 @@ export type SeparationTask = {
   blobId: string;
 };
 
-export type SeparationWorker = {
-  run: (task: SeparationTask) => Promise<void>;
-  getState: (projectId: number) => ProcessingWorkerProgressEvent | undefined;
-};
+export type SeparationWorker = AnalysisWorker<SeparationTask>;
 
 export const createSeparationWorker = (
   app: FastifyInstance,
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
-): SeparationWorker => {
-  let state: ProcessingWorkerProgressEvent | undefined = undefined;
-
-  return {
-    run: async (task) => {
-      try {
-        state = {
-          type: 'progress',
-          projectId: task.projectId,
-          step: 'separation',
-          progress: 0,
-        };
-        emitter.emit(state);
-
-        const project = await app.db.project.get(task.projectId);
-        if (!project) {
-          throw new Error(`Project with id ${task.projectId} not found`);
-        }
-
-        const masterSourcePath = app.blobStorage.getPath(task.blobId);
-        const sourceAnalysisPromise = analyzeLoudness({
-          fromPath: masterSourcePath,
-          logger,
-        });
-        const masterLead = app.blobStorage.createPath();
-        const masterBacking = app.blobStorage.createPath();
-        const masterInstrumental = app.blobStorage.createPath();
-
-        await separateAudio({
-          gpuHost: app.gpuHost,
-          sourcePath: masterSourcePath,
-          leadPath: masterLead.blobPath,
-          backingPath: masterBacking.blobPath,
-          instrumentalPath: masterInstrumental.blobPath,
-          sampleRate: project.sampleRate,
-          handlers: {
-            progress: (message) => {
-              if (!state) {
-                return;
-              }
-              state = {
-                ...state,
-                progress: message.progress,
-              };
-              emitter.emit(state);
-            },
-            download: (message) => {
-              if (!state) {
-                return;
-              }
-              state = {
-                ...state,
-                download: message,
-              };
-              emitter.emit(state);
-            },
-          },
-          modelsPath: envs.modelsPath,
-          logger,
-        });
-
-        const deliveryLead = app.blobStorage.createPath();
-        const deliveryBacking = app.blobStorage.createPath();
-        const deliveryInstrumental = app.blobStorage.createPath();
-        await Promise.all([
-          convertToFmp4({
-            fromPath: masterLead.blobPath,
-            toPath: deliveryLead.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-          convertToFmp4({
-            fromPath: masterBacking.blobPath,
-            toPath: deliveryBacking.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-          convertToFmp4({
-            fromPath: masterInstrumental.blobPath,
-            toPath: deliveryInstrumental.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-        ]);
-
-        const wavePeaksLead = app.blobStorage.createPath();
-        const wavePeaksBacking = app.blobStorage.createPath();
-        const wavePeaksInstrumental = app.blobStorage.createPath();
-        await Promise.all([
-          generateWavePeaks({
-            fromPath: masterLead.blobPath,
-            toPath: wavePeaksLead.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-          generateWavePeaks({
-            fromPath: masterBacking.blobPath,
-            toPath: wavePeaksBacking.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-          generateWavePeaks({
-            fromPath: masterInstrumental.blobPath,
-            toPath: wavePeaksInstrumental.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-        ]);
-
-        const [sourceAnalysis, leadAnalysis] = await Promise.all([
-          sourceAnalysisPromise,
-          analyzeLeadVisualLoudness({
-            fromPath: masterLead.blobPath,
-            sampleRate: project.sampleRate,
-            logger,
-          }),
-        ]);
-
-        await app.db.processing.applySeparationResult({
-          projectId: task.projectId,
-          audioAnalysis: {
-            sourceIntegratedLoudnessDb: sourceAnalysis.integratedLoudnessDb,
-            sourceTruePeakDb: sourceAnalysis.truePeakDb,
-            sourceGainDb: calculateSourceGainDb(sourceAnalysis),
-            leadIntegratedLoudnessDb: leadAnalysis.integratedLoudnessDb,
-            leadTruePeakDb: leadAnalysis.truePeakDb,
-            leadP95RmsDb: leadAnalysis.p95RmsDb,
-            leadSpectrogramGainDb: calculateLeadSpectrogramGainDb(leadAnalysis),
-          },
-          master: {
-            leadId: masterLead.blobId,
-            backingId: masterBacking.blobId,
-            instrumentalId: masterInstrumental.blobId,
-          },
-          delivery: {
-            leadId: deliveryLead.blobId,
-            backingId: deliveryBacking.blobId,
-            instrumentalId: deliveryInstrumental.blobId,
-          },
-          wavePeaks: {
-            leadId: wavePeaksLead.blobId,
-            backingId: wavePeaksBacking.blobId,
-            instrumentalId: wavePeaksInstrumental.blobId,
-          },
-        });
-
-        state = undefined;
-        emitter.emit({
-          type: 'complete',
-          projectId: task.projectId,
-          step: 'separation',
-        });
-      } catch (error) {
-        emitter.emit({
-          type: 'error',
-          projectId: task.projectId,
-          step: 'separation',
-        });
-        state = undefined;
-        logger.error({ projectId: task.projectId, error }, 'Separation failed');
+): SeparationWorker =>
+  createAnalysisWorker<SeparationTask>(emitter, logger, {
+    step: 'separation',
+    errorMessage: 'Separation failed',
+    process: async (task, handlers) => {
+      const project = await app.db.project.get(task.projectId);
+      if (!project) {
+        throw new Error(`Project with id ${task.projectId} not found`);
       }
+
+      const masterSourcePath = app.blobStorage.getPath(task.blobId);
+      const sourceAnalysisPromise = analyzeLoudness({
+        fromPath: masterSourcePath,
+        logger,
+      });
+      const masterLead = app.blobStorage.createPath();
+      const masterBacking = app.blobStorage.createPath();
+      const masterInstrumental = app.blobStorage.createPath();
+
+      await separateAudio({
+        gpuHost: app.gpuHost,
+        sourcePath: masterSourcePath,
+        leadPath: masterLead.blobPath,
+        backingPath: masterBacking.blobPath,
+        instrumentalPath: masterInstrumental.blobPath,
+        sampleRate: project.sampleRate,
+        handlers,
+        modelsPath: envs.modelsPath,
+        logger,
+      });
+
+      const deliveryLead = app.blobStorage.createPath();
+      const deliveryBacking = app.blobStorage.createPath();
+      const deliveryInstrumental = app.blobStorage.createPath();
+      await Promise.all([
+        convertToFmp4({
+          fromPath: masterLead.blobPath,
+          toPath: deliveryLead.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+        convertToFmp4({
+          fromPath: masterBacking.blobPath,
+          toPath: deliveryBacking.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+        convertToFmp4({
+          fromPath: masterInstrumental.blobPath,
+          toPath: deliveryInstrumental.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+      ]);
+
+      const wavePeaksLead = app.blobStorage.createPath();
+      const wavePeaksBacking = app.blobStorage.createPath();
+      const wavePeaksInstrumental = app.blobStorage.createPath();
+      await Promise.all([
+        generateWavePeaks({
+          fromPath: masterLead.blobPath,
+          toPath: wavePeaksLead.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+        generateWavePeaks({
+          fromPath: masterBacking.blobPath,
+          toPath: wavePeaksBacking.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+        generateWavePeaks({
+          fromPath: masterInstrumental.blobPath,
+          toPath: wavePeaksInstrumental.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+      ]);
+
+      const [sourceAnalysis, leadAnalysis] = await Promise.all([
+        sourceAnalysisPromise,
+        analyzeLeadVisualLoudness({
+          fromPath: masterLead.blobPath,
+          sampleRate: project.sampleRate,
+          logger,
+        }),
+      ]);
+
+      await app.db.processing.applySeparationResult({
+        projectId: task.projectId,
+        audioAnalysis: {
+          sourceIntegratedLoudnessDb: sourceAnalysis.integratedLoudnessDb,
+          sourceTruePeakDb: sourceAnalysis.truePeakDb,
+          sourceGainDb: calculateSourceGainDb(sourceAnalysis),
+          leadIntegratedLoudnessDb: leadAnalysis.integratedLoudnessDb,
+          leadTruePeakDb: leadAnalysis.truePeakDb,
+          leadP95RmsDb: leadAnalysis.p95RmsDb,
+          leadSpectrogramGainDb: calculateLeadSpectrogramGainDb(leadAnalysis),
+        },
+        master: {
+          leadId: masterLead.blobId,
+          backingId: masterBacking.blobId,
+          instrumentalId: masterInstrumental.blobId,
+        },
+        delivery: {
+          leadId: deliveryLead.blobId,
+          backingId: deliveryBacking.blobId,
+          instrumentalId: deliveryInstrumental.blobId,
+        },
+        wavePeaks: {
+          leadId: wavePeaksLead.blobId,
+          backingId: wavePeaksBacking.blobId,
+          instrumentalId: wavePeaksInstrumental.blobId,
+        },
+      });
     },
-    getState: (projectId) =>
-      state && state.projectId === projectId ? state : undefined,
-  };
-};
+  });
