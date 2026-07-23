@@ -1,30 +1,15 @@
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { shader } from './sliceSamples.wgsl.js';
 
 export const createPipeline = (device: GPUDevice) => {
   const layout = device.createBindGroupLayout({
     label: 'slice-samples-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+      'read-only-storage',
+    ]),
   });
   const pipelineLayout = device.createPipelineLayout({
     label: 'slice-samples-pipeline-layout',

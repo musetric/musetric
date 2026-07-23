@@ -1,3 +1,4 @@
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { autocorrelationShader } from './autocorrelation.wgsl.js';
 import { shader } from './fundamentalFrequency.wgsl.js';
 import { trackShader } from './track.wgsl.js';
@@ -13,68 +14,28 @@ export const createPipelines = (
 ): FundamentalFrequencyPipelines => {
   const autocorrLayout = device.createBindGroupLayout({
     label: 'fundamental-frequency-autocorr-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ]),
   });
   const observeLayout = device.createBindGroupLayout({
     label: 'fundamental-frequency-observe-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ]),
   });
   const trackLayout = device.createBindGroupLayout({
     label: 'fundamental-frequency-track-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ]),
   });
   const autocorrPipelineLayout = device.createPipelineLayout({
     label: 'fundamental-frequency-autocorr-pipeline-layout',

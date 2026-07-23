@@ -1,19 +1,13 @@
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { createShader } from './remap.wgsl.js';
 
 export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
   const spectrumEntries = Array.from({ length: spectrumCount }).flatMap(
-    (_, index): GPUBindGroupLayoutEntry[] => [
-      {
-        binding: 2 + index * 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 3 + index * 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-    ],
+    (_, index) =>
+      computeBufferEntries(
+        ['read-only-storage', 'read-only-storage'],
+        2 + index * 2,
+      ),
   );
   const bindGroupLayout = device.createBindGroupLayout({
     label: 'remap-bind-group-layout',
