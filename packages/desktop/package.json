@@ -17,13 +17,27 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "dependencies": {
+    "@fastify/multipart": "catalog:",
+    "@fastify/static": "catalog:",
+    "@fastify/swagger": "catalog:",
+    "@fastify/swagger-ui": "catalog:",
+    "@fastify/websocket": "catalog:",
     "@musetric/ai": "workspace:*",
-    "@musetric/backend": "workspace:*",
+    "@musetric/api": "workspace:*",
+    "@musetric/backend-core": "workspace:*",
     "@musetric/backend-db": "workspace:*",
     "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/toolkit": "workspace:*",
     "@musetric/utils": "workspace:*",
+    "axios": "catalog:",
+    "fastify": "catalog:",
+    "fastify-sse-v2": "catalog:",
+    "fastify-type-provider-zod": "catalog:",
     "onnxruntime-web": "catalog:",
+    "openapi-types": "catalog:",
+    "pino": "catalog:",
+    "pino-pretty": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

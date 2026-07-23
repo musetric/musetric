@@ -1,5 +1,5 @@
 import { app, BrowserWindow } from 'electron';
-import { backendUrl, type DesktopBackend, startBackend } from './backend.js';
+import { type DesktopBackend, startBackend } from './backend.js';
 import { createElectronGpuHost } from './electronGpuHost.js';
 
 const main = (): void => {
@@ -46,7 +46,7 @@ const main = (): void => {
     app.quit();
   };
 
-  const createWindow = async (): Promise<void> => {
+  const createWindow = async (url: string): Promise<void> => {
     const window = new BrowserWindow({
       width: 1280,
       height: 800,
@@ -62,17 +62,18 @@ const main = (): void => {
         void shutdown();
       }
     });
-    await window.loadURL(backendUrl);
+    await window.loadURL(url);
   };
 
   const start = async (): Promise<void> => {
-    backend = await startBackend({
+    const activeBackend = await startBackend({
       gpuPageHostFactory: createElectronGpuHost(),
     });
-    await createWindow();
+    backend = activeBackend;
+    await createWindow(activeBackend.url);
     app.on('activate', () => {
       if (mainWindow === undefined) {
-        void createWindow();
+        void createWindow(activeBackend.url);
       }
     });
   };

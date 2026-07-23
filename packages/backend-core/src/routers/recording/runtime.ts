@@ -1,6 +1,5 @@
 import { bindLogger, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../../common/envs.js';
 import { type ProjectRealtime } from './realtime.js';
 import { type RecordingSession } from './session.js';
 
@@ -15,7 +14,7 @@ export const createRecordingRuntime = (
   app: FastifyInstance,
 ): RecordingRuntime => ({
   app,
-  logger: bindLogger(app.log, envs.logLevel),
+  logger: bindLogger(app.log, app.config.logLevel),
   sessions: new Map(),
   projectSessionIds: new Map(),
   projectPlayerStates: new Map(),

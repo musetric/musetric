@@ -1,41 +1,39 @@
-import { analyzeRhythm } from '@musetric/ai/node';
+import { analyzeKey } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../../common/envs.js';
 import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
 import { type ProcessingWorkerEvent } from './processingSummary.js';
 
-export type RhythmTask = {
+export type KeyTask = {
   projectId: number;
   blobId: string;
 };
 
-export type RhythmWorker = AnalysisWorker<RhythmTask>;
+export type KeyWorker = AnalysisWorker<KeyTask>;
 
-export const createRhythmWorker = (
+export const createKeyWorker = (
   app: FastifyInstance,
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
-): RhythmWorker =>
-  createAnalysisWorker<RhythmTask>(emitter, logger, {
-    step: 'rhythm',
-    errorMessage: 'Rhythm analysis failed',
+): KeyWorker =>
+  createAnalysisWorker<KeyTask>(emitter, logger, {
+    step: 'key',
+    errorMessage: 'Key detection failed',
     process: async (task, handlers) => {
       const sourcePath = app.blobStorage.getPath(task.blobId);
-      const rhythm = app.blobStorage.createPath();
+      const key = app.blobStorage.createPath();
 
-      await analyzeRhythm({
-        gpuHost: app.gpuHost,
+      await analyzeKey({
         sourcePath,
-        resultPath: rhythm.blobPath,
+        resultPath: key.blobPath,
         handlers,
-        modelsPath: envs.modelsPath,
+        modelsPath: app.config.modelsPath,
         logger,
       });
 
-      await app.db.processing.applyRhythmResult({
+      await app.db.processing.applyKeyResult({
         projectId: task.projectId,
-        blobId: rhythm.blobId,
+        blobId: key.blobId,
       });
     },
   });

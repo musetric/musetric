@@ -1,9 +1,11 @@
+import { type LogLevel } from '@musetric/utils';
 import { type FastifyLoggerOptions } from 'fastify';
 import { type LoggerOptions, stdSerializers } from 'pino';
 import PinoPretty from 'pino-pretty';
-import { envs } from '../common/envs.js';
 
-export const logger: FastifyLoggerOptions & LoggerOptions = {
+export const createLoggerOptions = (
+  logLevel: LogLevel,
+): FastifyLoggerOptions & LoggerOptions => ({
   serializers: {
     error: stdSerializers.err,
     err: stdSerializers.err,
@@ -14,5 +16,5 @@ export const logger: FastifyLoggerOptions & LoggerOptions = {
     translateTime: 'HH:MM:ss.l',
     ignore: 'pid,hostname',
   }),
-  level: envs.logLevel,
-};
+  level: logLevel,
+});

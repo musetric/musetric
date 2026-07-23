@@ -2063,6 +2063,61 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/backend-core@workspace:*, @musetric/backend-core@workspace:packages/backend-core":
+  version: 0.0.0-use.local
+  resolution: "@musetric/backend-core@workspace:packages/backend-core"
+  dependencies:
+    "@fastify/multipart": "catalog:"
+    "@fastify/static": "catalog:"
+    "@fastify/swagger": "catalog:"
+    "@fastify/swagger-ui": "catalog:"
+    "@fastify/websocket": "catalog:"
+    "@musetric/ai": "workspace:*"
+    "@musetric/api": "workspace:*"
+    "@musetric/backend-db": "workspace:*"
+    "@musetric/cqt": "workspace:*"
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/toolkit": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    "@types/node": "catalog:"
+    "@typescript/native": "catalog:"
+    axios: "catalog:"
+    eslint: "catalog:"
+    fastify: "catalog:"
+    fastify-sse-v2: "catalog:"
+    fastify-type-provider-zod: "catalog:"
+    onnxruntime-web: "catalog:"
+    openapi-types: "catalog:"
+    pino: "catalog:"
+    pino-pretty: "catalog:"
+    typescript: "catalog:"
+    zod: "catalog:"
+  peerDependencies:
+    "@fastify/multipart": 9.4.0
+    "@fastify/static": 9.1.3
+    "@fastify/swagger": 9.7.0
+    "@fastify/swagger-ui": 5.2.6
+    "@fastify/websocket": 11.2.0
+    "@musetric/ai": "workspace:*"
+    "@musetric/api": "workspace:*"
+    "@musetric/backend-db": "workspace:*"
+    "@musetric/cqt": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/toolkit": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    axios: 1.18.1
+    fastify: 5.8.5
+    fastify-sse-v2: 4.2.2
+    fastify-type-provider-zod: 6.1.0
+    onnxruntime-web: 1.26.0
+    openapi-types: 12.1.3
+    pino: 10.3.1
+    pino-pretty: 13.1.3
+    zod: 4.4.3
+  languageName: unknown
+  linkType: soft
+
 "@musetric/backend-db@workspace:*, @musetric/backend-db@workspace:packages/backend-db":
   version: 0.0.0-use.local
   resolution: "@musetric/backend-db@workspace:packages/backend-db"
@@ -2080,7 +2135,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@musetric/backend@workspace:*, @musetric/backend@workspace:packages/backend":
+"@musetric/backend@workspace:packages/backend":
   version: 0.0.0-use.local
   resolution: "@musetric/backend@workspace:packages/backend"
   dependencies:
@@ -2091,6 +2146,7 @@ __metadata:
     "@fastify/websocket": "catalog:"
     "@musetric/ai": "workspace:*"
     "@musetric/api": "workspace:*"
+    "@musetric/backend-core": "workspace:*"
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
@@ -2141,20 +2197,34 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/desktop@workspace:packages/desktop"
   dependencies:
+    "@fastify/multipart": "catalog:"
+    "@fastify/static": "catalog:"
+    "@fastify/swagger": "catalog:"
+    "@fastify/swagger-ui": "catalog:"
+    "@fastify/websocket": "catalog:"
     "@musetric/ai": "workspace:*"
-    "@musetric/backend": "workspace:*"
+    "@musetric/api": "workspace:*"
+    "@musetric/backend-core": "workspace:*"
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
+    "@musetric/toolkit": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
+    axios: "catalog:"
     electron: "catalog:"
     electron-builder: "catalog:"
     eslint: "catalog:"
+    fastify: "catalog:"
+    fastify-sse-v2: "catalog:"
+    fastify-type-provider-zod: "catalog:"
     onnxruntime-web: "catalog:"
+    openapi-types: "catalog:"
+    pino: "catalog:"
+    pino-pretty: "catalog:"
     typescript: "catalog:"
     zod: "catalog:"
   languageName: unknown

@@ -36,7 +36,7 @@ files:
   - '!**/node_modules/@musetric/backend/dist-browser/**'
 extraResources:
   - from: ../backend/storage/public
-    to: backend/public
+    to: backend/storage/public
   - from: ../backend/dist-browser
     to: backend/dist-browser
 asarUnpack:

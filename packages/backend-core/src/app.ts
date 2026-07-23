@@ -6,7 +6,7 @@ import {
 } from '@musetric/ai/node';
 import { fastify, type FastifyInstance } from 'fastify';
 import { FastifySSEPlugin } from 'fastify-sse-v2';
-import { envs } from './common/envs.js';
+import { type AppConfig } from './common/config.js';
 import { registerRouters } from './routers/index.js';
 import {
   disableRequestLogging,
@@ -16,8 +16,7 @@ import { registerBlobGarbageCollector } from './services/blobGarbageCollector.js
 import { registerBlobStorage } from './services/blobStorage.js';
 import { registerDb } from './services/db.js';
 import { registerFrontend } from './services/frontend.js';
-import { getHttps } from './services/https.js';
-import { logger } from './services/logger.js';
+import { createLoggerOptions } from './services/logger.js';
 import { registerMultipart } from './services/multipart.js';
 import { registerProcessingWorker } from './services/processingWorker/registerProcessingWorker.js';
 import { registerSchemaCompiler } from './services/schemaCompiler.js';
@@ -26,6 +25,7 @@ import { registerSwagger } from './services/swagger.js';
 declare module 'fastify' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface FastifyInstance {
+    config: AppConfig;
     gpuHost: GpuHost;
   }
 }
@@ -35,17 +35,19 @@ export type CreateServerAppOptions = {
 };
 
 export const createServerApp = async (
+  config: AppConfig,
   options: CreateServerAppOptions = {},
 ): Promise<FastifyInstance> => {
-  const https = await getHttps();
   const app: FastifyInstance = fastify({
-    logger,
+    logger: createLoggerOptions(config.logLevel),
     disableRequestLogging,
-    https,
+    // eslint-disable-next-line musetric/no-null-literal
+    https: config.https ?? null,
   });
+  app.decorate('config', config);
   app.decorate('gpuHost', {
     createGpuPage: options.gpuPageHostFactory ?? defaultGpuPageHostFactory,
-    browserBundlePath: envs.browserBundlePath,
+    browserBundlePath: config.browserBundlePath,
   });
   registerApiLogger(app);
   await registerDb(app);

@@ -1,7 +1,6 @@
 import { transcribeAudio } from '@musetric/ai/node';
 import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../../common/envs.js';
 import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
 import { type ProcessingWorkerEvent } from './processingSummary.js';
 
@@ -29,7 +28,7 @@ export const createTranscriptionWorker = (
         sourcePath,
         resultPath: transcription.blobPath,
         handlers,
-        modelsPath: envs.modelsPath,
+        modelsPath: app.config.modelsPath,
         logger,
       });
 

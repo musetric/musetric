@@ -3,7 +3,6 @@ import { fastifyRoute } from '@musetric/api/node';
 import { bindLogger } from '@musetric/utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
-import { envs } from '../common/envs.js';
 import {
   resolveProcessing,
   resolveProcessingEvent,
@@ -103,7 +102,7 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
       const blobSong = await createProjectSource({
         blobStorage: app.blobStorage,
         file: song,
-        logger: bindLogger(app.log, envs.logLevel),
+        logger: bindLogger(app.log, app.config.logLevel),
       });
       const blobPreview = preview
         ? await app.blobStorage.addFile(preview)
