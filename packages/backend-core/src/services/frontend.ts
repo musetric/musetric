@@ -1,6 +1,5 @@
 import { fastifyStatic } from '@fastify/static';
 import { type FastifyInstance, type FastifyRequest } from 'fastify';
-import { envs } from '../common/envs.js';
 
 const crossOriginIsolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -23,7 +22,7 @@ const isFrontendRequest = (request: FastifyRequest) => {
 
 export const registerFrontend = (app: FastifyInstance) => {
   app.register(fastifyStatic, {
-    root: envs.publicPath,
+    root: app.config.publicPath,
     prefix: '/',
     index: ['index.html'],
     setHeaders: (response) => {

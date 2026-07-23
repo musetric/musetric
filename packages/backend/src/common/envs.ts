@@ -18,7 +18,4 @@ export const envs = {
   logLevel: getLogLevel(),
   protocol: process.env.PROTOCOL === 'http' ? 'http' : 'https',
   ...storagePaths,
-  gcIntervalMs: 5 * 60 * 1000,
-  blobRetentionMs: 5 * 60 * 1000,
-  processingIntervalMs: 10 * 1000,
 };

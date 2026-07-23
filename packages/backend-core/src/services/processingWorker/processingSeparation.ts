@@ -11,7 +11,6 @@ import {
   sourceTargetLufs,
 } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../../common/envs.js';
 import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
 import { type ProcessingWorkerEvent } from './processingSummary.js';
 
@@ -95,7 +94,7 @@ export const createSeparationWorker = (
         instrumentalPath: masterInstrumental.blobPath,
         sampleRate: project.sampleRate,
         handlers,
-        modelsPath: envs.modelsPath,
+        modelsPath: app.config.modelsPath,
         logger,
       });
 

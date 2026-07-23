@@ -1,7 +1,6 @@
 import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../common/envs.js';
 
 export const registerSwagger = (app: FastifyInstance) => {
   app.register(fastifySwagger, {
@@ -9,7 +8,7 @@ export const registerSwagger = (app: FastifyInstance) => {
       info: {
         title: 'Musetric API',
         description: 'API documentation for Musetric',
-        version: envs.version,
+        version: app.config.version,
       },
     },
     transform: app.schemaTransform,

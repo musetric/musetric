@@ -2,10 +2,9 @@ import { type ServerOptions } from 'node:https';
 import { generate } from 'selfsigned';
 import { envs } from '../common/envs.js';
 
-export const getHttps = async (): Promise<ServerOptions | null> => {
+export const getHttps = async (): Promise<ServerOptions | undefined> => {
   if (envs.protocol !== 'https') {
-    // eslint-disable-next-line musetric/no-null-literal
-    return null;
+    return undefined;
   }
   const pems = await generate([{ name: 'commonName', value: 'localhost' }], {
     keySize: 2048,

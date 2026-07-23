@@ -16,6 +16,7 @@
     "**/vitest.config.ts",
     "**/vitest.bench.config.ts",
     "**/index.html",
+    "**/package.json",
     "**/*.bench.*",
     "**/*.test.*"
   ]

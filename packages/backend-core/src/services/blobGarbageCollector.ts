@@ -1,12 +1,12 @@
 import { createBlobGarbageCollector } from '@musetric/utils/node';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../common/envs.js';
+import { blobRetentionMs, gcIntervalMs } from '../common/config.js';
 
 export const registerBlobGarbageCollector = (app: FastifyInstance) => {
   const blobGarbageCollector = createBlobGarbageCollector({
     blobStorage: app.blobStorage,
-    gcIntervalMs: envs.gcIntervalMs,
-    blobRetentionMs: envs.blobRetentionMs,
+    gcIntervalMs,
+    blobRetentionMs,
     getReferencedBlobIds: async () => await app.db.blob.list(),
   });
 

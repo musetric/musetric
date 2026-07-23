@@ -6,7 +6,7 @@ import {
 import { type Scheduler } from '@musetric/utils/cross/scheduler';
 import { createSingleWorker } from '@musetric/utils/cross/singleWorker';
 import { type FastifyInstance } from 'fastify';
-import { envs } from '../../common/envs.js';
+import { processingIntervalMs } from '../../common/config.js';
 import { createChordsWorker } from './processingChords.js';
 import { createKeyWorker } from './processingKey.js';
 import { createRhythmWorker } from './processingRhythm.js';
@@ -28,7 +28,7 @@ export const createProcessingWorker = (
   app: FastifyInstance,
 ): ProcessingWorker => {
   const emitter = createEventEmitter<ProcessingWorkerEvent>();
-  const logger = bindLogger(app.log, envs.logLevel);
+  const logger = bindLogger(app.log, app.config.logLevel);
   const separationWorker = createSeparationWorker(app, emitter, logger);
   const transcriptionWorker = createTranscriptionWorker(app, emitter, logger);
   const rhythmWorker = createRhythmWorker(app, emitter, logger);
@@ -36,7 +36,7 @@ export const createProcessingWorker = (
   const chordsWorker = createChordsWorker(app, emitter, logger);
 
   const worker = createSingleWorker({
-    intervalMs: envs.processingIntervalMs,
+    intervalMs: processingIntervalMs,
     runNext: async () => {
       const transcription = await app.db.processing.pendingTranscription();
       if (transcription) {

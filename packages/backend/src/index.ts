@@ -1,9 +1,21 @@
-import { createServerApp } from './app.js';
+import { createServerApp } from '@musetric/backend-core';
+import { type AppConfig } from '@musetric/backend-core/config';
 import { killDevHost } from './common/dev.js';
 import { envs } from './common/envs.js';
+import { getHttps } from './services/https.js';
 
 const startServer = async () => {
-  const app = await createServerApp();
+  const config: AppConfig = {
+    version: envs.version,
+    logLevel: envs.logLevel,
+    blobsPath: envs.blobsPath,
+    publicPath: envs.publicPath,
+    databasePath: envs.databasePath,
+    modelsPath: envs.modelsPath,
+    browserBundlePath: envs.browserBundlePath,
+    https: await getHttps(),
+  };
+  const app = await createServerApp(config);
   try {
     await app.listen({
       port: envs.port,
