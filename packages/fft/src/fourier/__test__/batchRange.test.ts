@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveFourierBatchRange } from '../batchRange.js';
-import { createIfftPackedStockhamC2r } from '../ifftPackedStockhamC2r/index.js';
-import { getPackedStockhamC2rVariant } from '../ifftPackedStockhamC2r/support.js';
+import { createIfftPackedStockhamC2r } from '../fftPackedStockham/c2r/index.js';
+import { getPackedStockhamC2rVariant } from '../fftPackedStockham/c2r/support.js';
 import { type FourierBatchRange } from '../types.js';
 import {
   batchRanges,

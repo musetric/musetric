@@ -1,3 +1,5 @@
+import { stockhamCombines } from '../butterflyLadder.wgsl.js';
+
 export const transformInPlaceMixedShader = `
 override packedWindowSize: u32 = 2560u;
 override radix8StageCount: u32 = 0u;
@@ -7,13 +9,7 @@ override radix3StageCount: u32 = 0u;
 override radix5StageCount: u32 = 0u;
 override inPlace: u32 = 1u;
 override threadCount: u32 = 256u;
-
-const sqrt1_2: f32 = 0.70710678118654752440;
-const sin3: f32 = 0.86602540378443864676;
-const cos5a: f32 = 0.30901699437494742410;
-const cos5b: f32 = -0.80901699437494742410;
-const sin5a: f32 = 0.95105651629515357212;
-const sin5b: f32 = 0.58778525229247312917;
+override twiddleSign: f32 = -1.0;
 
 struct Params {
   windowSize: u32,
@@ -28,7 +24,7 @@ var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 @group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
 @group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
 @group(0) @binding(4) var<uniform> params: Params;
-
+${stockhamCombines}
 fn getFactorCount() -> u32 {
   return radix8StageCount + radix4StageCount + radix2StageCount +
     radix3StageCount + radix5StageCount;
@@ -140,17 +136,6 @@ fn loadPacked(inputOffset: u32, packedIndex: u32) -> vec2<f32> {
   return vec2<f32>(readInput(inputOffset, s), readInput(inputOffset, s + 1u));
 }
 
-fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
-  return vec2<f32>(
-    a.x * b.x - a.y * b.y,
-    a.x * b.y + a.y * b.x,
-  );
-}
-
-fn getFftTwiddle(index: u32) -> vec2<f32> {
-  return vec2<f32>(fftTrigTable[2u * index], -fftTrigTable[2u * index + 1u]);
-}
-
 fn getResult(index: u32) -> vec2<f32> {
   return sm[index];
 }
@@ -211,35 +196,16 @@ fn main(
       let a5 = loadPacked(inputOffset, j + 5u * butterflyCount);
       let a6 = loadPacked(inputOffset, j + 6u * butterflyCount);
       let a7 = loadPacked(inputOffset, j + 7u * butterflyCount);
-      let e0 = a0 + a4;
-      let e1 = a0 - a4;
-      let e2 = a2 + a6;
-      let e3 = a2 - a6;
-      let E0 = e0 + e2;
-      let E1 = e1 + vec2<f32>(e3.y, -e3.x);
-      let E2 = e0 - e2;
-      let E3 = e1 + vec2<f32>(-e3.y, e3.x);
-      let f0 = a1 + a5;
-      let f1 = a1 - a5;
-      let f2 = a3 + a7;
-      let f3 = a3 - a7;
-      let O0 = f0 + f2;
-      let O1 = f1 + vec2<f32>(f3.y, -f3.x);
-      let O2 = f0 - f2;
-      let O3 = f1 + vec2<f32>(-f3.y, f3.x);
-      let p0 = O0;
-      let p1 = vec2<f32>(sqrt1_2 * (O1.x + O1.y), sqrt1_2 * (O1.y - O1.x));
-      let p2 = vec2<f32>(O2.y, -O2.x);
-      let p3 = vec2<f32>(sqrt1_2 * (O3.y - O3.x), -sqrt1_2 * (O3.x + O3.y));
+      let y = combineRadix8(a0, a1, a2, a3, a4, a5, a6, a7);
       let dst = reverseRestMixed(j) * 8u;
-      store(dst, E0 + p0);
-      store(dst + 1u, E1 + p1);
-      store(dst + 2u, E2 + p2);
-      store(dst + 3u, E3 + p3);
-      store(dst + 4u, E0 - p0);
-      store(dst + 5u, E1 - p1);
-      store(dst + 6u, E2 - p2);
-      store(dst + 7u, E3 - p3);
+      store(dst, y[0]);
+      store(dst + 1u, y[1]);
+      store(dst + 2u, y[2]);
+      store(dst + 3u, y[3]);
+      store(dst + 4u, y[4]);
+      store(dst + 5u, y[5]);
+      store(dst + 6u, y[6]);
+      store(dst + 7u, y[7]);
     }
     workgroupBarrier();
     stride = 8u;
@@ -268,41 +234,22 @@ fn main(
         let base = block * (stride * 8u) + k;
         let tw = k * twiddleScale;
         let a0 = getResult(base);
-        let a1 = mul(getResult(base + stride), getFftTwiddle(tw));
-        let a2 = mul(getResult(base + 2u * stride), getFftTwiddle(2u * tw));
-        let a3 = mul(getResult(base + 3u * stride), getFftTwiddle(3u * tw));
-        let a4 = mul(getResult(base + 4u * stride), getFftTwiddle(4u * tw));
-        let a5 = mul(getResult(base + 5u * stride), getFftTwiddle(5u * tw));
-        let a6 = mul(getResult(base + 6u * stride), getFftTwiddle(6u * tw));
-        let a7 = mul(getResult(base + 7u * stride), getFftTwiddle(7u * tw));
-        let e0 = a0 + a4;
-        let e1 = a0 - a4;
-        let e2 = a2 + a6;
-        let e3 = a2 - a6;
-        let E0 = e0 + e2;
-        let E1 = e1 + vec2<f32>(e3.y, -e3.x);
-        let E2 = e0 - e2;
-        let E3 = e1 + vec2<f32>(-e3.y, e3.x);
-        let f0 = a1 + a5;
-        let f1 = a1 - a5;
-        let f2 = a3 + a7;
-        let f3 = a3 - a7;
-        let O0 = f0 + f2;
-        let O1 = f1 + vec2<f32>(f3.y, -f3.x);
-        let O2 = f0 - f2;
-        let O3 = f1 + vec2<f32>(-f3.y, f3.x);
-        let p0 = O0;
-        let p1 = vec2<f32>(sqrt1_2 * (O1.x + O1.y), sqrt1_2 * (O1.y - O1.x));
-        let p2 = vec2<f32>(O2.y, -O2.x);
-        let p3 = vec2<f32>(sqrt1_2 * (O3.y - O3.x), -sqrt1_2 * (O3.x + O3.y));
-        store(base, E0 + p0);
-        store(base + stride, E1 + p1);
-        store(base + 2u * stride, E2 + p2);
-        store(base + 3u * stride, E3 + p3);
-        store(base + 4u * stride, E0 - p0);
-        store(base + 5u * stride, E1 - p1);
-        store(base + 6u * stride, E2 - p2);
-        store(base + 7u * stride, E3 - p3);
+        let a1 = mul(getResult(base + stride), getTwiddle(tw));
+        let a2 = mul(getResult(base + 2u * stride), getTwiddle(2u * tw));
+        let a3 = mul(getResult(base + 3u * stride), getTwiddle(3u * tw));
+        let a4 = mul(getResult(base + 4u * stride), getTwiddle(4u * tw));
+        let a5 = mul(getResult(base + 5u * stride), getTwiddle(5u * tw));
+        let a6 = mul(getResult(base + 6u * stride), getTwiddle(6u * tw));
+        let a7 = mul(getResult(base + 7u * stride), getTwiddle(7u * tw));
+        let y = combineRadix8(a0, a1, a2, a3, a4, a5, a6, a7);
+        store(base, y[0]);
+        store(base + stride, y[1]);
+        store(base + 2u * stride, y[2]);
+        store(base + 3u * stride, y[3]);
+        store(base + 4u * stride, y[4]);
+        store(base + 5u * stride, y[5]);
+        store(base + 6u * stride, y[6]);
+        store(base + 7u * stride, y[7]);
       }
     } else if (factor == 4u) {
       for (var j = t; j < butterflyCount; j += threadCount) {
@@ -311,29 +258,25 @@ fn main(
         let base = block * (stride * 4u) + k;
         let tw = k * twiddleScale;
         let a0 = getResult(base);
-        let a1 = mul(getResult(base + stride), getFftTwiddle(tw));
-        let a2 = mul(getResult(base + 2u * stride), getFftTwiddle(2u * tw));
-        let a3 = mul(getResult(base + 3u * stride), getFftTwiddle(3u * tw));
-        let sum02 = a0 + a2;
-        let diff02 = a0 - a2;
-        let sum13 = a1 + a3;
-        let diff13 = a1 - a3;
-        let minusIDiff13 = vec2<f32>(diff13.y, -diff13.x);
-        let plusIDiff13 = vec2<f32>(-diff13.y, diff13.x);
-        store(base, sum02 + sum13);
-        store(base + stride, diff02 + minusIDiff13);
-        store(base + 2u * stride, sum02 - sum13);
-        store(base + 3u * stride, diff02 + plusIDiff13);
+        let a1 = mul(getResult(base + stride), getTwiddle(tw));
+        let a2 = mul(getResult(base + 2u * stride), getTwiddle(2u * tw));
+        let a3 = mul(getResult(base + 3u * stride), getTwiddle(3u * tw));
+        let y = combineRadix4(a0, a1, a2, a3);
+        store(base, y[0]);
+        store(base + stride, y[1]);
+        store(base + 2u * stride, y[2]);
+        store(base + 3u * stride, y[3]);
       }
     } else if (factor == 2u) {
       for (var j = t; j < butterflyCount; j += threadCount) {
         let k = j % stride;
         let block = j / stride;
         let base = block * (stride * 2u) + k;
-        let a = getResult(base);
-        let b = mul(getResult(base + stride), getFftTwiddle(k * twiddleScale));
-        store(base, a + b);
-        store(base + stride, a - b);
+        let a0 = getResult(base);
+        let a1 = mul(getResult(base + stride), getTwiddle(k * twiddleScale));
+        let y = combineRadix2(a0, a1);
+        store(base, y[0]);
+        store(base + stride, y[1]);
       }
     } else if (factor == 3u) {
       for (var j = t; j < butterflyCount; j += threadCount) {
@@ -342,15 +285,12 @@ fn main(
         let base = block * (stride * 3u) + k;
         let tw = k * twiddleScale;
         let a0 = getResult(base);
-        let a1 = mul(getResult(base + stride), getFftTwiddle(tw));
-        let a2 = mul(getResult(base + 2u * stride), getFftTwiddle(2u * tw));
-        let t1 = a1 + a2;
-        let m = a0 - 0.5 * t1;
-        let d = a2 - a1;
-        let ids = vec2<f32>(-sin3 * d.y, sin3 * d.x);
-        store(base, a0 + t1);
-        store(base + stride, m + ids);
-        store(base + 2u * stride, m - ids);
+        let a1 = mul(getResult(base + stride), getTwiddle(tw));
+        let a2 = mul(getResult(base + 2u * stride), getTwiddle(2u * tw));
+        let y = combineRadix3(a0, a1, a2);
+        store(base, y[0]);
+        store(base + stride, y[1]);
+        store(base + 2u * stride, y[2]);
       }
     } else {
       for (var j = t; j < butterflyCount; j += threadCount) {
@@ -359,23 +299,16 @@ fn main(
         let base = block * (stride * 5u) + k;
         let tw = k * twiddleScale;
         let a0 = getResult(base);
-        let a1 = mul(getResult(base + stride), getFftTwiddle(tw));
-        let a2 = mul(getResult(base + 2u * stride), getFftTwiddle(2u * tw));
-        let a3 = mul(getResult(base + 3u * stride), getFftTwiddle(3u * tw));
-        let a4 = mul(getResult(base + 4u * stride), getFftTwiddle(4u * tw));
-        let t1 = a1 + a4;
-        let t2 = a2 + a3;
-        let t3 = a1 - a4;
-        let t4 = a2 - a3;
-        let b1 = a0 + cos5a * t1 + cos5b * t2;
-        let b2 = a0 + cos5b * t1 + cos5a * t2;
-        let b3 = sin5a * t3 + sin5b * t4;
-        let b4 = sin5b * t3 - sin5a * t4;
-        store(base, a0 + t1 + t2);
-        store(base + stride, b1 + vec2<f32>(b3.y, -b3.x));
-        store(base + 2u * stride, b2 + vec2<f32>(b4.y, -b4.x));
-        store(base + 3u * stride, b2 + vec2<f32>(-b4.y, b4.x));
-        store(base + 4u * stride, b1 + vec2<f32>(-b3.y, b3.x));
+        let a1 = mul(getResult(base + stride), getTwiddle(tw));
+        let a2 = mul(getResult(base + 2u * stride), getTwiddle(2u * tw));
+        let a3 = mul(getResult(base + 3u * stride), getTwiddle(3u * tw));
+        let a4 = mul(getResult(base + 4u * stride), getTwiddle(4u * tw));
+        let y = combineRadix5(a0, a1, a2, a3, a4);
+        store(base, y[0]);
+        store(base + stride, y[1]);
+        store(base + 2u * stride, y[2]);
+        store(base + 3u * stride, y[3]);
+        store(base + 4u * stride, y[4]);
       }
     }
 

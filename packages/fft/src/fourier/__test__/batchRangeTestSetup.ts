@@ -1,8 +1,8 @@
 import { createGpuBufferReader, createGpuContext } from '@musetric/utils/gpu';
 import { expect } from 'vitest';
-import { createFftPackedStockhamR2c } from '../fftPackedStockhamR2c/index.js';
+import { createIfftPackedStockhamC2r } from '../fftPackedStockham/c2r/index.js';
+import { createFftPackedStockhamR2c } from '../fftPackedStockham/r2c/index.js';
 import { createFftPackedTiledR2c } from '../fftPackedTiledR2c/index.js';
-import { createIfftPackedStockhamC2r } from '../ifftPackedStockhamC2r/index.js';
 import {
   type CreateFourier,
   type Fourier,

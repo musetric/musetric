@@ -1,10 +1,10 @@
-import { type FourierConfig } from '../config.es.js';
+import { type FourierConfig } from '../../config.es.js';
 import {
   createRadixStages,
   expandRadix8PreferredStages,
   type MultiPassRadixStage,
   type RadixStageCounts,
-} from '../factorization.es.js';
+} from '../../factorization.es.js';
 
 const minPackedWindowSize = 2;
 const pairThreadsPerGroup = 8;

@@ -1,6 +1,7 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
-import { type FourierArg } from '../types.js';
-import { createParamsRing, type ParamsRing } from './params.js';
+import { type FourierArg } from '../../types.js';
+import { createParamsRing, type ParamsRing } from '../params.js';
+import { disposeTrigTables, type TrigTables } from '../trigTables.js';
 import {
   createPipeline,
   type MultiPassPipeline,
@@ -11,11 +12,7 @@ import {
   getPackedStockhamR2cVariant,
   type PackedStockhamR2cVariant,
 } from './support.js';
-import {
-  createTrigTables,
-  disposeTrigTables,
-  type TrigTables,
-} from './trigTables.js';
+import { createTrigTables } from './trigTables.js';
 
 const createDummyInputBuffer = (device: GPUDevice): GPUBuffer =>
   device.createBuffer({
@@ -169,7 +166,11 @@ export const createStateCell = (
           `fftPackedStockhamR2c does not support windowSize=${arg.config.windowSize}`,
         );
       }
-      const params = createParamsRing(device, arg.config);
+      const params = createParamsRing(
+        device,
+        arg.config,
+        'packed-stockham-r2c-params',
+      );
       const dummyInput = createDummyInputBuffer(device);
       const input = inPlace ? dummyInput : arg.wave;
       const pipeline = createPipeline(device, variant, inPlace);

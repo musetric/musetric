@@ -1,6 +1,7 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
-import { type FourierArg } from '../types.js';
-import { createParamsRing, type ParamsRing } from './params.js';
+import { type FourierArg } from '../../types.js';
+import { createParamsRing, type ParamsRing } from '../params.js';
+import { disposeTrigTables, type TrigTables } from '../trigTables.js';
 import {
   createPipeline,
   type MultiPassPipeline,
@@ -11,11 +12,7 @@ import {
   getPackedStockhamC2rVariant,
   type PackedStockhamC2rVariant,
 } from './support.js';
-import {
-  createTrigTables,
-  disposeTrigTables,
-  type TrigTables,
-} from './trigTables.js';
+import { createTrigTables } from './trigTables.js';
 
 const createDummySpectrumBuffer = (device: GPUDevice): GPUBuffer =>
   device.createBuffer({
@@ -105,7 +102,11 @@ export const createStateCell = (
       const inPlace = arg.wave === arg.spectrum;
       const pipeline = createPipeline(device, variant, inPlace);
       const tables = createTrigTables(device, variant);
-      const params = createParamsRing(device, arg.config);
+      const params = createParamsRing(
+        device,
+        arg.config,
+        'packed-stockham-c2r-params',
+      );
       const { windowCount } = arg.config;
       const dummySpectrum = createDummySpectrumBuffer(device);
       const spectrum = inPlace ? dummySpectrum : arg.spectrum;
