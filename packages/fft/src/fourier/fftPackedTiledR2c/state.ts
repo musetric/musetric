@@ -1,6 +1,7 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
+import { createParamsRing, type ParamsRing } from '../params.js';
+import { createSlotCache } from '../slotCache.js';
 import { type FourierArg } from '../types.js';
-import { createParamsRing, type ParamsRing } from './params.js';
 import { createPipelines, type Pipelines } from './pipeline.js';
 import {
   getPackedTiledR2cVariant,
@@ -93,20 +94,6 @@ const createBindGroups = (
   }),
 });
 
-const createSlotCache = <T>(
-  build: (slot: number) => T,
-): ((slot: number) => T) => {
-  const cache = new Map<number, T>();
-  return (slot) => {
-    let cached = cache.get(slot);
-    if (cached === undefined) {
-      cached = build(slot);
-      cache.set(slot, cached);
-    }
-    return cached;
-  };
-};
-
 export type State = {
   pipelines: Pipelines;
   tables: TrigTables;
@@ -140,7 +127,11 @@ export const createStateCell = (
         variant,
         arg.config.windowCount,
       );
-      const params = createParamsRing(device, arg.config);
+      const params = createParamsRing(
+        device,
+        arg.config,
+        'packed-tiled-r2c-params',
+      );
 
       return {
         pipelines,

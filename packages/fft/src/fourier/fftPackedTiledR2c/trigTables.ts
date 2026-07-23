@@ -1,31 +1,9 @@
+import {
+  createFftTrigTable,
+  createR2cTrigTable,
+  createTrigBuffer,
+} from '../trigTables.js';
 import { type PackedTiledR2cVariant } from './support.js';
-
-const createBuffer = (
-  device: GPUDevice,
-  label: string,
-  array: Float32Array<ArrayBuffer>,
-): GPUBuffer => {
-  const buffer = device.createBuffer({
-    label,
-    size: array.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(buffer, 0, array);
-  return buffer;
-};
-
-const createFftTrigTable = (
-  size: number,
-  entryCount: number,
-): Float32Array<ArrayBuffer> => {
-  const table = new Float32Array(entryCount * 2);
-  for (let i = 0; i < entryCount; i++) {
-    const angle = (2 * Math.PI * i) / size;
-    table[2 * i] = Math.cos(angle);
-    table[2 * i + 1] = Math.sin(angle);
-  }
-  return table;
-};
 
 const createFourStepTrigTable = (
   variant: PackedTiledR2cVariant,
@@ -42,19 +20,6 @@ const createFourStepTrigTable = (
   return table;
 };
 
-const createR2cTrigTable = (
-  variant: PackedTiledR2cVariant,
-): Float32Array<ArrayBuffer> => {
-  const halfSize = variant.windowSize / 2;
-  const table = new Float32Array((halfSize + 1) * 2);
-  for (let k = 0; k <= halfSize; k++) {
-    const angle = (2 * Math.PI * k) / variant.windowSize;
-    table[2 * k] = Math.cos(angle);
-    table[2 * k + 1] = Math.sin(angle);
-  }
-  return table;
-};
-
 export type TrigTables = {
   rowFft: GPUBuffer;
   columnFft: GPUBuffer;
@@ -66,25 +31,25 @@ export const createTrigTables = (
   device: GPUDevice,
   variant: PackedTiledR2cVariant,
 ): TrigTables => ({
-  rowFft: createBuffer(
+  rowFft: createTrigBuffer(
     device,
     'packed-tiled-r2c-row-trig-table',
-    createFftTrigTable(variant.rowSize, variant.rowSize),
+    createFftTrigTable(variant.rowSize),
   ),
-  columnFft: createBuffer(
+  columnFft: createTrigBuffer(
     device,
     'packed-tiled-r2c-column-trig-table',
-    createFftTrigTable(variant.columnSize, variant.columnSize),
+    createFftTrigTable(variant.columnSize),
   ),
-  fourStep: createBuffer(
+  fourStep: createTrigBuffer(
     device,
     'packed-tiled-r2c-four-step-trig-table',
     createFourStepTrigTable(variant),
   ),
-  r2c: createBuffer(
+  r2c: createTrigBuffer(
     device,
     'packed-tiled-r2c-r2c-trig-table',
-    createR2cTrigTable(variant),
+    createR2cTrigTable(variant.windowSize),
   ),
 });
 
