@@ -1,3 +1,5 @@
+import { stockhamCombines } from '../butterflyLadder.wgsl.js';
+
 export const multiPassStageShader = `
 override packedWindowSize: u32 = 2560u;
 override factor: u32 = 5u;
@@ -7,14 +9,9 @@ override readBufferIndex: u32 = 0u;
 override writeBufferIndex: u32 = 0u;
 override inPlace: u32 = 1u;
 override fuseR2cPack: u32 = 0u;
+override twiddleSign: f32 = -1.0;
 
 override threadCount: u32 = 64u;
-const sqrt1_2: f32 = 0.70710678118654752440;
-const sin3: f32 = 0.86602540378443864676;
-const cos5a: f32 = 0.30901699437494742410;
-const cos5b: f32 = -0.80901699437494742410;
-const sin5a: f32 = 0.95105651629515357212;
-const sin5b: f32 = 0.58778525229247312917;
 
 struct Params {
   windowSize: u32,
@@ -31,18 +28,7 @@ struct Params {
 @group(0) @binding(6) var<storage, read> r2cTrigTable: array<f32>;
 
 var<private> yOut: array<vec2<f32>, 8>;
-
-fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
-  return vec2<f32>(
-    a.x * b.x - a.y * b.y,
-    a.x * b.y + a.y * b.x,
-  );
-}
-
-fn getFftTwiddle(index: u32) -> vec2<f32> {
-  return vec2<f32>(fftTrigTable[2u * index], -fftTrigTable[2u * index + 1u]);
-}
-
+${stockhamCombines}
 fn readScratch(index: u32) -> vec2<f32> {
   if (readBufferIndex == 0u) {
     return scratch0[index];
@@ -112,104 +98,73 @@ fn computeLastButterfly(windowIndex: u32, k: u32) {
   let butterflyCount = packedWindowSize / factor;
   let a0 = readStage(windowIndex, k);
   if (factor == 2u) {
-    let b = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
-    yOut[0] = a0 + b;
-    yOut[1] = a0 - b;
+    let a1 = mul(readStage(windowIndex, k + butterflyCount), getTwiddle(k));
+    let y = combineRadix2(a0, a1);
+    yOut[0] = y[0];
+    yOut[1] = y[1];
     return;
   }
   if (factor == 4u) {
-    let a1 = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
+    let a1 = mul(readStage(windowIndex, k + butterflyCount), getTwiddle(k));
     let a2 = mul(readStage(windowIndex, k + 2u * butterflyCount),
-      getFftTwiddle(2u * k));
+      getTwiddle(2u * k));
     let a3 = mul(readStage(windowIndex, k + 3u * butterflyCount),
-      getFftTwiddle(3u * k));
-    let sum02 = a0 + a2;
-    let diff02 = a0 - a2;
-    let sum13 = a1 + a3;
-    let diff13 = a1 - a3;
-    yOut[0] = sum02 + sum13;
-    yOut[1] = diff02 + vec2<f32>(diff13.y, -diff13.x);
-    yOut[2] = sum02 - sum13;
-    yOut[3] = diff02 + vec2<f32>(-diff13.y, diff13.x);
+      getTwiddle(3u * k));
+    let y = combineRadix4(a0, a1, a2, a3);
+    yOut[0] = y[0];
+    yOut[1] = y[1];
+    yOut[2] = y[2];
+    yOut[3] = y[3];
     return;
   }
   if (factor == 3u) {
-    let a1 = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
+    let a1 = mul(readStage(windowIndex, k + butterflyCount), getTwiddle(k));
     let a2 = mul(readStage(windowIndex, k + 2u * butterflyCount),
-      getFftTwiddle(2u * k));
-    let t1 = a1 + a2;
-    let m = a0 - 0.5 * t1;
-    let d = a2 - a1;
-    let ids = vec2<f32>(-sin3 * d.y, sin3 * d.x);
-    yOut[0] = a0 + t1;
-    yOut[1] = m + ids;
-    yOut[2] = m - ids;
+      getTwiddle(2u * k));
+    let y = combineRadix3(a0, a1, a2);
+    yOut[0] = y[0];
+    yOut[1] = y[1];
+    yOut[2] = y[2];
     return;
   }
   if (factor == 5u) {
-    let a1 = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
+    let a1 = mul(readStage(windowIndex, k + butterflyCount), getTwiddle(k));
     let a2 = mul(readStage(windowIndex, k + 2u * butterflyCount),
-      getFftTwiddle(2u * k));
+      getTwiddle(2u * k));
     let a3 = mul(readStage(windowIndex, k + 3u * butterflyCount),
-      getFftTwiddle(3u * k));
+      getTwiddle(3u * k));
     let a4 = mul(readStage(windowIndex, k + 4u * butterflyCount),
-      getFftTwiddle(4u * k));
-    let t1 = a1 + a4;
-    let t2 = a2 + a3;
-    let t3 = a1 - a4;
-    let t4 = a2 - a3;
-    let b1 = a0 + cos5a * t1 + cos5b * t2;
-    let b2 = a0 + cos5b * t1 + cos5a * t2;
-    let b3 = sin5a * t3 + sin5b * t4;
-    let b4 = sin5b * t3 - sin5a * t4;
-    yOut[0] = a0 + t1 + t2;
-    yOut[1] = b1 + vec2<f32>(b3.y, -b3.x);
-    yOut[2] = b2 + vec2<f32>(b4.y, -b4.x);
-    yOut[3] = b2 + vec2<f32>(-b4.y, b4.x);
-    yOut[4] = b1 + vec2<f32>(-b3.y, b3.x);
+      getTwiddle(4u * k));
+    let y = combineRadix5(a0, a1, a2, a3, a4);
+    yOut[0] = y[0];
+    yOut[1] = y[1];
+    yOut[2] = y[2];
+    yOut[3] = y[3];
+    yOut[4] = y[4];
     return;
   }
-  let a1 = mul(readStage(windowIndex, k + butterflyCount), getFftTwiddle(k));
+  let a1 = mul(readStage(windowIndex, k + butterflyCount), getTwiddle(k));
   let a2 = mul(readStage(windowIndex, k + 2u * butterflyCount),
-    getFftTwiddle(2u * k));
+    getTwiddle(2u * k));
   let a3 = mul(readStage(windowIndex, k + 3u * butterflyCount),
-    getFftTwiddle(3u * k));
+    getTwiddle(3u * k));
   let a4 = mul(readStage(windowIndex, k + 4u * butterflyCount),
-    getFftTwiddle(4u * k));
+    getTwiddle(4u * k));
   let a5 = mul(readStage(windowIndex, k + 5u * butterflyCount),
-    getFftTwiddle(5u * k));
+    getTwiddle(5u * k));
   let a6 = mul(readStage(windowIndex, k + 6u * butterflyCount),
-    getFftTwiddle(6u * k));
+    getTwiddle(6u * k));
   let a7 = mul(readStage(windowIndex, k + 7u * butterflyCount),
-    getFftTwiddle(7u * k));
-  let e0 = a0 + a4;
-  let e1 = a0 - a4;
-  let e2 = a2 + a6;
-  let e3 = a2 - a6;
-  let E0 = e0 + e2;
-  let E1 = e1 + vec2<f32>(e3.y, -e3.x);
-  let E2 = e0 - e2;
-  let E3 = e1 + vec2<f32>(-e3.y, e3.x);
-  let f0 = a1 + a5;
-  let f1 = a1 - a5;
-  let f2 = a3 + a7;
-  let f3 = a3 - a7;
-  let O0 = f0 + f2;
-  let O1 = f1 + vec2<f32>(f3.y, -f3.x);
-  let O2 = f0 - f2;
-  let O3 = f1 + vec2<f32>(-f3.y, f3.x);
-  let p0 = O0;
-  let p1 = vec2<f32>(sqrt1_2 * (O1.x + O1.y), sqrt1_2 * (O1.y - O1.x));
-  let p2 = vec2<f32>(O2.y, -O2.x);
-  let p3 = vec2<f32>(sqrt1_2 * (O3.y - O3.x), -sqrt1_2 * (O3.x + O3.y));
-  yOut[0] = E0 + p0;
-  yOut[1] = E1 + p1;
-  yOut[2] = E2 + p2;
-  yOut[3] = E3 + p3;
-  yOut[4] = E0 - p0;
-  yOut[5] = E1 - p1;
-  yOut[6] = E2 - p2;
-  yOut[7] = E3 - p3;
+    getTwiddle(7u * k));
+  let y = combineRadix8(a0, a1, a2, a3, a4, a5, a6, a7);
+  yOut[0] = y[0];
+  yOut[1] = y[1];
+  yOut[2] = y[2];
+  yOut[3] = y[3];
+  yOut[4] = y[4];
+  yOut[5] = y[5];
+  yOut[6] = y[6];
+  yOut[7] = y[7];
 }
 
 fn runFusedLastStage(windowIndex: u32, k: u32) {
@@ -278,39 +233,20 @@ fn main(
     let tw = k * twiddleScale;
     let a0 = readStage(windowIndex, base);
     let a1 = mul(readStage(windowIndex, base + butterflyCount),
-      getFftTwiddle(tw));
+      getTwiddle(tw));
     let a2 = mul(readStage(windowIndex, base + 2u * butterflyCount),
-      getFftTwiddle(2u * tw));
+      getTwiddle(2u * tw));
     let a3 = mul(readStage(windowIndex, base + 3u * butterflyCount),
-      getFftTwiddle(3u * tw));
+      getTwiddle(3u * tw));
     let a4 = mul(readStage(windowIndex, base + 4u * butterflyCount),
-      getFftTwiddle(4u * tw));
+      getTwiddle(4u * tw));
     let a5 = mul(readStage(windowIndex, base + 5u * butterflyCount),
-      getFftTwiddle(5u * tw));
+      getTwiddle(5u * tw));
     let a6 = mul(readStage(windowIndex, base + 6u * butterflyCount),
-      getFftTwiddle(6u * tw));
+      getTwiddle(6u * tw));
     let a7 = mul(readStage(windowIndex, base + 7u * butterflyCount),
-      getFftTwiddle(7u * tw));
-    let e0 = a0 + a4;
-    let e1 = a0 - a4;
-    let e2 = a2 + a6;
-    let e3 = a2 - a6;
-    let E0 = e0 + e2;
-    let E1 = e1 + vec2<f32>(e3.y, -e3.x);
-    let E2 = e0 - e2;
-    let E3 = e1 + vec2<f32>(-e3.y, e3.x);
-    let f0 = a1 + a5;
-    let f1 = a1 - a5;
-    let f2 = a3 + a7;
-    let f3 = a3 - a7;
-    let O0 = f0 + f2;
-    let O1 = f1 + vec2<f32>(f3.y, -f3.x);
-    let O2 = f0 - f2;
-    let O3 = f1 + vec2<f32>(-f3.y, f3.x);
-    let p0 = O0;
-    let p1 = vec2<f32>(sqrt1_2 * (O1.x + O1.y), sqrt1_2 * (O1.y - O1.x));
-    let p2 = vec2<f32>(O2.y, -O2.x);
-    let p3 = vec2<f32>(sqrt1_2 * (O3.y - O3.x), -sqrt1_2 * (O3.x + O3.y));
+      getTwiddle(7u * tw));
+    let y = combineRadix8(a0, a1, a2, a3, a4, a5, a6, a7);
     let o0 = block * (stageStride * 8u) + k;
     let o1 = o0 + stageStride;
     let o2 = o1 + stageStride;
@@ -319,104 +255,78 @@ fn main(
     let o5 = o4 + stageStride;
     let o6 = o5 + stageStride;
     let o7 = o6 + stageStride;
-    writeScratch(scratchOffset + o0, E0 + p0);
-    writeScratch(scratchOffset + o1, E1 + p1);
-    writeScratch(scratchOffset + o2, E2 + p2);
-    writeScratch(scratchOffset + o3, E3 + p3);
-    writeScratch(scratchOffset + o4, E0 - p0);
-    writeScratch(scratchOffset + o5, E1 - p1);
-    writeScratch(scratchOffset + o6, E2 - p2);
-    writeScratch(scratchOffset + o7, E3 - p3);
+    writeScratch(scratchOffset + o0, y[0]);
+    writeScratch(scratchOffset + o1, y[1]);
+    writeScratch(scratchOffset + o2, y[2]);
+    writeScratch(scratchOffset + o3, y[3]);
+    writeScratch(scratchOffset + o4, y[4]);
+    writeScratch(scratchOffset + o5, y[5]);
+    writeScratch(scratchOffset + o6, y[6]);
+    writeScratch(scratchOffset + o7, y[7]);
   } else if (factor == 2u) {
     let aIndex = block * stageStride + k;
     let bIndex = aIndex + butterflyCount;
-    let a = readStage(windowIndex, aIndex);
-    let b = mul(
-      readStage(windowIndex, bIndex),
-      getFftTwiddle(k * twiddleScale),
-    );
+    let a0 = readStage(windowIndex, aIndex);
+    let a1 = mul(readStage(windowIndex, bIndex), getTwiddle(k * twiddleScale));
+    let y = combineRadix2(a0, a1);
     let outEven = block * (stageStride * 2u) + k;
     let outOdd = outEven + stageStride;
-    writeScratch(scratchOffset + outEven, a + b);
-    writeScratch(scratchOffset + outOdd, a - b);
+    writeScratch(scratchOffset + outEven, y[0]);
+    writeScratch(scratchOffset + outOdd, y[1]);
   } else if (factor == 4u) {
     let r0 = block * stageStride + k;
     let r1 = r0 + butterflyCount;
     let r2 = r1 + butterflyCount;
     let r3 = r2 + butterflyCount;
     let a0 = readStage(windowIndex, r0);
-    let a1 = mul(
-      readStage(windowIndex, r1),
-      getFftTwiddle(k * twiddleScale),
-    );
-    let a2 = mul(
-      readStage(windowIndex, r2),
-      getFftTwiddle(2u * k * twiddleScale),
-    );
-    let a3 = mul(
-      readStage(windowIndex, r3),
-      getFftTwiddle(3u * k * twiddleScale),
-    );
-    let sum02 = a0 + a2;
-    let diff02 = a0 - a2;
-    let sum13 = a1 + a3;
-    let diff13 = a1 - a3;
-    let minusIDiff13 = vec2<f32>(diff13.y, -diff13.x);
-    let plusIDiff13 = vec2<f32>(-diff13.y, diff13.x);
+    let a1 = mul(readStage(windowIndex, r1), getTwiddle(k * twiddleScale));
+    let a2 = mul(readStage(windowIndex, r2), getTwiddle(2u * k * twiddleScale));
+    let a3 = mul(readStage(windowIndex, r3), getTwiddle(3u * k * twiddleScale));
+    let y = combineRadix4(a0, a1, a2, a3);
     let i0 = block * (stageStride * 4u) + k;
     let i1 = i0 + stageStride;
     let i2 = i1 + stageStride;
     let i3 = i2 + stageStride;
-    writeScratch(scratchOffset + i0, sum02 + sum13);
-    writeScratch(scratchOffset + i1, diff02 + minusIDiff13);
-    writeScratch(scratchOffset + i2, sum02 - sum13);
-    writeScratch(scratchOffset + i3, diff02 + plusIDiff13);
+    writeScratch(scratchOffset + i0, y[0]);
+    writeScratch(scratchOffset + i1, y[1]);
+    writeScratch(scratchOffset + i2, y[2]);
+    writeScratch(scratchOffset + i3, y[3]);
   } else if (factor == 3u) {
     let base = block * stageStride + k;
     let tw = k * twiddleScale;
     let a0 = readStage(windowIndex, base);
     let a1 = mul(readStage(windowIndex, base + butterflyCount),
-      getFftTwiddle(tw));
+      getTwiddle(tw));
     let a2 = mul(readStage(windowIndex, base + 2u * butterflyCount),
-      getFftTwiddle(2u * tw));
-    let t1 = a1 + a2;
-    let m = a0 - 0.5 * t1;
-    let d = a2 - a1;
-    let ids = vec2<f32>(-sin3 * d.y, sin3 * d.x);
+      getTwiddle(2u * tw));
+    let y = combineRadix3(a0, a1, a2);
     let o0 = block * (stageStride * 3u) + k;
-    writeScratch(scratchOffset + o0, a0 + t1);
-    writeScratch(scratchOffset + o0 + stageStride, m + ids);
-    writeScratch(scratchOffset + o0 + 2u * stageStride, m - ids);
+    writeScratch(scratchOffset + o0, y[0]);
+    writeScratch(scratchOffset + o0 + stageStride, y[1]);
+    writeScratch(scratchOffset + o0 + 2u * stageStride, y[2]);
   } else if (factor == 5u) {
     let base = block * stageStride + k;
     let tw = k * twiddleScale;
     let a0 = readStage(windowIndex, base);
     let a1 = mul(readStage(windowIndex, base + butterflyCount),
-      getFftTwiddle(tw));
+      getTwiddle(tw));
     let a2 = mul(readStage(windowIndex, base + 2u * butterflyCount),
-      getFftTwiddle(2u * tw));
+      getTwiddle(2u * tw));
     let a3 = mul(readStage(windowIndex, base + 3u * butterflyCount),
-      getFftTwiddle(3u * tw));
+      getTwiddle(3u * tw));
     let a4 = mul(readStage(windowIndex, base + 4u * butterflyCount),
-      getFftTwiddle(4u * tw));
-    let t1 = a1 + a4;
-    let t2 = a2 + a3;
-    let t3 = a1 - a4;
-    let t4 = a2 - a3;
-    let b1 = a0 + cos5a * t1 + cos5b * t2;
-    let b2 = a0 + cos5b * t1 + cos5a * t2;
-    let b3 = sin5a * t3 + sin5b * t4;
-    let b4 = sin5b * t3 - sin5a * t4;
+      getTwiddle(4u * tw));
+    let y = combineRadix5(a0, a1, a2, a3, a4);
     let o0 = block * (stageStride * 5u) + k;
     let o1 = o0 + stageStride;
     let o2 = o1 + stageStride;
     let o3 = o2 + stageStride;
     let o4 = o3 + stageStride;
-    writeScratch(scratchOffset + o0, a0 + t1 + t2);
-    writeScratch(scratchOffset + o1, b1 + vec2<f32>(b3.y, -b3.x));
-    writeScratch(scratchOffset + o2, b2 + vec2<f32>(b4.y, -b4.x));
-    writeScratch(scratchOffset + o3, b2 + vec2<f32>(-b4.y, b4.x));
-    writeScratch(scratchOffset + o4, b1 + vec2<f32>(-b3.y, b3.x));
+    writeScratch(scratchOffset + o0, y[0]);
+    writeScratch(scratchOffset + o1, y[1]);
+    writeScratch(scratchOffset + o2, y[2]);
+    writeScratch(scratchOffset + o3, y[3]);
+    writeScratch(scratchOffset + o4, y[4]);
   } else {
     for (var r = 0u; r < factor; r++) {
       var sum = vec2<f32>(0.0, 0.0);
@@ -426,7 +336,7 @@ fn main(
           (q * (k * twiddleScale + r * (packedWindowSize / factor))) %
           packedWindowSize;
         var value = readStage(windowIndex, inputIndex);
-        value = mul(value, getFftTwiddle(twiddleIndex));
+        value = mul(value, getTwiddle(twiddleIndex));
         sum += value;
       }
       let outputIndex = block * (stageStride * factor) + r * stageStride + k;

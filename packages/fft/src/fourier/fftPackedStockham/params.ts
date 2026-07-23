@@ -12,12 +12,13 @@ export type ParamsRing = {
 export const createParamsRing = (
   device: GPUDevice,
   config: FourierConfig,
+  label: string,
 ): ParamsRing => {
   const capacity = Math.max(1, config.windowCount);
   const alignment = device.limits.minUniformBufferOffsetAlignment;
   const stride = Math.ceil(paramsByteLength / alignment) * alignment;
   const buffer = device.createBuffer({
-    label: 'packed-stockham-r2c-params',
+    label,
     size: stride * capacity,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });

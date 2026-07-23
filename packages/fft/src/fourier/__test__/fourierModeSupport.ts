@@ -1,5 +1,5 @@
 import { type FourierMode } from '../config.es.js';
-import { getPackedStockhamR2cVariant } from '../fftPackedStockhamR2c/support.js';
+import { getPackedStockhamR2cVariant } from '../fftPackedStockham/r2c/support.js';
 import { getPackedTiledR2cVariant } from '../fftPackedTiledR2c/support.js';
 
 export type FourierModeConfig = {

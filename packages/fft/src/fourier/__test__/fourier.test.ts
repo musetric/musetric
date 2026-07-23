@@ -11,8 +11,8 @@ import {
   type FourierMode,
   type IFourierMode,
 } from '../config.es.js';
+import { getPackedStockhamC2rVariant } from '../fftPackedStockham/c2r/support.js';
 import { fouriers } from '../fouriers.js';
-import { getPackedStockhamC2rVariant } from '../ifftPackedStockhamC2r/support.js';
 import { iffts } from '../iffts.js';
 import {
   assertArrayClose,
