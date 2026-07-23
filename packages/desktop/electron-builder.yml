@@ -5,10 +5,14 @@ electronVersion: 43.1.1
 directories:
   output: build
   buildResources: assets
+beforePack: ./scripts/beforePack.ts
 win:
   icon: assets/icon.png
   target:
-    - nsis
+    - target: nsis
+      arch:
+        - x64
+        - arm64
 nsis:
   oneClick: false
   perMachine: false
@@ -16,13 +20,20 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Musetric
+  license: license.txt
 mac:
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - x64
+        - arm64
   category: public.app-category.music
 linux:
   target:
-    - AppImage
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
   category: Audio
 files:
   - dist/**/*
@@ -39,5 +50,10 @@ extraResources:
     to: backend/storage/public
   - from: ../backend/dist-browser
     to: backend/dist-browser
+  - from: ../../license.md
+    to: license.md
+  - from: ../../thirdPartyNotices.md
+    to: thirdPartyNotices.md
 asarUnpack:
   - node_modules/**/*.node
+  - node_modules/@musetric/ffmpeg/resources/**

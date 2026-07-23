@@ -6,6 +6,7 @@ build/
 tmp/
 **/backend/storage/
 packages/desktop/assets/
+packages/ffmpeg/resources/
 .eslintrc.local.json
 yarn-error.log
 .eslintcache

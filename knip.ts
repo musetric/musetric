@@ -5,8 +5,9 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: true,
   ignoreIssues: {
     'packages/engine/src/engine.ts': ['exports'],
+    'packages/desktop/scripts/beforePack.ts': ['exports'],
   },
-  ignoreBinaries: ['ffmpeg', 'ps'],
+  ignoreBinaries: ['ps'],
   ignoreUnresolved: ['vite/client', '^tsx$'],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
@@ -22,6 +23,9 @@ const config: KnipConfig = {
     },
     'packages/cqt': {
       entry: ['src/**/*.bench.ts'],
+    },
+    'packages/desktop': {
+      entry: ['scripts/**/*.ts'],
     },
     'packages/script': {
       entry: ['src/**/*.ts'],
