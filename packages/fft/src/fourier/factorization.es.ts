@@ -1,3 +1,41 @@
+export const isPowerOfTwo = (value: number): boolean =>
+  value > 0 && (value & (value - 1)) === 0;
+
+export type Radix8PreferredStageCounts = {
+  radix8StageCount: number;
+  radix4StageCount: number;
+  radix2StageCount: number;
+  radix3StageCount: number;
+  radix5StageCount: number;
+};
+
+export const createRadix8PreferredCounts = (
+  size: number,
+): Radix8PreferredStageCounts | undefined => {
+  let remaining = size;
+  const counts: Radix8PreferredStageCounts = {
+    radix8StageCount: 0,
+    radix4StageCount: 0,
+    radix2StageCount: 0,
+    radix3StageCount: 0,
+    radix5StageCount: 0,
+  };
+  const factors = [
+    [8, 'radix8StageCount'],
+    [4, 'radix4StageCount'],
+    [2, 'radix2StageCount'],
+    [3, 'radix3StageCount'],
+    [5, 'radix5StageCount'],
+  ] as const;
+  for (const [factor, key] of factors) {
+    while (remaining % factor === 0) {
+      counts[key]++;
+      remaining /= factor;
+    }
+  }
+  return remaining === 1 ? counts : undefined;
+};
+
 export type RadixStageCounts = {
   radix4StageCount: number;
   radix2StageCount: number;

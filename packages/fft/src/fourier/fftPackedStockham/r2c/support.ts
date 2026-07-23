@@ -1,51 +1,16 @@
 import { type FourierConfig } from '../../config.es.js';
 import {
+  createRadix8PreferredCounts,
   createRadixStages,
   expandRadix8PreferredStages,
+  isPowerOfTwo,
   type MultiPassRadixStage,
+  type Radix8PreferredStageCounts,
   type RadixStageCounts,
 } from '../../factorization.es.js';
 
 const minPackedWindowSize = 2;
 const pairThreadsPerGroup = 8;
-
-const isPowerOfTwo = (value: number): boolean =>
-  Number.isInteger(Math.log2(value));
-
-export type InPlaceMixedStageCounts = {
-  radix8StageCount: number;
-  radix4StageCount: number;
-  radix2StageCount: number;
-  radix3StageCount: number;
-  radix5StageCount: number;
-};
-
-const createRadix8PreferredCounts = (
-  packedWindowSize: number,
-): InPlaceMixedStageCounts | undefined => {
-  let remaining = packedWindowSize;
-  const counts = {
-    radix8StageCount: 0,
-    radix4StageCount: 0,
-    radix2StageCount: 0,
-    radix3StageCount: 0,
-    radix5StageCount: 0,
-  };
-  const factors = [
-    [8, 'radix8StageCount'],
-    [4, 'radix4StageCount'],
-    [2, 'radix2StageCount'],
-    [3, 'radix3StageCount'],
-    [5, 'radix5StageCount'],
-  ] as const;
-  for (const [factor, key] of factors) {
-    while (remaining % factor === 0) {
-      counts[key]++;
-      remaining /= factor;
-    }
-  }
-  return remaining === 1 ? counts : undefined;
-};
 
 const maxPairGroupSize = 64;
 
@@ -158,7 +123,7 @@ export type PackedStockhamR2cVariant =
     })
   | (PackedStockhamR2cBaseVariant & {
       kind: 'inPlaceMixed';
-      inPlaceStageCounts: InPlaceMixedStageCounts;
+      inPlaceStageCounts: Radix8PreferredStageCounts;
     })
   | (PackedStockhamR2cBaseVariant & {
       kind: 'multiPass';

@@ -1,3 +1,8 @@
+import {
+  createRadix8PreferredCounts,
+  isPowerOfTwo,
+  type Radix8PreferredStageCounts,
+} from '../../factorization.es.js';
 import { multiPassPairStageShader } from './multiPassPairStage.wgsl.js';
 import { multiPassStageShader } from './multiPassStage.wgsl.js';
 import {
@@ -7,64 +12,34 @@ import {
 import { transformShader } from './transform.wgsl.js';
 import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
 
-type TransformStageCounts = {
-  radix8StageCount: number;
-  radix4StageCount: number;
-  radix2StageCount: number;
-  radix3StageCount: number;
-  radix5StageCount: number;
-};
-
-const stageCount = (counts: TransformStageCounts): number =>
+const stageCount = (counts: Radix8PreferredStageCounts): number =>
   counts.radix8StageCount +
   counts.radix4StageCount +
   counts.radix2StageCount +
   counts.radix3StageCount +
   counts.radix5StageCount;
 
-const isPowerOfTwo = (value: number): boolean => (value & (value - 1)) === 0;
-
-const createRadix8PreferredCounts = (
-  packedWindowSize: number,
-): TransformStageCounts => {
-  let remaining = packedWindowSize;
-  const counts: TransformStageCounts = {
-    radix8StageCount: 0,
-    radix4StageCount: 0,
-    radix2StageCount: 0,
-    radix3StageCount: 0,
-    radix5StageCount: 0,
-  };
-  const factors = [
-    [8, 'radix8StageCount'],
-    [4, 'radix4StageCount'],
-    [2, 'radix2StageCount'],
-    [3, 'radix3StageCount'],
-    [5, 'radix5StageCount'],
-  ] as const;
-  for (const [factor, key] of factors) {
-    while (remaining % factor === 0) {
-      counts[key]++;
-      remaining /= factor;
-    }
-  }
-  return counts;
-};
-
 const selectTransformStageCounts = (
   variant: Extract<
     PackedStockhamC2rVariant,
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
-): TransformStageCounts =>
-  createRadix8PreferredCounts(variant.packedWindowSize);
+): Radix8PreferredStageCounts => {
+  const counts = createRadix8PreferredCounts(variant.packedWindowSize);
+  if (counts === undefined) {
+    throw new Error(
+      `Packed window size ${variant.packedWindowSize} is not radix-8 factorable`,
+    );
+  }
+  return counts;
+};
 
 const selectTransformThreadCount = (
   variant: Extract<
     PackedStockhamC2rVariant,
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
-  counts: TransformStageCounts,
+  counts: Radix8PreferredStageCounts,
 ): number => {
   if (variant.kind === 'inPlaceMixed') {
     if (isPowerOfTwo(variant.packedWindowSize)) {
