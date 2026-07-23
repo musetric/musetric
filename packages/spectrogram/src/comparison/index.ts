@@ -1,4 +1,5 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { createDynamicUniformParams } from '../common/dynamicUniform.js';
 import {
   type ExtSpectrogramConfig,
@@ -51,28 +52,12 @@ export const createSpectrogramComparisonColorCell = (
   });
   const bindGroupLayout = device.createBindGroupLayout({
     label: 'comparison-color-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ]),
   });
   const pipeline = device.createComputePipeline({
     label: 'comparison-color-pipeline',

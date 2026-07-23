@@ -1,3 +1,4 @@
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { runShader } from './run.wgsl.js';
 
 export type Pipelines = {
@@ -8,23 +9,7 @@ export type Pipelines = {
 export const createPipelines = (device: GPUDevice): Pipelines => {
   const layout = device.createBindGroupLayout({
     label: 'magnitudify-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-    ],
+    entries: computeBufferEntries(['storage', 'storage', 'dynamic-uniform']),
   });
   const pipelineLayout = device.createPipelineLayout({
     label: 'magnitudify-pipeline-layout',

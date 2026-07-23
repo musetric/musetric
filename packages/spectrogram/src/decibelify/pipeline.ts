@@ -1,3 +1,4 @@
+import { computeBufferEntries } from '../common/computeBufferEntries.js';
 import { energyShader } from './energy.wgsl.js';
 import { runShader } from './run.wgsl.js';
 
@@ -10,28 +11,12 @@ export type Pipelines = {
 export const createPipelines = (device: GPUDevice): Pipelines => {
   const layout = device.createBindGroupLayout({
     label: 'decibelify-bind-group-layout',
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'read-only-storage' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform', hasDynamicOffset: true },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'storage' },
-      },
-    ],
+    entries: computeBufferEntries([
+      'read-only-storage',
+      'dynamic-uniform',
+      'storage',
+      'storage',
+    ]),
   });
   const pipelineLayout = device.createPipelineLayout({
     label: 'decibelify-pipeline-layout',
