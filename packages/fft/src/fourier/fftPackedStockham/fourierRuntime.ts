@@ -1,12 +1,12 @@
 import { type ResourceCell } from '@musetric/utils';
 import { resolveFourierBatchRange } from '../batchRange.js';
+import { type ParamsRing } from '../params.js';
 import {
   type CreateFourier,
   type Fourier,
   type FourierArg,
   type FourierBatchRange,
 } from '../types.js';
-import { type ParamsRing } from './params.js';
 
 type MultiPassDispatchState = {
   kind: 'multiPass';

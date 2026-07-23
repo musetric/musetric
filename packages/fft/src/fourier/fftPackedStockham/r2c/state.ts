@@ -1,6 +1,7 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
+import { createParamsRing, type ParamsRing } from '../../params.js';
+import { createSlotCache } from '../../slotCache.js';
 import { type FourierArg } from '../../types.js';
-import { createParamsRing, type ParamsRing } from '../params.js';
 import { disposeTrigTables, type TrigTables } from '../trigTables.js';
 import {
   createPipeline,
@@ -111,20 +112,6 @@ const createMultiPassStageBindGroups = (
       entries,
     });
   });
-};
-
-const createSlotCache = <T>(
-  build: (slot: number) => T,
-): ((slot: number) => T) => {
-  const cache = new Map<number, T>();
-  return (slot) => {
-    let cached = cache.get(slot);
-    if (cached === undefined) {
-      cached = build(slot);
-      cache.set(slot, cached);
-    }
-    return cached;
-  };
 };
 
 type BaseState = {

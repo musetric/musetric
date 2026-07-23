@@ -1,8 +1,5 @@
-import {
-  createFftTrigTable,
-  createTrigBuffer,
-  type TrigTables,
-} from '../trigTables.js';
+import { createFftTrigTable, createTrigBuffer } from '../../trigTables.js';
+import { type TrigTables } from '../trigTables.js';
 import { type PackedStockhamC2rVariant } from './support.js';
 
 const createR2cTrigTable = (

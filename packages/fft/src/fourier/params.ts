@@ -1,4 +1,4 @@
-import { type FourierConfig } from '../config.es.js';
+import { type FourierConfig } from './config.es.js';
 
 const paramsByteLength = 16;
 
