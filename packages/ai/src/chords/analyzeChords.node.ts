@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { decodeMonoPcm } from '@musetric/ffmpeg';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { chordNetModel } from '../models/chordNetModel.js';
-import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureChordNetModelFiles } from '../service/chordNetModelCache.node.js';
 import { type GpuHost } from '../service/gpuHost.node.js';
 import { analyzeChordsHeadless } from '../service/headlessChordsService.node.js';

@@ -2006,6 +2006,7 @@ __metadata:
     "@huggingface/transformers": "catalog:"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
@@ -2018,6 +2019,7 @@ __metadata:
     vitest: "catalog:"
   peerDependencies:
     "@musetric/cqt": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     onnxruntime-web: 1.26.0
@@ -2078,8 +2080,8 @@ __metadata:
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/toolkit": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
@@ -2104,8 +2106,8 @@ __metadata:
     "@musetric/api": "workspace:*"
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/toolkit": "workspace:*"
     "@musetric/utils": "workspace:*"
     axios: 1.18.1
     fastify: 5.10.0
@@ -2151,8 +2153,8 @@ __metadata:
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/toolkit": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
@@ -2209,8 +2211,8 @@ __metadata:
     "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
+    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
-    "@musetric/toolkit": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
     "@types/node": "catalog:"
@@ -2289,6 +2291,21 @@ __metadata:
   peerDependencies:
     eslint: 10.5.0
     typescript: ^6.0.2
+  languageName: unknown
+  linkType: soft
+
+"@musetric/ffmpeg@workspace:*, @musetric/ffmpeg@workspace:packages/ffmpeg":
+  version: 0.0.0-use.local
+  resolution: "@musetric/ffmpeg@workspace:packages/ffmpeg"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    "@types/node": "catalog:"
+    "@typescript/native": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+  peerDependencies:
+    "@musetric/utils": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -2484,21 +2501,6 @@ __metadata:
     vitest: "catalog:"
   peerDependencies:
     "@musetric/fft": "workspace:*"
-    "@musetric/utils": "workspace:*"
-  languageName: unknown
-  linkType: soft
-
-"@musetric/toolkit@workspace:*, @musetric/toolkit@workspace:packages/toolkit":
-  version: 0.0.0-use.local
-  resolution: "@musetric/toolkit@workspace:packages/toolkit"
-  dependencies:
-    "@musetric/eslint-config": "workspace:*"
-    "@musetric/utils": "workspace:*"
-    "@types/node": "catalog:"
-    "@typescript/native": "catalog:"
-    eslint: "catalog:"
-    typescript: "catalog:"
-  peerDependencies:
     "@musetric/utils": "workspace:*"
   languageName: unknown
   linkType: soft

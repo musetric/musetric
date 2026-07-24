@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type FileHandle, mkdir, open, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { emptyWavePeaksBuffer, generateWavePeaks } from '@musetric/toolkit';
+import { emptyWavePeaksBuffer, generateWavePeaks } from '@musetric/ffmpeg';
 import { assertFound } from '../../common/assertFound.js';
 import {
   createReservedWav,

@@ -1,10 +1,7 @@
 import { rm } from 'node:fs/promises';
+import { decodeInterleavedPcm, encodeFlacFromRawFile } from '@musetric/ffmpeg';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { vocalsModel } from '../models/vocalsModel.js';
-import {
-  decodeInterleavedPcm,
-  encodeFlacFromRawFile,
-} from '../service/audioCodec.node.js';
 import { type GpuHost } from '../service/gpuHost.node.js';
 import { separateAudioHeadless } from '../service/headlessAiService.node.js';
 import { ensureSeparationModelFiles } from '../service/modelCache.node.js';

@@ -2,7 +2,7 @@ import {
   convertToFlac,
   flacAudioOutput,
   getAudioFrameCount,
-} from '@musetric/toolkit';
+} from '@musetric/ffmpeg';
 import { defaultSampleRate, type Logger } from '@musetric/utils';
 import { type BlobFile, type BlobStorage } from '@musetric/utils/node';
 

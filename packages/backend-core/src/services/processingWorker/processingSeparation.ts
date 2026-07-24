@@ -4,7 +4,7 @@ import {
   analyzeLoudness,
   convertToFmp4,
   generateWavePeaks,
-} from '@musetric/toolkit';
+} from '@musetric/ffmpeg';
 import {
   type EventEmitter,
   type Logger,

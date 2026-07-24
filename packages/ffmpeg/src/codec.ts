@@ -85,7 +85,7 @@ export const decodeInterleavedPcm = async (
     ],
     captureStdout: true,
     logger,
-    processName: 'ai.decodeInterleavedPcm',
+    processName: 'ffmpeg.decodeInterleavedPcm',
   });
   if (output.byteLength === 0) {
     throw new Error('ffmpeg produced no audio data');
@@ -156,7 +156,7 @@ export const decodeMonoPcm = async (
     ],
     captureStdout: true,
     logger,
-    processName: 'ai.decodeMonoPcm',
+    processName: 'ffmpeg.decodeMonoPcm',
   });
   if (output.byteLength === 0) {
     throw new Error('ffmpeg produced no audio data');
@@ -202,6 +202,6 @@ export const encodeFlacFromRawFile = async (
       outputPath,
     ],
     logger,
-    processName: 'ai.encodeFlacFromRawFile',
+    processName: 'ffmpeg.encodeFlacFromRawFile',
   });
 };

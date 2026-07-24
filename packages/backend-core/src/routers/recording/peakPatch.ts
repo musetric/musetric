@@ -1,4 +1,4 @@
-import { wavePeakCount } from '@musetric/toolkit';
+import { wavePeakCount } from '@musetric/ffmpeg';
 import {
   wavBytesPerSample,
   wavHeaderByteLength,
