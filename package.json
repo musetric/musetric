@@ -38,6 +38,7 @@
     "prettier": "catalog:"
   },
   "resolutions": {
+    "@fastify/static": "10.1.2",
     "adm-zip": "^0.6.0",
     "sharp": "^0.35.3"
   }
