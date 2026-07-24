@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { decodeMonoPcm } from '@musetric/ffmpeg';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { beatThisModel } from '../models/beatThisModel.js';
-import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureBeatThisModelFiles } from '../service/beatThisModelCache.node.js';
 import { type GpuHost } from '../service/gpuHost.node.js';
 import { analyzeRhythmHeadless } from '../service/headlessRhythmService.node.js';

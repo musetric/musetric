@@ -5,7 +5,7 @@ import {
   emptyWavePeaksBuffer,
   flacAudioOutput,
   fmp4AudioOutput,
-} from '@musetric/toolkit';
+} from '@musetric/ffmpeg';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';

@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { decodeMonoPcm } from '@musetric/ffmpeg';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { whisperModel } from '../models/whisperModel.js';
-import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { type GpuHost } from '../service/gpuHost.node.js';
 import { transcribeAudioHeadless } from '../service/headlessTranscriptionService.node.js';
 import { ensureWhisperModelFiles } from '../service/whisperModelCache.node.js';

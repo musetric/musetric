@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { decodeMonoPcm } from '@musetric/ffmpeg';
 import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { skeyModel } from '../models/skeyModel.js';
 import { createSkeyRuntime } from '../runtime/key/skeyRuntime.js';
-import { decodeMonoPcm } from '../service/audioCodec.node.js';
 import { ensureSkeyModelFiles } from '../service/skeyModelCache.node.js';
 import { keyMap } from './keyMap.js';
 import { type KeyResult } from './types.js';
