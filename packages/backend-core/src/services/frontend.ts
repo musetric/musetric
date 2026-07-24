@@ -25,11 +25,8 @@ export const registerFrontend = (app: FastifyInstance) => {
     root: app.config.publicPath,
     prefix: '/',
     index: ['index.html'],
-    setHeaders: (response) => {
-      Object.entries(crossOriginIsolationHeaders).forEach((header) => {
-        const [name, value] = header;
-        response.setHeader(name, value);
-      });
+    setHeaders: (reply) => {
+      reply.headers(crossOriginIsolationHeaders);
     },
   });
   app.setNotFoundHandler((request, reply) => {
