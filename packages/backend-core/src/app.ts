@@ -4,7 +4,7 @@ import {
   type GpuHost,
   type GpuPageHostFactory,
 } from '@musetric/ai/node';
-import { fastify, type FastifyInstance } from 'fastify';
+import { fastify, type FastifyInstance, LogController } from 'fastify';
 import { FastifySSEPlugin } from 'fastify-sse-v2';
 import { type AppConfig } from './common/config.js';
 import { registerRouters } from './routers/index.js';
@@ -40,7 +40,7 @@ export const createServerApp = async (
 ): Promise<FastifyInstance> => {
   const app: FastifyInstance = fastify({
     logger: createLoggerOptions(config.logLevel),
-    disableRequestLogging,
+    logController: new LogController({ disableRequestLogging }),
     // eslint-disable-next-line musetric/no-null-literal
     https: config.https ?? null,
   });
