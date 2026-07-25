@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { type Logger } from '@musetric/utils';
+import { ffmpegPath, ffprobePath } from './paths.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,7 +19,9 @@ const runFfmpeg = async (options: RunFfmpegOptions): Promise<Buffer> => {
   let lastStderr = '';
 
   return new Promise<Buffer>((resolve, reject) => {
-    const child = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(ffmpegPath(), args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
 
     child.stdout.on('data', (chunk: Buffer) => {
       if (captureStdout) {
@@ -94,7 +97,7 @@ export const decodeInterleavedPcm = async (
 };
 
 const probeChannelCount = async (sourcePath: string): Promise<number> => {
-  const { stdout } = await execFileAsync('ffprobe', [
+  const { stdout } = await execFileAsync(ffprobePath(), [
     '-v',
     'error',
     '-select_streams',

@@ -195,3 +195,12 @@ SOFTWARE.
 - Local files: `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/service/beatThisModelCache.node.ts`.
 - License: MIT, inherited from the upstream Beat This! weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
+
+## FFmpeg
+
+- Source: https://github.com/FFmpeg/FFmpeg, built and published as https://github.com/musetric/ffmpeg-builds (release `ffmpeg-n8.1.2`).
+- Usage: the unmodified `ffmpeg` and `ffprobe` command line tools, built in their LGPL configuration. They are vendored into `packages/ffmpeg/resources/<platform>-<arch>/` and shipped inside the desktop app, where this project runs them as separate processes; nothing is linked against the FFmpeg libraries.
+- Local files: `packages/ffmpeg/scripts/fetchFfmpeg.ts`, `packages/ffmpeg/src/paths.ts`, `packages/ffmpeg/src/codec.ts`, `packages/ffmpeg/src/analyzeLoudness.ts`, `packages/ffmpeg/src/convertToFlac.ts`, `packages/ffmpeg/src/convertToFmp4.ts`, `packages/ffmpeg/src/generateWavePeaks/readPcm.ts`, `packages/ffmpeg/src/getAudioFrameCount.ts`.
+- License: LGPL-2.1-or-later. Full text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+- License source: the `LICENSE.txt` shipped inside each downloaded archive, which is copied next to the binaries and travels with every installer.
+- Source availability: the sources and build scripts for the exact binaries are published in the release above. Each vendored directory also carries a `source.txt` naming the release, the archive URL and its SHA-256, so a shipped binary can be traced back to the sources it was built from.

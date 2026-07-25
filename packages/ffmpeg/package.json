@@ -14,6 +14,7 @@
     }
   },
   "scripts": {
+    "postinstall": "node ./scripts/fetchFfmpeg.ts",
     "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",

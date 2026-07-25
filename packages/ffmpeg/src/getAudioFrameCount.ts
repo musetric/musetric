@@ -1,5 +1,6 @@
 import { type Logger } from '@musetric/utils';
 import { spawnScript } from '@musetric/utils/node';
+import { ffprobePath } from './paths.js';
 
 export const getAudioFrameCount = async (
   fromPath: string,
@@ -10,7 +11,7 @@ export const getAudioFrameCount = async (
   let durationSeconds = undefined as number | undefined;
 
   await spawnScript({
-    command: 'ffprobe',
+    command: ffprobePath(),
     flatArgs: [
       '-v',
       'error',

@@ -48,7 +48,7 @@ scopes:
   - engine # packages/engine audio engine: playback/decode/visualization orchestration
   - fft # FFT signal-processing core behind visualizations
   - spectrogram # frequency spectrogram visualization
-  - ffmpeg # packages/ffmpeg ffmpeg-based audio codec/processing tasks
+  - ffmpeg # packages/ffmpeg vendored ffmpeg binary + audio codec/processing tasks
   - utils # packages/utils low-level shared utilities
   # App
   - backend # packages/backend Fastify server & orchestration

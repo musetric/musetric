@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { type Logger } from '@musetric/utils';
 import { spawnScript } from '@musetric/utils/node';
+import { ffmpegPath } from './paths.js';
 
 const fragmentDurationSeconds = 2;
 
@@ -25,7 +26,7 @@ export const convertToFmp4 = async (
   await mkdir(dirname(toPath), { recursive: true });
 
   await spawnScript({
-    command: 'ffmpeg',
+    command: ffmpegPath(),
     flatArgs: [
       '-y',
       '-hide_banner',

@@ -1,0 +1,42 @@
+Musetric
+
+MIT License
+
+Copyright (c) 2020-2026 Vladlen Popelenkov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Bundled FFmpeg
+
+This application bundles the FFmpeg command line tools (ffmpeg, ffprobe) in
+their LGPL configuration and runs them as separate executables. FFmpeg is
+licensed under the GNU Lesser General Public License version 2.1 or later.
+
+The full LGPL text ships next to the binaries, inside the installed
+application under
+
+  resources/app.asar.unpacked/node_modules/@musetric/ffmpeg/resources/
+
+together with a source.txt naming the exact build and where its sources and
+build scripts are published: https://github.com/musetric/ffmpeg-builds
+
+Every other third-party work this application bundles or downloads, including
+the AI models, is listed in resources/thirdPartyNotices.md inside the
+installed application.

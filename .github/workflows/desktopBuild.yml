@@ -24,7 +24,9 @@ jobs:
           path: ~/.yarn/berry/cache
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
-      - run: yarn --immutable --mode=skip-build
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
       - run: yarn build:desktop
       - run: yarn workspace @musetric/desktop pack:installer
         env:

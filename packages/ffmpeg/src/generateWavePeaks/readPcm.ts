@@ -1,5 +1,6 @@
 import { type Logger } from '@musetric/utils';
 import { spawnScript } from '@musetric/utils/node';
+import { ffmpegPath } from '../paths.js';
 
 export type ReadPcmOptions = {
   fromPath: string;
@@ -16,7 +17,7 @@ export const readPcm = async (options: ReadPcmOptions): Promise<void> => {
   let sampleIndex = 0;
 
   await spawnScript({
-    command: 'ffmpeg',
+    command: ffmpegPath(),
     flatArgs: [
       '-hide_banner',
       '-loglevel',

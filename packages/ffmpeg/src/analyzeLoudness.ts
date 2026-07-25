@@ -1,5 +1,6 @@
 import { type Logger } from '@musetric/utils';
 import { spawnScript } from '@musetric/utils/node';
+import { ffmpegPath } from './paths.js';
 
 const parseNumber = (value: unknown, label: string): number => {
   const rawNumber = typeof value === 'number' ? value : Number(value);
@@ -50,7 +51,7 @@ export const analyzeLoudness = async (
   const stderrLines: string[] = [];
 
   await spawnScript({
-    command: 'ffmpeg',
+    command: ffmpegPath(),
     flatArgs: [
       '-hide_banner',
       '-nostats',

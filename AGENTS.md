@@ -20,7 +20,7 @@
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/backend-db`: backend data access, entities, and schema-related code.
 - `packages/utils`: low-level shared utilities used across packages.
-- `packages/ffmpeg`: the ffmpeg-based audio codec and processing tasks (decode/encode, loudness, wave peaks, format conversion).
+- `packages/ffmpeg`: vendored ffmpeg/ffprobe binary plus the audio codec and processing tasks (decode/encode, loudness, wave peaks, format conversion) built on it.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
