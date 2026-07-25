@@ -8,11 +8,7 @@ directories:
 beforePack: ./scripts/beforePack.ts
 win:
   icon: assets/icon.png
-  target:
-    - target: nsis
-      arch:
-        - x64
-        - arm64
+  target: nsis
 nsis:
   oneClick: false
   perMachine: false
@@ -22,18 +18,10 @@ nsis:
   shortcutName: Musetric
   license: license.txt
 mac:
-  target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
+  target: dmg
   category: public.app-category.music
 linux:
-  target:
-    - target: AppImage
-      arch:
-        - x64
-        - arm64
+  target: AppImage
   category: Audio
 files:
   - dist/**/*

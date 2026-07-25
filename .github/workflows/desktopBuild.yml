@@ -10,16 +10,22 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            platform: win
             arch: x64
           - os: windows-latest
+            platform: win
             arch: arm64
           - os: macos-latest
+            platform: mac
             arch: x64
           - os: macos-latest
+            platform: mac
             arch: arm64
           - os: ubuntu-latest
+            platform: linux
             arch: x64
           - os: ubuntu-latest
+            platform: linux
             arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
@@ -41,7 +47,7 @@ jobs:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           MUSETRIC_SKIP_FFMPEG_FETCH: true
       - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.arch }}
+      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v7
