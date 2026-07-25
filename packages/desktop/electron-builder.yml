@@ -7,6 +7,7 @@ directories:
   buildResources: assets
 beforePack: ./scripts/beforePack.ts
 win:
+  artifactName: ${productName} Setup ${version}-${arch}.${ext}
   icon: assets/icon.png
   target: nsis
 nsis:

@@ -8187,13 +8187,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"onnxruntime-common@npm:1.24.0-dev.20251116-b39e144322":
-  version: 1.24.0-dev.20251116-b39e144322
-  resolution: "onnxruntime-common@npm:1.24.0-dev.20251116-b39e144322"
-  checksum: 10c0/0f93d8bf8b3337667bf1234c74a0e0d4680f969f121fe8f765cc4b6653d0ad9d67fe7b449dbce4e4c3233737b0744b371f3512b706954868d32065681da0efc4
-  languageName: node
-  linkType: hard
-
 "onnxruntime-common@npm:1.24.3":
   version: 1.24.3
   resolution: "onnxruntime-common@npm:1.24.3"
@@ -8231,20 +8224,6 @@ __metadata:
     platform: "npm:^1.3.6"
     protobufjs: "npm:^7.2.4"
   checksum: 10c0/6e63265dd2810c22897843c140b5c6b5912f285274f5f743af83ebdfeded863e5dea9f92e5f246cf72a0eb8ae4f38e64990869f6cd7472a0f20940b19b362c83
-  languageName: node
-  linkType: hard
-
-"onnxruntime-web@npm:1.26.0-dev.20260416-b7804b056c":
-  version: 1.26.0-dev.20260416-b7804b056c
-  resolution: "onnxruntime-web@npm:1.26.0-dev.20260416-b7804b056c"
-  dependencies:
-    flatbuffers: "npm:^25.1.24"
-    guid-typescript: "npm:^1.0.9"
-    long: "npm:^5.2.3"
-    onnxruntime-common: "npm:1.24.0-dev.20251116-b39e144322"
-    platform: "npm:^1.3.6"
-    protobufjs: "npm:^7.2.4"
-  checksum: 10c0/81c6ccdd81844f9590b0c1fccd220d31d201341969ca7ad659a36542ba7741cb0e090020ca85f61d3656a9ccc96ce0889106986a6bab8afc29c3cb1895ddb38e
   languageName: node
   linkType: hard
 
