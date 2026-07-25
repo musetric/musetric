@@ -8,7 +8,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-latest
+            arch: arm64
+          - os: macos-latest
+            arch: x64
+          - os: macos-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: x64
+          - os: ubuntu-latest
+            arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -27,15 +39,17 @@ jobs:
       - run: yarn --immutable
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          MUSETRIC_SKIP_FFMPEG_FETCH: true
       - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer
+      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-desktop-${{ runner.os }}
+          name: musetric-desktop-${{ runner.os }}-${{ matrix.arch }}
           if-no-files-found: ignore
           retention-days: 14
+          compression-level: 0
           path: |
             packages/desktop/build/*.exe
             packages/desktop/build/*.exe.blockmap
