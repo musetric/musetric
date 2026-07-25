@@ -46,6 +46,7 @@ jobs:
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           MUSETRIC_SKIP_FFMPEG_FETCH: true
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: yarn build:desktop
       - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }}
         env:
