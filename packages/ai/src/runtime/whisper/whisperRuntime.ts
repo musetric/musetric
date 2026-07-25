@@ -96,12 +96,7 @@ export const createWhisperRuntime = async (
       dtype: { ...whisperModel.dtype },
 
       session_options: {
-        executionProviders: [
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-          { name: 'webgpu', storageBufferCacheMode: 'bucket' } as {
-            name: 'webgpu';
-          },
-        ],
+        executionProviders: ['webgpu'],
       },
       progress_callback: (data: LoadProgress) => {
         if (data.status === 'progress' && typeof data.progress === 'number') {
