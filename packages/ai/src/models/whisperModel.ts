@@ -1,4 +1,4 @@
-const modelId = 'musetric/whisper-large-v3-onnx';
+const modelId = 'musetric/whisper-large-v3-turbo-onnx';
 const revision = 'main';
 
 const files = [
@@ -23,9 +23,9 @@ export const whisperModel = {
   files,
   sha256: {
     'config.json':
-      '806941fa1df73caf5900e06132a4c12b61fd86259b228f0f2fae69a11069f1cf',
+      '3895aac9c18e541502ded9bf0f4c31cbe25a3387ef88ffdc85214e43acc0ca57',
     'generation_config.json':
-      '93d43cd27dc1a5ac3aa593c60939d1339f719075823fa2adac88ac963491fff2',
+      '0392ccf797bca2bff1600477ed6fb71d367b428f3da626c6d3c8dbd82c58ae44',
     'preprocessor_config.json':
       '7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711',
     'tokenizer.json':
@@ -43,9 +43,9 @@ export const whisperModel = {
     'normalizer.json':
       'bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd',
     'encoder_model_q4.onnx':
-      'f142de7eb5928893e57546906817e7387157609cbc2a36ea7859d336a8d568d0',
+      '41ad35ee01012d68837d142d74de34d3bb32dc040a61817de470011219b1b1eb',
     'decoder_model_merged_q4.onnx':
-      '7b68ff4833299ca0e21cae70f4b9f9ada15a01644813524b7f29c160bda02e2b',
+      '783fd16e8596e59ec20bfe12cb174118ced18fbfd5ca5bbe42052ea1d3408966',
   },
 
   dtype: {

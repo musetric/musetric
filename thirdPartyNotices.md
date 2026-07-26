@@ -91,8 +91,8 @@ SOFTWARE.
 
 ## OpenAI Whisper
 
-- Source: https://huggingface.co/openai/whisper-large-v3
-- Usage: base speech-to-text weights behind lyric transcription. The `musetric/whisper-large-v3-onnx` export is an inference-only re-export of these weights with no fine-tuning.
+- Source: https://huggingface.co/openai/whisper-large-v3-turbo
+- Usage: base speech-to-text weights behind lyric transcription. The `musetric/whisper-large-v3-turbo-onnx` export is an inference-only re-export of these weights with no fine-tuning.
 - Local files: `packages/ai/src/models/whisperModel.ts`, `packages/ai/src/runtime/whisper/whisperRuntime.ts`, `packages/ai/src/service/whisperModelCache.node.ts`, `packages/ai/src/service/browserTranscribeEntry.ts`, `packages/ai/src/service/headlessTranscriptionService.node.ts`.
 - License: Apache-2.0. Full text: https://www.apache.org/licenses/LICENSE-2.0
 - License source: Hugging Face model card metadata of the repository the weights are downloaded from.
@@ -111,10 +111,10 @@ model weights are released under the MIT License", while the Hugging Face model
 card the weights are actually fetched from declares `apache-2.0`. This notice
 follows the source the weights are downloaded from.
 
-## Musetric Whisper large-v3 ONNX
+## Musetric Whisper large-v3-turbo ONNX
 
-- Source: https://huggingface.co/musetric/whisper-large-v3-onnx
-- Usage: word-timestamped q4 ONNX export of Whisper large-v3 in the transformers.js layout, downloaded at runtime.
+- Source: https://huggingface.co/musetric/whisper-large-v3-turbo-onnx
+- Usage: word-timestamped q4 ONNX export of Whisper large-v3-turbo in the transformers.js layout, downloaded at runtime.
 - Local files: `packages/ai/src/models/whisperModel.ts`, `packages/ai/src/service/whisperModelCache.node.ts`.
 - License: Apache-2.0, inherited from the base weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
