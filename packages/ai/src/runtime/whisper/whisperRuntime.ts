@@ -13,7 +13,12 @@ import {
   type DecodeResult,
   type WhisperPipelineInternals,
 } from './whisperDecoder.js';
-import { extractWords, isLooped, spanText } from './whisperSegments.js';
+import {
+  countWords,
+  extractWords,
+  isLooped,
+  spanText,
+} from './whisperSegments.js';
 
 const sampleRate = 16000;
 
@@ -21,6 +26,10 @@ const guardLadder: DecodeGuard[] = [
   { no_repeat_ngram_size: 3 },
   { no_repeat_ngram_size: 3, repetition_penalty: 1.15 },
 ];
+
+const collapsedWordsPerSecond = 0.25;
+const collapsedMinSeconds = 12;
+const alignedWordsPerSecond = 0.8;
 
 type LoadProgress = {
   status?: string;
@@ -42,6 +51,11 @@ export type WhisperRuntime = {
     audios: Float32Array[],
     language: string,
   ) => Promise<TranscriptionWord[][]>;
+
+  transcribeAligned: (
+    audio: Float32Array,
+    language: string,
+  ) => Promise<TranscriptionWord[]>;
   release: () => Promise<void>;
 };
 
@@ -81,7 +95,7 @@ export const createWhisperRuntime = async (
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
-  const { decodeTimestamped } = createWhisperDecoder(internals);
+  const { decodeTimestamped, decodeAligned } = createWhisperDecoder(internals);
   const generationConfig = internals.model.generation_config;
   const langToId = generationConfig.lang_to_id ?? {};
   const startToken = generationConfig.decoder_start_token_id ?? 50258;
@@ -137,6 +151,32 @@ export const createWhisperRuntime = async (
     const maxDuration = Math.max(...audios.map((a) => a.length / sampleRate));
 
     const outputs = await decodePass(audios, language, undefined);
+
+    const preferAligned = async (
+      result: DecodeResult,
+      audio: Float32Array,
+    ): Promise<DecodeResult> => {
+      const duration = audio.length / sampleRate;
+      const words = countWords(result.text);
+      const collapsed =
+        duration >= collapsedMinSeconds &&
+        words / duration < collapsedWordsPerSecond;
+      if (!collapsed && !isHallucination(result.text ?? '')) {
+        return result;
+      }
+      const aligned = await decodeAligned(audio, language);
+      const alignedWords = countWords(aligned.text);
+      const better =
+        alignedWords > words &&
+        alignedWords / duration >= alignedWordsPerSecond &&
+        !isHallucination(aligned.text ?? '') &&
+        !(await isLooped(aligned.text ?? ''));
+      console.log(
+        `whisper aligned decode: ${words}w -> ${alignedWords}w, ` +
+          `${better ? 'taken' : 'kept timestamped'}`,
+      );
+      return better ? aligned : result;
+    };
 
     const dropCaptionSegments = (result: DecodeResult): DecodeResult => {
       const segments = result.segments ?? [];
@@ -206,7 +246,9 @@ export const createWhisperRuntime = async (
     await runLadder(looped);
 
     for (const [index, result] of outputs.entries()) {
-      outputs[index] = dropCaptionSegments(result);
+      outputs[index] = dropCaptionSegments(
+        await preferAligned(result, audios[index]),
+      );
     }
 
     console.log(
@@ -215,9 +257,17 @@ export const createWhisperRuntime = async (
     return outputs.map((result) => extractWords(result.chunks ?? []));
   };
 
+  const transcribeAligned = async (
+    audio: Float32Array,
+    language: string,
+  ): Promise<TranscriptionWord[]> => {
+    const aligned = await decodeAligned(audio, language);
+    return extractWords(aligned.chunks ?? []);
+  };
+
   const release = async (): Promise<void> => {
     await transcriber.dispose();
   };
 
-  return { detectLanguage, transcribeBatch, release };
+  return { detectLanguage, transcribeBatch, transcribeAligned, release };
 };

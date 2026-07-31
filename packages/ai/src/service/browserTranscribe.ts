@@ -38,6 +38,7 @@ export const registerTranscribeApi = (): void => {
           language: request.language,
           detectLanguage: runtime.detectLanguage,
           transcribeBatch: runtime.transcribeBatch,
+          transcribeAligned: runtime.transcribeAligned,
 
           onProgress: async (fraction) => reportProgress(0.4 + fraction * 0.6),
         });

@@ -24,6 +24,9 @@ export const spanText = (chunks: WordChunk[]): string =>
     .join('')
     .trim();
 
+export const countWords = (text: string | undefined): number =>
+  (text ?? '').trim().split(/\s+/).filter(Boolean).length;
+
 const compressionRatio = async (text: string): Promise<number> => {
   const bytes = new TextEncoder().encode(text);
   if (bytes.length < 48) {

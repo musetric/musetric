@@ -88,9 +88,16 @@ export type TranscribeBatch = (
   language: string,
 ) => Promise<TranscriptionWord[][]>;
 
+export type TranscribeAligned = (
+  audio: Float32Array,
+  language: string,
+) => Promise<TranscriptionWord[]>;
+
 export type RunTranscriptionOptions = {
   audio: Float32Array;
   transcribeBatch: TranscribeBatch;
+
+  transcribeAligned?: TranscribeAligned;
 
   language?: string;
   detectLanguage?: DetectLanguage;
@@ -151,7 +158,9 @@ export const runTranscription = async (
     wordsPerChunk,
     mapping,
     transcribeSlice: async (slice) =>
-      (await transcribeBatch([slice], language))[0] ?? [],
+      options.transcribeAligned
+        ? await options.transcribeAligned(slice, language)
+        : ((await transcribeBatch([slice], language))[0] ?? []),
   });
   const words = repaired.flat().sort((a, b) => a.start - b.start);
 

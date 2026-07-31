@@ -1,4 +1,8 @@
-import { splitBySegments, type WordChunk } from './whisperSegments.js';
+import {
+  spanText,
+  splitBySegments,
+  type WordChunk,
+} from './whisperSegments.js';
 
 const sampleRate = 16000;
 
@@ -64,6 +68,11 @@ export type WhisperDecoder = {
     audio: Float32Array,
     language: string,
     guard: DecodeGuard | undefined,
+  ) => Promise<DecodeResult>;
+
+  decodeAligned: (
+    audio: Float32Array,
+    language: string,
   ) => Promise<DecodeResult>;
 };
 
@@ -140,5 +149,47 @@ export const createWhisperDecoder = (
     };
   };
 
-  return { decodeTimestamped };
+  const decodeAligned = async (
+    audio: Float32Array,
+    language: string,
+  ): Promise<DecodeResult> => {
+    const inputs = await internals.processor(audio);
+    const output = await internals.model.generate({
+      inputs: inputs.input_features,
+      return_token_timestamps: true,
+      return_timestamps: false,
+      ...generateArgs(audio, language, undefined),
+    });
+
+    const [ids] = output.sequences.tolist();
+    const [times] = output.token_timestamps.tolist();
+
+    const chunks: WordChunk[] = [];
+    for (const [index, id] of ids.entries()) {
+      const piece = internals.tokenizer.decode([id], {
+        skip_special_tokens: true,
+      });
+      if (!piece) {
+        continue;
+      }
+      const startsWord = piece.startsWith(' ') || chunks.length === 0;
+      const time = times[index] ?? 0;
+      if (startsWord) {
+        chunks.push({ text: piece, timestamp: [time, time] });
+        continue;
+      }
+      const last = chunks[chunks.length - 1];
+      last.text += piece;
+      last.timestamp[1] = time;
+    }
+    for (const chunk of chunks) {
+      if ((chunk.timestamp[1] ?? 0) <= chunk.timestamp[0]) {
+        chunk.timestamp[1] = chunk.timestamp[0];
+      }
+    }
+
+    return { text: spanText(chunks), chunks, segments: [chunks] };
+  };
+
+  return { decodeTimestamped, decodeAligned };
 };
