@@ -1,3 +1,4 @@
+import { uniqueRatio } from '../../transcription/collapseRepair.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
 
 export type WordChunk = { text: string; timestamp: [number, number | null] };
@@ -35,10 +36,12 @@ const compressionRatio = async (text: string): Promise<number> => {
   return bytes.length / compressed.byteLength;
 };
 
-const loopCompressionRatio = 2.4;
+const loopCompressionRatio = 3.5;
+const loopUniqueRatio = 0.35;
 
 export const isLooped = async (text: string): Promise<boolean> =>
-  (await compressionRatio(text)) > loopCompressionRatio;
+  (await compressionRatio(text)) > loopCompressionRatio &&
+  uniqueRatio(text) < loopUniqueRatio;
 
 type SegmentBounds = [number, number][];
 
