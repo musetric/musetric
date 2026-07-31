@@ -1,12 +1,17 @@
 import { uniqueRatio } from '../../transcription/collapseRepair.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
 
+const degenerateRepeat = /(.{1,3}?)\1{3,}/gu;
+
+const collapseRepeats = (text: string): string =>
+  text.replace(degenerateRepeat, '$1$1');
+
 export type WordChunk = { text: string; timestamp: [number, number | null] };
 
 export const extractWords = (chunks: WordChunk[]): TranscriptionWord[] => {
   const words: TranscriptionWord[] = [];
   for (const chunk of chunks) {
-    const text = chunk.text.trim();
+    const text = collapseRepeats(chunk.text.trim());
     if (!text) {
       continue;
     }
