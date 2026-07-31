@@ -13,7 +13,7 @@ const files = [
   'merges.txt',
   'normalizer.json',
   'encoder_model_q4.onnx',
-  'decoder_model_merged_q4.onnx',
+  'decoder_model_merged_fp16.onnx',
 ] as const;
 
 export const whisperModel = {
@@ -44,13 +44,13 @@ export const whisperModel = {
       'bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd',
     'encoder_model_q4.onnx':
       '41ad35ee01012d68837d142d74de34d3bb32dc040a61817de470011219b1b1eb',
-    'decoder_model_merged_q4.onnx':
-      '783fd16e8596e59ec20bfe12cb174118ced18fbfd5ca5bbe42052ea1d3408966',
+    'decoder_model_merged_fp16.onnx':
+      '6497641a50badd9fd90f58907fe74ad43048a874b8288e2039f26ce01a15ef3e',
   },
 
   dtype: {
     encoder_model: 'q4',
-    decoder_model_merged: 'q4',
+    decoder_model_merged: 'fp16',
   },
   chunkLengthSeconds: 30,
   strideLengthSeconds: 5,
