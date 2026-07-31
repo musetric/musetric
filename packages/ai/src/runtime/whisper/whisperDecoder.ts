@@ -2,7 +2,8 @@ import { splitBySegments, type WordChunk } from './whisperSegments.js';
 
 const sampleRate = 16000;
 
-const melHopSamples = 160;
+const encoderPositionSamples = 320;
+const encoderPositions = 1500;
 
 const timePrecision = 0.02;
 
@@ -74,7 +75,10 @@ export const createWhisperDecoder = (
     language: string,
     guard: DecodeGuard | undefined,
   ): Record<string, unknown> => ({
-    num_frames: Math.floor(audio.length / melHopSamples),
+    num_frames: Math.min(
+      encoderPositions,
+      Math.round(audio.length / encoderPositionSamples),
+    ),
     language,
     task: 'transcribe',
     max_new_tokens: Math.min(
