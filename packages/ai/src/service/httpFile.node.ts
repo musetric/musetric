@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, statSync } from 'node:fs';
 import { type ServerResponse } from 'node:http';
 
 export const sendFile = async (
@@ -8,6 +8,7 @@ export const sendFile = async (
 ): Promise<void> => {
   response.writeHead(200, {
     'content-type': contentType,
+    'content-length': statSync(path).size,
     'cache-control': 'no-store',
   });
   await new Promise<void>((resolve, reject) => {
