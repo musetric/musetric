@@ -11,7 +11,7 @@ const maxDecodeTokens = 400;
 const tokensPerSecond = 12;
 const minDecodeTokens = 32;
 
-export type DecodeGuard = Record<string, unknown>;
+export type DecodeGuard = Record<string, number>;
 
 type TokenId = number | bigint;
 

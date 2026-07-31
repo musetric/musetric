@@ -40,7 +40,7 @@ const normalizeTokens = (text: string): string[] =>
     .split(/\s+/)
     .filter(Boolean);
 
-const uniqueRatio = (text: string): number => {
+export const uniqueRatio = (text: string): number => {
   const tokens = normalizeTokens(text);
   if (tokens.length === 0) {
     return 1.0;

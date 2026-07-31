@@ -17,12 +17,10 @@ import { extractWords, isLooped, spanText } from './whisperSegments.js';
 
 const sampleRate = 16000;
 
-const fallbackTemperatures = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
-
-const ladderGuard = (temperature: number): DecodeGuard => ({
-  no_repeat_ngram_size: 3,
-  ...(temperature > 0 ? { do_sample: true, temperature } : {}),
-});
+const guardLadder: DecodeGuard[] = [
+  { no_repeat_ngram_size: 3 },
+  { no_repeat_ngram_size: 3, repetition_penalty: 1.15 },
+];
 
 type LoadProgress = {
   status?: string;
@@ -160,34 +158,52 @@ export const createWhisperRuntime = async (
       return { text: spanText(chunks), chunks, segments: clean };
     };
 
-    let looped: number[] = [];
+    const hasLoopedSegment = async (result: DecodeResult): Promise<boolean> => {
+      const segments = result.segments ?? [];
+      if (segments.length === 0) {
+        return isLooped(result.text ?? '');
+      }
+      for (const segment of segments) {
+        if (await isLooped(spanText(segment))) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const runLadder = async (looped: number[]): Promise<void> => {
+      let bad = looped;
+      for (const guard of guardLadder) {
+        if (bad.length === 0) {
+          return;
+        }
+        const retried = await decodePass(
+          bad.map((index) => audios[index]),
+          language,
+          guard,
+        );
+        const stillBad: number[] = [];
+        for (const [retryIndex, index] of bad.entries()) {
+          if (await hasLoopedSegment(retried[retryIndex])) {
+            stillBad.push(index);
+          } else {
+            outputs[index] = retried[retryIndex];
+          }
+        }
+        console.log(
+          `whisper ladder ${JSON.stringify(guard)}: rescued ${bad.length - stillBad.length}/${bad.length} chunk(s)`,
+        );
+        bad = stillBad;
+      }
+    };
+
+    const looped: number[] = [];
     for (const [index, result] of outputs.entries()) {
-      if (await isLooped(result.text ?? '')) {
+      if (await hasLoopedSegment(result)) {
         looped.push(index);
       }
     }
-    for (const temperature of fallbackTemperatures) {
-      if (looped.length === 0) {
-        break;
-      }
-      const retried = await decodePass(
-        looped.map((index) => audios[index]),
-        language,
-        ladderGuard(temperature),
-      );
-      const stillLooped: number[] = [];
-      for (const [retryIndex, index] of looped.entries()) {
-        outputs[index] = retried[retryIndex];
-        if (await isLooped(retried[retryIndex].text ?? '')) {
-          stillLooped.push(index);
-        }
-      }
-      const label = temperature > 0 ? `temp=${temperature}` : 'greedy+guard';
-      console.log(
-        `whisper ladder ${label}: rescued ${looped.length - stillLooped.length}/${looped.length} chunk(s)`,
-      );
-      looped = stillLooped;
-    }
+    await runLadder(looped);
 
     for (const [index, result] of outputs.entries()) {
       outputs[index] = dropCaptionSegments(result);
