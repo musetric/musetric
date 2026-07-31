@@ -5,58 +5,28 @@ import {
   Tensor,
 } from '@huggingface/transformers';
 import { whisperModel } from '../../models/whisperModel.js';
+import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
+import {
+  createWhisperDecoder,
+  type DecodeGuard,
+  type DecodeResult,
+  type WhisperPipelineInternals,
+} from './whisperDecoder.js';
+import { extractWords, isLooped, spanText } from './whisperSegments.js';
 
-type WordChunk = { text: string; timestamp: [number, number | null] };
-
-const extractWords = (chunks: WordChunk[]): TranscriptionWord[] => {
-  const words: TranscriptionWord[] = [];
-  for (const chunk of chunks) {
-    const text = chunk.text.trim();
-    if (!text) {
-      continue;
-    }
-
-    const [start, rawEnd] = chunk.timestamp;
-    const end = rawEnd ?? start;
-    words.push({ text, start, end });
-  }
-  return words;
-};
-
-const loopCompressionRatio = 2.4;
+const sampleRate = 16000;
 
 const fallbackTemperatures = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
 
-const compressionRatio = async (text: string): Promise<number> => {
-  const bytes = new TextEncoder().encode(text);
-  if (bytes.length < 48) {
-    return 0;
-  }
-  const compressedStream = new Blob([bytes])
-    .stream()
-    .pipeThrough(new CompressionStream('gzip'));
-  const compressed = await new Response(compressedStream).arrayBuffer();
-  return bytes.length / compressed.byteLength;
-};
+const ladderGuard = (temperature: number): DecodeGuard => ({
+  no_repeat_ngram_size: 3,
+  ...(temperature > 0 ? { do_sample: true, temperature } : {}),
+});
 
 type LoadProgress = {
   status?: string;
   progress?: number;
-};
-
-type WhisperModelInternals = {
-  generation_config: {
-    lang_to_id?: Record<string, number>;
-    decoder_start_token_id?: number;
-  };
-} & ((args: Record<string, unknown>) => Promise<{
-  logits: { data: Float32Array };
-}>);
-
-type WhisperPipelineInternals = {
-  model: WhisperModelInternals;
-  processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
 };
 
 export type WhisperRuntimeOptions = {
@@ -113,6 +83,7 @@ export const createWhisperRuntime = async (
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
+  const { decodeTimestamped } = createWhisperDecoder(internals);
   const generationConfig = internals.model.generation_config;
   const langToId = generationConfig.lang_to_id ?? {};
   const startToken = generationConfig.decoder_start_token_id ?? 50258;
@@ -140,48 +111,21 @@ export const createWhisperRuntime = async (
     return best.slice(2, -2);
   };
 
-  type DecodeResult = { text?: string; chunks?: WordChunk[] };
-
   const decodePass = async (
     audios: Float32Array[],
     language: string,
-    guard: boolean,
-    temperature = 0,
+    guard: DecodeGuard | undefined,
   ): Promise<DecodeResult[]> => {
-    const maxDuration = Math.max(...audios.map((a) => a.length / 16000));
-    const maxNewTokens = Math.min(
-      400,
-      Math.max(32, Math.round(maxDuration * 12) + 32),
-    );
-    try {
-      const output = await transcriber(audios, {
-        return_timestamps: 'word',
-        chunk_length_s: 0,
-        language,
-        task: 'transcribe',
-        max_new_tokens: maxNewTokens,
-
-        ...(temperature > 0 ? { do_sample: true, temperature } : {}),
-        ...(guard ? { no_repeat_ngram_size: 3 } : {}),
-      });
-      return Array.isArray(output) ? output : [output];
-    } catch (error) {
-      if (!(error instanceof Error) || !/non-empty array/.test(error.message)) {
-        throw error;
-      }
-
-      if (audios.length === 1) {
+    const results: DecodeResult[] = [];
+    for (const audio of audios) {
+      if (audio.length === 0) {
         console.log('whisper decode: empty chunk skipped');
-        return [{}];
+        results.push({});
+        continue;
       }
-      const results: DecodeResult[] = [];
-      for (const audio of audios) {
-        results.push(
-          (await decodePass([audio], language, guard, temperature))[0],
-        );
-      }
-      return results;
+      results.push(await decodeTimestamped(audio, language, guard));
     }
+    return results;
   };
 
   const transcribeBatch = async (
@@ -192,15 +136,33 @@ export const createWhisperRuntime = async (
       return [];
     }
     const decodeStart = performance.now();
-    const maxDuration = Math.max(...audios.map((a) => a.length / 16000));
+    const maxDuration = Math.max(...audios.map((a) => a.length / sampleRate));
 
-    const outputs = await decodePass(audios, language, false);
+    const outputs = await decodePass(audios, language, undefined);
 
-    const isLooped = async (result: DecodeResult): Promise<boolean> =>
-      (await compressionRatio(result.text ?? '')) > loopCompressionRatio;
+    const dropCaptionSegments = (result: DecodeResult): DecodeResult => {
+      const segments = result.segments ?? [];
+      if (segments.length === 0) {
+        return isHallucination(result.text ?? '') ? { text: '' } : result;
+      }
+      const clean = segments.filter(
+        (segment) => !isHallucination(spanText(segment)),
+      );
+      if (clean.length === segments.length) {
+        return result;
+      }
+      for (const segment of segments) {
+        if (!clean.includes(segment)) {
+          console.log(`whisper caption dropped: ${spanText(segment)}`);
+        }
+      }
+      const chunks = clean.flat();
+      return { text: spanText(chunks), chunks, segments: clean };
+    };
+
     let looped: number[] = [];
     for (const [index, result] of outputs.entries()) {
-      if (await isLooped(result)) {
+      if (await isLooped(result.text ?? '')) {
         looped.push(index);
       }
     }
@@ -211,13 +173,12 @@ export const createWhisperRuntime = async (
       const retried = await decodePass(
         looped.map((index) => audios[index]),
         language,
-        true,
-        temperature,
+        ladderGuard(temperature),
       );
       const stillLooped: number[] = [];
       for (const [retryIndex, index] of looped.entries()) {
         outputs[index] = retried[retryIndex];
-        if (await isLooped(retried[retryIndex])) {
+        if (await isLooped(retried[retryIndex].text ?? '')) {
           stillLooped.push(index);
         }
       }
@@ -226,6 +187,10 @@ export const createWhisperRuntime = async (
         `whisper ladder ${label}: rescued ${looped.length - stillLooped.length}/${looped.length} chunk(s)`,
       );
       looped = stillLooped;
+    }
+
+    for (const [index, result] of outputs.entries()) {
+      outputs[index] = dropCaptionSegments(result);
     }
 
     console.log(
