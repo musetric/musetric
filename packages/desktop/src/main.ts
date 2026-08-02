@@ -1,16 +1,21 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import { type DesktopBackend, startBackend } from './backend.js';
 import { createElectronGpuHost } from './electronGpuHost.js';
 
 const main = (): void => {
+  if (!app.requestSingleInstanceLock()) {
+    app.exit(0);
+    return;
+  }
+
   app.commandLine.appendSwitch('enable-unsafe-webgpu');
   app.commandLine.appendSwitch('disable-webgpu-blocklist');
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
   let backend: DesktopBackend | undefined = undefined;
   let stopBackendPromise: Promise<void> | undefined = undefined;
-  let mainWindow: BrowserWindow | undefined = undefined;
   let isQuitting = false;
+  const mainWindows = new Set<BrowserWindow>();
 
   const isMac = process.platform === 'darwin';
 
@@ -55,36 +60,56 @@ const main = (): void => {
         nodeIntegration: false,
       },
     });
-    mainWindow = window;
+    mainWindows.add(window);
     window.on('closed', () => {
-      mainWindow = undefined;
-      if (!isMac) {
+      mainWindows.delete(window);
+      if (!isMac && mainWindows.size === 0) {
         void shutdown();
       }
     });
     await window.loadURL(url);
   };
 
+  const openMainWindow = (): void => {
+    if (isQuitting || backend === undefined) {
+      return;
+    }
+    void createWindow(backend.url);
+  };
+
   const start = async (): Promise<void> => {
     const activeBackend = await startBackend({
       gpuPageHostFactory: createElectronGpuHost(),
     });
+    if (activeBackend === undefined) {
+      dialog.showErrorBox(
+        'Musetric is already running',
+        'Another Musetric process is using the same data folder. Close it and try again.',
+      );
+      await shutdown();
+      return;
+    }
     backend = activeBackend;
     await createWindow(activeBackend.url);
-    app.on('activate', () => {
-      if (mainWindow === undefined) {
-        void createWindow(activeBackend.url);
-      }
-    });
   };
 
-  void app
+  const startPromise = app
     .whenReady()
     .then(start)
     .catch((error: unknown) => {
       console.error(error);
       void shutdown();
     });
+
+  app.on('second-instance', () => {
+    void startPromise.then(openMainWindow);
+  });
+
+  app.on('activate', () => {
+    if (mainWindows.size === 0) {
+      openMainWindow();
+    }
+  });
 
   app.on('window-all-closed', () => {
     if (!isMac) {

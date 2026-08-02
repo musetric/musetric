@@ -4,6 +4,7 @@ import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
+import { acquireStorageLock } from './storageLock.js';
 
 const requestedPort = Number(process.env.MUSETRIC_DESKTOP_PORT ?? 0);
 
@@ -31,25 +32,38 @@ export type StartBackendOptions = {
 
 export const startBackend = async (
   options: StartBackendOptions,
-): Promise<DesktopBackend> => {
+): Promise<DesktopBackend | undefined> => {
   const config = createDesktopConfig();
-  await initDatabase(config.databasePath);
-  const { createServerApp } = await import('@musetric/backend-core');
-  const backend = await createServerApp(config, {
-    gpuPageHostFactory: options.gpuPageHostFactory,
-  });
-  await backend.listen({
-    port: requestedPort,
-    host: '127.0.0.1',
-  });
-  const address = backend.server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('desktop backend failed to bind a local HTTP port');
+  const storageLock = acquireStorageLock(config.lockPath);
+  if (!storageLock) {
+    return undefined;
   }
-  return {
-    url: `http://127.0.0.1:${address.port}`,
-    close: async () => {
-      await backend.close();
-    },
-  };
+  try {
+    await initDatabase(config.databasePath);
+    const { createServerApp } = await import('@musetric/backend-core');
+    const backend = await createServerApp(config, {
+      gpuPageHostFactory: options.gpuPageHostFactory,
+    });
+    await backend.listen({
+      port: requestedPort,
+      host: '127.0.0.1',
+    });
+    const address = backend.server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('desktop backend failed to bind a local HTTP port');
+    }
+    return {
+      url: `http://127.0.0.1:${address.port}`,
+      close: async () => {
+        try {
+          await backend.close();
+        } finally {
+          storageLock.release();
+        }
+      },
+    };
+  } catch (error) {
+    storageLock.release();
+    throw error;
+  }
 };
