@@ -25,9 +25,7 @@ export const createDatabase = async (
     enableForeignKeyConstraints: true,
     timeout: 5000,
   });
-  await Promise.resolve(database.exec('PRAGMA foreign_keys = ON;'));
-  await Promise.resolve(database.exec('PRAGMA journal_mode = WAL;'));
-  return database;
+  return await Promise.resolve(database);
 };
 
 export const createInstance = async (databasePath: string) => {
