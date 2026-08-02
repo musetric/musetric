@@ -1,4 +1,5 @@
 import { type DatabaseSync } from 'node:sqlite';
+import { createDatabase } from '../instance.js';
 
 const createProject = `
   CREATE TABLE IF NOT EXISTS Project (
@@ -129,8 +130,20 @@ const creationStatements = [
   createRecording,
 ] as const;
 
-export const createTables = async (database: DatabaseSync): Promise<void> => {
+const createTables = async (database: DatabaseSync): Promise<void> => {
   for (const statement of creationStatements) {
     await Promise.resolve(database.exec(statement));
+  }
+};
+
+export const initDatabase = async (databasePath: string): Promise<void> => {
+  const database = await createDatabase(databasePath);
+  try {
+    database.exec('PRAGMA journal_mode = WAL;');
+    await createTables(database);
+  } finally {
+    if (database.isOpen) {
+      database.close();
+    }
   }
 };

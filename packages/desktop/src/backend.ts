@@ -1,8 +1,7 @@
 import { join } from 'node:path';
 import { type GpuPageHostFactory } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
-import { DB } from '@musetric/backend-db';
-import { createTables } from '@musetric/backend-db/migrations';
+import { initDatabase } from '@musetric/backend-db/migrations';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
 
@@ -21,17 +20,6 @@ const createDesktopConfig = (): AppConfig => {
   };
 };
 
-const initDatabase = async (config: AppConfig): Promise<void> => {
-  const database = await DB.createDatabase(config.databasePath);
-  try {
-    await createTables(database);
-  } finally {
-    if (database.isOpen) {
-      database.close();
-    }
-  }
-};
-
 export type DesktopBackend = {
   url: string;
   close: () => Promise<void>;
@@ -45,7 +33,7 @@ export const startBackend = async (
   options: StartBackendOptions,
 ): Promise<DesktopBackend> => {
   const config = createDesktopConfig();
-  await initDatabase(config);
+  await initDatabase(config.databasePath);
   const { createServerApp } = await import('@musetric/backend-core');
   const backend = await createServerApp(config, {
     gpuPageHostFactory: options.gpuPageHostFactory,
