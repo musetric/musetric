@@ -11,6 +11,7 @@ win:
   icon: assets/icon.png
   target: nsis
 nsis:
+  include: installer.nsh
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
