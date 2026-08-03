@@ -6,8 +6,6 @@ import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
 import { acquireStorageLock } from './storageLock.js';
 
-const requestedPort = Number(process.env.MUSETRIC_DESKTOP_PORT ?? 0);
-
 const createLockPath = (): string =>
   join(app.getPath('userData'), 'storage/backend.lock');
 
@@ -48,7 +46,7 @@ export const startBackend = async (
       gpuPageHostFactory: options.gpuPageHostFactory,
     });
     await backend.listen({
-      port: requestedPort,
+      port: 0,
       host: '127.0.0.1',
     });
     const address = backend.server.address();
