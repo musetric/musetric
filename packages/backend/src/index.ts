@@ -13,7 +13,6 @@ const startServer = async () => {
     databasePath: envs.databasePath,
     modelsPath: envs.modelsPath,
     browserBundlePath: envs.browserBundlePath,
-    lockPath: envs.lockPath,
     https: await getHttps(),
   };
   const app = await createServerApp(config);
