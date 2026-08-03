@@ -12,6 +12,12 @@ const createDataRootPath = (): string => {
   return app.getPath('appData');
 };
 
+const createDataDirectoryName = (): string =>
+  app.isPackaged ? app.getName() : `${app.getName()} Dev`;
+
 export const applyAppPaths = (): void => {
-  app.setPath('userData', join(createDataRootPath(), app.getName()));
+  app.setPath(
+    'userData',
+    join(createDataRootPath(), createDataDirectoryName()),
+  );
 };
