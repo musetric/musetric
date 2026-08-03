@@ -6,7 +6,6 @@ export type StoragePaths = {
   databasePath: string;
   modelsPath: string;
   browserBundlePath: string;
-  lockPath: string;
 };
 
 export const createStoragePaths = (rootPath: string): StoragePaths => ({
@@ -15,5 +14,4 @@ export const createStoragePaths = (rootPath: string): StoragePaths => ({
   databasePath: join(rootPath, 'storage/db/app.db'),
   modelsPath: join(rootPath, 'storage/models'),
   browserBundlePath: join(rootPath, 'dist-browser'),
-  lockPath: join(rootPath, 'storage/backend.lock'),
 });

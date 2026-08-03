@@ -8,6 +8,9 @@ import { acquireStorageLock } from './storageLock.js';
 
 const requestedPort = Number(process.env.MUSETRIC_DESKTOP_PORT ?? 0);
 
+const createLockPath = (): string =>
+  join(app.getPath('userData'), 'storage/backend.lock');
+
 const createDesktopConfig = (): AppConfig => {
   const resourcePaths = createStoragePaths(
     join(app.getAppPath(), '../backend'),
@@ -34,7 +37,7 @@ export const startBackend = async (
   options: StartBackendOptions,
 ): Promise<DesktopBackend | undefined> => {
   const config = createDesktopConfig();
-  const storageLock = acquireStorageLock(config.lockPath);
+  const storageLock = acquireStorageLock(createLockPath());
   if (!storageLock) {
     return undefined;
   }
