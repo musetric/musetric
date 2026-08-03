@@ -16,8 +16,7 @@ const createDataDirectoryName = (): string =>
   app.isPackaged ? app.getName() : `${app.getName()} Dev`;
 
 export const applyAppPaths = (): void => {
-  app.setPath(
-    'userData',
-    join(createDataRootPath(), createDataDirectoryName()),
-  );
+  const userDataPath = join(createDataRootPath(), createDataDirectoryName());
+  app.setPath('userData', userDataPath);
+  app.setPath('sessionData', join(userDataPath, 'session'));
 };
