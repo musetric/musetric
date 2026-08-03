@@ -1,8 +1,11 @@
 import { app, BrowserWindow, dialog } from 'electron';
+import { applyAppPaths } from './appPaths.js';
 import { type DesktopBackend, startBackend } from './backend.js';
 import { createElectronGpuHost } from './electronGpuHost.js';
 
 const main = (): void => {
+  applyAppPaths();
+
   if (!app.requestSingleInstanceLock()) {
     app.exit(0);
     return;
