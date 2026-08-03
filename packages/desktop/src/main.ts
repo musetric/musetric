@@ -15,6 +15,7 @@ const main = (): void => {
   let backend: DesktopBackend | undefined = undefined;
   let stopBackendPromise: Promise<void> | undefined = undefined;
   let isQuitting = false;
+  let isRelaunchRequested = false;
   const mainWindows = new Set<BrowserWindow>();
 
   const isMac = process.platform === 'darwin';
@@ -77,6 +78,14 @@ const main = (): void => {
     void createWindow(backend.url);
   };
 
+  const requestRelaunch = (): void => {
+    if (isRelaunchRequested) {
+      return;
+    }
+    isRelaunchRequested = true;
+    app.relaunch();
+  };
+
   const start = async (): Promise<void> => {
     const activeBackend = await startBackend({
       gpuPageHostFactory: createElectronGpuHost(),
@@ -102,7 +111,13 @@ const main = (): void => {
     });
 
   app.on('second-instance', () => {
-    void startPromise.then(openMainWindow);
+    void startPromise.then(() => {
+      if (isQuitting) {
+        requestRelaunch();
+        return;
+      }
+      openMainWindow();
+    });
   });
 
   app.on('activate', () => {
