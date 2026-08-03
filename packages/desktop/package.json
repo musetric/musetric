@@ -1,5 +1,6 @@
 {
   "name": "@musetric/desktop",
+  "productName": "Musetric",
   "version": "0.1.0",
   "description": "Musetric — audio separation, transcription and analysis desktop app",
   "author": "Musetric <musetric@gmail.com>",
