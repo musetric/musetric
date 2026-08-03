@@ -1,31 +1,72 @@
-import { createHash } from 'node:crypto';
+import { createHash, type Hash } from 'node:crypto';
 import { once } from 'node:events';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { createReadStream, createWriteStream, type Stats } from 'node:fs';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { type MessageHandlers } from '@musetric/utils';
 import { leadBackingModel } from '../models/leadBackingModel.js';
 import { resolveVocalsModelUrl, vocalsModel } from '../models/vocalsModel.js';
 import { type SeparateAudioMessage } from '../separation/separateAudio.node.js';
 
-const verifiedPaths = new Set<string>();
+const partialSuffix = '.part';
+const manifestSuffix = '.verified';
+const downloadAttempts = 3;
+const retryDelayMs = 1000;
 
-const hashFile = async (path: string): Promise<string> => {
-  const hash = createHash('sha256');
+const delay = async (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const updateHashFromFile = async (path: string, hash: Hash): Promise<void> => {
   const stream = createReadStream(path);
   for await (const chunk of stream) {
     hash.update(chunk);
   }
+};
+
+const hashFile = async (path: string): Promise<string> => {
+  const hash = createHash('sha256');
+  await updateHashFromFile(path, hash);
   return hash.digest('hex');
 };
 
-const getFileSize = async (path: string): Promise<number | undefined> => {
+const statFile = async (path: string): Promise<Stats | undefined> => {
   try {
-    const fileStat = await stat(path);
-    return fileStat.size;
+    return await stat(path);
   } catch {
     return undefined;
   }
+};
+
+const createManifest = (fileStat: Stats, sha256: string): string =>
+  `size=${fileStat.size} mtime=${fileStat.mtimeMs} sha256=${sha256}`;
+
+const readManifest = async (path: string): Promise<string> => {
+  try {
+    return await readFile(`${path}${manifestSuffix}`, 'utf8');
+  } catch {
+    return '';
+  }
+};
+
+const getCachedFileSize = async (
+  path: string,
+  sha256: string,
+): Promise<number | undefined> => {
+  const fileStat = await statFile(path);
+  if (fileStat === undefined) {
+    return undefined;
+  }
+  const manifest = createManifest(fileStat, sha256);
+  if ((await readManifest(path)) === manifest) {
+    return fileStat.size;
+  }
+  if ((await hashFile(path)) !== sha256) {
+    return undefined;
+  }
+  await writeFile(`${path}${manifestSuffix}`, manifest);
+  return fileStat.size;
 };
 
 const waitForStreamDrain = async (
@@ -53,6 +94,36 @@ const closeWriteStream = async (
   await Promise.race([once(stream, 'finish'), streamError]);
 };
 
+type StartedDownload = {
+  body: ReadableStream<Uint8Array>;
+  resumeFrom: number;
+  total: number | undefined;
+};
+
+const startDownload = async (
+  label: string,
+  url: string,
+  partialSize: number,
+): Promise<StartedDownload> => {
+  const response = await fetch(
+    url,
+    partialSize > 0 ? { headers: { range: `bytes=${partialSize}-` } } : {},
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to download ${label}: HTTP ${response.status}`);
+  }
+  if (!response.body) {
+    throw new Error(`Failed to download ${label}: empty response body`);
+  }
+  const resumeFrom = response.status === 206 ? partialSize : 0;
+  const remaining = Number(response.headers.get('content-length') ?? 0);
+  return {
+    body: response.body,
+    resumeFrom,
+    total: remaining > 0 ? resumeFrom + remaining : undefined,
+  };
+};
+
 export type ModelDownloadMessage = {
   type: 'download';
   label: string;
@@ -71,45 +142,28 @@ export type ModelFileOptions = {
   onDownload: (message: ModelDownloadMessage) => Promise<void>;
 };
 
-export const ensureCachedModelFile = async (
+const runDownload = async (
   options: ModelFileOptions,
-): Promise<string> => {
-  const { label, file, path, sha256, onDownload } = options;
-  const existingSize = await getFileSize(path);
-  if (existingSize !== undefined) {
-    if (verifiedPaths.has(path) || (await hashFile(path)) === sha256) {
-      verifiedPaths.add(path);
-      await onDownload({
-        type: 'download',
-        label,
-        file,
-        downloaded: existingSize,
-        total: existingSize,
-        status: 'cached',
-      });
-      return path;
-    }
-    await rm(path, { force: true });
-  }
+  partialPath: string,
+): Promise<void> => {
+  const { label, file, url, sha256, onDownload } = options;
+  const partialStat = await statFile(partialPath);
+  const { body, resumeFrom, total } = await startDownload(
+    label,
+    url,
+    partialStat?.size ?? 0,
+  );
 
-  await mkdir(dirname(path), { recursive: true });
-  const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
-  await rm(tempPath, { force: true });
-
-  const response = await fetch(options.url);
-  if (!response.ok) {
-    throw new Error(`Failed to download ${label}: HTTP ${response.status}`);
-  }
-  if (!response.body) {
-    throw new Error(`Failed to download ${label}: empty response body`);
-  }
-
-  const totalValue = Number(response.headers.get('content-length') ?? 0);
-  const total = totalValue > 0 ? totalValue : undefined;
-  let downloaded = 0;
   const hash = createHash('sha256');
-  const reader = response.body.getReader();
-  const target = createWriteStream(tempPath);
+  if (resumeFrom > 0) {
+    await updateHashFromFile(partialPath, hash);
+  }
+
+  let downloaded = resumeFrom;
+  const reader = body.getReader();
+  const target = createWriteStream(partialPath, {
+    flags: resumeFrom > 0 ? 'a' : 'w',
+  });
   const streamError = new Promise<never>((_resolve, reject) => {
     target.on('error', reject);
   });
@@ -149,20 +203,55 @@ export const ensureCachedModelFile = async (
 
   const downloadedHash = hash.digest('hex');
   if (downloadedHash !== sha256) {
-    await rm(tempPath, { force: true });
+    await rm(partialPath, { force: true });
     throw new Error(
       `Downloaded ${label} checksum mismatch: expected ${sha256}, got ${downloadedHash}`,
     );
   }
+};
 
-  await rename(tempPath, path);
-  verifiedPaths.add(path);
+export const ensureCachedModelFile = async (
+  options: ModelFileOptions,
+): Promise<string> => {
+  const { label, file, path, sha256, onDownload } = options;
+  const cachedSize = await getCachedFileSize(path, sha256);
+  if (cachedSize !== undefined) {
+    await onDownload({
+      type: 'download',
+      label,
+      file,
+      downloaded: cachedSize,
+      total: cachedSize,
+      status: 'cached',
+    });
+    return path;
+  }
+  await rm(path, { force: true });
+  await rm(`${path}${manifestSuffix}`, { force: true });
+
+  await mkdir(dirname(path), { recursive: true });
+  const partialPath = `${path}${partialSuffix}`;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await runDownload(options, partialPath);
+      break;
+    } catch (error) {
+      if (attempt === downloadAttempts) {
+        throw error;
+      }
+      await delay(retryDelayMs * attempt);
+    }
+  }
+
+  await rename(partialPath, path);
+  const fileStat = await stat(path);
+  await writeFile(`${path}${manifestSuffix}`, createManifest(fileStat, sha256));
   await onDownload({
     type: 'download',
     label,
     file,
-    downloaded,
-    total: downloaded,
+    downloaded: fileStat.size,
+    total: fileStat.size,
     status: 'done',
   });
 
