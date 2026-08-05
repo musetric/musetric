@@ -44,6 +44,8 @@ extraResources:
     to: license.md
   - from: ../../thirdPartyNotices.md
     to: thirdPartyNotices.md
+  - from: ../../trademark.md
+    to: trademark.md
 asarUnpack:
   - node_modules/**/*.node
   - node_modules/@musetric/ffmpeg/resources/**
