@@ -43,8 +43,6 @@ jobs:
             echo "v$declared is already released" >&2
             exit 1
           fi
-          # Compared without the prerelease suffix: sort -V orders 0.2.0-beta.1
-          # above 0.2.0, so a release right after its own beta would be rejected.
           if [ -n "$published" ] && [ "$(printf '%s\n%s\n' "${published%%-*}" "${declared%%-*}" | sort -V | tail -1)" != "${declared%%-*}" ]; then
             echo "$declared is older than the published $published" >&2
             exit 1

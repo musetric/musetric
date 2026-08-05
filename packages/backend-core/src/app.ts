@@ -39,7 +39,7 @@ export const createServerApp = async (
   options: CreateServerAppOptions = {},
 ): Promise<FastifyInstance> => {
   const app: FastifyInstance = fastify({
-    logger: createLoggerOptions(config.logLevel),
+    logger: createLoggerOptions(config.logLevel, config.logDestination),
     logController: new LogController({ disableRequestLogging }),
     // eslint-disable-next-line musetric/no-null-literal
     https: config.https ?? null,

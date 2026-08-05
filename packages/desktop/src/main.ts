@@ -1,12 +1,17 @@
+import { join } from 'node:path';
 import { app, BrowserWindow, dialog } from 'electron';
 import { applyAppPaths } from './appPaths.js';
 import { type DesktopBackend, startBackend } from './backend.js';
 import { createElectronGpuHost } from './electronGpuHost.js';
+import { createDesktopLog, reportFatal, watchFatalEvents } from './logging.js';
 
 const main = (): void => {
   applyAppPaths();
 
+  const log = createDesktopLog(join(app.getPath('userData'), 'logs'));
+
   if (!app.requestSingleInstanceLock()) {
+    log.logger.info('another instance owns the single instance lock');
     app.exit(0);
     return;
   }
@@ -89,11 +94,17 @@ const main = (): void => {
     app.relaunch();
   };
 
+  watchFatalEvents(log, () => {
+    void shutdown();
+  });
+
   const start = async (): Promise<void> => {
     const activeBackend = await startBackend({
       gpuPageHostFactory: createElectronGpuHost(),
+      logDestination: log.destination,
     });
     if (activeBackend === undefined) {
+      log.logger.error('the storage lock is held by another process');
       dialog.showErrorBox(
         'Musetric is already running',
         'Another Musetric process is using the same data folder. Close it and try again.',
@@ -109,7 +120,7 @@ const main = (): void => {
     .whenReady()
     .then(start)
     .catch((error: unknown) => {
-      console.error(error);
+      reportFatal(log, 'the app failed to start', error);
       void shutdown();
     });
 
