@@ -2,9 +2,57 @@ name: Desktop Build
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: dev builds artifacts only, release publishes packages/desktop/package.json version
+        type: choice
+        options:
+          - dev
+          - release
+        default: dev
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: version
+        env:
+          MODE: ${{ inputs.mode }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          declared=$(node -p "require('./packages/desktop/package.json').version")
+          if [ "$MODE" = dev ]; then
+            echo "version=$declared-dev.g${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! printf '%s' "$declared" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+            echo "not a release version: $declared" >&2
+            exit 1
+          fi
+          case "$declared" in
+            *-dev.*)
+              echo "dev builds cannot be released: $declared" >&2
+              exit 1
+              ;;
+          esac
+          published=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""' | sed 's/^v//')
+          if [ -n "$published" ] && [ "$published" = "$declared" ]; then
+            echo "v$declared is already released" >&2
+            exit 1
+          fi
+          # Compared without the prerelease suffix: sort -V orders 0.2.0-beta.1
+          # above 0.2.0, so a release right after its own beta would be rejected.
+          if [ -n "$published" ] && [ "$(printf '%s\n%s\n' "${published%%-*}" "${declared%%-*}" | sort -V | tail -1)" != "${declared%%-*}" ]; then
+            echo "$declared is older than the published $published" >&2
+            exit 1
+          fi
+          echo "version=$declared" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -48,13 +96,13 @@ jobs:
           MUSETRIC_SKIP_FFMPEG_FETCH: true
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }}
+      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }} -c.extraMetadata.version=${{ needs.prepare.outputs.version }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v7
         with:
           name: musetric-desktop-${{ runner.os }}-${{ matrix.arch }}
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: |
@@ -62,3 +110,27 @@ jobs:
             packages/desktop/build/*.exe.blockmap
             packages/desktop/build/*.dmg
             packages/desktop/build/*.AppImage
+
+  release:
+    if: inputs.mode == 'release'
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Musetric $VERSION" \
+            --generate-notes \
+            artifacts/*

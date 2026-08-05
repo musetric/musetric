@@ -16,10 +16,12 @@
       ${if} $installMode == "all"
         SetShellVarContext current
       ${endIf}
-      RMDir /r "$LOCALAPPDATA\${PRODUCT_FILENAME}\storage"
-      RMDir /r "$LOCALAPPDATA\${PRODUCT_FILENAME}\session"
-      Delete "$LOCALAPPDATA\${PRODUCT_FILENAME}\lockfile"
-      RMDir "$LOCALAPPDATA\${PRODUCT_FILENAME}"
+      ; PRODUCT_NAME, not PRODUCT_FILENAME: the app derives its data folder
+      ; from app.getName(), which is productName rather than executableName.
+      RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}\storage"
+      RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}\session"
+      Delete "$LOCALAPPDATA\${PRODUCT_NAME}\lockfile"
+      RMDir "$LOCALAPPDATA\${PRODUCT_NAME}"
       ${if} $installMode == "all"
         SetShellVarContext all
       ${endIf}

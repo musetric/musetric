@@ -1,6 +1,4 @@
 appId: com.musetric.desktop
-productName: Musetric
-executableName: Musetric
 electronVersion: 43.1.1
 directories:
   output: build
@@ -17,12 +15,12 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Musetric
   license: license.txt
 mac:
   target: dmg
   category: public.app-category.music
 linux:
+  executableName: musetric
   target: AppImage
   category: Audio
 files:
