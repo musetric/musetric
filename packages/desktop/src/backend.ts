@@ -4,12 +4,13 @@ import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
+import { type DestinationStream } from 'pino';
 import { acquireStorageLock } from './storageLock.js';
 
 const createLockPath = (): string =>
   join(app.getPath('userData'), 'storage/backend.lock');
 
-const createDesktopConfig = (): AppConfig => {
+const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
   const resourcePaths = createStoragePaths(
     join(app.getAppPath(), '../backend'),
   );
@@ -17,6 +18,7 @@ const createDesktopConfig = (): AppConfig => {
     ...createStoragePaths(app.getPath('userData')),
     version: app.getVersion(),
     logLevel: 'info',
+    logDestination,
     publicPath: resourcePaths.publicPath,
     browserBundlePath: resourcePaths.browserBundlePath,
   };
@@ -29,12 +31,13 @@ export type DesktopBackend = {
 
 export type StartBackendOptions = {
   gpuPageHostFactory: GpuPageHostFactory;
+  logDestination: DestinationStream;
 };
 
 export const startBackend = async (
   options: StartBackendOptions,
 ): Promise<DesktopBackend | undefined> => {
-  const config = createDesktopConfig();
+  const config = createDesktopConfig(options.logDestination);
   const storageLock = acquireStorageLock(createLockPath());
   if (!storageLock) {
     return undefined;

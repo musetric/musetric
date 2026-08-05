@@ -16,8 +16,6 @@
       ${if} $installMode == "all"
         SetShellVarContext current
       ${endIf}
-      ; PRODUCT_NAME, not PRODUCT_FILENAME: the app derives its data folder
-      ; from app.getName(), which is productName rather than executableName.
       RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}\storage"
       RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}\session"
       Delete "$LOCALAPPDATA\${PRODUCT_NAME}\lockfile"
