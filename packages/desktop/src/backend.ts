@@ -5,6 +5,7 @@ import { initDatabase } from '@musetric/backend-db/migrations';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
 import { type DestinationStream } from 'pino';
+import { type DesktopBackend } from './backendRunner.js';
 import { acquireStorageLock } from './storageLock.js';
 
 const createLockPath = (): string =>
@@ -22,11 +23,6 @@ const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
     publicPath: resourcePaths.publicPath,
     browserBundlePath: resourcePaths.browserBundlePath,
   };
-};
-
-export type DesktopBackend = {
-  url: string;
-  close: () => Promise<void>;
 };
 
 export type StartBackendOptions = {

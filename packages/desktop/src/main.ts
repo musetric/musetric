@@ -1,9 +1,10 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog } from 'electron';
+import { app } from 'electron';
 import { applyAppPaths } from './appPaths.js';
-import { type DesktopBackend, startBackend } from './backend.js';
-import { createElectronGpuHost } from './electronGpuHost.js';
+import { createBackendRunner } from './backendRunner.js';
 import { createDesktopLog, reportFatal, watchFatalEvents } from './logging.js';
+import { startApp } from './startup.js';
+import { createWindows, destroyAllWindows } from './windows.js';
 
 const main = (): void => {
   applyAppPaths();
@@ -20,35 +21,10 @@ const main = (): void => {
   app.commandLine.appendSwitch('disable-webgpu-blocklist');
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
-  let backend: DesktopBackend | undefined = undefined;
-  let stopBackendPromise: Promise<void> | undefined = undefined;
+  const isMac = process.platform === 'darwin';
+  const runner = createBackendRunner();
   let isQuitting = false;
   let isRelaunchRequested = false;
-  const mainWindows = new Set<BrowserWindow>();
-
-  const isMac = process.platform === 'darwin';
-
-  const stopBackend = async (): Promise<void> => {
-    if (stopBackendPromise !== undefined) {
-      await stopBackendPromise;
-      return;
-    }
-    if (backend === undefined) {
-      return;
-    }
-    const activeBackend = backend;
-    backend = undefined;
-    stopBackendPromise = activeBackend.close();
-    await stopBackendPromise;
-  };
-
-  const destroyAllWindows = (): void => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.destroy();
-      }
-    }
-  };
 
   const shutdown = async (): Promise<void> => {
     if (isQuitting) {
@@ -56,34 +32,24 @@ const main = (): void => {
     }
     isQuitting = true;
     destroyAllWindows();
-    await stopBackend();
+    await runner.stop();
     app.quit();
   };
 
-  const createWindow = async (url: string): Promise<void> => {
-    const window = new BrowserWindow({
-      width: 1280,
-      height: 800,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-    mainWindows.add(window);
-    window.on('closed', () => {
-      mainWindows.delete(window);
-      if (!isMac && mainWindows.size === 0) {
+  const windows = createWindows({
+    onLastClosed: () => {
+      if (!isMac) {
         void shutdown();
       }
-    });
-    await window.loadURL(url);
-  };
+    },
+  });
 
   const openMainWindow = (): void => {
-    if (isQuitting || backend === undefined) {
+    const url = runner.url();
+    if (isQuitting || url === undefined) {
       return;
     }
-    void createWindow(backend.url);
+    void windows.open(async (window) => window.loadURL(url));
   };
 
   const requestRelaunch = (): void => {
@@ -98,27 +64,19 @@ const main = (): void => {
     void shutdown();
   });
 
-  const start = async (): Promise<void> => {
-    const activeBackend = await startBackend({
-      gpuPageHostFactory: createElectronGpuHost(),
-      logDestination: log.destination,
-    });
-    if (activeBackend === undefined) {
-      log.logger.error('the storage lock is held by another process');
-      dialog.showErrorBox(
-        'Musetric is already running',
-        'Another Musetric process is using the same data folder. Close it and try again.',
-      );
-      await shutdown();
-      return;
-    }
-    backend = activeBackend;
-    await createWindow(activeBackend.url);
-  };
-
   const startPromise = app
     .whenReady()
-    .then(start)
+    .then(async () => {
+      const result = await startApp({
+        log,
+        windows,
+        runner,
+        isQuitting: () => isQuitting,
+      });
+      if (result === 'storageBusy') {
+        await shutdown();
+      }
+    })
     .catch((error: unknown) => {
       reportFatal(log, 'the app failed to start', error);
       void shutdown();
@@ -135,7 +93,7 @@ const main = (): void => {
   });
 
   app.on('activate', () => {
-    if (mainWindows.size === 0) {
+    if (windows.isEmpty()) {
       openMainWindow();
     }
   });
