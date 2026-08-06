@@ -4,8 +4,12 @@ directories:
   output: build
   buildResources: assets
 beforePack: ./scripts/beforePack.ts
+publish:
+  provider: github
+  owner: musetric
+  repo: musetric
 win:
-  artifactName: ${productName} Setup ${version}-${arch}.${ext}
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   icon: assets/icon.png
   target: nsis
 nsis:
@@ -16,8 +20,11 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   license: license.txt
+  buildUniversalInstaller: false
 mac:
-  target: dmg
+  target:
+    - dmg
+    - zip
   category: public.app-category.music
 linux:
   executableName: musetric
