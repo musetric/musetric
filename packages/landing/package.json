@@ -4,8 +4,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3003",
-    "build:project": "vite build",
+    "dev": "vite --configLoader native --host 0.0.0.0 --port 3003",
+    "build:project": "vite build --configLoader native",
     "check:translations": "i18next-cli extract --config ./i18next.config.ts --ci --dry-run",
     "fix:translations": "i18next-cli extract --config ./i18next.config.ts",
     "check:ts": "tsc --build",

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:project": "tsc --build",
-    "dev": "vite",
+    "dev": "vite --configLoader native",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
