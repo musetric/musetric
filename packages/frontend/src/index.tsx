@@ -1,6 +1,8 @@
 import { assertDefined } from '@musetric/utils';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { endpoints } from './api/index.js';
+import { queryClient } from './api/queryClient.js';
 import { App } from './app/index.js';
 import { engine } from './engine/engine.js';
 import { initI18next } from './translations/index.js';
@@ -16,6 +18,7 @@ const runApp = async () => {
   );
   await initI18next();
   await engine.boot();
+  await queryClient.prefetchQuery(endpoints.project.list());
 
   createRoot(rootElement).render(
     <StrictMode>

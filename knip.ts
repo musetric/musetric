@@ -6,6 +6,8 @@ const config: KnipConfig = {
   ignoreIssues: {
     'packages/engine/src/engine.ts': ['exports'],
     'packages/desktop/scripts/beforePack.ts': ['exports'],
+    'packages/desktop/src/backend.ts': ['exports'],
+    'packages/desktop/src/electronGpuHost.ts': ['exports'],
   },
   ignoreBinaries: ['ps'],
   ignoreUnresolved: ['vite/client', '^tsx$'],

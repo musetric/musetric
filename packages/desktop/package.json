@@ -11,7 +11,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev:desktop": "yarn build:desktop && node ./scripts/startElectron.mjs",
-    "build:desktop": "node ./scripts/buildIcons.ts && tsc --build",
+    "build:desktop": "node ./scripts/buildAssets.ts && tsc --build",
     "pack:app": "electron-builder --dir",
     "pack:installer": "electron-builder --publish never",
     "check:ts": "tsc --build",
