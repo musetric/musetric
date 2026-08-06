@@ -82,7 +82,7 @@ jobs:
           MUSETRIC_SKIP_FFMPEG_FETCH: true
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --x64 --arm64 -c.extraMetadata.version=${{ needs.prepare.outputs.version }}
+      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --x64 --arm64 --config.extraMetadata.version=${{ needs.prepare.outputs.version }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v7
