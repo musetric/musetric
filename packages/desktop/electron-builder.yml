@@ -8,6 +8,7 @@ publish:
   provider: github
   owner: musetric
   repo: musetric
+electronUpdaterCompatibility: '>=2.15'
 win:
   artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   icon: assets/icon.png
@@ -22,11 +23,13 @@ nsis:
   license: license.txt
   buildUniversalInstaller: false
 mac:
+  artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - dmg
     - zip
   category: public.app-category.music
 linux:
+  artifactName: ${productName}-${version}-${arch}.${ext}
   executableName: musetric
   target: AppImage
   category: Audio

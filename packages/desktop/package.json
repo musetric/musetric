@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev:desktop": "yarn build:desktop && node ./scripts/startElectron.mjs",
+    "dev:desktop": "yarn build:desktop && node ./scripts/startElectron.ts",
     "build:desktop": "node ./scripts/buildAssets.ts && tsc --build",
     "pack:app": "electron-builder --dir",
     "pack:installer": "electron-builder --publish never",

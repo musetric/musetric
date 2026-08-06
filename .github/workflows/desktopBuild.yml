@@ -57,10 +57,22 @@ jobs:
         include:
           - os: windows-latest
             platform: win
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: arm64
           - os: macos-latest
             platform: mac
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: arm64
           - os: ubuntu-latest
             platform: linux
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -82,24 +94,28 @@ jobs:
           MUSETRIC_SKIP_FFMPEG_FETCH: true
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --x64 --arm64 --config.extraMetadata.version=${{ needs.prepare.outputs.version }}
+      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }} --config.extraMetadata.version=${{ needs.prepare.outputs.version }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-desktop-${{ runner.os }}
+          name: musetric-desktop-${{ runner.os }}-${{ matrix.arch }}
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: |
             packages/desktop/build/*.exe
-            packages/desktop/build/*.exe.blockmap
             packages/desktop/build/*.dmg
-            packages/desktop/build/*.dmg.blockmap
-            packages/desktop/build/*.zip
-            packages/desktop/build/*.zip.blockmap
             packages/desktop/build/*.AppImage
-            packages/desktop/build/*.AppImage.blockmap
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musetric-updater-${{ runner.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            packages/desktop/build/*.blockmap
+            packages/desktop/build/*.zip
             packages/desktop/build/latest*.yml
 
   release:
@@ -111,18 +127,25 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v6
         with:
           path: artifacts
-          merge-multiple: true
+          pattern: musetric-*
+          merge-multiple: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: node packages/desktop/scripts/assembleUpdateRelease.ts artifacts release
       - env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          (cd artifacts && sha256sum -- *) > SHA256SUMS.txt
+          (cd release && sha256sum -- *) > SHA256SUMS.txt
           gh release create "v$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Musetric $VERSION" \
             --generate-notes \
-            artifacts/* SHA256SUMS.txt
+            release/* SHA256SUMS.txt
