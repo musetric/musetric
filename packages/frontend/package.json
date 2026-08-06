@@ -4,8 +4,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build:project": "vite build && cpx \"dist/**/*\" ../backend/storage/public --clean",
+    "dev": "vite --configLoader native",
+    "build:project": "vite build --configLoader native && cpx \"dist/**/*\" ../backend/storage/public --clean",
     "check:translations": "i18next-cli extract --config ./i18next.config.ts --ci --dry-run",
     "fix:translations": "i18next-cli extract --config ./i18next.config.ts",
     "check:ts": "tsc --build",
