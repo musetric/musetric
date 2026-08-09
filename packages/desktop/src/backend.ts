@@ -39,7 +39,7 @@ export const startBackend = async (
     return undefined;
   }
   try {
-    await initDatabase(config.databasePath);
+    initDatabase(config.databasePath);
     const { createServerApp } = await import('@musetric/backend-core');
     const backend = await createServerApp(config, {
       gpuPageHostFactory: options.gpuPageHostFactory,
