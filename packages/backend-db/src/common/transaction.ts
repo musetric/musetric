@@ -1,4 +1,5 @@
 import { type DatabaseSync } from 'node:sqlite';
+import { rollbackQuietly } from './rollback.js';
 
 export const transaction = async <T>(
   database: DatabaseSync,
@@ -13,7 +14,7 @@ export const transaction = async <T>(
     await Promise.resolve(database.exec('COMMIT'));
     return result;
   } catch (error) {
-    await Promise.resolve(database.exec('ROLLBACK'));
+    rollbackQuietly(database);
     throw error;
   }
 };

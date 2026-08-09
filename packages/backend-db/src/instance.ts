@@ -1,6 +1,5 @@
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { type DatabaseSync } from 'node:sqlite';
+import { closeDatabase, openDatabase } from './common/index.js';
 import {
   audioDelivery,
   audioMaster,
@@ -19,14 +18,8 @@ import {
 
 export const createDatabase = async (
   databasePath: string,
-): Promise<DatabaseSync> => {
-  mkdirSync(dirname(databasePath), { recursive: true });
-  const database = new DatabaseSync(databasePath, {
-    enableForeignKeyConstraints: true,
-    timeout: 5000,
-  });
-  return await Promise.resolve(database);
-};
+): Promise<DatabaseSync> =>
+  await Promise.resolve(openDatabase(databasePath, { foreignKeys: true }));
 
 export const createInstance = async (databasePath: string) => {
   const database = await createDatabase(databasePath);
@@ -46,10 +39,7 @@ export const createInstance = async (databasePath: string) => {
     chords: chords.createInstance(database),
     blob: blob.createInstance(database),
     disconnect: async () => {
-      if (database.isOpen) {
-        database.close();
-      }
-      await Promise.resolve();
+      await Promise.resolve(closeDatabase(database));
     },
   };
 };
