@@ -21,6 +21,7 @@ const main = (): void => {
   app.commandLine.appendSwitch('enable-unsafe-webgpu');
   app.commandLine.appendSwitch('disable-webgpu-blocklist');
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('force_high_performance_gpu');
 
   const isMac = process.platform === 'darwin';
   const runner = createBackendRunner();
