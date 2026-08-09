@@ -1,5 +1,8 @@
+import { type MigrationReport } from '@musetric/backend-db/migrations';
+
 export type DesktopBackend = {
   url: string;
+  migration: MigrationReport;
   close: () => Promise<void>;
 };
 

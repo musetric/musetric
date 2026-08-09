@@ -49,6 +49,10 @@ export const startApp = async (
     return 'storageBusy';
   }
   runner.set(backend);
+  log.logger.info(
+    { ...backend.migration },
+    `database schema v${String(backend.migration.fromVersion)} -> v${String(backend.migration.toVersion)}`,
+  );
 
   if (isQuitting() || window.isDestroyed()) {
     return 'started';
