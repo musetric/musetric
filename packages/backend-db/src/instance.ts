@@ -1,4 +1,3 @@
-import { type DatabaseSync } from 'node:sqlite';
 import { closeDatabase, openDatabase } from './common/index.js';
 import {
   audioDelivery,
@@ -16,13 +15,10 @@ import {
   wavePeaks,
 } from './entity/index.js';
 
-export const createDatabase = async (
-  databasePath: string,
-): Promise<DatabaseSync> =>
-  await Promise.resolve(openDatabase(databasePath, { foreignKeys: true }));
-
 export const createInstance = async (databasePath: string) => {
-  const database = await createDatabase(databasePath);
+  const database = await Promise.resolve(
+    openDatabase(databasePath, { foreignKeys: true }),
+  );
 
   return {
     project: project.createInstance(database),
