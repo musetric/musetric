@@ -23,7 +23,8 @@
     "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@musetric/utils": "workspace:*",
@@ -36,6 +37,7 @@
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "zod": "catalog:"
   }
 }

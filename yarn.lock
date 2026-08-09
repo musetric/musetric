@@ -2129,6 +2129,7 @@ __metadata:
     "@typescript/native": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
+    vitest: "catalog:"
     zod: "catalog:"
   peerDependencies:
     "@musetric/utils": "workspace:*"
