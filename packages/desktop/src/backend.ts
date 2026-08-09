@@ -39,7 +39,7 @@ export const startBackend = async (
     return undefined;
   }
   try {
-    initDatabase(config.databasePath);
+    const migration = initDatabase(config.databasePath);
     const { createServerApp } = await import('@musetric/backend-core');
     const backend = await createServerApp(config, {
       gpuPageHostFactory: options.gpuPageHostFactory,
@@ -54,6 +54,7 @@ export const startBackend = async (
     }
     return {
       url: `http://127.0.0.1:${address.port}`,
+      migration,
       close: async () => {
         try {
           await backend.close();

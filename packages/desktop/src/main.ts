@@ -2,8 +2,9 @@ import { join } from 'node:path';
 import { app } from 'electron';
 import { applyAppPaths } from './appPaths.js';
 import { createBackendRunner } from './backendRunner.js';
-import { createDesktopLog, reportFatal, watchFatalEvents } from './logging.js';
+import { createDesktopLog, watchFatalEvents } from './logging.js';
 import { startApp } from './startup.js';
+import { reportStartupFailure } from './startupFailure.js';
 import { createWindows, destroyAllWindows } from './windows.js';
 
 const main = (): void => {
@@ -78,7 +79,7 @@ const main = (): void => {
       }
     })
     .catch((error: unknown) => {
-      reportFatal(log, 'the app failed to start', error);
+      reportStartupFailure(log, error);
       void shutdown();
     });
 
