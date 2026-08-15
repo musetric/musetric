@@ -1,60 +1,14 @@
 import { separateAudio } from '@musetric/ai/node';
 import {
-  analyzeLeadVisualLoudness,
   analyzeLoudness,
   convertToFmp4,
   generateWavePeaks,
 } from '@musetric/ffmpeg';
-import {
-  type EventEmitter,
-  type Logger,
-  sourceTargetLufs,
-} from '@musetric/utils';
+import { type EventEmitter, type Logger } from '@musetric/utils';
 import { type FastifyInstance } from 'fastify';
+import { analyzeStemLoudness } from '../stemLoudness.js';
 import { type AnalysisWorker, createAnalysisWorker } from './analysisWorker.js';
 import { type ProcessingWorkerEvent } from './processingSummary.js';
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
-
-const sourceTruePeakCeilingDb = -1;
-const sourceMaxBoostDb = 18;
-const sourceMaxCutDb = -12;
-
-const leadVisualTargetP95RmsDb = -22;
-const leadVisualPeakCeilingDb = 3;
-const leadVisualMaxBoostDb = 48;
-const leadVisualMaxCutDb = -12;
-
-type SourceAnalysis = {
-  integratedLoudnessDb: number;
-  truePeakDb: number;
-};
-
-const calculateSourceGainDb = (analysis: SourceAnalysis) =>
-  clamp(
-    Math.min(
-      sourceTargetLufs - analysis.integratedLoudnessDb,
-      sourceTruePeakCeilingDb - analysis.truePeakDb,
-    ),
-    sourceMaxCutDb,
-    sourceMaxBoostDb,
-  );
-
-type LeadAnalysis = {
-  p95RmsDb: number;
-  truePeakDb: number;
-};
-
-const calculateLeadSpectrogramGainDb = (analysis: LeadAnalysis) =>
-  clamp(
-    leadVisualTargetP95RmsDb - analysis.p95RmsDb,
-    leadVisualMaxCutDb,
-    Math.min(
-      leadVisualMaxBoostDb,
-      leadVisualPeakCeilingDb - analysis.truePeakDb,
-    ),
-  );
 
 export type SeparationTask = {
   projectId: number;
@@ -146,26 +100,19 @@ export const createSeparationWorker = (
         }),
       ]);
 
-      const [sourceAnalysis, leadAnalysis] = await Promise.all([
-        sourceAnalysisPromise,
-        analyzeLeadVisualLoudness({
-          fromPath: masterLead.blobPath,
-          sampleRate: project.sampleRate,
-          logger,
-        }),
-      ]);
-
+      const audioAnalysis = await analyzeStemLoudness({
+        sourceAnalysis: await sourceAnalysisPromise,
+        stemPaths: {
+          lead: masterLead.blobPath,
+          backing: masterBacking.blobPath,
+          instrumental: masterInstrumental.blobPath,
+        },
+        sampleRate: project.sampleRate,
+        logger,
+      });
       await app.db.processing.applySeparationResult({
         projectId: task.projectId,
-        audioAnalysis: {
-          sourceIntegratedLoudnessDb: sourceAnalysis.integratedLoudnessDb,
-          sourceTruePeakDb: sourceAnalysis.truePeakDb,
-          sourceGainDb: calculateSourceGainDb(sourceAnalysis),
-          leadIntegratedLoudnessDb: leadAnalysis.integratedLoudnessDb,
-          leadTruePeakDb: leadAnalysis.truePeakDb,
-          leadP95RmsDb: leadAnalysis.p95RmsDb,
-          leadSpectrogramGainDb: calculateLeadSpectrogramGainDb(leadAnalysis),
-        },
+        audioAnalysis,
         master: {
           leadId: masterLead.blobId,
           backingId: masterBacking.blobId,

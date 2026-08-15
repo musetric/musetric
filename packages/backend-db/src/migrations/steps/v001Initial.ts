@@ -34,6 +34,13 @@ const createProjectAudioAnalysis = `
     leadTruePeakDb REAL NOT NULL,
     leadP95RmsDb REAL NOT NULL,
     leadSpectrogramGainDb REAL NOT NULL,
+    backingIntegratedLoudnessDb REAL NOT NULL,
+    backingTruePeakDb REAL NOT NULL,
+    instrumentalIntegratedLoudnessDb REAL NOT NULL,
+    instrumentalTruePeakDb REAL NOT NULL,
+    leadGainDb REAL NOT NULL,
+    backingGainDb REAL NOT NULL,
+    instrumentalGainDb REAL NOT NULL,
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 `;

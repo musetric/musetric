@@ -26,6 +26,11 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
     return {
       sourceGainDb: analysis.sourceGainDb,
       leadSpectrogramGainDb: analysis.leadSpectrogramGainDb,
+      practiceGainsDb: {
+        lead: analysis.leadGainDb,
+        backing: analysis.backingGainDb,
+        instrumental: analysis.instrumentalGainDb,
+      },
     };
   };
 
