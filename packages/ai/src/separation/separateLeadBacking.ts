@@ -160,6 +160,17 @@ const getPeak = (audio: StereoAudio): number => {
   return peak;
 };
 
+const scaleSamples = (
+  input: Float32Array<ArrayBuffer>,
+  scale: number,
+): Float32Array<ArrayBuffer> => {
+  const output = new Float32Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    output[i] = input[i] * scale;
+  }
+  return output;
+};
+
 export type SeparateLeadBackingOptions = {
   audio: StereoAudio;
   runtime: LeadBackingGpuRuntime;
@@ -182,7 +193,7 @@ export const separateLeadBacking = async (
     throw new Error('Input audio appears to be silent.');
   }
 
-  const mixture = normalizePeak(audio.data, 0.9, 0);
+  const mixture = scaleSamples(audio.data, 1 / peak);
   const primary = await demix({
     mixture,
     samples: audio.samples,
