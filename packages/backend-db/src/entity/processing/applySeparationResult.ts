@@ -1,17 +1,14 @@
 import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
+import { type table } from '../../schema/index.js';
+import {
+  runProjectAudioAnalysisUpsert,
+  upsertProjectAudioAnalysisSql,
+} from '../projectAudioAnalysis/statement.js';
 
 export type ApplySeparationResultArg = {
   projectId: number;
-  audioAnalysis: {
-    sourceIntegratedLoudnessDb: number;
-    sourceTruePeakDb: number;
-    sourceGainDb: number;
-    leadIntegratedLoudnessDb: number;
-    leadTruePeakDb: number;
-    leadP95RmsDb: number;
-    leadSpectrogramGainDb: number;
-  };
+  audioAnalysis: Omit<table.projectAudioAnalysis.Item, 'projectId'>;
   master: {
     leadId: string;
     backingId: string;
@@ -42,39 +39,16 @@ export const applySeparationResult = (database: DatabaseSync) => {
        waveBlobId = excluded.waveBlobId`,
   );
   const upsertProjectAudioAnalysisStatement = database.prepare(
-    `INSERT INTO ProjectAudioAnalysis (
-       projectId,
-       sourceIntegratedLoudnessDb,
-       sourceTruePeakDb,
-       sourceGainDb,
-       leadIntegratedLoudnessDb,
-       leadTruePeakDb,
-       leadP95RmsDb,
-       leadSpectrogramGainDb
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(projectId) DO UPDATE SET
-       sourceIntegratedLoudnessDb = excluded.sourceIntegratedLoudnessDb,
-       sourceTruePeakDb = excluded.sourceTruePeakDb,
-       sourceGainDb = excluded.sourceGainDb,
-       leadIntegratedLoudnessDb = excluded.leadIntegratedLoudnessDb,
-       leadTruePeakDb = excluded.leadTruePeakDb,
-       leadP95RmsDb = excluded.leadP95RmsDb,
-       leadSpectrogramGainDb = excluded.leadSpectrogramGainDb`,
+    upsertProjectAudioAnalysisSql,
   );
 
   return async (arg: ApplySeparationResultArg): Promise<void> =>
     await transaction(database, async () => {
       await Promise.resolve(
-        upsertProjectAudioAnalysisStatement.run(
-          arg.projectId,
-          arg.audioAnalysis.sourceIntegratedLoudnessDb,
-          arg.audioAnalysis.sourceTruePeakDb,
-          arg.audioAnalysis.sourceGainDb,
-          arg.audioAnalysis.leadIntegratedLoudnessDb,
-          arg.audioAnalysis.leadTruePeakDb,
-          arg.audioAnalysis.leadP95RmsDb,
-          arg.audioAnalysis.leadSpectrogramGainDb,
-        ),
+        runProjectAudioAnalysisUpsert(upsertProjectAudioAnalysisStatement, {
+          projectId: arg.projectId,
+          ...arg.audioAnalysis,
+        }),
       );
 
       await Promise.resolve(

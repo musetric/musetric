@@ -10,7 +10,14 @@ export const get = (database: DatabaseSync) => {
             leadIntegratedLoudnessDb,
             leadTruePeakDb,
             leadP95RmsDb,
-            leadSpectrogramGainDb
+            leadSpectrogramGainDb,
+            backingIntegratedLoudnessDb,
+            backingTruePeakDb,
+            instrumentalIntegratedLoudnessDb,
+            instrumentalTruePeakDb,
+            leadGainDb,
+            backingGainDb,
+            instrumentalGainDb
      FROM ProjectAudioAnalysis
      WHERE projectId = ?`,
   );

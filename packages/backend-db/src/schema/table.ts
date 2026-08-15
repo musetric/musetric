@@ -20,6 +20,13 @@ export namespace projectAudioAnalysis {
     leadTruePeakDb: z.number(),
     leadP95RmsDb: z.number(),
     leadSpectrogramGainDb: z.number(),
+    backingIntegratedLoudnessDb: z.number(),
+    backingTruePeakDb: z.number(),
+    instrumentalIntegratedLoudnessDb: z.number(),
+    instrumentalTruePeakDb: z.number(),
+    leadGainDb: z.number(),
+    backingGainDb: z.number(),
+    instrumentalGainDb: z.number(),
   });
   export type Item = z.infer<typeof itemSchema>;
 }

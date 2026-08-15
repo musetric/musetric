@@ -46,6 +46,11 @@ export type Processing = z.infer<typeof processingSchema>;
 export const audioAnalysisSchema = z.object({
   sourceGainDb: z.number(),
   leadSpectrogramGainDb: z.number(),
+  practiceGainsDb: z.object({
+    lead: z.number(),
+    backing: z.number(),
+    instrumental: z.number(),
+  }),
 });
 export type AudioAnalysis = z.infer<typeof audioAnalysisSchema>;
 
