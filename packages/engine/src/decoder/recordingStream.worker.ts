@@ -1,7 +1,4 @@
-import {
-  type recordingStreamChannel,
-  type RecordingStreamChunkMessage,
-} from '../player/recordingStream.cross.js';
+import { type recordingStreamChannel } from '../player/recordingStream.cross.js';
 
 export const recordingPacketHeaderByteLength = 8;
 
@@ -16,35 +13,6 @@ const createControlledPromise = (): ControlledPromise => {
     promise,
     resolve: () => resolveFn(),
   };
-};
-
-const readSamplesFromRingBuffer = (
-  buffer: Float32Array<SharedArrayBuffer>,
-  metadata: Int32Array<SharedArrayBuffer>,
-  message: RecordingStreamChunkMessage,
-): Float32Array => {
-  const currentBufferFrameIndex = Atomics.load(metadata, 0);
-  if (currentBufferFrameIndex - message.bufferFrameIndex > buffer.length) {
-    throw new Error('Recording ring buffer overflow');
-  }
-  const samples = new Float32Array(message.frameCount);
-  const firstFrameCount = Math.min(
-    message.frameCount,
-    buffer.length - message.bufferOffset,
-  );
-  samples.set(
-    buffer.subarray(
-      message.bufferOffset,
-      message.bufferOffset + firstFrameCount,
-    ),
-  );
-  if (firstFrameCount < message.frameCount) {
-    samples.set(
-      buffer.subarray(0, message.frameCount - firstFrameCount),
-      firstFrameCount,
-    );
-  }
-  return samples;
 };
 
 export const createRecordingPacket = (
@@ -91,10 +59,7 @@ type ChunkSamples = { frameIndex: number; samples: Float32Array };
 
 export type RecordingStreamOptions = {
   port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
-  samples: Float32Array<SharedArrayBuffer>;
-  metadata: Int32Array<SharedArrayBuffer>;
   onChunk: (chunk: ChunkSamples) => void;
-  onError: (error: unknown) => void;
 };
 
 export type RecordingStream = {
@@ -109,7 +74,7 @@ export type RecordingStream = {
 export const createRecordingStream = (
   options: RecordingStreamOptions,
 ): RecordingStream => {
-  const { port, samples: sampleBuffer, metadata, onChunk, onError } = options;
+  const { port, onChunk } = options;
   const start = createControlledPromise();
   const finish = createControlledPromise();
   let processedFlushSequence = 0;
@@ -139,24 +104,15 @@ export const createRecordingStream = (
       flushWaiters = resolveFlushWaiters(processedFlushSequence, flushWaiters);
     },
     chunk: (message) => {
-      try {
-        const samples = readSamplesFromRingBuffer(
-          sampleBuffer,
-          metadata,
-          message,
-        );
-        const skippedFrameCount = Math.max(0, -message.frameIndex);
-        const alignedSamples = samples.subarray(skippedFrameCount);
-        if (alignedSamples.length === 0) {
-          return;
-        }
-        onChunk({
-          frameIndex: Math.max(0, message.frameIndex),
-          samples: alignedSamples,
-        });
-      } catch (error) {
-        onError(error);
+      const skippedFrameCount = Math.max(0, -message.frameIndex);
+      const alignedSamples = message.samples.subarray(skippedFrameCount);
+      if (alignedSamples.length === 0) {
+        return;
       }
+      onChunk({
+        frameIndex: Math.max(0, message.frameIndex),
+        samples: alignedSamples,
+      });
     },
   });
 

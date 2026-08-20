@@ -278,15 +278,12 @@ export const createDecoderWorkerRuntime = (
       recordingController.clearRecordingStream();
       recordingStream = createRecordingStream({
         port: recordingStreamChannel.outbound(message.port),
-        samples: message.samples,
-        metadata: message.metadata,
         onChunk: (chunk) => {
           audioDecode.patchRecordingSamples(chunk);
           realtime.sendBinary(
             createRecordingPacket(chunk.frameIndex, chunk.samples),
           );
         },
-        onError: recordingController.failRecordingStream,
       });
       realtime.sendJson({
         type: 'recording.start',

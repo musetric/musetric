@@ -13,8 +13,6 @@ export type StartRecordingMessage = {
   revision: number;
   latencyFrameCount: number;
   inputLatencyFrameCount: number;
-  samples: Float32Array<SharedArrayBuffer>;
-  metadata: Int32Array<SharedArrayBuffer>;
   notificationPort: MessagePort;
 };
 
@@ -54,12 +52,9 @@ export const createRecordingRuntime = (
     applyLatencyFrameCounts,
   } = options;
 
-  let recordingSamples: Float32Array<SharedArrayBuffer> | undefined = undefined;
-  let recordingMetadata: Int32Array<SharedArrayBuffer> | undefined = undefined;
+  const chunkSamples = new Float32Array(chunkFrameCount);
   let recordingOffset = 0;
   let recordingWriteFrameIndex = 0;
-  let recordingBufferFrameIndex = 0;
-  let recordingChunkBufferFrameIndex = 0;
   let recordingChunkFrameIndex = 0;
   let recordingSequence = 0;
   let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
@@ -69,7 +64,6 @@ export const createRecordingRuntime = (
     const compensatedFrameIndex = nextFrameIndex - getOutputLatencyFrameCount();
     recordingWriteFrameIndex = compensatedFrameIndex;
     recordingChunkFrameIndex = compensatedFrameIndex;
-    recordingChunkBufferFrameIndex = recordingBufferFrameIndex;
   };
 
   const flushRecordingBuffer = (): number => {
@@ -81,31 +75,17 @@ export const createRecordingRuntime = (
     recordingNotificationPort?.methods.chunk({
       sequence: recordingSequence,
       frameIndex: recordingChunkFrameIndex,
-      bufferFrameIndex: recordingChunkBufferFrameIndex,
-      bufferOffset:
-        recordingSamples && recordingSamples.length > 0
-          ? recordingChunkBufferFrameIndex % recordingSamples.length
-          : 0,
-      frameCount: recordingOffset,
+      samples: chunkSamples.slice(0, recordingOffset),
     });
     recordingOffset = 0;
     recordingChunkFrameIndex = recordingWriteFrameIndex;
-    recordingChunkBufferFrameIndex = recordingBufferFrameIndex;
     return recordingSequence;
   };
 
   const pushRecordingSample = (sample: number): void => {
-    if (!recordingSamples || !recordingMetadata) {
-      return;
-    }
-
-    const clamped = Math.max(-1, Math.min(1, sample));
-    recordingSamples[recordingBufferFrameIndex % recordingSamples.length] =
-      clamped;
+    chunkSamples[recordingOffset] = Math.max(-1, Math.min(1, sample));
     recordingOffset += 1;
     recordingWriteFrameIndex += 1;
-    recordingBufferFrameIndex += 1;
-    Atomics.store(recordingMetadata, 0, recordingBufferFrameIndex);
 
     if (recordingOffset === chunkFrameCount) {
       flushRecordingBuffer();
@@ -150,26 +130,20 @@ export const createRecordingRuntime = (
     processInput: processRecordingInput,
     start: (message) => {
       flushRecordingBuffer();
-      recordingSamples = message.samples;
-      recordingMetadata = message.metadata;
       recordingNotificationPort = recordingStreamChannel.inbound(
         message.notificationPort,
       );
       applyLatencyFrameCounts(message);
-      recordingBufferFrameIndex = 0;
       recordingOffset = 0;
       recordingSequence = 0;
       inputOffsetFrameIndex = 0;
       setRecordingWriteFrameIndex(message.frameIndex);
-      Atomics.store(recordingMetadata, 0, recordingBufferFrameIndex);
     },
     flush: (): number => {
       const sequence = flushRecordingBuffer() + 1;
       recordingSequence = sequence;
       recordingNotificationPort?.methods.flush({ sequence });
       recordingNotificationPort = undefined;
-      recordingSamples = undefined;
-      recordingMetadata = undefined;
       recordingOffset = 0;
       inputOffsetFrameIndex = 0;
       port.methods.recordingFlushed({
