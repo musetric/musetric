@@ -1,8 +1,8 @@
 export const resampleChannel = async (
-  samples: Float32Array,
+  samples: Float32Array<ArrayBuffer>,
   sourceSampleRate: number,
   targetSampleRate: number,
-): Promise<Float32Array> => {
+): Promise<Float32Array<ArrayBuffer>> => {
   if (sourceSampleRate === targetSampleRate) {
     return samples;
   }
@@ -14,7 +14,8 @@ export const resampleChannel = async (
   });
 
   try {
-    return src.simple(samples);
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    return src.simple(samples) as Float32Array<ArrayBuffer>;
   } finally {
     src.destroy();
   }

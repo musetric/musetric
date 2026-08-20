@@ -1,7 +1,7 @@
 import { type DemuxedTrack } from './demux.js';
 
 export type DecodedTrack = {
-  channels: Float32Array[];
+  channels: Float32Array<ArrayBuffer>[];
   sampleRate: number;
 };
 

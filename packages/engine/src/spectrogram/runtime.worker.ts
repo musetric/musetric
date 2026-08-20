@@ -111,12 +111,17 @@ export const createSpectrogramRuntime = async (
       samplesByLane = emptySamples();
       setStatus('pending');
     },
-    samplesChanged: (message) => {
+    patchSamples: (message) => {
+      const samples = samplesByLane[message.trackKey];
+      if (!samples) {
+        return;
+      }
+      samples.set(message.samples, message.frameIndex);
       processor.invalidateSamples([
         {
           trackKey: message.trackKey,
           frameIndex: message.frameIndex,
-          frameCount: message.frameCount,
+          frameCount: message.samples.length,
         },
       ]);
       if (!playing) {

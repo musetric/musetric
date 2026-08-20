@@ -46,16 +46,16 @@ export const spectrogramChannel = createMessageChannel<
 });
 
 export type SpectrogramLaneSamples = Partial<
-  Record<TrackKey, Float32Array<SharedArrayBuffer>>
+  Record<TrackKey, Float32Array<ArrayBuffer>>
 >;
 
 export type SpectrogramDataMethods = {
   mount: (message: { samples: SpectrogramLaneSamples }) => void;
   unmount: () => void;
-  samplesChanged: (message: {
+  patchSamples: (message: {
     trackKey: TrackKey;
     frameIndex: number;
-    frameCount: number;
+    samples: Float32Array<ArrayBuffer>;
   }) => void;
 };
 
@@ -67,6 +67,11 @@ export const spectrogramDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount', 'samplesChanged'],
+    keys: ['mount', 'unmount', 'patchSamples'],
+    transfers: {
+      mount: (message) =>
+        Object.values(message.samples).map((samples) => samples.buffer),
+      patchSamples: (message) => [message.samples.buffer],
+    },
   },
 });

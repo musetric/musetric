@@ -77,12 +77,18 @@ export const playerChannel = createMessageChannel<
   },
 });
 
+export type PlayerTracks = Record<
+  StemType | 'recording',
+  Float32Array<ArrayBuffer>[]
+>;
+
 export type PlayerDataMethods = {
-  mount: (message: {
-    frameCount: number;
-    tracks: Record<StemType | 'recording', Float32Array<SharedArrayBuffer>[]>;
-  }) => void;
+  mount: (message: { frameCount: number; tracks: PlayerTracks }) => void;
   unmount: () => void;
+  patchRecording: (message: {
+    frameIndex: number;
+    samples: Float32Array<ArrayBuffer>;
+  }) => void;
 };
 
 export const playerDataChannel = createMessageChannel<
@@ -93,6 +99,13 @@ export const playerDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount'],
+    keys: ['mount', 'unmount', 'patchRecording'],
+    transfers: {
+      mount: (message) =>
+        Object.values(message.tracks).flatMap((channels) =>
+          channels.map((channel) => channel.buffer),
+        ),
+      patchRecording: (message) => [message.samples.buffer],
+    },
   },
 });
