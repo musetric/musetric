@@ -32,8 +32,6 @@ export type PlayerOutboundMethods = {
     revision: number;
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
-    samples: Float32Array<SharedArrayBuffer>;
-    metadata: Int32Array<SharedArrayBuffer>;
     notificationPort: MessagePort;
   }) => void;
   flushRecording: () => void;

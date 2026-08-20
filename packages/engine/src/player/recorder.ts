@@ -9,8 +9,6 @@ import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineState } from '../state.js';
 import { type EnginePlayback } from './playback.js';
 
-const recordingBufferSeconds = 10;
-
 const stopMediaStream = (stream: MediaStream) => {
   for (const track of stream.getTracks()) {
     track.stop();
@@ -232,21 +230,12 @@ export const createEngineRecorder = (
       gain.gain.value = store.get().recordingGain;
       source.connect(gain);
       const recordingStreamChannel = new MessageChannel();
-      const recordingSamples = new Float32Array(
-        new SharedArrayBuffer(
-          Math.ceil(context.sampleRate * recordingBufferSeconds) *
-            Float32Array.BYTES_PER_ELEMENT,
-        ),
-      );
-      const recordingMetadata = new Int32Array(new SharedArrayBuffer(4));
       const { latencyFrameCount, inputLatencyFrameCount } = store.get();
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,
         frameCount,
         latencyFrameCount,
-        samples: recordingSamples,
-        metadata: recordingMetadata,
         port: recordingStreamChannel.port1,
       });
       session.decoderStreamStarted = true;
@@ -255,8 +244,6 @@ export const createEngineRecorder = (
         revision: store.get().seekEvent.revision,
         latencyFrameCount,
         inputLatencyFrameCount,
-        samples: recordingSamples,
-        metadata: recordingMetadata,
         notificationPort: recordingStreamChannel.port2,
       });
       session.playerStreamStarted = true;

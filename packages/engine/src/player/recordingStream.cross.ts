@@ -4,9 +4,7 @@ import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 export type RecordingStreamChunkMessage = {
   sequence: number;
   frameIndex: number;
-  bufferFrameIndex: number;
-  bufferOffset: number;
-  frameCount: number;
+  samples: Float32Array<ArrayBuffer>;
 };
 
 export type RecordingStreamFlushMessage = {
@@ -24,6 +22,9 @@ export const recordingStreamChannel = createMessageChannel<
 >({
   inbound: {
     keys: ['chunk', 'flush'],
+    transfers: {
+      chunk: (message) => [message.samples.buffer],
+    },
   },
   outbound: {
     keys: [],

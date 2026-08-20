@@ -13,8 +13,6 @@ export type EngineDecoderOutboundMethods = {
     sampleRate: number;
     frameCount: number;
     latencyFrameCount: number;
-    samples: Float32Array<SharedArrayBuffer>;
-    metadata: Int32Array<SharedArrayBuffer>;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;

@@ -22,8 +22,6 @@ export type EngineDecoder = {
     sampleRate: number;
     frameCount: number;
     latencyFrameCount: number;
-    samples: Float32Array<SharedArrayBuffer>;
-    metadata: Int32Array<SharedArrayBuffer>;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;
