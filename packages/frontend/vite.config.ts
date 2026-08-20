@@ -36,10 +36,6 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3001,
     strictPort: true,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
     proxy: {
       '/api': {
         target: 'https://localhost:3000/',
