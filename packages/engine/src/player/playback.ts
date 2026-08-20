@@ -9,7 +9,7 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
-import { type Playhead, readPlayhead } from './playhead.cross.js';
+import { createPlayhead } from './playhead.cross.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
 
 const noop = (): void => undefined;
@@ -51,7 +51,8 @@ export type CreateEnginePlaybackOptions = {
   audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
   decoderPort: MessagePort;
-  playhead: Playhead;
+  playheadPort: MessagePort;
+  playheadPorts: MessagePort[];
   onPlaybackEnded?: () => void;
 };
 
@@ -63,8 +64,9 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, store, decoderPort, playhead } = options;
+  const { context, audioOutput, store, decoderPort, playheadPorts } = options;
   const { onPlaybackEnded } = options;
+  const playhead = createPlayhead(options.playheadPort);
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
     numberOfInputs: 1,
@@ -83,7 +85,7 @@ export const createEnginePlayback = async (
   let lastPumpedFrameIndex = -1;
 
   const frameIndexPump = createAnimationFrameLoop(() => {
-    const { frameIndex, revision } = readPlayhead(playhead);
+    const { frameIndex, revision } = playhead.read();
     if (!isCurrentRevision(revision) || frameIndex === lastPumpedFrameIndex) {
       return;
     }
@@ -228,7 +230,7 @@ export const createEnginePlayback = async (
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
-        playhead,
+        playheadPorts,
       });
 
       return bootPromise.promise;

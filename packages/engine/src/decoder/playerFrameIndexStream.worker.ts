@@ -1,5 +1,5 @@
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
-import { type Playhead, readPlayhead } from '../player/playhead.cross.js';
+import { type Playhead } from '../player/playhead.cross.js';
 
 export type PlayerFrameIndexStreamOptions = {
   playhead: Playhead;
@@ -18,7 +18,7 @@ export const createPlayerFrameIndexStream = (
   let lastFrameIndex = -1;
 
   const loop = createAnimationFrameLoop(() => {
-    const { frameIndex } = readPlayhead(playhead);
+    const { frameIndex } = playhead.read();
     if (frameIndex === lastFrameIndex) {
       return;
     }

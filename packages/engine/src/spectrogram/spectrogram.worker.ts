@@ -1,3 +1,4 @@
+import { createPlayhead } from '../player/playhead.cross.js';
 import {
   spectrogramChannel,
   spectrogramDataChannel,
@@ -20,7 +21,7 @@ port.bindBoot(async (message) => {
   await createSpectrogramRuntime({
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
-    playhead: message.playhead,
+    playhead: createPlayhead(message.playheadPort),
     profiling,
   });
   port.methods.booted();

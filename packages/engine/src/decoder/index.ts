@@ -4,7 +4,6 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
-import { type Playhead } from '../player/playhead.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './protocol.cross.js';
@@ -45,7 +44,7 @@ export type CreateEngineDecoderOptions = {
   sampleRate: number;
   playerPort: MessagePort;
   spectrogramPort: MessagePort;
-  playhead: Playhead;
+  playheadPort: MessagePort;
   onRecordingPeaksChanged: (message: {
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
@@ -78,7 +77,7 @@ export const createEngineDecoder = (
     store,
     playerPort,
     spectrogramPort,
-    playhead,
+    playheadPort,
     onRecordingPeaksChanged,
     onRecordingStreamFailed,
     onPlayerPlayRequested,
@@ -174,7 +173,7 @@ export const createEngineDecoder = (
       port.methods.boot({
         playerPort,
         spectrogramPort,
-        playhead,
+        playheadPort,
       });
 
       return bootPromise.promise;

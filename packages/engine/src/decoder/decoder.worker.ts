@@ -1,3 +1,4 @@
+import { createPlayhead } from '../player/playhead.cross.js';
 import { playerDataChannel } from '../player/protocol.cross.js';
 import { spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { engineDecoderChannel } from './protocol.cross.js';
@@ -17,7 +18,7 @@ port.bindBoot((message) => {
     port,
     playerPort: playerDataChannel.outbound(message.playerPort),
     spectrogramPort: spectrogramDataChannel.outbound(message.spectrogramPort),
-    playhead: message.playhead,
+    playhead: createPlayhead(message.playheadPort),
   });
   port.methods.booted();
 });

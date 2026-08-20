@@ -1,7 +1,10 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { createTimePitchProcessor } from '@musetric/audio/player';
 import { createMetronome } from './metronome.worklet.js';
-import { type Playhead, writePlayhead } from './playhead.cross.js';
+import {
+  createPlayheadPublisher,
+  type PlayheadPublisher,
+} from './playhead.worklet.js';
 import {
   type playerChannel,
   type playerDataChannel,
@@ -55,7 +58,7 @@ const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
-  playhead: Playhead;
+  playheadPorts: MessagePort[];
 };
 
 export type PlayerRuntime = {
@@ -66,7 +69,10 @@ export type PlayerRuntime = {
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
 ): Promise<PlayerRuntime> => {
-  const { port, dataPort, playhead } = options;
+  const { port, dataPort } = options;
+  const playhead: PlayheadPublisher = createPlayheadPublisher(
+    options.playheadPorts,
+  );
 
   let frameCount = 0;
   let tracks: Record<StemType | 'recording', Float32Array[]> | undefined =
@@ -153,7 +159,7 @@ export const createPlayerRuntime = async (
       outputOffsetFrameIndex = 0;
       playing = false;
       recordingRuntime.resetInputOffset();
-      writePlayhead(playhead, frameIndex, revision);
+      playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     unmount: () => {
@@ -164,7 +170,7 @@ export const createPlayerRuntime = async (
       playing = false;
       recordingRuntime.resetInputOffset();
       timePitchProcessor.reset();
-      writePlayhead(playhead, frameIndex, revision);
+      playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
   });
@@ -187,7 +193,7 @@ export const createPlayerRuntime = async (
       revision = message.revision;
       playing = false;
       metronome.clear();
-      writePlayhead(playhead, frameIndex, revision);
+      playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     setFrozen: (message) => {
@@ -204,7 +210,7 @@ export const createPlayerRuntime = async (
       timePitchProcessor.reset();
       metronome.reset(message.frameIndex);
       metronome.clear();
-      writePlayhead(playhead, frameIndex, revision);
+      playhead.publishNow({ frameIndex, revision });
     },
     setTransposeSemitones: (message) => {
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
@@ -304,7 +310,7 @@ export const createPlayerRuntime = async (
         timePitchProcessor.reset();
         metronome.reset(0);
         metronome.clear();
-        writePlayhead(playhead, frameIndex, revision);
+        playhead.publishNow({ frameIndex, revision });
         port.methods.setPlaying({
           playing,
           frameIndex,
@@ -314,7 +320,7 @@ export const createPlayerRuntime = async (
         return;
       }
 
-      writePlayhead(playhead, frameIndex, revision);
+      playhead.publish({ frameIndex, revision });
     },
   };
 };

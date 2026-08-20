@@ -1,12 +1,14 @@
 import { type StemType } from '@musetric/audio/es';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
-import { type Playhead } from './playhead.cross.js';
 
 export const playerProcessorName = 'player-processor';
 
 export type PlayerOutboundMethods = {
-  boot: (message: { dataPort: MessagePort; playhead: Playhead }) => void;
+  boot: (message: {
+    dataPort: MessagePort;
+    playheadPorts: MessagePort[];
+  }) => void;
   play: (message: {
     revision: number;
     latencyFrameCount: number;
@@ -71,7 +73,7 @@ export const playerChannel = createMessageChannel<
       'flushRecording',
     ],
     transfers: {
-      boot: (message) => [message.dataPort],
+      boot: (message) => [message.dataPort, ...message.playheadPorts],
       startRecording: (message) => [message.notificationPort],
     },
   },

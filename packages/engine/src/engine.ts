@@ -11,7 +11,6 @@ import {
 import { createStore, type Store } from './common/store.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
-import { createPlayhead } from './player/playhead.cross.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
@@ -87,9 +86,11 @@ export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
-  const playhead = createPlayhead();
   const playerChannel = new MessageChannel();
   const spectrogramChannel = new MessageChannel();
+  const playerPlayheadChannel = new MessageChannel();
+  const decoderPlayheadChannel = new MessageChannel();
+  const spectrogramPlayheadChannel = new MessageChannel();
 
   const ref: Engine = {
     context,
@@ -105,7 +106,7 @@ export const createEngine = (): Engine => {
       store,
       sampleRate: context.sampleRate,
       decoderPort: spectrogramChannel.port2,
-      playhead,
+      playheadPort: spectrogramPlayheadChannel.port2,
     }),
     waveform: createEngineWaveform(store),
     decoder: createEngineDecoder({
@@ -113,7 +114,7 @@ export const createEngine = (): Engine => {
       sampleRate: context.sampleRate,
       playerPort: playerChannel.port1,
       spectrogramPort: spectrogramChannel.port1,
-      playhead,
+      playheadPort: decoderPlayheadChannel.port2,
       onRecordingPeaksChanged: (message) => {
         ref.waveform.applyRecordingPeakPatch({
           startPeakIndex: message.startPeakIndex,
@@ -166,7 +167,12 @@ export const createEngine = (): Engine => {
       store,
       decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,
-      playhead,
+      playheadPort: playerPlayheadChannel.port2,
+      playheadPorts: [
+        playerPlayheadChannel.port1,
+        decoderPlayheadChannel.port1,
+        spectrogramPlayheadChannel.port1,
+      ],
     }),
     boot: async () => {
       await Promise.all([
