@@ -3,7 +3,7 @@ import { decodeTrack } from './decode.js';
 import { withDemuxedTrack } from './demux.js';
 
 export type DecodedMp4 = {
-  channels: Float32Array<SharedArrayBuffer>[];
+  channels: Float32Array<ArrayBuffer>[];
   frameCount: number;
 };
 export const decodeMp4 = async (
@@ -11,17 +11,11 @@ export const decodeMp4 = async (
   sampleRate: number,
 ): Promise<DecodedMp4> => {
   const decoded = await withDemuxedTrack(encodedBuffer, decodeTrack);
-  const resampled = await Promise.all(
+  const channels = await Promise.all(
     decoded.channels.map(async (channel) =>
       resampleChannel(channel, decoded.sampleRate, sampleRate),
     ),
   );
-  const channels = resampled.map((channel) => {
-    const shared = new SharedArrayBuffer(channel.byteLength);
-    const sharedChannel = new Float32Array(shared);
-    sharedChannel.set(channel);
-    return sharedChannel;
-  });
   const frameCount = channels[0].length;
 
   return {

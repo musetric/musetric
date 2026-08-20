@@ -8,6 +8,7 @@ import {
 import {
   type playerChannel,
   type playerDataChannel,
+  type PlayerTracks,
 } from './protocol.cross.js';
 import {
   createRecordingRuntime,
@@ -41,7 +42,8 @@ const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
 
   for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
     const input = inputBuffers[channelIndex];
-    const samples = track[channelIndex];
+
+    const samples = track[channelIndex] ?? track[0];
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!samples) {
       continue;
@@ -75,8 +77,7 @@ export const createPlayerRuntime = async (
   );
 
   let frameCount = 0;
-  let tracks: Record<StemType | 'recording', Float32Array[]> | undefined =
-    undefined;
+  let tracks: PlayerTracks | undefined = undefined;
   let frameIndex = 0;
   let revision = 0;
   let playing = false;
@@ -161,6 +162,15 @@ export const createPlayerRuntime = async (
       recordingRuntime.resetInputOffset();
       playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
+    },
+    patchRecording: (message) => {
+      const channels = tracks?.recording;
+      if (!channels) {
+        return;
+      }
+      for (const channel of channels) {
+        channel.set(message.samples, message.frameIndex);
+      }
     },
     unmount: () => {
       frameCount = 0;
