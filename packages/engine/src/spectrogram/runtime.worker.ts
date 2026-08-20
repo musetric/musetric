@@ -7,14 +7,12 @@ import {
 } from '@musetric/spectrogram/gpu';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
+import { type Playhead } from '../player/playhead.cross.js';
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
   type SpectrogramLaneSamples,
-  type SpectrogramPlayhead,
 } from './protocol.cross.js';
-
-const playheadFrameIndexSlot = 0;
 
 const emptySamples = (): SpectrogramLaneSamples =>
   mapTrackKeys(() => undefined);
@@ -24,7 +22,7 @@ export type CreateSpectrogramRuntimeOptions = {
     typeof spectrogramChannel.inbound<DedicatedWorkerGlobalScope>
   >;
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
-  playhead: SpectrogramPlayhead;
+  playhead: Playhead;
   profiling?: boolean;
 };
 
@@ -85,7 +83,7 @@ export const createSpectrogramRuntime = async (
     if (frameCount <= 0) {
       return trackProgress;
     }
-    const frameIndex = Atomics.load(playhead, playheadFrameIndexSlot);
+    const { frameIndex } = playhead.read();
     return Math.min(1, Math.max(0, frameIndex / frameCount));
   };
 
@@ -154,8 +152,9 @@ export const createSpectrogramRuntime = async (
     setTrackProgress: (message) => {
       trackProgress = message.trackProgress;
       if (frameCount > 0) {
-        const frameIndex = Math.round(message.trackProgress * frameCount);
-        Atomics.store(playhead, playheadFrameIndexSlot, frameIndex);
+        playhead.writeFrameIndex(
+          Math.round(message.trackProgress * frameCount),
+        );
       }
       if (!playing) {
         void renderFromPlayhead();

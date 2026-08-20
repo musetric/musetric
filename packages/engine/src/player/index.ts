@@ -8,7 +8,6 @@ import {
   createEngineStubPlayback,
   type EnginePlayback,
 } from './playback.js';
-import { type Playhead } from './playhead.cross.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 
 export type EnginePlayer = {
@@ -45,14 +44,15 @@ export type CreateEnginePlayerOptions = {
   store: Store<EngineState>;
   decoderPort: MessagePort;
   getDecoder: () => EngineDecoder;
-  playhead: Playhead;
+  playheadPort: MessagePort;
+  playheadPorts: MessagePort[];
 };
 
 export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
-  const { context, audioOutput, store, decoderPort, getDecoder, playhead } =
-    options;
+  const { context, audioOutput, store, decoderPort, getDecoder } = options;
+  const { playheadPort, playheadPorts } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
 
@@ -68,7 +68,8 @@ export const createEnginePlayer = (
         audioOutput,
         store,
         decoderPort,
-        playhead,
+        playheadPort,
+        playheadPorts,
         onPlaybackEnded: () => {
           const state = store.get();
           if (!state.isSlave) {

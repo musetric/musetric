@@ -1,12 +1,10 @@
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
-type Playhead = Int32Array<SharedArrayBuffer>;
-
 export type EngineDecoderOutboundMethods = {
   boot: (message: {
     playerPort: MessagePort;
     spectrogramPort: MessagePort;
-    playhead: Playhead;
+    playheadPort: MessagePort;
   }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;
@@ -100,7 +98,11 @@ export const engineDecoderChannel = createMessageChannel<
       'sendPlayerSyncRequest',
     ],
     transfers: {
-      boot: (message) => [message.playerPort, message.spectrogramPort],
+      boot: (message) => [
+        message.playerPort,
+        message.spectrogramPort,
+        message.playheadPort,
+      ],
       startRecordingStream: (message) => [message.port],
     },
   },

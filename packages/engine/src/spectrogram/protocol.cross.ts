@@ -2,13 +2,8 @@ import { type SpectrogramConfig, type TrackKey } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 
-export type SpectrogramPlayhead = Int32Array<SharedArrayBuffer>;
-
 export type SpectrogramOutboundMethods = {
-  boot: (message: {
-    dataPort: MessagePort;
-    playhead: SpectrogramPlayhead;
-  }) => void;
+  boot: (message: { dataPort: MessagePort; playheadPort: MessagePort }) => void;
   mount: (message: {
     config: Partial<SpectrogramConfig>;
     trackProgress: number;
@@ -43,7 +38,7 @@ export const spectrogramChannel = createMessageChannel<
       'updateConfig',
     ],
     transfers: {
-      boot: (message) => [message.dataPort],
+      boot: (message) => [message.dataPort, message.playheadPort],
       mount: (message) =>
         message.config.canvas ? [message.config.canvas] : [],
     },

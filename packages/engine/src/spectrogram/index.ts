@@ -8,7 +8,6 @@ import {
 } from '@musetric/utils';
 import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
-import { type Playhead } from '../player/playhead.cross.js';
 import {
   type EngineState,
   getTrackProgress,
@@ -33,13 +32,13 @@ export type CreateEngineSpectrogramOptions = {
   store: Store<EngineState>;
   sampleRate: number;
   decoderPort: MessagePort;
-  playhead: Playhead;
+  playheadPort: MessagePort;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, playhead } = options;
+  const { store, sampleRate, decoderPort, playheadPort } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -98,7 +97,7 @@ export const createEngineSpectrogram = (
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
-        playhead,
+        playheadPort,
       });
 
       await bootPromise.promise;
