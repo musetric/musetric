@@ -55,6 +55,7 @@ scopes:
   - desktop # packages/desktop Electron app
   - frontend # packages/frontend app shell (cross-feature)
   - landing # packages/landing marketing site
+  - mobile # packages/mobile Tauri app
   # Quality & tooling
   - agent # agent guidance & config (AGENTS.md, AI tooling)
   - bench # benchmarks & perf measurement (packages/performance)
