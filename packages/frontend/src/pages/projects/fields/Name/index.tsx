@@ -17,9 +17,8 @@ export const NameField: FC<NameFieldProps> = (props) => {
   return (
     <TextField
       value={value ?? ''}
-      multiline
-      rows={3}
       size='small'
+      fullWidth
       label={t('pages.projects.fields.name.label')}
       disabled={disabled}
       error={!!error}
@@ -29,15 +28,8 @@ export const NameField: FC<NameFieldProps> = (props) => {
           shrink: true,
         },
       }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-        }
-      }}
       onChange={(event) => {
-        const text = event.target.value;
-        const newValue = text.replace(/(\r\n|\n|\r)/g, ' ');
-        setValue(newValue);
+        setValue(event.target.value);
       }}
     />
   );

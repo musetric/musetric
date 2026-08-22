@@ -1,8 +1,7 @@
-import { CardActionArea } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 import { type api } from '@musetric/api';
-import { AnimatePresence, motion } from 'framer-motion';
 import { type FC, useEffect } from 'react';
-import { routes } from '../../../../app/router/routes.js';
+import { getProcessingProgress } from '../../../../common/processingStep.js';
 import { ProjectPreview } from '../Preview.js';
 
 const usePreloadImage = (previewUrl?: string) => {
@@ -23,23 +22,33 @@ export const ProjectCardPreview: FC<ProjectCardPreviewProps> = (props) => {
 
   usePreloadImage(previewUrl);
 
+  const done = !!projectInfo.processing.done;
+  const percent = Math.round(
+    getProcessingProgress(projectInfo.processing) * 100,
+  );
+
   return (
-    <AnimatePresence mode='wait' initial={false}>
-      <motion.div
-        key={previewUrl}
-        initial={{ clipPath: 'inset(0% 100% 0% 0%)' }}
-        animate={{ clipPath: 'inset(0% 0% 0% 0%)' }}
-        exit={{ clipPath: 'inset(0% 100% 0% 0%)' }}
-        transition={{ duration: 0.5 }}
-        style={{ overflow: 'hidden' }}
-      >
-        <CardActionArea
-          component={routes.project.Link}
-          params={{ projectId: projectInfo.id }}
-        >
-          <ProjectPreview url={previewUrl} />
-        </CardActionArea>
-      </motion.div>
-    </AnimatePresence>
+    <Box width={{ xs: 64, sm: 80 }} flexShrink={0}>
+      <ProjectPreview url={previewUrl} name={projectInfo.name}>
+        {!done && (
+          <Box position='relative' display='inline-flex'>
+            <CircularProgress
+              variant='determinate'
+              value={100}
+              size={36}
+              thickness={3}
+              sx={{ color: 'rgba(0, 0, 0, 0.55)' }}
+            />
+            <CircularProgress
+              variant='determinate'
+              value={percent}
+              size={36}
+              thickness={3}
+              sx={{ position: 'absolute', left: 0 }}
+            />
+          </Box>
+        )}
+      </ProjectPreview>
+    </Box>
   );
 };

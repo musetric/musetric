@@ -1,19 +1,13 @@
-import { Box, Slider, Typography } from '@mui/material';
+import { Slider, Stack, Typography } from '@mui/material';
 import { getTrackProgress } from '@musetric/engine';
 import { isPrimaryPointerButton } from '@musetric/interaction';
 import { type FC, useEffect, useRef } from 'react';
+import { formatDuration } from '../../../common/formatDuration.js';
 import { engine } from '../../../engine/engine.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 const progressScale = 1000;
-
-const formatTime = (timeInSeconds: number) => {
-  const minutes = Math.floor(timeInSeconds / 60);
-  const seconds = Math.floor(timeInSeconds - minutes * 60);
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-};
 
 export const PlayerProgress: FC = () => {
   const ref = useRef<HTMLSpanElement>(null);
@@ -50,7 +44,9 @@ export const PlayerProgress: FC = () => {
       }
 
       if (currentTimeRef.current) {
-        currentTimeRef.current.textContent = formatTime(progress * duration);
+        currentTimeRef.current.textContent = formatDuration(
+          progress * duration,
+        );
       }
     };
 
@@ -89,7 +85,16 @@ export const PlayerProgress: FC = () => {
   }, []);
 
   return (
-    <Box position='relative'>
+    <Stack direction='row' alignItems='center' gap={3}>
+      <Typography
+        ref={currentTimeRef}
+        variant='caption'
+        color='text.secondary'
+        width={40}
+        flexShrink={0}
+      >
+        {formatDuration(initialProgress * duration)}
+      </Typography>
       <Slider
         ref={ref}
         min={0}
@@ -98,7 +103,11 @@ export const PlayerProgress: FC = () => {
         disabled={!frameCount || realtimeFailed}
         size='small'
         sx={{
+          flexGrow: 1,
           '& .MuiSlider-thumb': {
+            color: 'primary.main',
+          },
+          '& .MuiSlider-track': {
             color: 'primary.main',
           },
         }}
@@ -112,24 +121,14 @@ export const PlayerProgress: FC = () => {
         }}
       />
       <Typography
-        ref={currentTimeRef}
         variant='caption'
-        position='absolute'
-        top='calc(100% - 12px)'
-        left={0}
-        lineHeight={1}
+        color='text.secondary'
+        width={40}
+        flexShrink={0}
+        textAlign='right'
       >
-        {formatTime(initialProgress * duration)}
+        {formatDuration(duration)}
       </Typography>
-      <Typography
-        variant='caption'
-        position='absolute'
-        top='calc(100% - 12px)'
-        right={0}
-        lineHeight={1}
-      >
-        {formatTime(duration)}
-      </Typography>
-    </Box>
+    </Stack>
   );
 };

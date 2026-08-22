@@ -9,13 +9,13 @@ const getInactiveSubtitleSegmentSx = (status: SubtitleSegmentStatus) => {
   if (status === 'past') {
     return {
       color: 'text.secondary',
-      opacity: 0.5,
+      opacity: 0.3,
     };
   }
 
   return {
     color: 'text.primary',
-    opacity: 0.72,
+    opacity: 0.55,
   };
 };
 
@@ -52,7 +52,11 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
       {segment.words.length > 0
         ? segment.words.map((word, index) => (
             <Fragment key={`${word.start}-${index}`}>
-              <SubtitleWord word={word} chord={chordLabels[index]} />
+              <SubtitleWord
+                word={word}
+                chord={chordLabels[index]}
+                withChordRow={chordLabels.some(Boolean)}
+              />
               {index < segment.words.length - 1 ? ' ' : ''}
             </Fragment>
           ))

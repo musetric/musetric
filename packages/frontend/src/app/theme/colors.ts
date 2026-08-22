@@ -20,3 +20,17 @@ export const createColor = (main: string) => ({
 export const white = '#FFFFFF';
 export const black = '#000000';
 export const neutral = createColor('#96BEE6');
+
+export const surface = {
+  background: '#0A0A0C',
+  raised: '#141419',
+  overlay: '#1C1C23',
+  hover: '#23232B',
+};
+
+export const accent = createColor('#7FB2F0');
+
+export const outline = {
+  subtle: 'rgba(255, 255, 255, 0.08)',
+  strong: 'rgba(255, 255, 255, 0.16)',
+};

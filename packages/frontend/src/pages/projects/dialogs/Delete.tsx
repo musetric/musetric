@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -36,6 +37,8 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
   return (
     <Dialog
       open
+      fullWidth
+      maxWidth='xs'
       component='form'
       onKeyDown={async (event) => {
         if (event.key === 'Enter') {
@@ -51,38 +54,31 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
       }}
       onClose={close}
     >
-      <DialogTitle>
-        <Stack direction='row' alignItems='center' gap={2}>
-          <Typography variant='h6'>
-            {t('pages.projects.dialogs.delete.title')}
+      <DialogTitle>{t('pages.projects.dialogs.delete.title')}</DialogTitle>
+      <DialogContent>
+        <Stack direction='row' gap={3} alignItems='center' pt={1}>
+          <Box width={72} flexShrink={0}>
+            <ProjectPreview
+              url={projectInfo.data?.previewUrl}
+              name={projectInfo.data?.name}
+            >
+              {projectInfo.isPending && (
+                <CircularProgress size={20} sx={{ color: 'text.primary' }} />
+              )}
+            </ProjectPreview>
+          </Box>
+          <Typography
+            sx={{
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 3,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {projectInfo.data?.name}
           </Typography>
         </Stack>
-      </DialogTitle>
-      <DialogContent
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          width: 400,
-        }}
-      >
-        <ProjectPreview url={projectInfo.data?.previewUrl}>
-          {projectInfo.isPending && (
-            <CircularProgress sx={{ color: 'text.primary' }} />
-          )}
-        </ProjectPreview>
-        <Typography
-          px={1}
-          sx={{
-            display: '-webkit-box',
-            WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: 3,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {projectInfo.data?.name}
-        </Typography>
       </DialogContent>
       <DialogActions>
         <Button

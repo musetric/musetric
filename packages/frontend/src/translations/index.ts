@@ -11,5 +11,6 @@ export const initI18next = async () => {
   return init({
     resources,
     lng,
+    interpolation: { escapeValue: false },
   });
 };

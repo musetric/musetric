@@ -1,6 +1,6 @@
 import '@ncdai/react-wheel-picker/style.css';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 import { maxTransposeSemitones, minTransposeSemitones } from '@musetric/audio';
 import {
   WheelPicker,
@@ -86,9 +86,6 @@ export const TransposePickerContent: FC = () => {
 
   return (
     <Stack gap={2}>
-      <Typography variant='h6' textAlign='center'>
-        {t('pages.project.player.controls.transpose')}
-      </Typography>
       <Box
         sx={{
           '& [data-rwp-highlight-wrapper]': {
@@ -120,9 +117,10 @@ export const TransposePickerContent: FC = () => {
         </WheelPickerWrapper>
       </Box>
       <Button
-        size='large'
-        variant='outlined'
+        size='small'
+        color='primary'
         startIcon={<RestartAltIcon />}
+        sx={{ alignSelf: 'center' }}
         disabled={recording || transposeSemitones === 0}
         onClick={() => {
           engine.store.update((state) => {

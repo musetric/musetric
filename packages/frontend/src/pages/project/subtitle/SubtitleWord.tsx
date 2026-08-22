@@ -6,10 +6,11 @@ import { type WordChord } from './subtitleChords.js';
 export type SubtitleWordProps = {
   word: api.subtitle.Word;
   chord?: WordChord;
+  withChordRow: boolean;
 };
 
 export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
-  const { word, chord } = props;
+  const { word, chord, withChordRow } = props;
 
   return (
     <Box
@@ -24,23 +25,26 @@ export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
         verticalAlign: 'top',
       }}
     >
-      <Box
-        component='span'
-        data-subtitle-chord-start={chord?.start}
-        data-subtitle-chord-end={chord?.end}
-        sx={{
-          height: '1.15em',
-          lineHeight: 1,
-          fontSize: '0.62em',
-          fontWeight: 700,
-          whiteSpace: 'nowrap',
-          userSelect: 'none',
-          pointerEvents: 'none',
-          transition: 'color 120ms linear',
-        }}
-      >
-        {chord?.label ?? ' '}
-      </Box>
+      {withChordRow && (
+        <Box
+          component='span'
+          data-subtitle-chord-start={chord?.start}
+          data-subtitle-chord-end={chord?.end}
+          sx={{
+            height: '1.15em',
+            lineHeight: 1,
+            fontSize: '0.58em',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+            userSelect: 'none',
+            pointerEvents: 'none',
+            transition: 'color 120ms linear',
+          }}
+        >
+          {chord?.label ?? ' '}
+        </Box>
+      )}
       <Box
         component='span'
         data-subtitle-word-text=''

@@ -1,9 +1,8 @@
-import { Box, Paper, Stack } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
 import { type FC, useRef } from 'react';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
-import { TrackVolumeControl } from '../waveform/TrackVolumeControl.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
 import { useTracksSeekDrag } from './useTracksSeekDrag.js';
 
@@ -18,11 +17,6 @@ export const ProjectTracksVisualization: FC = () => {
         md: '1 1 0',
       }}
       display='grid'
-      gridTemplateColumns={{
-        xs: 'minmax(0, 1fr) 140px',
-        sm: 'minmax(0, 1fr) 200px',
-        lg: 'minmax(0, 1fr) 280px',
-      }}
       gridTemplateRows='100%'
       gap={1}
       minHeight={0}
@@ -42,15 +36,22 @@ export const ProjectTracksVisualization: FC = () => {
           {stemTypes.map((stemType) => (
             <Box
               key={stemType}
-              component={Paper}
-              elevation={3}
               height={80}
               flexShrink={0}
+              borderRadius={2}
+              overflow='hidden'
+              sx={{ backgroundColor: 'background.paper' }}
             >
               <WaveformCanvas kind='delivery' stemType={stemType} />
             </Box>
           ))}
-          <Box component={Paper} elevation={3} height={80} flexShrink={0}>
+          <Box
+            height={80}
+            flexShrink={0}
+            borderRadius={2}
+            overflow='hidden'
+            sx={{ backgroundColor: 'background.paper' }}
+          >
             <WaveformCanvas kind='recording' />
           </Box>
           <VisualizationCursor />
@@ -59,16 +60,6 @@ export const ProjectTracksVisualization: FC = () => {
           <VisualizationTimeline />
         </Box>
       </Box>
-      <Stack alignSelf='start' gap={1}>
-        {stemTypes.map((stemType) => (
-          <Stack key={stemType} height={80} flexShrink={0}>
-            <TrackVolumeControl kind='delivery' stemType={stemType} />
-          </Stack>
-        ))}
-        <Stack height={80} flexShrink={0}>
-          <TrackVolumeControl kind='recording' />
-        </Stack>
-      </Stack>
     </Box>
   );
 };

@@ -1,9 +1,9 @@
-import { IconButton, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { TempoIcon } from '../../../icons/TempoIcon.js';
 import { useProjectStore } from '../store.js';
+import { ControlButton } from './ControlButton.js';
 
 export const TempoButton: FC = () => {
   const { t } = useTranslation();
@@ -17,31 +17,17 @@ export const TempoButton: FC = () => {
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
 
   return (
-    <IconButton
-      color={tempoBpm !== sourceTempoBpm ? 'primary' : 'inherit'}
+    <ControlButton
+      icon={<TempoIcon fontSize='small' />}
+      label={t('pages.project.player.controls.tempo')}
+      value={t('pages.project.player.controls.tempoValue', {
+        value: tempoBpm,
+      })}
+      active={tempoBpm !== sourceTempoBpm}
       disabled={!frameCount || recording || realtimeFailed}
-      sx={{
-        borderRadius: 1,
-        px: 1,
-        py: 0,
-      }}
       onClick={(event) => {
         setTempoAnchorEl(event.currentTarget);
       }}
-    >
-      <Stack alignItems='center'>
-        <TempoIcon fontSize='small' />
-        <Typography
-          component='span'
-          variant='caption'
-          fontSize={10}
-          lineHeight={1}
-        >
-          {t('pages.project.player.controls.tempoValue', {
-            value: tempoBpm,
-          })}
-        </Typography>
-      </Stack>
-    </IconButton>
+    />
   );
 };
