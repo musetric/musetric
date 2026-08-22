@@ -1,9 +1,15 @@
-import { Box, Stack, Typography } from '@mui/material';
+import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined';
+import { Box, LinearProgress, Stack, Typography } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  getProcessingProgress,
+  processingStepOrder,
+} from '../../../common/processingStep.js';
 import { ProjectLayout } from '../ProjectPageLayout.js';
 import { FlowStep } from './Step/FlowStep.js';
+import { useProcessingEta } from './useProcessingEta.js';
 
 export type ProjectProgressFlowProps = {
   project: api.project.Item;
@@ -13,58 +19,69 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
   const { project } = props;
 
   const { t } = useTranslation();
+  const progress = getProcessingProgress(project.processing);
+  const percent = Math.round(progress * 100);
+  const eta = useProcessingEta(project.id, progress);
 
   return (
-    <ProjectLayout>
+    <ProjectLayout title={project.name}>
       <Box
         width='100%'
         display='flex'
         alignItems='center'
         justifyContent='center'
-        p={4}
         flex={1}
       >
-        <Stack width='100%' maxWidth='48rem' position='relative' gap={3}>
-          <Typography variant='h4' fontWeight='bold'>
-            {t('pages.project.progress.trackTitle')}
-          </Typography>
+        <Stack width='100%' maxWidth='34rem' gap={6}>
           <Stack gap={2}>
-            <FlowStep
-              projectId={project.id}
-              stepName='separation'
-              title={t('pages.project.progress.steps.separation')}
-              step={project.processing.steps.separation}
+            <Stack
+              direction='row'
+              justifyContent='space-between'
+              alignItems='baseline'
+              gap={3}
+            >
+              <Typography variant='h5'>
+                {t('pages.project.progress.trackTitle')}
+              </Typography>
+              <Typography variant='h5' color='primary'>
+                {`${percent}%`}
+              </Typography>
+            </Stack>
+            <LinearProgress variant='determinate' value={percent} />
+            <Stack
+              direction='row'
+              justifyContent='space-between'
+              gap={3}
+              color='text.secondary'
+            >
+              <Typography variant='caption'>
+                {t('pages.project.progress.background')}
+              </Typography>
+              {eta && (
+                <Typography variant='caption'>
+                  {t('pages.project.progress.remaining', { duration: eta })}
+                </Typography>
+              )}
+            </Stack>
+          </Stack>
+          <Stack gap={3}>
+            {processingStepOrder.map((stepKey) => (
+              <FlowStep
+                key={stepKey}
+                projectId={project.id}
+                stepKey={stepKey}
+                step={project.processing.steps[stepKey]}
+              />
+            ))}
+          </Stack>
+          <Stack direction='row' gap={2} alignItems='center'>
+            <MemoryOutlinedIcon
+              fontSize='small'
+              sx={{ color: 'text.disabled' }}
             />
-            <FlowStep
-              projectId={project.id}
-              stepName='voices'
-              title={t('pages.project.progress.steps.voices')}
-              step={project.processing.steps.voices}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='transcription'
-              title={t('pages.project.progress.steps.transcription')}
-              step={project.processing.steps.transcription}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='rhythm'
-              title={t('pages.project.progress.steps.rhythm')}
-              step={project.processing.steps.rhythm}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='key'
-              title={t('pages.project.progress.steps.key')}
-              step={project.processing.steps.key}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='chords'
-              title={t('pages.project.progress.steps.chords')}
-              step={project.processing.steps.chords}
-            />
+            <Typography variant='caption' color='text.disabled'>
+              {t('pages.project.progress.local')}
+            </Typography>
           </Stack>
         </Stack>
       </Box>

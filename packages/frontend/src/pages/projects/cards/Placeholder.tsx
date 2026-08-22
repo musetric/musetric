@@ -1,14 +1,15 @@
-import { Box, Card, CardActions, CircularProgress } from '@mui/material';
+import { Box, Skeleton, Stack } from '@mui/material';
 import { type FC } from 'react';
-import { ProjectPreview } from './Preview.js';
 
 export const PlaceholderCard: FC = () => (
-  <Card sx={{ background: 'none', boxShadow: 'none' }}>
-    <ProjectPreview>
-      <CircularProgress sx={{ color: 'text.primary' }} />
-    </ProjectPreview>
-    <CardActions>
-      <Box width='100%' height='3em' />
-    </CardActions>
-  </Card>
+  <Box>
+    <Skeleton
+      variant='rectangular'
+      sx={{ aspectRatio: '1 / 1', borderRadius: 2 }}
+    />
+    <Stack pt={1.5} gap={0.5}>
+      <Skeleton variant='text' width='70%' />
+      <Skeleton variant='text' width='45%' />
+    </Stack>
+  </Box>
 );

@@ -1,4 +1,3 @@
-import { IconButton, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +7,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { TransposeIcon } from '../../../icons/TransposeIcon.js';
 import { formatKeyCompact, transposeKeyRoot } from '../key/keyFormat.js';
 import { useProjectStore } from '../store.js';
+import { ControlButton } from './ControlButton.js';
 import { formatTransposeSemitones } from './formatTransposeSemitones.js';
 
 export const TransposeButton: FC = () => {
@@ -26,7 +26,7 @@ export const TransposeButton: FC = () => {
   );
   const keyQuery = useQuery(endpoints.key.get(projectId));
 
-  const label =
+  const value =
     keyQuery.status === 'success'
       ? formatKeyCompact(
           transposeKeyRoot(keyQuery.data.root, transposeSemitones),
@@ -37,29 +37,15 @@ export const TransposeButton: FC = () => {
         });
 
   return (
-    <IconButton
-      color={transposeSemitones !== 0 ? 'primary' : 'inherit'}
+    <ControlButton
+      icon={<TransposeIcon fontSize='small' />}
+      label={t('pages.project.player.controls.transpose')}
+      value={value}
+      active={transposeSemitones !== 0}
       disabled={!frameCount || recording || realtimeFailed}
-      sx={{
-        borderRadius: 1,
-        px: 1,
-        py: 0,
-      }}
       onClick={(event) => {
         setTransposeAnchorEl(event.currentTarget);
       }}
-    >
-      <Stack alignItems='center'>
-        <TransposeIcon fontSize='small' />
-        <Typography
-          component='span'
-          variant='caption'
-          fontSize={10}
-          lineHeight={1}
-        >
-          {label}
-        </Typography>
-      </Stack>
-    </IconButton>
+    />
   );
 };

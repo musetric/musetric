@@ -26,9 +26,6 @@ export const PlaybackPlayButton: FC = () => {
       }}
       size='small'
       sx={{
-        alignSelf: 'stretch',
-        borderBottomLeftRadius: 0,
-        borderTopLeftRadius: 0,
         flex: 1,
       }}
       title={t('pages.project.player.controls.play')}

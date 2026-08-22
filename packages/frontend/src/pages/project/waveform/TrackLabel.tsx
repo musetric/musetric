@@ -3,6 +3,7 @@ import { type StemType } from '@musetric/audio';
 import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type TrackVolumeTarget } from '../mix/trackVolume.js';
 
 const stemLabels: Record<StemType, (t: TFunction) => string> = {
   lead: (t) => t('pages.project.waveform.stemType.lead'),
@@ -10,14 +11,9 @@ const stemLabels: Record<StemType, (t: TFunction) => string> = {
   instrumental: (t) => t('pages.project.waveform.stemType.instrumental'),
 };
 
-export type TrackLabelProps =
-  | {
-      kind: 'delivery';
-      stemType: StemType;
-    }
-  | {
-      kind: 'recording';
-    };
+export type TrackLabelProps = TrackVolumeTarget & {
+  variant?: 'overlay' | 'inline';
+};
 
 export const TrackLabel: FC<TrackLabelProps> = (props) => {
   const { t } = useTranslation();
@@ -26,10 +22,17 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
       ? t('pages.project.waveform.stemType.recording')
       : stemLabels[props.stemType](t);
 
+  if (props.variant === 'inline') {
+    return (
+      <Typography variant='subtitle2' color='text.primary'>
+        {label}
+      </Typography>
+    );
+  }
+
   return (
     <Typography
       variant='subtitle2'
-      fontWeight={600}
       color='text.secondary'
       sx={{
         position: 'absolute',

@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
-  Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type TFunction } from 'i18next';
@@ -76,7 +75,7 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
       return <QueryError error={project.error} />;
     }
     return (
-      <Stack direction='column' gap={2}>
+      <Stack direction='column' gap={4} pt={1}>
         <Controller
           name='preview'
           control={control}
@@ -86,6 +85,7 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
               <PreviewField
                 value={field.value}
                 setValue={field.onChange}
+                name={project.data?.name}
                 loading={project.isPending}
               />
             );
@@ -113,23 +113,18 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
   return (
     <Dialog
       open
+      fullWidth
+      maxWidth='xs'
       component='form'
       onSubmit={handleSubmit(onSubmit)}
       onClose={close}
     >
-      <DialogTitle>
-        <Stack direction='row' alignItems='center' gap={2}>
-          <Typography variant='h6'>
-            {t('pages.projects.dialogs.edit.title')}
-          </Typography>
-        </Stack>
-      </DialogTitle>
+      <DialogTitle>{t('pages.projects.dialogs.edit.title')}</DialogTitle>
       <DialogContent
         sx={{
           display: 'flex',
           flexDirection: 'column',
           gap: 3,
-          width: 450,
         }}
       >
         {renderContent()}

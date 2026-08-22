@@ -155,7 +155,7 @@ export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
   const status = useSubtitleSegmentStatus(index, subtitleCursor);
 
   return (
-    <Box data-subtitle-segment-index={index} py={1}>
+    <Box data-subtitle-segment-index={index} py={2}>
       {status === 'active' ? (
         <ActiveSubtitleSegment
           segment={segment}

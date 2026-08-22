@@ -1,22 +1,8 @@
-import AutorenewIcon from '@mui/icons-material/Autorenew';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import { Chip, type ChipProps } from '@mui/material';
+import { Typography } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type TFunction } from 'i18next';
-import { type FC, type JSX } from 'react';
+import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const getStatusTranslations = (
-  t: TFunction,
-): Record<api.project.ProcessingStepStatus, string> => ({
-  pending: t('pages.project.progress.status.pending'),
-  processing: t('pages.project.progress.status.processing'),
-  failed: t('pages.project.progress.status.failed'),
-  done: t('pages.project.progress.status.done'),
-});
 
 const getPhaseTranslations = (
   t: TFunction,
@@ -27,23 +13,6 @@ const getPhaseTranslations = (
   running: t('pages.project.progress.phase.running'),
   saving: t('pages.project.progress.phase.saving'),
 });
-
-const statusChipColor: Record<
-  api.project.ProcessingStepStatus,
-  ChipProps['color']
-> = {
-  pending: 'default',
-  processing: 'primary',
-  failed: 'error',
-  done: 'success',
-};
-
-const statusIcon: Record<api.project.ProcessingStepStatus, JSX.Element> = {
-  pending: <ScheduleIcon fontSize='small' />,
-  processing: <AutorenewIcon fontSize='small' />,
-  failed: <ErrorOutlineIcon fontSize='small' />,
-  done: <CheckCircleIcon fontSize='small' />,
-};
 
 const getWaitingTranslations = (
   t: TFunction,
@@ -95,25 +64,18 @@ export const FlowStepStatus: FC<FlowStepStatusProps> = (props) => {
     waiting === undefined
       ? undefined
       : getWaitingTranslations(t)[waiting.reason];
-  const label =
-    phaseLabel ?? waitingLabel ?? getStatusTranslations(t)[step.status];
+  const label = phaseLabel ?? waitingLabel;
+  if (label === undefined) {
+    return;
+  }
   const count = getCountLabel(step);
 
   return (
-    <Chip
-      size='small'
-      variant='outlined'
-      color={
-        waitingLabel === undefined ? statusChipColor[step.status] : 'warning'
-      }
-      icon={
-        waitingLabel === undefined ? (
-          statusIcon[step.status]
-        ) : (
-          <PauseCircleOutlineIcon fontSize='small' />
-        )
-      }
-      label={count === undefined ? label : `${label} • ${count}`}
-    />
+    <Typography
+      variant='caption'
+      color={waitingLabel === undefined ? 'text.secondary' : 'warning.main'}
+    >
+      {count === undefined ? label : `${label} · ${count}`}
+    </Typography>
   );
 };

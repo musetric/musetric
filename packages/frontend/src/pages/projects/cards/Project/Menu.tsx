@@ -26,13 +26,18 @@ export const ProjectCardMenu: FC<ProjectCardMenuProps> = (props) => {
   return (
     <>
       <IconButton
+        data-card-menu=''
         size='small'
+        aria-label={t('pages.projects.cards.menu.title')}
         onClick={(event) => {
           setAnchorEl(event.currentTarget);
         }}
-        sx={{ margin: '0 !important' }}
+        sx={{
+          opacity: anchorEl ? 1 : 0,
+          transition: 'opacity 120ms linear',
+        }}
       >
-        <MoreVertIcon />
+        <MoreVertIcon fontSize='small' />
       </IconButton>
       <Menu
         anchorEl={anchorEl}
