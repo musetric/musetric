@@ -1,102 +1,112 @@
-import {
-  Alert,
-  alpha,
-  Button,
-  Card,
-  LinearProgress,
-  Stack,
-  Typography,
-} from '@mui/material';
-import { type Theme, useTheme } from '@mui/material/styles';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined';
+import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
+import { Button, CircularProgress, Stack, Typography } from '@mui/material';
 import { type api } from '@musetric/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../../api/index.js';
+import {
+  getProcessingStepProgress,
+  getProcessingStepTitle,
+} from '../../../../common/processingStep.js';
 import { FlowStepDownload } from './FlowStepDownload.js';
 import { FlowStepStatus } from './FlowStepStatus.js';
 
-const getStatusColor = (
-  status: api.project.ProcessingStepStatus,
-  theme: Theme,
-): string => {
-  if (status === 'processing') {
-    return theme.palette.primary.main;
-  }
-  if (status === 'done') {
-    return theme.palette.success.main;
-  }
-  if (status === 'failed') {
-    return theme.palette.error.main;
-  }
-  return theme.palette.grey[500];
+type FlowStepIconProps = {
+  status: api.project.ProcessingStepStatus;
 };
 
-const getRunningValue = (
-  step: api.project.ProcessingStep,
-): number | undefined => {
-  const { unit, unitCount } = step;
-  if (step.phase !== 'running' || unit === undefined || !unitCount) {
-    return undefined;
+const FlowStepIcon: FC<FlowStepIconProps> = (props) => {
+  const { status } = props;
+
+  const renderIcon = () => {
+    if (status === 'done') {
+      return <CheckRoundedIcon fontSize='small' color='success' />;
+    }
+    if (status === 'failed') {
+      return <ErrorOutlineRoundedIcon fontSize='small' color='error' />;
+    }
+    if (status === 'processing') {
+      return <CircularProgress size={18} thickness={4} color='primary' />;
+    }
+    return (
+      <CircleOutlinedIcon fontSize='small' sx={{ color: 'text.disabled' }} />
+    );
+  };
+
+  return (
+    <Stack width={20} alignItems='center' flexShrink={0}>
+      {renderIcon()}
+    </Stack>
+  );
+};
+
+const getTitleColor = (status: api.project.ProcessingStepStatus): string => {
+  if (status === 'pending') {
+    return 'text.disabled';
   }
-  return (unit / unitCount) * 100;
+  if (status === 'done') {
+    return 'text.secondary';
+  }
+  return 'text.primary';
 };
 
 export type FlowStepProps = {
   projectId: number;
-  stepName: api.project.ProcessingStepName;
-  title: string;
+  stepKey: api.project.ProcessingStepName;
   step: api.project.ProcessingStep;
 };
 
 export const FlowStep: FC<FlowStepProps> = (props) => {
-  const { projectId, stepName, title, step } = props;
-  const theme = useTheme();
+  const { projectId, stepKey, step } = props;
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const retry = useMutation(endpoints.project.retry(queryClient, projectId));
-  const accent = getStatusColor(step.status, theme);
-  const running = getRunningValue(step);
+  const active = step.status === 'processing';
+  const percent = Math.round(getProcessingStepProgress(step) * 100);
 
   return (
-    <Card
-      component={Stack}
-      gap={2}
-      sx={{
-        padding: 2,
-        border: `1px solid ${alpha(accent, 0.4)}`,
-        backgroundColor: `${alpha(accent, 0.1)}`,
-      }}
-    >
-      <Stack direction='row' alignItems='center' gap={2}>
-        <Typography variant='subtitle1' fontWeight='bold'>
-          {title}
-        </Typography>
-        <FlowStepStatus step={step} />
-      </Stack>
-      {running !== undefined && (
-        <LinearProgress variant='determinate' value={running} />
-      )}
-      {step.error && (
-        <Alert
-          severity='error'
-          action={
-            <Button
-              color='inherit'
-              size='small'
-              loading={retry.isPending}
-              onClick={() => {
-                retry.mutate({ step: stepName });
-              }}
-            >
-              {t('pages.project.progress.retry')}
-            </Button>
-          }
+    <Stack gap={1}>
+      <Stack direction='row' alignItems='center' gap={3}>
+        <FlowStepIcon status={step.status} />
+        <Typography
+          variant='subtitle1'
+          flexGrow={1}
+          color={getTitleColor(step.status)}
         >
-          {step.error}
-        </Alert>
+          {getProcessingStepTitle(stepKey, t)}
+        </Typography>
+        {active && (
+          <Typography variant='subtitle2' color='primary'>
+            {`${percent}%`}
+          </Typography>
+        )}
+        {step.status === 'failed' && (
+          <Button
+            size='small'
+            color='error'
+            loading={retry.isPending}
+            onClick={() => {
+              retry.mutate({ step: stepKey });
+            }}
+          >
+            {t('pages.project.progress.retry')}
+          </Button>
+        )}
+      </Stack>
+      {(active || step.error) && (
+        <Stack pl={7} gap={0.5}>
+          {active && <FlowStepStatus step={step} />}
+          {active && <FlowStepDownload step={step} />}
+          {step.error && (
+            <Typography variant='caption' color='error'>
+              {step.error}
+            </Typography>
+          )}
+        </Stack>
       )}
-      <FlowStepDownload step={step} />
-    </Card>
+    </Stack>
   );
 };

@@ -1,25 +1,29 @@
-import { Stack } from '@mui/material';
+import { Stack, Typography } from '@mui/material';
 import { type FC, type ReactNode } from 'react';
 import { safeAreaPadding } from '../../app/theme/safeArea.js';
 import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 
 export type ProjectLayoutProps = {
   children: ReactNode;
-  heading?: ReactNode;
+  title?: string;
+  actions?: ReactNode;
 };
 export const ProjectLayout: FC<ProjectLayoutProps> = (props) => {
-  const { children, heading } = props;
-  const headingContent = heading ?? <ProjectBackButton />;
+  const { children, title, actions } = props;
 
   return (
     <Stack
       height='100dvh'
       position='relative'
-      gap={2}
-      sx={(theme) => safeAreaPadding(theme, 2)}
+      gap={3}
+      sx={(theme) => safeAreaPadding(theme, 3)}
     >
-      <Stack direction='row' gap={2} alignItems='center' position='relative'>
-        {headingContent}
+      <Stack direction='row' gap={3} alignItems='center' position='relative'>
+        <ProjectBackButton />
+        <Typography variant='h6' noWrap flexGrow={1} minWidth={0}>
+          {title}
+        </Typography>
+        {actions}
       </Stack>
       {children}
     </Stack>

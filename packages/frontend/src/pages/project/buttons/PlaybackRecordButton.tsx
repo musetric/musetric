@@ -2,15 +2,12 @@ import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import { IconButton } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
-export type PlaybackRecordButtonProps = {
-  projectId: number;
-};
-
-export const PlaybackRecordButton: FC<PlaybackRecordButtonProps> = (props) => {
-  const { projectId } = props;
+export const PlaybackRecordButton: FC = () => {
+  const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
   const frameCount = useEngineStore((state) => state.frameCount);
   const isSlave = useEngineStore((state) => state.isSlave);
@@ -42,9 +39,6 @@ export const PlaybackRecordButton: FC<PlaybackRecordButtonProps> = (props) => {
       }}
       size='small'
       sx={{
-        alignSelf: 'stretch',
-        borderBottomRightRadius: 0,
-        borderTopRightRadius: 0,
         flex: 1,
       }}
       title={t('pages.project.player.controls.record')}

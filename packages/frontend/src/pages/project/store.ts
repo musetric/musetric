@@ -10,6 +10,7 @@ export type ProjectState = {
   audioSettingsOpen: boolean;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
+  mixAnchorEl?: HTMLElement;
 };
 
 const initialState: ProjectState = {
@@ -24,6 +25,7 @@ export type ProjectActions = {
   setAudioSettingsOpen: (value: boolean) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
+  setMixAnchorEl: (anchorEl: HTMLElement | undefined) => void;
 };
 
 type State = ProjectState & ProjectActions;
@@ -48,6 +50,10 @@ export const useProjectStore = create<State>()(
     setTempoAnchorEl: (tempoAnchorEl) =>
       set({
         tempoAnchorEl,
+      }),
+    setMixAnchorEl: (mixAnchorEl) =>
+      set({
+        mixAnchorEl,
       }),
   })),
 );

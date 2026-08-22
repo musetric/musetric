@@ -1,7 +1,8 @@
-import PauseIcon from '@mui/icons-material/Pause';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { IconButton, Slider, Stack } from '@mui/material';
+import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import { IconButton, Slider, Stack, Typography } from '@mui/material';
 import { type FC, useEffect, useRef, useState } from 'react';
+import { formatDuration } from '../../../common/formatDuration.js';
 
 export type SongPlayerProps = {
   url: string;
@@ -10,37 +11,39 @@ export const SongPlayer: FC<SongPlayerProps> = (props) => {
   const { url } = props;
   const audioRef = useRef<HTMLAudioElement>(undefined);
   const [playing, setPlaying] = useState(false);
-  const [progressPercent, setProgressPercent] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
     const audio = new Audio(url);
     audioRef.current = audio;
 
     const onTimeUpdate = () => {
-      const duration = audio.duration || 1;
-      setProgressPercent((audio.currentTime / duration) * 100);
+      setCurrentTime(audio.currentTime);
+    };
+    const onLoadedMetadata = () => {
+      const rawDuration = audio.duration;
+      setDuration(Number.isFinite(rawDuration) ? rawDuration : 0);
+    };
+    const onEnded = () => {
+      setPlaying(false);
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('ended', onEnded);
     return () => {
       audio.pause();
       audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('ended', onEnded);
     };
   }, [url]);
 
   return (
-    <Stack direction='row' alignItems='center' gap={1} sx={{ mt: 2 }}>
-      <Slider
-        size='small'
-        sx={{ flex: 1 }}
-        value={progressPercent}
-        onChange={(_, value) => {
-          if (!audioRef.current) return;
-          const duration = audioRef.current.duration || 1;
-          audioRef.current.currentTime = (value / 100) * duration;
-        }}
-      />
+    <Stack direction='row' alignItems='center' gap={2}>
       <IconButton
+        size='small'
         onClick={() => {
           if (!audioRef.current) return;
           if (playing) audioRef.current.pause();
@@ -48,8 +51,28 @@ export const SongPlayer: FC<SongPlayerProps> = (props) => {
           setPlaying(!playing);
         }}
       >
-        {playing ? <PauseIcon /> : <PlayArrowIcon />}
+        {playing ? <PauseRoundedIcon /> : <PlayArrowRoundedIcon />}
       </IconButton>
+      <Slider
+        size='small'
+        sx={{ flex: 1 }}
+        min={0}
+        max={duration || 1}
+        value={currentTime}
+        onChange={(_, value) => {
+          if (!audioRef.current) return;
+          audioRef.current.currentTime = value;
+          setCurrentTime(value);
+        }}
+      />
+      <Typography
+        variant='caption'
+        color='text.secondary'
+        width={72}
+        textAlign='right'
+      >
+        {`${formatDuration(currentTime)} / ${formatDuration(duration)}`}
+      </Typography>
     </Stack>
   );
 };

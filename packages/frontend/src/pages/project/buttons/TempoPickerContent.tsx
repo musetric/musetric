@@ -1,6 +1,6 @@
 import '@ncdai/react-wheel-picker/style.css';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 import { getMaxTempoBpm, getMinTempoBpm } from '@musetric/audio';
 import {
   WheelPicker,
@@ -65,9 +65,6 @@ export const TempoPickerContent: FC = () => {
 
   return (
     <Stack gap={2}>
-      <Typography variant='h6' textAlign='center'>
-        {t('pages.project.player.controls.tempo')}
-      </Typography>
       <Box
         sx={{
           '& [data-rwp-highlight-wrapper]': {
@@ -99,9 +96,10 @@ export const TempoPickerContent: FC = () => {
         </WheelPickerWrapper>
       </Box>
       <Button
-        size='large'
-        variant='outlined'
+        size='small'
+        color='primary'
         startIcon={<RestartAltIcon />}
+        sx={{ alignSelf: 'center' }}
         disabled={recording || tempoBpm === sourceTempoBpm}
         onClick={() => {
           engine.store.update((state) => {

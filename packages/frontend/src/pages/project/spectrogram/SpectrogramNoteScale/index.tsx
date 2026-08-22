@@ -4,7 +4,7 @@ import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../../settings/store.js';
 import { useProjectStore } from '../../store.js';
-import { getNoteMarkers, isNaturalMidi } from './noteMarker.js';
+import { getNoteMarkers, isNaturalMidi, isOctaveMidi } from './noteMarker.js';
 
 const alignPixel = (value: number, pixelRatio: number) =>
   Math.round(value * pixelRatio) / pixelRatio;
@@ -27,11 +27,10 @@ export const SpectrogramNoteScale: FC = () => {
     }
 
     const colors = {
-      primary: alpha(theme.palette.primary.main, 0.9),
-      secondary: alpha(theme.palette.secondary.main, 0.55),
-      gray: alpha(theme.palette.grey[400], 0.2),
+      octave: alpha(theme.palette.common.white, 0.22),
+      semitone: alpha(theme.palette.common.white, 0.06),
     };
-    const noteLabelColor = alpha(theme.palette.text.primary, 0.75);
+    const noteLabelColor = alpha(theme.palette.text.primary, 0.55);
     const labelBackground = alpha(theme.palette.background.default, 0.6);
     const font = `12px ${theme.typography.fontFamily}`;
     let pixelRatio = window.devicePixelRatio || 1;
@@ -78,29 +77,30 @@ export const SpectrogramNoteScale: FC = () => {
       context.textBaseline = 'middle';
       context.lineWidth = 1;
 
+      const markerSpacing =
+        markers.length > 1 ? height / (markers.length - 1) : height;
+      const withNaturalLabels = markerSpacing >= 16;
+
       for (const marker of markers) {
         const y = alignPixel(marker.topRatio * height, pixelRatio);
+        const octave = isOctaveMidi(marker.midi);
 
         if (notesMode) {
-          if (isNaturalMidi(marker.midi)) {
+          if (octave || (withNaturalLabels && isNaturalMidi(marker.midi))) {
             drawLabel(y, marker.label, noteLabelColor);
           }
           continue;
         }
 
-        const color = colors[marker.tone];
-
-        context.strokeStyle = color;
+        context.strokeStyle = octave ? colors.octave : colors.semitone;
         context.beginPath();
         context.moveTo(0, y);
         context.lineTo(width, y);
         context.stroke();
 
-        if (marker.tone === 'gray') {
-          continue;
+        if (octave) {
+          drawLabel(y, marker.label, noteLabelColor);
         }
-
-        drawLabel(y, marker.label, color);
       }
 
       context.restore();

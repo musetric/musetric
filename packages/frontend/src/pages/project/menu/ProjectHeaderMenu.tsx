@@ -3,6 +3,8 @@ import { IconButton, Menu, Tooltip } from '@mui/material';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { ControlButtonContent } from '../buttons/ControlButtonContent.js';
+import { controlButtonSx } from '../buttons/controlButtonSx.js';
 import { AudioSettingsMenuItem } from './AudioSettingsMenuItem.js';
 import { SpectrogramSettingsMenuItem } from './SpectrogramSettingsMenuItem.js';
 
@@ -20,11 +22,15 @@ export const ProjectHeaderMenu: FC = () => {
           size='small'
           disabled={realtimeFailed}
           aria-label={t('pages.project.menu.title')}
+          sx={controlButtonSx}
           onClick={(event) => {
             setAnchorEl(event.currentTarget);
           }}
         >
-          <MenuIcon />
+          <ControlButtonContent
+            icon={<MenuIcon fontSize='small' />}
+            caption={t('pages.project.menu.title')}
+          />
         </IconButton>
       </Tooltip>
       <Menu

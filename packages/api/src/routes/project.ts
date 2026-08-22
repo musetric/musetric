@@ -69,6 +69,7 @@ export const processingSchema = z.object({
   done: z.boolean().optional(),
   steps: processingStepsSchema,
 });
+export type Processing = z.infer<typeof processingSchema>;
 
 export const audioAnalysisSchema = z.object({
   sourceGainDb: z.number(),
