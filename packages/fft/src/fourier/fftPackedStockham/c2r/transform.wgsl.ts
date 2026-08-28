@@ -6,7 +6,6 @@ import {
 
 export const transformShader = `
 override packedWindowSize: u32 = 1024u;
-override positiveWindowSize: u32 = 1025u;
 override radix8StageCount: u32 = 0u;
 override radix4StageCount: u32 = 0u;
 override radix2StageCount: u32 = 0u;
