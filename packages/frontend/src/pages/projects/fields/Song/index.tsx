@@ -3,6 +3,21 @@ import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type SongValue } from './schema.js';
 
+const audioAccept = [
+  'audio/*',
+  '.aac',
+  '.aif',
+  '.aiff',
+  '.flac',
+  '.m4a',
+  '.mp3',
+  '.oga',
+  '.ogg',
+  '.opus',
+  '.wav',
+  '.wma',
+].join(',');
+
 export type SongFieldProps = {
   value?: SongValue;
   setValue: (value: SongValue) => void;
@@ -52,7 +67,7 @@ export const SongField: FC<SongFieldProps> = (props) => {
     >
       <input
         type='file'
-        accept='audio/*'
+        accept={audioAccept}
         ref={inputRef}
         hidden
         onChange={(event) => {
