@@ -66,7 +66,6 @@ const createTransformConstants = (
   const counts = selectTransformStageCounts(variant);
   return {
     packedWindowSize: variant.packedWindowSize,
-    positiveWindowSize: variant.positiveWindowSize,
     inPlace: inPlace ? 1 : 0,
     threadCount: selectTransformThreadCount(variant, counts),
     ...counts,

@@ -2,7 +2,6 @@ import { stockhamCombines } from '../butterflyLadder.wgsl.js';
 
 export const transformInPlaceMixedShader = `
 override packedWindowSize: u32 = 2560u;
-override positiveWindowSize: u32 = 2561u;
 override radix8StageCount: u32 = 0u;
 override radix4StageCount: u32 = 0u;
 override radix2StageCount: u32 = 0u;
