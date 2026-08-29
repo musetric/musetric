@@ -84,7 +84,7 @@ export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
   const session = await ort.InferenceSession.create(options.modelUrl, {
-    executionProviders: ['webgpu'],
+    executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: {
       [beatThisModel.beatOutputName]: 'gpu-buffer',
