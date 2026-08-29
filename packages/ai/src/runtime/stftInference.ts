@@ -13,7 +13,6 @@ import {
   dispatch2d,
   type Dispatch2dOptions,
 } from './helpers.js';
-import { webGpuExecutionProvider } from './ortWebGpu.js';
 
 ort.env.logLevel = 'error';
 
@@ -84,7 +83,7 @@ export const createStftInferenceRuntime = async (
     windowCount * (nFft + 2) * Float32Array.BYTES_PER_ELEMENT;
 
   const session = await ort.InferenceSession.create(options.modelUrl, {
-    executionProviders: [webGpuExecutionProvider],
+    executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
     ...(options.externalData ? { externalData: options.externalData } : {}),
