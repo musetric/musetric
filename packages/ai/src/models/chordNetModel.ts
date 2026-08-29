@@ -1,18 +1,12 @@
-const modelId = 'musetric/chordmini-onnx';
-const revision = 'main';
-
-const files = [
-  'config.json',
-  'chordnet.onnx',
-  'cqt-plan.bin',
-  'cqt-plan.manifest.json',
-] as const;
-
 export const chordNetModel = {
-  modelId,
-  revision,
-  repo: `https://huggingface.co/${modelId}`,
-  files,
+  modelId: 'musetric/chordmini-onnx',
+  revision: 'fbd620e6a7617bbc82795b1f0c828a7721c213f4',
+  files: [
+    'config.json',
+    'chordnet.onnx',
+    'cqt-plan.bin',
+    'cqt-plan.manifest.json',
+  ],
   sha256: {
     'config.json':
       '1f26c11ebea51ec08f12e813eb213a729fa0ecc407ac7632dfdc7bad67e65aa4',
@@ -35,4 +29,4 @@ export const chordNetModel = {
 } as const;
 
 export const resolveChordNetModelUrl = (file: string): string =>
-  `${chordNetModel.repo}/resolve/${chordNetModel.revision}/${file}`;
+  `https://huggingface.co/${chordNetModel.modelId}/resolve/${chordNetModel.revision}/${file}`;
