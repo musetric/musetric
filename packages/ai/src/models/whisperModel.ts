@@ -1,26 +1,20 @@
-const modelId = 'musetric/whisper-large-v3-turbo-onnx';
-const revision = 'main';
-
-const files = [
-  'config.json',
-  'generation_config.json',
-  'preprocessor_config.json',
-  'tokenizer.json',
-  'tokenizer_config.json',
-  'special_tokens_map.json',
-  'added_tokens.json',
-  'vocab.json',
-  'merges.txt',
-  'normalizer.json',
-  'encoder_model_q4.onnx',
-  'decoder_model_merged_fp16.onnx',
-] as const;
-
 export const whisperModel = {
-  modelId,
-  revision,
-  repo: `https://huggingface.co/${modelId}`,
-  files,
+  modelId: 'musetric/whisper-large-v3-turbo-onnx',
+  revision: 'c94aa532da95fe1ed726cc33d8d89477e0b5b011',
+  files: [
+    'config.json',
+    'generation_config.json',
+    'preprocessor_config.json',
+    'tokenizer.json',
+    'tokenizer_config.json',
+    'special_tokens_map.json',
+    'added_tokens.json',
+    'vocab.json',
+    'merges.txt',
+    'normalizer.json',
+    'encoder_model_q4.onnx',
+    'decoder_model_merged_fp16.onnx',
+  ],
   sha256: {
     'config.json':
       '3895aac9c18e541502ded9bf0f4c31cbe25a3387ef88ffdc85214e43acc0ca57',
@@ -57,4 +51,4 @@ export const whisperModel = {
 } as const;
 
 export const resolveWhisperModelUrl = (file: string): string =>
-  `${whisperModel.repo}/resolve/${whisperModel.revision}/${file}`;
+  `https://huggingface.co/${whisperModel.modelId}/resolve/${whisperModel.revision}/${file}`;

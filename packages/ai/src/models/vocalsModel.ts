@@ -4,8 +4,8 @@ const frames = 1101;
 const packedBins = (nFft / 2 + 1) * 2;
 
 export const vocalsModel = {
-  repo: 'https://huggingface.co/musetric/vocal-separation-roformer-onnx',
-  revision: 'main',
+  modelId: 'musetric/vocal-separation-roformer-onnx',
+  revision: '7272c4abd85495c110d161df1083631e8bcd9cdb',
   files: {
     model: 'syhft_core_folded_fp16_webgpu.onnx',
     data: 'syhft_core_folded_fp16_webgpu.onnx.data',
@@ -27,4 +27,4 @@ export const vocalsModel = {
 } as const;
 
 export const resolveVocalsModelUrl = (file: string): string =>
-  `${vocalsModel.repo}/resolve/${vocalsModel.revision}/${file}`;
+  `https://huggingface.co/${vocalsModel.modelId}/resolve/${vocalsModel.revision}/${file}`;
