@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfigs/tsconfig.es.json",
+  "references": [
+    {
+      "path": "./tsconfig.src.json"
+    }
+  ]
+}

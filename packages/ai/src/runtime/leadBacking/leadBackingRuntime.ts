@@ -39,6 +39,7 @@ export const createLeadBackingGpuRuntime = async (
     label: 'Lead/backing',
     model: { ...leadBackingModel, frames },
     modelUrl: options.modelUrl,
+    graphOptimizationLevel: 'basic',
     frameShader: leadBackingFrameShader,
     overlapAddShader: leadBackingOverlapAddShader,
     createCore: (buffers): StftInferenceCore => {

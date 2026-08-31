@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfigs/tsconfig.dom.json",
+  "compilerOptions": {
+    "types": ["@webgpu/types"]
+  },
+  "references": [
+    { "path": "./tsconfig.src.json" },
+    { "path": "./tsconfig.es.json" }
+  ]
+}

@@ -1,4 +1,5 @@
 export const chordNetModel = {
+  cacheDirName: 'chordmini-onnx',
   modelId: 'musetric/chordmini-onnx',
   revision: 'fbd620e6a7617bbc82795b1f0c828a7721c213f4',
   files: [

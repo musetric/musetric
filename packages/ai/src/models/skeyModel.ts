@@ -1,4 +1,5 @@
 export const skeyModel = {
+  cacheDirName: 'skey-onnx',
   modelId: 'musetric/skey-onnx',
   revision: '9d90d2a9ff6679df1d64000f4fa750643f247643',
   files: ['config.json', 'skey.onnx'],

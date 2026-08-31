@@ -5,33 +5,7 @@ import { type Logger, type MessageHandlers } from '@musetric/utils';
 import { skeyModel } from '../models/skeyModel.js';
 import { createSkeyRuntime } from '../runtime/key/skeyRuntime.js';
 import { ensureSkeyModelFiles } from '../service/skeyModelCache.node.js';
-import { keyMap } from './keyMap.js';
-import { type KeyResult } from './types.js';
-
-const peakNormalize = (audio: Float32Array): void => {
-  let peak = 0;
-  for (const sample of audio) {
-    const magnitude = Math.abs(sample);
-    if (magnitude > peak) {
-      peak = magnitude;
-    }
-  }
-  if (peak > 0) {
-    for (let i = 0; i < audio.length; i += 1) {
-      audio[i] /= peak;
-    }
-  }
-};
-
-const argmax = (values: Float32Array): number => {
-  let best = 0;
-  for (let i = 1; i < values.length; i += 1) {
-    if (values[i] > values[best]) {
-      best = i;
-    }
-  }
-  return best;
-};
+import { peakNormalize, resolveKeyResult } from './keyProbabilities.es.js';
 
 export type AnalyzeKeyMessage =
   | {
@@ -79,13 +53,7 @@ export const analyzeKey = async (options: AnalyzeKeyOptions): Promise<void> => {
     .analyze(audio)
     .finally(async () => runtime.release());
 
-  const index = argmax(probs);
-  const { root, mode } = keyMap[index];
-  const result: KeyResult = {
-    root,
-    mode,
-    confidence: probs[index],
-  };
+  const result = resolveKeyResult(probs);
 
   await mkdir(dirname(resultPath), { recursive: true });
   await writeFile(resultPath, JSON.stringify(result, undefined, 2), 'utf-8');

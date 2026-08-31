@@ -10,8 +10,6 @@ import {
   type ModelDownloadMessage,
 } from './modelCache.node.js';
 
-export const beatThisCacheDirName = 'beat-this-onnx';
-
 export type BeatThisModelFiles = {
   modelPath: string;
   filterbankPath: string;
@@ -29,7 +27,7 @@ export const ensureBeatThisModelFiles = async (
   const onDownload = async (message: ModelDownloadMessage): Promise<void> => {
     await handlers.download(message);
   };
-  const cacheDir = join(modelsPath, beatThisCacheDirName);
+  const cacheDir = join(modelsPath, beatThisModel.cacheDirName);
   const paths = new Map<string, string>();
   for (const file of beatThisModel.files) {
     const path = await ensureCachedModelFile({

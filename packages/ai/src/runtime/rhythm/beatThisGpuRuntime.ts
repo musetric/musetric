@@ -2,6 +2,7 @@ import { createFftPackedStockhamR2c } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
 import { beatThisModel } from '../../models/beatThisModel.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
+import { configureOrtWebGpu } from '../ortWebGpu.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -89,6 +90,7 @@ export type BeatThisGpuRuntimeOptions = {
 export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
+  configureOrtWebGpu();
   await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(options.modelUrl, {
     executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],

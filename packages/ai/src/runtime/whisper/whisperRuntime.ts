@@ -66,7 +66,6 @@ export const createWhisperRuntime = async (
   env.useBrowserCache = false;
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
-
   const loadStart = performance.now();
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',

@@ -14,6 +14,7 @@ import {
   createStorageBuffer,
   dispatch1d,
 } from '../helpers.js';
+import { configureOrtWebGpu } from '../ortWebGpu.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -167,6 +168,7 @@ export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
   const { modelUrl, plan } = options;
+  configureOrtWebGpu();
   await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(modelUrl, {
     executionProviders: ['webgpu'],

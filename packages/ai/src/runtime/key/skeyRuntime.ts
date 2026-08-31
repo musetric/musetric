@@ -1,5 +1,6 @@
-import * as ort from 'onnxruntime-web';
+import * as ort from 'onnxruntime-web/webgpu';
 import { skeyModel } from '../../models/skeyModel.js';
+import { configureOrtWebGpu } from '../ortWebGpu.js';
 
 ort.env.logLevel = 'error';
 
@@ -16,8 +17,9 @@ export const createSkeyRuntime = async (
   options: SkeyRuntimeOptions,
 ): Promise<SkeyRuntime> => {
   const { inputName, outputName } = skeyModel;
+  configureOrtWebGpu();
   const session = await ort.InferenceSession.create(options.modelPath, {
-    executionProviders: ['wasm'],
+    executionProviders: ['webgpu'],
     graphOptimizationLevel: 'all',
   });
 

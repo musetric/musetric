@@ -1,4 +1,5 @@
 export const beatThisModel = {
+  cacheDirName: 'beat-this-onnx',
   modelId: 'musetric/beat-this-onnx',
   revision: '45ba973e6c1fbee08a8a75b485e1c5adf45d2bc4',
   files: ['config.json', 'beat_this.onnx', 'mel-filterbank.bin'],

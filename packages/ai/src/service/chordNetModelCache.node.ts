@@ -10,8 +10,6 @@ import {
   type ModelDownloadMessage,
 } from './modelCache.node.js';
 
-export const chordNetCacheDirName = 'chordmini-onnx';
-
 export type ChordNetModelFiles = {
   modelPath: string;
   planPath: string;
@@ -30,7 +28,7 @@ export const ensureChordNetModelFiles = async (
   const onDownload = async (message: ModelDownloadMessage): Promise<void> => {
     await handlers.download(message);
   };
-  const cacheDir = join(modelsPath, chordNetCacheDirName);
+  const cacheDir = join(modelsPath, chordNetModel.cacheDirName);
   const paths = new Map<string, string>();
   for (const file of chordNetModel.files) {
     const path = await ensureCachedModelFile({

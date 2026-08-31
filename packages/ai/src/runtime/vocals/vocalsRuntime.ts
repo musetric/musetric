@@ -45,6 +45,7 @@ export const createVocalsGpuRuntime = async (
     externalData: [{ path: options.modelDataPath, data: options.modelDataUrl }],
     frameShader: vocalsFrameShader,
     overlapAddShader: vocalsOverlapAddShader,
+    normalizedPeak: 0.5,
     createCore: (buffers): StftInferenceCore => {
       const { device, wave, spectrum } = buffers;
       const stft = createStorageBuffer(device, modelBytes);

@@ -7,8 +7,6 @@ import {
   type ModelDownloadMessage,
 } from './modelCache.node.js';
 
-export const skeyCacheDirName = 'skey-onnx';
-
 type EnsureSkeyModelFilesOptions = {
   modelsPath: string;
   handlers: MessageHandlers<AnalyzeKeyMessage>;
@@ -21,7 +19,7 @@ export const ensureSkeyModelFiles = async (
   const onDownload = async (message: ModelDownloadMessage): Promise<void> => {
     await handlers.download(message);
   };
-  const cacheDir = join(modelsPath, skeyCacheDirName);
+  const cacheDir = join(modelsPath, skeyModel.cacheDirName);
 
   let modelPath = '';
   for (const file of skeyModel.files) {

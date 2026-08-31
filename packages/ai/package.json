@@ -6,6 +6,12 @@
   "sideEffects": false,
   "exports": {
     "./package.json": "./package.json",
+    "./dom": {
+      "monorepo": "./src/index.dom.ts",
+      "types": "./dist/index.dom.d.ts",
+      "import": "./dist/index.dom.js",
+      "default": "./dist/index.dom.js"
+    },
     "./node": {
       "monorepo": "./src/index.node.ts",
       "types": "./dist/index.node.d.ts",

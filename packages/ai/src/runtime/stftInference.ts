@@ -13,6 +13,7 @@ import {
   dispatch2d,
   type Dispatch2dOptions,
 } from './helpers.js';
+import { configureOrtWebGpu } from './ortWebGpu.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -28,6 +29,54 @@ const runStage = (encoder: GPUCommandEncoder, stage: StftStage): void => {
   const pass = encoder.beginComputePass();
   dispatch2d({ pass, ...stage });
   pass.end();
+};
+
+const baseMobileGpuCooldownMilliseconds =
+  globalThis.navigator.userAgent.includes('Android') ? 1_000 : 0;
+
+const getAndroidThermalStatus = (): number => {
+  const bridge = Reflect.get(globalThis, 'MusetricThermal');
+  if (typeof bridge !== 'object' || !bridge) {
+    return 0;
+  }
+  const getStatus = Reflect.get(bridge, 'status');
+  if (typeof getStatus !== 'function') {
+    return 0;
+  }
+  const status: unknown = Reflect.apply(getStatus, bridge, []);
+  return typeof status === 'number' ? status : 0;
+};
+
+const yieldGpuToCompositor = async (): Promise<void> => {
+  if (baseMobileGpuCooldownMilliseconds === 0) {
+    return;
+  }
+  const thermalStatus = getAndroidThermalStatus();
+  let cooldownMilliseconds = baseMobileGpuCooldownMilliseconds;
+  if (thermalStatus >= 3) {
+    cooldownMilliseconds = 15_000;
+  } else if (thermalStatus >= 2) {
+    cooldownMilliseconds = 8_000;
+  } else if (thermalStatus >= 1) {
+    cooldownMilliseconds = 3_000;
+  }
+  await new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, cooldownMilliseconds);
+  });
+};
+
+const getInputScale = (
+  input: Float32Array<ArrayBuffer>,
+  normalizedPeak: number | undefined,
+): number => {
+  if (normalizedPeak === undefined) {
+    return 1;
+  }
+  let peak = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    peak = Math.max(peak, Math.abs(input[index]));
+  }
+  return peak > 0 ? normalizedPeak / peak : 1;
 };
 
 export type StftInferenceRuntime = {
@@ -72,15 +121,26 @@ export type StftInferenceOptions = {
   externalData?: NonNullable<
     ort.InferenceSession.SessionOptions['externalData']
   >;
+  graphOptimizationLevel?: NonNullable<
+    ort.InferenceSession.SessionOptions['graphOptimizationLevel']
+  >;
   frameShader: string;
   overlapAddShader: string;
+  normalizedPeak?: number;
   createCore: (buffers: StftInferenceBuffers) => StftInferenceCore;
 };
 
 export const createStftInferenceRuntime = async (
   options: StftInferenceOptions,
 ): Promise<StftInferenceRuntime> => {
-  const { label, model, frameShader, overlapAddShader, createCore } = options;
+  const {
+    label,
+    model,
+    frameShader,
+    overlapAddShader,
+    normalizedPeak,
+    createCore,
+  } = options;
   const { nFft, hop, channels, chunkSamples, frames } = model;
   const pad = nFft / 2;
   const windowCount = channels * frames;
@@ -88,8 +148,9 @@ export const createStftInferenceRuntime = async (
   const chunkBytes = chunkFloats * Float32Array.BYTES_PER_ELEMENT;
   const spectrumBytes =
     windowCount * (nFft + 2) * Float32Array.BYTES_PER_ELEMENT;
-  await prepareMusetricWebGpu();
 
+  configureOrtWebGpu();
+  await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(options.modelUrl, {
     executionProviders: [
       {
@@ -97,7 +158,7 @@ export const createStftInferenceRuntime = async (
         storageBufferCacheMode: 'simple',
       },
     ],
-    graphOptimizationLevel: 'all',
+    graphOptimizationLevel: options.graphOptimizationLevel ?? 'all',
     preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
     ...(options.externalData ? { externalData: options.externalData } : {}),
   });
@@ -142,6 +203,7 @@ export const createStftInferenceRuntime = async (
   );
   const outputAudio = createStorageBuffer(device, chunkBytes);
   const readback = createReadbackBuffer(device, chunkBytes);
+  const scaledInput = new Float32Array(chunkFloats);
 
   const core = createCore({ device, wave, spectrum });
 
@@ -184,7 +246,16 @@ export const createStftInferenceRuntime = async (
     ) {
       throw new Error(`${label} chunk must contain ${chunkFloats} floats`);
     }
-    device.queue.writeBuffer(rawAudio, 0, input);
+    await yieldGpuToCompositor();
+    const scale = getInputScale(input, normalizedPeak);
+    if (scale === 1) {
+      device.queue.writeBuffer(rawAudio, 0, input);
+    } else {
+      for (let index = 0; index < chunkFloats; index += 1) {
+        scaledInput[index] = input[index] * scale;
+      }
+      device.queue.writeBuffer(rawAudio, 0, scaledInput);
+    }
 
     const stftEncoder = device.createCommandEncoder();
     runStage(stftEncoder, frameStage);
@@ -223,6 +294,12 @@ export const createStftInferenceRuntime = async (
     const audio = output ?? new Float32Array(mapped.length);
     audio.set(mapped);
     readback.unmap();
+    if (scale !== 1) {
+      for (let index = 0; index < audio.length; index += 1) {
+        audio[index] /= scale;
+      }
+    }
+    await yieldGpuToCompositor();
     return audio;
   };
 

@@ -1,6 +1,18 @@
 {
   "extends": "../../tsconfigs/tsconfig.test.json",
   "references": [{ "path": "./tsconfig.src.json" }],
+  "include": [
+    "${configDir}/src/**/__test__/**/*.ts",
+    "${configDir}/src/runtime/cpuFft.dom.ts",
+    "${configDir}/src/runtime/cpuStftInference.dom.ts"
+  ],
+  "exclude": [
+    "${configDir}/src/**/*.es.ts",
+    "${configDir}/src/**/*.cross.ts",
+    "${configDir}/src/**/*.node.ts",
+    "${configDir}/src/**/*.worker.ts",
+    "${configDir}/src/**/*.worklet.ts"
+  ],
   "compilerOptions": {
     "types": ["@webgpu/types"]
   }
