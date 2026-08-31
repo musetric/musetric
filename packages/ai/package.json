@@ -28,7 +28,7 @@
     "@musetric/ffmpeg": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "onnxruntime-web": "1.29.0-dev.20260724-ed98916356"
+    "onnxruntime-web": "1.29.0"
   },
   "devDependencies": {
     "@musetric/cqt": "workspace:*",

@@ -2020,7 +2020,7 @@ __metadata:
     "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
-    onnxruntime-web: 1.29.0-dev.20260724-ed98916356
+    onnxruntime-web: 1.29.0
   languageName: unknown
   linkType: soft
 
@@ -2111,7 +2111,7 @@ __metadata:
     fastify: 5.10.0
     fastify-sse-v2: 4.2.2
     fastify-type-provider-zod: 6.1.0
-    onnxruntime-web: 1.29.0-dev.20260724-ed98916356
+    onnxruntime-web: 1.29.0
     openapi-types: 12.1.3
     pino: 10.3.1
     pino-pretty: 13.1.3
@@ -8195,10 +8195,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"onnxruntime-common@npm:1.29.0-dev.20260723-1b1e1db7bc":
-  version: 1.29.0-dev.20260723-1b1e1db7bc
-  resolution: "onnxruntime-common@npm:1.29.0-dev.20260723-1b1e1db7bc"
-  checksum: 10c0/bde02b0d7ec5b565e75a29f9cc82d797194a66cdbd7544b2ae261e76e774558153e5b575ee3593a0ac0955bd7036167a5783c0edb6c21609a5abc8a0eb84f840
+"onnxruntime-common@npm:1.29.0":
+  version: 1.29.0
+  resolution: "onnxruntime-common@npm:1.29.0"
+  checksum: 10c0/cf87c1b2492f4a89e84649086195dd9a40b45fe026d69f88e30cbeb406402342996553f00be298c411bcda57bb2f3eb12c56b17c6a0cc1d643f1b92f18876578
   languageName: node
   linkType: hard
 
@@ -8214,17 +8214,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"onnxruntime-web@npm:1.29.0-dev.20260724-ed98916356":
-  version: 1.29.0-dev.20260724-ed98916356
-  resolution: "onnxruntime-web@npm:1.29.0-dev.20260724-ed98916356"
+"onnxruntime-web@npm:1.29.0":
+  version: 1.29.0
+  resolution: "onnxruntime-web@npm:1.29.0"
   dependencies:
     flatbuffers: "npm:^25.1.24"
     guid-typescript: "npm:^1.0.9"
     long: "npm:^5.2.3"
-    onnxruntime-common: "npm:1.29.0-dev.20260723-1b1e1db7bc"
+    onnxruntime-common: "npm:1.29.0"
     platform: "npm:^1.3.6"
     protobufjs: "npm:^7.2.4"
-  checksum: 10c0/737dbfdde6d11f0509d4307fe8f05218342b46c6c17c4f484e80d43e62746a61e59833e2e6164c5e42fcd83e2201adf200028808f816ab83bcb6a620f355b3be
+  checksum: 10c0/9eb0ccd13a1f622e9825e2cac07d022ec8dd98eaba7d2fc6115fc5ada66be09640c8f5232931719dba36856519cedabba653654bea051395784daef1340337dc
   languageName: node
   linkType: hard
 
