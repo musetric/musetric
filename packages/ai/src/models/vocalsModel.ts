@@ -16,6 +16,7 @@ export const vocalsModel = {
   },
   inputName: 'stft_repr',
   outputName: 'masks',
+  minStorageBuffersPerShaderStage: 9,
   inputShape: [1, packedBins, frames, 2] as const,
   outputShape: [1, packedBins, frames, 2] as const,
   sampleRate: 44100,

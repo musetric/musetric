@@ -13,6 +13,12 @@ import {
   dispatch2d,
   type Dispatch2dOptions,
 } from './helpers.js';
+import {
+  assertStorageBufferLimit,
+  defaultStorageBufferLimit,
+  getMusetricWebGpuDevice,
+  prepareMusetricWebGpu,
+} from './webgpuDevice.js';
 
 ort.env.logLevel = 'error';
 
@@ -40,6 +46,7 @@ export type StftInferenceModel = {
   frames: number;
   inputName: string;
   outputName: string;
+  minStorageBuffersPerShaderStage?: number;
   inputShape: readonly number[];
   outputShape: readonly number[];
 };
@@ -81,14 +88,27 @@ export const createStftInferenceRuntime = async (
   const chunkBytes = chunkFloats * Float32Array.BYTES_PER_ELEMENT;
   const spectrumBytes =
     windowCount * (nFft + 2) * Float32Array.BYTES_PER_ELEMENT;
+  await prepareMusetricWebGpu();
 
   const session = await ort.InferenceSession.create(options.modelUrl, {
-    executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
+    executionProviders: [
+      {
+        name: 'webgpu',
+        storageBufferCacheMode: 'simple',
+      },
+    ],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
     ...(options.externalData ? { externalData: options.externalData } : {}),
   });
-  const device = await ort.env.webgpu.device;
+  const webgpu = await getMusetricWebGpuDevice();
+  assertStorageBufferLimit({
+    actual: webgpu.maxStorageBuffersPerShaderStage,
+    required:
+      model.minStorageBuffersPerShaderStage ?? defaultStorageBufferLimit,
+    label,
+  });
+  const { device } = webgpu;
 
   const frameLayout = createBindGroupLayout(device, [
     'read-only-storage',
