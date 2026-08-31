@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@huggingface/transformers": "catalog:"
+    "@huggingface/transformers": "patch:@huggingface/transformers@npm%3A4.2.0#~/.yarn/patches/@huggingface-transformers-npm-4.2.0-0cfb11597b.patch"
   },
   "peerDependencies": {
     "@musetric/cqt": "workspace:*",

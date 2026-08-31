@@ -1,0 +1,49 @@
+diff --git a/src/backends/onnx.js b/src/backends/onnx.js
+index 13b1a748272d03aa062950ff585c1a2277ba96c9..72a0cbf3744578576b2c6e43caf5504fac678fbc 100644
+--- a/src/backends/onnx.js
++++ b/src/backends/onnx.js
+@@ -292,7 +292,13 @@ export async function createInferenceSession(buffer_or_path, session_options, se
+             logSeverityLevel,
+             ...session_options,
+         });
+-    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
++    // A failed WebGPU session must not poison all later session creations. A caller can
++    // deliberately retry a model with the WASM provider after a driver or validation
++    // failure, so recover the *previous* chain while preserving the failure for the
++    // session that originally caused it.
++    const session = await (apis.IS_WEB_ENV
++        ? (webInitChain = webInitChain.catch(() => undefined).then(load))
++        : load());
+     session.config = session_config;
+     return session;
+ }
+@@ -318,4 +324,7 @@ export async function runInferenceSession(session, ortFeed) {
+ export async function runInferenceSession(session, ortFeed) {
+     const run = () => session.run(ortFeed);
+-    return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
++    // A WebGPU inference failure must not prevent a later WASM fallback run.
++    return apis.IS_WEB_ENV
++        ? (webInferenceChain = webInferenceChain.catch(() => undefined).then(run))
++        : run();
+ }
+diff --git a/dist/transformers.web.js b/dist/transformers.web.js
+--- a/dist/transformers.web.js
++++ b/dist/transformers.web.js
+@@ -7762,4 +7762,7 @@ async function createInferenceSession(buffer_or_path, session_options, session_
+-  const session = await (apis.IS_WEB_ENV ? webInitChain = webInitChain.then(load) : load());
++  // A failed WebGPU session must not poison a later WASM fallback session.
++  const session = await (apis.IS_WEB_ENV
++    ? webInitChain = webInitChain.catch(() => undefined).then(load)
++    : load());
+   session.config = session_config;
+   return session;
+ }
+@@ -7766,4 +7769,7 @@ var webInferenceChain = Promise.resolve();
+ async function runInferenceSession(session, ortFeed) {
+   const run = () => session.run(ortFeed);
+-  return apis.IS_WEB_ENV ? webInferenceChain = webInferenceChain.then(run) : run();
++  // A failed WebGPU run must not poison a later WASM fallback run.
++  return apis.IS_WEB_ENV
++    ? webInferenceChain = webInferenceChain.catch(() => undefined).then(run)
++    : run();
+ }

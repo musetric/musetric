@@ -1140,6 +1140,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@huggingface/transformers@patch:@huggingface/transformers@npm%3A4.2.0#~/.yarn/patches/@huggingface-transformers-npm-4.2.0-0cfb11597b.patch":
+  version: 4.2.0
+  resolution: "@huggingface/transformers@patch:@huggingface/transformers@npm%3A4.2.0#~/.yarn/patches/@huggingface-transformers-npm-4.2.0-0cfb11597b.patch::version=4.2.0&hash=2cb5b7"
+  dependencies:
+    "@huggingface/jinja": "npm:^0.5.6"
+    "@huggingface/tokenizers": "npm:^0.1.3"
+    onnxruntime-node: "npm:1.24.3"
+    onnxruntime-web: "npm:1.26.0-dev.20260416-b7804b056c"
+    sharp: "npm:^0.34.5"
+  checksum: 10c0/69a485e0ccb699ebb9b13083fb84d795d2aa5b9ebab50a7ec962b8f85502752b9ee41b7012c74e39581f7bc7f92bc58397245d1422562aa83ace4e8332e92335
+  languageName: node
+  linkType: hard
+
 "@humanfs/core@npm:^0.19.1":
   version: 0.19.1
   resolution: "@humanfs/core@npm:0.19.1"
@@ -2001,7 +2014,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/ai@workspace:packages/ai"
   dependencies:
-    "@huggingface/transformers": "catalog:"
+    "@huggingface/transformers": "patch:@huggingface/transformers@npm%3A4.2.0#~/.yarn/patches/@huggingface-transformers-npm-4.2.0-0cfb11597b.patch"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
