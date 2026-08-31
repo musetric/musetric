@@ -55,6 +55,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: '0.1.0'
+        NSMicrophoneUsageDescription: Musetric uses the microphone to record a vocal take in your project.
         NSLocalNetworkUsageDescription: Musetric uses your local network to find and connect to Musetric running on your computer.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

@@ -14,4 +14,35 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
+axum = { version = "0.8", default-features = false, features = [
+  "http1",
+  "json",
+  "multipart",
+  "query",
+  "tokio",
+  "ws",
+] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+futures-util = { version = "0.3", default-features = false }
+hex = "0.4"
+rand = "0.9"
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "stream",
+  "http2",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
 tauri = { version = "=2.11.5", features = [] }
+tokio = { version = "1", features = [
+  "fs",
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "sync",
+  "time",
+] }
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["io"] }

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- AndroidTV support -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.musetric_mobile"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
         <activity
@@ -19,8 +29,30 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- AndroidTV support -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:label="@string/main_activity_title"
+            android:name=".GpuMainActivity"
+            android:process=":gpu"
+            android:taskAffinity="${applicationId}.main"
+            android:theme="@style/Theme.musetric_mobile.Starting"
+            android:exported="false" />
+
+        <provider
+            android:name=".GpuStartupProvider"
+            android:authorities="${applicationId}.gpu-androidx-startup"
+            android:process=":gpu"
+            android:exported="false" />
+
+        <service
+            android:name=".ProcessingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

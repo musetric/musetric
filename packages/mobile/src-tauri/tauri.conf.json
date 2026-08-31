@@ -20,6 +20,6 @@
     }
   },
   "bundle": {
-    "icon": ["gen-assets/icon.png"]
+    "icon": ["gen-assets/icon.png", "gen-assets/icon.ico"]
   }
 }
