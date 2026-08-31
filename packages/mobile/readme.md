@@ -4,18 +4,33 @@ The Musetric app for Android and iOS: a Tauri application that runs the
 Musetric frontend in a WebView. It opens on the Musetric logo and hands the
 screen to React as soon as the bundle loads.
 
+## Inference
+
+The mobile processing queue stores projects behind a token-protected loopback
+HTTP server. Browser workers run every production model on WebGPU; model assets
+are downloaded on demand from the same pinned, checksummed sources as desktop.
+There is intentionally no CPU, WASM, Core ML or native ONNX fallback. If an
+Android WebView renderer ends during separation, the isolated GPU renderer is
+recreated and processing resumes from persisted state without changing model
+runtime.
+
+The measured WebGPU limits and setup notes are in
+[`docs/androidWebgpu.md`](docs/androidWebgpu.md) and
+[`docs/iosWebgpu.md`](docs/iosWebgpu.md).
+
 ## Commands
 
-| Command              | What it does                                           |
-| -------------------- | ------------------------------------------------------ |
-| `yarn dev:mobile`    | Starts Vite for desktop-browser preview                |
-| `yarn build:mobile`  | Creates the WebView bundle                             |
-| `yarn init:android`  | Materializes `src-tauri/gen/android`                   |
-| `yarn dev:android`   | Runs a connected device against the development server |
-| `yarn build:android` | Builds the APK                                         |
-| `yarn init:ios`      | Materializes `src-tauri/gen/apple`                     |
-| `yarn dev:ios`       | Runs a connected device against the development server |
-| `yarn build:ios`     | Builds the app                                         |
+| Command                      | What it does                                           |
+| ---------------------------- | ------------------------------------------------------ |
+| `yarn dev:mobile`            | Starts Vite for desktop-browser preview                |
+| `yarn build:mobile`          | Creates the WebView bundle                             |
+| `yarn init:android`          | Materializes `src-tauri/gen/android`                   |
+| `yarn dev:android`           | Runs a connected device against the development server |
+| `yarn build:android`         | Builds the APK                                         |
+| `yarn init:ios`              | Materializes `src-tauri/gen/apple`                     |
+| `yarn dev:ios`               | Runs a connected device against the development server |
+| `yarn build:ios`             | Builds the app                                         |
+| `yarn check:ios-environment` | Verifies the macOS toolchain required for iOS          |
 
 ## Native projects
 
@@ -49,6 +64,12 @@ images under `gen/android`.
 Android builds need `ANDROID_HOME`, `NDK_HOME` and JDK 21 in `JAVA_HOME`.
 iOS builds need Xcode, the `aarch64-apple-ios` Rust target, XcodeGen and an
 Apple team id in `DEVELOPMENT_TEAM`.
+
+## Storage
+
+The app stores files under its platform data directory in `storage/db`,
+`storage/blobs` and `storage/models`. Large files use the loopback server,
+which binds to `127.0.0.1` and prefixes every path with a random token.
 
 On Windows, the Android NDK linker wrapper can exceed `cmd.exe`'s
 command-line limit. Point Cargo at `clang.exe` rather than the `.cmd`
