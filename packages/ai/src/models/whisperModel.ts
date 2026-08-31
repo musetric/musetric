@@ -1,6 +1,6 @@
 export const whisperModel = {
   modelId: 'musetric/whisper-large-v3-turbo-onnx',
-  revision: 'c94aa532da95fe1ed726cc33d8d89477e0b5b011',
+  revision: 'da27c0c3e917574b5541f71251abfd2c1aabb3a1',
   files: [
     'config.json',
     'generation_config.json',
@@ -37,7 +37,7 @@ export const whisperModel = {
     'normalizer.json':
       'bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd',
     'encoder_model_q4.onnx':
-      '41ad35ee01012d68837d142d74de34d3bb32dc040a61817de470011219b1b1eb',
+      'd27943f0f3ee4fdfc33241a64d68fffd40ce0f2344ee21f73d37abac9ebd1a43',
     'decoder_model_merged_fp16.onnx':
       '6497641a50badd9fd90f58907fe74ad43048a874b8288e2039f26ce01a15ef3e',
   },
