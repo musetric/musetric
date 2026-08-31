@@ -14,6 +14,12 @@ import {
   createStorageBuffer,
   dispatch1d,
 } from '../helpers.js';
+import {
+  assertStorageBufferLimit,
+  defaultStorageBufferLimit,
+  getMusetricWebGpuDevice,
+  prepareMusetricWebGpu,
+} from '../webgpuDevice.js';
 import { chordPadFeaturesShader } from './padFeatures.wgsl.js';
 import { chordSmoothArgmaxShader } from './smoothArgmax.wgsl.js';
 
@@ -161,12 +167,19 @@ export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
   const { modelUrl, plan } = options;
+  await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(modelUrl, {
     executionProviders: ['webgpu'],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [chordNetModel.outputName]: 'gpu-buffer' },
   });
-  const device = await ort.env.webgpu.device;
+  const webgpu = await getMusetricWebGpuDevice();
+  assertStorageBufferLimit({
+    actual: webgpu.maxStorageBuffersPerShaderStage,
+    required: defaultStorageBufferLimit,
+    label: 'ChordNet',
+  });
+  const { device } = webgpu;
   const cqtCell = createCqt(device);
   let state: ChordNetGpuState | undefined = undefined;
 

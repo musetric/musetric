@@ -3,6 +3,12 @@ import * as ort from 'onnxruntime-web/webgpu';
 import { beatThisModel } from '../../models/beatThisModel.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
 import {
+  assertStorageBufferLimit,
+  defaultStorageBufferLimit,
+  getMusetricWebGpuDevice,
+  prepareMusetricWebGpu,
+} from '../webgpuDevice.js';
+import {
   type BeatThisGpuState,
   createBeatThisGpuState,
   destroyBeatThisGpuState,
@@ -83,6 +89,7 @@ export type BeatThisGpuRuntimeOptions = {
 export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
+  await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(options.modelUrl, {
     executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
     graphOptimizationLevel: 'all',
@@ -91,7 +98,13 @@ export const createBeatThisGpuRuntime = async (
       [beatThisModel.downbeatOutputName]: 'gpu-buffer',
     },
   });
-  const device = await ort.env.webgpu.device;
+  const webgpu = await getMusetricWebGpuDevice();
+  assertStorageBufferLimit({
+    actual: webgpu.maxStorageBuffersPerShaderStage,
+    required: defaultStorageBufferLimit,
+    label: 'Beat This',
+  });
+  const { device } = webgpu;
   const fftCell = createFftPackedStockhamR2c(device);
   const filterbank = createStorageBuffer(
     device,
