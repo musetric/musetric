@@ -2,6 +2,12 @@ import { api } from '@musetric/api';
 import { requestWithAxios } from '@musetric/api/dom';
 import { type StemType } from '@musetric/audio/es';
 import axios from 'axios';
+import { getWorkerBackendUrlHash } from '../common/workerBackendUrl.cross.js';
+
+const backendUrl = getWorkerBackendUrlHash();
+if (backendUrl) {
+  axios.defaults.baseURL = backendUrl;
+}
 
 export const getDeliveryAudioContent = async (
   projectId: number,

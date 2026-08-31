@@ -18,6 +18,17 @@ const fitChannelToFrameCount = (
   return fitted;
 };
 
+const decodeDeliveryAudio = async (
+  content: Uint8Array<ArrayBuffer>,
+  sampleRate: number,
+) => {
+  try {
+    return await decodeMp4(content.buffer, sampleRate);
+  } catch {
+    return await decodeWav(content.buffer, sampleRate);
+  }
+};
+
 export type CreateAudioDecodeOptions = {
   playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
   spectrogramPort: ReturnType<
@@ -46,14 +57,14 @@ export const createAudioDecode = (
     mount: async (message) => {
       const { projectId, sampleRate } = message;
       const [lead, backing, instrumental, recording] = await Promise.all([
-        getDeliveryAudioContent(projectId, 'lead').then(async (content) =>
-          decodeMp4(content.buffer, sampleRate),
+        getDeliveryAudioContent(projectId, 'lead').then(
+          async (content) => await decodeDeliveryAudio(content, sampleRate),
         ),
-        getDeliveryAudioContent(projectId, 'backing').then(async (content) =>
-          decodeMp4(content.buffer, sampleRate),
+        getDeliveryAudioContent(projectId, 'backing').then(
+          async (content) => await decodeDeliveryAudio(content, sampleRate),
         ),
         getDeliveryAudioContent(projectId, 'instrumental').then(
-          async (content) => decodeMp4(content.buffer, sampleRate),
+          async (content) => await decodeDeliveryAudio(content, sampleRate),
         ),
         getRecordingAudioContent(projectId).then(async (content) =>
           decodeWav(content.buffer, sampleRate),

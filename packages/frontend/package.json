@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
+  "exports": {
+    ".": {
+      "monorepo": "./src/index.tsx",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "vite --configLoader native",
     "build:project": "vite build --configLoader native && cpx \"dist/**/*\" ../backend/storage/public --clean",

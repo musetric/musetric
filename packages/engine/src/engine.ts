@@ -18,6 +18,14 @@ import {
 import { type EngineState } from './state.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
+const getEngineBackendUrl = (): string | undefined => {
+  const backendUrl: unknown = Reflect.get(
+    globalThis,
+    'musetricEngineBackendUrl',
+  );
+  return typeof backendUrl === 'string' ? backendUrl : undefined;
+};
+
 const initialState: EngineState = {
   statuses: {
     decoder: 'pending',
@@ -83,6 +91,7 @@ export type Engine = {
 };
 
 export const createEngine = (): Engine => {
+  const backendUrl = getEngineBackendUrl();
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
@@ -108,8 +117,9 @@ export const createEngine = (): Engine => {
       decoderPort: spectrogramChannel.port2,
       playheadPort: spectrogramPlayheadChannel.port2,
     }),
-    waveform: createEngineWaveform(store),
+    waveform: createEngineWaveform(store, backendUrl),
     decoder: createEngineDecoder({
+      backendUrl,
       store,
       sampleRate: context.sampleRate,
       playerPort: playerChannel.port1,

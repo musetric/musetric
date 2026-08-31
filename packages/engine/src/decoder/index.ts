@@ -4,6 +4,7 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
+import { setWorkerBackendUrlHash } from '../common/workerBackendUrl.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel } from './protocol.cross.js';
@@ -38,6 +39,7 @@ export type EngineDecoder = {
 };
 
 export type CreateEngineDecoderOptions = {
+  backendUrl?: string;
   store: Store<EngineState>;
   sampleRate: number;
   playerPort: MessagePort;
@@ -85,7 +87,11 @@ export const createEngineDecoder = (
     onPlayerRevisionChanged,
     onPlayerSyncState,
   } = options;
-  const worker = new Worker(decoderWorkerUrl, { type: 'module' });
+  const workerUrl = new URL(decoderWorkerUrl, self.location.href);
+  if (options.backendUrl) {
+    setWorkerBackendUrlHash(workerUrl, options.backendUrl);
+  }
+  const worker = new Worker(workerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let mountPromise: ControlledPromise<void> | undefined = undefined;

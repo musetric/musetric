@@ -1,8 +1,19 @@
 import { api } from '@musetric/api';
+import { getWorkerBackendUrlHash } from '../common/workerBackendUrl.cross.js';
+
+const stripTrailingSlashes = (value: string): string => {
+  let endIndex = value.length;
+  while (endIndex > 0 && value[endIndex - 1] === '/') {
+    endIndex -= 1;
+  }
+  return value.slice(0, endIndex);
+};
 
 const createWebSocketUrl = (projectId: number) => {
+  const endpoint = api.project.realtime.base.endpoint({ projectId });
+  const backendUrl = getWorkerBackendUrlHash();
   const url = new URL(
-    api.project.realtime.base.endpoint({ projectId }),
+    backendUrl ? `${stripTrailingSlashes(backendUrl)}${endpoint}` : endpoint,
     self.location.href,
   );
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';

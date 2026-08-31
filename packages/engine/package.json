@@ -11,6 +11,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./mobile": {
+      "monorepo": "./src/mobile.ts",
+      "types": "./dist/mobile.d.ts",
+      "import": "./dist/mobile.js",
+      "default": "./dist/mobile.js"
     }
   },
   "scripts": {

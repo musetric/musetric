@@ -28,6 +28,11 @@ export const subscribeToStatus = (queryClient: QueryClient) =>
 
     queryClient.setQueryData(list().queryKey, (projects) => {
       if (!projects) {
+        void queryClient.invalidateQueries({ queryKey: list().queryKey });
+        return projects;
+      }
+      if (!projects.some((projectItem) => projectItem.id === event.projectId)) {
+        void queryClient.invalidateQueries({ queryKey: list().queryKey });
         return projects;
       }
       return projects.map((projectItem) =>

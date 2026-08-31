@@ -24,9 +24,13 @@ export const ProjectsPage: FC = () => {
       width='100%'
       height='100dvh'
       overflow='auto'
-      sx={{
+      sx={(theme) => ({
         scrollbarGutter: 'stable',
-      }}
+        paddingTop: `calc(${theme.spacing(4)} + env(safe-area-inset-top, 0px))`,
+        paddingBottom: `calc(${theme.spacing(4)} + env(safe-area-inset-bottom, 0px))`,
+        paddingLeft: `calc(${theme.spacing(4)} + env(safe-area-inset-left, 0px))`,
+        paddingRight: `calc(${theme.spacing(4)} + env(safe-area-inset-right, 0px))`,
+      })}
     >
       <ProjectsTitle />
       <ProjectsContent />

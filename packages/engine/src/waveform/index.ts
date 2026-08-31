@@ -10,6 +10,7 @@ import {
   subscribeResizeObserver,
 } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
+import { setWorkerBackendUrlHash } from '../common/workerBackendUrl.cross.js';
 import { type EngineState } from '../state.js';
 import { waveformChannel } from './protocol.cross.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
@@ -41,8 +42,13 @@ export type EngineWaveform = {
 
 export const createEngineWaveform = (
   store: Store<EngineState>,
+  backendUrl?: string,
 ): EngineWaveform => {
-  const worker = new Worker(waveformWorkerUrl, { type: 'module' });
+  const workerUrl = new URL(waveformWorkerUrl, self.location.href);
+  if (backendUrl) {
+    setWorkerBackendUrlHash(workerUrl, backendUrl);
+  }
+  const worker = new Worker(workerUrl, { type: 'module' });
   const port = waveformChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
 
