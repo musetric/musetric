@@ -43,7 +43,7 @@
     "@fastify/static": "10.1.2",
     "adm-zip": "0.6.0",
     "filelist": "2.0.2",
-    "onnxruntime-web": "1.29.0-dev.20260724-ed98916356",
+    "onnxruntime-web": "1.29.0",
     "sharp": "0.35.3",
     "tar": "7.5.21"
   }
