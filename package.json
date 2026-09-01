@@ -37,6 +37,8 @@
     "check:ts": "yarn workspaces foreach --all --parallel --interlaced run check:ts",
     "check:lint": "yarn workspaces foreach --all --parallel --interlaced run check:lint",
     "fix:lint": "yarn workspaces foreach --all --parallel --interlaced run fix:lint",
+    "check:rust": "yarn workspaces foreach --all --parallel --interlaced run check:rust",
+    "fix:rust": "yarn workspaces foreach --all --parallel --interlaced run fix:rust",
     "test": "yarn workspaces foreach --all --parallel --interlaced run test"
   },
   "devDependencies": {

@@ -30,6 +30,14 @@ jobs:
           key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
           restore-keys: |
             eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/server/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
       - run: yarn check:deps:security
       - run: yarn check:deps:dupe
       - run: yarn check:dupe
@@ -40,4 +48,5 @@ jobs:
       - run: yarn check:openapi
       - run: yarn check:ts
       - run: yarn check:lint
+      - run: yarn check:rust
       - run: yarn test

@@ -2491,6 +2491,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/server@workspace:packages/server":
+  version: 0.0.0-use.local
+  resolution: "@musetric/server@workspace:packages/server"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/spa-router@workspace:*, @musetric/spa-router@workspace:packages/spa-router":
   version: 0.0.0-use.local
   resolution: "@musetric/spa-router@workspace:packages/spa-router"
