@@ -27,11 +27,11 @@
   },
   "scripts": {
     "build:project": "tsc --build",
+    "check:openapi": "node --import tsx ./scripts/openapi.ts --check",
+    "fix:openapi": "node --import tsx ./scripts/openapi.ts",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "check:openapi": "node --import tsx ./scripts/openapi.ts --check",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "fix:openapi": "node --import tsx ./scripts/openapi.ts"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
     "axios": "1.18.1",
