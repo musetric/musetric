@@ -1,0 +1,42 @@
+{
+  "name": "@musetric/mobile",
+  "productName": "Musetric",
+  "version": "0.1.0",
+  "description": "Musetric — audio separation, transcription and analysis mobile app",
+  "author": "Musetric <musetric@gmail.com>",
+  "license": "MIT",
+  "repository": "github:musetric/musetric",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:mobile": "vite --configLoader native",
+    "build:mobile": "yarn build:icons && vite build --configLoader native",
+    "build:icons": "node ./scripts/buildIcons.ts && tauri icon -o src-tauri/gen-assets src-tauri/gen/icon.json",
+    "init:android": "node ./scripts/initNative.ts android",
+    "init:ios": "node ./scripts/initNative.ts ios",
+    "dev:android": "yarn init:android && tauri android dev",
+    "build:android": "yarn init:android && tauri android build --apk",
+    "dev:ios": "yarn init:ios && tauri ios dev",
+    "build:ios": "yarn init:ios && tauri ios build",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+  },
+  "devDependencies": {
+    "@musetric/eslint-config": "workspace:*",
+    "@resvg/resvg-js": "catalog:",
+    "@tauri-apps/cli": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@typescript/native": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "dependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

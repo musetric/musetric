@@ -1,0 +1,17 @@
+[package]
+name = "musetric-mobile"
+version = "0.1.0"
+description = "Musetric — audio separation, transcription and analysis mobile app"
+authors = ["Musetric <musetric@gmail.com>"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "musetric_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.5", features = [] }

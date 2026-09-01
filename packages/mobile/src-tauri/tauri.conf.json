@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Musetric",
+  "version": "0.1.0",
+  "identifier": "com.musetric.mobile",
+  "build": {
+    "beforeDevCommand": "yarn build:icons && yarn dev:mobile",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "yarn build:mobile",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Musetric"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "icon": ["gen-assets/icon.png"]
+  }
+}

@@ -11,7 +11,7 @@ const icon = new Resvg(svg, { fitTo: { mode: 'width', value: 1024 } })
   .render()
   .asPng();
 
-const assetsDir = join(packageDir, 'assets');
+const assetsDir = join(packageDir, 'gen-assets');
 await mkdir(assetsDir, { recursive: true });
 await writeFile(join(assetsDir, 'icon.png'), Buffer.from(icon));
 
