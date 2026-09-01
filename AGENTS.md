@@ -24,6 +24,7 @@
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
+- `packages/server`: the Rust backend, a self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Ground Rules
 
@@ -90,3 +91,4 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:lint`: lint checks with automatic fixes.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
+- `yarn check:rust`: Rust formatting, Clippy, and tests, when `crates` was touched.

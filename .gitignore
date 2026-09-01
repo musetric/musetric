@@ -6,6 +6,7 @@ gen-assets/
 *.tgz
 tmp/
 **/backend/storage/
+packages/server/target/
 packages/mobile/src-tauri/target/
 packages/mobile/src-tauri/gen/
 packages/ffmpeg/resources/
