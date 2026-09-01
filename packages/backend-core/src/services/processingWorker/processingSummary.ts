@@ -63,6 +63,7 @@ export type ProcessingWorkerErrorEvent = {
   type: 'error';
   projectId: number;
   step: ProcessingStepKind;
+  error: string;
 };
 
 export type ProcessingWorkerEvent =
@@ -91,7 +92,13 @@ export const resolveProcessingEvent = (
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (event.type === 'error') {
-    return { done: false, steps: buildSteps(event.step, pendingStep) };
+    return {
+      done: false,
+      steps: buildSteps(event.step, {
+        status: 'failed',
+        error: event.error,
+      }),
+    };
   }
 
   return assertNever(event, 'Unhandled processing worker event');
@@ -106,51 +113,37 @@ export const resolveProcessing = async (
     return resolveProcessingEvent(active);
   }
 
-  const [subtitle, rhythm, key, chords, lead] = await Promise.all([
+  const [subtitle, rhythm, key, chords, lead, errors] = await Promise.all([
     app.db.subtitle.getByProject(projectId),
     app.db.rhythm.getByProject(projectId),
     app.db.key.getByProject(projectId),
     app.db.chords.getByProject(projectId),
     app.db.audioMaster.get(projectId, 'lead'),
+    app.db.processing.getErrorsByProject(projectId),
   ]);
 
-  const stepFor = (present: unknown): api.project.ProcessingStep =>
-    present ? doneStep : pendingStep;
-
-  if (subtitle && rhythm && key && chords) {
-    return {
-      done: true,
-      steps: {
-        separation: doneStep,
-        transcription: doneStep,
-        rhythm: doneStep,
-        key: doneStep,
-        chords: doneStep,
-      },
-    };
-  }
-
-  if (lead) {
-    return {
-      done: false,
-      steps: {
-        separation: doneStep,
-        transcription: stepFor(subtitle),
-        rhythm: stepFor(rhythm),
-        key: stepFor(key),
-        chords: stepFor(chords),
-      },
-    };
-  }
+  const errorsByStep = new Map(
+    errors.map((error) => [error.step, error.message]),
+  );
+  const stepFor = (
+    step: ProcessingStepKind,
+    present: unknown,
+  ): api.project.ProcessingStep => {
+    const error = errorsByStep.get(step);
+    if (error !== undefined) {
+      return { status: 'failed', error };
+    }
+    return present ? doneStep : pendingStep;
+  };
 
   return {
-    done: false,
+    done: errors.length === 0 && !!subtitle && !!rhythm && !!key && !!chords,
     steps: {
-      separation: pendingStep,
-      transcription: pendingStep,
-      rhythm: pendingStep,
-      key: pendingStep,
-      chords: pendingStep,
+      separation: stepFor('separation', lead),
+      transcription: stepFor('transcription', subtitle),
+      rhythm: stepFor('rhythm', rhythm),
+      key: stepFor('key', key),
+      chords: stepFor('chords', chords),
     },
   };
 };

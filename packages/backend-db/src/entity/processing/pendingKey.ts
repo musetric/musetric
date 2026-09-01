@@ -8,6 +8,11 @@ export const pendingKey = (database: DatabaseSync) => {
      LEFT JOIN Key
        ON Key.projectId = Instrumental.projectId
      WHERE Instrumental.type = 'instrumental' AND Key.id IS NULL
+       AND NOT EXISTS (
+        SELECT 1 FROM ProcessingError
+        WHERE ProcessingError.projectId = Instrumental.projectId
+          AND ProcessingError.step = 'key'
+       )
      `,
   );
 

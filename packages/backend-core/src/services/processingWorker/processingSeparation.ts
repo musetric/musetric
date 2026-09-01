@@ -22,7 +22,7 @@ export const createSeparationWorker = (
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
 ): SeparationWorker =>
-  createAnalysisWorker<SeparationTask>(emitter, logger, {
+  createAnalysisWorker<SeparationTask>(emitter, logger, app.db.processing, {
     step: 'separation',
     errorMessage: 'Separation failed',
     process: async (task, handlers) => {

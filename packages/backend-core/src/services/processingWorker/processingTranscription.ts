@@ -16,7 +16,7 @@ export const createTranscriptionWorker = (
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
 ): TranscriptionWorker =>
-  createAnalysisWorker<TranscriptionTask>(emitter, logger, {
+  createAnalysisWorker<TranscriptionTask>(emitter, logger, app.db.processing, {
     step: 'transcription',
     errorMessage: 'Transcription failed',
     process: async (task, handlers) => {

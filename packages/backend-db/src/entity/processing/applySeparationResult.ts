@@ -5,6 +5,7 @@ import {
   runProjectAudioAnalysisUpsert,
   upsertProjectAudioAnalysisSql,
 } from '../projectAudioAnalysis/statement.js';
+import { clearError } from './clearError.js';
 
 export type ApplySeparationResultArg = {
   projectId: number;
@@ -27,6 +28,7 @@ export type ApplySeparationResultArg = {
 };
 
 export const applySeparationResult = (database: DatabaseSync) => {
+  const clearProcessingError = clearError(database);
   const upsertAudioMasterStatement = database.prepare(
     `INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?, ?, ?)
      ON CONFLICT(projectId, type) DO UPDATE SET blobId = excluded.blobId`,
@@ -101,5 +103,10 @@ export const applySeparationResult = (database: DatabaseSync) => {
           arg.wavePeaks.backingId,
         ),
       );
+
+      await clearProcessingError({
+        projectId: arg.projectId,
+        step: 'separation',
+      });
     });
 };

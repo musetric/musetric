@@ -10,6 +10,23 @@ export namespace project {
   });
 }
 
+export namespace processingError {
+  const stepSchema = z.enum([
+    'separation',
+    'transcription',
+    'rhythm',
+    'key',
+    'chords',
+  ]);
+
+  export const itemSchema = z.object({
+    projectId: numericIdSchema,
+    step: stepSchema,
+    message: z.string(),
+  });
+  export type Item = z.infer<typeof itemSchema>;
+}
+
 export namespace projectAudioAnalysis {
   export const itemSchema = z.object({
     projectId: numericIdSchema,

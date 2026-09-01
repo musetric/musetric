@@ -16,7 +16,7 @@ export const createChordsWorker = (
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
 ): ChordsWorker =>
-  createAnalysisWorker<ChordsTask>(emitter, logger, {
+  createAnalysisWorker<ChordsTask>(emitter, logger, app.db.processing, {
     step: 'chords',
     errorMessage: 'Chord detection failed',
     process: async (task, handlers) => {

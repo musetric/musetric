@@ -1,5 +1,6 @@
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { Chip, type ChipProps } from '@mui/material';
 import { type api } from '@musetric/api';
@@ -12,6 +13,7 @@ const getStatusTranslations = (
 ): Record<api.project.ProcessingStepStatus, string> => ({
   pending: t('pages.project.progress.status.pending'),
   processing: t('pages.project.progress.status.processing'),
+  failed: t('pages.project.progress.status.failed'),
   done: t('pages.project.progress.status.done'),
 });
 
@@ -21,12 +23,14 @@ const statusChipColor: Record<
 > = {
   pending: 'default',
   processing: 'primary',
+  failed: 'error',
   done: 'success',
 };
 
 const statusIcon: Record<api.project.ProcessingStepStatus, JSX.Element> = {
   pending: <ScheduleIcon fontSize='small' />,
   processing: <AutorenewIcon fontSize='small' />,
+  failed: <ErrorOutlineIcon fontSize='small' />,
   done: <CheckCircleIcon fontSize='small' />,
 };
 
