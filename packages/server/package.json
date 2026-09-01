@@ -3,11 +3,30 @@
   "version": "0.1.0",
   "license": "MIT",
   "private": true,
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "monorepo": "./src/rustProxy.ts",
+      "types": "./dist/rustProxy.d.ts",
+      "import": "./dist/rustProxy.js",
+      "default": "./dist/rustProxy.js"
+    }
+  },
   "scripts": {
+    "build:project": "tsc --build",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
     "check:rust": "ast-grep scan . && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
     "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
   },
   "devDependencies": {
-    "@ast-grep/cli": "catalog:"
+    "@ast-grep/cli": "catalog:",
+    "@musetric/eslint-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
   }
 }
