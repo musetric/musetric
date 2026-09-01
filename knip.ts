@@ -17,6 +17,9 @@ const config: KnipConfig = {
     'packages/ai': {
       entry: ['src/service/browserEntry.ts'],
     },
+    'packages/api': {
+      entry: ['scripts/**/*.ts'],
+    },
     'packages/backend': {
       entry: ['scripts/**/*.ts'],
     },

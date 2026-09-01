@@ -1,0 +1,2388 @@
+{
+  "components": {
+    "schemas": {
+      "ProjectStatusEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "processing": {
+            "additionalProperties": false,
+            "properties": {
+              "done": { "type": "boolean" },
+              "steps": {
+                "additionalProperties": false,
+                "properties": {
+                  "chords": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "download": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "downloaded": { "type": "number" },
+                          "file": { "type": "string" },
+                          "label": { "type": "string" },
+                          "status": {
+                            "enum": ["processing", "cached", "done"],
+                            "type": "string"
+                          },
+                          "total": { "type": "number" }
+                        },
+                        "required": ["label", "downloaded"],
+                        "type": "object"
+                      },
+                      "error": { "type": "string" },
+                      "message": { "type": "string" },
+                      "progress": { "type": "number" },
+                      "status": {
+                        "enum": ["pending", "processing", "failed", "done"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "type": "object"
+                  },
+                  "key": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "download": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "downloaded": { "type": "number" },
+                          "file": { "type": "string" },
+                          "label": { "type": "string" },
+                          "status": {
+                            "enum": ["processing", "cached", "done"],
+                            "type": "string"
+                          },
+                          "total": { "type": "number" }
+                        },
+                        "required": ["label", "downloaded"],
+                        "type": "object"
+                      },
+                      "error": { "type": "string" },
+                      "message": { "type": "string" },
+                      "progress": { "type": "number" },
+                      "status": {
+                        "enum": ["pending", "processing", "failed", "done"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "type": "object"
+                  },
+                  "rhythm": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "download": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "downloaded": { "type": "number" },
+                          "file": { "type": "string" },
+                          "label": { "type": "string" },
+                          "status": {
+                            "enum": ["processing", "cached", "done"],
+                            "type": "string"
+                          },
+                          "total": { "type": "number" }
+                        },
+                        "required": ["label", "downloaded"],
+                        "type": "object"
+                      },
+                      "error": { "type": "string" },
+                      "message": { "type": "string" },
+                      "progress": { "type": "number" },
+                      "status": {
+                        "enum": ["pending", "processing", "failed", "done"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "type": "object"
+                  },
+                  "separation": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "download": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "downloaded": { "type": "number" },
+                          "file": { "type": "string" },
+                          "label": { "type": "string" },
+                          "status": {
+                            "enum": ["processing", "cached", "done"],
+                            "type": "string"
+                          },
+                          "total": { "type": "number" }
+                        },
+                        "required": ["label", "downloaded"],
+                        "type": "object"
+                      },
+                      "error": { "type": "string" },
+                      "message": { "type": "string" },
+                      "progress": { "type": "number" },
+                      "status": {
+                        "enum": ["pending", "processing", "failed", "done"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "type": "object"
+                  },
+                  "transcription": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "download": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "downloaded": { "type": "number" },
+                          "file": { "type": "string" },
+                          "label": { "type": "string" },
+                          "status": {
+                            "enum": ["processing", "cached", "done"],
+                            "type": "string"
+                          },
+                          "total": { "type": "number" }
+                        },
+                        "required": ["label", "downloaded"],
+                        "type": "object"
+                      },
+                      "error": { "type": "string" },
+                      "message": { "type": "string" },
+                      "progress": { "type": "number" },
+                      "status": {
+                        "enum": ["pending", "processing", "failed", "done"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "separation",
+                  "transcription",
+                  "rhythm",
+                  "key",
+                  "chords"
+                ],
+                "type": "object"
+              }
+            },
+            "required": ["steps"],
+            "type": "object"
+          },
+          "projectId": { "type": "number" }
+        },
+        "required": ["projectId", "processing"],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "API documentation for Musetric",
+    "title": "Musetric API",
+    "version": "contract"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/audio/project/{projectId}/delivery/{stemType}/content": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          },
+          {
+            "in": "path",
+            "name": "stemType",
+            "required": true,
+            "schema": {
+              "enum": ["lead", "backing", "instrumental"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/audio/project/{projectId}/delivery/{stemType}/wave": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          },
+          {
+            "in": "path",
+            "name": "stemType",
+            "required": true,
+            "schema": {
+              "enum": ["lead", "backing", "instrumental"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/audio/project/{projectId}/master/{type}/content": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          },
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "enum": ["source", "lead", "backing", "instrumental"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/audio/project/{projectId}/recording/content": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/audio/project/{projectId}/recording/wave": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/chords/project/{projectId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "segments": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "end": { "type": "number" },
+                          "label": { "type": "string" },
+                          "quality": { "type": "string" },
+                          "root": { "type": "string" },
+                          "start": { "type": "number" }
+                        },
+                        "required": ["start", "end", "label", "root"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["segments"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/key/project/{projectId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "confidence": { "type": "number" },
+                    "mode": { "enum": ["major", "minor"], "type": "string" },
+                    "root": { "type": "string" }
+                  },
+                  "required": ["root", "mode", "confidence"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/preview/{previewId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "previewId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/{projectId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "audioAnalysis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "leadSpectrogramGainDb": { "type": "number" },
+                        "practiceGainsDb": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "backing": { "type": "number" },
+                            "instrumental": { "type": "number" },
+                            "lead": { "type": "number" }
+                          },
+                          "required": ["lead", "backing", "instrumental"],
+                          "type": "object"
+                        },
+                        "sourceGainDb": { "type": "number" }
+                      },
+                      "required": [
+                        "sourceGainDb",
+                        "leadSpectrogramGainDb",
+                        "practiceGainsDb"
+                      ],
+                      "type": "object"
+                    },
+                    "frameCount": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "id": { "type": "number" },
+                    "name": { "minLength": 3, "type": "string" },
+                    "previewUrl": { "type": "string" },
+                    "processing": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "done": { "type": "boolean" },
+                        "steps": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "chords": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "key": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "rhythm": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "separation": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "transcription": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "separation",
+                            "transcription",
+                            "rhythm",
+                            "key",
+                            "chords"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["steps"],
+                      "type": "object"
+                    },
+                    "sampleRate": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sampleRate",
+                    "frameCount",
+                    "processing"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/{projectId}/edit": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "name": { "minLength": 3, "type": "string" },
+                  "preview": { "format": "binary", "type": "string" },
+                  "withoutPreview": { "type": "boolean" }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "audioAnalysis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "leadSpectrogramGainDb": { "type": "number" },
+                        "practiceGainsDb": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "backing": { "type": "number" },
+                            "instrumental": { "type": "number" },
+                            "lead": { "type": "number" }
+                          },
+                          "required": ["lead", "backing", "instrumental"],
+                          "type": "object"
+                        },
+                        "sourceGainDb": { "type": "number" }
+                      },
+                      "required": [
+                        "sourceGainDb",
+                        "leadSpectrogramGainDb",
+                        "practiceGainsDb"
+                      ],
+                      "type": "object"
+                    },
+                    "frameCount": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "id": { "type": "number" },
+                    "name": { "minLength": 3, "type": "string" },
+                    "previewUrl": { "type": "string" },
+                    "processing": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "done": { "type": "boolean" },
+                        "steps": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "chords": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "key": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "rhythm": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "separation": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "transcription": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "separation",
+                            "transcription",
+                            "rhythm",
+                            "key",
+                            "chords"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["steps"],
+                      "type": "object"
+                    },
+                    "sampleRate": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sampleRate",
+                    "frameCount",
+                    "processing"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/{projectId}/realtime": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "enum": [null], "nullable": true, "type": "string" }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/{projectId}/remove": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "enum": [null], "nullable": true, "type": "string" }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/{projectId}/retry": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "step": {
+                    "enum": [
+                      "separation",
+                      "transcription",
+                      "rhythm",
+                      "key",
+                      "chords"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": ["step"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "audioAnalysis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "leadSpectrogramGainDb": { "type": "number" },
+                        "practiceGainsDb": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "backing": { "type": "number" },
+                            "instrumental": { "type": "number" },
+                            "lead": { "type": "number" }
+                          },
+                          "required": ["lead", "backing", "instrumental"],
+                          "type": "object"
+                        },
+                        "sourceGainDb": { "type": "number" }
+                      },
+                      "required": [
+                        "sourceGainDb",
+                        "leadSpectrogramGainDb",
+                        "practiceGainsDb"
+                      ],
+                      "type": "object"
+                    },
+                    "frameCount": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "id": { "type": "number" },
+                    "name": { "minLength": 3, "type": "string" },
+                    "previewUrl": { "type": "string" },
+                    "processing": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "done": { "type": "boolean" },
+                        "steps": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "chords": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "key": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "rhythm": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "separation": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "transcription": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "separation",
+                            "transcription",
+                            "rhythm",
+                            "key",
+                            "chords"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["steps"],
+                      "type": "object"
+                    },
+                    "sampleRate": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sampleRate",
+                    "frameCount",
+                    "processing"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/create": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "name": { "minLength": 3, "type": "string" },
+                  "preview": { "format": "binary", "type": "string" },
+                  "song": { "format": "binary", "type": "string" }
+                },
+                "required": ["song", "name"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "audioAnalysis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "leadSpectrogramGainDb": { "type": "number" },
+                        "practiceGainsDb": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "backing": { "type": "number" },
+                            "instrumental": { "type": "number" },
+                            "lead": { "type": "number" }
+                          },
+                          "required": ["lead", "backing", "instrumental"],
+                          "type": "object"
+                        },
+                        "sourceGainDb": { "type": "number" }
+                      },
+                      "required": [
+                        "sourceGainDb",
+                        "leadSpectrogramGainDb",
+                        "practiceGainsDb"
+                      ],
+                      "type": "object"
+                    },
+                    "frameCount": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "id": { "type": "number" },
+                    "name": { "minLength": 3, "type": "string" },
+                    "previewUrl": { "type": "string" },
+                    "processing": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "done": { "type": "boolean" },
+                        "steps": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "chords": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "key": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "rhythm": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "separation": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            },
+                            "transcription": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "download": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "downloaded": { "type": "number" },
+                                    "file": { "type": "string" },
+                                    "label": { "type": "string" },
+                                    "status": {
+                                      "enum": ["processing", "cached", "done"],
+                                      "type": "string"
+                                    },
+                                    "total": { "type": "number" }
+                                  },
+                                  "required": ["label", "downloaded"],
+                                  "type": "object"
+                                },
+                                "error": { "type": "string" },
+                                "message": { "type": "string" },
+                                "progress": { "type": "number" },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "processing",
+                                    "failed",
+                                    "done"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["status"],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "separation",
+                            "transcription",
+                            "rhythm",
+                            "key",
+                            "chords"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["steps"],
+                      "type": "object"
+                    },
+                    "sampleRate": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sampleRate",
+                    "frameCount",
+                    "processing"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/list": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "audioAnalysis": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "leadSpectrogramGainDb": { "type": "number" },
+                          "practiceGainsDb": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "backing": { "type": "number" },
+                              "instrumental": { "type": "number" },
+                              "lead": { "type": "number" }
+                            },
+                            "required": ["lead", "backing", "instrumental"],
+                            "type": "object"
+                          },
+                          "sourceGainDb": { "type": "number" }
+                        },
+                        "required": [
+                          "sourceGainDb",
+                          "leadSpectrogramGainDb",
+                          "practiceGainsDb"
+                        ],
+                        "type": "object"
+                      },
+                      "frameCount": {
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "id": { "type": "number" },
+                      "name": { "minLength": 3, "type": "string" },
+                      "previewUrl": { "type": "string" },
+                      "processing": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "done": { "type": "boolean" },
+                          "steps": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "chords": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "download": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "downloaded": { "type": "number" },
+                                      "file": { "type": "string" },
+                                      "label": { "type": "string" },
+                                      "status": {
+                                        "enum": [
+                                          "processing",
+                                          "cached",
+                                          "done"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "total": { "type": "number" }
+                                    },
+                                    "required": ["label", "downloaded"],
+                                    "type": "object"
+                                  },
+                                  "error": { "type": "string" },
+                                  "message": { "type": "string" },
+                                  "progress": { "type": "number" },
+                                  "status": {
+                                    "enum": [
+                                      "pending",
+                                      "processing",
+                                      "failed",
+                                      "done"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["status"],
+                                "type": "object"
+                              },
+                              "key": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "download": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "downloaded": { "type": "number" },
+                                      "file": { "type": "string" },
+                                      "label": { "type": "string" },
+                                      "status": {
+                                        "enum": [
+                                          "processing",
+                                          "cached",
+                                          "done"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "total": { "type": "number" }
+                                    },
+                                    "required": ["label", "downloaded"],
+                                    "type": "object"
+                                  },
+                                  "error": { "type": "string" },
+                                  "message": { "type": "string" },
+                                  "progress": { "type": "number" },
+                                  "status": {
+                                    "enum": [
+                                      "pending",
+                                      "processing",
+                                      "failed",
+                                      "done"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["status"],
+                                "type": "object"
+                              },
+                              "rhythm": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "download": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "downloaded": { "type": "number" },
+                                      "file": { "type": "string" },
+                                      "label": { "type": "string" },
+                                      "status": {
+                                        "enum": [
+                                          "processing",
+                                          "cached",
+                                          "done"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "total": { "type": "number" }
+                                    },
+                                    "required": ["label", "downloaded"],
+                                    "type": "object"
+                                  },
+                                  "error": { "type": "string" },
+                                  "message": { "type": "string" },
+                                  "progress": { "type": "number" },
+                                  "status": {
+                                    "enum": [
+                                      "pending",
+                                      "processing",
+                                      "failed",
+                                      "done"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["status"],
+                                "type": "object"
+                              },
+                              "separation": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "download": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "downloaded": { "type": "number" },
+                                      "file": { "type": "string" },
+                                      "label": { "type": "string" },
+                                      "status": {
+                                        "enum": [
+                                          "processing",
+                                          "cached",
+                                          "done"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "total": { "type": "number" }
+                                    },
+                                    "required": ["label", "downloaded"],
+                                    "type": "object"
+                                  },
+                                  "error": { "type": "string" },
+                                  "message": { "type": "string" },
+                                  "progress": { "type": "number" },
+                                  "status": {
+                                    "enum": [
+                                      "pending",
+                                      "processing",
+                                      "failed",
+                                      "done"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["status"],
+                                "type": "object"
+                              },
+                              "transcription": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "download": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "downloaded": { "type": "number" },
+                                      "file": { "type": "string" },
+                                      "label": { "type": "string" },
+                                      "status": {
+                                        "enum": [
+                                          "processing",
+                                          "cached",
+                                          "done"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "total": { "type": "number" }
+                                    },
+                                    "required": ["label", "downloaded"],
+                                    "type": "object"
+                                  },
+                                  "error": { "type": "string" },
+                                  "message": { "type": "string" },
+                                  "progress": { "type": "number" },
+                                  "status": {
+                                    "enum": [
+                                      "pending",
+                                      "processing",
+                                      "failed",
+                                      "done"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["status"],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "separation",
+                              "transcription",
+                              "rhythm",
+                              "key",
+                              "chords"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": ["steps"],
+                        "type": "object"
+                      },
+                      "sampleRate": {
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "sampleRate",
+                      "frameCount",
+                      "processing"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/project/status/stream": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Server-Sent Events stream (text/event-stream) with JSON encoded project status updates and heartbeat events.",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-Sent Events stream (text/event-stream) with JSON encoded project status updates and heartbeat events."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/rhythm/project/{projectId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "beats": { "items": { "type": "number" }, "type": "array" },
+                    "bpm": { "type": "number" },
+                    "downbeats": {
+                      "items": { "type": "number" },
+                      "type": "array"
+                    },
+                    "meter": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["bpm", "beats", "downbeats", "meter"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/subtitle/project/{projectId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": { "type": "number" },
+                      "start": { "type": "number" },
+                      "text": { "type": "string" },
+                      "words": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "end": { "type": "number" },
+                            "start": { "type": "number" },
+                            "text": { "type": "string" }
+                          },
+                          "required": ["text", "start", "end"],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": ["text", "start", "end", "words"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "message": { "type": "string" } },
+                  "required": ["message"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        }
+      }
+    }
+  }
+}
