@@ -2,7 +2,7 @@ appId: com.musetric.desktop
 electronVersion: 43.1.1
 directories:
   output: build
-  buildResources: assets
+  buildResources: gen-assets
 beforePack: ./scripts/beforePack.ts
 publish:
   provider: github
@@ -11,7 +11,7 @@ publish:
 electronUpdaterCompatibility: '>=2.15'
 win:
   artifactName: ${productName}-Setup-${version}-${arch}.${ext}
-  icon: assets/icon.png
+  icon: gen-assets/icon.png
   target: nsis
 nsis:
   include: installer.nsh

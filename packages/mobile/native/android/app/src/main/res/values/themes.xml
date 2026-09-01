@@ -1,0 +1,24 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.musetric_mobile" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:navigationBarColor">@color/musetric_background</item>
+        <item name="android:statusBarColor">@color/musetric_background</item>
+        <item name="android:windowAnimationStyle">@style/Animation.Musetric.None</item>
+        <item name="android:windowBackground">@drawable/musetric_splash_background</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.musetric_mobile.Starting" parent="Theme.SplashScreen">
+        <item name="postSplashScreenTheme">@style/Theme.musetric_mobile</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_system_icon</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="windowSplashScreenBackground">@color/musetric_background</item>
+    </style>
+
+    <style name="Animation.Musetric.None" parent="@android:style/Animation">
+        <item name="android:activityCloseEnterAnimation">@anim/no_animation</item>
+        <item name="android:activityCloseExitAnimation">@anim/no_animation</item>
+        <item name="android:activityOpenEnterAnimation">@anim/no_animation</item>
+        <item name="android:activityOpenExitAnimation">@anim/no_animation</item>
+    </style>
+</resources>

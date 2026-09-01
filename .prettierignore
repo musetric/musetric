@@ -1,3 +1,5 @@
 dist
 node_modules
+target
 /legacy/
+/packages/mobile/src-tauri/gen/
