@@ -16,7 +16,7 @@ export const createKeyWorker = (
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
 ): KeyWorker =>
-  createAnalysisWorker<KeyTask>(emitter, logger, {
+  createAnalysisWorker<KeyTask>(emitter, logger, app.db.processing, {
     step: 'key',
     errorMessage: 'Key detection failed',
     process: async (task, handlers) => {

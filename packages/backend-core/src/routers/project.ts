@@ -166,6 +166,35 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
   });
 
   app.route({
+    ...fastifyRoute(api.project.retry.base),
+    handler: async (request) => {
+      const { projectId } = request.params;
+      const { step } = request.body;
+      const found = await app.db.project.get(projectId);
+      assertFound(found, `Project with id ${projectId} not found`);
+
+      const errors = await app.db.processing.getErrorsByProject(projectId);
+      assertFound(
+        errors.find((error) => error.step === step),
+        `Processing step ${step} is not failed`,
+      );
+      await app.db.processing.clearError({ projectId, step });
+
+      const [processing, audioAnalysis] = await Promise.all([
+        resolveProcessing(app, projectId),
+        resolveAudioAnalysis(projectId),
+      ]);
+      const result: api.project.retry.Response = {
+        ...found,
+        previewUrl: api.preview.get.url(found.preview?.id),
+        audioAnalysis,
+        processing,
+      };
+      return result;
+    },
+  });
+
+  app.route({
     ...fastifyRoute(api.project.remove.base),
     handler: async (request, reply) => {
       const { projectId } = request.params;

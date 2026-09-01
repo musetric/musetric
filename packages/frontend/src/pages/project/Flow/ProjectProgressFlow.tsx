@@ -30,22 +30,32 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
           </Typography>
           <Stack gap={2}>
             <FlowStep
+              projectId={project.id}
+              stepName='separation'
               title={t('pages.project.progress.steps.separation')}
               step={project.processing.steps.separation}
             />
             <FlowStep
+              projectId={project.id}
+              stepName='transcription'
               title={t('pages.project.progress.steps.transcription')}
               step={project.processing.steps.transcription}
             />
             <FlowStep
+              projectId={project.id}
+              stepName='rhythm'
               title={t('pages.project.progress.steps.rhythm')}
               step={project.processing.steps.rhythm}
             />
             <FlowStep
+              projectId={project.id}
+              stepName='key'
               title={t('pages.project.progress.steps.key')}
               step={project.processing.steps.key}
             />
             <FlowStep
+              projectId={project.id}
+              stepName='chords'
               title={t('pages.project.progress.steps.chords')}
               step={project.processing.steps.chords}
             />

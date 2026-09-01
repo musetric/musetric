@@ -10,6 +10,11 @@ export const pendingSeparation = (database: DatabaseSync) => {
         SELECT 1 FROM AudioMaster AS Lead
         WHERE Lead.projectId = Source.projectId AND Lead.type = 'lead'
        )
+       AND NOT EXISTS (
+        SELECT 1 FROM ProcessingError
+        WHERE ProcessingError.projectId = Source.projectId
+          AND ProcessingError.step = 'separation'
+       )
      `,
   );
 

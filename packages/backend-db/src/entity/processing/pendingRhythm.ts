@@ -8,6 +8,11 @@ export const pendingRhythm = (database: DatabaseSync) => {
      LEFT JOIN Rhythm
        ON Rhythm.projectId = Instrumental.projectId
      WHERE Instrumental.type = 'instrumental' AND Rhythm.id IS NULL
+       AND NOT EXISTS (
+        SELECT 1 FROM ProcessingError
+        WHERE ProcessingError.projectId = Instrumental.projectId
+          AND ProcessingError.step = 'rhythm'
+       )
      `,
   );
 

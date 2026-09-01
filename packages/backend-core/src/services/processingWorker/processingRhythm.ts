@@ -16,7 +16,7 @@ export const createRhythmWorker = (
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
 ): RhythmWorker =>
-  createAnalysisWorker<RhythmTask>(emitter, logger, {
+  createAnalysisWorker<RhythmTask>(emitter, logger, app.db.processing, {
     step: 'rhythm',
     errorMessage: 'Rhythm analysis failed',
     process: async (task, handlers) => {

@@ -1,5 +1,6 @@
 import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
+import { clearError } from './clearError.js';
 
 export type ApplyChordsResultArg = {
   projectId: number;
@@ -7,6 +8,7 @@ export type ApplyChordsResultArg = {
 };
 
 export const applyChordsResult = (database: DatabaseSync) => {
+  const clearProcessingError = clearError(database);
   const insertChordsStatement = database.prepare(
     `INSERT INTO Chords (projectId, blobId)
      VALUES (?, ?)
@@ -18,5 +20,6 @@ export const applyChordsResult = (database: DatabaseSync) => {
       await Promise.resolve(
         insertChordsStatement.run(arg.projectId, arg.blobId),
       );
+      await clearProcessingError({ projectId: arg.projectId, step: 'chords' });
     });
 };

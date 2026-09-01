@@ -1,5 +1,6 @@
 import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
+import { clearError } from './clearError.js';
 
 export type ApplyKeyResultArg = {
   projectId: number;
@@ -7,6 +8,7 @@ export type ApplyKeyResultArg = {
 };
 
 export const applyKeyResult = (database: DatabaseSync) => {
+  const clearProcessingError = clearError(database);
   const insertKeyStatement = database.prepare(
     `INSERT INTO Key (projectId, blobId)
      VALUES (?, ?)
@@ -16,5 +18,6 @@ export const applyKeyResult = (database: DatabaseSync) => {
   return async (arg: ApplyKeyResultArg): Promise<void> =>
     await transaction(database, async () => {
       await Promise.resolve(insertKeyStatement.run(arg.projectId, arg.blobId));
+      await clearProcessingError({ projectId: arg.projectId, step: 'key' });
     });
 };

@@ -10,6 +10,16 @@ import {
   type ProcessingWorkerProgressEvent,
 } from './processingSummary.js';
 
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error) {
+    return error;
+  }
+  return fallback;
+};
+
 export type AnalysisHandlers = MessageHandlers<
   | { type: 'progress'; progress: number }
   | ({ type: 'download' } & api.project.Download)
@@ -26,9 +36,18 @@ export type AnalysisWorkerConfig<Task> = {
   process: (task: Task, handlers: AnalysisHandlers) => Promise<void>;
 };
 
+export type ProcessingErrorStore = {
+  recordError: (arg: {
+    projectId: number;
+    step: ProcessingStepKind;
+    message: string;
+  }) => Promise<void>;
+};
+
 export const createAnalysisWorker = <Task extends { projectId: number }>(
   emitter: EventEmitter<ProcessingWorkerEvent>,
   logger: Logger,
+  processingErrors: ProcessingErrorStore,
   config: AnalysisWorkerConfig<Task>,
 ): AnalysisWorker<Task> => {
   const { step, errorMessage, process } = config;
@@ -67,7 +86,25 @@ export const createAnalysisWorker = <Task extends { projectId: number }>(
         emitter.emit({ type: 'complete', projectId: task.projectId, step });
         state = undefined;
       } catch (error) {
-        emitter.emit({ type: 'error', projectId: task.projectId, step });
+        const message = getErrorMessage(error, errorMessage);
+        try {
+          await processingErrors.recordError({
+            projectId: task.projectId,
+            step,
+            message,
+          });
+        } catch (recordError) {
+          logger.error(
+            { projectId: task.projectId, error: recordError },
+            'Failed to record processing error',
+          );
+        }
+        emitter.emit({
+          type: 'error',
+          projectId: task.projectId,
+          step,
+          error: message,
+        });
         state = undefined;
         logger.error({ projectId: task.projectId, error }, errorMessage);
       }

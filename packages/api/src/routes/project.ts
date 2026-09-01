@@ -17,14 +17,26 @@ export type Download = z.infer<typeof downloadSchema>;
 export const processingStepStatusSchema = z.enum([
   'pending',
   'processing',
+  'failed',
   'done',
 ]);
 export type ProcessingStepStatus = z.infer<typeof processingStepStatusSchema>;
+
+export const processingStepNameSchema = z.enum([
+  'separation',
+  'transcription',
+  'rhythm',
+  'key',
+  'chords',
+]);
+export type ProcessingStepName = z.infer<typeof processingStepNameSchema>;
 
 export const processingStepSchema = z.object({
   status: processingStepStatusSchema,
   progress: z.number().optional(),
   download: downloadSchema.optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
 });
 export type ProcessingStep = z.infer<typeof processingStepSchema>;
 
@@ -191,6 +203,19 @@ export namespace edit {
       .partial(),
     responseSchema: itemSchema,
     isMultipart: true,
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
+export namespace retry {
+  export const base = createApiRoute({
+    method: 'post',
+    path: '/api/project/:projectId/retry',
+    paramsSchema: z.object({ projectId: z.number() }),
+    requestSchema: z.object({ step: processingStepNameSchema }),
+    responseSchema: itemSchema,
   });
   export type Params = z.infer<typeof base.paramsSchema>;
   export type Request = z.infer<typeof base.requestSchema>;

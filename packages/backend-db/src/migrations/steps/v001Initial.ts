@@ -9,6 +9,16 @@ const createProject = `
   );
 `;
 
+const createProcessingError = `
+  CREATE TABLE ProcessingError (
+    projectId INTEGER NOT NULL,
+    step TEXT NOT NULL CHECK (step IN ('separation', 'transcription', 'rhythm', 'key', 'chords')),
+    message TEXT NOT NULL,
+    PRIMARY KEY (projectId, step),
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+`;
+
 const createAudioMaster = `
   CREATE TABLE AudioMaster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,6 +133,7 @@ const createRecording = `
 
 export const v001Initial: Migration = [
   createProject,
+  createProcessingError,
   createAudioMaster,
   createAudioMasterIndex,
   createProjectAudioAnalysis,

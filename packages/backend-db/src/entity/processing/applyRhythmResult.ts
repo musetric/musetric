@@ -1,5 +1,6 @@
 import { type DatabaseSync } from 'node:sqlite';
 import { transaction } from '../../common/index.js';
+import { clearError } from './clearError.js';
 
 export type ApplyRhythmResultArg = {
   projectId: number;
@@ -7,6 +8,7 @@ export type ApplyRhythmResultArg = {
 };
 
 export const applyRhythmResult = (database: DatabaseSync) => {
+  const clearProcessingError = clearError(database);
   const insertRhythmStatement = database.prepare(
     `INSERT INTO Rhythm (projectId, blobId)
      VALUES (?, ?)
@@ -18,5 +20,6 @@ export const applyRhythmResult = (database: DatabaseSync) => {
       await Promise.resolve(
         insertRhythmStatement.run(arg.projectId, arg.blobId),
       );
+      await clearProcessingError({ projectId: arg.projectId, step: 'rhythm' });
     });
 };

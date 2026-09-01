@@ -8,6 +8,11 @@ export const pendingTranscription = (database: DatabaseSync) => {
      LEFT JOIN Subtitle
        ON Subtitle.projectId = Lead.projectId
      WHERE Lead.type = 'lead' AND Subtitle.id IS NULL
+       AND NOT EXISTS (
+        SELECT 1 FROM ProcessingError
+        WHERE ProcessingError.projectId = Lead.projectId
+          AND ProcessingError.step = 'transcription'
+       )
      `,
   );
 
