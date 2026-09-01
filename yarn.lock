@@ -2099,6 +2099,7 @@ __metadata:
     pino: "catalog:"
     pino-pretty: "catalog:"
     typescript: "catalog:"
+    vitest: "catalog:"
     zod: "catalog:"
   peerDependencies:
     "@fastify/multipart": 9.4.0

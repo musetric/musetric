@@ -22,7 +22,8 @@
     "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@fastify/multipart": "9.4.0",
@@ -73,6 +74,7 @@
     "pino": "catalog:",
     "pino-pretty": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "zod": "catalog:"
   }
 }

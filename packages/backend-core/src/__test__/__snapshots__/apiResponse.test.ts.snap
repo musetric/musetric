@@ -1,0 +1,602 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a matching etag answers not modified 1`] = `
+{
+  "body": undefined,
+  "headers": {
+    "cache-control": "public, max-age=86400",
+    "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_subtitle.json",
+    "content-length": "82",
+    "content-type": "application/json",
+    "etag": "f5f493b54a7a83e748f0861d3850614f",
+    "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+  },
+  "route": "GET /api/subtitle/project/1",
+  "status": 304,
+}
+`;
+
+exports[`creating a project answers the same way 1`] = `
+{
+  "body": {
+    "frameCount": 4800,
+    "id": 2,
+    "name": "Created project",
+    "processing": {
+      "done": false,
+      "steps": {
+        "chords": {
+          "status": "pending",
+        },
+        "key": {
+          "status": "pending",
+        },
+        "rhythm": {
+          "status": "pending",
+        },
+        "separation": {
+          "status": "pending",
+        },
+        "transcription": {
+          "status": "pending",
+        },
+      },
+    },
+    "sampleRate": 48000,
+  },
+  "headers": {
+    "content-length": "266",
+    "content-type": "application/json; charset=utf-8",
+  },
+  "route": "POST /api/project/create",
+  "status": 200,
+}
+`;
+
+exports[`editing a project answers the same way 1`] = `
+{
+  "body": {
+    "audioAnalysis": {
+      "leadSpectrogramGainDb": 3.2,
+      "practiceGainsDb": {
+        "backing": -0.6,
+        "instrumental": 0.9,
+        "lead": 1.5,
+      },
+      "sourceGainDb": 0.4,
+    },
+    "frameCount": 441000,
+    "id": 1,
+    "name": "Renamed project",
+    "previewUrl": "/api/preview/1",
+    "processing": {
+      "done": true,
+      "steps": {
+        "chords": {
+          "progress": 1,
+          "status": "done",
+        },
+        "key": {
+          "progress": 1,
+          "status": "done",
+        },
+        "rhythm": {
+          "progress": 1,
+          "status": "done",
+        },
+        "separation": {
+          "progress": 1,
+          "status": "done",
+        },
+        "transcription": {
+          "progress": 1,
+          "status": "done",
+        },
+      },
+    },
+    "sampleRate": 44100,
+  },
+  "headers": {
+    "content-length": "477",
+    "content-type": "application/json; charset=utf-8",
+  },
+  "route": "PATCH /api/project/1/edit",
+  "status": 200,
+}
+`;
+
+exports[`missing resources answer the same way 1`] = `
+[
+  {
+    "body": {
+      "message": "Project with id 404 not found",
+    },
+    "headers": {
+      "content-length": "43",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/project/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Chords for project 404 not found",
+    },
+    "headers": {
+      "content-length": "46",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/chords/project/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Key for project 404 not found",
+    },
+    "headers": {
+      "content-length": "43",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/key/project/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Rhythm for project 404 not found",
+    },
+    "headers": {
+      "content-length": "46",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/rhythm/project/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Subtitle for project 404 not found",
+    },
+    "headers": {
+      "content-length": "48",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/subtitle/project/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Preview with id 404 not found",
+    },
+    "headers": {
+      "content-length": "43",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/preview/404",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Audio master for project 404 and type source not found",
+    },
+    "headers": {
+      "content-length": "68",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/audio/project/404/master/source/content",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "Audio delivery for project 404 and stem type lead not found",
+    },
+    "headers": {
+      "content-length": "73",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/audio/project/404/delivery/lead/content",
+    "status": 404,
+  },
+]
+`;
+
+exports[`read routes answer the same way 1`] = `
+[
+  {
+    "body": [
+      {
+        "audioAnalysis": {
+          "leadSpectrogramGainDb": 3.2,
+          "practiceGainsDb": {
+            "backing": -0.6,
+            "instrumental": 0.9,
+            "lead": 1.5,
+          },
+          "sourceGainDb": 0.4,
+        },
+        "frameCount": 441000,
+        "id": 1,
+        "name": "Fixture project",
+        "previewUrl": "/api/preview/1",
+        "processing": {
+          "done": true,
+          "steps": {
+            "chords": {
+              "progress": 1,
+              "status": "done",
+            },
+            "key": {
+              "progress": 1,
+              "status": "done",
+            },
+            "rhythm": {
+              "progress": 1,
+              "status": "done",
+            },
+            "separation": {
+              "progress": 1,
+              "status": "done",
+            },
+            "transcription": {
+              "progress": 1,
+              "status": "done",
+            },
+          },
+        },
+        "sampleRate": 44100,
+      },
+    ],
+    "headers": {
+      "content-length": "479",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/project/list",
+    "status": 200,
+  },
+  {
+    "body": {
+      "audioAnalysis": {
+        "leadSpectrogramGainDb": 3.2,
+        "practiceGainsDb": {
+          "backing": -0.6,
+          "instrumental": 0.9,
+          "lead": 1.5,
+        },
+        "sourceGainDb": 0.4,
+      },
+      "frameCount": 441000,
+      "id": 1,
+      "name": "Fixture project",
+      "previewUrl": "/api/preview/1",
+      "processing": {
+        "done": true,
+        "steps": {
+          "chords": {
+            "progress": 1,
+            "status": "done",
+          },
+          "key": {
+            "progress": 1,
+            "status": "done",
+          },
+          "rhythm": {
+            "progress": 1,
+            "status": "done",
+          },
+          "separation": {
+            "progress": 1,
+            "status": "done",
+          },
+          "transcription": {
+            "progress": 1,
+            "status": "done",
+          },
+        },
+      },
+      "sampleRate": 44100,
+    },
+    "headers": {
+      "content-length": "477",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/project/1",
+    "status": 200,
+  },
+  {
+    "body": {
+      "segments": [
+        {
+          "end": 1,
+          "label": "C",
+          "quality": "major",
+          "root": "C",
+          "start": 0,
+        },
+      ],
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_chords.json",
+      "content-length": "75",
+      "content-type": "application/json",
+      "etag": "3fe28810f1fb20270d39f00c2446d507",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/chords/project/1",
+    "status": 200,
+  },
+  {
+    "body": {
+      "confidence": 0.8,
+      "mode": "major",
+      "root": "C",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_key.json",
+      "content-length": "44",
+      "content-type": "application/json",
+      "etag": "44a5de7740e09cf6569971e65fbb4a84",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/key/project/1",
+    "status": 200,
+  },
+  {
+    "body": {
+      "beats": [
+        0,
+        0.5,
+        1,
+      ],
+      "bpm": 120,
+      "downbeats": [
+        0,
+      ],
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_rhythm.json",
+      "content-length": "45",
+      "content-type": "application/json",
+      "etag": "e8489f1b91168afee216f925d23b221e",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/rhythm/project/1",
+    "status": 200,
+  },
+  {
+    "body": [
+      {
+        "end": 1.5,
+        "start": 0,
+        "text": "a line",
+        "words": [
+          {
+            "end": 0.5,
+            "start": 0,
+            "text": "a",
+          },
+        ],
+      },
+    ],
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_subtitle.json",
+      "content-length": "82",
+      "content-type": "application/json",
+      "etag": "f5f493b54a7a83e748f0861d3850614f",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/subtitle/project/1",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 15,
+      "sha256": "d846e6a366adf5b7ab37b95ba8b6b7b90d8cf04d43180d0af8dbe8fba38f0611",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''preview.png",
+      "content-length": "15",
+      "content-type": "image/png",
+      "etag": "84821bac4c0f2d0eb01162d7fc117b9b",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/preview/1",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 20,
+      "sha256": "eb29e953a169f3293686ad62e33298d2fd7c12ea0d9dde98216ed659351d0ab7",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project.flac",
+      "content-length": "20",
+      "content-type": "audio/flac",
+      "etag": "e31fb1c846d25211ed5cbe68b13b0b7b",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/master/source/content",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 25,
+      "sha256": "e4feccf5404d09dbd0b85a43a28db9c581b3618edd14d355550292a5f3fa7524",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
+      "content-length": "25",
+      "content-type": "audio/flac",
+      "etag": "0576f2eb97d59a507dcf8f09c44b2d3a",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 27,
+      "sha256": "c920c2648fe0ea31d4ee242fb39c00b946e355311c97a2f9a88e02217d9b7c7b",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.mp4",
+      "content-length": "27",
+      "content-type": "audio/mp4",
+      "etag": "ec407ce3b36ce91137f8adf37d16dd1a",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/delivery/lead/content",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 23,
+      "sha256": "3463668d493277c25079ecced6f486ffbd31ffc4b294673795dda4fc04fd3a47",
+    },
+    "headers": {
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''waveform.bin",
+      "content-length": "23",
+      "content-type": "application/octet-stream",
+      "etag": "9b3c52aa58bbaf37a78a8208ad77413f",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/delivery/lead/wave",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 23,
+      "sha256": "d5d8e4efa78dbef13bb0f6b46bddc77841f8d68749d4806d51a970c4e8b8a181",
+    },
+    "headers": {
+      "cache-control": "no-store",
+      "content-length": "23",
+      "content-type": "audio/wav",
+    },
+    "route": "GET /api/audio/project/1/recording/content",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 28,
+      "sha256": "7dae41777e4ab1a3003582e0f44777278381d6c431607a5ee3a37300bbf8d6ee",
+    },
+    "headers": {
+      "cache-control": "no-store",
+      "content-length": "28",
+      "content-type": "application/octet-stream",
+    },
+    "route": "GET /api/audio/project/1/recording/wave",
+    "status": 200,
+  },
+]
+`;
+
+exports[`removing a project answers the same way 1`] = `
+[
+  {
+    "body": undefined,
+    "headers": {
+      "content-length": "0",
+    },
+    "route": "DELETE /api/project/1/remove",
+    "status": 200,
+  },
+  {
+    "body": {
+      "message": "Project with id 1 not found",
+    },
+    "headers": {
+      "content-length": "41",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/project/1",
+    "status": 404,
+  },
+]
+`;
+
+exports[`retrying a failed step answers the same way 1`] = `
+[
+  {
+    "body": {
+      "message": "Processing step chords is not failed",
+    },
+    "headers": {
+      "content-length": "50",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/1/retry",
+    "status": 404,
+  },
+  {
+    "body": {
+      "audioAnalysis": {
+        "leadSpectrogramGainDb": 3.2,
+        "practiceGainsDb": {
+          "backing": -0.6,
+          "instrumental": 0.9,
+          "lead": 1.5,
+        },
+        "sourceGainDb": 0.4,
+      },
+      "frameCount": 441000,
+      "id": 1,
+      "name": "Fixture project",
+      "previewUrl": "/api/preview/1",
+      "processing": {
+        "done": true,
+        "steps": {
+          "chords": {
+            "progress": 1,
+            "status": "done",
+          },
+          "key": {
+            "progress": 1,
+            "status": "done",
+          },
+          "rhythm": {
+            "progress": 1,
+            "status": "done",
+          },
+          "separation": {
+            "progress": 1,
+            "status": "done",
+          },
+          "transcription": {
+            "progress": 1,
+            "status": "done",
+          },
+        },
+      },
+      "sampleRate": 44100,
+    },
+    "headers": {
+      "content-length": "477",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/1/retry",
+    "status": 200,
+  },
+]
+`;
+
+exports[`the status stream opens as server-sent events 1`] = `
+{
+  "body": "retry: 3000
+
+",
+  "headers": {
+    "cache-control": "no-cache,no-transform",
+    "content-type": "text/event-stream; charset=utf-8",
+  },
+  "route": "GET /api/project/status/stream",
+  "status": 200,
+}
+`;
