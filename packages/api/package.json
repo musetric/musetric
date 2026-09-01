@@ -27,6 +27,8 @@
   },
   "scripts": {
     "build:project": "tsc --build",
+    "check:openapi": "node --import tsx ./scripts/openapi.ts --check",
+    "fix:openapi": "node --import tsx ./scripts/openapi.ts",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
@@ -36,11 +38,17 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@fastify/swagger": "catalog:",
     "@musetric/eslint-config": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "axios": "catalog:",
     "eslint": "catalog:",
+    "fastify": "catalog:",
+    "fastify-type-provider-zod": "catalog:",
+    "openapi-types": "catalog:",
+    "prettier": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
   }

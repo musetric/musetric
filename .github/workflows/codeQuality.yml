@@ -37,6 +37,7 @@ jobs:
       - run: yarn check:editor
       - run: yarn check:format
       - run: yarn check:translations
+      - run: yarn check:openapi
       - run: yarn check:ts
       - run: yarn check:lint
       - run: yarn test

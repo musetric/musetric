@@ -32,6 +32,8 @@
     "fix:format": "prettier . --write --list-different",
     "check:translations": "yarn workspaces foreach --all --parallel --interlaced run check:translations",
     "fix:translations": "yarn workspaces foreach --all --parallel --interlaced run fix:translations",
+    "check:openapi": "yarn workspaces foreach --all --parallel --interlaced run check:openapi",
+    "fix:openapi": "yarn workspaces foreach --all --parallel --interlaced run fix:openapi",
     "check:ts": "yarn workspaces foreach --all --parallel --interlaced run check:ts",
     "check:lint": "yarn workspaces foreach --all --parallel --interlaced run check:lint",
     "fix:lint": "yarn workspaces foreach --all --parallel --interlaced run fix:lint",

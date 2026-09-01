@@ -2028,11 +2028,17 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/api@workspace:packages/api"
   dependencies:
+    "@fastify/swagger": "catalog:"
     "@musetric/eslint-config": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
     axios: "catalog:"
     eslint: "catalog:"
+    fastify: "catalog:"
+    fastify-type-provider-zod: "catalog:"
+    openapi-types: "catalog:"
+    prettier: "catalog:"
+    tsx: "catalog:"
     typescript: "catalog:"
     zod: "catalog:"
   peerDependencies:
