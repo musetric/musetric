@@ -11,5 +11,8 @@ mod serve;
 mod storage;
 mod wav;
 
+#[cfg(test)]
+mod test_workspace;
+
 pub use musetric_db::BoxedError;
 pub use serve::{ServerOptions, TlsOptions, serve};

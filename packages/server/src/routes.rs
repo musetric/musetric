@@ -25,17 +25,7 @@ pub(crate) fn create_router(proxy: ProxyState, storage: Arc<Storage>) -> Router 
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs::{create_dir_all, remove_dir_all, write},
-        net::SocketAddr,
-        path::PathBuf,
-        process::id,
-        sync::{
-            Arc,
-            atomic::{AtomicUsize, Ordering},
-        },
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::net::SocketAddr;
 
     use axum::{
         Router,
@@ -45,13 +35,11 @@ mod tests {
         routing::any,
     };
     use http_body_util::BodyExt;
-    use musetric_db::{OpenOptions, Reader, Writer, blob_path, init_database, open_database};
-    use musetric_media::Tools;
     use tokio::{net::TcpListener, sync::oneshot};
     use tower::ServiceExt;
 
     use super::create_router;
-    use crate::{proxy::ProxyState, storage::Storage};
+    use crate::{proxy::ProxyState, test_workspace::Workspace};
 
     const BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
     const OTHER_BLOB_ID: &str = "5a6b7c8d-0000-4000-8000-000000000002";
@@ -93,78 +81,11 @@ mod tests {
       VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001', 'preview.png', 'image/png');
     ";
 
-    static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-    struct Workspace {
-        directory: PathBuf,
-    }
-
-    impl Workspace {
-        fn new() -> Self {
-            let stamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("the clock should be after the epoch")
-                .as_nanos();
-            let ordinal = WORKSPACE_COUNT.fetch_add(1, Ordering::Relaxed);
-            let directory =
-                std::env::temp_dir().join(format!("musetric-routes-{}-{stamp}-{ordinal}", id()));
-            create_dir_all(&directory).expect("the workspace should be created");
-            let workspace = Self { directory };
-            init_database(&workspace.database_path()).expect("the database should be created");
-            workspace
-        }
-
-        fn database_path(&self) -> PathBuf {
-            self.directory.join("db").join("app.db")
-        }
-
-        fn blobs_path(&self) -> PathBuf {
-            self.directory.join("blobs")
-        }
-
-        fn seed(&self, statements: &str) {
-            let options = OpenOptions {
-                foreign_keys: false,
-            };
-            let connection =
-                open_database(&self.database_path(), &options).expect("the database should open");
-            connection
-                .execute_batch(statements)
-                .expect("the fixture should be written");
-        }
-
-        fn add_blob(&self, blob_id: &str, content: &str) {
-            let path = blob_path(&self.blobs_path(), blob_id);
-            let directory = path.parent().expect("a blob path should have a directory");
-            create_dir_all(directory).expect("the blob directory should be created");
-            write(&path, content).expect("the blob should be written");
-        }
-
-        fn create_storage(&self) -> Arc<Storage> {
-            Arc::new(Storage {
-                database: Reader::open(&self.database_path()).expect("the reader should open"),
-                writer: Writer::open(&self.database_path()).expect("the writer should open"),
-                blobs_path: self.blobs_path(),
-                tools: Tools {
-                    ffmpeg: PathBuf::from("ffmpeg"),
-                    ffprobe: PathBuf::from("ffprobe"),
-                },
-            })
-        }
-
-        fn create_router(&self, upstream: SocketAddr) -> Router {
-            let storage = self.create_storage();
-            let address = format!("http://{upstream}")
-                .parse()
-                .expect("the upstream should be a valid uri");
-            create_router(ProxyState::create(address), storage)
-        }
-    }
-
-    impl Drop for Workspace {
-        fn drop(&mut self) {
-            let _ = remove_dir_all(&self.directory);
-        }
+    fn create_test_router(workspace: &Workspace, upstream: SocketAddr) -> Router {
+        let address = format!("http://{upstream}")
+            .parse()
+            .expect("the upstream should be a valid uri");
+        create_router(ProxyState::create(address), workspace.create_storage())
     }
 
     async fn start_upstream() -> (SocketAddr, oneshot::Sender<()>) {
@@ -226,7 +147,11 @@ mod tests {
         workspace.add_blob(BLOB_ID, CHORDS);
         let (upstream, shutdown) = start_upstream().await;
 
-        let response = request(workspace.create_router(upstream), "/api/chords/project/1").await;
+        let response = request(
+            create_test_router(&workspace, upstream),
+            "/api/chords/project/1",
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -251,7 +176,7 @@ mod tests {
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
         let (upstream, shutdown) = start_upstream().await;
-        let router = workspace.create_router(upstream);
+        let router = create_test_router(&workspace, upstream);
         let first = request(router.clone(), "/api/chords/project/1").await;
         let etag = read_header(&first, "etag").expect("the answer should carry an etag");
 
@@ -276,13 +201,23 @@ mod tests {
         let workspace = Workspace::new();
         let (upstream, shutdown) = start_upstream().await;
 
-        let without_row = request(workspace.create_router(upstream), "/api/chords/project/1").await;
+        let without_row = request(
+            create_test_router(&workspace, upstream),
+            "/api/chords/project/1",
+        )
+        .await;
         workspace.seed(CREATE_CHORDS);
-        let without_project =
-            request(workspace.create_router(upstream), "/api/chords/project/1").await;
+        let without_project = request(
+            create_test_router(&workspace, upstream),
+            "/api/chords/project/1",
+        )
+        .await;
         workspace.seed(CREATE_PROJECT);
-        let without_blob =
-            request(workspace.create_router(upstream), "/api/chords/project/1").await;
+        let without_blob = request(
+            create_test_router(&workspace, upstream),
+            "/api/chords/project/1",
+        )
+        .await;
 
         assert_eq!(without_row.status(), StatusCode::NOT_FOUND);
         assert_eq!(
@@ -309,7 +244,11 @@ mod tests {
         let workspace = Workspace::new();
         let (upstream, shutdown) = start_upstream().await;
 
-        let response = request(workspace.create_router(upstream), "/api/chords/project/abc").await;
+        let response = request(
+            create_test_router(&workspace, upstream),
+            "/api/chords/project/abc",
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -327,7 +266,7 @@ mod tests {
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, AUDIO);
         let (upstream, shutdown) = start_upstream().await;
-        let router = workspace.create_router(upstream);
+        let router = create_test_router(&workspace, upstream);
 
         let source = request(router.clone(), SOURCE_URL).await;
         let lead = request(router, LEAD_URL).await;
@@ -352,7 +291,7 @@ mod tests {
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
         let (upstream, shutdown) = start_upstream().await;
-        let router = workspace.create_router(upstream);
+        let router = create_test_router(&workspace, upstream);
 
         let content = request(router.clone(), DELIVERY_URL).await;
         let wave = request(router, WAVE_URL).await;
@@ -375,7 +314,7 @@ mod tests {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
         let (upstream, shutdown) = start_upstream().await;
-        let router = workspace.create_router(upstream);
+        let router = create_test_router(&workspace, upstream);
 
         let content = request(router.clone(), RECORDING_URL).await;
         let wave = request(router, RECORDING_WAVE_URL).await;
@@ -414,7 +353,7 @@ mod tests {
         let (upstream, shutdown) = start_upstream().await;
 
         let response = request(
-            workspace.create_router(upstream),
+            create_test_router(&workspace, upstream),
             "/api/audio/project/1/delivery/vocals/content",
         )
         .await;
@@ -434,7 +373,7 @@ mod tests {
         workspace.add_blob(BLOB_ID, PREVIEW);
         let (upstream, shutdown) = start_upstream().await;
 
-        let response = request(workspace.create_router(upstream), "/api/preview/1").await;
+        let response = request(create_test_router(&workspace, upstream), "/api/preview/1").await;
 
         assert_eq!(
             read_header(&response, "content-type"),
