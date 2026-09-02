@@ -23,7 +23,7 @@ const HTTP_DATE: &[BorrowedFormatItem<'_>] = format_description!(
 
 pub(crate) struct CachedFile {
     pub(crate) filename: String,
-    pub(crate) content_type: &'static str,
+    pub(crate) content_type: String,
     pub(crate) size: u64,
     pub(crate) modified: SystemTime,
 }
@@ -41,7 +41,7 @@ impl CachedHeaders {
             encode_uri_component(&file.filename)
         );
         let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_str(file.content_type)?);
+        headers.insert(CONTENT_TYPE, HeaderValue::from_str(&file.content_type)?);
         headers.insert(CONTENT_DISPOSITION, HeaderValue::from_str(&disposition)?);
         headers.insert(
             LAST_MODIFIED,
@@ -138,7 +138,7 @@ mod tests {
     fn create_file(size: u64, modified: Duration) -> CachedFile {
         CachedFile {
             filename: "Fixture project_chords.json".to_owned(),
-            content_type: "application/json",
+            content_type: "application/json".to_owned(),
             size,
             modified: UNIX_EPOCH + modified,
         }

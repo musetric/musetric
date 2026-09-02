@@ -26,11 +26,16 @@ export const missingUrls = [
   '/api/preview/404',
   '/api/audio/project/404/master/source/content',
   '/api/audio/project/404/delivery/lead/content',
+  '/api/audio/project/404/recording/content',
+  '/api/audio/project/404/recording/wave',
 ];
 
 export const invalidUrls = [
   '/api/chords/project/abc',
   '/api/subtitle/project/abc',
+  '/api/preview/abc',
+  '/api/audio/project/1/master/vocals/content',
+  '/api/audio/project/1/delivery/vocals/wave',
 ];
 
 const subtitleUrl = `/api/subtitle/project/${fixtureProjectId}`;
