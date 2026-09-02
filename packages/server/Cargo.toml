@@ -32,6 +32,7 @@ tower = { version = "=0.5.3", features = ["util"] }
 workspace = true
 
 [workspace]
+members = ["crates/*"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
