@@ -1,5 +1,3 @@
-import { mkdir, open } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { defaultSampleRate } from '@musetric/utils';
 
 export const wavContentType = 'audio/wav';
@@ -27,23 +25,3 @@ const createWavHeader = (frameCount: number, sampleRate: number): Buffer => {
 };
 
 export const createEmptyWavBuffer = () => createWavHeader(0, defaultSampleRate);
-
-export type CreateReservedWavOptions = {
-  toPath: string;
-  frameCount: number;
-  sampleRate: number;
-};
-
-export const createReservedWav = async (
-  options: CreateReservedWavOptions,
-): Promise<void> => {
-  const { toPath, frameCount, sampleRate } = options;
-  await mkdir(dirname(toPath), { recursive: true });
-  const file = await open(toPath, 'w');
-  try {
-    await file.write(createWavHeader(frameCount, sampleRate), 0);
-    await file.truncate(wavHeaderByteLength + frameCount * wavBytesPerSample);
-  } finally {
-    await file.close();
-  }
-};

@@ -21,6 +21,14 @@ pub struct NewProject {
     pub preview: Option<NewPreview>,
 }
 
+pub struct NewRecording {
+    pub project_id: i64,
+    pub blob_id: String,
+    pub wave_blob_id: String,
+    pub sample_rate: i64,
+    pub frame_count: i64,
+}
+
 pub struct ProjectEdit {
     pub project_id: i64,
     pub name: Option<String>,
@@ -81,6 +89,23 @@ impl Writer {
                 insert_preview(transaction, edit.project_id, preview)?;
             }
             Ok(true)
+        })
+    }
+
+    pub fn create_recording(&self, recording: &NewRecording) -> Result<(), BoxedError> {
+        self.write(|transaction| {
+            transaction.execute(
+                "INSERT INTO Recording (projectId, blobId, waveBlobId, sampleRate, frameCount)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                (
+                    recording.project_id,
+                    &recording.blob_id,
+                    &recording.wave_blob_id,
+                    recording.sample_rate,
+                    recording.frame_count,
+                ),
+            )?;
+            Ok(())
         })
     }
 

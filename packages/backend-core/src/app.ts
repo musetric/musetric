@@ -1,4 +1,3 @@
-import websocket from '@fastify/websocket';
 import {
   defaultGpuPageHostFactory,
   type GpuHost,
@@ -54,7 +53,6 @@ export const createServerApp = async (
   registerProcessingWorker(app);
   registerMultipart(app);
   app.register(FastifySSEPlugin);
-  await app.register(websocket);
   registerSchemaCompiler(app);
   registerSwagger(app);
   registerFrontend(app);

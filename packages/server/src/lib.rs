@@ -5,6 +5,7 @@ mod failure;
 mod form;
 mod garbage;
 mod proxy;
+mod realtime;
 mod router;
 mod routes;
 mod serve;
