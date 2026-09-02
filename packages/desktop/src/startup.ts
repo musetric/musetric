@@ -39,6 +39,7 @@ export const startApp = async (
   const backend = await startBackend({
     gpuPageHostFactory: createElectronGpuHost(),
     logDestination: log.destination,
+    logger: log.logger,
   });
   if (backend === undefined) {
     log.logger.error('the storage lock is held by another process');

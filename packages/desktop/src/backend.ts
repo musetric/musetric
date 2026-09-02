@@ -2,9 +2,11 @@ import { join } from 'node:path';
 import { type GpuPageHostFactory } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
+import { startRustProxy } from '@musetric/server';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
-import { type DestinationStream } from 'pino';
+import { type FastifyInstance } from 'fastify';
+import { type DestinationStream, type Logger } from 'pino';
 import { type DesktopBackend } from './backendRunner.js';
 import { acquireStorageLock } from './storageLock.js';
 
@@ -28,6 +30,7 @@ const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
 export type StartBackendOptions = {
   gpuPageHostFactory: GpuPageHostFactory;
   logDestination: DestinationStream;
+  logger: Logger;
 };
 
 export const startBackend = async (
@@ -38,33 +41,51 @@ export const startBackend = async (
   if (!storageLock) {
     return undefined;
   }
+  let backend: FastifyInstance | undefined = undefined;
   try {
     const migration = initDatabase(config.databasePath);
     const { createServerApp } = await import('@musetric/backend-core');
-    const backend = await createServerApp(config, {
+    const fastify = await createServerApp(config, {
       gpuPageHostFactory: options.gpuPageHostFactory,
     });
-    await backend.listen({
+    backend = fastify;
+    await fastify.listen({
       port: 0,
       host: '127.0.0.1',
     });
-    const address = backend.server.address();
+    const address = fastify.server.address();
     if (!address || typeof address === 'string') {
       throw new Error('desktop backend failed to bind a local HTTP port');
     }
+    const proxy = await startRustProxy({
+      upstream: `http://127.0.0.1:${String(address.port)}`,
+      listen: '127.0.0.1:0',
+      resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+      onLog: (line) => {
+        options.logger.info({ scope: 'rustProxy' }, line);
+      },
+    });
     return {
-      url: `http://127.0.0.1:${address.port}`,
+      url: proxy.url,
       migration,
       close: async () => {
         try {
-          await backend.close();
+          await proxy.close();
         } finally {
-          storageLock.release();
+          try {
+            await fastify.close();
+          } finally {
+            storageLock.release();
+          }
         }
       },
     };
   } catch (error) {
-    storageLock.release();
+    try {
+      await backend?.close();
+    } finally {
+      storageLock.release();
+    }
     throw error;
   }
 };

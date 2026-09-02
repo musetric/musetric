@@ -2244,6 +2244,7 @@ __metadata:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
+    "@musetric/server": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
@@ -2302,6 +2303,7 @@ __metadata:
     "@musetric/eslint-config": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
+    "@musetric/server": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
     "@types/node": "catalog:"
@@ -2574,11 +2576,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@musetric/server@workspace:packages/server":
+"@musetric/server@workspace:*, @musetric/server@workspace:packages/server":
   version: 0.0.0-use.local
   resolution: "@musetric/server@workspace:packages/server"
   dependencies:
     "@ast-grep/cli": "catalog:"
+    "@musetric/eslint-config": "workspace:*"
+    "@types/node": "catalog:"
+    "@typescript/native": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
   languageName: unknown
   linkType: soft
 

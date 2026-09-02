@@ -29,6 +29,7 @@
     "@musetric/cqt": "workspace:*",
     "@musetric/ffmpeg": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/server": "workspace:*",
     "@musetric/utils": "workspace:*",
     "axios": "catalog:",
     "fastify": "catalog:",

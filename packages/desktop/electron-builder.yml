@@ -48,6 +48,8 @@ extraResources:
     to: backend/storage/public
   - from: ../backend/dist-browser
     to: backend/dist-browser
+  - from: gen-assets/server
+    to: server
   - from: ../../license.md
     to: license.md
   - from: ../../thirdPartyNotices.md

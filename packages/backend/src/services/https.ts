@@ -1,8 +1,12 @@
-import { type ServerOptions } from 'node:https';
 import { generate } from 'selfsigned';
 import { envs } from '../common/envs.js';
 
-export const getHttps = async (): Promise<ServerOptions | undefined> => {
+export type HttpsCredentials = {
+  certificate: string;
+  privateKey: string;
+};
+
+export const getHttps = async (): Promise<HttpsCredentials | undefined> => {
   if (envs.protocol !== 'https') {
     return undefined;
   }
@@ -10,8 +14,5 @@ export const getHttps = async (): Promise<ServerOptions | undefined> => {
     keySize: 2048,
     extensions: [{ name: 'basicConstraints', cA: true }],
   });
-  return {
-    key: pems.private,
-    cert: pems.cert,
-  };
+  return { certificate: pems.cert, privateKey: pems.private };
 };

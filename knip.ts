@@ -9,7 +9,7 @@ const config: KnipConfig = {
     'packages/desktop/src/backend.ts': ['exports'],
     'packages/desktop/src/electronGpuHost.ts': ['exports'],
   },
-  ignoreBinaries: ['ps', 'xcodegen'],
+  ignoreBinaries: ['ps', 'rustup', 'xcodegen'],
   ignoreUnresolved: ['vite/client', '^tsx$'],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
