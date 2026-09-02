@@ -26,6 +26,3 @@ export const vocalsModel = {
   frames,
   chunkSamples: hop * (frames - 1),
 } as const;
-
-export const resolveVocalsModelUrl = (file: string): string =>
-  `https://huggingface.co/${vocalsModel.modelId}/resolve/${vocalsModel.revision}/${file}`;

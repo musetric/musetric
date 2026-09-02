@@ -22,7 +22,7 @@ use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
-use crate::host::{BoxedError, ExecutorHost, ExecutorHostOptions};
+use crate::host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions};
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -203,7 +203,7 @@ async fn reply(socket: &mut Executor, message: &Value) {
 
 struct RunningJob {
     executor: Executor,
-    answered: tokio::task::JoinHandle<Result<Value, BoxedError>>,
+    answered: tokio::task::JoinHandle<Result<Value, ExecutorFailure>>,
     command: Value,
 }
 
@@ -420,5 +420,5 @@ async fn fails_a_running_job_when_the_executor_disappears() {
         .expect("the job should not hang")
         .expect("the job task should finish")
         .expect_err("the job should fail");
-    assert_eq!(failure.to_string(), "the gpu executor disconnected");
+    assert!(matches!(failure, ExecutorFailure::Unavailable));
 }

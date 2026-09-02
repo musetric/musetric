@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::{Display, Formatter},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
@@ -40,6 +41,23 @@ const FILES_ROUTE: &str = "/files/";
 const MODELS_ROUTE: &str = "/models/";
 const DISCONNECTED: &str = "the gpu executor disconnected";
 
+#[derive(Debug)]
+pub enum ExecutorFailure {
+    Refused(String),
+    Unavailable,
+}
+
+impl Display for ExecutorFailure {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Refused(message) => formatter.write_str(message),
+            Self::Unavailable => formatter.write_str(DISCONNECTED),
+        }
+    }
+}
+
+impl std::error::Error for ExecutorFailure {}
+
 pub type ProgressSink = Arc<dyn Fn(f64) + Send + Sync>;
 
 pub struct ExecutorHostOptions {
@@ -59,8 +77,8 @@ pub(crate) struct HostState {
     files: Mutex<HashMap<String, PathBuf>>,
     directories: Mutex<HashMap<String, PathBuf>>,
     uploads: Mutex<Vec<PendingUpload>>,
-    jobs: Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>,
-    ready: Mutex<Option<oneshot::Sender<Result<(), String>>>>,
+    jobs: Mutex<HashMap<String, oneshot::Sender<Result<Value, ExecutorFailure>>>>,
+    ready: Mutex<Option<oneshot::Sender<Result<(), ExecutorFailure>>>>,
     outgoing: Mutex<Option<mpsc::UnboundedSender<Message>>>,
     closing: Notify,
 }
@@ -77,22 +95,27 @@ impl HostState {
             } => self.report_ready(adapter, shader_f16),
             ExecutorMessage::Progress { progress } => (self.on_progress)(progress),
             ExecutorMessage::Answer { job_id, result } => self.answer(&job_id, Ok(result)),
-            ExecutorMessage::Failure { job_id, error } => self.answer(&job_id, Err(error)),
+            ExecutorMessage::Failure { job_id, error } => {
+                self.answer(&job_id, Err(ExecutorFailure::Refused(error)));
+            }
         }
     }
 
     fn report_ready(&self, adapter: bool, shader_f16: bool) {
         let outcome = if adapter {
             if self.require_shader_f16 && !shader_f16 {
-                Err(format!(
+                Err(ExecutorFailure::Refused(format!(
                     "{} adapter does not support required shader-f16",
                     self.label
-                ))
+                )))
             } else {
                 Ok(())
             }
         } else {
-            Err(format!("{} could not get a WebGPU adapter", self.label))
+            Err(ExecutorFailure::Refused(format!(
+                "{} could not get a WebGPU adapter",
+                self.label
+            )))
         };
         if let Ok(mut ready) = self.ready.lock()
             && let Some(sender) = ready.take()
@@ -101,7 +124,7 @@ impl HostState {
         }
     }
 
-    fn answer(&self, job_id: &str, result: Result<Value, String>) {
+    fn answer(&self, job_id: &str, result: Result<Value, ExecutorFailure>) {
         let taken = self
             .jobs
             .lock()
@@ -148,11 +171,11 @@ impl HostState {
         if let Ok(mut ready) = self.ready.lock()
             && let Some(sender) = ready.take()
         {
-            let _ = sender.send(Err(format!("{} {DISCONNECTED}", self.label)));
+            let _ = sender.send(Err(ExecutorFailure::Unavailable));
         }
         if let Ok(mut jobs) = self.jobs.lock() {
             for (_, sender) in jobs.drain() {
-                let _ = sender.send(Err(DISCONNECTED.to_owned()));
+                let _ = sender.send(Err(ExecutorFailure::Unavailable));
             }
         }
         if let Ok(mut uploads) = self.uploads.lock() {
@@ -162,10 +185,15 @@ impl HostState {
         }
     }
 
-    fn send(&self, message: Message) -> Result<(), BoxedError> {
-        let stored = self.outgoing.lock().map_err(|_| "the host is poisoned")?;
-        let outgoing = stored.as_ref().ok_or(DISCONNECTED)?;
-        outgoing.send(message).map_err(|_| DISCONNECTED)?;
+    fn send(&self, message: Message) -> Result<(), ExecutorFailure> {
+        let stored = self
+            .outgoing
+            .lock()
+            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?;
+        let outgoing = stored.as_ref().ok_or(ExecutorFailure::Unavailable)?;
+        outgoing
+            .send(message)
+            .map_err(|_| ExecutorFailure::Unavailable)?;
         Ok(())
     }
 }
@@ -173,7 +201,7 @@ impl HostState {
 pub struct ExecutorHost {
     state: Arc<HostState>,
     base_url: String,
-    ready: Mutex<Option<oneshot::Receiver<Result<(), String>>>>,
+    ready: Mutex<Option<oneshot::Receiver<Result<(), ExecutorFailure>>>>,
     shutdown: Option<oneshot::Sender<()>>,
     served: JoinHandle<()>,
 }
@@ -282,34 +310,38 @@ impl ExecutorHost {
         Ok(format!("{}{MODELS_ROUTE}{token}", self.base_url))
     }
 
-    pub async fn wait_ready(&self) -> Result<(), BoxedError> {
+    pub async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
         let receiver = self
             .ready
             .lock()
-            .map_err(|_| "the host is poisoned")?
+            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
             .take()
-            .ok_or("the gpu executor was already awaited")?;
+            .ok_or_else(|| {
+                ExecutorFailure::Refused("the gpu executor was already awaited".to_owned())
+            })?;
         let waited = timeout(READY_TIMEOUT, receiver).await;
         let Ok(answered) = waited else {
-            return Err(format!("{} executor did not connect in time", self.state.label).into());
+            return Err(ExecutorFailure::Refused(format!(
+                "{} executor did not connect in time",
+                self.state.label
+            )));
         };
-        answered.map_err(|_| DISCONNECTED)??;
+        answered.map_err(|_| ExecutorFailure::Unavailable)??;
         Ok(())
     }
 
-    pub async fn run(&self, api: &str, request: &Value) -> Result<Value, BoxedError> {
+    pub async fn run(&self, api: &str, request: &Value) -> Result<Value, ExecutorFailure> {
         let job_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         self.state
             .jobs
             .lock()
-            .map_err(|_| "the host is poisoned")?
+            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
             .insert(job_id.clone(), sender);
         let upload_url = format!("{}{UPLOAD_ROUTE}", self.base_url);
         let command = write_job_command(&job_id, api, &upload_url, request);
         self.state.send(Message::Text(command.into()))?;
-        let answered = receiver.await.map_err(|_| DISCONNECTED)?;
-        Ok(answered?)
+        receiver.await.map_err(|_| ExecutorFailure::Unavailable)?
     }
 
     pub fn expect_uploads(

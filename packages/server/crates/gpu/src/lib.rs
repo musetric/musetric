@@ -8,5 +8,5 @@ mod upload;
 mod tests;
 
 pub use cache::{Download, DownloadReport, DownloadStatus, ModelFile, ensure_model_file};
-pub use host::{BoxedError, ExecutorHost, ExecutorHostOptions, ProgressSink};
+pub use host::{BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ProgressSink};
 pub use upload::UploadWait;

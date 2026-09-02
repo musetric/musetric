@@ -4,7 +4,6 @@ import { chordsRouter } from './chords.js';
 import { gpuRouter } from './gpu.js';
 import { keyRouter } from './key.js';
 import { previewRouter } from './preview.js';
-import { processingRouter } from './processing.js';
 import { projectRouter } from './project.js';
 import { rhythmRouter } from './rhythm.js';
 import { subtitleRouter } from './subtitle.js';
@@ -15,7 +14,6 @@ export const registerRouters = (app: FastifyInstance) => {
   app.register(chordsRouter);
   app.register(keyRouter);
   app.register(previewRouter);
-  app.register(processingRouter);
   app.register(projectRouter);
   app.register(rhythmRouter);
   app.register(subtitleRouter);

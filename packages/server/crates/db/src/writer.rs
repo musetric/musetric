@@ -23,6 +23,37 @@ pub struct NewProject {
     pub preview: Option<NewPreview>,
 }
 
+pub struct NewAudioAnalysis {
+    pub source_integrated_loudness_db: f64,
+    pub source_true_peak_db: f64,
+    pub source_gain_db: f64,
+    pub lead_integrated_loudness_db: f64,
+    pub lead_true_peak_db: f64,
+    pub lead_p95_rms_db: f64,
+    pub lead_spectrogram_gain_db: f64,
+    pub backing_integrated_loudness_db: f64,
+    pub backing_true_peak_db: f64,
+    pub instrumental_integrated_loudness_db: f64,
+    pub instrumental_true_peak_db: f64,
+    pub lead_gain_db: f64,
+    pub backing_gain_db: f64,
+    pub instrumental_gain_db: f64,
+}
+
+pub struct StemBlobs {
+    pub lead: String,
+    pub backing: String,
+    pub instrumental: String,
+}
+
+pub struct NewSeparation {
+    pub project_id: i64,
+    pub analysis: NewAudioAnalysis,
+    pub master: StemBlobs,
+    pub delivery: StemBlobs,
+    pub wave_peaks: StemBlobs,
+}
+
 pub struct NewRecording {
     pub project_id: i64,
     pub blob_id: String,
@@ -138,6 +169,34 @@ impl Writer {
         })
     }
 
+    pub fn apply_separation_result(&self, result: &NewSeparation) -> Result<(), BoxedError> {
+        self.write(|transaction| {
+            write_audio_analysis(transaction, result.project_id, &result.analysis)?;
+            for (stem, blob_id) in stems(&result.master) {
+                transaction.execute(
+                    "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, ?2, ?3)
+                     ON CONFLICT(projectId, type) DO UPDATE SET blobId = excluded.blobId",
+                    (result.project_id, stem, blob_id),
+                )?;
+            }
+            for ((stem, blob_id), (_, wave_blob_id)) in stems(&result.delivery)
+                .into_iter()
+                .zip(stems(&result.wave_peaks))
+            {
+                transaction.execute(
+                    "INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(projectId, stemType) DO UPDATE SET
+                       blobId = excluded.blobId,
+                       waveBlobId = excluded.waveBlobId",
+                    (result.project_id, stem, blob_id, wave_blob_id),
+                )?;
+            }
+            clear_failure(transaction, result.project_id, ProcessingStep::Separation)?;
+            Ok(())
+        })
+    }
+
     pub fn record_failure(
         &self,
         project_id: i64,
@@ -170,6 +229,63 @@ impl Writer {
         transaction.commit()?;
         Ok(value)
     }
+}
+
+fn stems(blobs: &StemBlobs) -> [(&'static str, &str); 3] {
+    [
+        ("lead", blobs.lead.as_str()),
+        ("backing", blobs.backing.as_str()),
+        ("instrumental", blobs.instrumental.as_str()),
+    ]
+}
+
+fn write_audio_analysis(
+    transaction: &Transaction,
+    project_id: i64,
+    analysis: &NewAudioAnalysis,
+) -> Result<usize> {
+    transaction.execute(
+        "INSERT INTO ProjectAudioAnalysis (
+           projectId, sourceIntegratedLoudnessDb, sourceTruePeakDb, sourceGainDb,
+           leadIntegratedLoudnessDb, leadTruePeakDb, leadP95RmsDb, leadSpectrogramGainDb,
+           backingIntegratedLoudnessDb, backingTruePeakDb,
+           instrumentalIntegratedLoudnessDb, instrumentalTruePeakDb,
+           leadGainDb, backingGainDb, instrumentalGainDb
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+         ON CONFLICT(projectId) DO UPDATE SET
+           sourceIntegratedLoudnessDb = excluded.sourceIntegratedLoudnessDb,
+           sourceTruePeakDb = excluded.sourceTruePeakDb,
+           sourceGainDb = excluded.sourceGainDb,
+           leadIntegratedLoudnessDb = excluded.leadIntegratedLoudnessDb,
+           leadTruePeakDb = excluded.leadTruePeakDb,
+           leadP95RmsDb = excluded.leadP95RmsDb,
+           leadSpectrogramGainDb = excluded.leadSpectrogramGainDb,
+           backingIntegratedLoudnessDb = excluded.backingIntegratedLoudnessDb,
+           backingTruePeakDb = excluded.backingTruePeakDb,
+           instrumentalIntegratedLoudnessDb = excluded.instrumentalIntegratedLoudnessDb,
+           instrumentalTruePeakDb = excluded.instrumentalTruePeakDb,
+           leadGainDb = excluded.leadGainDb,
+           backingGainDb = excluded.backingGainDb,
+           instrumentalGainDb = excluded.instrumentalGainDb",
+        (
+            project_id,
+            analysis.source_integrated_loudness_db,
+            analysis.source_true_peak_db,
+            analysis.source_gain_db,
+            analysis.lead_integrated_loudness_db,
+            analysis.lead_true_peak_db,
+            analysis.lead_p95_rms_db,
+            analysis.lead_spectrogram_gain_db,
+            analysis.backing_integrated_loudness_db,
+            analysis.backing_true_peak_db,
+            analysis.instrumental_integrated_loudness_db,
+            analysis.instrumental_true_peak_db,
+            analysis.lead_gain_db,
+            analysis.backing_gain_db,
+            analysis.instrumental_gain_db,
+        ),
+    )
 }
 
 fn project_exists(transaction: &Transaction, project_id: i64) -> Result<bool> {

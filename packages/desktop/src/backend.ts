@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { type GpuPageHostFactory, type OpenJobPage } from '@musetric/ai/node';
+import { type OpenJobPage } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
@@ -29,7 +29,6 @@ const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
 };
 
 export type StartBackendOptions = {
-  gpuPageHostFactory: GpuPageHostFactory;
   openPage: OpenJobPage;
   logDestination: DestinationStream;
   logger: Logger;
@@ -48,7 +47,6 @@ export const startBackend = async (
     const migration = initDatabase(config.databasePath);
     const { createServerApp } = await import('@musetric/backend-core');
     const fastify = await createServerApp(config, {
-      gpuPageHostFactory: options.gpuPageHostFactory,
       openPage: options.openPage,
     });
     backend = fastify;

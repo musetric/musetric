@@ -2,7 +2,10 @@ use std::{path::Path, process::Stdio};
 
 use tokio::{io::AsyncReadExt, process::Command};
 
-use crate::{Tools, run::BoxedError};
+use crate::{
+    Tools,
+    run::{BoxedError, run},
+};
 
 const BYTES_PER_FRAME: usize = 8;
 const READ_BUFFER_BYTE_LENGTH: usize = 64 * 1024;
@@ -93,4 +96,16 @@ fn read_float(frame: &[u8], index: usize) -> f32 {
         .get(start..end)
         .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
         .map_or(0.0, f32::from_le_bytes)
+}
+
+pub async fn decode_interleaved_pcm(
+    tools: &Tools,
+    from: &Path,
+    sample_rate: u32,
+) -> Result<Vec<u8>, BoxedError> {
+    let finished = run(&tools.ffmpeg, &decode_arguments(from, sample_rate)).await?;
+    if finished.stdout.is_empty() {
+        return Err("ffmpeg produced no audio data".into());
+    }
+    Ok(finished.stdout)
 }

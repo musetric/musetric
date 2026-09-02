@@ -2076,7 +2076,6 @@ __metadata:
     "@huggingface/transformers": "catalog:"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"

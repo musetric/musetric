@@ -190,3 +190,42 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         ),
     ],
 };
+
+pub(crate) const VOCALS_MODEL: &str = "syhft_core_t1100.onnx";
+pub(crate) const VOCALS_MODEL_DATA: &str = "syhft_core_t1100.onnx.data";
+
+pub(crate) const VOCALS: ModelBundle = ModelBundle {
+    label: "Vocals separation model",
+    model_id: "musetric/vocal-separation-roformer-onnx",
+    revision: "98064f6e42af945316fd96261a18f1befe3a4536",
+    directory: "vocal-separation-roformer-onnx",
+    sample_rate: 44100,
+    downmix: Downmix::Ffmpeg,
+    layout: CacheLayout::Flat,
+    files: &[
+        (
+            VOCALS_MODEL,
+            "8b624200ac9bfc76c38fbcc9dcde3901f307acd6ee7e95b5b0a6cb3022585758",
+        ),
+        (
+            VOCALS_MODEL_DATA,
+            "06b41c5798b3c44d514e74feca715a002031c26fa390fcea913ad01844fb7221",
+        ),
+    ],
+};
+
+pub(crate) const LEAD_BACKING_MODEL: &str = "UVR_MDXNET_KARA_2.onnx";
+
+pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
+    label: "Lead/backing separation model",
+    model_id: "AI4future/RVC",
+    revision: "main",
+    directory: "uvr_mdxnet_kara_2",
+    sample_rate: 44100,
+    downmix: Downmix::Ffmpeg,
+    layout: CacheLayout::Flat,
+    files: &[(
+        LEAD_BACKING_MODEL,
+        "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+    )],
+};
