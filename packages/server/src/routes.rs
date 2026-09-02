@@ -1,6 +1,7 @@
 mod analysis;
 mod audio;
 mod preview;
+mod project;
 
 use std::sync::Arc;
 
@@ -18,6 +19,7 @@ pub(crate) fn create_router(proxy: ProxyState, storage: Arc<Storage>) -> Router 
     analysis::create_router()
         .merge(audio::create_router())
         .merge(preview::create_router())
+        .merge(project::create_router())
         .with_state(RouteState { proxy, storage })
 }
 
@@ -43,7 +45,8 @@ mod tests {
         routing::any,
     };
     use http_body_util::BodyExt;
-    use musetric_db::{OpenOptions, Reader, blob_path, init_database, open_database};
+    use musetric_db::{OpenOptions, Reader, Writer, blob_path, init_database, open_database};
+    use musetric_media::Tools;
     use tokio::{net::TcpListener, sync::oneshot};
     use tower::ServiceExt;
 
@@ -137,11 +140,20 @@ mod tests {
             write(&path, content).expect("the blob should be written");
         }
 
-        fn create_router(&self, upstream: SocketAddr) -> Router {
-            let storage = Arc::new(Storage {
+        fn create_storage(&self) -> Arc<Storage> {
+            Arc::new(Storage {
                 database: Reader::open(&self.database_path()).expect("the reader should open"),
+                writer: Writer::open(&self.database_path()).expect("the writer should open"),
                 blobs_path: self.blobs_path(),
-            });
+                tools: Tools {
+                    ffmpeg: PathBuf::from("ffmpeg"),
+                    ffprobe: PathBuf::from("ffprobe"),
+                },
+            })
+        }
+
+        fn create_router(&self, upstream: SocketAddr) -> Router {
+            let storage = self.create_storage();
             let address = format!("http://{upstream}")
                 .parse()
                 .expect("the upstream should be a valid uri");

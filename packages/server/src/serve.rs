@@ -7,10 +7,11 @@ use std::{
 };
 
 use axum_server::{Handle, tls_rustls::RustlsConfig};
-use musetric_db::{BoxedError, Reader};
+use musetric_db::{BoxedError, Reader, Writer};
+use musetric_media::Tools;
 use tokio::{io::AsyncReadExt, net::TcpListener};
 
-use crate::{router::create_router, storage::Storage};
+use crate::{garbage::spawn_collector, router::create_router, storage::Storage};
 
 const READY_PREFIX: &str = "MUSETRIC_PROXY_URL=";
 const ADDRESS_IN_USE: &str = "MUSETRIC_PROXY_ERROR=address-in-use";
@@ -21,6 +22,8 @@ pub struct ServerOptions {
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
     pub tls: Option<TlsOptions>,
 }
 
@@ -32,8 +35,14 @@ pub struct TlsOptions {
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let storage = Arc::new(Storage {
         database: Reader::open(&options.database)?,
+        writer: Writer::open(&options.database)?,
         blobs_path: options.blobs,
+        tools: Tools {
+            ffmpeg: options.ffmpeg,
+            ffprobe: options.ffprobe,
+        },
     });
+    spawn_collector(Arc::clone(&storage));
     let app = create_router(options.upstream.parse()?, storage);
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;

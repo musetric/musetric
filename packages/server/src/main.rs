@@ -25,6 +25,12 @@ struct Arguments {
     #[arg(long, help = "Directory that holds the stored blobs.")]
     blobs: PathBuf,
 
+    #[arg(long, help = "Bundled ffmpeg binary used to normalise uploaded audio.")]
+    ffmpeg: PathBuf,
+
+    #[arg(long, help = "Bundled ffprobe binary used to measure uploaded audio.")]
+    ffprobe: PathBuf,
+
     #[arg(
         long,
         requires = "private_key",
@@ -55,6 +61,8 @@ async fn main() -> Result<(), BoxedError> {
         listen: arguments.listen,
         database: arguments.database,
         blobs: arguments.blobs,
+        ffmpeg: arguments.ffmpeg,
+        ffprobe: arguments.ffprobe,
         tls,
     })
     .await

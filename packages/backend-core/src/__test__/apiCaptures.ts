@@ -1,6 +1,8 @@
 import { type ApiClient, type ApiSnapshot } from './apiResponse.js';
 import { createFixtureAudioFile, fixtureProjectId } from './projectFixture.js';
 
+const createdProjectId = fixtureProjectId + 1;
+
 export const readUrls = [
   '/api/project/list',
   `/api/project/${fixtureProjectId}`,
@@ -40,6 +42,36 @@ export const invalidUrls = [
 
 const subtitleUrl = `/api/subtitle/project/${fixtureProjectId}`;
 
+const createForm = (fields: Record<string, string | File>): FormData => {
+  const form = new FormData();
+  Object.entries(fields).forEach((entry) => {
+    const [name, value] = entry;
+    form.set(name, value);
+  });
+  return form;
+};
+
+const createPreviewFile = (marker: string): File =>
+  new File([Buffer.from(`preview ${marker}`, 'utf8')], `${marker}.png`, {
+    type: 'image/png',
+  });
+
+const createBrokenAudioFile = (): File =>
+  new File([Buffer.from('not an audio file', 'utf8')], 'broken.wav', {
+    type: 'audio/wav',
+  });
+
+const volatileHeaders = ['etag', 'last-modified'];
+
+const withoutBlobHeaders = (snapshot: ApiSnapshot): ApiSnapshot => {
+  const headers = Object.fromEntries(
+    Object.entries(snapshot.headers).filter(
+      (entry) => !volatileHeaders.includes(entry[0]),
+    ),
+  );
+  return { ...snapshot, headers };
+};
+
 const captureConditional = async (
   client: ApiClient,
 ): Promise<ApiSnapshot[]> => {
@@ -52,34 +84,118 @@ const captureConditional = async (
   return [first, second];
 };
 
-const captureWrites = async (client: ApiClient): Promise<ApiSnapshot[]> => {
-  const created = new FormData();
-  created.set('name', 'Created project');
-  created.set('song', createFixtureAudioFile());
-  const renamed = new FormData();
-  renamed.set('name', 'Renamed project');
-  return [
-    await client.capture({
-      method: 'POST',
-      url: `/api/project/${fixtureProjectId}/retry`,
-      body: { step: 'chords' },
+export const captureInvalidWrites = async (
+  client: ApiClient,
+): Promise<ApiSnapshot[]> => [
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({ name: 'ab', song: createFixtureAudioFile() }),
+  }),
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({ song: createFixtureAudioFile() }),
+  }),
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({ name: 'Without a song' }),
+  }),
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({}),
+  }),
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({
+      name: 'Broken song',
+      song: createBrokenAudioFile(),
     }),
-    await client.capture({
-      method: 'POST',
-      url: '/api/project/create',
-      payload: created,
+  }),
+  await client.capture({
+    method: 'PATCH',
+    url: `/api/project/${fixtureProjectId}/edit`,
+    payload: createForm({ name: 'ab' }),
+  }),
+  await client.capture({
+    method: 'PATCH',
+    url: `/api/project/${fixtureProjectId}/edit`,
+    payload: createForm({ withoutPreview: 'maybe' }),
+  }),
+  await client.capture({
+    method: 'PATCH',
+    url: '/api/project/404/edit',
+    payload: createForm({ name: 'Renamed project' }),
+  }),
+  await client.capture({
+    method: 'PATCH',
+    url: '/api/project/abc/edit',
+    payload: createForm({ name: 'Renamed project' }),
+  }),
+  await client.capture({ method: 'DELETE', url: '/api/project/404/remove' }),
+  await client.capture({ method: 'DELETE', url: '/api/project/abc/remove' }),
+];
+
+export const captureWrites = async (
+  client: ApiClient,
+): Promise<ApiSnapshot[]> => [
+  await client.capture({
+    method: 'POST',
+    url: `/api/project/${fixtureProjectId}/retry`,
+    body: { step: 'chords' },
+  }),
+  await client.capture({
+    method: 'POST',
+    url: '/api/project/create',
+    payload: createForm({
+      name: 'Created project',
+      song: createFixtureAudioFile(),
+      preview: createPreviewFile('created'),
     }),
+  }),
+  await client.capture({
+    method: 'GET',
+    url: `/api/project/${createdProjectId}`,
+  }),
+  withoutBlobHeaders(
     await client.capture({
-      method: 'PATCH',
-      url: `/api/project/${fixtureProjectId}/edit`,
-      payload: renamed,
+      method: 'GET',
+      url: `/api/audio/project/${createdProjectId}/master/source/content`,
     }),
-    await client.capture({
-      method: 'DELETE',
-      url: `/api/project/${fixtureProjectId}/remove`,
-    }),
-  ];
-};
+  ),
+  withoutBlobHeaders(
+    await client.capture({ method: 'GET', url: `/api/preview/2` }),
+  ),
+  await client.capture({
+    method: 'PATCH',
+    url: `/api/project/${fixtureProjectId}/edit`,
+    payload: createForm({ name: 'Renamed project' }),
+  }),
+  await client.capture({
+    method: 'PATCH',
+    url: `/api/project/${fixtureProjectId}/edit`,
+    payload: createForm({ preview: createPreviewFile('replaced') }),
+  }),
+  await client.capture({
+    method: 'GET',
+    url: `/api/project/${fixtureProjectId}`,
+  }),
+  withoutBlobHeaders(
+    await client.capture({ method: 'GET', url: `/api/preview/3` }),
+  ),
+  await client.capture({
+    method: 'PATCH',
+    url: `/api/project/${fixtureProjectId}/edit`,
+    payload: createForm({ withoutPreview: 'true' }),
+  }),
+  await client.capture({
+    method: 'DELETE',
+    url: `/api/project/${fixtureProjectId}/remove`,
+  }),
+];
 
 export const captureEverything = async (
   client: ApiClient,
@@ -90,6 +206,7 @@ export const captureEverything = async (
   }
   snapshots.push(...(await captureConditional(client)));
   snapshots.push(await client.captureStream('/api/project/status/stream'));
+  snapshots.push(...(await captureInvalidWrites(client)));
   snapshots.push(...(await captureWrites(client)));
   return snapshots;
 };

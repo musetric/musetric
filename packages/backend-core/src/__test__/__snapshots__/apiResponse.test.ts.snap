@@ -104,6 +104,132 @@ exports[`editing a project answers the same way 1`] = `
 }
 `;
 
+exports[`invalid writes answer the same way 1`] = `
+[
+  {
+    "body": {
+      "message": "body/name Too small: expected string to have >=3 characters",
+    },
+    "headers": {
+      "content-length": "73",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/create",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "body/name Invalid input: expected string, received undefined",
+    },
+    "headers": {
+      "content-length": "74",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/create",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "body/song Invalid input: expected file, received undefined",
+    },
+    "headers": {
+      "content-length": "72",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/create",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "body/song Invalid input: expected file, received undefined, body/name Invalid input: expected string, received undefined",
+    },
+    "headers": {
+      "content-length": "134",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/create",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "Uploaded audio file is invalid",
+    },
+    "headers": {
+      "content-length": "44",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "POST /api/project/create",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "body/name Too small: expected string to have >=3 characters",
+    },
+    "headers": {
+      "content-length": "73",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "PATCH /api/project/1/edit",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "body/withoutPreview Invalid input: expected boolean, received string",
+    },
+    "headers": {
+      "content-length": "82",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "PATCH /api/project/1/edit",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "Project with id 404 not found",
+    },
+    "headers": {
+      "content-length": "43",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "PATCH /api/project/404/edit",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "params/projectId Invalid input: expected number, received string",
+    },
+    "headers": {
+      "content-length": "78",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "PATCH /api/project/abc/edit",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "Project with id 404 not found",
+    },
+    "headers": {
+      "content-length": "43",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "DELETE /api/project/404/remove",
+    "status": 404,
+  },
+  {
+    "body": {
+      "message": "params/projectId Invalid input: expected number, received string",
+    },
+    "headers": {
+      "content-length": "78",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "DELETE /api/project/abc/remove",
+    "status": 400,
+  },
+]
+`;
+
 exports[`missing resources answer the same way 1`] = `
 [
   {

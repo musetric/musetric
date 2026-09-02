@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { type GpuPageHostFactory } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
+import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
 import { startRustProxy } from '@musetric/server';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
@@ -62,6 +63,8 @@ export const startBackend = async (
       listen: '127.0.0.1:0',
       databasePath: config.databasePath,
       blobsPath: config.blobsPath,
+      ffmpegPath: ffmpegPath(),
+      ffprobePath: ffprobePath(),
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustProxy' }, line);

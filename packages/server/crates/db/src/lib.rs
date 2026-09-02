@@ -9,6 +9,7 @@ mod project;
 mod reader;
 mod runner;
 mod schema;
+mod writer;
 
 #[cfg(test)]
 mod tests;
@@ -23,3 +24,4 @@ pub use preview::Preview;
 pub use reader::Reader;
 pub use runner::{MigrationReport, init_database, run_migrations};
 pub use schema::{MIGRATIONS, Migration};
+pub use writer::{NewPreview, NewProject, ProjectEdit, Writer};

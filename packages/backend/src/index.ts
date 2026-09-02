@@ -1,5 +1,6 @@
 import { createServerApp } from '@musetric/backend-core';
 import { type AppConfig } from '@musetric/backend-core/config';
+import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
 import {
   isAddressInUseError,
   type RustProxy,
@@ -39,6 +40,8 @@ const startServer = async () => {
       listen: `${envs.host}:${String(envs.port)}`,
       databasePath: config.databasePath,
       blobsPath: config.blobsPath,
+      ffmpegPath: ffmpegPath(),
+      ffprobePath: ffprobePath(),
       tls: https,
       onLog: (line) => {
         console.log(line);

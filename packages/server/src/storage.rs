@@ -1,13 +1,16 @@
 use std::{path::PathBuf, sync::Arc};
 
-use musetric_db::{BoxedError, Reader};
+use musetric_db::{BoxedError, Reader, Writer};
+use musetric_media::Tools;
 use tokio::task::spawn_blocking;
 
 use crate::failure::Failure;
 
 pub(crate) struct Storage {
     pub(crate) database: Reader,
+    pub(crate) writer: Writer,
     pub(crate) blobs_path: PathBuf,
+    pub(crate) tools: Tools,
 }
 
 pub(crate) async fn read<Value>(
@@ -19,6 +22,20 @@ where
 {
     let owned = Arc::clone(storage);
     spawn_blocking(move || query(&owned.database))
+        .await
+        .map_err(Failure::failed)?
+        .map_err(Failure::failed)
+}
+
+pub(crate) async fn write<Value>(
+    storage: &Arc<Storage>,
+    change: impl FnOnce(&Writer) -> Result<Value, BoxedError> + Send + 'static,
+) -> Result<Value, Failure>
+where
+    Value: Send + 'static,
+{
+    let owned = Arc::clone(storage);
+    spawn_blocking(move || change(&owned.writer))
         .await
         .map_err(Failure::failed)?
         .map_err(Failure::failed)
