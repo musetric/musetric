@@ -6427,16 +6427,16 @@ __metadata:
   linkType: hard
 
 "fast-uri@npm:^3.0.0, fast-uri@npm:^3.0.1, fast-uri@npm:^3.0.5":
-  version: 3.1.5
-  resolution: "fast-uri@npm:3.1.5"
-  checksum: 10c0/2bf60eb800dd610c65e17be436425dcb21c92aff3a87d442a8bccab0b7b071e88cf1a5d7d1ea946370b937e6fc0375c405c0296c10587e57de4f78be4646d1d0
+  version: 3.1.6
+  resolution: "fast-uri@npm:3.1.6"
+  checksum: 10c0/77fa4f966f7d2cf83c34af2d3eb88882872fe90634f27a6bd309551db65377d3ca55616467c7cb4dcc57e33523d149e2fec1952d51cc2f00bfce68a66c3711ea
   languageName: node
   linkType: hard
 
 "fast-uri@npm:^4.0.0":
-  version: 4.1.2
-  resolution: "fast-uri@npm:4.1.2"
-  checksum: 10c0/539fda19fbc7ada89ac8c5beca3c7ab57d643789485ca25f2b88f94edaea3fc90d553ecd55d85b95d5c819ab2bf57f6ff7880aa0a92d0883e25bd35f30860e6a
+  version: 4.1.3
+  resolution: "fast-uri@npm:4.1.3"
+  checksum: 10c0/6fc13d8731757ab6ba419a38044dece1b0757f086c57e75627218d66a0085ae3cff501aaa9840fffb4c83ecccd9806e7f8ebce985cd6e3fb589cffec3d86b9b1
   languageName: node
   linkType: hard
 
