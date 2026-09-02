@@ -9,5 +9,3 @@ export type AppConfig = StoragePaths & {
   logDestination?: DestinationStream;
   https?: ServerOptions;
 };
-
-export const processingIntervalMs = 10 * 1000;

@@ -3,10 +3,7 @@ import { fastifyRoute } from '@musetric/api/node';
 import { bindLogger } from '@musetric/utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { assertFound } from '../common/assertFound.js';
-import {
-  resolveProcessing,
-  resolveProcessingEvent,
-} from '../services/processingWorker/processingSummary.js';
+import { resolveProcessing } from '../services/processing/summary.js';
 import { createProjectSource } from '../services/projectSource.js';
 
 export const projectRouter: FastifyPluginCallbackZod = (app) => {
@@ -78,21 +75,12 @@ export const projectRouter: FastifyPluginCallbackZod = (app) => {
   app.route({
     ...fastifyRoute(api.project.status.base),
     handler: (request, reply) => {
-      const unsubscribe = app.processingWorker.emitter.subscribe((event) => {
-        reply.sse({
-          data: api.project.status.event.stringify({
-            projectId: event.projectId,
-            processing: resolveProcessingEvent(event),
-          }),
-        });
-      });
       const heartbeat = setInterval(() => {
         reply.sse({ event: 'ping' });
       }, 30_000);
 
       request.socket.on('close', () => {
         clearInterval(heartbeat);
-        unsubscribe();
       });
 
       reply.sse({ comment: 'connected' });

@@ -33,6 +33,14 @@ struct Arguments {
 
     #[arg(
         long,
+        default_value_t = true,
+        num_args = 1,
+        help = "Run the processing queue that turns uploaded songs into analyses."
+    )]
+    processing: bool,
+
+    #[arg(
+        long,
         requires = "private_key",
         help = "PEM certificate for the public HTTPS listener."
     )]
@@ -63,6 +71,7 @@ async fn main() -> Result<(), BoxedError> {
         blobs: arguments.blobs,
         ffmpeg: arguments.ffmpeg,
         ffprobe: arguments.ffprobe,
+        processing: arguments.processing,
         tls,
     })
     .await

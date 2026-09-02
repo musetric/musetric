@@ -7,8 +7,8 @@ use tokio::task::spawn_blocking;
 use crate::failure::Failure;
 
 pub(crate) struct Storage {
-    pub(crate) database: Reader,
-    pub(crate) writer: Writer,
+    pub(crate) database: Arc<Reader>,
+    pub(crate) writer: Arc<Writer>,
     pub(crate) blobs_path: PathBuf,
     pub(crate) tools: Tools,
 }

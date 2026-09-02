@@ -8,14 +8,19 @@ use std::{
 
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, Reader, Writer};
+use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::Tools;
 use tokio::{io::AsyncReadExt, net::TcpListener};
 
-use crate::{garbage::spawn_collector, router::create_router, storage::Storage};
+use crate::{
+    garbage::spawn_collector, jobs::UpstreamRunner, proxy::ProxyState, router::create_router,
+    storage::Storage,
+};
 
 const READY_PREFIX: &str = "MUSETRIC_PROXY_URL=";
 const ADDRESS_IN_USE: &str = "MUSETRIC_PROXY_ERROR=address-in-use";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct ServerOptions {
     pub upstream: String,
@@ -24,6 +29,7 @@ pub struct ServerOptions {
     pub blobs: PathBuf,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
+    pub processing: bool,
     pub tls: Option<TlsOptions>,
 }
 
@@ -34,8 +40,8 @@ pub struct TlsOptions {
 
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let storage = Arc::new(Storage {
-        database: Reader::open(&options.database)?,
-        writer: Writer::open(&options.database)?,
+        database: Arc::new(Reader::open(&options.database)?),
+        writer: Arc::new(Writer::open(&options.database)?),
         blobs_path: options.blobs,
         tools: Tools {
             ffmpeg: options.ffmpeg,
@@ -43,7 +49,17 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         },
     });
     spawn_collector(Arc::clone(&storage));
-    let app = create_router(options.upstream.parse()?, storage);
+    let proxy = ProxyState::create(options.upstream.parse()?);
+    let queue = Queue::create(QueueOptions {
+        reader: Arc::clone(&storage.database),
+        writer: Arc::clone(&storage.writer),
+        runner: Arc::new(UpstreamRunner::create(proxy.clone())),
+        interval: PROCESSING_INTERVAL,
+    });
+    if options.processing {
+        queue.spawn();
+    }
+    let app = create_router(proxy, storage, queue);
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     if let Some(tls) = options.tls {

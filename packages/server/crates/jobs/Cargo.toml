@@ -1,0 +1,20 @@
+[package]
+name = "musetric-jobs"
+description = "Musetric processing queue: steps, progress, failures and events"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT"
+authors = ["Musetric <musetric@gmail.com>"]
+repository = "https://github.com/musetric/musetric"
+
+[dependencies]
+musetric-db = { path = "../db" }
+serde_json = "=1.0.151"
+tokio = { version = "=1.53.1", features = ["macros", "rt", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
+
+[lints]
+workspace = true

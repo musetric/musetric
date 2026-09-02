@@ -776,6 +776,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "musetric-jobs"
+version = "0.1.0"
+dependencies = [
+ "musetric-db",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "musetric-media"
 version = "0.1.0"
 dependencies = [
@@ -797,6 +806,7 @@ dependencies = [
  "hyper-util",
  "md5",
  "musetric-db",
+ "musetric-jobs",
  "musetric-media",
  "serde_json",
  "time",

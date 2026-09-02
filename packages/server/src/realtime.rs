@@ -376,7 +376,10 @@ mod tests {
 
     use super::packet;
     use crate::{
-        proxy::ProxyState, realtime::Rooms, routes, storage::Storage, test_workspace::Workspace,
+        proxy::ProxyState,
+        routes,
+        storage::Storage,
+        test_workspace::{Workspace, create_route_state},
     };
 
     const PROJECT: &str = "
@@ -404,11 +407,8 @@ mod tests {
         let upstream = "http://127.0.0.1:1"
             .parse()
             .expect("the upstream should be a valid uri");
-        let application: Router = routes::create_router(
-            ProxyState::create(upstream),
-            Arc::new(Rooms::create()),
-            storage,
-        );
+        let application: Router =
+            routes::create_router(create_route_state(ProxyState::create(upstream), storage));
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("the test server should bind");

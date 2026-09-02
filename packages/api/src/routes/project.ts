@@ -47,7 +47,6 @@ export const processingStepsSchema = z.object({
   key: processingStepSchema,
   chords: processingStepSchema,
 });
-export type ProcessingSteps = z.infer<typeof processingStepsSchema>;
 
 export const processingSchema = z.object({
   done: z.boolean().optional(),
