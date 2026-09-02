@@ -76,8 +76,22 @@ const runJob = async (
   }
 };
 
+const loopbackHosts = ['127.0.0.1', 'localhost', '[::1]', '::1'];
+
+const readSocketUrl = (jobUrl: string): string | undefined => {
+  const url = new URL(jobUrl);
+  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+    return undefined;
+  }
+  return loopbackHosts.includes(url.hostname) ? url.toString() : undefined;
+};
+
 export const startJobExecutor = (jobUrl: string): void => {
-  const socket = new WebSocket(jobUrl);
+  const socketUrl = readSocketUrl(jobUrl);
+  if (socketUrl === undefined) {
+    throw new Error('The job executor accepts a local socket url only');
+  }
+  const socket = new WebSocket(socketUrl);
   socket.addEventListener('open', () => {
     void readGpuSupport().then((support) => {
       send(socket, { type: 'ready', ...support });

@@ -83,3 +83,12 @@ test('the browser client reports a failing job back to the host', async () => {
     await page.close();
   }
 });
+
+test('the browser client refuses a socket url outside the machine', () => {
+  expect(() => {
+    startJobExecutor('ws://example.com/jobs');
+  }).toThrow('accepts a local socket url only');
+  expect(() => {
+    startJobExecutor('http://127.0.0.1/jobs');
+  }).toThrow('accepts a local socket url only');
+});

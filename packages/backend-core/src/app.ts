@@ -30,6 +30,7 @@ declare module 'fastify' {
 
 export type CreateServerAppOptions = {
   gpuPageHostFactory?: GpuPageHostFactory;
+  withProcessingWorker?: boolean;
 };
 
 export const createServerApp = async (
@@ -50,7 +51,7 @@ export const createServerApp = async (
   registerApiLogger(app);
   await registerDb(app);
   registerBlobStorage(app);
-  registerProcessingWorker(app);
+  registerProcessingWorker(app, options.withProcessingWorker ?? true);
   registerMultipart(app);
   app.register(FastifySSEPlugin);
   registerSchemaCompiler(app);
