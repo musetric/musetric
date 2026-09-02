@@ -18,6 +18,7 @@ hyper = { version = "=1.11.1", features = ["client", "http1"] }
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "http1", "tokio"] }
 md5 = "=0.8.1"
 musetric-db = { path = "crates/db" }
+musetric-gpu = { path = "crates/gpu" }
 musetric-jobs = { path = "crates/jobs" }
 musetric-media = { path = "crates/media" }
 serde_json = "=1.0.151"

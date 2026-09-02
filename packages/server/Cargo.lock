@@ -776,6 +776,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "musetric-gpu"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "musetric-jobs"
 version = "0.1.0"
 dependencies = [
@@ -806,6 +822,7 @@ dependencies = [
  "hyper-util",
  "md5",
  "musetric-db",
+ "musetric-gpu",
  "musetric-jobs",
  "musetric-media",
  "serde_json",
