@@ -1,0 +1,12 @@
+id: forbid-rust-comments
+language: Rust
+severity: error
+message: Comments are forbidden, including doc comments; say it with names, types and tests.
+files:
+  - '**/*.rs'
+ignores:
+  - target/**
+rule:
+  any:
+    - kind: line_comment
+    - kind: block_comment

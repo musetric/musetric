@@ -4,7 +4,10 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
+    "check:rust": "ast-grep scan . && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
     "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
+  },
+  "devDependencies": {
+    "@ast-grep/cli": "catalog:"
   }
 }
