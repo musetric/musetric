@@ -288,3 +288,91 @@ fn shards_a_blob_path_by_the_first_two_byte_pairs() {
             .join("1f2e3d4c-0000-4000-8000-000000000001")
     );
 }
+
+const BLOB_COLUMNS: [&str; 10] = [
+    "AudioDelivery.blobId",
+    "AudioDelivery.waveBlobId",
+    "AudioMaster.blobId",
+    "Chords.blobId",
+    "Key.blobId",
+    "Preview.blobId",
+    "Recording.blobId",
+    "Recording.waveBlobId",
+    "Rhythm.blobId",
+    "Subtitle.blobId",
+];
+
+const BLOB_SEED: &str = "
+  INSERT INTO Project (name, sampleRate, frameCount) VALUES ('song', 44100, 100);
+  INSERT INTO AudioMaster (projectId, type, blobId)
+    VALUES (1, 'source', 'AudioMaster.blobId');
+  INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
+    VALUES (1, 'lead', 'AudioDelivery.blobId', 'AudioDelivery.waveBlobId');
+  INSERT INTO Preview (projectId, blobId, filename, contentType)
+    VALUES (1, 'Preview.blobId', 'cover.png', 'image/png');
+  INSERT INTO Subtitle (projectId, blobId) VALUES (1, 'Subtitle.blobId');
+  INSERT INTO Rhythm (projectId, blobId) VALUES (1, 'Rhythm.blobId');
+  INSERT INTO Key (projectId, blobId) VALUES (1, 'Key.blobId');
+  INSERT INTO Chords (projectId, blobId) VALUES (1, 'Chords.blobId');
+  INSERT INTO Recording (projectId, blobId, waveBlobId, sampleRate, frameCount)
+    VALUES (1, 'Recording.blobId', 'Recording.waveBlobId', 44100, 100);
+";
+
+fn blob_columns(path: &Path) -> Vec<String> {
+    let tables: Vec<String> = read(path, |connection| {
+        let mut statement = connection
+            .prepare(
+                "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )
+            .unwrap();
+        statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    });
+    let mut columns: Vec<String> = tables
+        .iter()
+        .flat_map(|table| {
+            read(path, |connection| {
+                let mut statement = connection
+                    .prepare(&format!("PRAGMA table_info({table})"))
+                    .unwrap();
+                statement
+                    .query_map([], |row| row.get::<_, String>(1))
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .map(|column| format!("{table}.{column}"))
+                    .collect::<Vec<_>>()
+            })
+        })
+        .filter(|column| column.to_lowercase().ends_with("blobid"))
+        .collect();
+    columns.sort();
+    columns
+}
+
+#[test]
+fn covers_every_blob_column_the_schema_declares() {
+    let workspace = Workspace::new();
+    init_database(&workspace.database_path()).unwrap();
+
+    assert_eq!(blob_columns(&workspace.database_path()), BLOB_COLUMNS);
+}
+
+#[test]
+fn lists_a_value_stored_in_every_blob_column() {
+    let workspace = Workspace::new();
+    init_database(&workspace.database_path()).unwrap();
+    let options = OpenOptions { foreign_keys: true };
+    open_database(&workspace.database_path(), &options)
+        .unwrap()
+        .execute_batch(BLOB_SEED)
+        .unwrap();
+
+    let reader = crate::Reader::open(&workspace.database_path()).unwrap();
+    let mut blob_ids = reader.referenced_blob_ids().unwrap();
+    blob_ids.sort();
+
+    assert_eq!(blob_ids, BLOB_COLUMNS);
+}

@@ -10,6 +10,4 @@ export type AppConfig = StoragePaths & {
   https?: ServerOptions;
 };
 
-export const gcIntervalMs = 5 * 60 * 1000;
-export const blobRetentionMs = 5 * 60 * 1000;
 export const processingIntervalMs = 10 * 1000;

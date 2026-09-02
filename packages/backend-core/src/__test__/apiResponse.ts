@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
 import { startRustProxy } from '@musetric/server';
 import { type FastifyInstance, type InjectOptions } from 'fastify';
 import { createServerApp } from '../app.js';
@@ -191,6 +192,8 @@ const withClient = async <Result>(
     listen: '127.0.0.1:0',
     databasePath: workspace.config.databasePath,
     blobsPath: workspace.config.blobsPath,
+    ffmpegPath: ffmpegPath(),
+    ffprobePath: ffprobePath(),
   });
   try {
     return await run(createHttpClient(proxy.url), workspace);

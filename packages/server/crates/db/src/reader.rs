@@ -8,6 +8,7 @@ use crate::{
         AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
         read_recording,
     },
+    blob::read_referenced_blob_ids,
     database::{OpenOptions, open_database},
     failure::BoxedError,
     preview::{Preview, read_preview},
@@ -65,6 +66,10 @@ impl Reader {
 
     pub fn preview(&self, preview_id: i64) -> Result<Option<Preview>, BoxedError> {
         self.read(|connection| read_preview(connection, preview_id))
+    }
+
+    pub fn referenced_blob_ids(&self) -> Result<Vec<String>, BoxedError> {
+        self.read(read_referenced_blob_ids)
     }
 
     fn read<Value>(

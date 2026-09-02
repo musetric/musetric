@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { invalidUrls, missingUrls, readUrls } from './apiCaptures.js';
+import {
+  captureInvalidWrites,
+  invalidUrls,
+  missingUrls,
+  readUrls,
+} from './apiCaptures.js';
 import { type ApiSnapshot, withTestServer } from './apiResponse.js';
 import {
   createFixtureAudioFile,
@@ -37,6 +42,11 @@ test('unparsable ids answer the same way', async () => {
     }
     return result;
   });
+  expect(snapshots).toMatchSnapshot();
+});
+
+test('invalid writes answer the same way', async () => {
+  const snapshots = await withTestServer(captureInvalidWrites);
   expect(snapshots).toMatchSnapshot();
 });
 

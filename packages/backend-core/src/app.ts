@@ -12,7 +12,6 @@ import {
   disableRequestLogging,
   registerApiLogger,
 } from './services/apiLogger.js';
-import { registerBlobGarbageCollector } from './services/blobGarbageCollector.js';
 import { registerBlobStorage } from './services/blobStorage.js';
 import { registerDb } from './services/db.js';
 import { registerFrontend } from './services/frontend.js';
@@ -52,7 +51,6 @@ export const createServerApp = async (
   registerApiLogger(app);
   await registerDb(app);
   registerBlobStorage(app);
-  registerBlobGarbageCollector(app);
   registerProcessingWorker(app);
   registerMultipart(app);
   app.register(FastifySSEPlugin);
