@@ -2080,6 +2080,7 @@ __metadata:
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
+    "@types/ws": "catalog:"
     "@typescript/native": "catalog:"
     "@webgpu/types": "catalog:"
     eslint: "catalog:"
@@ -2087,6 +2088,7 @@ __metadata:
     playwright: "catalog:"
     typescript: "catalog:"
     vitest: "catalog:"
+    ws: "catalog:"
   peerDependencies:
     "@musetric/cqt": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
@@ -4039,6 +4041,15 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: 10c0/a58ba341cb9e7d74f71810a88862da7b2a6fa42e2a1fc0ce40498f6ea1d44382f0640117057da779f74c47039f7166bf48fad02dc876f94e005c7afa50f5e129
+  languageName: node
+  linkType: hard
+
+"@types/ws@npm:8.18.1":
+  version: 8.18.1
+  resolution: "@types/ws@npm:8.18.1"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/61aff1129143fcc4312f083bc9e9e168aa3026b7dd6e70796276dcfb2c8211c4292603f9c4864fae702f2ed86e4abd4d38aa421831c2fd7f856c931a481afbab
   languageName: node
   linkType: hard
 
@@ -10707,7 +10718,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:^8.19.0":
+"ws@npm:8.21.0, ws@npm:^8.19.0":
   version: 8.21.0
   resolution: "ws@npm:8.21.0"
   peerDependencies:

@@ -3,7 +3,9 @@ import {
   type BrowserProgressMessage,
   reportProgressApiName,
 } from './browserApi.js';
+import { gpuSupportApiName } from './browserGpuSupport.js';
 import { type CreateGpuPageOptions, type GpuPage } from './gpuPageHost.node.js';
+import { createJobGpuPage, type OpenedPage } from './jobGpuPage.node.js';
 
 const browserLaunchArgs = [
   '--enable-unsafe-webgpu',
@@ -17,30 +19,18 @@ const ensureWebGpu = async (
   label: string,
   requireShaderF16: boolean,
 ): Promise<void> => {
-  const support = await page.evaluate(async () => {
-    const gpu: unknown = Reflect.get(navigator, 'gpu');
-    if (typeof gpu !== 'object' || !gpu) {
+  const support = await page.evaluate(async (name: string) => {
+    const api: unknown = Reflect.get(globalThis, name);
+    if (typeof api !== 'function') {
       return { adapter: false, shaderF16: false };
     }
-    const requestAdapter: unknown = Reflect.get(gpu, 'requestAdapter');
-    if (typeof requestAdapter !== 'function') {
-      return { adapter: false, shaderF16: false };
-    }
-    const adapter: unknown = await Reflect.apply(requestAdapter, gpu, []);
-    if (typeof adapter !== 'object' || !adapter) {
-      return { adapter: false, shaderF16: false };
-    }
-    const features: unknown = Reflect.get(adapter, 'features');
-    const has =
-      typeof features === 'object' && features
-        ? Reflect.get(features, 'has')
-        : undefined;
-    const shaderF16 =
-      typeof has === 'function'
-        ? Boolean(Reflect.apply(has, features, ['shader-f16']))
+    const reported: unknown = await Reflect.apply(api, undefined, []);
+    const read = (key: string): boolean =>
+      typeof reported === 'object' && reported
+        ? Boolean(Reflect.get(reported, key))
         : false;
-    return { adapter: true, shaderF16 };
-  });
+    return { adapter: read('adapter'), shaderF16: read('shaderF16') };
+  }, gpuSupportApiName);
   if (!support.adapter) {
     throw new Error(`${label} could not get a WebGPU adapter`);
   }
@@ -99,13 +89,8 @@ const captureDownloads = async (
   });
 };
 
-const createGpuPage = async (
-  browser: Browser,
-  options: CreateGpuPageOptions,
-): Promise<Page> => {
-  const { label, pageUrl, apiName, requireShaderF16 } = options;
-  const { onProgress, onConsole, onPageError } = options;
-  const page = await browser.newPage();
+const attachDiagnostics = (page: Page, options: CreateGpuPageOptions): void => {
+  const { onConsole, onPageError } = options;
   if (onConsole !== undefined) {
     page.on('console', (message) => {
       onConsole(message.text());
@@ -116,6 +101,15 @@ const createGpuPage = async (
       onPageError(error.message);
     });
   }
+};
+
+const createGpuPage = async (
+  browser: Browser,
+  options: CreateGpuPageOptions,
+): Promise<Page> => {
+  const { label, pageUrl, apiName, requireShaderF16, onProgress } = options;
+  const page = await browser.newPage();
+  attachDiagnostics(page, options);
   if (onProgress !== undefined) {
     await page.exposeFunction(
       reportProgressApiName,
@@ -125,11 +119,11 @@ const createGpuPage = async (
     );
   }
   await page.goto(pageUrl);
-  await ensureWebGpu(page, label, requireShaderF16);
   await page.waitForFunction(
     (name) => typeof Reflect.get(globalThis, name) === 'function',
     apiName,
   );
+  await ensureWebGpu(page, label, requireShaderF16);
   return page;
 };
 
@@ -149,6 +143,28 @@ export const createPlaywrightGpuPage = async (
       captureDownloads: async (targets) => captureDownloads(page, targets),
       close: async () => browser.close(),
     };
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
+};
+
+export const createPlaywrightJobGpuPage = async (
+  options: CreateGpuPageOptions,
+): Promise<GpuPage> => {
+  const browser = await chromium.launch({
+    headless: true,
+    channel: 'chromium',
+    args: browserLaunchArgs,
+  });
+  const open = async (url: string): Promise<OpenedPage> => {
+    const page = await browser.newPage();
+    attachDiagnostics(page, options);
+    await page.goto(url);
+    return { close: async () => browser.close() };
+  };
+  try {
+    return await createJobGpuPage({ ...options, open });
   } catch (error) {
     await browser.close();
     throw error;

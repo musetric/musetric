@@ -21,7 +21,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@huggingface/transformers": "catalog:"
+    "@huggingface/transformers": "catalog:",
+    "ws": "catalog:"
   },
   "peerDependencies": {
     "@musetric/cqt": "workspace:*",
@@ -37,6 +38,7 @@
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
+    "@types/ws": "catalog:",
     "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
