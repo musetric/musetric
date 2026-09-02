@@ -61,6 +61,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/ffmpeg": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/server": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",

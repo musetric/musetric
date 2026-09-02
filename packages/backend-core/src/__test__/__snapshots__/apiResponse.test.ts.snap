@@ -6,7 +6,6 @@ exports[`a matching etag answers not modified 1`] = `
   "headers": {
     "cache-control": "public, max-age=86400",
     "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_subtitle.json",
-    "content-length": "82",
     "content-type": "application/json",
     "etag": "f5f493b54a7a83e748f0861d3850614f",
     "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",

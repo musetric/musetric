@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { startRustProxy } from '@musetric/server';
 import { type FastifyInstance, type InjectOptions } from 'fastify';
 import { createServerApp } from '../app.js';
 import { createProjectFixture } from './projectFixture.js';
@@ -16,33 +17,14 @@ const snapshotHeaders = [
   'last-modified',
 ];
 
-export const withTestServer = async <Result>(
-  run: (app: FastifyInstance, workspace: StorageWorkspace) => Promise<Result>,
-): Promise<Result> => {
-  const workspace = createStorageWorkspace();
-  await createProjectFixture(workspace);
-  const app = await createServerApp(workspace.config, {
-    gpuPageHostFactory: () => {
-      throw new Error('A test must not reach the GPU host');
-    },
-  });
-  await app.ready();
-  try {
-    return await run(app, workspace);
-  } finally {
-    await app.close();
-    workspace.remove();
-  }
-};
-
 const readHeaders = (
-  headers: Record<string, unknown>,
+  read: (name: string) => string | undefined,
 ): Record<string, string> => {
   const result: Record<string, string> = {};
   snapshotHeaders.forEach((name) => {
-    const value = headers[name];
+    const value = read(name);
     if (value !== undefined) {
-      result[name] = String(value);
+      result[name] = value;
     }
   });
   return result;
@@ -76,40 +58,158 @@ export type ApiSnapshot = {
   body: unknown;
 };
 
-export const captureResponse = async (
-  app: FastifyInstance,
-  options: CaptureOptions,
-): Promise<ApiSnapshot> => {
-  const inject: InjectOptions = {
-    method: options.method,
-    url: options.url,
-    headers: options.headers,
-    payload: options.payload ?? options.body,
-  };
-  const response = await app.inject(inject);
-  const headers = readHeaders(response.headers);
+const createSnapshot = (
+  options: Pick<CaptureOptions, 'method' | 'url'>,
+  status: number,
+  headers: Record<string, string>,
+  payload: Buffer,
+): ApiSnapshot => ({
+  route: `${options.method} ${options.url}`,
+  status,
+  headers,
+  body: readBody(headers['content-type'] ?? '', payload),
+});
+
+export type ApiClient = {
+  capture: (options: CaptureOptions) => Promise<ApiSnapshot>;
+  captureStream: (url: string) => Promise<ApiSnapshot>;
+};
+
+const createInjectClient = (app: FastifyInstance): ApiClient => ({
+  capture: async (options) => {
+    const inject: InjectOptions = {
+      method: options.method,
+      url: options.url,
+      headers: options.headers,
+      payload: options.payload ?? options.body,
+    };
+    const response = await app.inject(inject);
+    const headers = readHeaders((name) => {
+      const value = response.headers[name];
+      return value === undefined ? undefined : String(value);
+    });
+    return createSnapshot(
+      options,
+      response.statusCode,
+      headers,
+      response.rawPayload,
+    );
+  },
+  captureStream: async (url) => {
+    const inject: InjectOptions = { method: 'GET', url, payloadAsStream: true };
+    const response = await app.inject(inject);
+    const chunk: unknown = await new Promise((resolve) => {
+      response.stream().once('data', resolve);
+    });
+    response.stream().destroy();
+    return {
+      route: `GET ${url}`,
+      status: response.statusCode,
+      headers: readHeaders((name) => {
+        const value = response.headers[name];
+        return value === undefined ? undefined : String(value);
+      }),
+      body: Buffer.isBuffer(chunk) ? chunk.toString('utf8') : undefined,
+    };
+  },
+});
+
+const createRequestInit = (options: CaptureOptions): RequestInit => {
+  if (options.body !== undefined) {
+    return {
+      method: options.method,
+      headers: { ...options.headers, 'content-type': 'application/json' },
+      body: JSON.stringify(options.body),
+    };
+  }
   return {
-    route: `${options.method} ${options.url}`,
-    status: response.statusCode,
-    headers,
-    body: readBody(headers['content-type'] ?? '', response.rawPayload),
+    method: options.method,
+    headers: options.headers,
+    body: options.payload,
   };
 };
 
-export const captureStream = async (
+const createHttpClient = (baseUrl: string): ApiClient => ({
+  capture: async (options) => {
+    const response = await fetch(
+      `${baseUrl}${options.url}`,
+      createRequestInit(options),
+    );
+    const headers = readHeaders(
+      (name) => response.headers.get(name) ?? undefined,
+    );
+    const payload = Buffer.from(await response.arrayBuffer());
+    return createSnapshot(options, response.status, headers, payload);
+  },
+  captureStream: async (url) => {
+    const response = await fetch(`${baseUrl}${url}`);
+    const reader = response.body?.getReader();
+    const chunk = await reader?.read();
+    await reader?.cancel();
+    return {
+      route: `GET ${url}`,
+      status: response.status,
+      headers: readHeaders((name) => response.headers.get(name) ?? undefined),
+      body: chunk?.value
+        ? Buffer.from(chunk.value).toString('utf8')
+        : undefined,
+    };
+  },
+});
+
+const listenLocally = async (app: FastifyInstance): Promise<string> => {
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('the test server failed to bind a local port');
+  }
+  return `http://127.0.0.1:${String(address.port)}`;
+};
+
+export type Transport = 'inject' | 'http' | 'proxy';
+
+export type ServerRun<Result> = (
+  client: ApiClient,
+  workspace: StorageWorkspace,
+) => Promise<Result>;
+
+const withClient = async <Result>(
   app: FastifyInstance,
-  url: string,
-): Promise<ApiSnapshot> => {
-  const inject: InjectOptions = { method: 'GET', url, payloadAsStream: true };
-  const response = await app.inject(inject);
-  const chunk: unknown = await new Promise((resolve) => {
-    response.stream().once('data', resolve);
+  workspace: StorageWorkspace,
+  transport: Transport,
+  run: ServerRun<Result>,
+): Promise<Result> => {
+  if (transport === 'inject') {
+    return await run(createInjectClient(app), workspace);
+  }
+  const upstream = await listenLocally(app);
+  if (transport === 'http') {
+    return await run(createHttpClient(upstream), workspace);
+  }
+  const proxy = await startRustProxy({ upstream, listen: '127.0.0.1:0' });
+  try {
+    return await run(createHttpClient(proxy.url), workspace);
+  } finally {
+    await proxy.close();
+  }
+};
+
+export const withTestServer = async <Result>(
+  run: ServerRun<Result>,
+  transport: Transport = 'inject',
+): Promise<Result> => {
+  const workspace = createStorageWorkspace();
+  await createProjectFixture(workspace);
+  const app = await createServerApp(workspace.config, {
+    gpuPageHostFactory: () => {
+      throw new Error('A test must not reach the GPU host');
+    },
   });
-  response.stream().destroy();
-  return {
-    route: `GET ${url}`,
-    status: response.statusCode,
-    headers: readHeaders(response.headers),
-    body: Buffer.isBuffer(chunk) ? chunk.toString('utf8') : undefined,
-  };
+  await app.ready();
+  try {
+    return await withClient(app, workspace, transport, run);
+  } finally {
+    await app.close();
+    workspace.remove();
+  }
 };
