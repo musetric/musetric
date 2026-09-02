@@ -1,5 +1,8 @@
 import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
-import { buildChordSegments } from '../chords/chordSegments.js';
+import {
+  buildChordSegments,
+  type ChordResult,
+} from '../chords/chordSegments.js';
 import { chordNetModel } from '../models/chordNetModel.js';
 import {
   fetchFloat32,
@@ -10,7 +13,6 @@ import {
 import {
   analyzeChordsApiName,
   type BrowserAnalyzeChordsRequest,
-  type BrowserAnalyzeChordsResult,
 } from './chordsApi.js';
 
 type CqtPlanManifest = {
@@ -53,7 +55,7 @@ const fetchCqtPlan = async (
 };
 
 export const registerChordsApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeChordsRequest, BrowserAnalyzeChordsResult>(
+  registerBrowserApi<BrowserAnalyzeChordsRequest, ChordResult>(
     analyzeChordsApiName,
     async (request) => {
       await reportProgress(0);
