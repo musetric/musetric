@@ -4,8 +4,13 @@ use rusqlite::Connection;
 
 use crate::{
     analysis::{Analysis, read_analysis_blob},
+    audio::{
+        AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
+        read_recording,
+    },
     database::{OpenOptions, open_database},
     failure::BoxedError,
+    preview::{Preview, read_preview},
     project::read_project_name,
 };
 
@@ -36,6 +41,30 @@ impl Reader {
 
     pub fn project_name(&self, project_id: i64) -> Result<Option<String>, BoxedError> {
         self.read(|connection| read_project_name(connection, project_id))
+    }
+
+    pub fn master_blob(
+        &self,
+        project_id: i64,
+        master: MasterType,
+    ) -> Result<Option<String>, BoxedError> {
+        self.read(|connection| read_master_blob(connection, project_id, master))
+    }
+
+    pub fn delivery(
+        &self,
+        project_id: i64,
+        stem: StemType,
+    ) -> Result<Option<AudioDelivery>, BoxedError> {
+        self.read(|connection| read_delivery(connection, project_id, stem))
+    }
+
+    pub fn recording(&self, project_id: i64) -> Result<Option<Recording>, BoxedError> {
+        self.read(|connection| read_recording(connection, project_id))
+    }
+
+    pub fn preview(&self, preview_id: i64) -> Result<Option<Preview>, BoxedError> {
+        self.read(|connection| read_preview(connection, preview_id))
     }
 
     fn read<Value>(

@@ -194,6 +194,30 @@ exports[`missing resources answer the same way 1`] = `
     "route": "GET /api/audio/project/404/delivery/lead/content",
     "status": 404,
   },
+  {
+    "body": {
+      "byteLength": 44,
+      "sha256": "531cd597b25052b4845ef2f3887dec2183240802a93b6e044960de8ba017caa0",
+    },
+    "headers": {
+      "cache-control": "no-store",
+      "content-type": "audio/wav",
+    },
+    "route": "GET /api/audio/project/404/recording/content",
+    "status": 200,
+  },
+  {
+    "body": {
+      "byteLength": 30720,
+      "sha256": "4c7eea521d2218c5965fd3666c694a967a939e29a6928d528b6ed1101176b8ac",
+    },
+    "headers": {
+      "cache-control": "no-store",
+      "content-type": "application/octet-stream",
+    },
+    "route": "GET /api/audio/project/404/recording/wave",
+    "status": 200,
+  },
 ]
 `;
 
@@ -622,6 +646,39 @@ exports[`unparsable ids answer the same way 1`] = `
       "content-type": "application/json; charset=utf-8",
     },
     "route": "GET /api/subtitle/project/abc",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "params/previewId Invalid input: expected number, received string",
+    },
+    "headers": {
+      "content-length": "78",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/preview/abc",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "params/type Invalid option: expected one of "source"|"lead"|"backing"|"instrumental"",
+    },
+    "headers": {
+      "content-length": "106",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/audio/project/1/master/vocals/content",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "params/stemType Invalid option: expected one of "lead"|"backing"|"instrumental"",
+    },
+    "headers": {
+      "content-length": "99",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/audio/project/1/delivery/vocals/wave",
     "status": 400,
   },
 ]

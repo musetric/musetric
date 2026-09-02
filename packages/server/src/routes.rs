@@ -1,175 +1,24 @@
-use std::{path::PathBuf, sync::Arc, time::SystemTime};
+mod analysis;
+mod audio;
+mod preview;
 
-use axum::{
-    Router,
-    body::Body,
-    extract::{Path, State},
-    http::{HeaderMap, HeaderValue, Request, StatusCode, header::CONTENT_TYPE},
-    response::Response,
-    routing::{MethodRouter, get},
-};
-use musetric_db::{Analysis, blob_path};
-use tokio::{
-    fs::{File, metadata},
-    task::spawn_blocking,
-};
-use tokio_util::io::ReaderStream;
+use std::sync::Arc;
 
-use crate::{
-    cached_file::{CachedFile, CachedHeaders},
-    proxy::{ProxyState, forward},
-    storage::Storage,
-};
+use axum::Router;
 
-const CONTENT_TYPE_JSON: &str = "application/json";
-const CONTENT_TYPE_ERROR: &str = "application/json; charset=utf-8";
+use crate::{proxy::ProxyState, storage::Storage};
 
 #[derive(Clone)]
-pub(crate) struct AnalysisState {
-    proxy: ProxyState,
-    storage: Arc<Storage>,
-}
-
-enum Failure {
-    NotFound(String),
-    Failed(String),
-}
-
-struct AnalysisBlob {
-    path: PathBuf,
-    project_name: String,
-}
-
-struct BlobStat {
-    size: u64,
-    modified: SystemTime,
+pub(crate) struct RouteState {
+    pub(crate) proxy: ProxyState,
+    pub(crate) storage: Arc<Storage>,
 }
 
 pub(crate) fn create_router(proxy: ProxyState, storage: Arc<Storage>) -> Router {
-    Router::new()
-        .route(
-            "/api/chords/project/{projectId}",
-            create_route(Analysis::Chords),
-        )
-        .route("/api/key/project/{projectId}", create_route(Analysis::Key))
-        .route(
-            "/api/rhythm/project/{projectId}",
-            create_route(Analysis::Rhythm),
-        )
-        .route(
-            "/api/subtitle/project/{projectId}",
-            create_route(Analysis::Subtitle),
-        )
-        .with_state(AnalysisState { proxy, storage })
-}
-
-fn create_route(analysis: Analysis) -> MethodRouter<AnalysisState> {
-    get(
-        move |State(state): State<AnalysisState>,
-              Path(project_id): Path<String>,
-              request: Request<Body>| async move {
-            handle(analysis, state, &project_id, request).await
-        },
-    )
-}
-
-async fn handle(
-    analysis: Analysis,
-    state: AnalysisState,
-    raw_project_id: &str,
-    request: Request<Body>,
-) -> Response<Body> {
-    let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
-    };
-    match send_analysis(analysis, &state.storage, project_id, request.headers()).await {
-        Ok(response) => response,
-        Err(failure) => create_failure_response(failure),
-    }
-}
-
-async fn send_analysis(
-    analysis: Analysis,
-    storage: &Arc<Storage>,
-    project_id: i64,
-    request: &HeaderMap,
-) -> Result<Response<Body>, Failure> {
-    let blob = read_analysis_blob(analysis, storage, project_id).await?;
-    let stat = read_blob_stat(&blob, analysis, project_id).await?;
-    let file = CachedFile {
-        filename: format!(
-            "{}_{}.json",
-            blob.project_name,
-            analysis.table().to_ascii_lowercase()
-        ),
-        content_type: CONTENT_TYPE_JSON,
-        size: stat.size,
-        modified: stat.modified,
-    };
-    let headers =
-        CachedHeaders::create(&file).map_err(|error| Failure::Failed(error.to_string()))?;
-    if headers.is_not_modified(request) {
-        return Ok(headers.respond_not_modified());
-    }
-    let content = File::open(&blob.path)
-        .await
-        .map_err(|error| Failure::Failed(error.to_string()))?;
-    let body = Body::from_stream(ReaderStream::new(content));
-    Ok(headers.respond(file.size, body))
-}
-
-async fn read_analysis_blob(
-    analysis: Analysis,
-    storage: &Arc<Storage>,
-    project_id: i64,
-) -> Result<AnalysisBlob, Failure> {
-    let owned = Arc::clone(storage);
-    let read = spawn_blocking(move || {
-        let blob_id = owned.database.analysis_blob(analysis, project_id)?;
-        let project_name = owned.database.project_name(project_id)?;
-        Ok::<_, musetric_db::BoxedError>((blob_id, project_name))
-    })
-    .await
-    .map_err(|error| Failure::Failed(error.to_string()))?;
-    let (found_blob, found_project) = read.map_err(|error| Failure::Failed(error.to_string()))?;
-    let title = analysis.table();
-    let blob_id = found_blob
-        .ok_or_else(|| Failure::NotFound(format!("{title} for project {project_id} not found")))?;
-    let project_name = found_project
-        .ok_or_else(|| Failure::NotFound(format!("Project with id {project_id} not found")))?;
-    Ok(AnalysisBlob {
-        path: blob_path(&storage.blobs_path, &blob_id),
-        project_name,
-    })
-}
-
-async fn read_blob_stat(
-    blob: &AnalysisBlob,
-    analysis: Analysis,
-    project_id: i64,
-) -> Result<BlobStat, Failure> {
-    let title = analysis.table();
-    let missing = || Failure::NotFound(format!("{title} blob for project {project_id} not found"));
-    let metadata = metadata(&blob.path).await.map_err(|_| missing())?;
-    let modified = metadata.modified().map_err(|_| missing())?;
-    Ok(BlobStat {
-        size: metadata.len(),
-        modified,
-    })
-}
-
-fn create_failure_response(failure: Failure) -> Response<Body> {
-    let (status, message) = match failure {
-        Failure::NotFound(message) => (StatusCode::NOT_FOUND, message),
-        Failure::Failed(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
-    };
-    let payload = serde_json::json!({ "message": message }).to_string();
-    let mut response = Response::new(Body::from(payload));
-    *response.status_mut() = status;
-    response
-        .headers_mut()
-        .insert(CONTENT_TYPE, HeaderValue::from_static(CONTENT_TYPE_ERROR));
-    response
+    analysis::create_router()
+        .merge(audio::create_router())
+        .merge(preview::create_router())
+        .with_state(RouteState { proxy, storage })
 }
 
 #[cfg(test)]
@@ -202,7 +51,22 @@ mod tests {
     use crate::{proxy::ProxyState, storage::Storage};
 
     const BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
+    const OTHER_BLOB_ID: &str = "5a6b7c8d-0000-4000-8000-000000000002";
     const CHORDS: &str = "{\"segments\":[]}";
+    const AUDIO: &str = "fixture audio";
+    const PEAKS: &str = "fixture peaks";
+    const PREVIEW: &str = "fixture preview";
+    const FLAC: &str = "audio/flac";
+    const FMP4: &str = "audio/mp4";
+    const NO_STORE: &str = "no-store";
+    const WAV_HEADER_BYTE_LENGTH: usize = 44;
+    const PEAKS_BYTE_LENGTH: usize = 3840 * 2 * 4;
+    const SOURCE_URL: &str = "/api/audio/project/1/master/source/content";
+    const LEAD_URL: &str = "/api/audio/project/1/master/lead/content";
+    const DELIVERY_URL: &str = "/api/audio/project/1/delivery/lead/content";
+    const WAVE_URL: &str = "/api/audio/project/1/delivery/lead/wave";
+    const RECORDING_URL: &str = "/api/audio/project/1/recording/content";
+    const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/wave";
     const CREATE_PROJECT: &str = "
       INSERT INTO Project (id, name, sampleRate, frameCount)
       VALUES (1, 'Fixture project', 44100, 441000);
@@ -210,6 +74,20 @@ mod tests {
     const CREATE_CHORDS: &str = "
       INSERT INTO Chords (projectId, blobId)
       VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001');
+    ";
+    const CREATE_MASTERS: &str = "
+      INSERT INTO AudioMaster (projectId, type, blobId)
+      VALUES (1, 'source', '1f2e3d4c-0000-4000-8000-000000000001'),
+             (1, 'lead', '5a6b7c8d-0000-4000-8000-000000000002');
+    ";
+    const CREATE_DELIVERY: &str = "
+      INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
+      VALUES (1, 'lead', '1f2e3d4c-0000-4000-8000-000000000001',
+                         '5a6b7c8d-0000-4000-8000-000000000002');
+    ";
+    const CREATE_PREVIEW: &str = "
+      INSERT INTO Preview (projectId, blobId, filename, contentType)
+      VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001', 'preview.png', 'image/png');
     ";
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -226,7 +104,7 @@ mod tests {
                 .as_nanos();
             let ordinal = WORKSPACE_COUNT.fetch_add(1, Ordering::Relaxed);
             let directory =
-                std::env::temp_dir().join(format!("musetric-analysis-{}-{stamp}-{ordinal}", id()));
+                std::env::temp_dir().join(format!("musetric-routes-{}-{stamp}-{ordinal}", id()));
             create_dir_all(&directory).expect("the workspace should be created");
             let workspace = Self { directory };
             init_database(&workspace.database_path()).expect("the database should be created");
@@ -252,8 +130,8 @@ mod tests {
                 .expect("the fixture should be written");
         }
 
-        fn add_blob(&self, content: &str) {
-            let path = blob_path(&self.blobs_path(), BLOB_ID);
+        fn add_blob(&self, blob_id: &str, content: &str) {
+            let path = blob_path(&self.blobs_path(), blob_id);
             let directory = path.parent().expect("a blob path should have a directory");
             create_dir_all(directory).expect("the blob directory should be created");
             write(&path, content).expect("the blob should be written");
@@ -333,7 +211,7 @@ mod tests {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
-        workspace.add_blob(CHORDS);
+        workspace.add_blob(BLOB_ID, CHORDS);
         let (upstream, shutdown) = start_upstream().await;
 
         let response = request(workspace.create_router(upstream), "/api/chords/project/1").await;
@@ -359,7 +237,7 @@ mod tests {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
-        workspace.add_blob(CHORDS);
+        workspace.add_blob(BLOB_ID, CHORDS);
         let (upstream, shutdown) = start_upstream().await;
         let router = workspace.create_router(upstream);
         let first = request(router.clone(), "/api/chords/project/1").await;
@@ -426,6 +304,135 @@ mod tests {
             read_body(response).await,
             "upstream answered /api/chords/project/abc"
         );
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn names_a_master_stem_after_the_project_and_the_stem() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_MASTERS);
+        workspace.add_blob(BLOB_ID, AUDIO);
+        workspace.add_blob(OTHER_BLOB_ID, AUDIO);
+        let (upstream, shutdown) = start_upstream().await;
+        let router = workspace.create_router(upstream);
+
+        let source = request(router.clone(), SOURCE_URL).await;
+        let lead = request(router, LEAD_URL).await;
+
+        assert_eq!(
+            read_header(&source, "content-disposition"),
+            Some("attachment; filename*=UTF-8''Fixture%20project.flac".to_owned())
+        );
+        assert_eq!(read_header(&source, "content-type"), Some(FLAC.to_owned()));
+        assert_eq!(
+            read_header(&lead, "content-disposition"),
+            Some("attachment; filename*=UTF-8''Fixture%20project_lead.flac".to_owned())
+        );
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn reads_the_delivery_and_its_peaks_from_one_row() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_DELIVERY);
+        workspace.add_blob(BLOB_ID, AUDIO);
+        workspace.add_blob(OTHER_BLOB_ID, PEAKS);
+        let (upstream, shutdown) = start_upstream().await;
+        let router = workspace.create_router(upstream);
+
+        let content = request(router.clone(), DELIVERY_URL).await;
+        let wave = request(router, WAVE_URL).await;
+
+        assert_eq!(
+            read_header(&content, "content-disposition"),
+            Some("attachment; filename*=UTF-8''Fixture%20project_lead.mp4".to_owned())
+        );
+        assert_eq!(read_header(&content, "content-type"), Some(FMP4.to_owned()));
+        assert_eq!(
+            read_header(&wave, "content-disposition"),
+            Some("attachment; filename*=UTF-8''waveform.bin".to_owned())
+        );
+        assert_eq!(read_body(wave).await, PEAKS);
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn hands_out_an_empty_take_when_nothing_is_recorded() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        let (upstream, shutdown) = start_upstream().await;
+        let router = workspace.create_router(upstream);
+
+        let content = request(router.clone(), RECORDING_URL).await;
+        let wave = request(router, RECORDING_WAVE_URL).await;
+
+        assert_eq!(content.status(), StatusCode::OK);
+        assert_eq!(
+            read_header(&content, "cache-control"),
+            Some(NO_STORE.to_owned())
+        );
+        assert_eq!(
+            read_header(&content, "content-type"),
+            Some("audio/wav".to_owned())
+        );
+        assert_eq!(read_header(&content, "content-length"), None);
+        assert_eq!(read_header(&wave, "content-length"), None);
+        let header = to_bytes(content.into_body(), WAV_HEADER_BYTE_LENGTH)
+            .await
+            .expect("the body should be readable");
+        assert_eq!(header.len(), WAV_HEADER_BYTE_LENGTH);
+        assert_eq!(&header[..4], b"RIFF");
+        assert_eq!(
+            read_header(&wave, "cache-control"),
+            Some(NO_STORE.to_owned())
+        );
+        let peaks = to_bytes(wave.into_body(), PEAKS_BYTE_LENGTH)
+            .await
+            .expect("the body should be readable");
+        assert_eq!(peaks.len(), PEAKS_BYTE_LENGTH);
+        assert!(peaks.iter().all(|byte| *byte == 0));
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn leaves_a_stem_type_it_does_not_know_to_the_upstream() {
+        let workspace = Workspace::new();
+        let (upstream, shutdown) = start_upstream().await;
+
+        let response = request(
+            workspace.create_router(upstream),
+            "/api/audio/project/1/delivery/vocals/content",
+        )
+        .await;
+
+        assert_eq!(
+            read_body(response).await,
+            "upstream answered /api/audio/project/1/delivery/vocals/content"
+        );
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn sends_a_preview_with_the_content_type_it_was_stored_with() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_PREVIEW);
+        workspace.add_blob(BLOB_ID, PREVIEW);
+        let (upstream, shutdown) = start_upstream().await;
+
+        let response = request(workspace.create_router(upstream), "/api/preview/1").await;
+
+        assert_eq!(
+            read_header(&response, "content-type"),
+            Some("image/png".to_owned())
+        );
+        assert_eq!(
+            read_header(&response, "content-disposition"),
+            Some("attachment; filename*=UTF-8''preview.png".to_owned())
+        );
+        assert_eq!(read_body(response).await, PREVIEW);
         let _ = shutdown.send(());
     }
 }
