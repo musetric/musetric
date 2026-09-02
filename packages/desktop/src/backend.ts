@@ -67,6 +67,7 @@ export const startBackend = async (
       ffprobePath: ffprobePath(),
       modelsPath: config.modelsPath,
       browserBundlePath: config.browserBundlePath,
+      publicPath: config.publicPath,
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustProxy' }, line);

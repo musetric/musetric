@@ -4,6 +4,7 @@ mod blobs;
 mod cached_file;
 mod failure;
 mod form;
+mod frontend;
 mod garbage;
 mod proxy;
 mod realtime;

@@ -13,7 +13,6 @@ import {
 } from './services/apiLogger.js';
 import { registerBlobStorage } from './services/blobStorage.js';
 import { registerDb } from './services/db.js';
-import { registerFrontend } from './services/frontend.js';
 import { createLoggerOptions } from './services/logger.js';
 import { registerMultipart } from './services/multipart.js';
 import { registerSchemaCompiler } from './services/schemaCompiler.js';
@@ -50,7 +49,6 @@ export const createServerApp = async (
   app.register(FastifySSEPlugin);
   registerSchemaCompiler(app);
   registerSwagger(app);
-  registerFrontend(app);
   registerRouters(app);
   return app;
 };

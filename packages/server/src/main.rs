@@ -40,6 +40,9 @@ struct Arguments {
     )]
     browser_bundle: PathBuf,
 
+    #[arg(long, help = "Directory that holds the built frontend.")]
+    public: PathBuf,
+
     #[arg(
         long,
         default_value_t = true,
@@ -82,6 +85,7 @@ async fn main() -> Result<(), BoxedError> {
         ffprobe: arguments.ffprobe,
         models: arguments.models,
         browser_bundle: arguments.browser_bundle,
+        public: arguments.public,
         processing: arguments.processing,
         tls,
     })

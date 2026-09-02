@@ -15,9 +15,10 @@ use tokio::{io::AsyncReadExt, net::TcpListener};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
+    frontend::Frontend,
     garbage::spawn_collector,
     proxy::ProxyState,
-    router::create_router,
+    router::{RouterOptions, create_router},
     storage::Storage,
 };
 
@@ -35,6 +36,7 @@ pub struct ServerOptions {
     pub ffprobe: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: PathBuf,
+    pub public: PathBuf,
     pub processing: bool,
     pub tls: Option<TlsOptions>,
 }
@@ -72,7 +74,12 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     if options.processing {
         queue.spawn();
     }
-    let app = create_router(proxy, storage, queue);
+    let app = create_router(RouterOptions {
+        proxy,
+        frontend: Frontend::create(options.public),
+        storage,
+        queue,
+    });
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     if let Some(tls) = options.tls {
