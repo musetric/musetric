@@ -1,5 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, Result};
 
+use crate::processing::ProcessingStep;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Analysis {
     Chords,
@@ -9,6 +11,16 @@ pub enum Analysis {
 }
 
 impl Analysis {
+    #[must_use]
+    pub fn step(self) -> ProcessingStep {
+        match self {
+            Self::Chords => ProcessingStep::Chords,
+            Self::Key => ProcessingStep::Key,
+            Self::Rhythm => ProcessingStep::Rhythm,
+            Self::Subtitle => ProcessingStep::Transcription,
+        }
+    }
+
     #[must_use]
     pub fn table(self) -> &'static str {
         match self {

@@ -5,12 +5,18 @@ use crate::{
     run::{BoxedError, run},
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Downmix {
+    Ffmpeg,
+    Mean,
+}
+
 pub async fn decode_mono_pcm(
     tools: &Tools,
     from: &Path,
     sample_rate: u32,
+    downmix: Downmix,
 ) -> Result<Vec<u8>, BoxedError> {
-    let channels = read_channel_count(tools, from).await?;
     let mut arguments = vec![
         "-hide_banner".to_owned(),
         "-loglevel".to_owned(),
@@ -23,7 +29,7 @@ pub async fn decode_mono_pcm(
         "-dn".to_owned(),
         "-vn".to_owned(),
     ];
-    arguments.extend(mean_downmix(channels));
+    arguments.extend(read_downmix(tools, from, downmix).await?);
     arguments.extend([
         "-ar".to_owned(),
         sample_rate.to_string(),
@@ -38,6 +44,18 @@ pub async fn decode_mono_pcm(
         return Err("ffmpeg produced no audio data".into());
     }
     Ok(finished.stdout)
+}
+
+async fn read_downmix(
+    tools: &Tools,
+    from: &Path,
+    downmix: Downmix,
+) -> Result<Vec<String>, BoxedError> {
+    if downmix == Downmix::Ffmpeg {
+        return Ok(single_channel());
+    }
+    let channels = read_channel_count(tools, from).await?;
+    Ok(mean_downmix(channels))
 }
 
 async fn read_channel_count(tools: &Tools, from: &Path) -> Result<u32, BoxedError> {
@@ -61,9 +79,13 @@ async fn read_channel_count(tools: &Tools, from: &Path) -> Result<u32, BoxedErro
         .ok_or_else(|| "Invalid audio channel count".into())
 }
 
+fn single_channel() -> Vec<String> {
+    vec!["-ac".to_owned(), "1".to_owned()]
+}
+
 fn mean_downmix(channels: u32) -> Vec<String> {
     if channels <= 1 {
-        return vec!["-ac".to_owned(), "1".to_owned()];
+        return single_channel();
     }
     let weight = 1.0 / f64::from(channels);
     let terms = (0..channels)
@@ -75,7 +97,24 @@ fn mean_downmix(channels: u32) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::mean_downmix;
+    use std::path::{Path, PathBuf};
+
+    use super::{Downmix, mean_downmix, read_downmix};
+    use crate::Tools;
+
+    #[tokio::test]
+    async fn keeps_the_ffmpeg_downmix_without_probing_the_source() {
+        let tools = Tools {
+            ffmpeg: PathBuf::from("missing-ffmpeg"),
+            ffprobe: PathBuf::from("missing-ffprobe"),
+        };
+
+        let arguments = read_downmix(&tools, Path::new("missing.wav"), Downmix::Ffmpeg)
+            .await
+            .expect("the ffmpeg downmix should not need the source");
+
+        assert_eq!(arguments, vec!["-ac", "1"]);
+    }
 
     #[test]
     fn weights_every_channel_the_way_the_node_decoder_does() {

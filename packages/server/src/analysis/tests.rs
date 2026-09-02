@@ -6,18 +6,20 @@ use axum::{
     http::StatusCode,
     routing::{delete, post},
 };
-use musetric_db::{PendingJob, ProcessingStep};
+use musetric_db::{Analysis, PendingJob, ProcessingStep};
 use musetric_gpu::{Download, DownloadStatus};
+use musetric_media::Downmix;
 use reqwest::Client;
-use serde_json::json;
+use serde_json::{Value, json};
 use tokio::fs::read_to_string;
 
 use crate::{
     analysis::{
         AnalysisContext,
-        chords::{describe, store},
-        models::chord_net_files,
+        browser::{FileUrls, describe, store},
+        models::{CHORD_NET, CHORD_NET_MODEL},
         page::{PageFailure, close_page, open_page},
+        steps::create as create_step,
     },
     proxy::ProxyState,
     storage::read,
@@ -113,7 +115,7 @@ async fn stores_the_chords_the_executor_answered() {
     };
     let chords = json!({ "segments": [{ "start": 0, "end": 1, "label": "C" }] });
 
-    store(&context, &job, &chords)
+    store(&context, &job, Analysis::Chords, &chords)
         .await
         .map_err(|_| "the chords should be stored")
         .expect("the chords should be stored");
@@ -178,7 +180,7 @@ fn describes_a_download_the_way_the_api_expects() {
 
 #[test]
 fn points_every_chord_model_file_at_its_cache_entry() {
-    let files = chord_net_files(std::path::Path::new("/models"));
+    let files = CHORD_NET.cached(std::path::Path::new("/models"));
 
     let names = files
         .iter()
@@ -195,7 +197,7 @@ fn points_every_chord_model_file_at_its_cache_entry() {
     );
     let model = files
         .iter()
-        .find(|file| file.file == "chordnet.onnx")
+        .find(|file| file.file == CHORD_NET_MODEL)
         .expect("the model should be listed");
     assert_eq!(
         model.url,
@@ -206,4 +208,75 @@ fn points_every_chord_model_file_at_its_cache_entry() {
             .path
             .ends_with(std::path::Path::new("chordmini-onnx/chordnet.onnx"))
     );
+}
+
+fn create_urls(files: &[&str]) -> FileUrls {
+    let urls = files
+        .iter()
+        .map(|file| ((*file).to_owned(), format!("http://host/files/{file}")))
+        .collect();
+    FileUrls::create(urls)
+}
+
+fn describe_step(step: ProcessingStep) -> Option<Value> {
+    let analysis = create_step(step, std::path::Path::new("/models"))?;
+    let files = analysis
+        .files
+        .iter()
+        .map(|model| model.file.as_str())
+        .collect::<Vec<_>>();
+    let urls = create_urls(&files);
+    let request = (analysis.build)("http://host/pcm", &urls)
+        .map_err(|_| "the request should be built")
+        .expect("the request should be built");
+    Some(json!({
+        "api": analysis.api,
+        "table": analysis.stored.table(),
+        "mean": analysis.downmix == Downmix::Mean,
+        "request": request,
+    }))
+}
+
+#[test]
+fn asks_the_browser_for_the_rhythm_it_stores_as_rhythm() {
+    let described = describe_step(ProcessingStep::Rhythm);
+
+    assert_eq!(
+        described,
+        Some(json!({
+            "api": "musetricAiAnalyzeRhythm",
+            "table": "Rhythm",
+            "mean": true,
+            "request": {
+                "pcmUrl": "http://host/pcm",
+                "modelUrl": "http://host/files/beat_this.onnx",
+                "filterbankUrl": "http://host/files/mel-filterbank.bin",
+            },
+        }))
+    );
+}
+
+#[test]
+fn asks_the_browser_for_the_key_without_a_mean_downmix() {
+    let described = describe_step(ProcessingStep::Key);
+
+    assert_eq!(
+        described,
+        Some(json!({
+            "api": "musetricAiAnalyzeKey",
+            "table": "Key",
+            "mean": false,
+            "request": {
+                "pcmUrl": "http://host/pcm",
+                "modelUrl": "http://host/files/skey.onnx",
+            },
+        }))
+    );
+}
+
+#[test]
+fn leaves_the_remaining_steps_to_the_upstream_app() {
+    assert!(describe_step(ProcessingStep::Chords).is_some());
+    assert!(describe_step(ProcessingStep::Transcription).is_none());
+    assert!(describe_step(ProcessingStep::Separation).is_none());
 }

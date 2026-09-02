@@ -3,6 +3,7 @@ use std::{path::Path, sync::Mutex};
 use rusqlite::{Connection, OptionalExtension, Result, Transaction, TransactionBehavior};
 
 use crate::{
+    analysis::Analysis,
     database::{OpenOptions, open_database},
     failure::BoxedError,
     processing::{ProcessingStep, clear_failure, write_failure},
@@ -117,14 +118,22 @@ impl Writer {
         })
     }
 
-    pub fn apply_chords_result(&self, project_id: i64, blob_id: &str) -> Result<(), BoxedError> {
+    pub fn apply_analysis_result(
+        &self,
+        analysis: Analysis,
+        project_id: i64,
+        blob_id: &str,
+    ) -> Result<(), BoxedError> {
+        let table = analysis.table();
         self.write(|transaction| {
             transaction.execute(
-                "INSERT INTO Chords (projectId, blobId) VALUES (?1, ?2)
-                 ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId",
+                &format!(
+                    "INSERT INTO {table} (projectId, blobId) VALUES (?1, ?2)
+                     ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId"
+                ),
                 (project_id, blob_id),
             )?;
-            clear_failure(transaction, project_id, ProcessingStep::Chords)?;
+            clear_failure(transaction, project_id, analysis.step())?;
             Ok(())
         })
     }

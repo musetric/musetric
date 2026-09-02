@@ -1,5 +1,3 @@
-export * from './key/analyzeKey.node.js';
-export * from './rhythm/analyzeRhythm.node.js';
 export * from './separation/separateAudio.node.js';
 export * from './service/browserApi.js';
 export * from './service/gpuHost.node.js';

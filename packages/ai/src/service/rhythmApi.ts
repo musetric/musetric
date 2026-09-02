@@ -5,8 +5,3 @@ export type BrowserAnalyzeRhythmRequest = {
   modelUrl: string;
   filterbankUrl: string;
 };
-
-export type BrowserAnalyzeRhythmResult = {
-  beat: number[];
-  downbeat: number[];
-};
