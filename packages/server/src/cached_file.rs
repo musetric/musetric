@@ -14,7 +14,8 @@ use axum::{
 use musetric_db::BoxedError;
 use time::{OffsetDateTime, format_description::BorrowedFormatItem, macros::format_description};
 
-const CACHE_CONTROL_VALUE: &str = "public, max-age=86400";
+pub(crate) const DOWNLOAD_CACHE: &str = "public, max-age=86400";
+pub(crate) const REVALIDATE_CACHE: &str = "public, max-age=0";
 const UNRESERVED: &[u8] = b"-_.!~*'()";
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const HTTP_DATE: &[BorrowedFormatItem<'_>] = format_description!(
@@ -22,8 +23,9 @@ const HTTP_DATE: &[BorrowedFormatItem<'_>] = format_description!(
 );
 
 pub(crate) struct CachedFile {
-    pub(crate) filename: String,
+    pub(crate) filename: Option<String>,
     pub(crate) content_type: String,
+    pub(crate) cache_control: &'static str,
     pub(crate) size: u64,
     pub(crate) modified: SystemTime,
 }
@@ -36,18 +38,20 @@ pub(crate) struct CachedHeaders {
 impl CachedHeaders {
     pub(crate) fn create(file: &CachedFile) -> Result<Self, BoxedError> {
         let etag = create_etag(file)?;
-        let disposition = format!(
-            "attachment; filename*=UTF-8''{}",
-            encode_uri_component(&file.filename)
-        );
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_str(&file.content_type)?);
-        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_str(&disposition)?);
+        if let Some(filename) = file.filename.as_ref() {
+            let disposition = format!(
+                "attachment; filename*=UTF-8''{}",
+                encode_uri_component(filename)
+            );
+            headers.insert(CONTENT_DISPOSITION, HeaderValue::from_str(&disposition)?);
+        }
         headers.insert(
             LAST_MODIFIED,
             HeaderValue::from_str(&format_http_date(file.modified)?)?,
         );
-        headers.insert(CACHE_CONTROL, HeaderValue::from_static(CACHE_CONTROL_VALUE));
+        headers.insert(CACHE_CONTROL, HeaderValue::from_static(file.cache_control));
         headers.insert(ETAG, HeaderValue::from_str(&etag)?);
         Ok(Self { headers, etag })
     }
@@ -130,15 +134,19 @@ mod tests {
         header::{CONTENT_DISPOSITION, CONTENT_LENGTH, IF_NONE_MATCH},
     };
 
-    use super::{CachedFile, CachedHeaders, create_etag, encode_uri_component, format_http_date};
+    use super::{
+        CachedFile, CachedHeaders, DOWNLOAD_CACHE, create_etag, encode_uri_component,
+        format_http_date,
+    };
 
     const FIXTURE_MODIFIED: Duration = Duration::new(1_577_836_800, 0);
     const SUB_MILLISECOND: Duration = Duration::new(1_577_836_800, 123_456_800);
 
     fn create_file(size: u64, modified: Duration) -> CachedFile {
         CachedFile {
-            filename: "Fixture project_chords.json".to_owned(),
+            filename: Some("Fixture project_chords.json".to_owned()),
             content_type: "application/json".to_owned(),
+            cache_control: DOWNLOAD_CACHE,
             size,
             modified: UNIX_EPOCH + modified,
         }

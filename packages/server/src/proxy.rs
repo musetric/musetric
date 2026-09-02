@@ -13,6 +13,8 @@ use hyper_util::{
 };
 use tokio::io::copy_bidirectional;
 
+use crate::frontend::{Frontend, Visit};
+
 type ProxyClient = Client<HttpConnector, Body>;
 
 #[derive(Clone)]
@@ -29,12 +31,31 @@ impl ProxyState {
     }
 }
 
-pub(crate) fn create_router(state: ProxyState) -> Router {
-    Router::new().fallback(any(handle)).with_state(state)
+#[derive(Clone)]
+pub(crate) struct FallbackState {
+    proxy: ProxyState,
+    frontend: Frontend,
 }
 
-async fn handle(State(state): State<ProxyState>, request: Request<Body>) -> Response<Body> {
-    forward(&state, request).await
+pub(crate) fn create_router(proxy: ProxyState, frontend: Frontend) -> Router {
+    Router::new()
+        .fallback(any(handle))
+        .with_state(FallbackState { proxy, frontend })
+}
+
+async fn handle(State(state): State<FallbackState>, request: Request<Body>) -> Response<Body> {
+    if is_upgrade_request(request.headers()) {
+        return forward(&state.proxy, request).await;
+    }
+    let visit = Visit {
+        method: request.method(),
+        uri: request.uri(),
+        headers: request.headers(),
+    };
+    if let Some(response) = state.frontend.respond(visit).await {
+        return response;
+    }
+    forward(&state.proxy, request).await
 }
 
 pub(crate) async fn forward(state: &ProxyState, mut request: Request<Body>) -> Response<Body> {
@@ -112,7 +133,10 @@ fn proxy_error(error: impl std::fmt::Display) -> Response<Body> {
 #[cfg(test)]
 mod tests {
     use std::{
+        fs::{create_dir_all, remove_dir_all, write},
         net::SocketAddr,
+        path::PathBuf,
+        process::id,
         time::{Duration, Instant},
     };
 
@@ -133,7 +157,7 @@ mod tests {
     };
     use tower::ServiceExt;
 
-    use super::{ProxyState, create_router};
+    use super::{Frontend, ProxyState, create_router};
 
     const CHUNK_DELAY: Duration = Duration::from_millis(400);
 
@@ -156,16 +180,46 @@ mod tests {
         (address, shutdown_sender)
     }
 
-    fn create_test_router(upstream: SocketAddr) -> Router {
-        create_router(ProxyState::create(
+    fn create_test_router(upstream: SocketAddr, public: PathBuf) -> Router {
+        let proxy = ProxyState::create(
             format!("http://{upstream}")
                 .parse()
                 .expect("upstream address should be a valid uri"),
-        ))
+        );
+        create_router(proxy, Frontend::create(public))
     }
 
     async fn start_proxy_for(upstream: SocketAddr) -> (SocketAddr, oneshot::Sender<()>) {
-        start_server(create_test_router(upstream)).await
+        start_server(create_test_router(
+            upstream,
+            PathBuf::from("missing-public"),
+        ))
+        .await
+    }
+
+    async fn ask(address: SocketAddr, pathname: &str) -> String {
+        let mut connection = TcpStream::connect(address)
+            .await
+            .expect("the proxy should accept connections");
+        connection
+            .write_all(
+                format!(
+                    "GET {pathname} HTTP/1.1
+Host: localhost
+Connection: close
+
+"
+                )
+                .as_bytes(),
+            )
+            .await
+            .expect("the request should be written");
+        let mut response = String::new();
+        connection
+            .read_to_string(&mut response)
+            .await
+            .expect("the response should be readable");
+        response
     }
 
     async fn echo_upgrade(upgrade: upgrade::OnUpgrade) {
@@ -270,7 +324,7 @@ mod tests {
             format!("{:?}", request.version())
         }));
         let (upstream_address, upstream_shutdown) = start_server(upstream).await;
-        let proxy = create_test_router(upstream_address);
+        let proxy = create_test_router(upstream_address, PathBuf::from("missing-public"));
 
         let request = Request::builder()
             .version(Version::HTTP_2)
@@ -379,6 +433,26 @@ mod tests {
         proxy_shutdown
             .send(())
             .expect("proxy should still be running");
+    }
+
+    #[tokio::test]
+    async fn answers_the_app_itself_and_leaves_the_api_upstream() {
+        let public = std::env::temp_dir().join(format!("musetric-fallback-{}", id()));
+        create_dir_all(&public).expect("the public directory should be built");
+        write(public.join("index.html"), "app shell").expect("the index should be written");
+        let upstream = Router::new().fallback(any(|| async { "upstream answer" }));
+        let (upstream_address, upstream_shutdown) = start_server(upstream).await;
+        let (proxy_address, proxy_shutdown) =
+            start_server(create_test_router(upstream_address, public.clone())).await;
+
+        let app = ask(proxy_address, "/project/1").await;
+        let api = ask(proxy_address, "/api/project/list").await;
+
+        assert!(app.contains("app shell"), "{app}");
+        assert!(api.contains("upstream answer"), "{api}");
+        let _ = remove_dir_all(&public);
+        let _ = upstream_shutdown.send(());
+        let _ = proxy_shutdown.send(());
     }
 
     #[tokio::test]

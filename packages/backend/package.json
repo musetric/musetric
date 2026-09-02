@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@fastify/multipart": "catalog:",
-    "@fastify/static": "catalog:",
     "@fastify/swagger": "catalog:",
     "@fastify/swagger-ui": "catalog:",
     "@musetric/ai": "workspace:*",

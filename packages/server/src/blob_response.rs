@@ -13,7 +13,7 @@ use tokio::fs::{File, metadata};
 use tokio_util::io::ReaderStream;
 
 use crate::{
-    cached_file::{CachedFile, CachedHeaders},
+    cached_file::{CachedFile, CachedHeaders, DOWNLOAD_CACHE},
     failure::Failure,
     storage::Storage,
 };
@@ -46,8 +46,9 @@ pub(crate) async fn send_cached(
         .modified()
         .map_err(|_| Failure::NotFound(blob.missing_message))?;
     let file = CachedFile {
-        filename: blob.filename,
+        filename: Some(blob.filename),
         content_type: blob.content_type,
+        cache_control: DOWNLOAD_CACHE,
         size: stat.len(),
         modified,
     };

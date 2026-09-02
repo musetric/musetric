@@ -2148,7 +2148,6 @@ __metadata:
   resolution: "@musetric/backend-core@workspace:packages/backend-core"
   dependencies:
     "@fastify/multipart": "catalog:"
-    "@fastify/static": "catalog:"
     "@fastify/swagger": "catalog:"
     "@fastify/swagger-ui": "catalog:"
     "@musetric/ai": "workspace:*"
@@ -2176,7 +2175,6 @@ __metadata:
     zod: "catalog:"
   peerDependencies:
     "@fastify/multipart": 9.4.0
-    "@fastify/static": 10.1.2
     "@fastify/swagger": 9.7.0
     "@fastify/swagger-ui": 5.2.6
     "@musetric/ai": "workspace:*"
@@ -2221,7 +2219,6 @@ __metadata:
   resolution: "@musetric/backend@workspace:packages/backend"
   dependencies:
     "@fastify/multipart": "catalog:"
-    "@fastify/static": "catalog:"
     "@fastify/swagger": "catalog:"
     "@fastify/swagger-ui": "catalog:"
     "@musetric/ai": "workspace:*"
@@ -2279,7 +2276,6 @@ __metadata:
   resolution: "@musetric/desktop@workspace:packages/desktop"
   dependencies:
     "@fastify/multipart": "catalog:"
-    "@fastify/static": "catalog:"
     "@fastify/swagger": "catalog:"
     "@fastify/swagger-ui": "catalog:"
     "@musetric/ai": "workspace:*"

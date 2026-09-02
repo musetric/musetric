@@ -44,6 +44,7 @@ const startServer = async () => {
       ffprobePath: ffprobePath(),
       modelsPath: config.modelsPath,
       browserBundlePath: config.browserBundlePath,
+      publicPath: config.publicPath,
       tls: https,
       onLog: (line) => {
         console.log(line);

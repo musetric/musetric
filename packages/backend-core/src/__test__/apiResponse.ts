@@ -196,6 +196,7 @@ const withClient = async <Result>(
     ffprobePath: ffprobePath(),
     modelsPath: workspace.config.modelsPath,
     browserBundlePath: workspace.config.browserBundlePath,
+    publicPath: workspace.config.publicPath,
     processing: false,
   });
   try {
