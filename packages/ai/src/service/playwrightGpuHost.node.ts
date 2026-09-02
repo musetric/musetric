@@ -5,7 +5,11 @@ import {
 } from './browserApi.js';
 import { gpuSupportApiName } from './browserGpuSupport.js';
 import { type CreateGpuPageOptions, type GpuPage } from './gpuPageHost.node.js';
-import { createJobGpuPage, type OpenedPage } from './jobGpuPage.node.js';
+import {
+  createJobGpuPage,
+  type OpenedPage,
+  type OpenJobPage,
+} from './jobGpuPage.node.js';
 
 const browserLaunchArgs = [
   '--enable-unsafe-webgpu',
@@ -143,6 +147,22 @@ export const createPlaywrightGpuPage = async (
       captureDownloads: async (targets) => captureDownloads(page, targets),
       close: async () => browser.close(),
     };
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
+};
+
+export const openPlaywrightPage: OpenJobPage = async (url: string) => {
+  const browser = await chromium.launch({
+    headless: true,
+    channel: 'chromium',
+    args: browserLaunchArgs,
+  });
+  try {
+    const page = await browser.newPage();
+    await page.goto(url);
+    return { close: async () => browser.close() };
   } catch (error) {
     await browser.close();
     throw error;

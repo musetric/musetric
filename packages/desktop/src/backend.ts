@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { type GpuPageHostFactory } from '@musetric/ai/node';
+import { type GpuPageHostFactory, type OpenJobPage } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
@@ -30,6 +30,7 @@ const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
 
 export type StartBackendOptions = {
   gpuPageHostFactory: GpuPageHostFactory;
+  openPage: OpenJobPage;
   logDestination: DestinationStream;
   logger: Logger;
 };
@@ -48,6 +49,7 @@ export const startBackend = async (
     const { createServerApp } = await import('@musetric/backend-core');
     const fastify = await createServerApp(config, {
       gpuPageHostFactory: options.gpuPageHostFactory,
+      openPage: options.openPage,
     });
     backend = fastify;
     await fastify.listen({
@@ -65,6 +67,8 @@ export const startBackend = async (
       blobsPath: config.blobsPath,
       ffmpegPath: ffmpegPath(),
       ffprobePath: ffprobePath(),
+      modelsPath: config.modelsPath,
+      browserBundlePath: config.browserBundlePath,
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustProxy' }, line);

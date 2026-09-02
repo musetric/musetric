@@ -1,4 +1,6 @@
 import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
+import { buildChordSegments } from '../chords/chordSegments.js';
+import { chordNetModel } from '../models/chordNetModel.js';
 import {
   fetchFloat32,
   fetchOk,
@@ -69,7 +71,7 @@ export const registerChordsApi = (): void => {
         await reportProgress(0.4);
         const indices = await runtime.analyze(audio);
         await reportProgress(1);
-        return Array.from(indices);
+        return buildChordSegments(indices, chordNetModel.frameDuration);
       } finally {
         await runtime.release();
       }

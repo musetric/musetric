@@ -117,6 +117,18 @@ impl Writer {
         })
     }
 
+    pub fn apply_chords_result(&self, project_id: i64, blob_id: &str) -> Result<(), BoxedError> {
+        self.write(|transaction| {
+            transaction.execute(
+                "INSERT INTO Chords (projectId, blobId) VALUES (?1, ?2)
+                 ON CONFLICT(projectId) DO UPDATE SET blobId = excluded.blobId",
+                (project_id, blob_id),
+            )?;
+            clear_failure(transaction, project_id, ProcessingStep::Chords)?;
+            Ok(())
+        })
+    }
+
     pub fn record_failure(
         &self,
         project_id: i64,

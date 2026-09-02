@@ -21,6 +21,7 @@ musetric-db = { path = "crates/db" }
 musetric-gpu = { path = "crates/gpu" }
 musetric-jobs = { path = "crates/jobs" }
 musetric-media = { path = "crates/media" }
+reqwest = { version = "=0.13.4", default-features = false, features = ["rustls"] }
 serde_json = "=1.0.151"
 time = { version = "=0.3.55", features = ["formatting", "macros"] }
 tokio = { version = "=1.53.1", features = [

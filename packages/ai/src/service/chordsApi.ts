@@ -1,3 +1,5 @@
+import { type ChordResult } from '../chords/chordSegments.js';
+
 export const analyzeChordsApiName = 'musetricAiAnalyzeChords';
 
 export type BrowserAnalyzeChordsRequest = {
@@ -7,4 +9,4 @@ export type BrowserAnalyzeChordsRequest = {
   planManifestUrl?: string;
 };
 
-export type BrowserAnalyzeChordsResult = number[];
+export type BrowserAnalyzeChordsResult = ChordResult;
