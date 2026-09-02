@@ -1,7 +1,13 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use musetric_gpu::ModelFile;
 use musetric_media::Downmix;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CacheLayout {
+    Flat,
+    Hub,
+}
 
 pub(crate) struct ModelBundle {
     pub(crate) label: &'static str,
@@ -10,12 +16,24 @@ pub(crate) struct ModelBundle {
     pub(crate) directory: &'static str,
     pub(crate) sample_rate: u32,
     pub(crate) downmix: Downmix,
+    pub(crate) layout: CacheLayout,
     pub(crate) files: &'static [(&'static str, &'static str)],
 }
 
 impl ModelBundle {
+    pub(crate) fn root(&self, models_path: &Path) -> PathBuf {
+        models_path.join(self.directory)
+    }
+
     pub(crate) fn cached(&self, models_path: &Path) -> Vec<ModelFile> {
-        let directory = models_path.join(self.directory);
+        let directory = match self.layout {
+            CacheLayout::Flat => self.root(models_path),
+            CacheLayout::Hub => self
+                .root(models_path)
+                .join(self.model_id)
+                .join("resolve")
+                .join(self.revision),
+        };
         self.files
             .iter()
             .map(|(file, sha256)| ModelFile {
@@ -42,6 +60,7 @@ pub(crate) const CHORD_NET: ModelBundle = ModelBundle {
     revision: "fbd620e6a7617bbc82795b1f0c828a7721c213f4",
     directory: "chordmini-onnx",
     sample_rate: 22050,
+    layout: CacheLayout::Flat,
     downmix: Downmix::Mean,
     files: &[
         (
@@ -72,6 +91,7 @@ pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
     revision: "45ba973e6c1fbee08a8a75b485e1c5adf45d2bc4",
     directory: "beat-this-onnx",
     sample_rate: 22050,
+    layout: CacheLayout::Flat,
     downmix: Downmix::Mean,
     files: &[
         (
@@ -97,6 +117,7 @@ pub(crate) const SKEY: ModelBundle = ModelBundle {
     revision: "9d90d2a9ff6679df1d64000f4fa750643f247643",
     directory: "skey-onnx",
     sample_rate: 22050,
+    layout: CacheLayout::Flat,
     downmix: Downmix::Ffmpeg,
     files: &[
         (
@@ -106,6 +127,66 @@ pub(crate) const SKEY: ModelBundle = ModelBundle {
         (
             SKEY_MODEL,
             "5113c1378c1007c8559fcb767593366ba9794397b060535eb80a113db50530fc",
+        ),
+    ],
+};
+
+pub(crate) const WHISPER: ModelBundle = ModelBundle {
+    label: "Whisper transcription model",
+    model_id: "musetric/whisper-large-v3-turbo-onnx",
+    revision: "da27c0c3e917574b5541f71251abfd2c1aabb3a1",
+    directory: "whisper-onnx-hf-cache",
+    sample_rate: 16000,
+    downmix: Downmix::Ffmpeg,
+    layout: CacheLayout::Hub,
+    files: &[
+        (
+            "config.json",
+            "3895aac9c18e541502ded9bf0f4c31cbe25a3387ef88ffdc85214e43acc0ca57",
+        ),
+        (
+            "generation_config.json",
+            "0392ccf797bca2bff1600477ed6fb71d367b428f3da626c6d3c8dbd82c58ae44",
+        ),
+        (
+            "preprocessor_config.json",
+            "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+        ),
+        (
+            "tokenizer.json",
+            "b3c8202bbf06d8ee4232c5984baa563784ac4737e2e7fdc42fa180200d3cfcdb",
+        ),
+        (
+            "tokenizer_config.json",
+            "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+        ),
+        (
+            "special_tokens_map.json",
+            "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+        ),
+        (
+            "added_tokens.json",
+            "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+        ),
+        (
+            "vocab.json",
+            "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387",
+        ),
+        (
+            "merges.txt",
+            "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+        ),
+        (
+            "normalizer.json",
+            "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+        ),
+        (
+            "encoder_model_q4.onnx",
+            "d27943f0f3ee4fdfc33241a64d68fffd40ce0f2344ee21f73d37abac9ebd1a43",
+        ),
+        (
+            "decoder_model_merged_fp16.onnx",
+            "6497641a50badd9fd90f58907fe74ad43048a874b8288e2039f26ce01a15ef3e",
         ),
     ],
 };

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use axum::{
     Json, Router,
@@ -16,8 +19,8 @@ use tokio::fs::read_to_string;
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{FileUrls, describe, store},
-        models::{CHORD_NET, CHORD_NET_MODEL},
+        browser::{BrowserAnalysis, HostedModel, Serve, describe, store},
+        models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
         page::{PageFailure, close_page, open_page},
         steps::create as create_step,
     },
@@ -210,29 +213,34 @@ fn points_every_chord_model_file_at_its_cache_entry() {
     );
 }
 
-fn create_urls(files: &[&str]) -> FileUrls {
-    let urls = files
+fn create_hosted(analysis: &BrowserAnalysis) -> HostedModel {
+    if matches!(analysis.serve, Serve::Directory(_)) {
+        return HostedModel::create(HashMap::new(), Some("http://host/models".to_owned()));
+    }
+    let urls = analysis
+        .files
         .iter()
-        .map(|file| ((*file).to_owned(), format!("http://host/files/{file}")))
+        .map(|model| {
+            (
+                model.file.clone(),
+                format!("http://host/files/{}", model.file),
+            )
+        })
         .collect();
-    FileUrls::create(urls)
+    HostedModel::create(urls, None)
 }
 
 fn describe_step(step: ProcessingStep) -> Option<Value> {
     let analysis = create_step(step, std::path::Path::new("/models"))?;
-    let files = analysis
-        .files
-        .iter()
-        .map(|model| model.file.as_str())
-        .collect::<Vec<_>>();
-    let urls = create_urls(&files);
-    let request = (analysis.build)("http://host/pcm", &urls)
+    let hosted = create_hosted(&analysis);
+    let request = (analysis.build)("http://host/pcm", &hosted)
         .map_err(|_| "the request should be built")
         .expect("the request should be built");
     Some(json!({
         "api": analysis.api,
         "table": analysis.stored.table(),
         "mean": analysis.downmix == Downmix::Mean,
+        "f16": analysis.require_shader_f16,
         "request": request,
     }))
 }
@@ -247,6 +255,7 @@ fn asks_the_browser_for_the_rhythm_it_stores_as_rhythm() {
             "api": "musetricAiAnalyzeRhythm",
             "table": "Rhythm",
             "mean": true,
+            "f16": false,
             "request": {
                 "pcmUrl": "http://host/pcm",
                 "modelUrl": "http://host/files/beat_this.onnx",
@@ -266,6 +275,7 @@ fn asks_the_browser_for_the_key_without_a_mean_downmix() {
             "api": "musetricAiAnalyzeKey",
             "table": "Key",
             "mean": false,
+            "f16": false,
             "request": {
                 "pcmUrl": "http://host/pcm",
                 "modelUrl": "http://host/files/skey.onnx",
@@ -275,8 +285,49 @@ fn asks_the_browser_for_the_key_without_a_mean_downmix() {
 }
 
 #[test]
-fn leaves_the_remaining_steps_to_the_upstream_app() {
+fn points_the_transcription_at_the_whole_model_directory() {
+    let described = describe_step(ProcessingStep::Transcription);
+
+    assert_eq!(
+        described,
+        Some(json!({
+            "api": "musetricAiTranscribeAudio",
+            "table": "Subtitle",
+            "mean": false,
+            "f16": true,
+            "request": {
+                "pcmUrl": "http://host/pcm",
+                "sampleRate": 16000,
+                "modelHost": "http://host/models",
+                "modelId": "musetric/whisper-large-v3-turbo-onnx",
+                "revision": "da27c0c3e917574b5541f71251abfd2c1aabb3a1",
+            },
+        }))
+    );
+}
+
+#[test]
+fn caches_the_whisper_bundle_the_way_transformers_asks_for_it() {
+    let files = WHISPER.cached(std::path::Path::new("/models"));
+
+    let encoder = files
+        .iter()
+        .find(|file| file.file == "encoder_model_q4.onnx")
+        .expect("the encoder should be listed");
+    let hosted = encoder
+        .path
+        .strip_prefix(WHISPER.root(std::path::Path::new("/models")))
+        .expect("the encoder should live under the served directory");
+    assert_eq!(
+        hosted,
+        std::path::Path::new(
+            "musetric/whisper-large-v3-turbo-onnx/resolve/da27c0c3e917574b5541f71251abfd2c1aabb3a1/encoder_model_q4.onnx"
+        )
+    );
+}
+
+#[test]
+fn leaves_the_separation_to_the_upstream_app() {
     assert!(describe_step(ProcessingStep::Chords).is_some());
-    assert!(describe_step(ProcessingStep::Transcription).is_none());
     assert!(describe_step(ProcessingStep::Separation).is_none());
 }

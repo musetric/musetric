@@ -1,9 +1,6 @@
-import { execFile, spawn } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import { type Logger } from '@musetric/utils';
-import { ffmpegPath, ffprobePath } from './paths.js';
-
-const execFileAsync = promisify(execFile);
+import { ffmpegPath } from './paths.js';
 
 type RunFfmpegOptions = {
   args: string[];
@@ -89,77 +86,6 @@ export const decodeInterleavedPcm = async (
     captureStdout: true,
     logger,
     processName: 'ffmpeg.decodeInterleavedPcm',
-  });
-  if (output.byteLength === 0) {
-    throw new Error('ffmpeg produced no audio data');
-  }
-  return output;
-};
-
-const probeChannelCount = async (sourcePath: string): Promise<number> => {
-  const { stdout } = await execFileAsync(ffprobePath(), [
-    '-v',
-    'error',
-    '-select_streams',
-    'a:0',
-    '-show_entries',
-    'stream=channels',
-    '-of',
-    'csv=p=0',
-    sourcePath,
-  ]);
-  return Number(stdout.trim());
-};
-
-const meanDownmixArgs = async (sourcePath: string): Promise<string[]> => {
-  const channels = await probeChannelCount(sourcePath);
-  if (channels <= 1) {
-    return ['-ac', '1'];
-  }
-  const weight = 1 / channels;
-  const terms = Array.from(
-    { length: channels },
-    (_ignored, index) => `${weight}*c${index}`,
-  ).join('+');
-  return ['-af', `pan=mono|c0=${terms}`];
-};
-
-export type MonoDownmix = 'rematrix' | 'mean';
-
-type DecodeMonoOptions = DecodeOptions & {
-  downmix?: MonoDownmix;
-};
-
-export const decodeMonoPcm = async (
-  options: DecodeMonoOptions,
-): Promise<Buffer> => {
-  const { sourcePath, sampleRate, logger, downmix } = options;
-  const downmixArgs =
-    downmix === 'mean' ? await meanDownmixArgs(sourcePath) : ['-ac', '1'];
-  const output = await runFfmpeg({
-    args: [
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-i',
-      sourcePath,
-      '-map',
-      '0:a:0',
-      '-sn',
-      '-dn',
-      '-vn',
-      ...downmixArgs,
-      '-ar',
-      sampleRate.toString(),
-      '-f',
-      'f32le',
-      '-c:a',
-      'pcm_f32le',
-      'pipe:1',
-    ],
-    captureStdout: true,
-    logger,
-    processName: 'ffmpeg.decodeMonoPcm',
   });
   if (output.byteLength === 0) {
     throw new Error('ffmpeg produced no audio data');

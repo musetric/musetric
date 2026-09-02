@@ -45,13 +45,19 @@ impl From<String> for Failure {
     }
 }
 
-pub(crate) struct FileUrls {
-    urls: HashMap<String, String>,
+pub(crate) enum Serve {
+    Files,
+    Directory(PathBuf),
 }
 
-impl FileUrls {
-    pub(crate) fn create(urls: HashMap<String, String>) -> Self {
-        Self { urls }
+pub(crate) struct HostedModel {
+    urls: HashMap<String, String>,
+    root: Option<String>,
+}
+
+impl HostedModel {
+    pub(crate) fn create(urls: HashMap<String, String>, root: Option<String>) -> Self {
+        Self { urls, root }
     }
 
     pub(crate) fn url(&self, file: &str) -> Result<&str, Failure> {
@@ -60,9 +66,15 @@ impl FileUrls {
             .map(String::as_str)
             .ok_or_else(|| Failure::Refused(format!("The model cache is missing {file}")))
     }
+
+    pub(crate) fn root(&self) -> Result<&str, Failure> {
+        self.root.as_deref().ok_or_else(|| {
+            Failure::Refused("The model cache is not served as a directory".to_owned())
+        })
+    }
 }
 
-pub(crate) type BuildRequest = fn(&str, &FileUrls) -> Result<Value, Failure>;
+pub(crate) type BuildRequest = fn(&str, &HostedModel) -> Result<Value, Failure>;
 
 pub(crate) struct BrowserAnalysis {
     pub(crate) label: &'static str,
@@ -72,6 +84,7 @@ pub(crate) struct BrowserAnalysis {
     pub(crate) downmix: Downmix,
     pub(crate) require_shader_f16: bool,
     pub(crate) files: Vec<ModelFile>,
+    pub(crate) serve: Serve,
     pub(crate) build: BuildRequest,
 }
 
@@ -142,8 +155,8 @@ async fn read_result(
     files: &[(String, PathBuf)],
 ) -> Result<Value, Failure> {
     let host = running.host;
-    let urls = register_files(host, files).await?;
-    let request = (analysis.build)(&host.pcm_url(), &urls)?;
+    let hosted = register_files(host, &analysis.serve, files).await?;
+    let request = (analysis.build)(&host.pcm_url(), &hosted)?;
     let page = open_page(&context.proxy, &host.page_url()).await?;
     let found = run_job(running, analysis.api, &request).await;
     close_page(&context.proxy, &page).await;
@@ -168,13 +181,20 @@ async fn run_job(running: Running<'_>, api: &str, request: &Value) -> Result<Val
 
 async fn register_files(
     host: &ExecutorHost,
+    serve: &Serve,
     files: &[(String, PathBuf)],
-) -> Result<FileUrls, Failure> {
+) -> Result<HostedModel, Failure> {
+    if let Serve::Directory(root) = serve {
+        return Ok(HostedModel::create(
+            HashMap::new(),
+            Some(host.register_directory(root).await?),
+        ));
+    }
     let mut urls = HashMap::new();
     for (file, path) in files {
         urls.insert(file.clone(), host.register_file(path).await?);
     }
-    Ok(FileUrls::create(urls))
+    Ok(HostedModel::create(urls, None))
 }
 
 async fn ensure_files(

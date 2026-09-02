@@ -4,10 +4,10 @@ use musetric_db::{Analysis, ProcessingStep};
 use serde_json::{Value, json};
 
 use crate::analysis::{
-    browser::{BrowserAnalysis, Failure, FileUrls},
+    browser::{BrowserAnalysis, Failure, HostedModel, Serve},
     models::{
         BEAT_THIS, BEAT_THIS_FILTERBANK, BEAT_THIS_MODEL, CHORD_NET, CHORD_NET_MODEL,
-        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL,
+        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, WHISPER,
     },
 };
 
@@ -21,6 +21,7 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             downmix: CHORD_NET.downmix,
             require_shader_f16: false,
             files: CHORD_NET.cached(models_path),
+            serve: Serve::Files,
             build: build_chords,
         }),
         ProcessingStep::Rhythm => Some(BrowserAnalysis {
@@ -31,6 +32,7 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             downmix: BEAT_THIS.downmix,
             require_shader_f16: false,
             files: BEAT_THIS.cached(models_path),
+            serve: Serve::Files,
             build: build_rhythm,
         }),
         ProcessingStep::Key => Some(BrowserAnalysis {
@@ -41,13 +43,25 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             downmix: SKEY.downmix,
             require_shader_f16: false,
             files: SKEY.cached(models_path),
+            serve: Serve::Files,
             build: build_key,
         }),
-        ProcessingStep::Separation | ProcessingStep::Transcription => None,
+        ProcessingStep::Transcription => Some(BrowserAnalysis {
+            label: "Headless transcription",
+            api: "musetricAiTranscribeAudio",
+            stored: Analysis::Subtitle,
+            sample_rate: WHISPER.sample_rate,
+            downmix: WHISPER.downmix,
+            require_shader_f16: true,
+            files: WHISPER.cached(models_path),
+            serve: Serve::Directory(WHISPER.root(models_path)),
+            build: build_transcription,
+        }),
+        ProcessingStep::Separation => None,
     }
 }
 
-fn build_chords(pcm_url: &str, files: &FileUrls) -> Result<Value, Failure> {
+fn build_chords(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
     Ok(json!({
         "pcmUrl": pcm_url,
         "modelUrl": files.url(CHORD_NET_MODEL)?,
@@ -56,7 +70,7 @@ fn build_chords(pcm_url: &str, files: &FileUrls) -> Result<Value, Failure> {
     }))
 }
 
-fn build_rhythm(pcm_url: &str, files: &FileUrls) -> Result<Value, Failure> {
+fn build_rhythm(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
     Ok(json!({
         "pcmUrl": pcm_url,
         "modelUrl": files.url(BEAT_THIS_MODEL)?,
@@ -64,9 +78,19 @@ fn build_rhythm(pcm_url: &str, files: &FileUrls) -> Result<Value, Failure> {
     }))
 }
 
-fn build_key(pcm_url: &str, files: &FileUrls) -> Result<Value, Failure> {
+fn build_key(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
     Ok(json!({
         "pcmUrl": pcm_url,
         "modelUrl": files.url(SKEY_MODEL)?,
+    }))
+}
+
+fn build_transcription(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+    Ok(json!({
+        "pcmUrl": pcm_url,
+        "sampleRate": WHISPER.sample_rate,
+        "modelHost": files.root()?,
+        "modelId": WHISPER.model_id,
+        "revision": WHISPER.revision,
     }))
 }
