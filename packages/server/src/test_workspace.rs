@@ -81,8 +81,8 @@ impl Workspace {
             writer: Writer::open(&self.database_path()).expect("the writer should open"),
             blobs_path: self.blobs_path(),
             tools: Tools {
-                ffmpeg: PathBuf::from("ffmpeg"),
-                ffprobe: PathBuf::from("ffprobe"),
+                ffmpeg: bundled_tool("ffmpeg"),
+                ffprobe: bundled_tool("ffprobe"),
             },
         })
     }
@@ -92,4 +92,24 @@ impl Drop for Workspace {
     fn drop(&mut self) {
         let _ = remove_dir_all(&self.directory);
     }
+}
+
+fn bundled_tool(name: &str) -> PathBuf {
+    let platform = match std::env::consts::OS {
+        "windows" => "win32",
+        "macos" => "darwin",
+        other => other,
+    };
+    let architecture = match std::env::consts::ARCH {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        other => other,
+    };
+    let executable = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("ffmpeg")
+        .join("resources")
+        .join(format!("{platform}-{architecture}"))
+        .join(executable)
 }

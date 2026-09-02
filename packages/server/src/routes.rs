@@ -7,25 +7,31 @@ use std::sync::Arc;
 
 use axum::Router;
 
-use crate::{proxy::ProxyState, storage::Storage};
+use crate::{proxy::ProxyState, realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
     pub(crate) proxy: ProxyState,
+    pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
 }
 
-pub(crate) fn create_router(proxy: ProxyState, storage: Arc<Storage>) -> Router {
+pub(crate) fn create_router(proxy: ProxyState, rooms: Arc<Rooms>, storage: Arc<Storage>) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
-        .with_state(RouteState { proxy, storage })
+        .merge(realtime::create_router())
+        .with_state(RouteState {
+            proxy,
+            rooms,
+            storage,
+        })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
+    use std::{net::SocketAddr, sync::Arc};
 
     use axum::{
         Router,
@@ -39,7 +45,7 @@ mod tests {
     use tower::ServiceExt;
 
     use super::create_router;
-    use crate::{proxy::ProxyState, test_workspace::Workspace};
+    use crate::{proxy::ProxyState, realtime::Rooms, test_workspace::Workspace};
 
     const BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
     const OTHER_BLOB_ID: &str = "5a6b7c8d-0000-4000-8000-000000000002";
@@ -85,7 +91,11 @@ mod tests {
         let address = format!("http://{upstream}")
             .parse()
             .expect("the upstream should be a valid uri");
-        create_router(ProxyState::create(address), workspace.create_storage())
+        create_router(
+            ProxyState::create(address),
+            Arc::new(Rooms::create()),
+            workspace.create_storage(),
+        )
     }
 
     async fn start_upstream() -> (SocketAddr, oneshot::Sender<()>) {

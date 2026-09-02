@@ -1,5 +1,5 @@
-const HEADER_BYTE_LENGTH: usize = 44;
-const BYTES_PER_SAMPLE: u16 = 2;
+pub(crate) const HEADER_BYTE_LENGTH: usize = 44;
+pub(crate) const BYTES_PER_SAMPLE: u16 = 2;
 const BITS_PER_SAMPLE: u16 = 16;
 const PCM_FORMAT: u16 = 1;
 const CHANNEL_COUNT: u16 = 1;
@@ -13,7 +13,7 @@ pub(crate) fn create_empty() -> Vec<u8> {
     create_header(0, DEFAULT_SAMPLE_RATE)
 }
 
-fn create_header(frame_count: u32, sample_rate: u32) -> Vec<u8> {
+pub(crate) fn create_header(frame_count: u32, sample_rate: u32) -> Vec<u8> {
     let bytes_per_sample = u32::from(BYTES_PER_SAMPLE);
     let data_byte_length = frame_count * bytes_per_sample;
     let mut header = Vec::with_capacity(HEADER_BYTE_LENGTH);

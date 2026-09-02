@@ -13,6 +13,28 @@ pub(crate) struct Storage {
     pub(crate) tools: Tools,
 }
 
+pub(crate) async fn read_database<Value>(
+    storage: &Arc<Storage>,
+    query: impl FnOnce(&Reader) -> Result<Value, BoxedError> + Send + 'static,
+) -> Result<Value, BoxedError>
+where
+    Value: Send + 'static,
+{
+    let owned = Arc::clone(storage);
+    spawn_blocking(move || query(&owned.database)).await?
+}
+
+pub(crate) async fn write_database<Value>(
+    storage: &Arc<Storage>,
+    change: impl FnOnce(&Writer) -> Result<Value, BoxedError> + Send + 'static,
+) -> Result<Value, BoxedError>
+where
+    Value: Send + 'static,
+{
+    let owned = Arc::clone(storage);
+    spawn_blocking(move || change(&owned.writer)).await?
+}
+
 pub(crate) async fn read<Value>(
     storage: &Arc<Storage>,
     query: impl FnOnce(&Reader) -> Result<Value, BoxedError> + Send + 'static,
@@ -20,11 +42,7 @@ pub(crate) async fn read<Value>(
 where
     Value: Send + 'static,
 {
-    let owned = Arc::clone(storage);
-    spawn_blocking(move || query(&owned.database))
-        .await
-        .map_err(Failure::failed)?
-        .map_err(Failure::failed)
+    read_database(storage, query).await.map_err(Failure::failed)
 }
 
 pub(crate) async fn write<Value>(
@@ -34,9 +52,7 @@ pub(crate) async fn write<Value>(
 where
     Value: Send + 'static,
 {
-    let owned = Arc::clone(storage);
-    spawn_blocking(move || change(&owned.writer))
+    write_database(storage, change)
         .await
-        .map_err(Failure::failed)?
         .map_err(Failure::failed)
 }

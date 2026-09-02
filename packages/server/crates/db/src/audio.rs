@@ -67,6 +67,8 @@ pub struct AudioDelivery {
 pub struct Recording {
     pub blob_id: String,
     pub wave_blob_id: String,
+    pub sample_rate: i64,
+    pub frame_count: i64,
 }
 
 pub(crate) fn read_master_blob(
@@ -108,12 +110,14 @@ pub(crate) fn read_recording(
 ) -> Result<Option<Recording>> {
     connection
         .query_row(
-            "SELECT blobId, waveBlobId FROM Recording WHERE projectId = ?1",
+            "SELECT blobId, waveBlobId, sampleRate, frameCount FROM Recording WHERE projectId = ?1",
             [project_id],
             |row| {
                 Ok(Recording {
                     blob_id: row.get(0)?,
                     wave_blob_id: row.get(1)?,
+                    sample_rate: row.get(2)?,
+                    frame_count: row.get(3)?,
                 })
             },
         )
