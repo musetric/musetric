@@ -12,15 +12,14 @@ use std::{
 
 use axum::Router;
 use musetric_db::{
-    OpenOptions as DatabaseOptions, Reader, Writer, blob_path, init_database, open_database,
+    OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
+    open_database,
 };
-use musetric_jobs::{Queue, QueueOptions};
+use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
 use musetric_media::Tools;
 use tokio::{net::TcpListener, sync::oneshot};
 
-use crate::{
-    jobs::UpstreamRunner, proxy::ProxyState, realtime::Rooms, routes::RouteState, storage::Storage,
-};
+use crate::{proxy::ProxyState, realtime::Rooms, routes::RouteState, storage::Storage};
 
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
 
@@ -117,11 +116,19 @@ pub(crate) async fn start_upstream(app: Router) -> (SocketAddr, oneshot::Sender<
     (address, shutdown_sender)
 }
 
+struct IdleRunner;
+
+impl StepRunner for IdleRunner {
+    fn run<'a>(&'a self, _job: &'a PendingJob, _report: &'a StepReport) -> StepOutcome<'a> {
+        Box::pin(async { StepAnswer::Unavailable })
+    }
+}
+
 pub(crate) fn create_route_state(proxy: ProxyState, storage: Arc<Storage>) -> RouteState {
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
         writer: Arc::clone(&storage.writer),
-        runner: Arc::new(UpstreamRunner::create(proxy.clone())),
+        runner: Arc::new(IdleRunner),
         interval: QUEUE_INTERVAL,
     });
     RouteState {

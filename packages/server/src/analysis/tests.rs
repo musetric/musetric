@@ -9,9 +9,12 @@ use axum::{
     http::StatusCode,
     routing::{delete, post},
 };
-use musetric_db::{Analysis, PendingJob, ProcessingStep};
-use musetric_gpu::{Download, DownloadStatus};
-use musetric_media::Downmix;
+use musetric_db::{
+    Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemType,
+};
+use musetric_gpu::{Download, DownloadStatus, ExecutorFailure};
+use musetric_jobs::StepAnswer;
+use musetric_media::{Downmix, LeadVisualLoudness, Loudness};
 use reqwest::Client;
 use serde_json::{Value, json};
 use tokio::fs::read_to_string;
@@ -19,13 +22,14 @@ use tokio::fs::read_to_string;
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{BrowserAnalysis, HostedModel, Serve, describe, store},
+        browser::{BrowserAnalysis, HostedModel, Serve, answer, describe, store},
+        gains::{Stems, measure},
         models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
         page::{PageFailure, close_page, open_page},
         steps::create as create_step,
     },
     proxy::ProxyState,
-    storage::read,
+    storage::{read, write_database},
     test_workspace::{Workspace, start_upstream},
 };
 
@@ -330,4 +334,132 @@ fn caches_the_whisper_bundle_the_way_transformers_asks_for_it() {
 fn leaves_the_separation_to_the_upstream_app() {
     assert!(describe_step(ProcessingStep::Chords).is_some());
     assert!(describe_step(ProcessingStep::Separation).is_none());
+}
+
+const SEPARATION_PROJECT: &str = "
+  INSERT INTO Project (id, name, sampleRate, frameCount)
+  VALUES (2, 'Fixture project', 48000, 480000);
+  INSERT INTO ProcessingError (projectId, step, message)
+  VALUES (2, 'separation', 'Fixture failure');
+";
+
+fn create_loudness(integrated_loudness_db: f64, true_peak_db: f64) -> Loudness {
+    Loudness {
+        integrated_loudness_db,
+        true_peak_db,
+    }
+}
+
+fn create_stems(lead_integrated_loudness_db: f64) -> Stems {
+    Stems {
+        lead: LeadVisualLoudness {
+            loudness: create_loudness(lead_integrated_loudness_db, -2.0),
+            p95_rms_db: -30.0,
+        },
+        backing: create_loudness(-30.0, -4.0),
+        instrumental: create_loudness(-8.0, -1.5),
+    }
+}
+
+fn describe_gains(lead_integrated_loudness_db: f64) -> Value {
+    let analysis = measure(
+        create_loudness(-20.0, -3.0),
+        &create_stems(lead_integrated_loudness_db),
+    );
+    json!({
+        "source": analysis.source_gain_db,
+        "spectrogram": analysis.lead_spectrogram_gain_db,
+        "lead": analysis.lead_gain_db,
+        "backing": analysis.backing_gain_db,
+        "instrumental": analysis.instrumental_gain_db,
+        "leadP95Rms": analysis.lead_p95_rms_db,
+        "instrumentalLoudness": analysis.instrumental_integrated_loudness_db,
+    })
+}
+
+#[test]
+fn matches_the_gains_the_node_service_calculated() {
+    let gains = describe_gains(-25.0);
+
+    assert_eq!(
+        gains,
+        json!({
+            "source": 2.0,
+            "spectrogram": 5.0,
+            "lead": 9.0,
+            "backing": 9.0,
+            "instrumental": -12.0,
+            "leadP95Rms": -30.0,
+            "instrumentalLoudness": -8.0,
+        })
+    );
+}
+
+#[test]
+fn falls_back_to_the_source_gain_when_the_lead_is_silent() {
+    let gains = describe_gains(-50.0);
+
+    assert_eq!(gains["source"], json!(2.0));
+    assert_eq!(gains["lead"], json!(2.0));
+    assert_eq!(gains["backing"], json!(2.0));
+    assert_eq!(gains["instrumental"], json!(2.0));
+}
+
+#[test]
+fn leaves_a_step_pending_when_the_gpu_executor_disconnects() {
+    let result = answer(Err(ExecutorFailure::Unavailable.into()));
+
+    assert!(matches!(result, StepAnswer::Unavailable));
+}
+
+fn create_blobs(prefix: &str) -> StemBlobs {
+    StemBlobs {
+        lead: format!("{prefix}-lead"),
+        backing: format!("{prefix}-backing"),
+        instrumental: format!("{prefix}-instrumental"),
+    }
+}
+
+#[tokio::test]
+async fn records_every_stem_the_separation_produced() {
+    let workspace = Workspace::new();
+    workspace.seed(SEPARATION_PROJECT);
+    let storage = workspace.create_storage();
+    let separation = NewSeparation {
+        project_id: 2,
+        analysis: measure(create_loudness(-20.0, -3.0), &create_stems(-25.0)),
+        master: create_blobs("master"),
+        delivery: create_blobs("delivery"),
+        wave_peaks: create_blobs("wave"),
+    };
+
+    write_database(&storage, move |writer| {
+        writer.apply_separation_result(&separation)
+    })
+    .await
+    .expect("the separation should be recorded");
+
+    let recorded = read(&storage, |database| {
+        let master = database.master_blob(2, MasterType::Backing)?;
+        let delivery = database.delivery(2, StemType::Instrumental)?;
+        let analysis = database.audio_analysis(2)?;
+        let failures = database.step_failures(2)?;
+        Ok((master, delivery, analysis, failures))
+    })
+    .await
+    .expect("the separation should be read");
+    let (master, delivery, analysis, failures) = recorded;
+    assert_eq!(master.as_deref(), Some("master-backing"));
+    let delivered = delivery.expect("the instrumental delivery should be recorded");
+    assert_eq!(delivered.blob_id, "delivery-instrumental");
+    assert_eq!(delivered.wave_blob_id, "wave-instrumental");
+    assert_eq!(
+        json!(
+            analysis
+                .expect("the audio analysis should be recorded")
+                .source_gain_db
+        ),
+        json!(2.0)
+    );
+    assert!(failures.is_empty());
 }

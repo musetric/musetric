@@ -212,7 +212,7 @@ export const withTestServer = async <Result>(
   const workspace = createStorageWorkspace();
   await createProjectFixture(workspace);
   const app = await createServerApp(workspace.config, {
-    gpuPageHostFactory: () => {
+    openPage: () => {
       throw new Error('A test must not reach the GPU host');
     },
   });

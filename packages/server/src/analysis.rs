@@ -1,6 +1,8 @@
 mod browser;
+mod gains;
 mod models;
 mod page;
+mod separation;
 mod steps;
 
 #[cfg(test)]
@@ -12,7 +14,7 @@ use musetric_db::PendingJob;
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 
-use crate::{jobs::UpstreamRunner, proxy::ProxyState, storage::Storage};
+use crate::{proxy::ProxyState, storage::Storage};
 
 pub(crate) struct AnalysisContext {
     pub(crate) storage: Arc<Storage>,
@@ -24,13 +26,11 @@ pub(crate) struct AnalysisContext {
 
 pub(crate) struct AnalysisRunner {
     context: AnalysisContext,
-    upstream: UpstreamRunner,
 }
 
 impl AnalysisRunner {
     pub(crate) fn create(context: AnalysisContext) -> Self {
-        let upstream = UpstreamRunner::create(context.proxy.clone());
-        Self { context, upstream }
+        Self { context }
     }
 }
 
@@ -40,7 +40,7 @@ impl StepRunner for AnalysisRunner {
             Some(analysis) => {
                 Box::pin(async move { browser::run(&self.context, job, report, &analysis).await })
             }
-            None => self.upstream.run(job, report),
+            None => Box::pin(separation::run(&self.context, job, report)),
         }
     }
 }

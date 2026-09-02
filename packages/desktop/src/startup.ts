@@ -13,7 +13,6 @@ const importBackendModules = async () => {
   ]);
   return {
     startBackend: backend.startBackend,
-    createElectronGpuHost: gpuHost.createElectronGpuHost,
     createElectronPageOpener: gpuHost.createElectronPageOpener,
   };
 };
@@ -36,10 +35,9 @@ export const startApp = async (
     loadingWindow.loadFile(loadingPath),
   );
 
-  const { startBackend, createElectronGpuHost, createElectronPageOpener } =
+  const { startBackend, createElectronPageOpener } =
     await importBackendModules();
   const backend = await startBackend({
-    gpuPageHostFactory: createElectronGpuHost(),
     openPage: createElectronPageOpener(),
     logDestination: log.destination,
     logger: log.logger,

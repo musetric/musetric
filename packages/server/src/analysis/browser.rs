@@ -3,7 +3,8 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Download, ExecutorHost, ExecutorHostOptions, ModelFile, ProgressSink, ensure_model_file,
+    Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ModelFile, ProgressSink,
+    ensure_model_file,
 };
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
 use musetric_media::{Downmix, decode_mono_pcm};
@@ -16,6 +17,7 @@ use crate::{
         page::{PageFailure, close_page, open_page},
     },
     blobs::create_blob_ref,
+    proxy::ProxyState,
     storage::write_database,
 };
 
@@ -35,6 +37,15 @@ impl From<PageFailure> for Failure {
         match failure {
             PageFailure::Refused(message) => Self::Refused(message),
             PageFailure::Unreachable => Self::Unreachable,
+        }
+    }
+}
+
+impl From<ExecutorFailure> for Failure {
+    fn from(failure: ExecutorFailure) -> Self {
+        match failure {
+            ExecutorFailure::Refused(message) => Self::Refused(message),
+            ExecutorFailure::Unavailable => Self::Unreachable,
         }
     }
 }
@@ -88,13 +99,91 @@ pub(crate) struct BrowserAnalysis {
     pub(crate) build: BuildRequest,
 }
 
+pub(crate) struct SessionOptions {
+    pub(crate) label: &'static str,
+    pub(crate) bundle_path: PathBuf,
+    pub(crate) pcm: Vec<u8>,
+    pub(crate) require_shader_f16: bool,
+}
+
+pub(crate) struct Job<'job> {
+    pub(crate) api: &'job str,
+    pub(crate) request: &'job Value,
+    pub(crate) report: &'job StepReport,
+}
+
+pub(crate) struct Session {
+    host: ExecutorHost,
+    reported: mpsc::UnboundedReceiver<f64>,
+}
+
+impl Session {
+    pub(crate) async fn start(options: SessionOptions) -> Result<Self, Failure> {
+        let (progress, reported) = mpsc::unbounded_channel();
+        let sink: ProgressSink = Arc::new(move |value| {
+            let _ = progress.send(value);
+        });
+        let host = ExecutorHost::start(ExecutorHostOptions {
+            label: options.label.to_owned(),
+            bundle_path: options.bundle_path,
+            pcm: Bytes::from(options.pcm),
+            require_shader_f16: options.require_shader_f16,
+            on_progress: sink,
+        })
+        .await?;
+        Ok(Self { host, reported })
+    }
+
+    pub(crate) fn host(&self) -> &ExecutorHost {
+        &self.host
+    }
+
+    pub(crate) async fn run(&mut self, proxy: &ProxyState, job: Job<'_>) -> Result<Value, Failure> {
+        let page = open_page(proxy, &self.host.page_url()).await?;
+        let found = self.answer(job).await;
+        close_page(proxy, &page).await;
+        found
+    }
+
+    async fn answer(&mut self, job: Job<'_>) -> Result<Value, Failure> {
+        let Self { host, reported } = self;
+        host.wait_ready().await?;
+        let running = host.run(job.api, job.request);
+        tokio::pin!(running);
+        loop {
+            tokio::select! {
+                received = reported.recv() => {
+                    if let Some(value) = received {
+                        (job.report)(StepEvent::Progress(value));
+                    }
+                }
+                answered = &mut running => return Ok(answered?),
+            }
+        }
+    }
+
+    pub(crate) async fn close(self) {
+        self.host.close().await;
+    }
+}
+
+struct Attempt<'attempt> {
+    context: &'attempt AnalysisContext,
+    report: &'attempt StepReport,
+    analysis: &'attempt BrowserAnalysis,
+}
+
 pub(crate) async fn run(
     context: &AnalysisContext,
     job: &PendingJob,
     report: &StepReport,
     analysis: &BrowserAnalysis,
 ) -> StepAnswer {
-    match analyze(context, job, report, analysis).await {
+    answer(analyze(context, job, report, analysis).await)
+}
+
+pub(crate) fn answer(found: Result<(), Failure>) -> StepAnswer {
+    match found {
         Ok(()) => StepAnswer::Finished,
         Err(Failure::Refused(message)) => StepAnswer::Failed(message),
         Err(Failure::Unreachable) => StepAnswer::Unavailable,
@@ -117,66 +206,44 @@ async fn analyze(
         analysis.downmix,
     )
     .await?;
-    let (progress, mut reported) = mpsc::unbounded_channel();
-    let sink: ProgressSink = Arc::new(move |value| {
-        let _ = progress.send(value);
-    });
-    let host = ExecutorHost::start(ExecutorHostOptions {
-        label: analysis.label.to_owned(),
+    let mut session = Session::start(SessionOptions {
+        label: analysis.label,
         bundle_path: context.bundle_path.clone(),
-        pcm: Bytes::from(pcm),
+        pcm,
         require_shader_f16: analysis.require_shader_f16,
-        on_progress: sink,
     })
     .await?;
-    let running = Running {
-        host: &host,
-        reported: &mut reported,
+    let attempt = Attempt {
+        context,
         report,
+        analysis,
     };
-    let found = read_result(context, running, analysis, &files).await;
-    host.close().await;
+    let found = read_result(&attempt, &mut session, &files).await;
+    session.close().await;
     let result = found?;
     store(context, job, analysis.stored, &result).await?;
     report(StepEvent::Progress(1.0));
     Ok(())
 }
 
-struct Running<'run> {
-    host: &'run ExecutorHost,
-    reported: &'run mut mpsc::UnboundedReceiver<f64>,
-    report: &'run StepReport,
-}
-
 async fn read_result(
-    context: &AnalysisContext,
-    running: Running<'_>,
-    analysis: &BrowserAnalysis,
+    attempt: &Attempt<'_>,
+    session: &mut Session,
     files: &[(String, PathBuf)],
 ) -> Result<Value, Failure> {
-    let host = running.host;
-    let hosted = register_files(host, &analysis.serve, files).await?;
-    let request = (analysis.build)(&host.pcm_url(), &hosted)?;
-    let page = open_page(&context.proxy, &host.page_url()).await?;
-    let found = run_job(running, analysis.api, &request).await;
-    close_page(&context.proxy, &page).await;
-    found
-}
-
-async fn run_job(running: Running<'_>, api: &str, request: &Value) -> Result<Value, Failure> {
-    running.host.wait_ready().await?;
-    let job = running.host.run(api, request);
-    tokio::pin!(job);
-    loop {
-        tokio::select! {
-            received = running.reported.recv() => {
-                if let Some(value) = received {
-                    (running.report)(StepEvent::Progress(value));
-                }
-            }
-            answered = &mut job => return Ok(answered?),
-        }
-    }
+    let analysis = attempt.analysis;
+    let hosted = register_files(session.host(), &analysis.serve, files).await?;
+    let request = (analysis.build)(&session.host().pcm_url(), &hosted)?;
+    session
+        .run(
+            &attempt.context.proxy,
+            Job {
+                api: analysis.api,
+                request: &request,
+                report: attempt.report,
+            },
+        )
+        .await
 }
 
 async fn register_files(
@@ -197,7 +264,7 @@ async fn register_files(
     Ok(HostedModel::create(urls, None))
 }
 
-async fn ensure_files(
+pub(crate) async fn ensure_files(
     context: &AnalysisContext,
     report: &StepReport,
     files: &[ModelFile],

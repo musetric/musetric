@@ -7,8 +7,6 @@ export const stemDownloadNames = {
   instrumental: 'instrumental.pcm',
 } as const;
 
-export type StemKey = keyof typeof stemDownloadNames;
-
 export type BrowserSeparateAudioRequest = {
   pcmUrl: string;
   sampleRate: number;

@@ -6,6 +6,12 @@ use crate::{Tools, run::BoxedError, run::run};
 
 const FRAGMENT_DURATION_MICROS: u32 = 2_000_000;
 
+#[derive(Clone, Copy)]
+pub struct SampleRates {
+    pub input: u32,
+    pub output: u32,
+}
+
 pub async fn convert_to_flac(
     tools: &Tools,
     from: &Path,
@@ -83,5 +89,39 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
     if let Some(directory) = to.parent() {
         create_dir_all(directory).await?;
     }
+    Ok(())
+}
+
+pub async fn encode_flac_from_raw(
+    tools: &Tools,
+    from: &Path,
+    to: &Path,
+    rates: SampleRates,
+) -> Result<(), BoxedError> {
+    create_parent(to).await?;
+    let arguments = vec![
+        "-y".to_owned(),
+        "-hide_banner".to_owned(),
+        "-loglevel".to_owned(),
+        "error".to_owned(),
+        "-f".to_owned(),
+        "f32le".to_owned(),
+        "-ar".to_owned(),
+        rates.input.to_string(),
+        "-ac".to_owned(),
+        "2".to_owned(),
+        "-i".to_owned(),
+        from.display().to_string(),
+        "-ar".to_owned(),
+        rates.output.to_string(),
+        "-c:a".to_owned(),
+        "flac".to_owned(),
+        "-sample_fmt".to_owned(),
+        "s32".to_owned(),
+        "-f".to_owned(),
+        "flac".to_owned(),
+        to.display().to_string(),
+    ];
+    run(&tools.ffmpeg, &arguments).await?;
     Ok(())
 }

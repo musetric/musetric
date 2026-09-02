@@ -1,8 +1,6 @@
 import {
-  defaultGpuPageHostFactory,
   defaultOpenJobPage,
   type GpuHost,
-  type GpuPageHostFactory,
   type OpenJobPage,
 } from '@musetric/ai/node';
 import { fastify, type FastifyInstance, LogController } from 'fastify';
@@ -30,7 +28,6 @@ declare module 'fastify' {
 }
 
 export type CreateServerAppOptions = {
-  gpuPageHostFactory?: GpuPageHostFactory;
   openPage?: OpenJobPage;
 };
 
@@ -45,11 +42,7 @@ export const createServerApp = async (
     https: config.https ?? null,
   });
   app.decorate('config', config);
-  app.decorate('gpuHost', {
-    createGpuPage: options.gpuPageHostFactory ?? defaultGpuPageHostFactory,
-    openPage: options.openPage ?? defaultOpenJobPage,
-    browserBundlePath: config.browserBundlePath,
-  });
+  app.decorate('gpuHost', { openPage: options.openPage ?? defaultOpenJobPage });
   registerApiLogger(app);
   await registerDb(app);
   registerBlobStorage(app);
