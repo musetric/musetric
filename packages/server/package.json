@@ -19,14 +19,18 @@
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
     "check:rust": "ast-grep scan . && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
-    "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
+    "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
     "@musetric/eslint-config": "workspace:*",
+    "@musetric/ffmpeg": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
