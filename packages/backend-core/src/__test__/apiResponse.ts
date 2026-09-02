@@ -212,6 +212,7 @@ export const withTestServer = async <Result>(
     gpuPageHostFactory: () => {
       throw new Error('A test must not reach the GPU host');
     },
+    withProcessingWorker: false,
   });
   await app.ready();
   try {

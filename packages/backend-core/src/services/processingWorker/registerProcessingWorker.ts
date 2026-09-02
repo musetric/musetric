@@ -11,12 +11,17 @@ declare module 'fastify' {
   }
 }
 
-export const registerProcessingWorker = (app: FastifyInstance) => {
+export const registerProcessingWorker = (
+  app: FastifyInstance,
+  withProcessingWorker: boolean,
+) => {
   const processingWorker = createProcessingWorker(app);
 
-  app.addHook('onReady', () => {
-    processingWorker.start();
-  });
+  if (withProcessingWorker) {
+    app.addHook('onReady', () => {
+      processingWorker.start();
+    });
+  }
   app.addHook('onClose', () => {
     processingWorker.stop();
   });
