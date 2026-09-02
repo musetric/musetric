@@ -49,6 +49,3 @@ export const whisperModel = {
   chunkLengthSeconds: 30,
   strideLengthSeconds: 5,
 } as const;
-
-export const resolveWhisperModelUrl = (file: string): string =>
-  `https://huggingface.co/${whisperModel.modelId}/resolve/${whisperModel.revision}/${file}`;

@@ -37,6 +37,7 @@ const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const HTML: &str = "text/html; charset=utf-8";
 const PCM_ROUTE: &str = "/pcm";
 const FILES_ROUTE: &str = "/files/";
+const MODELS_ROUTE: &str = "/models/";
 const DISCONNECTED: &str = "the gpu executor disconnected";
 
 pub type ProgressSink = Arc<dyn Fn(f64) + Send + Sync>;
@@ -56,6 +57,7 @@ pub(crate) struct HostState {
     require_shader_f16: bool,
     on_progress: ProgressSink,
     files: Mutex<HashMap<String, PathBuf>>,
+    directories: Mutex<HashMap<String, PathBuf>>,
     uploads: Mutex<Vec<PendingUpload>>,
     jobs: Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>,
     ready: Mutex<Option<oneshot::Sender<Result<(), String>>>>,
@@ -186,6 +188,7 @@ impl ExecutorHost {
             require_shader_f16: options.require_shader_f16,
             on_progress: options.on_progress,
             files: Mutex::new(HashMap::new()),
+            directories: Mutex::new(HashMap::new()),
             uploads: Mutex::new(Vec::new()),
             jobs: Mutex::new(HashMap::new()),
             ready: Mutex::new(Some(ready_sender)),
@@ -258,6 +261,27 @@ impl ExecutorHost {
         Ok(format!("{}{FILES_ROUTE}{token}/{name}", self.base_url))
     }
 
+    pub async fn register_directory(&self, path: &Path) -> Result<String, BoxedError> {
+        if !tokio::fs::metadata(path)
+            .await
+            .is_ok_and(|stat| stat.is_dir())
+        {
+            return Err(format!(
+                "{} directory not found at {}",
+                self.state.label,
+                path.display()
+            )
+            .into());
+        }
+        let token = Uuid::new_v4().to_string();
+        self.state
+            .directories
+            .lock()
+            .map_err(|_| "the host is poisoned")?
+            .insert(token.clone(), path.to_path_buf());
+        Ok(format!("{}{MODELS_ROUTE}{token}", self.base_url))
+    }
+
     pub async fn wait_ready(&self) -> Result<(), BoxedError> {
         let receiver = self
             .ready
@@ -326,6 +350,7 @@ fn create_router(state: Arc<HostState>) -> Router {
         .route("/", get(handle_page))
         .route(PCM_ROUTE, get(handle_pcm))
         .route("/files/{token}/{name}", get(handle_file))
+        .route("/models/{token}/{*name}", get(handle_directory))
         .route(JOB_SOCKET_PATH, any(handle_socket))
         .fallback(any(handle_asset))
         .with_state(state)
@@ -360,6 +385,28 @@ async fn handle_file(
         return missing();
     };
     match send_file(&path, OCTET_STREAM).await {
+        Some(response) => response,
+        None => missing(),
+    }
+}
+
+async fn handle_directory(
+    State(state): State<Arc<HostState>>,
+    axum::extract::Path((token, name)): axum::extract::Path<(String, String)>,
+) -> Response {
+    let found = state
+        .directories
+        .lock()
+        .ok()
+        .and_then(|directories| directories.get(&token).cloned());
+    let Some(root) = found else {
+        return missing();
+    };
+    let Some(path) = resolve_asset(&root, &name) else {
+        return missing();
+    };
+    let content_type = read_content_type(&path);
+    match send_file(&path, content_type).await {
         Some(response) => response,
         None => missing(),
     }

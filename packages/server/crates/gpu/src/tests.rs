@@ -60,6 +60,15 @@ impl Workspace {
         path
     }
 
+    fn nested(&self, name: &str, content: &str) -> PathBuf {
+        let root = self.directory.join("cache");
+        let path = root.join(name);
+        create_dir_all(path.parent().expect("the nested file should have a parent"))
+            .expect("the nested directory should be created");
+        write(&path, content).expect("the nested file should be written");
+        root
+    }
+
     fn target(&self, name: &str) -> PathBuf {
         self.directory.join("uploads").join(name)
     }
@@ -254,6 +263,29 @@ async fn serves_the_page_the_pcm_and_the_registered_files() {
     assert_eq!(asset_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&asset), BUNDLE_ASSET);
     assert_eq!(missing_status, StatusCode::NOT_FOUND);
+    host.close().await;
+}
+
+#[tokio::test]
+async fn serves_a_whole_registered_directory() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = start_host(&workspace, false, &reported).await;
+    let root = workspace.nested("model/resolve/main/config.json", "{}");
+
+    let directory_url = host
+        .register_directory(&root)
+        .await
+        .expect("the directory should register");
+    let (found_status, found) =
+        get(&format!("{directory_url}/model/resolve/main/config.json")).await;
+    let (missing_status, _) = get(&format!("{directory_url}/model/resolve/main/other.json")).await;
+    let (escaped_status, _) = get(&format!("{directory_url}/%2e%2e/bundle/index.js")).await;
+
+    assert_eq!(found_status, StatusCode::OK);
+    assert_eq!(String::from_utf8_lossy(&found), "{}");
+    assert_eq!(missing_status, StatusCode::NOT_FOUND);
+    assert_eq!(escaped_status, StatusCode::NOT_FOUND);
     host.close().await;
 }
 
