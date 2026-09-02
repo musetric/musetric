@@ -14,8 +14,29 @@ workspace = true
 [workspace]
 
 [workspace.lints.rust]
-unsafe_code = "deny"
+unsafe_code = "forbid"
+unreachable_pub = "deny"
+unused = { level = "deny", priority = -1 }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+allow_attributes_without_reason = "deny"
+cognitive_complexity = "deny"
+dbg_macro = "deny"
+enum_glob_use = "deny"
+excessive_nesting = "deny"
+expect_used = "deny"
+missing_errors_doc = "allow"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+shadow_reuse = "deny"
+shadow_unrelated = "deny"
+todo = "deny"
+too_many_arguments = "deny"
+too_many_lines = "deny"
+type_complexity = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"
+wildcard_imports = "deny"
