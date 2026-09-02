@@ -1,0 +1,27 @@
+[package]
+name = "musetric-gpu"
+description = "Musetric gpu executor: the page it serves and the job protocol it speaks"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT"
+authors = ["Musetric <musetric@gmail.com>"]
+repository = "https://github.com/musetric/musetric"
+
+[dependencies]
+axum = { version = "=0.8.9", features = ["ws"] }
+http-body-util = "=0.1.5"
+serde_json = "=1.0.151"
+tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-util = { version = "=0.7.19", features = ["io"] }
+uuid = { version = "=1.26.0", features = ["v4"] }
+
+[dev-dependencies]
+futures-util = "=0.3.34"
+hyper = { version = "=1.11.1", features = ["client", "http1"] }
+hyper-util = { version = "=0.1.20", features = ["client-legacy", "http1", "tokio"] }
+tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
+tokio-tungstenite = "=0.29.0"
+
+[lints]
+workspace = true
