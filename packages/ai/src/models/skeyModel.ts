@@ -12,6 +12,3 @@ export const skeyModel = {
   inputName: 'audio',
   outputName: 'probs',
 } as const;
-
-export const resolveSkeyModelUrl = (file: string): string =>
-  `https://huggingface.co/${skeyModel.modelId}/resolve/${skeyModel.revision}/${file}`;

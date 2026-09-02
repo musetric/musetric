@@ -25,6 +25,3 @@ export const beatThisModel = {
   beatOutputName: 'beat',
   downbeatOutputName: 'downbeat',
 } as const;
-
-export const resolveBeatThisModelUrl = (file: string): string =>
-  `https://huggingface.co/${beatThisModel.modelId}/resolve/${beatThisModel.revision}/${file}`;

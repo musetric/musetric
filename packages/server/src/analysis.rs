@@ -1,13 +1,14 @@
-mod chords;
+mod browser;
 mod models;
 mod page;
+mod steps;
 
 #[cfg(test)]
 mod tests;
 
 use std::{path::PathBuf, sync::Arc};
 
-use musetric_db::{PendingJob, ProcessingStep};
+use musetric_db::PendingJob;
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 
@@ -35,9 +36,11 @@ impl AnalysisRunner {
 
 impl StepRunner for AnalysisRunner {
     fn run<'a>(&'a self, job: &'a PendingJob, report: &'a StepReport) -> StepOutcome<'a> {
-        if job.step == ProcessingStep::Chords {
-            return Box::pin(chords::run(&self.context, job, report));
+        match steps::create(job.step, &self.context.models_path) {
+            Some(analysis) => {
+                Box::pin(async move { browser::run(&self.context, job, report, &analysis).await })
+            }
+            None => self.upstream.run(job, report),
         }
-        self.upstream.run(job, report)
     }
 }

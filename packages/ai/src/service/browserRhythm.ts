@@ -1,3 +1,6 @@
+import { pickBeatTimes } from '../rhythm/beatPeaks.js';
+import { estimateBpm, estimateMeter } from '../rhythm/rhythmSummary.js';
+import { type RhythmResult } from '../rhythm/types.js';
 import {
   fetchFloat32,
   registerBrowserApi,
@@ -6,11 +9,10 @@ import {
 import {
   analyzeRhythmApiName,
   type BrowserAnalyzeRhythmRequest,
-  type BrowserAnalyzeRhythmResult,
 } from './rhythmApi.js';
 
 export const registerRhythmApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeRhythmRequest, BrowserAnalyzeRhythmResult>(
+  registerBrowserApi<BrowserAnalyzeRhythmRequest, RhythmResult>(
     analyzeRhythmApiName,
     async (request) => {
       await reportProgress(0);
@@ -31,10 +33,16 @@ export const registerRhythmApi = (): void => {
         const logits = await runtime.analyze(audio, async (progress) => {
           await reportProgress(0.1 + progress * 0.8);
         });
+        const { beats, downbeats } = pickBeatTimes(
+          logits.beat,
+          logits.downbeat,
+        );
         await reportProgress(1);
         return {
-          beat: Array.from(logits.beat),
-          downbeat: Array.from(logits.downbeat),
+          bpm: estimateBpm(beats),
+          beats,
+          downbeats,
+          meter: estimateMeter(beats, downbeats),
         };
       } finally {
         await runtime.release();
