@@ -40,6 +40,8 @@ const createTlsFiles = async (tls: RustProxyTls): Promise<TlsFiles> => {
 export type StartRustProxyOptions = {
   upstream: string;
   listen: string;
+  databasePath: string;
+  blobsPath: string;
   resourcesPath?: string;
   tls?: RustProxyTls;
   onLog?: (line: string) => void;
@@ -54,7 +56,16 @@ const createCommand = (
   options: StartRustProxyOptions,
   tlsFiles: TlsFiles | undefined,
 ): Command => {
-  const args = ['--upstream', options.upstream, '--listen', options.listen];
+  const args = [
+    '--upstream',
+    options.upstream,
+    '--listen',
+    options.listen,
+    '--database',
+    options.databasePath,
+    '--blobs',
+    options.blobsPath,
+  ];
   if (tlsFiles !== undefined) {
     args.push(
       '--certificate',

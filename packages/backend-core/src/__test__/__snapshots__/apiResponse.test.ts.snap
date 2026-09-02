@@ -599,3 +599,30 @@ exports[`the status stream opens as server-sent events 1`] = `
   "status": 200,
 }
 `;
+
+exports[`unparsable ids answer the same way 1`] = `
+[
+  {
+    "body": {
+      "message": "params/projectId Invalid input: expected number, received string",
+    },
+    "headers": {
+      "content-length": "78",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/chords/project/abc",
+    "status": 400,
+  },
+  {
+    "body": {
+      "message": "params/projectId Invalid input: expected number, received string",
+    },
+    "headers": {
+      "content-length": "78",
+      "content-type": "application/json; charset=utf-8",
+    },
+    "route": "GET /api/subtitle/project/abc",
+    "status": 400,
+  },
+]
+`;

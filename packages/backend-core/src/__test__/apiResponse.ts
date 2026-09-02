@@ -186,7 +186,12 @@ const withClient = async <Result>(
   if (transport === 'http') {
     return await run(createHttpClient(upstream), workspace);
   }
-  const proxy = await startRustProxy({ upstream, listen: '127.0.0.1:0' });
+  const proxy = await startRustProxy({
+    upstream,
+    listen: '127.0.0.1:0',
+    databasePath: workspace.config.databasePath,
+    blobsPath: workspace.config.blobsPath,
+  });
   try {
     return await run(createHttpClient(proxy.url), workspace);
   } finally {

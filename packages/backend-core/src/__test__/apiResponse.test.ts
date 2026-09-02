@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { missingUrls, readUrls } from './apiCaptures.js';
+import { invalidUrls, missingUrls, readUrls } from './apiCaptures.js';
 import { type ApiSnapshot, withTestServer } from './apiResponse.js';
 import {
   createFixtureAudioFile,
@@ -22,6 +22,17 @@ test('missing resources answer the same way', async () => {
   const snapshots = await withTestServer(async (client) => {
     const result: ApiSnapshot[] = [];
     for (const url of missingUrls) {
+      result.push(await client.capture({ method: 'GET', url }));
+    }
+    return result;
+  });
+  expect(snapshots).toMatchSnapshot();
+});
+
+test('unparsable ids answer the same way', async () => {
+  const snapshots = await withTestServer(async (client) => {
+    const result: ApiSnapshot[] = [];
+    for (const url of invalidUrls) {
       result.push(await client.capture({ method: 'GET', url }));
     }
     return result;
