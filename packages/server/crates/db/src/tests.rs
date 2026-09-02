@@ -275,3 +275,16 @@ fn avoids_characters_that_no_windows_file_name_may_hold() {
     assert_eq!(name, "app-2026-08-08T09-14-16-123Z-v3.db");
     assert!(!name.contains([':', '*', '?', '"', '<', '>', '|']));
 }
+
+#[test]
+fn shards_a_blob_path_by_the_first_two_byte_pairs() {
+    let path = crate::blob_path(Path::new("root"), "1f2e3d4c-0000-4000-8000-000000000001");
+
+    assert_eq!(
+        path,
+        Path::new("root")
+            .join("1f")
+            .join("2e")
+            .join("1f2e3d4c-0000-4000-8000-000000000001")
+    );
+}

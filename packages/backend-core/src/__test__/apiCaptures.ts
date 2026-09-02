@@ -28,6 +28,11 @@ export const missingUrls = [
   '/api/audio/project/404/delivery/lead/content',
 ];
 
+export const invalidUrls = [
+  '/api/chords/project/abc',
+  '/api/subtitle/project/abc',
+];
+
 const subtitleUrl = `/api/subtitle/project/${fixtureProjectId}`;
 
 const captureConditional = async (
@@ -75,7 +80,7 @@ export const captureEverything = async (
   client: ApiClient,
 ): Promise<ApiSnapshot[]> => {
   const snapshots: ApiSnapshot[] = [];
-  for (const url of [...readUrls, ...missingUrls]) {
+  for (const url of [...readUrls, ...missingUrls, ...invalidUrls]) {
     snapshots.push(await client.capture({ method: 'GET', url }));
   }
   snapshots.push(...(await captureConditional(client)));

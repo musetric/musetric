@@ -37,6 +37,8 @@ const startServer = async () => {
     proxy = await startRustProxy({
       upstream: `http://127.0.0.1:${String(address.port)}`,
       listen: `${envs.host}:${String(envs.port)}`,
+      databasePath: config.databasePath,
+      blobsPath: config.blobsPath,
       tls: https,
       onLog: (line) => {
         console.log(line);

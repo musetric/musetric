@@ -1,7 +1,7 @@
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
-use musetric_server::{ServerOptions, TlsOptions, serve};
+use musetric_server::{BoxedError, ServerOptions, TlsOptions, serve};
 
 #[derive(Parser)]
 #[command(about = "Musetric HTTP proxy")]
@@ -19,6 +19,12 @@ struct Arguments {
     )]
     listen: String,
 
+    #[arg(long, help = "SQLite database shared with the Fastify app.")]
+    database: PathBuf,
+
+    #[arg(long, help = "Directory that holds the stored blobs.")]
+    blobs: PathBuf,
+
     #[arg(
         long,
         requires = "private_key",
@@ -35,7 +41,7 @@ struct Arguments {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), BoxedError> {
     let arguments = Arguments::parse();
     let tls = arguments
         .certificate
@@ -47,6 +53,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     serve(ServerOptions {
         upstream: arguments.upstream,
         listen: arguments.listen,
+        database: arguments.database,
+        blobs: arguments.blobs,
         tls,
     })
     .await

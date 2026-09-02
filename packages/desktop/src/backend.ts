@@ -60,6 +60,8 @@ export const startBackend = async (
     const proxy = await startRustProxy({
       upstream: `http://127.0.0.1:${String(address.port)}`,
       listen: '127.0.0.1:0',
+      databasePath: config.databasePath,
+      blobsPath: config.blobsPath,
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustProxy' }, line);

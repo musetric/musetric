@@ -15,7 +15,12 @@ clap = { version = "=4.6.6", features = ["derive"] }
 http-body-util = "=0.1.5"
 hyper = { version = "=1.11.1", features = ["client", "http1"] }
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "http1", "tokio"] }
+md5 = "=0.8.1"
+musetric-db = { path = "crates/db" }
+serde_json = "=1.0.151"
+time = { version = "=0.3.55", features = ["formatting", "macros"] }
 tokio = { version = "=1.53.1", features = [
+  "fs",
   "io-std",
   "io-util",
   "macros",
@@ -24,6 +29,7 @@ tokio = { version = "=1.53.1", features = [
   "sync",
   "time",
 ] }
+tokio-util = { version = "=0.7.19", features = ["io"] }
 
 [dev-dependencies]
 tower = { version = "=0.5.3", features = ["util"] }
