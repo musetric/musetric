@@ -5,6 +5,7 @@ use rusqlite::{Connection, OptionalExtension, Result, Transaction, TransactionBe
 use crate::{
     database::{OpenOptions, open_database},
     failure::BoxedError,
+    processing::{ProcessingStep, clear_failure, write_failure},
 };
 
 pub struct NewPreview {
@@ -113,6 +114,25 @@ impl Writer {
         self.write(|transaction| {
             let removed = transaction.execute("DELETE FROM Project WHERE id = ?1", [project_id])?;
             Ok(removed != 0)
+        })
+    }
+
+    pub fn record_failure(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+        message: &str,
+    ) -> Result<(), BoxedError> {
+        self.write(|transaction| {
+            write_failure(transaction, project_id, step, message)?;
+            Ok(())
+        })
+    }
+
+    pub fn clear_failure(&self, project_id: i64, step: ProcessingStep) -> Result<bool, BoxedError> {
+        self.write(|transaction| {
+            let cleared = clear_failure(transaction, project_id, step)?;
+            Ok(cleared != 0)
         })
     }
 

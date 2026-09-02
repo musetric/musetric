@@ -4,6 +4,7 @@ mod cached_file;
 mod failure;
 mod form;
 mod garbage;
+mod jobs;
 mod proxy;
 mod realtime;
 mod router;

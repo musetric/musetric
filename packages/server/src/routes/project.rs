@@ -2,25 +2,30 @@ use std::{path::Path as FilePath, sync::Arc};
 
 use axum::{
     Router,
-    body::Body,
+    body::{Body, to_bytes},
     extract::{DefaultBodyLimit, FromRequest, Multipart, Path, State},
-    http::{Method, Request, StatusCode},
+    http::{Request, StatusCode},
     response::Response,
-    routing::{delete, patch, post},
+    routing::{delete, get, patch, post},
 };
-use musetric_db::{NewPreview, NewProject, ProjectEdit, blob_path};
+use musetric_db::{NewPreview, NewProject, ProcessingStep, ProjectEdit, blob_path};
 use musetric_media::{convert_to_flac, read_frame_count};
+use serde_json::Value;
 
 use crate::{
     blobs::{create_blob_ref, discard_blob},
     failure::{Failure, finish},
     form::{Field, Form, UploadedFile, read_form},
     proxy::forward,
-    routes::RouteState,
-    storage::{Storage, write},
+    routes::{
+        RouteState,
+        item::{json_response, missing_message, read_items, respond_with_item},
+    },
+    storage::{Storage, read, write},
 };
 
 const UPLOAD_LIMIT: usize = 200 * 1024 * 1024;
+const RETRY_LIMIT: usize = 4 * 1024;
 const SAMPLE_RATE: u32 = 48000;
 const NAME_MIN_LENGTH: usize = 3;
 const INVALID_AUDIO: &str = "Uploaded audio file is invalid";
@@ -28,10 +33,79 @@ const SHORT_NAME: &str = "body/name Too small: expected string to have >=3 chara
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
+        .route("/api/project/list", get(handle_list))
+        .route("/api/project/{projectId}", get(handle_get))
+        .route("/api/project/{projectId}/retry", post(handle_retry))
         .route("/api/project/create", post(handle_create))
         .route("/api/project/{projectId}/edit", patch(handle_edit))
         .route("/api/project/{projectId}/remove", delete(handle_remove))
         .layer(DefaultBodyLimit::max(UPLOAD_LIMIT))
+}
+
+async fn handle_list(State(state): State<RouteState>) -> Response<Body> {
+    finish(read_items(&state).await.map(|items| json_response(&items)))
+}
+
+async fn handle_get(
+    State(state): State<RouteState>,
+    Path(raw_project_id): Path<String>,
+    request: Request<Body>,
+) -> Response<Body> {
+    let Ok(project_id) = raw_project_id.parse::<i64>() else {
+        return forward(&state.proxy, request).await;
+    };
+    respond_with_item(&state, project_id).await
+}
+
+async fn handle_retry(
+    State(state): State<RouteState>,
+    Path(raw_project_id): Path<String>,
+    request: Request<Body>,
+) -> Response<Body> {
+    let Ok(project_id) = raw_project_id.parse::<i64>() else {
+        return forward(&state.proxy, request).await;
+    };
+    let (parts, body) = request.into_parts();
+    let payload = match to_bytes(body, RETRY_LIMIT).await {
+        Ok(payload) => payload,
+        Err(error) => return finish(Err(Failure::failed(error))),
+    };
+    let Some(step) = read_step(&payload) else {
+        let forwarded = Request::from_parts(parts, Body::from(payload));
+        return forward(&state.proxy, forwarded).await;
+    };
+    match retry(&state, project_id, step).await {
+        Ok(()) => respond_with_item(&state, project_id).await,
+        Err(failure) => finish(Err(failure)),
+    }
+}
+
+fn read_step(payload: &[u8]) -> Option<ProcessingStep> {
+    let body: Value = serde_json::from_slice(payload).ok()?;
+    ProcessingStep::parse(body.get("step")?.as_str()?)
+}
+
+async fn retry(state: &RouteState, project_id: i64, step: ProcessingStep) -> Result<(), Failure> {
+    let found = read(&state.storage, move |reader| reader.project(project_id)).await?;
+    if found.is_none() {
+        return Err(Failure::NotFound(missing_message(project_id)));
+    }
+    let failures = read(&state.storage, move |reader| {
+        reader.step_failures(project_id)
+    })
+    .await?;
+    if !failures.iter().any(|failure| failure.step == step) {
+        return Err(Failure::NotFound(format!(
+            "Processing step {} is not failed",
+            step.name()
+        )));
+    }
+    write(&state.storage, move |writer| {
+        writer.clear_failure(project_id, step)
+    })
+    .await?;
+    state.queue.wake();
+    Ok(())
 }
 
 async fn handle_create(State(state): State<RouteState>, multipart: Multipart) -> Response<Body> {
@@ -44,7 +118,10 @@ async fn handle_create(State(state): State<RouteState>, multipart: Multipart) ->
         form.discard(&state.storage.blobs_path).await;
     }
     match created {
-        Ok(project_id) => respond_with_item(&state, project_id).await,
+        Ok(project_id) => {
+            state.queue.wake();
+            respond_with_item(&state, project_id).await
+        }
         Err(failure) => finish(Err(failure)),
     }
 }
@@ -128,10 +205,6 @@ async fn remove(state: &RouteState, project_id: i64) -> Result<Response<Body>, F
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::OK;
     Ok(response)
-}
-
-fn missing_message(project_id: i64) -> String {
-    format!("Project with id {project_id} not found")
 }
 
 fn create_preview(file: &UploadedFile) -> NewPreview {
@@ -272,15 +345,4 @@ async fn convert_and_measure(
         .await
         .ok()?;
     i64::try_from(frames).ok()
-}
-
-async fn respond_with_item(state: &RouteState, project_id: i64) -> Response<Body> {
-    let built = Request::builder()
-        .method(Method::GET)
-        .uri(format!("/api/project/{project_id}"))
-        .body(Body::empty());
-    match built {
-        Ok(request) => forward(&state.proxy, request).await,
-        Err(error) => finish(Err(Failure::failed(error))),
-    }
 }

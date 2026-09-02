@@ -44,6 +44,7 @@ export type StartRustProxyOptions = {
   blobsPath: string;
   ffmpegPath: string;
   ffprobePath: string;
+  processing?: boolean;
   resourcesPath?: string;
   tls?: RustProxyTls;
   onLog?: (line: string) => void;
@@ -71,6 +72,8 @@ const createCommand = (
     options.ffmpegPath,
     '--ffprobe',
     options.ffprobePath,
+    '--processing',
+    String(options.processing ?? true),
   ];
   if (tlsFiles !== undefined) {
     args.push(

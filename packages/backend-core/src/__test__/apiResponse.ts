@@ -194,6 +194,7 @@ const withClient = async <Result>(
     blobsPath: workspace.config.blobsPath,
     ffmpegPath: ffmpegPath(),
     ffprobePath: ffprobePath(),
+    processing: false,
   });
   try {
     return await run(createHttpClient(proxy.url), workspace);
@@ -212,7 +213,6 @@ export const withTestServer = async <Result>(
     gpuPageHostFactory: () => {
       throw new Error('A test must not reach the GPU host');
     },
-    withProcessingWorker: false,
   });
   await app.ready();
   try {

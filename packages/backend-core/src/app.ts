@@ -16,7 +16,6 @@ import { registerDb } from './services/db.js';
 import { registerFrontend } from './services/frontend.js';
 import { createLoggerOptions } from './services/logger.js';
 import { registerMultipart } from './services/multipart.js';
-import { registerProcessingWorker } from './services/processingWorker/registerProcessingWorker.js';
 import { registerSchemaCompiler } from './services/schemaCompiler.js';
 import { registerSwagger } from './services/swagger.js';
 
@@ -30,7 +29,6 @@ declare module 'fastify' {
 
 export type CreateServerAppOptions = {
   gpuPageHostFactory?: GpuPageHostFactory;
-  withProcessingWorker?: boolean;
 };
 
 export const createServerApp = async (
@@ -51,7 +49,6 @@ export const createServerApp = async (
   registerApiLogger(app);
   await registerDb(app);
   registerBlobStorage(app);
-  registerProcessingWorker(app, options.withProcessingWorker ?? true);
   registerMultipart(app);
   app.register(FastifySSEPlugin);
   registerSchemaCompiler(app);

@@ -1,11 +1,15 @@
 mod analysis;
 mod audio;
+mod item;
 mod preview;
 mod project;
+mod status;
 
 use std::sync::Arc;
 
 use axum::Router;
+
+use musetric_jobs::Queue;
 
 use crate::{proxy::ProxyState, realtime, realtime::Rooms, storage::Storage};
 
@@ -14,24 +18,22 @@ pub(crate) struct RouteState {
     pub(crate) proxy: ProxyState,
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
+    pub(crate) queue: Arc<Queue>,
 }
 
-pub(crate) fn create_router(proxy: ProxyState, rooms: Arc<Rooms>, storage: Arc<Storage>) -> Router {
+pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
+        .merge(status::create_router())
         .merge(realtime::create_router())
-        .with_state(RouteState {
-            proxy,
-            rooms,
-            storage,
-        })
+        .with_state(state)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{net::SocketAddr, sync::Arc};
+    use std::net::SocketAddr;
 
     use axum::{
         Router,
@@ -41,11 +43,14 @@ mod tests {
         routing::any,
     };
     use http_body_util::BodyExt;
-    use tokio::{net::TcpListener, sync::oneshot};
+    use tokio::sync::oneshot;
     use tower::ServiceExt;
 
     use super::create_router;
-    use crate::{proxy::ProxyState, realtime::Rooms, test_workspace::Workspace};
+    use crate::{
+        proxy::ProxyState,
+        test_workspace::{Workspace, create_route_state, start_upstream},
+    };
 
     const BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
     const OTHER_BLOB_ID: &str = "5a6b7c8d-0000-4000-8000-000000000002";
@@ -91,33 +96,17 @@ mod tests {
         let address = format!("http://{upstream}")
             .parse()
             .expect("the upstream should be a valid uri");
-        create_router(
+        create_router(create_route_state(
             ProxyState::create(address),
-            Arc::new(Rooms::create()),
             workspace.create_storage(),
-        )
+        ))
     }
 
-    async fn start_upstream() -> (SocketAddr, oneshot::Sender<()>) {
+    async fn start_echo_upstream() -> (SocketAddr, oneshot::Sender<()>) {
         let app = Router::new().fallback(any(|request: Request<Body>| async move {
             format!("upstream answered {}", request.uri())
         }));
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("the upstream should bind");
-        let address = listener
-            .local_addr()
-            .expect("the upstream should have an address");
-        let (shutdown_sender, shutdown_receiver) = oneshot::channel();
-        tokio::spawn(async move {
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_receiver.await;
-                })
-                .await
-                .expect("the upstream should stop cleanly");
-        });
-        (address, shutdown_sender)
+        start_upstream(app).await
     }
 
     fn read_header(response: &Response<Body>, name: &str) -> Option<String> {
@@ -155,7 +144,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
 
         let response = request(
             create_test_router(&workspace, upstream),
@@ -185,7 +174,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
         let router = create_test_router(&workspace, upstream);
         let first = request(router.clone(), "/api/chords/project/1").await;
         let etag = read_header(&first, "etag").expect("the answer should carry an etag");
@@ -209,7 +198,7 @@ mod tests {
     #[tokio::test]
     async fn tells_a_missing_row_a_missing_project_and_a_missing_blob_apart() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
 
         let without_row = request(
             create_test_router(&workspace, upstream),
@@ -252,7 +241,7 @@ mod tests {
     #[tokio::test]
     async fn leaves_a_project_id_it_cannot_read_to_the_upstream() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
 
         let response = request(
             create_test_router(&workspace, upstream),
@@ -275,7 +264,7 @@ mod tests {
         workspace.seed(CREATE_MASTERS);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, AUDIO);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
         let router = create_test_router(&workspace, upstream);
 
         let source = request(router.clone(), SOURCE_URL).await;
@@ -300,7 +289,7 @@ mod tests {
         workspace.seed(CREATE_DELIVERY);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
         let router = create_test_router(&workspace, upstream);
 
         let content = request(router.clone(), DELIVERY_URL).await;
@@ -323,7 +312,7 @@ mod tests {
     async fn hands_out_an_empty_take_when_nothing_is_recorded() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
         let router = create_test_router(&workspace, upstream);
 
         let content = request(router.clone(), RECORDING_URL).await;
@@ -360,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn leaves_a_stem_type_it_does_not_know_to_the_upstream() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
 
         let response = request(
             create_test_router(&workspace, upstream),
@@ -381,7 +370,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_PREVIEW);
         workspace.add_blob(BLOB_ID, PREVIEW);
-        let (upstream, shutdown) = start_upstream().await;
+        let (upstream, shutdown) = start_echo_upstream().await;
 
         let response = request(create_test_router(&workspace, upstream), "/api/preview/1").await;
 

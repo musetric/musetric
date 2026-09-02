@@ -3,7 +3,7 @@ use std::{path::Path, sync::Mutex};
 use rusqlite::Connection;
 
 use crate::{
-    analysis::{Analysis, read_analysis_blob},
+    analysis::{Analysis, AudioAnalysis, read_analysis_blob, read_audio_analysis},
     audio::{
         AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
         read_recording,
@@ -12,7 +12,11 @@ use crate::{
     database::{OpenOptions, open_database},
     failure::BoxedError,
     preview::{Preview, read_preview},
-    project::read_project_name,
+    processing::{
+        PendingJob, ProcessingStep, StepFailure, StepResults, read_failures, read_pending,
+        read_results,
+    },
+    project::{ProjectItem, read_project, read_project_name, read_projects},
 };
 
 pub struct Reader {
@@ -42,6 +46,30 @@ impl Reader {
 
     pub fn project_name(&self, project_id: i64) -> Result<Option<String>, BoxedError> {
         self.read(|connection| read_project_name(connection, project_id))
+    }
+
+    pub fn project(&self, project_id: i64) -> Result<Option<ProjectItem>, BoxedError> {
+        self.read(|connection| read_project(connection, project_id))
+    }
+
+    pub fn projects(&self) -> Result<Vec<ProjectItem>, BoxedError> {
+        self.read(read_projects)
+    }
+
+    pub fn audio_analysis(&self, project_id: i64) -> Result<Option<AudioAnalysis>, BoxedError> {
+        self.read(|connection| read_audio_analysis(connection, project_id))
+    }
+
+    pub fn step_results(&self, project_id: i64) -> Result<StepResults, BoxedError> {
+        self.read(|connection| read_results(connection, project_id))
+    }
+
+    pub fn step_failures(&self, project_id: i64) -> Result<Vec<StepFailure>, BoxedError> {
+        self.read(|connection| read_failures(connection, project_id))
+    }
+
+    pub fn pending_job(&self, step: ProcessingStep) -> Result<Option<PendingJob>, BoxedError> {
+        self.read(|connection| read_pending(connection, step))
     }
 
     pub fn master_blob(
