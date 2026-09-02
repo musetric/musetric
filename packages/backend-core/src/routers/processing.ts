@@ -1,16 +1,17 @@
 import { PassThrough } from 'node:stream';
-import { api } from '@musetric/api';
+import { type api } from '@musetric/api';
 import { bindLogger } from '@musetric/utils';
 import { type FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
+  fastifyStepSchema,
   readStepFailure,
   runProcessingStep,
 } from '../services/processing/runStep.js';
 import { type ProcessingHandlers } from '../services/processing/types.js';
 
 const runSchema = z.object({
-  step: api.project.processingStepNameSchema,
+  step: fastifyStepSchema,
   projectId: z.number(),
   blobId: z.string(),
 });

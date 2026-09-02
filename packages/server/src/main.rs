@@ -31,6 +31,15 @@ struct Arguments {
     #[arg(long, help = "Bundled ffprobe binary used to measure uploaded audio.")]
     ffprobe: PathBuf,
 
+    #[arg(long, help = "Directory that holds the downloaded analysis models.")]
+    models: PathBuf,
+
+    #[arg(
+        long,
+        help = "Directory that holds the browser bundle of the gpu executor."
+    )]
+    browser_bundle: PathBuf,
+
     #[arg(
         long,
         default_value_t = true,
@@ -71,6 +80,8 @@ async fn main() -> Result<(), BoxedError> {
         blobs: arguments.blobs,
         ffmpeg: arguments.ffmpeg,
         ffprobe: arguments.ffprobe,
+        models: arguments.models,
+        browser_bundle: arguments.browser_bundle,
         processing: arguments.processing,
         tls,
     })

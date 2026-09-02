@@ -42,6 +42,8 @@ const startServer = async () => {
       blobsPath: config.blobsPath,
       ffmpegPath: ffmpegPath(),
       ffprobePath: ffprobePath(),
+      modelsPath: config.modelsPath,
+      browserBundlePath: config.browserBundlePath,
       tls: https,
       onLog: (line) => {
         console.log(line);

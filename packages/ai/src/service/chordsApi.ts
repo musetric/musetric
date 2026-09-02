@@ -6,5 +6,3 @@ export type BrowserAnalyzeChordsRequest = {
   planUrl: string;
   planManifestUrl?: string;
 };
-
-export type BrowserAnalyzeChordsResult = number[];

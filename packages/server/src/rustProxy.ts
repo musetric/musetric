@@ -44,6 +44,8 @@ export type StartRustProxyOptions = {
   blobsPath: string;
   ffmpegPath: string;
   ffprobePath: string;
+  modelsPath: string;
+  browserBundlePath: string;
   processing?: boolean;
   resourcesPath?: string;
   tls?: RustProxyTls;
@@ -72,6 +74,10 @@ const createCommand = (
     options.ffmpegPath,
     '--ffprobe',
     options.ffprobePath,
+    '--models',
+    options.modelsPath,
+    '--browser-bundle',
+    options.browserBundlePath,
     '--processing',
     String(options.processing ?? true),
   ];

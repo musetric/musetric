@@ -27,6 +27,3 @@ export const chordNetModel = {
   chordCount: 170,
   smoothingKernel: 9,
 } as const;
-
-export const resolveChordNetModelUrl = (file: string): string =>
-  `https://huggingface.co/${chordNetModel.modelId}/resolve/${chordNetModel.revision}/${file}`;

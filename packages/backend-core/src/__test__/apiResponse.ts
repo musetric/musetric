@@ -194,6 +194,8 @@ const withClient = async <Result>(
     blobsPath: workspace.config.blobsPath,
     ffmpegPath: ffmpegPath(),
     ffprobePath: ffprobePath(),
+    modelsPath: workspace.config.modelsPath,
+    browserBundlePath: workspace.config.browserBundlePath,
     processing: false,
   });
   try {

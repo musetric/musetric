@@ -10,10 +10,14 @@ use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, Reader, Writer};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::Tools;
+use reqwest::Client;
 use tokio::{io::AsyncReadExt, net::TcpListener};
 
 use crate::{
-    garbage::spawn_collector, jobs::UpstreamRunner, proxy::ProxyState, router::create_router,
+    analysis::{AnalysisContext, AnalysisRunner},
+    garbage::spawn_collector,
+    proxy::ProxyState,
+    router::create_router,
     storage::Storage,
 };
 
@@ -29,6 +33,8 @@ pub struct ServerOptions {
     pub blobs: PathBuf,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
+    pub models: PathBuf,
+    pub browser_bundle: PathBuf,
     pub processing: bool,
     pub tls: Option<TlsOptions>,
 }
@@ -50,10 +56,17 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     });
     spawn_collector(Arc::clone(&storage));
     let proxy = ProxyState::create(options.upstream.parse()?);
+    let runner = AnalysisRunner::create(AnalysisContext {
+        storage: Arc::clone(&storage),
+        proxy: proxy.clone(),
+        client: Client::new(),
+        models_path: options.models,
+        bundle_path: options.browser_bundle,
+    });
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
         writer: Arc::clone(&storage.writer),
-        runner: Arc::new(UpstreamRunner::create(proxy.clone())),
+        runner: Arc::new(runner),
         interval: PROCESSING_INTERVAL,
     });
     if options.processing {
