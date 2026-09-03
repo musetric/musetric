@@ -18,7 +18,11 @@
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "check:rust": "ast-grep scan . ../mobile/src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
+    "check:rust:ast": "ast-grep scan . ../mobile/src-tauri",
+    "check:rust:fmt": "cargo fmt --all --check",
+    "check:rust:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+    "check:rust:test": "cargo test --workspace --locked",
+    "check:rust": "yarn check:rust:ast && yarn check:rust:fmt && yarn check:rust:clippy && yarn check:rust:test",
     "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged",
     "test": "vitest run"
   },

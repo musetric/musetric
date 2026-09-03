@@ -1,4 +1,4 @@
-name: Code Quality
+name: JS Quality
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  check-code-quality:
+  check-js-quality:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,8 +28,6 @@ jobs:
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
       - run: yarn --immutable
-      - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
-      - run: yarn build:mobile
       - uses: actions/cache@v5
         with:
           path: packages/*/.eslintcache
@@ -56,5 +54,4 @@ jobs:
       - run: yarn check:openapi
       - run: yarn check:ts
       - run: yarn check:lint
-      - run: yarn check:rust
       - run: yarn test
