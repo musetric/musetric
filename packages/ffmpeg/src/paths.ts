@@ -15,7 +15,7 @@ const exeSuffix = process.platform === 'win32' ? '.exe' : '';
 
 const bundledDir = fromUnpackedAsar(join(packageDir, 'resources', platformKey));
 
-const bundledBinary = (name: 'ffmpeg' | 'ffprobe'): string => {
+const bundledBinary = (name: 'ffmpeg'): string => {
   const path = join(bundledDir, `${name}${exeSuffix}`);
   if (!existsSync(path)) {
     throw new Error(`Bundled ${name} is missing at ${path}.`);
@@ -24,5 +24,3 @@ const bundledBinary = (name: 'ffmpeg' | 'ffprobe'): string => {
 };
 
 export const ffmpegPath = (): string => bundledBinary('ffmpeg');
-
-export const ffprobePath = (): string => bundledBinary('ffprobe');

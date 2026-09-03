@@ -352,8 +352,6 @@ async fn convert_and_measure(
     convert_to_flac(&storage.tools, from, to, SAMPLE_RATE)
         .await
         .ok()?;
-    let frames = read_frame_count(&storage.tools, to, SAMPLE_RATE)
-        .await
-        .ok()?;
+    let frames = read_frame_count(to).await.ok()?;
     i64::try_from(frames).ok()
 }

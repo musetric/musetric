@@ -35,13 +35,11 @@ type FfmpegBuild = {
   sha256: string;
   exe: '' | '.exe';
   ffmpegSha256: string;
-  ffprobeSha256: string;
 };
 
 type FfmpegHashes = {
   archive: string;
   ffmpeg: string;
-  ffprobe: string;
 };
 
 const musetric = (
@@ -53,7 +51,6 @@ const musetric = (
   sha256: hashes.archive,
   exe: os === 'windows' ? '.exe' : '',
   ffmpegSha256: hashes.ffmpeg,
-  ffprobeSha256: hashes.ffprobe,
 });
 
 const builds = new Map<string, FfmpegBuild>([
@@ -64,8 +61,6 @@ const builds = new Map<string, FfmpegBuild>([
         '655229847a3f2c2f51d360ddf82c06cf759de861431e6aca2776deacc20928ed',
       ffmpeg:
         '22c517bb3a005ee56139d290631a4199ddd223dd230c05427177ac7fbba177c6',
-      ffprobe:
-        '60a9266b623675a268a66d6f3ece89958222b8a6bfebbd94396bef1a582f4b5c',
     }),
   ],
   [
@@ -75,8 +70,6 @@ const builds = new Map<string, FfmpegBuild>([
         '11c870008366aa7ae0c26e148873c1563faefe7af949a7962d4cef790449873c',
       ffmpeg:
         '5a8ece55b2b8521e07c57d131ce6db1301c13c5380105dc1873271fdfea8eb01',
-      ffprobe:
-        'ce5f9bd84be07ea6a17dc2472bf15d247e592c11c615a6a90a7487aa51914222',
     }),
   ],
   [
@@ -86,8 +79,6 @@ const builds = new Map<string, FfmpegBuild>([
         'ac2c24beae8ba279f59a6161aa9786b52f23c8bb092955b4b522b39e337a4a07',
       ffmpeg:
         '73dd2b464b68fae0bda391a9295c23b60a00f7e71a5355d767ccc025980423a1',
-      ffprobe:
-        'c3e6281b0e2b8fdbbdd9c672f5a44392bcc179b2b2dba2df0988c1ebb64bbf8d',
     }),
   ],
   [
@@ -97,8 +88,6 @@ const builds = new Map<string, FfmpegBuild>([
         'dac20991bca0b5bf5fcaceb95bbcf7b70db97b6585717a88f3bd0ce55c44e42c',
       ffmpeg:
         '5de68cea92a24ef39da5fec2f6a5eb4936e9529118c8f26cff469c57f46dbbab',
-      ffprobe:
-        'b175675b7e0339cad38e5fbfed0ab8598c24575310d819c19df08efa913e8141',
     }),
   ],
   [
@@ -108,8 +97,6 @@ const builds = new Map<string, FfmpegBuild>([
         'e25393de3bedc64367f20acf792d484d6ccb747b07b9510be4fa834d613289a6',
       ffmpeg:
         'b4527d8e038abb7539a71d89dc9e7e56015713f5ac4b16afd289bc7470cf8956',
-      ffprobe:
-        'e4150e4079e1195b008bd21d498af1cc0aea07836e47f6f76f8b7d6e1879d613',
     }),
   ],
   [
@@ -119,8 +106,6 @@ const builds = new Map<string, FfmpegBuild>([
         '3d44ecbae9fb6e8e8f4e563be62336cfc42d328364e8db54dedff737b85bc9d7',
       ffmpeg:
         '0bdf967aad6086c534bcc4a4f1e208a5c9160fbf8fcb27141ce4e05ecc59cd3b',
-      ffprobe:
-        '8676b805a461adaeeb73b721862dfcde7e7aaa27c30343c92bf91f8b965c79cd',
     }),
   ],
 ]);
@@ -148,7 +133,6 @@ const downloadTimeoutMs = 5 * 60 * 1000;
 
 const members = (build: FfmpegBuild): string[] => [
   `ffmpeg${build.exe}`,
-  `ffprobe${build.exe}`,
   licenseName,
 ];
 
@@ -166,15 +150,8 @@ const sha256Of = async (path: string): Promise<string> =>
     .update(await readFile(path))
     .digest('hex');
 
-const memberSha256 = (build: FfmpegBuild, member: string): string => {
-  if (member === `ffmpeg${build.exe}`) {
-    return build.ffmpegSha256;
-  }
-  if (member === `ffprobe${build.exe}`) {
-    return build.ffprobeSha256;
-  }
-  return licenseSha256;
-};
+const memberSha256 = (build: FfmpegBuild, member: string): string =>
+  member === `ffmpeg${build.exe}` ? build.ffmpegSha256 : licenseSha256;
 
 const hasExpectedMembers = async (
   targetDir: string,
@@ -243,6 +220,24 @@ const ensureStore = async (
   return storeDir;
 };
 
+const strangers = async (
+  targetDir: string,
+  build: FfmpegBuild,
+): Promise<string[]> => {
+  const expected = new Set([...members(build), sourceName]);
+  const entries = await readdir(targetDir);
+  return entries.filter((entry) => !expected.has(entry));
+};
+
+const removeStrangers = async (
+  targetDir: string,
+  build: FfmpegBuild,
+): Promise<void> => {
+  for (const entry of await strangers(targetDir, build)) {
+    await rm(join(targetDir, entry), { recursive: true, force: true });
+  }
+};
+
 const isVendored = async (
   targetDir: string,
   build: FfmpegBuild,
@@ -252,6 +247,9 @@ const isVendored = async (
     return false;
   }
   if ((await readFile(sourcePath, 'utf8')) !== sourceNote(build)) {
+    return false;
+  }
+  if ((await strangers(targetDir, build)).length > 0) {
     return false;
   }
   return hasExpectedMembers(targetDir, build);
@@ -267,11 +265,12 @@ const vendorKey = async (key: string): Promise<void> => {
   }
   const targetDir = join(resourcesDir, key);
   if (!force && (await isVendored(targetDir, build))) {
-    console.log(`ffmpeg/ffprobe already vendored for ${key}, skipping.`);
+    console.log(`ffmpeg already vendored for ${key}, skipping.`);
     return;
   }
   const storeDir = await ensureStore(key, build);
   await mkdir(targetDir, { recursive: true });
+  await removeStrangers(targetDir, build);
   for (const member of members(build)) {
     const destPath = join(targetDir, member);
     await copyFile(join(storeDir, member), destPath);
@@ -280,7 +279,7 @@ const vendorKey = async (key: string): Promise<void> => {
     }
   }
   await writeFile(join(targetDir, sourceName), sourceNote(build));
-  console.log(`Vendored ffmpeg/ffprobe for ${key}.`);
+  console.log(`Vendored ffmpeg for ${key}.`);
 };
 
 const pruneKeys = async (keys: string[]): Promise<void> => {
@@ -299,7 +298,7 @@ const resolveKeys = (): string[] =>
 
 const main = async (): Promise<void> => {
   if (process.env.MUSETRIC_SKIP_FFMPEG_FETCH !== undefined) {
-    console.log('Skipping ffmpeg/ffprobe fetch.');
+    console.log('Skipping ffmpeg fetch.');
     return;
   }
   const keys = resolveKeys();

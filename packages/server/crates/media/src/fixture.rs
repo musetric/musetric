@@ -30,7 +30,6 @@ impl Fixture {
             directory,
             tools: Tools {
                 ffmpeg: bundled("ffmpeg"),
-                ffprobe: bundled("ffprobe"),
             },
         }
     }
@@ -41,6 +40,11 @@ impl Fixture {
 
     pub(crate) async fn write_wav(&self, signal: &Signal<'_>) -> PathBuf {
         self.write(signal, &["-c:a".to_owned(), "pcm_s16le".to_owned()])
+            .await
+    }
+
+    pub(crate) async fn write_flac(&self, signal: &Signal<'_>) -> PathBuf {
+        self.write(signal, &["-c:a".to_owned(), "flac".to_owned()])
             .await
     }
 

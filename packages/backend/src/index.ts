@@ -1,5 +1,5 @@
 import { defaultOpenJobPage } from '@musetric/ai/node';
-import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
+import { ffmpegPath } from '@musetric/ffmpeg';
 import {
   isAddressInUseError,
   type RustProxy,
@@ -19,7 +19,6 @@ const start = async (): Promise<RustProxy> => {
     databasePath: envs.databasePath,
     blobsPath: envs.blobsPath,
     ffmpegPath: ffmpegPath(),
-    ffprobePath: ffprobePath(),
     modelsPath: envs.modelsPath,
     browserBundlePath: envs.browserBundlePath,
     publicPath: envs.publicPath,
