@@ -199,8 +199,17 @@ SOFTWARE.
 ## FFmpeg
 
 - Source: https://github.com/FFmpeg/FFmpeg, built and published as https://github.com/musetric/ffmpeg-builds (release `ffmpeg-n8.1.2`).
-- Usage: the unmodified `ffmpeg` command line tool, built in its LGPL configuration. They are vendored into `packages/ffmpeg/resources/<platform>-<arch>/` and shipped inside the desktop app, where this project runs them as separate processes; nothing is linked against the FFmpeg libraries.
-- Local files: `packages/ffmpeg/scripts/fetchFfmpeg.ts`, `packages/ffmpeg/src/paths.ts`, `packages/server/crates/media/src/convert.rs`, `packages/server/crates/media/src/mono.rs`, `packages/server/crates/media/src/pcm.rs`.
+- Usage: the unmodified `ffmpeg` command line tool, built in its LGPL configuration. They are vendored into `packages/ffmpeg/resources/<platform>-<arch>/` and shipped inside the desktop app, where this project runs them as separate processes; nothing is linked against the FFmpeg libraries. Production uses it for one job only, the fragmented MP4 delivery copy; the remaining references are test oracles.
+- Local files: `packages/ffmpeg/scripts/fetchFfmpeg.ts`, `packages/ffmpeg/src/paths.ts`, `packages/server/crates/media/src/convert.rs`.
 - License: LGPL-2.1-or-later. Full text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 - License source: the `LICENSE.txt` shipped inside each downloaded archive, which is copied next to the binaries and travels with every installer.
 - Source availability: the sources and build scripts for the exact binaries are published in the release above. Each vendored directory also carries a `source.txt` naming the release, the archive URL and its SHA-256, so a shipped binary can be traced back to the sources it was built from.
+
+## Symphonia
+
+- Source: https://github.com/pdeljanov/Symphonia, used as the published crate `symphonia` 0.6.1 with the `all` feature.
+- Usage: decoding uploaded audio into interleaved stereo PCM on every platform. The crate is compiled into the Rust core; it is pure Rust and forbids unsafe code, so no separate process and no native library is involved.
+- Local files: `packages/server/crates/media/src/decode.rs`.
+- License: MPL-2.0. Full text: https://www.mozilla.org/en-US/MPL/2.0/
+- License source: the `license` field of the published crate and the `LICENSE` file in the repository.
+- Source availability: the crate sources are published on crates.io and mirrored in the repository above. This project does not modify them, so the file-level obligations of the MPL are satisfied by the upstream sources.

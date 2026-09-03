@@ -15,7 +15,7 @@ use musetric_db::{
     open_database,
 };
 use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
-use musetric_media::{FfmpegPcm, Tools};
+use musetric_media::{SymphoniaPcm, Tools};
 
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
 
@@ -85,7 +85,7 @@ impl Workspace {
             ),
             writer: Arc::new(Writer::open(&self.database_path()).expect("the writer should open")),
             blobs_path: self.blobs_path(),
-            pcm: Arc::new(FfmpegPcm::create(bundled_tool("ffmpeg"))),
+            pcm: Arc::new(SymphoniaPcm),
             tools: Tools {
                 ffmpeg: bundled_tool("ffmpeg"),
             },

@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{Tools, pcm::FfmpegPcm, run::run};
+use crate::{Tools, decode::SymphoniaPcm, run::run};
 
 static TAKEN: AtomicUsize = AtomicUsize::new(0);
 
@@ -19,7 +19,7 @@ pub(crate) struct Signal<'signal> {
 pub(crate) struct Fixture {
     directory: PathBuf,
     pub(crate) tools: Tools,
-    pub(crate) pcm: FfmpegPcm,
+    pub(crate) pcm: SymphoniaPcm,
 }
 
 impl Fixture {
@@ -32,7 +32,7 @@ impl Fixture {
             tools: Tools {
                 ffmpeg: bundled("ffmpeg"),
             },
-            pcm: FfmpegPcm::create(bundled("ffmpeg")),
+            pcm: SymphoniaPcm,
         }
     }
 
@@ -48,6 +48,20 @@ impl Fixture {
     pub(crate) async fn write_flac(&self, signal: &Signal<'_>) -> PathBuf {
         self.write(signal, &["-c:a".to_owned(), "flac".to_owned()])
             .await
+    }
+
+    pub(crate) async fn write_as(&self, signal: &Signal<'_>, format: &[&str]) -> PathBuf {
+        let arguments = format
+            .iter()
+            .map(|part| (*part).to_owned())
+            .collect::<Vec<_>>();
+        self.write(signal, &arguments).await
+    }
+
+    pub(crate) fn asset(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join(name)
     }
 
     pub(crate) async fn write_raw(&self, signal: &Signal<'_>) -> PathBuf {
@@ -78,6 +92,42 @@ impl Fixture {
             .expect("the fixture should be written");
         to
     }
+}
+
+pub(crate) fn read_floats(bytes: &[u8]) -> Vec<f32> {
+    bytes
+        .chunks_exact(size_of::<f32>())
+        .filter_map(|value| <[u8; 4]>::try_from(value).ok())
+        .map(f32::from_le_bytes)
+        .collect()
+}
+
+pub(crate) fn energy(values: &[f32]) -> f64 {
+    values.iter().map(|value| f64::from(*value).powi(2)).sum()
+}
+
+pub(crate) fn level(measured: &[f32], expected: &[f32]) -> f64 {
+    (energy(measured) / energy(expected)).sqrt()
+}
+
+pub(crate) fn correlation(left: &[f32], right: &[f32]) -> f64 {
+    let mut product = 0.0_f64;
+    let mut left_energy = 0.0_f64;
+    let mut right_energy = 0.0_f64;
+    for (first, second) in left.iter().zip(right) {
+        product += f64::from(*first) * f64::from(*second);
+        left_energy += f64::from(*first) * f64::from(*first);
+        right_energy += f64::from(*second) * f64::from(*second);
+    }
+    product / (left_energy.sqrt() * right_energy.sqrt())
+}
+
+pub(crate) fn worst_difference(measured: &[f32], expected: &[f32]) -> f32 {
+    measured
+        .iter()
+        .zip(expected)
+        .map(|(ours, theirs)| (ours - theirs).abs())
+        .fold(0.0_f32, f32::max)
 }
 
 impl Drop for Fixture {
