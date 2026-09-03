@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{Tools, run::run};
+use crate::{Tools, pcm::FfmpegPcm, run::run};
 
 static TAKEN: AtomicUsize = AtomicUsize::new(0);
 
@@ -19,6 +19,7 @@ pub(crate) struct Signal<'signal> {
 pub(crate) struct Fixture {
     directory: PathBuf,
     pub(crate) tools: Tools,
+    pub(crate) pcm: FfmpegPcm,
 }
 
 impl Fixture {
@@ -31,6 +32,7 @@ impl Fixture {
             tools: Tools {
                 ffmpeg: bundled("ffmpeg"),
             },
+            pcm: FfmpegPcm::create(bundled("ffmpeg")),
         }
     }
 

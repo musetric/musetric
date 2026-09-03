@@ -7,7 +7,7 @@ use musetric_gpu::{
     ensure_model_file,
 };
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
-use musetric_media::{Downmix, decode_mono_pcm};
+use musetric_media::{Downmix, PcmRequest, decode_mono_pcm};
 use serde_json::{Map, Value, json};
 use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
 
@@ -200,13 +200,11 @@ async fn analyze(
     report(StepEvent::Progress(0.0));
     let files = ensure_files(context, report, &analysis.files).await?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let pcm = decode_mono_pcm(
-        &context.storage.tools,
-        &source,
-        analysis.sample_rate,
-        analysis.downmix,
-    )
-    .await?;
+    let request = PcmRequest {
+        from: &source,
+        sample_rate: analysis.sample_rate,
+    };
+    let pcm = decode_mono_pcm(context.storage.pcm.as_ref(), request, analysis.downmix).await?;
     let mut session = Session::start(SessionOptions {
         label: analysis.label,
         bundle: context.bundle.clone(),

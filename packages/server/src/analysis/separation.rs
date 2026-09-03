@@ -6,9 +6,9 @@ use std::{
 use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
 use musetric_media::{
-    BoxedError, Loudness, SampleRates, Tools, WavePeaks, analyze_lead_visual_loudness,
-    analyze_loudness, convert_to_fmp4, decode_interleaved_pcm, encode_flac_from_raw,
-    generate_wave_peaks, read_frame_count,
+    BoxedError, Loudness, PcmRequest, PcmSource, SampleRates, Tools, WavePeaks,
+    analyze_lead_visual_loudness, analyze_loudness, collect_interleaved_pcm, convert_to_fmp4,
+    encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 use serde_json::{Value, json};
 use tokio::fs::remove_file;
@@ -113,10 +113,9 @@ async fn separate(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let context = running.context;
     (running.report)(StepEvent::Progress(0.0));
     let sample_rate = read_sample_rate(context, job.project_id).await?;
-    let tools = &context.storage.tools;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let source_analysis = async {
-        analyze_loudness(tools, &source, sample_rate)
+        analyze_loudness(context.storage.pcm.as_ref(), read_at(&source, sample_rate))
             .await
             .map_err(Failure::from)
     };
@@ -149,23 +148,44 @@ async fn process_stems(
             rates
         ),
     )?;
+    let delivery = Delivery {
+        tools,
+        pcm: context.storage.pcm.as_ref(),
+        sample_rate,
+    };
     tokio::try_join!(
-        deliver_stem(tools, &stems.lead, sample_rate),
-        deliver_stem(tools, &stems.backing, sample_rate),
-        deliver_stem(tools, &stems.instrumental, sample_rate),
+        deliver_stem(&delivery, &stems.lead),
+        deliver_stem(&delivery, &stems.backing),
+        deliver_stem(&delivery, &stems.instrumental),
     )?;
     Ok(())
 }
 
-async fn deliver_stem(tools: &Tools, stem: &Stem, sample_rate: u32) -> Result<(), BoxedError> {
-    convert_to_fmp4(tools, &stem.master.path, &stem.delivery.path, sample_rate).await?;
-    let request = WavePeaks {
-        from: &stem.master.path,
-        to: &stem.wave_peaks.path,
+struct Delivery<'delivery> {
+    tools: &'delivery Tools,
+    pcm: &'delivery dyn PcmSource,
+    sample_rate: u32,
+}
+
+fn read_at(from: &Path, sample_rate: u32) -> PcmRequest<'_> {
+    PcmRequest { from, sample_rate }
+}
+
+async fn deliver_stem(delivery: &Delivery<'_>, stem: &Stem) -> Result<(), BoxedError> {
+    let sample_rate = delivery.sample_rate;
+    convert_to_fmp4(
+        delivery.tools,
+        &stem.master.path,
+        &stem.delivery.path,
         sample_rate,
+    )
+    .await?;
+    let request = WavePeaks {
+        source: read_at(&stem.master.path, sample_rate),
+        to: &stem.wave_peaks.path,
         total_frames: read_frame_count(&stem.master.path).await?,
     };
-    generate_wave_peaks(tools, &request).await
+    generate_wave_peaks(delivery.pcm, &request).await
 }
 
 async fn store(
@@ -175,12 +195,12 @@ async fn store(
     source_loudness: Loudness,
 ) -> Result<(), Failure> {
     let context = running.context;
-    let tools = &context.storage.tools;
+    let pcm = context.storage.pcm.as_ref();
     let stems = running.stems;
     let (lead, backing, instrumental) = tokio::try_join!(
-        analyze_lead_visual_loudness(tools, &stems.lead.master.path, sample_rate),
-        analyze_loudness(tools, &stems.backing.master.path, sample_rate),
-        analyze_loudness(tools, &stems.instrumental.master.path, sample_rate),
+        analyze_lead_visual_loudness(pcm, read_at(&stems.lead.master.path, sample_rate)),
+        analyze_loudness(pcm, read_at(&stems.backing.master.path, sample_rate)),
+        analyze_loudness(pcm, read_at(&stems.instrumental.master.path, sample_rate)),
     )?;
     let analysis = measure(
         source_loudness,
@@ -210,7 +230,11 @@ async fn split(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let mut models = ensure_files(context, report, &VOCALS.cached(&context.models_path)).await?;
     models.extend(ensure_files(context, report, &LEAD_BACKING.cached(&context.models_path)).await?);
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let pcm = decode_interleaved_pcm(&context.storage.tools, &source, VOCALS.sample_rate).await?;
+    let pcm = collect_interleaved_pcm(
+        context.storage.pcm.as_ref(),
+        read_at(&source, VOCALS.sample_rate),
+    )
+    .await?;
     let mut session = Session::start(SessionOptions {
         label: LABEL,
         bundle: context.bundle.clone(),

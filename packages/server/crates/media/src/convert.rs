@@ -9,7 +9,7 @@ use tokio::{fs::create_dir_all, task::spawn_blocking};
 use crate::{
     Tools,
     flac::FlacWriter,
-    pcm::{BYTES_PER_FRAME, CHANNELS, Frames, READ_BUFFER_BYTE_LENGTH, read_pcm},
+    pcm::{BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH},
     resample::{Conversion, SampleRates},
     run::{BoxedError, run},
 };
@@ -17,18 +17,23 @@ use crate::{
 const FRAGMENT_DURATION_MICROS: u32 = 2_000_000;
 
 pub async fn convert_to_flac(
-    tools: &Tools,
-    from: &Path,
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
     to: &Path,
-    sample_rate: u32,
 ) -> Result<(), BoxedError> {
     create_parent(to).await?;
-    let mut writer = FlacWriter::create(to, sample_rate)?;
-    read_pcm(tools, from, sample_rate, |left, right, _| {
-        writer.push(left, right);
-    })
-    .await?;
+    let mut writer = FlacWriter::create(to, request.sample_rate)?;
+    encode_source(source, request, &mut writer).await?;
     writer.finish()
+}
+
+async fn encode_source(
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
+    writer: &mut FlacWriter,
+) -> Result<(), BoxedError> {
+    let mut sink = |chunk: &[f32]| write_frames(writer, chunk);
+    source.read_pcm(request, &mut sink).await
 }
 
 pub async fn encode_flac_from_raw(
@@ -123,10 +128,9 @@ mod tests {
 
     use super::{convert_to_flac, encode_flac_from_raw};
     use crate::{
-        Tools,
         fixture::{Fixture, Signal},
         frames::read_frame_count,
-        pcm::{CHANNELS, decode_interleaved_pcm},
+        pcm::{CHANNELS, PcmRequest, collect_interleaved_pcm},
         resample::SampleRates,
         run::run,
     };
@@ -158,8 +162,9 @@ mod tests {
             .collect()
     }
 
-    async fn decode(tools: &Tools, from: &Path, sample_rate: u32) -> Vec<f32> {
-        let bytes = decode_interleaved_pcm(tools, from, sample_rate)
+    async fn decode(fixture: &Fixture, from: &Path, sample_rate: u32) -> Vec<f32> {
+        let request = PcmRequest { from, sample_rate };
+        let bytes = collect_interleaved_pcm(&fixture.pcm, request)
             .await
             .expect("the decoder should read the file");
         read_floats(&bytes)
@@ -216,12 +221,16 @@ mod tests {
         let source = fixture.write_wav(&tone("source.wav", TARGET_RATE)).await;
         let master = fixture.join("master.flac");
 
-        convert_to_flac(&fixture.tools, &source, &master, TARGET_RATE)
+        let request = PcmRequest {
+            from: &source,
+            sample_rate: TARGET_RATE,
+        };
+        convert_to_flac(&fixture.pcm, request, &master)
             .await
             .expect("the upload should be converted");
 
-        let expected = decode(&fixture.tools, &source, TARGET_RATE).await;
-        let written = decode(&fixture.tools, &master, TARGET_RATE).await;
+        let expected = decode(&fixture, &source, TARGET_RATE).await;
+        let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
         assert_eq!(written, expected);
         let counted = read_frame_count(&master)
@@ -249,7 +258,7 @@ mod tests {
                 .await
                 .expect("the raw stem should exist"),
         );
-        let written = decode(&fixture.tools, &master, TARGET_RATE).await;
+        let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), source.len());
         let expected = source.iter().copied().map(quantized).collect::<Vec<_>>();
         assert_eq!(written, expected);
@@ -270,7 +279,7 @@ mod tests {
             .expect("the stem should be encoded");
 
         let expected = resampled_by_ffmpeg(&fixture, &raw).await;
-        let written = decode(&fixture.tools, &master, TARGET_RATE).await;
+        let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
         let measured = correlation(&written, &expected);
         assert!(measured > CORRELATION, "correlation {measured}");

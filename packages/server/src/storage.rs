@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use musetric_db::{BoxedError, Reader, Writer};
-use musetric_media::Tools;
+use musetric_media::{PcmSource, Tools};
 use tokio::task::spawn_blocking;
 
 use crate::failure::Failure;
@@ -11,6 +11,7 @@ pub(crate) struct Storage {
     pub(crate) writer: Arc<Writer>,
     pub(crate) blobs_path: PathBuf,
     pub(crate) tools: Tools,
+    pub(crate) pcm: Arc<dyn PcmSource>,
 }
 
 pub(crate) async fn read_database<Value>(
