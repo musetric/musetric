@@ -1,3 +1,4 @@
+mod aac;
 mod convert;
 mod decode;
 #[cfg(test)]
@@ -13,6 +14,7 @@ mod run;
 
 use std::path::PathBuf;
 
+pub use aac::AacEncoder;
 pub use convert::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
 pub use decode::SymphoniaPcm;
 pub use frames::read_frame_count;
