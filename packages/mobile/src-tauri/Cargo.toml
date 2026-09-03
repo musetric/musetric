@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Musetric — audio separation, transcription and analysis mobile app"
 authors = ["Musetric <musetric@gmail.com>"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
+workspace = "../../server"
 
 [lib]
 name = "musetric_mobile_lib"
@@ -14,4 +15,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
+musetric-server = { path = "../../server" }
 tauri = { version = "=2.11.5", features = [] }
+
+[lints]
+workspace = true

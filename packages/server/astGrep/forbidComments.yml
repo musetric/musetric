@@ -5,7 +5,7 @@ message: Comments are forbidden, including doc comments; say it with names, type
 files:
   - '**/*.rs'
 ignores:
-  - target/**
+  - '**/target/**'
 rule:
   any:
     - kind: line_comment

@@ -1,11 +1,12 @@
 use std::{
     io::{self, Write},
     net::{SocketAddr, TcpListener as StdTcpListener},
-    path::PathBuf,
-    sync::Arc,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
+use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
 use musetric_jobs::{Queue, QueueOptions};
@@ -52,6 +53,36 @@ pub struct TlsOptions {
     pub private_key: PathBuf,
 }
 
+pub struct EmbeddedServerOptions {
+    pub listen: String,
+    pub database: PathBuf,
+    pub blobs: PathBuf,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
+    pub models: PathBuf,
+    pub browser_bundle: PathBuf,
+    pub frontend: Frontend,
+}
+
+pub struct EmbeddedServer {
+    url: String,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+}
+
+impl EmbeddedServer {
+    #[must_use]
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn close(&self) {
+        let sender = self.shutdown.lock().ok().and_then(|mut guard| guard.take());
+        if let Some(shutdown) = sender {
+            let _ = shutdown.send(());
+        }
+    }
+}
+
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let (host, closed) = HostProcess::create(stdin(), stdout());
     match init_database(&options.database) {
@@ -61,36 +92,19 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
             return Err(failure.into());
         }
     }
-    let storage = Arc::new(Storage {
-        database: Arc::new(Reader::open(&options.database)?),
-        writer: Arc::new(Writer::open(&options.database)?),
-        blobs_path: options.blobs,
-        tools: Tools {
-            ffmpeg: options.ffmpeg,
-            ffprobe: options.ffprobe,
-        },
-    });
-    spawn_collector(Arc::clone(&storage));
-    let runner = AnalysisRunner::create(AnalysisContext {
-        storage: Arc::clone(&storage),
-        host: Arc::clone(&host),
-        client: Client::new(),
-        models_path: options.models,
-        bundle_path: options.browser_bundle,
-    });
-    let queue = Queue::create(QueueOptions {
-        reader: Arc::clone(&storage.database),
-        writer: Arc::clone(&storage.writer),
-        runner: Arc::new(runner),
-        interval: PROCESSING_INTERVAL,
-    });
-    if options.processing {
-        queue.spawn();
-    }
-    let app = create_router(RouterOptions {
-        frontend: Frontend::create(options.public),
+    let storage = create_storage(
+        &options.database,
+        options.blobs,
+        options.ffmpeg,
+        options.ffprobe,
+    )?;
+    let app = create_app(AppOptions {
         storage,
-        queue,
+        host: Arc::clone(&host),
+        models: options.models,
+        browser_bundle: options.browser_bundle,
+        frontend: Frontend::from_directory(options.public),
+        processing: options.processing,
     });
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
@@ -113,6 +127,89 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         })
         .await?;
     Ok(())
+}
+
+pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedServer, BoxedError> {
+    init_database(&options.database)?;
+    let storage = create_storage(
+        &options.database,
+        options.blobs,
+        options.ffmpeg,
+        options.ffprobe,
+    )?;
+    let app = create_app(AppOptions {
+        storage,
+        host: HostProcess::unavailable(),
+        models: options.models,
+        browser_bundle: options.browser_bundle,
+        frontend: options.frontend,
+        processing: false,
+    });
+    let socket = bind(&options.listen)?;
+    let address = socket.local_addr()?;
+    let listener = TcpListener::from_std(socket)?;
+    let (shutdown, closed) = oneshot::channel();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                let _ = closed.await;
+            })
+            .await;
+    });
+    Ok(EmbeddedServer {
+        url: format!("http://{address}"),
+        shutdown: Mutex::new(Some(shutdown)),
+    })
+}
+
+struct AppOptions {
+    storage: Arc<Storage>,
+    host: Arc<HostProcess>,
+    models: PathBuf,
+    browser_bundle: PathBuf,
+    frontend: Frontend,
+    processing: bool,
+}
+
+fn create_app(options: AppOptions) -> Router {
+    let storage = options.storage;
+    let runner = AnalysisRunner::create(AnalysisContext {
+        storage: Arc::clone(&storage),
+        host: options.host,
+        client: Client::new(),
+        models_path: options.models,
+        bundle_path: options.browser_bundle,
+    });
+    let queue = Queue::create(QueueOptions {
+        reader: Arc::clone(&storage.database),
+        writer: Arc::clone(&storage.writer),
+        runner: Arc::new(runner),
+        interval: PROCESSING_INTERVAL,
+    });
+    if options.processing {
+        queue.spawn();
+    }
+    create_router(RouterOptions {
+        frontend: options.frontend,
+        storage,
+        queue,
+    })
+}
+
+fn create_storage(
+    database: &Path,
+    blobs: PathBuf,
+    ffmpeg: PathBuf,
+    ffprobe: PathBuf,
+) -> Result<Arc<Storage>, BoxedError> {
+    let storage = Arc::new(Storage {
+        database: Arc::new(Reader::open(database)?),
+        writer: Arc::new(Writer::open(database)?),
+        blobs_path: blobs,
+        tools: Tools { ffmpeg, ffprobe },
+    });
+    spawn_collector(Arc::clone(&storage));
+    Ok(storage)
 }
 
 fn bind(listen: &str) -> Result<StdTcpListener, BoxedError> {
@@ -162,4 +259,99 @@ fn insert_backup(described: &mut Map<String, Value>, backup_path: Option<&std::p
 async fn shutdown_on_closed_host(handle: Handle<SocketAddr>, closed: oneshot::Receiver<()>) {
     let _ = closed.await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::remove_dir_all,
+        path::PathBuf,
+        process::id,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use super::{EmbeddedServerOptions, start_embedded};
+    use crate::{Frontend, FrontendAsset, FrontendAssets};
+
+    static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    struct Assets;
+
+    impl FrontendAssets for Assets {
+        fn get(&self, path: &str) -> Option<FrontendAsset> {
+            (path == "index.html").then(|| {
+                FrontendAsset::new(
+                    b"<!doctype html><title>Musetric</title>".to_vec(),
+                    "text/html; charset=utf-8".to_owned(),
+                )
+            })
+        }
+    }
+
+    struct Workspace {
+        root: PathBuf,
+    }
+
+    impl Workspace {
+        fn new() -> Self {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("the clock should be after the epoch")
+                .as_nanos();
+            let ordinal = WORKSPACE_COUNT.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "musetric-embedded-server-{}-{stamp}-{ordinal}",
+                id()
+            ));
+            Self { root }
+        }
+
+        fn options(&self) -> EmbeddedServerOptions {
+            EmbeddedServerOptions {
+                listen: "127.0.0.1:0".to_owned(),
+                database: self.root.join("storage/db/app.db"),
+                blobs: self.root.join("storage/blobs"),
+                ffmpeg: self.root.join("runtime/ffmpeg"),
+                ffprobe: self.root.join("runtime/ffprobe"),
+                models: self.root.join("models"),
+                browser_bundle: self.root.join("browser"),
+                frontend: Frontend::from_assets(Arc::new(Assets)),
+            }
+        }
+    }
+
+    impl Drop for Workspace {
+        fn drop(&mut self) {
+            let _ = remove_dir_all(&self.root);
+        }
+    }
+
+    async fn read(url: &str) -> String {
+        reqwest::get(url)
+            .await
+            .expect("the embedded server should answer")
+            .text()
+            .await
+            .expect("the embedded response should be text")
+    }
+
+    #[tokio::test]
+    async fn serves_the_app_and_the_api_from_the_shared_core() {
+        let workspace = Workspace::new();
+        let server = start_embedded(workspace.options())
+            .await
+            .expect("the embedded server should start");
+
+        let shell = read(server.url()).await;
+        let projects = read(&format!("{}/api/project/list", server.url())).await;
+
+        assert!(workspace.root.join("storage/db/app.db").is_file());
+        assert_eq!(shell, "<!doctype html><title>Musetric</title>");
+        assert_eq!(projects, "[]");
+        server.close();
+    }
 }

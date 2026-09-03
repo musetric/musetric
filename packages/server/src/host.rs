@@ -31,6 +31,7 @@ type PageAnswer = Result<(), String>;
 pub(crate) struct HostProcess {
     lines: mpsc::UnboundedSender<String>,
     pending: Mutex<HashMap<String, oneshot::Sender<PageAnswer>>>,
+    is_available: bool,
 }
 
 impl HostProcess {
@@ -46,6 +47,7 @@ impl HostProcess {
         let host = Arc::new(Self {
             lines,
             pending: Mutex::new(HashMap::new()),
+            is_available: true,
         });
         let (closed, closing) = oneshot::channel();
         tokio::spawn(write_lines(output, written));
@@ -57,7 +59,19 @@ impl HostProcess {
         self.send(line);
     }
 
+    pub(crate) fn unavailable() -> Arc<Self> {
+        let (lines, _) = mpsc::unbounded_channel();
+        Arc::new(Self {
+            lines,
+            pending: Mutex::new(HashMap::new()),
+            is_available: false,
+        })
+    }
+
     pub(crate) async fn open_page(&self, url: &str) -> Result<OpenedPage, PageFailure> {
+        if !self.is_available {
+            return Err(PageFailure::Unreachable);
+        }
         let page_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         self.remember(page_id.clone(), sender)?;
