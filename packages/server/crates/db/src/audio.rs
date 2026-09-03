@@ -1,5 +1,14 @@
 use rusqlite::{Connection, OptionalExtension, Result};
 
+pub const MASTER_TYPES: [MasterType; 4] = [
+    MasterType::Source,
+    MasterType::Lead,
+    MasterType::Backing,
+    MasterType::Instrumental,
+];
+
+pub const STEM_TYPES: [StemType; 3] = [StemType::Lead, StemType::Backing, StemType::Instrumental];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MasterType {
     Source,

@@ -1,9 +1,12 @@
 use std::path::{Component, Path, PathBuf};
 
 use axum::{
+    Router,
     body::Body,
+    extract::{Request, State},
     http::{HeaderMap, Method, StatusCode, Uri},
     response::Response,
+    routing::any,
 };
 use tokio::fs::{File, metadata};
 use tokio_util::io::ReaderStream;
@@ -18,10 +21,26 @@ pub(crate) struct Frontend {
     public_path: PathBuf,
 }
 
-pub(crate) struct Visit<'visit> {
-    pub(crate) method: &'visit Method,
-    pub(crate) uri: &'visit Uri,
-    pub(crate) headers: &'visit HeaderMap,
+struct Visit<'visit> {
+    method: &'visit Method,
+    uri: &'visit Uri,
+    headers: &'visit HeaderMap,
+}
+
+pub(crate) fn create_router(frontend: Frontend) -> Router {
+    Router::new().fallback(any(handle)).with_state(frontend)
+}
+
+async fn handle(State(frontend): State<Frontend>, request: Request) -> Response<Body> {
+    let visit = Visit {
+        method: request.method(),
+        uri: request.uri(),
+        headers: request.headers(),
+    };
+    match frontend.respond(visit).await {
+        Some(response) => response,
+        None => missing(),
+    }
 }
 
 impl Frontend {
@@ -29,7 +48,7 @@ impl Frontend {
         Self { public_path }
     }
 
-    pub(crate) async fn respond(&self, visit: Visit<'_>) -> Option<Response<Body>> {
+    async fn respond(&self, visit: Visit<'_>) -> Option<Response<Body>> {
         if visit.method != Method::GET && visit.method != Method::HEAD {
             return None;
         }

@@ -8,12 +8,11 @@ use axum::{
     response::Response,
     routing::get,
 };
-use musetric_db::{MasterType, StemType};
+use musetric_db::{MASTER_TYPES, MasterType, STEM_TYPES, StemType};
 
 use crate::{
     blob_response::{CachedBlob, StoredBlob, send_cached, send_generated, send_stored},
-    failure::{Failure, finish},
-    proxy::forward,
+    failure::{Failure, finish, invalid_number, invalid_option},
     routes::RouteState,
     storage::{Storage, read},
     wav,
@@ -27,6 +26,10 @@ const PEAKS_CONTENT_TYPE: &str = "application/octet-stream";
 const PEAKS_FILENAME: &str = "waveform.bin";
 const PEAK_COUNT: usize = 3840;
 const PEAK_BYTE_LENGTH: usize = PEAK_COUNT * 2 * size_of::<f32>();
+const PARAMS: &str = "params";
+const PROJECT_ID: &str = "projectId";
+const MASTER_FIELD: &str = "type";
+const STEM_FIELD: &str = "stemType";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
@@ -57,12 +60,29 @@ async fn master_content(
     Path((raw_project_id, raw_type)): Path<(String, String)>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let (Ok(project_id), Some(master)) =
-        (raw_project_id.parse::<i64>(), MasterType::parse(&raw_type))
-    else {
-        return forward(&state.proxy, request).await;
+    let (project_id, master) = match read_master(&raw_project_id, &raw_type) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
     finish(send_master(&state.storage, project_id, master, request.headers()).await)
+}
+
+fn read_master(raw_project_id: &str, raw_type: &str) -> Result<(i64, MasterType), Failure> {
+    let project_id = raw_project_id
+        .parse::<i64>()
+        .map_err(|_| invalid_number(PROJECT_ID))?;
+    let master = MasterType::parse(raw_type)
+        .ok_or_else(|| invalid_option(PARAMS, MASTER_FIELD, &MASTER_TYPES.map(MasterType::name)))?;
+    Ok((project_id, master))
+}
+
+fn read_stem(raw_project_id: &str, raw_stem: &str) -> Result<(i64, StemType), Failure> {
+    let project_id = raw_project_id
+        .parse::<i64>()
+        .map_err(|_| invalid_number(PROJECT_ID))?;
+    let stem = StemType::parse(raw_stem)
+        .ok_or_else(|| invalid_option(PARAMS, STEM_FIELD, &STEM_TYPES.map(StemType::name)))?;
+    Ok((project_id, stem))
 }
 
 async fn delivery_content(
@@ -70,9 +90,9 @@ async fn delivery_content(
     Path((raw_project_id, raw_stem)): Path<(String, String)>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let (Ok(project_id), Some(stem)) = (raw_project_id.parse::<i64>(), StemType::parse(&raw_stem))
-    else {
-        return forward(&state.proxy, request).await;
+    let (project_id, stem) = match read_stem(&raw_project_id, &raw_stem) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
     finish(send_delivery(&state.storage, project_id, stem, request.headers()).await)
 }
@@ -82,9 +102,9 @@ async fn delivery_wave(
     Path((raw_project_id, raw_stem)): Path<(String, String)>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let (Ok(project_id), Some(stem)) = (raw_project_id.parse::<i64>(), StemType::parse(&raw_stem))
-    else {
-        return forward(&state.proxy, request).await;
+    let (project_id, stem) = match read_stem(&raw_project_id, &raw_stem) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
     finish(send_peaks(&state.storage, project_id, stem, request.headers()).await)
 }
@@ -92,10 +112,9 @@ async fn delivery_wave(
 async fn recording_content(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
-    request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     finish(send_recording_content(&state.storage, project_id).await)
 }
@@ -103,10 +122,9 @@ async fn recording_content(
 async fn recording_wave(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
-    request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     finish(send_recording_wave(&state.storage, project_id).await)
 }

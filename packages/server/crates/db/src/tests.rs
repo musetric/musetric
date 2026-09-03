@@ -16,7 +16,7 @@ const SCHEMA_QUERY: &str = "
   ORDER BY type, name
 ";
 
-const EXPECTED_FINGERPRINT: &str = include_str!("../../../../backend-db/schema.fingerprint.json");
+const EXPECTED_FINGERPRINT: &str = include_str!("../schema.fingerprint.json");
 
 const SECOND_STEP: Migration = &["ALTER TABLE Project ADD COLUMN note TEXT"];
 

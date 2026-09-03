@@ -29,7 +29,7 @@ const rustTargets: Record<string, string | undefined> = {
 const buildServer = (key: string): void => {
   const target = rustTargets[key];
   if (target === undefined) {
-    throw new Error(`The rust proxy has no known target for ${key}`);
+    throw new Error(`The rust server has no known target for ${key}`);
   }
   execFileSync('rustup', ['target', 'add', target], { stdio: 'inherit' });
   execFileSync(

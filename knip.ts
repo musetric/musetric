@@ -8,6 +8,8 @@ const config: KnipConfig = {
     'packages/desktop/scripts/beforePack.ts': ['exports'],
     'packages/desktop/src/backend.ts': ['exports'],
     'packages/desktop/src/electronGpuHost.ts': ['exports'],
+    'packages/api/src/routes/audio.ts': ['exports'],
+    'packages/api/src/routes/preview.ts': ['exports'],
   },
   ignoreBinaries: ['ps', 'rustup', 'xcodegen'],
   ignoreUnresolved: ['vite/client', '^tsx$'],
@@ -18,9 +20,6 @@ const config: KnipConfig = {
       entry: ['src/service/browserEntry.ts'],
     },
     'packages/api': {
-      entry: ['scripts/**/*.ts'],
-    },
-    'packages/backend': {
       entry: ['scripts/**/*.ts'],
     },
     'packages/fft': {

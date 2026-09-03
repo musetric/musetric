@@ -376,7 +376,6 @@ mod tests {
 
     use super::packet;
     use crate::{
-        proxy::ProxyState,
         routes,
         storage::Storage,
         test_workspace::{Workspace, create_route_state},
@@ -404,11 +403,7 @@ mod tests {
     }
 
     async fn start_server(storage: Arc<Storage>) -> (String, TestServer) {
-        let upstream = "http://127.0.0.1:1"
-            .parse()
-            .expect("the upstream should be a valid uri");
-        let application: Router =
-            routes::create_router(create_route_state(ProxyState::create(upstream), storage));
+        let application: Router = routes::create_router(create_route_state(storage));
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("the test server should bind");

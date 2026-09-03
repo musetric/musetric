@@ -20,12 +20,8 @@
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
-  "peerDependencies": {
-    "@musetric/utils": "workspace:*"
-  },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "eslint": "catalog:",

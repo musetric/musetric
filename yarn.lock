@@ -1044,20 +1044,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fastify/busboy@npm:^3.0.0":
-  version: 3.2.0
-  resolution: "@fastify/busboy@npm:3.2.0"
-  checksum: 10c0/3e4fb00a27e3149d1c68de8ff14007d2bbcbbc171a9d050d0a8772e836727329d4d3f130995ebaa19cf537d5d2f5ce2a88000366e6192e751457bfcc2125f351
-  languageName: node
-  linkType: hard
-
-"@fastify/deepmerge@npm:^3.0.0":
-  version: 3.2.0
-  resolution: "@fastify/deepmerge@npm:3.2.0"
-  checksum: 10c0/c5ef2d683ad8817aca8528d9c62e1bc62b516270622bac0b732fd85b161cc213a90cb015b663627db81aa9c48b68e35f67a8c0a22dc3aa7736db191b9de42583
-  languageName: node
-  linkType: hard
-
 "@fastify/error@npm:^4.0.0, @fastify/error@npm:^4.2.0":
   version: 4.2.0
   resolution: "@fastify/error@npm:4.2.0"
@@ -1087,19 +1073,6 @@ __metadata:
   dependencies:
     dequal: "npm:^2.0.3"
   checksum: 10c0/dfa884a8f62d53f71de273fdcd0e501b213367767a7d8c522ae87ba6fb571b3eea85175d6e019036d7c0c5419be60305abe54899b9459f76ed5333358699efcb
-  languageName: node
-  linkType: hard
-
-"@fastify/multipart@npm:9.4.0":
-  version: 9.4.0
-  resolution: "@fastify/multipart@npm:9.4.0"
-  dependencies:
-    "@fastify/busboy": "npm:^3.0.0"
-    "@fastify/deepmerge": "npm:^3.0.0"
-    "@fastify/error": "npm:^4.0.0"
-    fastify-plugin: "npm:^5.0.0"
-    secure-json-parse: "npm:^4.0.0"
-  checksum: 10c0/4e82b59333dca720ef71b409249291db1955ac6fa7eb6769a83d22e08342fb48fd6e9ca28e553dc2222b58aaebc09392fcf8f680297f2fc259597a7bddd80243
   languageName: node
   linkType: hard
 
@@ -2088,77 +2061,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@musetric/backend-core@workspace:*, @musetric/backend-core@workspace:packages/backend-core":
-  version: 0.0.0-use.local
-  resolution: "@musetric/backend-core@workspace:packages/backend-core"
-  dependencies:
-    "@fastify/multipart": "catalog:"
-    "@fastify/swagger": "catalog:"
-    "@musetric/api": "workspace:*"
-    "@musetric/backend-db": "workspace:*"
-    "@musetric/eslint-config": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
-    "@musetric/server": "workspace:*"
-    "@musetric/utils": "workspace:*"
-    "@types/node": "catalog:"
-    "@typescript/native": "catalog:"
-    axios: "catalog:"
-    eslint: "catalog:"
-    fastify: "catalog:"
-    fastify-sse-v2: "catalog:"
-    fastify-type-provider-zod: "catalog:"
-    openapi-types: "catalog:"
-    pino: "catalog:"
-    pino-pretty: "catalog:"
-    typescript: "catalog:"
-    vitest: "catalog:"
-    zod: "catalog:"
-  peerDependencies:
-    "@fastify/multipart": 9.4.0
-    "@fastify/swagger": 9.7.0
-    "@musetric/api": "workspace:*"
-    "@musetric/backend-db": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
-    "@musetric/utils": "workspace:*"
-    axios: 1.18.1
-    fastify: 5.10.0
-    fastify-sse-v2: 4.2.2
-    fastify-type-provider-zod: 6.1.0
-    openapi-types: 12.1.3
-    pino: 10.3.1
-    pino-pretty: 13.1.3
-    zod: 4.4.3
-  languageName: unknown
-  linkType: soft
-
-"@musetric/backend-db@workspace:*, @musetric/backend-db@workspace:packages/backend-db":
-  version: 0.0.0-use.local
-  resolution: "@musetric/backend-db@workspace:packages/backend-db"
-  dependencies:
-    "@musetric/eslint-config": "workspace:*"
-    "@musetric/utils": "workspace:*"
-    "@types/node": "catalog:"
-    "@typescript/native": "catalog:"
-    eslint: "catalog:"
-    typescript: "catalog:"
-    vitest: "catalog:"
-    zod: "catalog:"
-  peerDependencies:
-    "@musetric/utils": "workspace:*"
-    zod: 4.4.3
-  languageName: unknown
-  linkType: soft
-
 "@musetric/backend@workspace:packages/backend":
   version: 0.0.0-use.local
   resolution: "@musetric/backend@workspace:packages/backend"
   dependencies:
-    "@fastify/multipart": "catalog:"
-    "@fastify/swagger": "catalog:"
     "@musetric/ai": "workspace:*"
-    "@musetric/api": "workspace:*"
-    "@musetric/backend-core": "workspace:*"
-    "@musetric/backend-db": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
@@ -2167,20 +2074,12 @@ __metadata:
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
-    axios: "catalog:"
     eslint: "catalog:"
-    fastify: "catalog:"
-    fastify-sse-v2: "catalog:"
-    fastify-type-provider-zod: "catalog:"
     onnxruntime-web: "catalog:"
-    openapi-types: "catalog:"
-    pino: "catalog:"
-    pino-pretty: "catalog:"
     selfsigned: "catalog:"
     tsx: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
-    zod: "catalog:"
   languageName: unknown
   linkType: soft
 
@@ -2209,11 +2108,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/desktop@workspace:packages/desktop"
   dependencies:
-    "@fastify/multipart": "catalog:"
-    "@fastify/swagger": "catalog:"
-    "@musetric/api": "workspace:*"
-    "@musetric/backend-core": "workspace:*"
-    "@musetric/backend-db": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/ffmpeg": "workspace:*"
     "@musetric/server": "workspace:*"
@@ -2221,18 +2115,11 @@ __metadata:
     "@resvg/resvg-js": "catalog:"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
-    axios: "catalog:"
     electron: "catalog:"
     electron-builder: "catalog:"
     eslint: "catalog:"
-    fastify: "catalog:"
-    fastify-sse-v2: "catalog:"
-    fastify-type-provider-zod: "catalog:"
-    openapi-types: "catalog:"
     pino: "catalog:"
-    pino-pretty: "catalog:"
     typescript: "catalog:"
-    zod: "catalog:"
   languageName: unknown
   linkType: soft
 
@@ -2302,13 +2189,10 @@ __metadata:
   resolution: "@musetric/ffmpeg@workspace:packages/ffmpeg"
   dependencies:
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"
     eslint: "catalog:"
     typescript: "catalog:"
-  peerDependencies:
-    "@musetric/utils": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -4936,7 +4820,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base64-js@npm:^1.3.1, base64-js@npm:^1.5.1":
+"base64-js@npm:^1.5.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
   checksum: 10c0/f23823513b63173a001030fae4f2dabe283b99a9d324ade3ad3d148e218134676f1ee8568c877cd79ec1c53158dcf2d2ba527a97c606618928ba99dd930102bf
@@ -5001,16 +4885,6 @@ __metadata:
   version: 1.1.2
   resolution: "buffer-from@npm:1.1.2"
   checksum: 10c0/124fff9d66d691a86d3b062eff4663fe437a9d9ee4b47b1b9e97f5a5d14f6d5399345db80f796827be7c95e70a8e765dd404b7c3ff3b3324f98e9b0c8826cc34
-  languageName: node
-  linkType: hard
-
-"buffer@npm:^6.0.3":
-  version: 6.0.3
-  resolution: "buffer@npm:6.0.3"
-  dependencies:
-    base64-js: "npm:^1.3.1"
-    ieee754: "npm:^1.2.1"
-  checksum: 10c0/2a905fbbcde73cc5d8bd18d1caa23715d5f83a5935867c2329f0ac06104204ba7947be098fe1317fbd8830e26090ff8e764f08cd14fefc977bb248c3487bcbd0
   languageName: node
   linkType: hard
 
@@ -5266,13 +5140,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"colorette@npm:^2.0.7":
-  version: 2.0.20
-  resolution: "colorette@npm:2.0.20"
-  checksum: 10c0/e94116ff33b0ff56f3b83b9ace895e5bf87c2a7a47b3401b8c3f3226e050d5ef76cf4072fb3325f9dc24d1698f9b730baf4e05eeaf861d74a1883073f4c98a40
-  languageName: node
-  linkType: hard
-
 "combined-stream@npm:^1.0.8":
   version: 1.0.8
   resolution: "combined-stream@npm:1.0.8"
@@ -5384,13 +5251,6 @@ __metadata:
   version: 3.2.3
   resolution: "csstype@npm:3.2.3"
   checksum: 10c0/cd29c51e70fa822f1cecd8641a1445bed7063697469d35633b516e60fe8c1bde04b08f6c5b6022136bb669b64c63d4173af54864510fbb4ee23281801841a3ce
-  languageName: node
-  linkType: hard
-
-"dateformat@npm:^4.6.3":
-  version: 4.6.3
-  resolution: "dateformat@npm:4.6.3"
-  checksum: 10c0/e2023b905e8cfe2eb8444fb558562b524807a51cdfe712570f360f873271600b5c94aebffaf11efb285e2c072264a7cf243eadb68f3eba0f8cc85fb86cd25df6
   languageName: node
   linkType: hard
 
@@ -6227,13 +6087,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fast-copy@npm:^4.0.0":
-  version: 4.0.2
-  resolution: "fast-copy@npm:4.0.2"
-  checksum: 10c0/f8e51483ce1761e3ba21a07cbd2149afd99a62230aa8025acc6ce4c818000a52c94ebb80960d63953ff01677b7886841f250395e462ad9a54bef39cce1834343
-  languageName: node
-  linkType: hard
-
 "fast-decode-uri-component@npm:^1.0.1":
   version: 1.0.1
   resolution: "fast-decode-uri-component@npm:1.0.1"
@@ -6245,13 +6098,6 @@ __metadata:
   version: 3.1.3
   resolution: "fast-deep-equal@npm:3.1.3"
   checksum: 10c0/40dedc862eb8992c54579c66d914635afbec43350afbbe991235fdcb4e3a8d5af1b23ae7e79bef7d4882d0ecee06c3197488026998fb19f72dc95acff1d1b1d0
-  languageName: node
-  linkType: hard
-
-"fast-fifo@npm:^1.0.0":
-  version: 1.3.2
-  resolution: "fast-fifo@npm:1.3.2"
-  checksum: 10c0/d53f6f786875e8b0529f784b59b4b05d4b5c31c651710496440006a398389a579c8dbcd2081311478b5bf77f4b0b21de69109c5a4eabea9d8e8783d1eb864e4c
   languageName: node
   linkType: hard
 
@@ -6306,13 +6152,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fast-safe-stringify@npm:^2.1.1":
-  version: 2.1.1
-  resolution: "fast-safe-stringify@npm:2.1.1"
-  checksum: 10c0/d90ec1c963394919828872f21edaa3ad6f1dddd288d2bd4e977027afff09f5db40f94e39536d4646f7e01761d704d72d51dce5af1b93717f3489ef808f5f4e4d
-  languageName: node
-  linkType: hard
-
 "fast-string-truncated-width@npm:^3.0.2":
   version: 3.0.3
   resolution: "fast-string-truncated-width@npm:3.0.3"
@@ -6352,30 +6191,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fastify-plugin@npm:^4.3.0":
-  version: 4.5.1
-  resolution: "fastify-plugin@npm:4.5.1"
-  checksum: 10c0/f58f79cd9d3c88fd7f79a3270276c6339fc57bbe72ef14d20b73779193c404e317ac18e8eae2c5071b3909ebee45d7eb6871da4e65464ac64ed0d9746b4e9b9f
-  languageName: node
-  linkType: hard
-
 "fastify-plugin@npm:^5.0.0":
   version: 5.1.0
   resolution: "fastify-plugin@npm:5.1.0"
   checksum: 10c0/61b330b8cb03a3581b796d745137499a782934abcf65dbf9a41d07248520cfd220b3ae8b16afeaf81af712e68e1ac24352895132cfeb2b372c66662c0170f365
-  languageName: node
-  linkType: hard
-
-"fastify-sse-v2@npm:4.2.2":
-  version: 4.2.2
-  resolution: "fastify-sse-v2@npm:4.2.2"
-  dependencies:
-    fastify-plugin: "npm:^4.3.0"
-    it-pushable: "npm:^1.4.2"
-    it-to-stream: "npm:^1.0.0"
-  peerDependencies:
-    fastify: ">=4"
-  checksum: 10c0/e207da1dd5e4d0f7f8ecb85617dd3f4f7b48259cd86b4c15030ec08ba165a87d9129cd2b5daac3ae5428aebe7aace396aed41de2da46657976ca8c0fa4eb6c6b
   languageName: node
   linkType: hard
 
@@ -6743,13 +6562,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"get-iterator@npm:^1.0.2":
-  version: 1.0.2
-  resolution: "get-iterator@npm:1.0.2"
-  checksum: 10c0/d4096a21ca860678326ab059dabf1bf2d5cfe5dda59ce987d0c6b43c41706b92797bac4c6b75bf5e58341be70763a6961af826e79f5c606115d68ad982eaff79
-  languageName: node
-  linkType: hard
-
 "get-proto@npm:^1.0.1":
   version: 1.0.1
   resolution: "get-proto@npm:1.0.1"
@@ -6929,13 +6741,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"help-me@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "help-me@npm:5.0.0"
-  checksum: 10c0/054c0e2e9ae2231c85ab5e04f75109b9d068ffcc54e58fb22079822a5ace8ff3d02c66fd45379c902ad5ab825e5d2e1451fcc2f7eab1eb49e7d488133ba4cacb
-  languageName: node
-  linkType: hard
-
 "hermes-estree@npm:0.25.1":
   version: 0.25.1
   resolution: "hermes-estree@npm:0.25.1"
@@ -7104,13 +6909,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ieee754@npm:^1.2.1":
-  version: 1.2.1
-  resolution: "ieee754@npm:1.2.1"
-  checksum: 10c0/b0782ef5e0935b9f12883a2e2aa37baa75da6e66ce6515c168697b42160807d9330de9a32ec1ed73149aea02e0d822e572bca6f1e22bdcbd2149e13b050b17bb
-  languageName: node
-  linkType: hard
-
 "ignore@npm:^5.2.0":
   version: 5.3.2
   resolution: "ignore@npm:5.3.2"
@@ -7149,7 +6947,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"inherits@npm:^2.0.3, inherits@npm:~2.0.3":
+"inherits@npm:~2.0.3":
   version: 2.0.4
   resolution: "inherits@npm:2.0.4"
   checksum: 10c0/4e531f648b29039fb7426fb94075e6545faa1eb9fe83c29f0b6d9e7263aceb4289d2d4557db0d428188eeb449cc7c5e77b0a0b2c4e248ff2a65933a0dee49ef2
@@ -7307,29 +7105,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pushable@npm:^1.4.2":
-  version: 1.4.2
-  resolution: "it-pushable@npm:1.4.2"
-  dependencies:
-    fast-fifo: "npm:^1.0.0"
-  checksum: 10c0/6486d466bba26ad421b3c3ee20b22d0850b383308209216e8f9fa35f518689cb2bf80bad868ac0191591d693ec651949d76a91980a2e81a9d8cb4fe82ba9abff
-  languageName: node
-  linkType: hard
-
-"it-to-stream@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "it-to-stream@npm:1.0.0"
-  dependencies:
-    buffer: "npm:^6.0.3"
-    fast-fifo: "npm:^1.0.0"
-    get-iterator: "npm:^1.0.2"
-    p-defer: "npm:^3.0.0"
-    p-fifo: "npm:^1.0.0"
-    readable-stream: "npm:^3.6.0"
-  checksum: 10c0/92415ba12aac6df438ab941bcb8ca3bda4c6d1ce50756d3aa55916e8ab0e85e069c571b45cd27a0c85b0370adb062d843995a18257c93f4ef2237b21f66666b4
-  languageName: node
-  linkType: hard
-
 "jake@npm:^10.8.5":
   version: 10.9.4
   resolution: "jake@npm:10.9.4"
@@ -7349,13 +7124,6 @@ __metadata:
   bin:
     jiti: lib/jiti-cli.mjs
   checksum: 10c0/1b1e2310a490dce1aeea3da5f5dfe18273516c20ce48be2e98eb8ea452d5f3dcc8fd0cfd6d28b4052a24c5dbab6e3089b2d7e79f0bce7915b10d750929563c42
-  languageName: node
-  linkType: hard
-
-"joycon@npm:^3.1.1":
-  version: 3.1.1
-  resolution: "joycon@npm:3.1.1"
-  checksum: 10c0/131fb1e98c9065d067fd49b6e685487ac4ad4d254191d7aa2c9e3b90f4e9ca70430c43cad001602bdbdabcf58717d3b5c5b7461c1bd8e39478c8de706b3fe6ae
   languageName: node
   linkType: hard
 
@@ -8516,23 +8284,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"p-defer@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "p-defer@npm:3.0.0"
-  checksum: 10c0/848eb9821785b9a203def23618217ddbfa5cd909574ad0d66aae61a1981c4dcfa084804d6f97abe027bd004643471ddcdc823aa8df60198f791a9bd985e01bee
-  languageName: node
-  linkType: hard
-
-"p-fifo@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "p-fifo@npm:1.0.0"
-  dependencies:
-    fast-fifo: "npm:^1.0.0"
-    p-defer: "npm:^3.0.0"
-  checksum: 10c0/b9e5b9c14c0fea63801c55c116028dce60770ff0be06dff459981c83c014028cf7b671acb12f169a4bdb3e7e1c5ec75c6d69542aebeccd1c13e3ddd764e7450d
-  languageName: node
-  linkType: hard
-
 "p-limit@npm:^3.0.2":
   version: 3.1.0
   resolution: "p-limit@npm:3.1.0"
@@ -8665,29 +8416,6 @@ __metadata:
   dependencies:
     split2: "npm:^4.0.0"
   checksum: 10c0/4486e1b9508110aaf963d07741ac98d660b974dd51d8ad42077d215118e27cda20c64da46c07c926898d52540aab7c6b9c37dc0f5355c203bb1d6a72b5bd8d6c
-  languageName: node
-  linkType: hard
-
-"pino-pretty@npm:13.1.3":
-  version: 13.1.3
-  resolution: "pino-pretty@npm:13.1.3"
-  dependencies:
-    colorette: "npm:^2.0.7"
-    dateformat: "npm:^4.6.3"
-    fast-copy: "npm:^4.0.0"
-    fast-safe-stringify: "npm:^2.1.1"
-    help-me: "npm:^5.0.0"
-    joycon: "npm:^3.1.1"
-    minimist: "npm:^1.2.6"
-    on-exit-leak-free: "npm:^2.1.0"
-    pino-abstract-transport: "npm:^3.0.0"
-    pump: "npm:^3.0.0"
-    secure-json-parse: "npm:^4.0.0"
-    sonic-boom: "npm:^4.0.1"
-    strip-json-comments: "npm:^5.0.2"
-  bin:
-    pino-pretty: bin.js
-  checksum: 10c0/36fa382521a893290c8f6a5b2ddc28dfb87fda1d161adb6b97d80bf7d24184970d0a7eab6f8ee45c39aff4b2ec3b2e533c756899798adc270010f34ba4411063
   languageName: node
   linkType: hard
 
@@ -9086,17 +8814,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"readable-stream@npm:^3.6.0":
-  version: 3.6.2
-  resolution: "readable-stream@npm:3.6.2"
-  dependencies:
-    inherits: "npm:^2.0.3"
-    string_decoder: "npm:^1.1.1"
-    util-deprecate: "npm:^1.0.1"
-  checksum: 10c0/e37be5c79c376fdd088a45fa31ea2e423e5d48854be7a22a58869b4e84d25047b193f6acb54f1012331e1bcd667ffb569c01b99d36b0bd59658fb33f513511b7
-  languageName: node
-  linkType: hard
-
 "readdirp@npm:^5.0.0":
   version: 5.0.0
   resolution: "readdirp@npm:5.0.0"
@@ -9337,13 +9054,6 @@ __metadata:
   version: 5.1.2
   resolution: "safe-buffer@npm:5.1.2"
   checksum: 10c0/780ba6b5d99cc9a40f7b951d47152297d0e260f0df01472a1b99d4889679a4b94a13d644f7dbc4f022572f09ae9005fa2fbb93bbbd83643316f365a3e9a45b21
-  languageName: node
-  linkType: hard
-
-"safe-buffer@npm:~5.2.0":
-  version: 5.2.1
-  resolution: "safe-buffer@npm:5.2.1"
-  checksum: 10c0/6501914237c0a86e9675d4e51d89ca3c21ffd6a31642efeba25ad65720bce6921c9e7e974e5be91a786b25aa058b5303285d3c15dbabf983a919f5f630d349f3
   languageName: node
   linkType: hard
 
@@ -9802,15 +9512,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"string_decoder@npm:^1.1.1":
-  version: 1.3.0
-  resolution: "string_decoder@npm:1.3.0"
-  dependencies:
-    safe-buffer: "npm:~5.2.0"
-  checksum: 10c0/810614ddb030e271cd591935dcd5956b2410dd079d64ff92a1844d6b7588bf992b3e1b69b0f4d34a3e06e0bd73046ac646b5264c1987b20d0601f81ef35d731d
-  languageName: node
-  linkType: hard
-
 "string_decoder@npm:~1.1.1":
   version: 1.1.1
   resolution: "string_decoder@npm:1.1.1"
@@ -9845,7 +9546,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"strip-json-comments@npm:5.0.3, strip-json-comments@npm:^5.0.2":
+"strip-json-comments@npm:5.0.3":
   version: 5.0.3
   resolution: "strip-json-comments@npm:5.0.3"
   checksum: 10c0/daaf20b29f69fb51112698f4a9a662490dbb78d5baf6127c75a0a83c2ac6c078a8c0f74b389ad5e0519d6fc359c4a57cb9971b1ae201aef62ce45a13247791e0
@@ -10330,7 +10031,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"util-deprecate@npm:^1.0.1, util-deprecate@npm:~1.0.1":
+"util-deprecate@npm:~1.0.1":
   version: 1.0.2
   resolution: "util-deprecate@npm:1.0.2"
   checksum: 10c0/41a5bdd214df2f6c3ecf8622745e4a366c4adced864bc3c833739791aeeeb1838119af7daed4ba36428114b5c67dcda034a79c882e97e43c03e66a4dd7389942

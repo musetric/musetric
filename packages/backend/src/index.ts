@@ -1,6 +1,4 @@
 import { defaultOpenJobPage } from '@musetric/ai/node';
-import { createServerApp } from '@musetric/backend-core';
-import { type AppConfig } from '@musetric/backend-core/config';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
 import {
   isAddressInUseError,
@@ -14,62 +12,44 @@ import { getHttps } from './services/https.js';
 const createDisplayUrl = (url: string): string =>
   url.replace(/\/\/(0\.0\.0\.0|127\.0\.0\.1):/u, '//localhost:');
 
-const startServer = async () => {
+const start = async (): Promise<RustProxy> => {
   const https = await getHttps();
-  const config: AppConfig = {
-    version: envs.version,
-    logLevel: envs.logLevel,
-    blobsPath: envs.blobsPath,
-    publicPath: envs.publicPath,
+  return await startRustProxy({
+    listen: `${envs.host}:${String(envs.port)}`,
     databasePath: envs.databasePath,
+    blobsPath: envs.blobsPath,
+    ffmpegPath: ffmpegPath(),
+    ffprobePath: ffprobePath(),
     modelsPath: envs.modelsPath,
     browserBundlePath: envs.browserBundlePath,
-  };
-  const app = await createServerApp(config);
-  let proxy: RustProxy | undefined = undefined;
-  try {
-    await app.listen({
-      port: 0,
-      host: '127.0.0.1',
-    });
-    const address = app.server.address();
-    if (!address || typeof address === 'string') {
-      throw new Error('backend failed to bind a local HTTP port');
-    }
-    proxy = await startRustProxy({
-      upstream: `http://127.0.0.1:${String(address.port)}`,
-      listen: `${envs.host}:${String(envs.port)}`,
-      databasePath: config.databasePath,
-      blobsPath: config.blobsPath,
-      ffmpegPath: ffmpegPath(),
-      ffprobePath: ffprobePath(),
-      modelsPath: config.modelsPath,
-      browserBundlePath: config.browserBundlePath,
-      publicPath: config.publicPath,
-      openPage: defaultOpenJobPage,
-      tls: https,
-      onLog: (line) => {
-        console.log(line);
-      },
-    });
-    console.log(`Server: ${createDisplayUrl(proxy.url)}`);
-  } catch (error) {
-    await proxy?.close();
-    await app.close();
-    if (isAddressInUseError(error)) {
-      console.error(`Port ${envs.port} is already in use`);
-      killDevHost();
-      process.exit(1);
-    }
-    throw error;
-  }
+    publicPath: envs.publicPath,
+    openPage: defaultOpenJobPage,
+    tls: https,
+    onLog: (line) => {
+      console.log(line);
+    },
+  });
+};
 
-  const close = async (): Promise<void> => {
-    await proxy.close();
-    await app.close();
-  };
+const reportStartFailure = (error: unknown): never => {
+  if (isAddressInUseError(error)) {
+    console.error(`Port ${String(envs.port)} is already in use`);
+    killDevHost();
+    process.exit(1);
+  }
+  throw error;
+};
+
+const startServer = async (): Promise<void> => {
+  const server = await start().catch(reportStartFailure);
+  const { fromVersion, toVersion } = server.migration;
+  console.log(
+    `Database schema v${String(fromVersion)} -> v${String(toVersion)}`,
+  );
+  console.log(`Server: ${createDisplayUrl(server.url)}`);
+
   const stop = (): void => {
-    void close().then(() => {
+    void server.close().then(() => {
       process.exit();
     });
   };

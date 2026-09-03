@@ -7,10 +7,11 @@ use std::{
 };
 
 use axum_server::{Handle, tls_rustls::RustlsConfig};
-use musetric_db::{BoxedError, Reader, Writer};
+use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::Tools;
 use reqwest::Client;
+use serde_json::{Map, Value, json};
 use tokio::{
     io::{stdin, stdout},
     net::TcpListener,
@@ -22,18 +23,18 @@ use crate::{
     frontend::Frontend,
     garbage::spawn_collector,
     host::HostProcess,
-    proxy::ProxyState,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
 
 const READY_PREFIX: &str = "MUSETRIC_PROXY_URL=";
+const MIGRATION_PREFIX: &str = "MUSETRIC_MIGRATION=";
+const MIGRATION_FAILED_PREFIX: &str = "MUSETRIC_MIGRATION_FAILED=";
 const ADDRESS_IN_USE: &str = "MUSETRIC_PROXY_ERROR=address-in-use";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct ServerOptions {
-    pub upstream: String,
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
@@ -52,6 +53,14 @@ pub struct TlsOptions {
 }
 
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
+    let (host, closed) = HostProcess::create(stdin(), stdout());
+    match init_database(&options.database) {
+        Ok(report) => announce_migration(&host, &report),
+        Err(failure) => {
+            announce_migration_failure(&host, &failure);
+            return Err(failure.into());
+        }
+    }
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(&options.database)?),
         writer: Arc::new(Writer::open(&options.database)?),
@@ -62,8 +71,6 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         },
     });
     spawn_collector(Arc::clone(&storage));
-    let (host, closed) = HostProcess::create(stdin(), stdout());
-    let proxy = ProxyState::create(options.upstream.parse()?);
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         host: Arc::clone(&host),
@@ -81,7 +88,6 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         queue.spawn();
     }
     let app = create_router(RouterOptions {
-        proxy,
         frontend: Frontend::create(options.public),
         storage,
         queue,
@@ -124,6 +130,33 @@ fn report_bind_failure(error: io::Error) -> io::Error {
 
 fn announce_ready(host: &HostProcess, protocol: &str, address: SocketAddr) {
     host.announce(&format!("{READY_PREFIX}{protocol}://{address}"));
+}
+
+fn announce_migration(host: &HostProcess, report: &MigrationReport) {
+    let mut described = Map::new();
+    described.insert("fromVersion".to_owned(), json!(report.from_version));
+    described.insert("toVersion".to_owned(), json!(report.to_version));
+    insert_backup(&mut described, report.backup_path.as_deref());
+    host.announce(&format!("{MIGRATION_PREFIX}{}", Value::Object(described)));
+}
+
+fn announce_migration_failure(host: &HostProcess, failure: &MigrationFailure) {
+    let mut described = Map::new();
+    described.insert("message".to_owned(), json!(failure.to_string()));
+    if let Some(version) = failure.committed_version() {
+        described.insert("committedVersion".to_owned(), json!(version));
+    }
+    insert_backup(&mut described, failure.backup_path());
+    host.announce(&format!(
+        "{MIGRATION_FAILED_PREFIX}{}",
+        Value::Object(described)
+    ));
+}
+
+fn insert_backup(described: &mut Map<String, Value>, backup_path: Option<&std::path::Path>) {
+    if let Some(path) = backup_path {
+        described.insert("backupPath".to_owned(), json!(path));
+    }
 }
 
 async fn shutdown_on_closed_host(handle: Handle<SocketAddr>, closed: oneshot::Receiver<()>) {

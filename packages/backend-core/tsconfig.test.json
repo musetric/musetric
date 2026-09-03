@@ -1,8 +1,0 @@
-{
-  "extends": "../../tsconfigs/tsconfig.test.json",
-  "compilerOptions": {
-    "lib": ["ES2024"],
-    "types": ["node"]
-  },
-  "references": [{ "path": "./tsconfig.src.json" }]
-}

@@ -7,10 +7,10 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "monorepo": "./src/rustProxy.ts",
-      "types": "./dist/rustProxy.d.ts",
-      "import": "./dist/rustProxy.js",
-      "default": "./dist/rustProxy.js"
+      "monorepo": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {

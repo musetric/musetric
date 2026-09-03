@@ -11,11 +11,12 @@ use axum::{
 
 use crate::{
     blob_response::{CachedBlob, send_cached},
-    failure::{Failure, finish},
-    proxy::forward,
+    failure::{Failure, finish, invalid_number},
     routes::RouteState,
     storage::{Storage, read},
 };
+
+const PREVIEW_ID: &str = "previewId";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new().route("/api/preview/{previewId}", get(handle))
@@ -27,7 +28,7 @@ async fn handle(
     request: Request<Body>,
 ) -> Response<Body> {
     let Ok(preview_id) = raw_preview_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PREVIEW_ID)));
     };
     finish(send(&state.storage, preview_id, request.headers()).await)
 }

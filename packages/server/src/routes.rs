@@ -11,11 +11,10 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use crate::{proxy::ProxyState, realtime, realtime::Rooms, storage::Storage};
+use crate::{realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
-    pub(crate) proxy: ProxyState,
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
@@ -33,24 +32,17 @@ pub(crate) fn create_router(state: RouteState) -> Router {
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
-
     use axum::{
         Router,
         body::{Body, to_bytes},
         http::{Request, StatusCode, header::IF_NONE_MATCH},
         response::Response,
-        routing::any,
     };
     use http_body_util::BodyExt;
-    use tokio::sync::oneshot;
     use tower::ServiceExt;
 
     use super::create_router;
-    use crate::{
-        proxy::ProxyState,
-        test_workspace::{Workspace, create_route_state, start_upstream},
-    };
+    use crate::test_workspace::{Workspace, create_route_state};
 
     const BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
     const OTHER_BLOB_ID: &str = "5a6b7c8d-0000-4000-8000-000000000002";
@@ -92,21 +84,8 @@ mod tests {
       VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001', 'preview.png', 'image/png');
     ";
 
-    fn create_test_router(workspace: &Workspace, upstream: SocketAddr) -> Router {
-        let address = format!("http://{upstream}")
-            .parse()
-            .expect("the upstream should be a valid uri");
-        create_router(create_route_state(
-            ProxyState::create(address),
-            workspace.create_storage(),
-        ))
-    }
-
-    async fn start_echo_upstream() -> (SocketAddr, oneshot::Sender<()>) {
-        let app = Router::new().fallback(any(|request: Request<Body>| async move {
-            format!("upstream answered {}", request.uri())
-        }));
-        start_upstream(app).await
+    fn create_test_router(workspace: &Workspace) -> Router {
+        create_router(create_route_state(workspace.create_storage()))
     }
 
     fn read_header(response: &Response<Body>, name: &str) -> Option<String> {
@@ -144,13 +123,8 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
-        let (upstream, shutdown) = start_echo_upstream().await;
 
-        let response = request(
-            create_test_router(&workspace, upstream),
-            "/api/chords/project/1",
-        )
-        .await;
+        let response = request(create_test_router(&workspace), "/api/chords/project/1").await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -165,7 +139,6 @@ mod tests {
             .await
             .expect("the body should be readable");
         assert_eq!(&body[..], CHORDS.as_bytes());
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
@@ -174,8 +147,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
-        let (upstream, shutdown) = start_echo_upstream().await;
-        let router = create_test_router(&workspace, upstream);
+        let router = create_test_router(&workspace);
         let first = request(router.clone(), "/api/chords/project/1").await;
         let etag = read_header(&first, "etag").expect("the answer should carry an etag");
 
@@ -192,31 +164,18 @@ mod tests {
         assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
         assert_eq!(read_header(&response, "etag"), read_header(&first, "etag"));
         assert_eq!(read_body(response).await, "");
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
     async fn tells_a_missing_row_a_missing_project_and_a_missing_blob_apart() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_echo_upstream().await;
 
-        let without_row = request(
-            create_test_router(&workspace, upstream),
-            "/api/chords/project/1",
-        )
-        .await;
+        let without_row = request(create_test_router(&workspace), "/api/chords/project/1").await;
         workspace.seed(CREATE_CHORDS);
-        let without_project = request(
-            create_test_router(&workspace, upstream),
-            "/api/chords/project/1",
-        )
-        .await;
+        let without_project =
+            request(create_test_router(&workspace), "/api/chords/project/1").await;
         workspace.seed(CREATE_PROJECT);
-        let without_blob = request(
-            create_test_router(&workspace, upstream),
-            "/api/chords/project/1",
-        )
-        .await;
+        let without_blob = request(create_test_router(&workspace), "/api/chords/project/1").await;
 
         assert_eq!(without_row.status(), StatusCode::NOT_FOUND);
         assert_eq!(
@@ -235,26 +194,19 @@ mod tests {
             read_body(without_blob).await,
             "{\"message\":\"Chords blob for project 1 not found\"}"
         );
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
-    async fn leaves_a_project_id_it_cannot_read_to_the_upstream() {
+    async fn refuses_a_project_id_it_cannot_read() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_echo_upstream().await;
 
-        let response = request(
-            create_test_router(&workspace, upstream),
-            "/api/chords/project/abc",
-        )
-        .await;
+        let response = request(create_test_router(&workspace), "/api/chords/project/abc").await;
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             read_body(response).await,
-            "upstream answered /api/chords/project/abc"
+            "{\"message\":\"params/projectId Invalid input: expected number, received string\"}"
         );
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
@@ -264,8 +216,7 @@ mod tests {
         workspace.seed(CREATE_MASTERS);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, AUDIO);
-        let (upstream, shutdown) = start_echo_upstream().await;
-        let router = create_test_router(&workspace, upstream);
+        let router = create_test_router(&workspace);
 
         let source = request(router.clone(), SOURCE_URL).await;
         let lead = request(router, LEAD_URL).await;
@@ -279,7 +230,6 @@ mod tests {
             read_header(&lead, "content-disposition"),
             Some("attachment; filename*=UTF-8''Fixture%20project_lead.flac".to_owned())
         );
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
@@ -289,8 +239,7 @@ mod tests {
         workspace.seed(CREATE_DELIVERY);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
-        let (upstream, shutdown) = start_echo_upstream().await;
-        let router = create_test_router(&workspace, upstream);
+        let router = create_test_router(&workspace);
 
         let content = request(router.clone(), DELIVERY_URL).await;
         let wave = request(router, WAVE_URL).await;
@@ -305,15 +254,13 @@ mod tests {
             Some("attachment; filename*=UTF-8''waveform.bin".to_owned())
         );
         assert_eq!(read_body(wave).await, PEAKS);
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
     async fn hands_out_an_empty_take_when_nothing_is_recorded() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
-        let (upstream, shutdown) = start_echo_upstream().await;
-        let router = create_test_router(&workspace, upstream);
+        let router = create_test_router(&workspace);
 
         let content = request(router.clone(), RECORDING_URL).await;
         let wave = request(router, RECORDING_WAVE_URL).await;
@@ -343,25 +290,23 @@ mod tests {
             .expect("the body should be readable");
         assert_eq!(peaks.len(), PEAKS_BYTE_LENGTH);
         assert!(peaks.iter().all(|byte| *byte == 0));
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
-    async fn leaves_a_stem_type_it_does_not_know_to_the_upstream() {
+    async fn refuses_a_stem_type_it_does_not_know() {
         let workspace = Workspace::new();
-        let (upstream, shutdown) = start_echo_upstream().await;
 
         let response = request(
-            create_test_router(&workspace, upstream),
+            create_test_router(&workspace),
             "/api/audio/project/1/delivery/vocals/content",
         )
         .await;
 
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             read_body(response).await,
-            "upstream answered /api/audio/project/1/delivery/vocals/content"
+            "{\"message\":\"params/stemType Invalid option: expected one of \\\"lead\\\"|\\\"backing\\\"|\\\"instrumental\\\"\"}"
         );
-        let _ = shutdown.send(());
     }
 
     #[tokio::test]
@@ -370,9 +315,8 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_PREVIEW);
         workspace.add_blob(BLOB_ID, PREVIEW);
-        let (upstream, shutdown) = start_echo_upstream().await;
 
-        let response = request(create_test_router(&workspace, upstream), "/api/preview/1").await;
+        let response = request(create_test_router(&workspace), "/api/preview/1").await;
 
         assert_eq!(
             read_header(&response, "content-type"),
@@ -383,6 +327,5 @@ mod tests {
             Some("attachment; filename*=UTF-8''preview.png".to_owned())
         );
         assert_eq!(read_body(response).await, PREVIEW);
-        let _ = shutdown.send(());
     }
 }

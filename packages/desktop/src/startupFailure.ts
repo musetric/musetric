@@ -1,5 +1,5 @@
 import { dirname } from 'node:path';
-import { readMigrationFailure } from '@musetric/backend-db/migrations';
+import { readMigrationFailure } from '@musetric/server';
 import { dialog } from 'electron';
 import { type DesktopLog, reportFatal } from './logging.js';
 

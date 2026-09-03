@@ -4,14 +4,20 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createMigrationReader,
+  type MigrationReader,
+  type MigrationReport,
+} from './migration.js';
+import {
+  createPageChannel,
+  type OpenGpuPage,
+  type PageChannel,
+} from './pageChannel.js';
 
 const packagePath = dirname(dirname(fileURLToPath(import.meta.url)));
 const readyPrefix = 'MUSETRIC_PROXY_URL=';
 const addressInUseMarker = 'MUSETRIC_PROXY_ERROR=address-in-use';
-const openPagePrefix = 'MUSETRIC_PAGE_OPEN=';
-const closePagePrefix = 'MUSETRIC_PAGE_CLOSE=';
-const pageOpenedPrefix = 'MUSETRIC_PAGE_OPENED=';
-const pageFailedPrefix = 'MUSETRIC_PAGE_FAILED=';
 
 const executableName =
   process.platform === 'win32' ? 'musetric-server.exe' : 'musetric-server';
@@ -41,14 +47,7 @@ const createTlsFiles = async (tls: RustProxyTls): Promise<TlsFiles> => {
   return { directory, certificatePath, privateKeyPath };
 };
 
-export type OpenedGpuPage = {
-  close: () => Promise<void>;
-};
-
-export type OpenGpuPage = (url: string) => Promise<OpenedGpuPage>;
-
 export type StartRustProxyOptions = {
-  upstream: string;
   listen: string;
   databasePath: string;
   blobsPath: string;
@@ -74,8 +73,6 @@ const createCommand = (
   tlsFiles: TlsFiles | undefined,
 ): Command => {
   const args = [
-    '--upstream',
-    options.upstream,
     '--listen',
     options.listen,
     '--database',
@@ -119,7 +116,7 @@ const createCommand = (
 
   const executablePath = join(options.resourcesPath, 'server', executableName);
   if (!existsSync(executablePath)) {
-    throw new Error(`The bundled rust proxy is missing at ${executablePath}`);
+    throw new Error(`The bundled rust server is missing at ${executablePath}`);
   }
   return { command: executablePath, args };
 };
@@ -137,85 +134,16 @@ const createLineReader = (
   };
 };
 
-const readMessage = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/\s+/gu, ' ');
-};
-
-type PageChannel = {
-  handleLine: (line: string) => boolean;
-  closeAll: () => Promise<void>;
-};
-
-const createPageChannel = (
-  child: ChildProcess,
-  options: StartRustProxyOptions,
-): PageChannel => {
-  const pages = new Map<string, Promise<OpenedGpuPage | undefined>>();
-  const answer = (line: string): void => {
-    child.stdin?.write(`${line}\n`);
-  };
-  const open = (pageId: string, url: string): void => {
-    const { openPage } = options;
-    if (!openPage) {
-      options.onLog?.('the gpu page was refused: this host opens no pages');
-      return;
-    }
-    pages.set(
-      pageId,
-      openPage(url).then(
-        (page) => {
-          answer(`${pageOpenedPrefix}${pageId}`);
-          return page;
-        },
-        (error: unknown) => {
-          answer(`${pageFailedPrefix}${pageId} ${readMessage(error)}`);
-          return undefined;
-        },
-      ),
-    );
-  };
-  const close = async (pageId: string): Promise<void> => {
-    const opening = pages.get(pageId);
-    pages.delete(pageId);
-    const page = await opening;
-    await page?.close();
-  };
-  const forget = (pageId: string): void => {
-    close(pageId).catch((error: unknown) => {
-      options.onLog?.(`the gpu page did not close (${readMessage(error)})`);
-    });
-  };
-  return {
-    handleLine: (line) => {
-      if (line.startsWith(openPagePrefix)) {
-        const asked = line.slice(openPagePrefix.length);
-        const separator = asked.indexOf(' ');
-        open(asked.slice(0, separator), asked.slice(separator + 1));
-        return true;
-      }
-      if (line.startsWith(closePagePrefix)) {
-        forget(line.slice(closePagePrefix.length));
-        return true;
-      }
-      return false;
-    },
-    closeAll: async () => {
-      const opened = [...pages.keys()];
-      await Promise.all(opened.map(close));
-    },
-  };
-};
-
 const waitForReady = async (
   child: ChildProcess,
   channel: PageChannel,
+  migrations: MigrationReader,
   onLog: ((line: string) => void) | undefined,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const { stdout, stderr } = child;
     if (!stdout || !stderr) {
-      reject(new Error('the rust proxy was started without output streams'));
+      reject(new Error('the rust server was started without output streams'));
       return;
     }
 
@@ -225,7 +153,7 @@ const waitForReady = async (
       reject(new Error([message, ...startupLines].join('\n').trimEnd()));
     };
     const handleLine = (line: string): void => {
-      if (channel.handleLine(line)) {
+      if (channel.handleLine(line) || migrations.handleLine(line)) {
         return;
       }
       if (!ready && line.startsWith(readyPrefix)) {
@@ -242,15 +170,15 @@ const waitForReady = async (
     stdout.on('data', createLineReader(handleLine));
     stderr.on('data', createLineReader(handleLine));
     child.once('error', (error) => {
-      fail(`the rust proxy failed to start (${error.message})`);
+      fail(`the rust server failed to start (${error.message})`);
     });
     child.once('exit', (code, signal) => {
       const status = `code ${String(code)}, signal ${String(signal)}`;
       if (ready) {
-        onLog?.(`the rust proxy exited (${status})`);
+        onLog?.(`the rust server exited (${status})`);
         return;
       }
-      fail(`the rust proxy stopped before it was ready (${status})`);
+      fail(`the rust server stopped before it was ready (${status})`);
     });
   });
 
@@ -290,6 +218,7 @@ const stopChild = async (
 
 export type RustProxy = {
   url: string;
+  migration: MigrationReport;
   close: () => Promise<void>;
 };
 
@@ -301,10 +230,19 @@ export const startRustProxy = async (
   const { command, args } = createCommand(options, tlsFiles);
   const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
   const exited = waitForExit(child);
-  const channel = createPageChannel(child, options);
+  const channel = createPageChannel({
+    child,
+    openPage: options.openPage,
+    onLog: options.onLog,
+  });
+  const migrations = createMigrationReader();
 
   try {
-    const url = await waitForReady(child, channel, options.onLog);
+    const url = await waitForReady(child, channel, migrations, options.onLog);
+    const migration = migrations.report();
+    if (migration === undefined) {
+      throw new Error('the rust server started without reporting its schema');
+    }
     let closing: Promise<void> | undefined = undefined;
     const close = async (): Promise<void> => {
       if (closing !== undefined) {
@@ -314,9 +252,11 @@ export const startRustProxy = async (
       closing = stopChild(child, channel, exited, tlsFiles);
       await closing;
     };
-    return { url, close };
+    return { url, migration, close };
   } catch (error) {
     await stopChild(child, channel, exited, tlsFiles);
-    throw error;
+    throw migrations.fail(
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 };

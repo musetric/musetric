@@ -44,14 +44,14 @@ scopes:
   # Libraries
   - ai # neural-network inference
   - api # packages/api contracts & client/server integration
-  - db # packages/backend-db data access, entities, schema
+  - db # database schema, migrations and data access
   - engine # packages/engine audio engine: playback/decode/visualization orchestration
   - fft # FFT signal-processing core behind visualizations
   - spectrogram # frequency spectrogram visualization
-  - ffmpeg # packages/ffmpeg vendored ffmpeg binary + audio codec/processing tasks
+  - ffmpeg # packages/ffmpeg vendored ffmpeg binaries + audio decode/encode
   - utils # packages/utils low-level shared utilities
   # App
-  - backend # packages/backend Fastify server & orchestration
+  - backend # the server: http api, storage, processing queue
   - desktop # packages/desktop Electron app
   - frontend # packages/frontend app shell (cross-feature)
   - landing # packages/landing marketing site

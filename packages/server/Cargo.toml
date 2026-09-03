@@ -14,8 +14,6 @@ axum-server = { version = "=0.8.0", features = ["tls-rustls"] }
 clap = { version = "=4.6.6", features = ["derive"] }
 futures-util = "=0.3.34"
 http-body-util = "=0.1.5"
-hyper = { version = "=1.11.1", features = ["client", "http1"] }
-hyper-util = { version = "=0.1.20", features = ["client-legacy", "http1", "tokio"] }
 md5 = "=0.8.1"
 musetric-db = { path = "crates/db" }
 musetric-gpu = { path = "crates/gpu" }

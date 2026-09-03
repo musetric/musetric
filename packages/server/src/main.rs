@@ -4,14 +4,8 @@ use clap::Parser;
 use musetric_server::{BoxedError, ServerOptions, TlsOptions, serve};
 
 #[derive(Parser)]
-#[command(about = "Musetric HTTP proxy")]
+#[command(about = "Musetric HTTP server")]
 struct Arguments {
-    #[arg(
-        long,
-        help = "Address of the Fastify app that handles requests during the migration."
-    )]
-    upstream: String,
-
     #[arg(
         long,
         default_value = "127.0.0.1:0",
@@ -19,7 +13,7 @@ struct Arguments {
     )]
     listen: String,
 
-    #[arg(long, help = "SQLite database shared with the Fastify app.")]
+    #[arg(long, help = "SQLite database that holds the projects.")]
     database: PathBuf,
 
     #[arg(long, help = "Directory that holds the stored blobs.")]
@@ -77,7 +71,6 @@ async fn main() -> Result<(), BoxedError> {
             private_key,
         });
     serve(ServerOptions {
-        upstream: arguments.upstream,
         listen: arguments.listen,
         database: arguments.database,
         blobs: arguments.blobs,
