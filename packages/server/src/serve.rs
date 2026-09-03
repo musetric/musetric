@@ -9,10 +9,9 @@ use std::{
 use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
-use musetric_gpu::Bundle;
+use musetric_gpu::{Bundle, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::{SymphoniaPcm, Tools};
-use reqwest::Client;
 use serde_json::{Map, Value, json};
 use tokio::{
     io::{stdin, stdout},
@@ -102,7 +101,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
         processing: options.processing,
-    });
+    })?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     if let Some(tls) = options.tls {
@@ -136,7 +135,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
         processing: options.processing,
-    });
+    })?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let listener = TcpListener::from_std(socket)?;
@@ -163,12 +162,12 @@ struct AppOptions {
     processing: bool,
 }
 
-fn create_app(options: AppOptions) -> Router {
+fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     let storage = options.storage;
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         pages: options.pages,
-        client: Client::new(),
+        client: create_client()?,
         models_path: options.models,
         bundle: options.browser_bundle,
     });
@@ -181,11 +180,11 @@ fn create_app(options: AppOptions) -> Router {
     if options.processing {
         queue.spawn();
     }
-    create_router(RouterOptions {
+    Ok(create_router(RouterOptions {
         frontend: options.frontend,
         storage,
         queue,
-    })
+    }))
 }
 
 fn create_storage(

@@ -2506,6 +2506,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "uuid",
+ "webpki-root-certs",
 ]
 
 [[package]]

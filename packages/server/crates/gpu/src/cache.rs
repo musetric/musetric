@@ -5,7 +5,7 @@ use std::{
 };
 
 use reqwest::{
-    Client, StatusCode,
+    Certificate, Client, StatusCode,
     header::{HeaderValue, RANGE},
 };
 use sha2::{Digest, Sha256};
@@ -16,6 +16,14 @@ use tokio::{
 };
 
 use crate::host::BoxedError;
+
+pub fn create_client() -> Result<Client, BoxedError> {
+    let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS
+        .iter()
+        .map(|certificate| Certificate::from_der(certificate))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Client::builder().tls_certs_only(roots).build()?)
+}
 
 const PARTIAL_SUFFIX: &str = ".part";
 const MANIFEST_SUFFIX: &str = ".verified";
