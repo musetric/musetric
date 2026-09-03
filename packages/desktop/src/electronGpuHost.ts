@@ -1,4 +1,4 @@
-import { type OpenJobPage } from '@musetric/ai/node';
+import { type OpenGpuPage } from '@musetric/server';
 import { BrowserWindow } from 'electron';
 
 const createHiddenWindow = (partition: string): BrowserWindow =>
@@ -22,7 +22,7 @@ const destroyWindow = async (window: BrowserWindow): Promise<void> => {
   await closed;
 };
 
-export const createElectronPageOpener = (): OpenJobPage => {
+export const createElectronPageOpener = (): OpenGpuPage => {
   let nextPageId = 0;
   return async (url) => {
     const window = createHiddenWindow(`musetric-gpu-${nextPageId++}`);

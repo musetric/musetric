@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 const packagePath = dirname(dirname(fileURLToPath(import.meta.url)));
 const readyPrefix = 'MUSETRIC_PROXY_URL=';
 const addressInUseMarker = 'MUSETRIC_PROXY_ERROR=address-in-use';
+const openPagePrefix = 'MUSETRIC_PAGE_OPEN=';
+const closePagePrefix = 'MUSETRIC_PAGE_CLOSE=';
+const pageOpenedPrefix = 'MUSETRIC_PAGE_OPENED=';
+const pageFailedPrefix = 'MUSETRIC_PAGE_FAILED=';
 
 const executableName =
   process.platform === 'win32' ? 'musetric-server.exe' : 'musetric-server';
@@ -37,6 +41,12 @@ const createTlsFiles = async (tls: RustProxyTls): Promise<TlsFiles> => {
   return { directory, certificatePath, privateKeyPath };
 };
 
+export type OpenedGpuPage = {
+  close: () => Promise<void>;
+};
+
+export type OpenGpuPage = (url: string) => Promise<OpenedGpuPage>;
+
 export type StartRustProxyOptions = {
   upstream: string;
   listen: string;
@@ -50,6 +60,7 @@ export type StartRustProxyOptions = {
   processing?: boolean;
   resourcesPath?: string;
   tls?: RustProxyTls;
+  openPage?: OpenGpuPage;
   onLog?: (line: string) => void;
 };
 
@@ -126,8 +137,79 @@ const createLineReader = (
   };
 };
 
+const readMessage = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/gu, ' ');
+};
+
+type PageChannel = {
+  handleLine: (line: string) => boolean;
+  closeAll: () => Promise<void>;
+};
+
+const createPageChannel = (
+  child: ChildProcess,
+  options: StartRustProxyOptions,
+): PageChannel => {
+  const pages = new Map<string, Promise<OpenedGpuPage | undefined>>();
+  const answer = (line: string): void => {
+    child.stdin?.write(`${line}\n`);
+  };
+  const open = (pageId: string, url: string): void => {
+    const { openPage } = options;
+    if (!openPage) {
+      options.onLog?.('the gpu page was refused: this host opens no pages');
+      return;
+    }
+    pages.set(
+      pageId,
+      openPage(url).then(
+        (page) => {
+          answer(`${pageOpenedPrefix}${pageId}`);
+          return page;
+        },
+        (error: unknown) => {
+          answer(`${pageFailedPrefix}${pageId} ${readMessage(error)}`);
+          return undefined;
+        },
+      ),
+    );
+  };
+  const close = async (pageId: string): Promise<void> => {
+    const opening = pages.get(pageId);
+    pages.delete(pageId);
+    const page = await opening;
+    await page?.close();
+  };
+  const forget = (pageId: string): void => {
+    close(pageId).catch((error: unknown) => {
+      options.onLog?.(`the gpu page did not close (${readMessage(error)})`);
+    });
+  };
+  return {
+    handleLine: (line) => {
+      if (line.startsWith(openPagePrefix)) {
+        const asked = line.slice(openPagePrefix.length);
+        const separator = asked.indexOf(' ');
+        open(asked.slice(0, separator), asked.slice(separator + 1));
+        return true;
+      }
+      if (line.startsWith(closePagePrefix)) {
+        forget(line.slice(closePagePrefix.length));
+        return true;
+      }
+      return false;
+    },
+    closeAll: async () => {
+      const opened = [...pages.keys()];
+      await Promise.all(opened.map(close));
+    },
+  };
+};
+
 const waitForReady = async (
   child: ChildProcess,
+  channel: PageChannel,
   onLog: ((line: string) => void) | undefined,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -143,6 +225,9 @@ const waitForReady = async (
       reject(new Error([message, ...startupLines].join('\n').trimEnd()));
     };
     const handleLine = (line: string): void => {
+      if (channel.handleLine(line)) {
+        return;
+      }
       if (!ready && line.startsWith(readyPrefix)) {
         ready = true;
         resolve(line.slice(readyPrefix.length));
@@ -188,9 +273,11 @@ const waitForExit = async (child: ChildProcess): Promise<void> =>
 
 const stopChild = async (
   child: ChildProcess,
+  channel: PageChannel,
   exited: Promise<void>,
   tlsFiles: TlsFiles | undefined,
 ): Promise<void> => {
+  await channel.closeAll();
   if (!hasExited(child)) {
     child.stdin?.end();
     child.kill();
@@ -214,21 +301,22 @@ export const startRustProxy = async (
   const { command, args } = createCommand(options, tlsFiles);
   const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
   const exited = waitForExit(child);
+  const channel = createPageChannel(child, options);
 
   try {
-    const url = await waitForReady(child, options.onLog);
+    const url = await waitForReady(child, channel, options.onLog);
     let closing: Promise<void> | undefined = undefined;
     const close = async (): Promise<void> => {
       if (closing !== undefined) {
         await closing;
         return;
       }
-      closing = stopChild(child, exited, tlsFiles);
+      closing = stopChild(child, channel, exited, tlsFiles);
       await closing;
     };
     return { url, close };
   } catch (error) {
-    await stopChild(child, exited, tlsFiles);
+    await stopChild(child, channel, exited, tlsFiles);
     throw error;
   }
 };

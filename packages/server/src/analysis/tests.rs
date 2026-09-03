@@ -1,14 +1,5 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashMap;
 
-use axum::{
-    Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
-    routing::{delete, post},
-};
 use musetric_db::{
     Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemType,
 };
@@ -25,12 +16,11 @@ use crate::{
         browser::{BrowserAnalysis, HostedModel, Serve, answer, describe, store},
         gains::{Stems, measure},
         models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
-        page::{PageFailure, close_page, open_page},
         steps::create as create_step,
     },
-    proxy::ProxyState,
+    host::tests::start_fake_host,
     storage::{read, write_database},
-    test_workspace::{Workspace, start_upstream},
+    test_workspace::Workspace,
 };
 
 const CREATE_PROJECT: &str = "
@@ -39,82 +29,22 @@ const CREATE_PROJECT: &str = "
   INSERT INTO ProcessingError (projectId, step, message)
   VALUES (1, 'chords', 'Fixture failure');
 ";
-const PAGE_ROUTE: &str = "/api/internal/gpu/page";
-const PAGE_ID: &str = "page-1";
 
-fn create_context(workspace: &Workspace, upstream: &str) -> AnalysisContext {
-    let address = upstream
-        .parse()
-        .expect("the upstream should be a valid uri");
+fn create_context(workspace: &Workspace) -> AnalysisContext {
     AnalysisContext {
         storage: workspace.create_storage(),
-        proxy: ProxyState::create(address),
+        host: start_fake_host(None).host,
         client: Client::new(),
         models_path: workspace.blobs_path().join("models"),
         bundle_path: workspace.blobs_path().join("bundle"),
     }
 }
 
-async fn start_page_upstream(
-    closed: Arc<Mutex<Vec<String>>>,
-) -> (String, tokio::sync::oneshot::Sender<()>) {
-    let application = Router::new()
-        .route(PAGE_ROUTE, post(|| async { Json(json!({ "pageId": PAGE_ID })) }))
-        .route(
-            &format!("{PAGE_ROUTE}/{{pageId}}"),
-            delete(
-                |State(state): State<Arc<Mutex<Vec<String>>>>, Path(page_id): Path<String>| async move {
-                    state
-                        .lock()
-                        .expect("the close log should be writable")
-                        .push(page_id);
-                    StatusCode::OK
-                },
-            ),
-        )
-        .with_state(closed);
-    let (address, shutdown) = start_upstream(application).await;
-    (format!("http://{address}"), shutdown)
-}
-
-#[tokio::test]
-async fn opens_and_closes_a_page_through_the_upstream_app() {
-    let workspace = Workspace::new();
-    let closed = Arc::new(Mutex::new(Vec::new()));
-    let (upstream, shutdown) = start_page_upstream(Arc::clone(&closed)).await;
-    let context = create_context(&workspace, &upstream);
-
-    let page = open_page(&context.proxy, "http://127.0.0.1:1/?jobs=x")
-        .await
-        .map_err(|_| "the page should open")
-        .expect("the page should open");
-    close_page(&context.proxy, &page).await;
-
-    assert_eq!(
-        closed
-            .lock()
-            .expect("the close log should be readable")
-            .as_slice(),
-        [PAGE_ID]
-    );
-    let _ = shutdown.send(());
-}
-
-#[tokio::test]
-async fn reports_an_unreachable_app_instead_of_a_failed_step() {
-    let workspace = Workspace::new();
-    let context = create_context(&workspace, "http://127.0.0.1:1");
-
-    let refused = open_page(&context.proxy, "http://127.0.0.1:1/?jobs=x").await;
-
-    assert!(matches!(refused, Err(PageFailure::Unreachable)));
-}
-
 #[tokio::test]
 async fn stores_the_chords_the_executor_answered() {
     let workspace = Workspace::new();
     workspace.seed(CREATE_PROJECT);
-    let context = create_context(&workspace, "http://127.0.0.1:1");
+    let context = create_context(&workspace);
     let job = PendingJob {
         step: ProcessingStep::Chords,
         project_id: 1,
@@ -331,7 +261,7 @@ fn caches_the_whisper_bundle_the_way_transformers_asks_for_it() {
 }
 
 #[test]
-fn leaves_the_separation_to_the_upstream_app() {
+fn keeps_the_separation_out_of_the_step_table() {
     assert!(describe_step(ProcessingStep::Chords).is_some());
     assert!(describe_step(ProcessingStep::Separation).is_none());
 }

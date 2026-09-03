@@ -12,12 +12,9 @@ use serde_json::{Map, Value, json};
 use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
 
 use crate::{
-    analysis::{
-        AnalysisContext,
-        page::{PageFailure, close_page, open_page},
-    },
+    analysis::AnalysisContext,
     blobs::create_blob_ref,
-    proxy::ProxyState,
+    host::{HostProcess, PageFailure},
     storage::write_database,
 };
 
@@ -138,10 +135,10 @@ impl Session {
         &self.host
     }
 
-    pub(crate) async fn run(&mut self, proxy: &ProxyState, job: Job<'_>) -> Result<Value, Failure> {
-        let page = open_page(proxy, &self.host.page_url()).await?;
+    pub(crate) async fn run(&mut self, host: &HostProcess, job: Job<'_>) -> Result<Value, Failure> {
+        let page = host.open_page(&self.host.page_url()).await?;
         let found = self.answer(job).await;
-        close_page(proxy, &page).await;
+        host.close_page(&page);
         found
     }
 
@@ -236,7 +233,7 @@ async fn read_result(
     let request = (analysis.build)(&session.host().pcm_url(), &hosted)?;
     session
         .run(
-            &attempt.context.proxy,
+            &attempt.context.host,
             Job {
                 api: analysis.api,
                 request: &request,

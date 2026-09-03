@@ -11,7 +11,7 @@ use tokio_util::io::ReaderStream;
 use crate::cached_file::{CachedFile, CachedHeaders, REVALIDATE_CACHE};
 
 const INDEX: &str = "index.html";
-const SERVER_PREFIXES: [&str; 3] = ["/api", "/docs", "/swagger"];
+const SERVER_PREFIXES: [&str; 1] = ["/api"];
 
 #[derive(Clone)]
 pub(crate) struct Frontend {
@@ -239,7 +239,6 @@ mod tests {
         let frontend = Frontend::create(public.directory.clone());
 
         assert!(visit(&frontend, "/api/project/list").await.is_none());
-        assert!(visit(&frontend, "/docs").await.is_none());
         assert!(visit(&frontend, "/assets/missing.js").await.is_none());
         assert!(visit(&frontend, "/../secret").await.is_none());
     }

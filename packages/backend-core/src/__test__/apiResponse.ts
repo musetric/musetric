@@ -212,11 +212,7 @@ export const withTestServer = async <Result>(
 ): Promise<Result> => {
   const workspace = createStorageWorkspace();
   await createProjectFixture(workspace);
-  const app = await createServerApp(workspace.config, {
-    openPage: () => {
-      throw new Error('A test must not reach the GPU host');
-    },
-  });
+  const app = await createServerApp(workspace.config);
   await app.ready();
   try {
     return await withClient(app, workspace, transport, run);
