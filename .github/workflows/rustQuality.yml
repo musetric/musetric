@@ -30,7 +30,6 @@ jobs:
       - run: yarn --immutable
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
-          MUSETRIC_SKIP_FFMPEG_FETCH: true
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       - run: yarn build:mobile
