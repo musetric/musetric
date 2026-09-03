@@ -1,0 +1,57 @@
+name: JS Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-js-quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: npm install -g corepack@latest
+      - run: corepack enable
+      - run: corepack prepare yarn@4.17.1 --activate
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+      - uses: actions/cache@v5
+        with:
+          path: packages/*/.eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/server/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - run: yarn check:deps:security
+      - run: yarn check:deps:dupe
+      - run: yarn check:dupe
+      - run: yarn check:unused
+      - run: yarn check:editor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: yarn check:format
+      - run: yarn check:translations
+      - run: yarn check:openapi
+      - run: yarn check:ts
+      - run: yarn check:lint
+      - run: yarn test

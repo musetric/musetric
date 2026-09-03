@@ -1,4 +1,4 @@
-name: Code Quality
+name: Rust Quality
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  check-code-quality:
+  check-rust-quality:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,14 +28,12 @@ jobs:
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
       - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          MUSETRIC_SKIP_FFMPEG_FETCH: true
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       - run: yarn build:mobile
-      - uses: actions/cache@v5
-        with:
-          path: packages/*/.eslintcache
-          key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
-          restore-keys: |
-            eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
       - uses: actions/cache@v5
         with:
           path: |
@@ -44,17 +42,7 @@ jobs:
             packages/server/target
           key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
-      - run: yarn check:deps:security
-      - run: yarn check:deps:dupe
-      - run: yarn check:dupe
-      - run: yarn check:unused
-      - run: yarn check:editor
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: yarn check:format
-      - run: yarn check:translations
-      - run: yarn check:openapi
-      - run: yarn check:ts
-      - run: yarn check:lint
-      - run: yarn check:rust
-      - run: yarn test
+      - run: yarn workspace @musetric/server check:rust:ast
+      - run: yarn workspace @musetric/server check:rust:fmt
+      - run: yarn workspace @musetric/server check:rust:clippy
+      - run: yarn workspace @musetric/server check:rust:test
