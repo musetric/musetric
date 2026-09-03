@@ -104,8 +104,8 @@ pub async fn decode_interleaved_pcm(
     sample_rate: u32,
 ) -> Result<Vec<u8>, BoxedError> {
     let finished = run(&tools.ffmpeg, &decode_arguments(from, sample_rate)).await?;
-    if finished.stdout.is_empty() {
+    if finished.is_empty() {
         return Err("ffmpeg produced no audio data".into());
     }
-    Ok(finished.stdout)
+    Ok(finished)
 }

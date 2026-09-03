@@ -1,16 +1,20 @@
 use std::path::Path;
 
-use serde_json::Value;
+use ebur128::{EbuR128, Mode};
 
-use crate::{Tools, pcm::read_pcm, run::BoxedError, run::run};
+use crate::{Tools, pcm::read_pcm, run::BoxedError};
 
 const EPSILON: f64 = 1e-12;
+const CHANNELS: u32 = 2;
+const FLUSH_FRAMES: usize = 4096;
 const WINDOW_SECONDS: f64 = 0.1;
 const HOP_SECONDS: f64 = 0.025;
 const MINIMUM_ACTIVE_PEAK_DB: f64 = -55.0;
 const MINIMUM_ACTIVE_DB: f64 = -70.0;
 const ACTIVE_MARGIN_DB: f64 = 20.0;
 const PERCENTILE: f64 = 0.95;
+const SILENT_INTEGRATED: &str = "The integrated loudness is not a number";
+const SILENT_PEAK: &str = "The true peak is not a number";
 
 #[derive(Clone, Copy)]
 pub struct Loudness {
@@ -23,25 +27,72 @@ pub struct LeadVisualLoudness {
     pub p95_rms_db: f64,
 }
 
-pub async fn analyze_loudness(tools: &Tools, from: &Path) -> Result<Loudness, BoxedError> {
-    let arguments = vec![
-        "-hide_banner".to_owned(),
-        "-nostats".to_owned(),
-        "-i".to_owned(),
-        from.display().to_string(),
-        "-map".to_owned(),
-        "0:a:0".to_owned(),
-        "-sn".to_owned(),
-        "-dn".to_owned(),
-        "-vn".to_owned(),
-        "-af".to_owned(),
-        "loudnorm=print_format=json".to_owned(),
-        "-f".to_owned(),
-        "null".to_owned(),
-        "-".to_owned(),
-    ];
-    let finished = run(&tools.ffmpeg, &arguments).await?;
-    parse_loudnorm(&finished.stderr)
+struct Meter {
+    state: EbuR128,
+    frames: Vec<f32>,
+    failure: Option<ebur128::Error>,
+}
+
+impl Meter {
+    fn create(sample_rate: u32) -> Result<Self, BoxedError> {
+        let state = EbuR128::new(CHANNELS, sample_rate, Mode::I | Mode::TRUE_PEAK)?;
+        Ok(Self {
+            state,
+            frames: Vec::with_capacity(FLUSH_FRAMES * CHANNELS as usize),
+            failure: None,
+        })
+    }
+
+    fn push(&mut self, left: f32, right: f32) {
+        self.frames.push(left);
+        self.frames.push(right);
+        if self.frames.len() >= FLUSH_FRAMES * CHANNELS as usize {
+            self.flush();
+        }
+    }
+
+    fn flush(&mut self) {
+        if self.failure.is_none()
+            && let Err(failure) = self.state.add_frames_f32(&self.frames)
+        {
+            self.failure = Some(failure);
+        }
+        self.frames.clear();
+    }
+
+    fn finish(mut self) -> Result<Loudness, BoxedError> {
+        self.flush();
+        if let Some(failure) = self.failure {
+            return Err(failure.into());
+        }
+        let integrated = self.state.loudness_global()?;
+        let left = self.state.true_peak(0)?;
+        let right = self.state.true_peak(1)?;
+        let peak = amplitude_to_db(left.max(right));
+        if !integrated.is_finite() {
+            return Err(SILENT_INTEGRATED.into());
+        }
+        if !peak.is_finite() {
+            return Err(SILENT_PEAK.into());
+        }
+        Ok(Loudness {
+            integrated_loudness_db: integrated,
+            true_peak_db: peak,
+        })
+    }
+}
+
+pub async fn analyze_loudness(
+    tools: &Tools,
+    from: &Path,
+    sample_rate: u32,
+) -> Result<Loudness, BoxedError> {
+    let mut meter = Meter::create(sample_rate)?;
+    read_pcm(tools, from, sample_rate, |left, right, _| {
+        meter.push(left, right);
+    })
+    .await?;
+    meter.finish()
 }
 
 #[expect(
@@ -53,30 +104,36 @@ pub async fn analyze_lead_visual_loudness(
     from: &Path,
     sample_rate: u32,
 ) -> Result<LeadVisualLoudness, BoxedError> {
-    let loudness = analyze_loudness(tools, from).await?;
     let window_frames = frame_count(WINDOW_SECONDS, sample_rate);
     let hop_frames = frame_count(HOP_SECONDS, sample_rate) as u64;
-    let active_threshold_db =
-        MINIMUM_ACTIVE_DB.max(loudness.integrated_loudness_db - ACTIVE_MARGIN_DB);
+    let mut meter = Meter::create(sample_rate)?;
     let mut window = vec![0.0_f32; window_frames];
-    let mut active_rms_values = Vec::new();
+    let mut measured = Vec::new();
     let mut write_index = 0_usize;
     let mut filled_frames = 0_usize;
     let mut next_window_start = 0_u64;
 
     read_pcm(tools, from, sample_rate, |left, right, frame_index| {
+        meter.push(left, right);
         window[write_index] = ((f64::from(left) + f64::from(right)) * 0.5) as f32;
         write_index = (write_index + 1) % window_frames;
         filled_frames = filled_frames.saturating_add(1).min(window_frames);
         let window_end = next_window_start + window_frames as u64 - 1;
         if filled_frames == window_frames && frame_index >= window_end {
-            if let Some(rms_db) = measure_window(&window, write_index, active_threshold_db) {
-                active_rms_values.push(rms_db);
-            }
+            measured.push(measure_window(&window, write_index));
             next_window_start += hop_frames;
         }
     })
     .await?;
+
+    let loudness = meter.finish()?;
+    let active_threshold_db =
+        MINIMUM_ACTIVE_DB.max(loudness.integrated_loudness_db - ACTIVE_MARGIN_DB);
+    let mut active_rms_values = measured
+        .into_iter()
+        .filter(|measurement| measurement.is_active(active_threshold_db))
+        .map(|measurement| measurement.rms_db)
+        .collect::<Vec<_>>();
 
     Ok(LeadVisualLoudness {
         p95_rms_db: percentile(&mut active_rms_values, PERCENTILE)
@@ -85,11 +142,22 @@ pub async fn analyze_lead_visual_loudness(
     })
 }
 
+struct Window {
+    rms_db: f64,
+    peak_db: f64,
+}
+
+impl Window {
+    fn is_active(&self, active_threshold_db: f64) -> bool {
+        self.rms_db >= active_threshold_db && self.peak_db >= MINIMUM_ACTIVE_PEAK_DB
+    }
+}
+
 #[expect(
     clippy::cast_precision_loss,
     reason = "a window holds a fraction of a second of frames"
 )]
-fn measure_window(window: &[f32], write_index: usize, active_threshold_db: f64) -> Option<f64> {
+fn measure_window(window: &[f32], write_index: usize) -> Window {
     let frame_count = window.len();
     let mut sum_squares = 0.0_f64;
     let mut peak = 0.0_f64;
@@ -98,9 +166,10 @@ fn measure_window(window: &[f32], write_index: usize, active_threshold_db: f64) 
         sum_squares += value * value;
         peak = peak.max(value.abs());
     }
-    let rms_db = amplitude_to_db((sum_squares / frame_count as f64).sqrt());
-    let peak_db = amplitude_to_db(peak);
-    (rms_db >= active_threshold_db && peak_db >= MINIMUM_ACTIVE_PEAK_DB).then_some(rms_db)
+    Window {
+        rms_db: amplitude_to_db((sum_squares / frame_count as f64).sqrt()),
+        peak_db: amplitude_to_db(peak),
+    }
 }
 
 fn amplitude_to_db(value: f64) -> f64 {
@@ -118,44 +187,178 @@ fn percentile(values: &mut [f64], ratio: f64) -> Option<f64> {
         return None;
     }
     values.sort_by(f64::total_cmp);
-    let position = (values.len() as f64 * ratio).ceil() - 1.0;
-    let index = (position.max(0.0) as usize).min(values.len() - 1);
-    values.get(index).copied()
+    let index = ((values.len() as f64) * ratio).ceil() as usize;
+    let clamped = index.saturating_sub(1).min(values.len() - 1);
+    values.get(clamped).copied()
 }
 
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "the window length is a rounded count of frames"
+    reason = "a window is a fraction of a second at an audio sample rate"
 )]
 fn frame_count(seconds: f64, sample_rate: u32) -> usize {
-    let frames = (seconds * f64::from(sample_rate)).round();
-    frames.max(1.0) as usize
+    (seconds * f64::from(sample_rate)).round() as usize
 }
 
-fn parse_loudnorm(reported: &str) -> Result<Loudness, BoxedError> {
-    let start = reported
-        .find('{')
-        .ok_or("ffmpeg loudnorm output is missing JSON")?;
-    let end = reported
-        .rfind('}')
-        .filter(|end| *end > start)
-        .ok_or("ffmpeg loudnorm output is missing JSON")?;
-    let parsed: Value = serde_json::from_str(&reported[start..=end])
-        .map_err(|_| "ffmpeg loudnorm JSON is invalid")?;
-    Ok(Loudness {
-        integrated_loudness_db: read_measurement(&parsed, "input_i")?,
-        true_peak_db: read_measurement(&parsed, "input_tp")?,
-    })
-}
-
-fn read_measurement(parsed: &Value, label: &str) -> Result<f64, BoxedError> {
-    let measured = match parsed.get(label) {
-        Some(Value::Number(number)) => number.as_f64(),
-        Some(Value::String(text)) => text.trim().parse::<f64>().ok(),
-        _ => None,
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::{create_dir_all, remove_dir_all},
+        path::PathBuf,
+        process::id,
     };
-    measured
-        .filter(|value| value.is_finite())
-        .ok_or_else(|| format!("Invalid loudness {label}").into())
+
+    use super::{analyze_lead_visual_loudness, analyze_loudness};
+    use crate::{Tools, run::run};
+
+    const SAMPLE_RATE: u32 = 48000;
+    const TOLERANCE_DB: f64 = 0.1;
+    const TONE: &str = "0.6*sin(440*2*PI*t)*(0.2+0.8*abs(sin(1.3*t)))|0.45*sin(523.25*2*PI*t+sin(3*t))*(0.1+0.9*abs(sin(0.7*t)))";
+
+    fn bundled_ffmpeg() -> PathBuf {
+        let platform = match std::env::consts::OS {
+            "windows" => "win32",
+            "macos" => "darwin",
+            other => other,
+        };
+        let architecture = match std::env::consts::ARCH {
+            "x86_64" => "x64",
+            "aarch64" => "arm64",
+            other => other,
+        };
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../ffmpeg/resources")
+            .join(format!("{platform}-{architecture}"))
+            .join(format!("ffmpeg{}", std::env::consts::EXE_SUFFIX))
+    }
+
+    struct Fixture {
+        directory: PathBuf,
+        tools: Tools,
+    }
+
+    impl Fixture {
+        async fn create(expression: &str, seconds: f64) -> Self {
+            let directory = std::env::temp_dir().join(format!("musetric-loudness-{}", id()));
+            create_dir_all(&directory).expect("the fixture directory should be built");
+            let ffmpeg = bundled_ffmpeg();
+            let fixture = Self {
+                directory,
+                tools: Tools {
+                    ffmpeg: ffmpeg.clone(),
+                    ffprobe: ffmpeg,
+                },
+            };
+            let arguments = vec![
+                "-hide_banner".to_owned(),
+                "-loglevel".to_owned(),
+                "error".to_owned(),
+                "-y".to_owned(),
+                "-f".to_owned(),
+                "lavfi".to_owned(),
+                "-i".to_owned(),
+                format!("aevalsrc=exprs={expression}:s={SAMPLE_RATE}:d={seconds}"),
+                "-c:a".to_owned(),
+                "pcm_s16le".to_owned(),
+                fixture.path().display().to_string(),
+            ];
+            run(&fixture.tools.ffmpeg, &arguments)
+                .await
+                .expect("the fixture should be written");
+            fixture
+        }
+
+        fn path(&self) -> PathBuf {
+            self.directory.join("fixture.wav")
+        }
+
+        async fn measured_by_ffmpeg(&self) -> (f64, f64) {
+            let arguments = vec![
+                "-hide_banner".to_owned(),
+                "-nostats".to_owned(),
+                "-i".to_owned(),
+                self.path().display().to_string(),
+                "-af".to_owned(),
+                "ebur128=peak=true".to_owned(),
+                "-f".to_owned(),
+                "null".to_owned(),
+                "-".to_owned(),
+            ];
+            let reported = read_stderr(&self.tools.ffmpeg, &arguments).await;
+            let summary = reported
+                .rfind("Integrated loudness:")
+                .map(|start| reported[start..].to_owned())
+                .expect("the filter should print a summary");
+            (
+                read_labelled(&summary, "I:"),
+                read_labelled(&summary, "Peak:"),
+            )
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = remove_dir_all(&self.directory);
+        }
+    }
+
+    async fn read_stderr(program: &std::path::Path, arguments: &[String]) -> String {
+        let output = tokio::process::Command::new(program)
+            .args(arguments)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output()
+            .await
+            .expect("ffmpeg should run");
+        String::from_utf8_lossy(&output.stderr).into_owned()
+    }
+
+    fn read_labelled(summary: &str, label: &str) -> f64 {
+        summary
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix(label))
+            .filter_map(|value| value.split_whitespace().next())
+            .find_map(|value| value.parse::<f64>().ok())
+            .expect("the summary should carry the measurement")
+    }
+
+    #[tokio::test]
+    async fn measures_what_the_ffmpeg_filter_measures() {
+        let fixture = Fixture::create(TONE, 4.0).await;
+
+        let measured = analyze_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+            .await
+            .expect("the loudness should be measured");
+        let (integrated, true_peak) = fixture.measured_by_ffmpeg().await;
+
+        assert!(
+            (measured.integrated_loudness_db - integrated).abs() < TOLERANCE_DB,
+            "integrated: rust {} ffmpeg {integrated}",
+            measured.integrated_loudness_db
+        );
+        assert!(
+            (measured.true_peak_db - true_peak).abs() < TOLERANCE_DB,
+            "true peak: rust {} ffmpeg {true_peak}",
+            measured.true_peak_db
+        );
+    }
+
+    #[tokio::test]
+    async fn reads_the_lead_window_in_the_same_pass() {
+        let fixture = Fixture::create(TONE, 4.0).await;
+
+        let visual = analyze_lead_visual_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+            .await
+            .expect("the lead loudness should be measured");
+        let alone = analyze_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+            .await
+            .expect("the loudness should be measured");
+
+        assert!(
+            (visual.loudness.integrated_loudness_db - alone.integrated_loudness_db).abs() < 1e-9
+        );
+        assert!(visual.p95_rms_db > visual.loudness.integrated_loudness_db - 20.0);
+    }
 }

@@ -115,7 +115,7 @@ async fn separate(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let tools = &context.storage.tools;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let source_analysis = async {
-        analyze_loudness(tools, &source)
+        analyze_loudness(tools, &source, sample_rate)
             .await
             .map_err(Failure::from)
     };
@@ -172,8 +172,8 @@ async fn store(
     let stems = running.stems;
     let (lead, backing, instrumental) = tokio::try_join!(
         analyze_lead_visual_loudness(tools, &stems.lead.master.path, sample_rate),
-        analyze_loudness(tools, &stems.backing.master.path),
-        analyze_loudness(tools, &stems.instrumental.master.path),
+        analyze_loudness(tools, &stems.backing.master.path, sample_rate),
+        analyze_loudness(tools, &stems.instrumental.master.path, sample_rate),
     )?;
     let analysis = measure(
         source_loudness,

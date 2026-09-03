@@ -4,12 +4,7 @@ use tokio::process::Command;
 
 pub type BoxedError = Box<dyn Error + Send + Sync>;
 
-pub(crate) struct Finished {
-    pub(crate) stdout: Vec<u8>,
-    pub(crate) stderr: String,
-}
-
-pub(crate) async fn run(program: &Path, arguments: &[String]) -> Result<Finished, BoxedError> {
+pub(crate) async fn run(program: &Path, arguments: &[String]) -> Result<Vec<u8>, BoxedError> {
     let output = Command::new(program)
         .args(arguments)
         .stdin(Stdio::null())
@@ -31,10 +26,7 @@ pub(crate) async fn run(program: &Path, arguments: &[String]) -> Result<Finished
         };
         return Err(reported.into());
     }
-    Ok(Finished {
-        stdout: output.stdout,
-        stderr,
-    })
+    Ok(output.stdout)
 }
 
 fn describe(code: Option<i32>) -> String {
