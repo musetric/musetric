@@ -5,8 +5,8 @@ use axum::{
     http::{
         HeaderMap, HeaderValue, StatusCode,
         header::{
-            CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH,
-            LAST_MODIFIED,
+            ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE,
+            CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED,
         },
     },
     response::Response,
@@ -14,8 +14,11 @@ use axum::{
 use musetric_db::BoxedError;
 use time::{OffsetDateTime, format_description::BorrowedFormatItem, macros::format_description};
 
+use crate::range::PartialRange;
+
 pub(crate) const DOWNLOAD_CACHE: &str = "public, max-age=86400";
 pub(crate) const REVALIDATE_CACHE: &str = "public, max-age=0";
+const ACCEPT_RANGES_VALUE: &str = "bytes";
 const UNRESERVED: &[u8] = b"-_.!~*'()";
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const HTTP_DATE: &[BorrowedFormatItem<'_>] = format_description!(
@@ -53,6 +56,7 @@ impl CachedHeaders {
         );
         headers.insert(CACHE_CONTROL, HeaderValue::from_static(file.cache_control));
         headers.insert(ETAG, HeaderValue::from_str(&etag)?);
+        headers.insert(ACCEPT_RANGES, HeaderValue::from_static(ACCEPT_RANGES_VALUE));
         Ok(Self { headers, etag })
     }
 
@@ -75,6 +79,30 @@ impl CachedHeaders {
         let mut response = Response::new(body);
         *response.headers_mut() = self.headers;
         response
+    }
+
+    pub(crate) fn respond_partial(
+        mut self,
+        range: PartialRange,
+        size: u64,
+        body: Body,
+    ) -> Result<Response<Body>, BoxedError> {
+        let content_range = format!(
+            "{ACCEPT_RANGES_VALUE} {}-{}/{}",
+            range.start, range.end, size
+        );
+        self.headers.insert(
+            CONTENT_RANGE,
+            HeaderValue::from_str(&content_range).map_err(|_| "the content range is invalid")?,
+        );
+        self.headers.insert(
+            CONTENT_LENGTH,
+            HeaderValue::from(range.end - range.start + 1),
+        );
+        let mut response = Response::new(body);
+        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+        *response.headers_mut() = self.headers;
+        Ok(response)
     }
 }
 

@@ -147,6 +147,10 @@ mod tests {
         "0.6*sin(440*2*PI*t)*(0.2+0.8*abs(sin(1.3*t)))|0.45*sin(523.25*2*PI*t+sin(3*t))";
     const CORRELATION: f64 = 0.998;
     const LEVEL_TOLERANCE: f64 = 0.01;
+    const SEEK_POINTS: usize = 512;
+    const SEEK_POINT_BYTES: usize = 18;
+    const HEADER_BYTE_LENGTH: usize = 12 + 34 + SEEK_POINTS * SEEK_POINT_BYTES;
+    const SEEK_TABLE_BLOCK: u8 = 3;
 
     fn tone(name: &str, sample_rate: u32) -> Signal<'_> {
         Signal {
@@ -216,6 +220,19 @@ mod tests {
             .await
             .expect("the master should report its duration");
         assert_eq!(counted, (expected.len() / CHANNELS) as u64);
+
+        let stored = tokio::fs::read(&master)
+            .await
+            .expect("the master should be readable");
+        assert_eq!(stored[42], 0x80 | SEEK_TABLE_BLOCK);
+        let seek_length = u32::try_from(SEEK_POINTS * SEEK_POINT_BYTES).expect("the table fits");
+        assert_eq!(&stored[43..46], &seek_length.to_be_bytes()[1..]);
+        let first = &stored[46..46 + SEEK_POINT_BYTES];
+        assert_eq!(first[..8], [0; 8]);
+        assert_eq!(first[8..16], u64::to_be_bytes(HEADER_BYTE_LENGTH as u64));
+        assert!(first[16..18] != [0; 2]);
+        let second = &stored[46 + SEEK_POINT_BYTES..46 + 2 * SEEK_POINT_BYTES];
+        assert_eq!(second[..8], u64::to_be_bytes(u64::from(TARGET_RATE) * 2));
     }
 
     #[tokio::test]

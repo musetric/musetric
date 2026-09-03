@@ -1,9 +1,69 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`a byte range answers a partial body 1`] = `
+[
+  {
+    "body": {
+      "byteLength": 4,
+      "sha256": "a5e40d758f80d917581f750c6a5a145fa8d502f20b6b157f9bf5a431182cc88c",
+    },
+    "headers": {
+      "accept-ranges": "bytes",
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
+      "content-length": "4",
+      "content-range": "bytes 2-5/25",
+      "content-type": "audio/flac",
+      "etag": "0576f2eb97d59a507dcf8f09c44b2d3a",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 206,
+  },
+  {
+    "body": {
+      "byteLength": 4,
+      "sha256": "305587cba515b319fdf13937fc2d291875c6323a266e1d6417821a1120892794",
+    },
+    "headers": {
+      "accept-ranges": "bytes",
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
+      "content-length": "4",
+      "content-range": "bytes 21-24/25",
+      "content-type": "audio/flac",
+      "etag": "0576f2eb97d59a507dcf8f09c44b2d3a",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 206,
+  },
+  {
+    "body": {
+      "byteLength": 23,
+      "sha256": "75cae1723f2e10e5eac2972f850f2401aa99901397cc50e24edc3a2422550102",
+    },
+    "headers": {
+      "accept-ranges": "bytes",
+      "cache-control": "public, max-age=86400",
+      "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
+      "content-length": "23",
+      "content-range": "bytes 2-24/25",
+      "content-type": "audio/flac",
+      "etag": "0576f2eb97d59a507dcf8f09c44b2d3a",
+      "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 206,
+  },
+]
+`;
+
 exports[`a matching etag answers not modified 1`] = `
 {
   "body": undefined,
   "headers": {
+    "accept-ranges": "bytes",
     "cache-control": "public, max-age=86400",
     "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_subtitle.json",
     "content-type": "application/json",
@@ -13,6 +73,45 @@ exports[`a matching etag answers not modified 1`] = `
   "route": "GET /api/subtitle/project/1",
   "status": 304,
 }
+`;
+
+exports[`a matching etag wins over a byte range 1`] = `
+{
+  "body": undefined,
+  "headers": {
+    "accept-ranges": "bytes",
+    "cache-control": "public, max-age=86400",
+    "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
+    "content-type": "audio/flac",
+    "etag": "0576f2eb97d59a507dcf8f09c44b2d3a",
+    "last-modified": "Wed, 01 Jan 2020 00:00:00 GMT",
+  },
+  "route": "GET /api/audio/project/1/master/lead/content",
+  "status": 304,
+}
+`;
+
+exports[`an unsatisfiable range is refused the same way 1`] = `
+[
+  {
+    "body": undefined,
+    "headers": {
+      "content-length": "0",
+      "content-range": "bytes */25",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 416,
+  },
+  {
+    "body": undefined,
+    "headers": {
+      "content-length": "0",
+      "content-range": "bytes */25",
+    },
+    "route": "GET /api/audio/project/1/master/lead/content",
+    "status": 416,
+  },
+]
 `;
 
 exports[`creating a project answers the same way 1`] = `
@@ -462,6 +561,7 @@ exports[`read routes answer the same way 1`] = `
       ],
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_chords.json",
       "content-length": "75",
@@ -479,6 +579,7 @@ exports[`read routes answer the same way 1`] = `
       "root": "C",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_key.json",
       "content-length": "44",
@@ -502,6 +603,7 @@ exports[`read routes answer the same way 1`] = `
       ],
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_rhythm.json",
       "content-length": "45",
@@ -528,6 +630,7 @@ exports[`read routes answer the same way 1`] = `
       },
     ],
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_subtitle.json",
       "content-length": "82",
@@ -544,6 +647,7 @@ exports[`read routes answer the same way 1`] = `
       "sha256": "d846e6a366adf5b7ab37b95ba8b6b7b90d8cf04d43180d0af8dbe8fba38f0611",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''preview.png",
       "content-length": "15",
@@ -560,6 +664,7 @@ exports[`read routes answer the same way 1`] = `
       "sha256": "eb29e953a169f3293686ad62e33298d2fd7c12ea0d9dde98216ed659351d0ab7",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project.flac",
       "content-length": "20",
@@ -576,6 +681,7 @@ exports[`read routes answer the same way 1`] = `
       "sha256": "e4feccf5404d09dbd0b85a43a28db9c581b3618edd14d355550292a5f3fa7524",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.flac",
       "content-length": "25",
@@ -592,6 +698,7 @@ exports[`read routes answer the same way 1`] = `
       "sha256": "c920c2648fe0ea31d4ee242fb39c00b946e355311c97a2f9a88e02217d9b7c7b",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''Fixture%20project_lead.mp4",
       "content-length": "27",
@@ -608,6 +715,7 @@ exports[`read routes answer the same way 1`] = `
       "sha256": "3463668d493277c25079ecced6f486ffbd31ffc4b294673795dda4fc04fd3a47",
     },
     "headers": {
+      "accept-ranges": "bytes",
       "cache-control": "public, max-age=86400",
       "content-disposition": "attachment; filename*=UTF-8''waveform.bin",
       "content-length": "23",
