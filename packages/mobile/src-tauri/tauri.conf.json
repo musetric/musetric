@@ -10,16 +10,16 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Musetric"
-      }
-    ],
+    "windows": [{ "title": "Musetric" }],
     "security": {
       "csp": null
     }
   },
   "bundle": {
-    "icon": ["gen-assets/icon.png"]
+    "icon": [
+      "gen-assets/icon.png",
+      "gen-assets/icon.ico",
+      "gen-assets/icon.icns"
+    ]
   }
 }

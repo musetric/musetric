@@ -1,10 +1,13 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    path::{Component, Path, PathBuf},
+    sync::Arc,
+};
 
 use axum::{
     Router,
     body::Body,
     extract::{Request, State},
-    http::{HeaderMap, Method, StatusCode, Uri},
+    http::{HeaderMap, HeaderValue, Method, StatusCode, Uri},
     response::Response,
     routing::any,
 };
@@ -17,8 +20,33 @@ const INDEX: &str = "index.html";
 const SERVER_PREFIXES: [&str; 1] = ["/api"];
 
 #[derive(Clone)]
-pub(crate) struct Frontend {
-    public_path: PathBuf,
+pub struct Frontend {
+    source: FrontendSource,
+}
+
+#[derive(Clone)]
+enum FrontendSource {
+    Directory(PathBuf),
+    Assets(Arc<dyn FrontendAssets>),
+}
+
+pub trait FrontendAssets: Send + Sync {
+    fn get(&self, path: &str) -> Option<FrontendAsset>;
+}
+
+pub struct FrontendAsset {
+    bytes: Vec<u8>,
+    content_type: String,
+}
+
+impl FrontendAsset {
+    #[must_use]
+    pub fn new(bytes: Vec<u8>, content_type: String) -> Self {
+        Self {
+            bytes,
+            content_type,
+        }
+    }
 }
 
 struct Visit<'visit> {
@@ -44,8 +72,18 @@ async fn handle(State(frontend): State<Frontend>, request: Request) -> Response<
 }
 
 impl Frontend {
-    pub(crate) fn create(public_path: PathBuf) -> Self {
-        Self { public_path }
+    #[must_use]
+    pub fn from_directory(public_path: PathBuf) -> Self {
+        Self {
+            source: FrontendSource::Directory(public_path),
+        }
+    }
+
+    #[must_use]
+    pub fn from_assets(assets: Arc<dyn FrontendAssets>) -> Self {
+        Self {
+            source: FrontendSource::Assets(assets),
+        }
     }
 
     async fn respond(&self, visit: Visit<'_>) -> Option<Response<Body>> {
@@ -53,31 +91,44 @@ impl Frontend {
             return None;
         }
         let pathname = visit.uri.path();
-        if let Some(path) = self.resolve(pathname)
-            && let Some(response) = send(&path, &visit).await
-        {
+        if let Some(response) = self.send(pathname, &visit).await {
             return Some(response);
         }
         if !serves_the_app(pathname) {
             return None;
         }
-        let index = self.public_path.join(INDEX);
-        Some(send(&index, &visit).await.unwrap_or_else(missing))
+        Some(self.send(INDEX, &visit).await.unwrap_or_else(missing))
     }
 
-    fn resolve(&self, pathname: &str) -> Option<PathBuf> {
-        let relative = PathBuf::from(pathname.trim_start_matches('/'));
-        let safe = relative
-            .components()
-            .all(|part| matches!(part, Component::Normal(_)));
-        if !safe {
-            return None;
+    async fn send(&self, pathname: &str, visit: &Visit<'_>) -> Option<Response<Body>> {
+        match &self.source {
+            FrontendSource::Directory(public_path) => {
+                let path = resolve(public_path, pathname)?;
+                send_file(&path, visit).await
+            }
+            FrontendSource::Assets(assets) => assets
+                .get(normalize(pathname))
+                .map(|asset| send_asset(asset, visit)),
         }
-        if relative.as_os_str().is_empty() {
-            return Some(self.public_path.join(INDEX));
-        }
-        Some(self.public_path.join(relative))
     }
+}
+
+fn resolve(public_path: &Path, pathname: &str) -> Option<PathBuf> {
+    let relative = PathBuf::from(pathname.trim_start_matches('/'));
+    let safe = relative
+        .components()
+        .all(|part| matches!(part, Component::Normal(_)));
+    if !safe {
+        return None;
+    }
+    if relative.as_os_str().is_empty() {
+        return Some(public_path.join(INDEX));
+    }
+    Some(public_path.join(relative))
+}
+
+fn normalize(pathname: &str) -> &str {
+    pathname.trim_start_matches('/')
 }
 
 fn serves_the_app(pathname: &str) -> bool {
@@ -87,7 +138,7 @@ fn serves_the_app(pathname: &str) -> bool {
     !served && !pathname.contains('.')
 }
 
-async fn send(path: &Path, visit: &Visit<'_>) -> Option<Response<Body>> {
+async fn send_file(path: &Path, visit: &Visit<'_>) -> Option<Response<Body>> {
     let stat = metadata(path).await.ok()?;
     if !stat.is_file() {
         return None;
@@ -108,6 +159,24 @@ async fn send(path: &Path, visit: &Visit<'_>) -> Option<Response<Body>> {
     }
     let opened = File::open(path).await.ok()?;
     Some(headers.respond(stat.len(), Body::from_stream(ReaderStream::new(opened))))
+}
+
+fn send_asset(asset: FrontendAsset, visit: &Visit<'_>) -> Response<Body> {
+    let FrontendAsset {
+        bytes,
+        content_type,
+    } = asset;
+    let mut response = if visit.method == Method::HEAD {
+        Response::new(Body::empty())
+    } else {
+        Response::new(Body::from(bytes))
+    };
+    response.headers_mut().insert(
+        "content-type",
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    response
 }
 
 fn missing() -> Response<Body> {
@@ -221,7 +290,7 @@ mod tests {
     #[tokio::test]
     async fn answers_a_deep_link_with_the_app_shell() {
         let public = Public::new();
-        let frontend = Frontend::create(public.directory.clone());
+        let frontend = Frontend::from_directory(public.directory.clone());
 
         let root = visit(&frontend, "/").await.expect("the root should answer");
         let deep = visit(&frontend, "/project/1/lyrics")
@@ -240,7 +309,7 @@ mod tests {
     #[tokio::test]
     async fn answers_an_asset_with_its_own_content_type() {
         let public = Public::new();
-        let frontend = Frontend::create(public.directory.clone());
+        let frontend = Frontend::from_directory(public.directory.clone());
 
         let asset = visit(&frontend, "/assets/index.js")
             .await
@@ -255,7 +324,7 @@ mod tests {
     #[tokio::test]
     async fn leaves_the_server_paths_and_the_missing_files_alone() {
         let public = Public::new();
-        let frontend = Frontend::create(public.directory.clone());
+        let frontend = Frontend::from_directory(public.directory.clone());
 
         assert!(visit(&frontend, "/api/project/list").await.is_none());
         assert!(visit(&frontend, "/assets/missing.js").await.is_none());
@@ -265,7 +334,7 @@ mod tests {
     #[tokio::test]
     async fn answers_not_modified_for_a_known_asset() {
         let public = Public::new();
-        let frontend = Frontend::create(public.directory.clone());
+        let frontend = Frontend::from_directory(public.directory.clone());
         let first = visit(&frontend, "/assets/index.js")
             .await
             .expect("the asset should answer");

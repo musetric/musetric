@@ -18,7 +18,6 @@ android {
     compileSdk = 36
     namespace = "com.musetric.mobile"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.musetric.mobile"
         minSdk = 24
         targetSdk = 36
@@ -27,7 +26,6 @@ android {
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false

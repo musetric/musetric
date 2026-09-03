@@ -17,5 +17,8 @@ mod wav;
 #[cfg(test)]
 mod test_workspace;
 
+pub use frontend::{Frontend, FrontendAsset, FrontendAssets};
 pub use musetric_db::BoxedError;
-pub use serve::{ServerOptions, TlsOptions, serve};
+pub use serve::{
+    EmbeddedServer, EmbeddedServerOptions, ServerOptions, TlsOptions, serve, start_embedded,
+};

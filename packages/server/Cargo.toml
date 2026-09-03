@@ -43,7 +43,8 @@ tower = { version = "=0.5.3", features = ["util"] }
 workspace = true
 
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "../mobile/src-tauri"]
+resolver = "3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
