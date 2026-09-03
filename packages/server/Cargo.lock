@@ -2396,6 +2396,7 @@ dependencies = [
  "musetric-server",
  "tauri",
  "tauri-build",
+ "tokio",
 ]
 
 [[package]]

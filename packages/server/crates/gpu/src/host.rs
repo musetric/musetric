@@ -24,7 +24,9 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    files::{LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file},
+    files::{
+        Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
+    },
     protocol::{
         ExecutorMessage, JOB_SOCKET_PATH, JOB_URL_PARAMETER, UPLOAD_ROUTE, read_executor_message,
         write_job_command,
@@ -62,7 +64,7 @@ pub type ProgressSink = Arc<dyn Fn(f64) + Send + Sync>;
 
 pub struct ExecutorHostOptions {
     pub label: String,
-    pub bundle_path: PathBuf,
+    pub bundle: Bundle,
     pub pcm: Bytes,
     pub require_shader_f16: bool,
     pub on_progress: ProgressSink,
@@ -70,7 +72,7 @@ pub struct ExecutorHostOptions {
 
 pub(crate) struct HostState {
     label: String,
-    bundle_path: PathBuf,
+    bundle: Bundle,
     pcm: Bytes,
     require_shader_f16: bool,
     on_progress: ProgressSink,
@@ -211,7 +213,7 @@ impl ExecutorHost {
         let (ready_sender, ready_receiver) = oneshot::channel();
         let state = Arc::new(HostState {
             label: options.label,
-            bundle_path: options.bundle_path,
+            bundle: options.bundle,
             pcm: options.pcm,
             require_shader_f16: options.require_shader_f16,
             on_progress: options.on_progress,
@@ -449,11 +451,7 @@ async fn handle_asset(State(state): State<Arc<HostState>>, request: Request) -> 
     if request.method() == axum::http::Method::PUT && pathname.starts_with(UPLOAD_ROUTE) {
         return receive_upload(&state, &pathname, request).await;
     }
-    let Some(path) = resolve_asset(&state.bundle_path, &pathname) else {
-        return missing();
-    };
-    let content_type = read_content_type(&path);
-    match send_file(&path, content_type).await {
+    match state.bundle.send(&pathname).await {
         Some(response) => response,
         None => missing(),
     }

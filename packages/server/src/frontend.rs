@@ -1,5 +1,5 @@
 use std::{
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -14,6 +14,7 @@ use axum::{
     response::Response,
     routing::any,
 };
+use musetric_gpu::{Asset, Assets, read_relative};
 use tokio::fs::{File, metadata};
 use tokio_util::io::ReaderStream;
 
@@ -31,26 +32,7 @@ pub struct Frontend {
 #[derive(Clone)]
 enum FrontendSource {
     Directory(PathBuf),
-    Assets(Arc<dyn FrontendAssets>),
-}
-
-pub trait FrontendAssets: Send + Sync {
-    fn get(&self, path: &str) -> Option<FrontendAsset>;
-}
-
-pub struct FrontendAsset {
-    bytes: Vec<u8>,
-    content_type: String,
-}
-
-impl FrontendAsset {
-    #[must_use]
-    pub fn new(bytes: Vec<u8>, content_type: String) -> Self {
-        Self {
-            bytes,
-            content_type,
-        }
-    }
+    Assets(Arc<dyn Assets>),
 }
 
 struct Visit<'visit> {
@@ -84,7 +66,7 @@ impl Frontend {
     }
 
     #[must_use]
-    pub fn from_assets(assets: Arc<dyn FrontendAssets>) -> Self {
+    pub fn from_assets(assets: Arc<dyn Assets>) -> Self {
         Self {
             source: FrontendSource::Assets(assets),
         }
@@ -107,36 +89,14 @@ impl Frontend {
     async fn send(&self, pathname: &str, visit: &Visit<'_>) -> Option<Response<Body>> {
         match &self.source {
             FrontendSource::Directory(public_path) => {
-                let path = resolve(public_path, pathname)?;
+                let path = public_path.join(read_relative(pathname)?);
                 send_file(&path, visit).await
             }
             FrontendSource::Assets(assets) => assets
-                .get(normalize(pathname)?)
+                .get(read_relative(pathname)?)
                 .map(|asset| send_asset(asset, visit)),
         }
     }
-}
-
-fn resolve(public_path: &Path, pathname: &str) -> Option<PathBuf> {
-    let relative = PathBuf::from(pathname.trim_start_matches('/'));
-    let safe = relative
-        .components()
-        .all(|part| matches!(part, Component::Normal(_)));
-    if !safe {
-        return None;
-    }
-    if relative.as_os_str().is_empty() {
-        return Some(public_path.join(INDEX));
-    }
-    Some(public_path.join(relative))
-}
-
-fn normalize(pathname: &str) -> Option<&str> {
-    let relative = pathname.trim_start_matches('/');
-    let safe = Path::new(relative)
-        .components()
-        .all(|part| matches!(part, Component::Normal(_)));
-    safe.then_some(relative)
 }
 
 fn serves_the_app(pathname: &str) -> bool {
@@ -169,11 +129,8 @@ async fn send_file(path: &Path, visit: &Visit<'_>) -> Option<Response<Body>> {
     Some(headers.respond(stat.len(), Body::from_stream(ReaderStream::new(opened))))
 }
 
-fn send_asset(asset: FrontendAsset, visit: &Visit<'_>) -> Response<Body> {
-    let FrontendAsset {
-        bytes,
-        content_type,
-    } = asset;
+fn send_asset(asset: Asset, visit: &Visit<'_>) -> Response<Body> {
+    let (bytes, content_type) = asset.into_parts();
     let length = bytes.len();
     let mut response = if visit.method == Method::HEAD {
         Response::new(Body::empty())

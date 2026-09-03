@@ -11,27 +11,19 @@ use tokio::{
 };
 use uuid::Uuid;
 
+use crate::pages::{OpenedPage, OpeningPage, PageFailure, PageOpener};
+
 const OPEN_PREFIX: &str = "MUSETRIC_PAGE_OPEN=";
 const CLOSE_PREFIX: &str = "MUSETRIC_PAGE_CLOSE=";
 const OPENED_PREFIX: &str = "MUSETRIC_PAGE_OPENED=";
 const FAILED_PREFIX: &str = "MUSETRIC_PAGE_FAILED=";
 const OPEN_TIMEOUT: Duration = Duration::from_mins(2);
 
-pub(crate) enum PageFailure {
-    Refused(String),
-    Unreachable,
-}
-
-pub(crate) struct OpenedPage {
-    page_id: String,
-}
-
 type PageAnswer = Result<(), String>;
 
 pub(crate) struct HostProcess {
     lines: mpsc::UnboundedSender<String>,
     pending: Mutex<HashMap<String, oneshot::Sender<PageAnswer>>>,
-    is_available: bool,
 }
 
 impl HostProcess {
@@ -47,7 +39,6 @@ impl HostProcess {
         let host = Arc::new(Self {
             lines,
             pending: Mutex::new(HashMap::new()),
-            is_available: true,
         });
         let (closed, closing) = oneshot::channel();
         tokio::spawn(write_lines(output, written));
@@ -59,19 +50,7 @@ impl HostProcess {
         self.send(line);
     }
 
-    pub(crate) fn unavailable() -> Arc<Self> {
-        let (lines, _) = mpsc::unbounded_channel();
-        Arc::new(Self {
-            lines,
-            pending: Mutex::new(HashMap::new()),
-            is_available: false,
-        })
-    }
-
-    pub(crate) async fn open_page(&self, url: &str) -> Result<OpenedPage, PageFailure> {
-        if !self.is_available {
-            return Err(PageFailure::Unreachable);
-        }
+    async fn request_page(&self, url: &str) -> Result<OpenedPage, PageFailure> {
         let page_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         self.remember(page_id.clone(), sender)?;
@@ -83,14 +62,10 @@ impl HostProcess {
             return Err(PageFailure::Unreachable);
         };
         match answered {
-            Ok(Ok(())) => Ok(OpenedPage { page_id }),
+            Ok(Ok(())) => Ok(OpenedPage::create(page_id)),
             Ok(Err(message)) => Err(PageFailure::Refused(message)),
             Err(_) => Err(PageFailure::Unreachable),
         }
-    }
-
-    pub(crate) fn close_page(&self, page: &OpenedPage) {
-        self.send(&format!("{CLOSE_PREFIX}{}", page.page_id));
     }
 
     fn send(&self, line: &str) {
@@ -144,6 +119,16 @@ impl HostProcess {
     }
 }
 
+impl PageOpener for HostProcess {
+    fn open_page<'opener>(&'opener self, url: &'opener str) -> OpeningPage<'opener> {
+        Box::pin(self.request_page(url))
+    }
+
+    fn close_page(&self, page: &OpenedPage) {
+        self.send(&format!("{CLOSE_PREFIX}{}", page.id()));
+    }
+}
+
 async fn write_lines<Output>(mut output: Output, mut written: mpsc::UnboundedReceiver<String>)
 where
     Output: AsyncWrite + Unpin + Send + 'static,
@@ -176,7 +161,8 @@ pub(crate) mod tests {
 
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, duplex, split};
 
-    use super::{HostProcess, PageFailure};
+    use super::HostProcess;
+    use crate::pages::{PageFailure, PageOpener};
 
     const URL: &str = "http://127.0.0.1:9/?jobs=x";
     const REFUSAL: &str = "the window could not be created";
