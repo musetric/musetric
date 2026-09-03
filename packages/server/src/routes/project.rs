@@ -11,7 +11,7 @@ use axum::{
 use musetric_db::{
     NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, blob_path,
 };
-use musetric_media::{convert_to_flac, read_frame_count};
+use musetric_media::{PcmRequest, convert_to_flac, read_frame_count};
 use serde_json::Value;
 
 use crate::{
@@ -349,7 +349,11 @@ async fn convert_and_measure(
     from: &FilePath,
     to: &FilePath,
 ) -> Option<i64> {
-    convert_to_flac(&storage.tools, from, to, SAMPLE_RATE)
+    let request = PcmRequest {
+        from,
+        sample_rate: SAMPLE_RATE,
+    };
+    convert_to_flac(storage.pcm.as_ref(), request, to)
         .await
         .ok()?;
     let frames = read_frame_count(to).await.ok()?;

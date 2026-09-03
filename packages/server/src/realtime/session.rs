@@ -5,7 +5,7 @@ use std::{
 };
 
 use musetric_db::{BoxedError, NewRecording, Recording, blob_path};
-use musetric_media::{WAVE_PEAK_COUNT, WavePeaks, generate_wave_peaks};
+use musetric_media::{PcmRequest, WAVE_PEAK_COUNT, WavePeaks, generate_wave_peaks};
 use tokio::{
     fs::{File, OpenOptions, create_dir_all, try_exists, write as write_file},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
@@ -131,12 +131,14 @@ impl Session {
         drop(self.audio);
         drop(self.wave);
         let request = WavePeaks {
-            from: &self.audio_path,
+            source: PcmRequest {
+                from: &self.audio_path,
+                sample_rate: u32::try_from(self.sample_rate)?,
+            },
             to: &self.wave_path,
-            sample_rate: u32::try_from(self.sample_rate)?,
             total_frames: u64::try_from(self.frame_count)?,
         };
-        generate_wave_peaks(&storage.tools, &request).await
+        generate_wave_peaks(storage.pcm.as_ref(), &request).await
     }
 
     async fn measure_peak(

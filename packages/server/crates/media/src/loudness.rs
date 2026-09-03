@@ -1,11 +1,11 @@
-use std::path::Path;
-
 use ebur128::{EbuR128, Mode};
 
-use crate::{Tools, pcm::read_pcm, run::BoxedError};
+use crate::{
+    pcm::{CHANNELS, PcmRequest, PcmSource},
+    run::BoxedError,
+};
 
 const EPSILON: f64 = 1e-12;
-const CHANNELS: u32 = 2;
 const FLUSH_FRAMES: usize = 4096;
 const WINDOW_SECONDS: f64 = 0.1;
 const HOP_SECONDS: f64 = 0.025;
@@ -35,10 +35,11 @@ struct Meter {
 
 impl Meter {
     fn create(sample_rate: u32) -> Result<Self, BoxedError> {
-        let state = EbuR128::new(CHANNELS, sample_rate, Mode::I | Mode::TRUE_PEAK)?;
+        let channels = u32::try_from(CHANNELS)?;
+        let state = EbuR128::new(channels, sample_rate, Mode::I | Mode::TRUE_PEAK)?;
         Ok(Self {
             state,
-            frames: Vec::with_capacity(FLUSH_FRAMES * CHANNELS as usize),
+            frames: Vec::with_capacity(FLUSH_FRAMES * CHANNELS),
             failure: None,
         })
     }
@@ -46,7 +47,7 @@ impl Meter {
     fn push(&mut self, left: f32, right: f32) {
         self.frames.push(left);
         self.frames.push(right);
-        if self.frames.len() >= FLUSH_FRAMES * CHANNELS as usize {
+        if self.frames.len() >= FLUSH_FRAMES * CHANNELS {
             self.flush();
         }
     }
@@ -83,49 +84,33 @@ impl Meter {
 }
 
 pub async fn analyze_loudness(
-    tools: &Tools,
-    from: &Path,
-    sample_rate: u32,
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
 ) -> Result<Loudness, BoxedError> {
-    let mut meter = Meter::create(sample_rate)?;
-    read_pcm(tools, from, sample_rate, |left, right, _| {
-        meter.push(left, right);
-    })
-    .await?;
+    let mut meter = Meter::create(request.sample_rate)?;
+    measure(source, request, &mut meter).await?;
     meter.finish()
 }
 
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "javascript keeps this window in a Float32Array"
-)]
-pub async fn analyze_lead_visual_loudness(
-    tools: &Tools,
-    from: &Path,
-    sample_rate: u32,
-) -> Result<LeadVisualLoudness, BoxedError> {
-    let window_frames = frame_count(WINDOW_SECONDS, sample_rate);
-    let hop_frames = frame_count(HOP_SECONDS, sample_rate) as u64;
-    let mut meter = Meter::create(sample_rate)?;
-    let mut window = vec![0.0_f32; window_frames];
-    let mut measured = Vec::new();
-    let mut write_index = 0_usize;
-    let mut filled_frames = 0_usize;
-    let mut next_window_start = 0_u64;
-
-    read_pcm(tools, from, sample_rate, |left, right, frame_index| {
-        meter.push(left, right);
-        window[write_index] = ((f64::from(left) + f64::from(right)) * 0.5) as f32;
-        write_index = (write_index + 1) % window_frames;
-        filled_frames = filled_frames.saturating_add(1).min(window_frames);
-        let window_end = next_window_start + window_frames as u64 - 1;
-        if filled_frames == window_frames && frame_index >= window_end {
-            measured.push(measure_window(&window, write_index));
-            next_window_start += hop_frames;
+async fn measure(
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
+    meter: &mut Meter,
+) -> Result<(), BoxedError> {
+    let mut sink = |chunk: &[f32]| {
+        for frame in chunk.chunks_exact(CHANNELS) {
+            meter.push(frame[0], frame[1]);
         }
-    })
-    .await?;
+    };
+    source.read_pcm(request, &mut sink).await
+}
 
+pub async fn analyze_lead_visual_loudness(
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
+) -> Result<LeadVisualLoudness, BoxedError> {
+    let mut meter = Meter::create(request.sample_rate)?;
+    let measured = measure_lead(source, request, &mut meter).await?;
     let loudness = meter.finish()?;
     let active_threshold_db =
         MINIMUM_ACTIVE_DB.max(loudness.integrated_loudness_db - ACTIVE_MARGIN_DB);
@@ -140,6 +125,41 @@ pub async fn analyze_lead_visual_loudness(
             .unwrap_or(loudness.integrated_loudness_db),
         loudness,
     })
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "javascript keeps this window in a Float32Array"
+)]
+async fn measure_lead(
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
+    meter: &mut Meter,
+) -> Result<Vec<Window>, BoxedError> {
+    let window_frames = frame_count(WINDOW_SECONDS, request.sample_rate);
+    let hop_frames = frame_count(HOP_SECONDS, request.sample_rate) as u64;
+    let mut window = vec![0.0_f32; window_frames];
+    let mut measured = Vec::new();
+    let mut write_index = 0_usize;
+    let mut filled_frames = 0_usize;
+    let mut next_window_start = 0_u64;
+    let mut frame_index = 0_u64;
+    let mut sink = |chunk: &[f32]| {
+        for frame in chunk.chunks_exact(CHANNELS) {
+            meter.push(frame[0], frame[1]);
+            window[write_index] = ((f64::from(frame[0]) + f64::from(frame[1])) * 0.5) as f32;
+            write_index = (write_index + 1) % window_frames;
+            filled_frames = filled_frames.saturating_add(1).min(window_frames);
+            let window_end = next_window_start + window_frames as u64 - 1;
+            if filled_frames == window_frames && frame_index >= window_end {
+                measured.push(measure_window(&window, write_index));
+                next_window_start += hop_frames;
+            }
+            frame_index += 1;
+        }
+    };
+    source.read_pcm(request, &mut sink).await?;
+    Ok(measured)
 }
 
 struct Window {
@@ -206,7 +226,10 @@ mod tests {
     use std::path::Path;
 
     use super::{analyze_lead_visual_loudness, analyze_loudness};
-    use crate::fixture::{Fixture, Signal};
+    use crate::{
+        fixture::{Fixture, Signal},
+        pcm::PcmRequest,
+    };
 
     const SAMPLE_RATE: u32 = 48000;
     const TOLERANCE_DB: f64 = 0.1;
@@ -252,6 +275,13 @@ mod tests {
             .expect("the summary should carry the measurement")
     }
 
+    fn read_at(from: &Path) -> PcmRequest<'_> {
+        PcmRequest {
+            from,
+            sample_rate: SAMPLE_RATE,
+        }
+    }
+
     fn tone(name: &str) -> Signal<'_> {
         Signal {
             name,
@@ -266,7 +296,7 @@ mod tests {
         let fixture = Fixture::create();
         let source = fixture.write_wav(&tone("source.wav")).await;
 
-        let measured = analyze_loudness(&fixture.tools, &source, SAMPLE_RATE)
+        let measured = analyze_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the loudness should be measured");
         let (integrated, true_peak) = measured_by_ffmpeg(&fixture, &source).await;
@@ -288,10 +318,10 @@ mod tests {
         let fixture = Fixture::create();
         let source = fixture.write_wav(&tone("source.wav")).await;
 
-        let visual = analyze_lead_visual_loudness(&fixture.tools, &source, SAMPLE_RATE)
+        let visual = analyze_lead_visual_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the lead loudness should be measured");
-        let alone = analyze_loudness(&fixture.tools, &source, SAMPLE_RATE)
+        let alone = analyze_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the loudness should be measured");
 
