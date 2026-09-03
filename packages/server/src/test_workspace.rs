@@ -87,7 +87,6 @@ impl Workspace {
             blobs_path: self.blobs_path(),
             tools: Tools {
                 ffmpeg: bundled_tool("ffmpeg"),
-                ffprobe: bundled_tool("ffprobe"),
             },
         })
     }

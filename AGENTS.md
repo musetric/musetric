@@ -19,7 +19,7 @@
 - `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/utils`: low-level shared utilities used across packages.
-- `packages/ffmpeg`: the vendored ffmpeg/ffprobe binaries and the paths that locate them.
+- `packages/ffmpeg`: the vendored ffmpeg binary and the path that locates it.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.

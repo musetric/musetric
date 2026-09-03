@@ -17,11 +17,10 @@ pub use frames::read_frame_count;
 pub use loudness::{LeadVisualLoudness, Loudness, analyze_lead_visual_loudness, analyze_loudness};
 pub use mono::{Downmix, decode_mono_pcm};
 pub use pcm::decode_interleaved_pcm;
-pub use peaks::{WAVE_PEAK_COUNT, generate_wave_peaks};
+pub use peaks::{WAVE_PEAK_COUNT, WavePeaks, generate_wave_peaks};
 pub use resample::SampleRates;
 pub use run::BoxedError;
 
 pub struct Tools {
     pub ffmpeg: PathBuf,
-    pub ffprobe: PathBuf,
 }

@@ -5,7 +5,7 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use musetric_media::{
-    BoxedError, SampleRates, Tools, analyze_lead_visual_loudness, analyze_loudness,
+    BoxedError, SampleRates, Tools, WavePeaks, analyze_lead_visual_loudness, analyze_loudness,
     convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 
@@ -14,9 +14,6 @@ use musetric_media::{
 struct Arguments {
     #[arg(long)]
     ffmpeg: PathBuf,
-
-    #[arg(long)]
-    ffprobe: PathBuf,
 
     #[command(subcommand)]
     operation: Operation,
@@ -61,8 +58,6 @@ enum Operation {
     Frames {
         #[arg(long)]
         from: PathBuf,
-        #[arg(long)]
-        sample_rate: u32,
     },
     Loudness {
         #[arg(long)]
@@ -83,7 +78,6 @@ async fn main() -> Result<(), BoxedError> {
     let arguments = Arguments::parse();
     let tools = Tools {
         ffmpeg: arguments.ffmpeg,
-        ffprobe: arguments.ffprobe,
     };
     let reported = run(&tools, arguments.operation).await?;
     let mut output = stdout().lock();
@@ -128,11 +122,17 @@ async fn run(tools: &Tools, operation: Operation) -> Result<String, BoxedError> 
             to,
             sample_rate,
         } => {
-            generate_wave_peaks(tools, &from, &to, sample_rate).await?;
+            let request = WavePeaks {
+                from: &from,
+                to: &to,
+                sample_rate,
+                total_frames: read_frame_count(&from).await?,
+            };
+            generate_wave_peaks(tools, &request).await?;
             Ok(String::new())
         }
-        Operation::Frames { from, sample_rate } => {
-            let frames = read_frame_count(tools, &from, sample_rate).await?;
+        Operation::Frames { from } => {
+            let frames = read_frame_count(&from).await?;
             Ok(frames.to_string())
         }
         Operation::Loudness { from, sample_rate } => {

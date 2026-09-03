@@ -42,7 +42,6 @@ pub struct ServerOptions {
     pub database: PathBuf,
     pub blobs: PathBuf,
     pub ffmpeg: PathBuf,
-    pub ffprobe: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: PathBuf,
     pub public: PathBuf,
@@ -60,7 +59,6 @@ pub struct EmbeddedServerOptions {
     pub database: PathBuf,
     pub blobs: PathBuf,
     pub ffmpeg: PathBuf,
-    pub ffprobe: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
@@ -96,12 +94,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
             return Err(failure.into());
         }
     }
-    let storage = create_storage(
-        &options.database,
-        options.blobs,
-        options.ffmpeg,
-        options.ffprobe,
-    )?;
+    let storage = create_storage(&options.database, options.blobs, options.ffmpeg)?;
     let app = create_app(AppOptions {
         storage,
         pages: Arc::clone(&host) as Arc<dyn PageOpener>,
@@ -135,12 +128,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
 
 pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedServer, BoxedError> {
     init_database(&options.database)?;
-    let storage = create_storage(
-        &options.database,
-        options.blobs,
-        options.ffmpeg,
-        options.ffprobe,
-    )?;
+    let storage = create_storage(&options.database, options.blobs, options.ffmpeg)?;
     let app = create_app(AppOptions {
         storage,
         pages: options.pages,
@@ -204,13 +192,12 @@ fn create_storage(
     database: &Path,
     blobs: PathBuf,
     ffmpeg: PathBuf,
-    ffprobe: PathBuf,
 ) -> Result<Arc<Storage>, BoxedError> {
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),
         writer: Arc::new(Writer::open(database)?),
         blobs_path: blobs,
-        tools: Tools { ffmpeg, ffprobe },
+        tools: Tools { ffmpeg },
     });
     spawn_collector(Arc::clone(&storage));
     Ok(storage)
@@ -320,7 +307,6 @@ mod tests {
                 database: self.root.join("storage/db/app.db"),
                 blobs: self.root.join("storage/blobs"),
                 ffmpeg: self.root.join("runtime/ffmpeg"),
-                ffprobe: self.root.join("runtime/ffprobe"),
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),

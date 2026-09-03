@@ -6,8 +6,9 @@ use std::{
 use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
 use musetric_media::{
-    BoxedError, Loudness, SampleRates, Tools, analyze_lead_visual_loudness, analyze_loudness,
-    convert_to_fmp4, decode_interleaved_pcm, encode_flac_from_raw, generate_wave_peaks,
+    BoxedError, Loudness, SampleRates, Tools, WavePeaks, analyze_lead_visual_loudness,
+    analyze_loudness, convert_to_fmp4, decode_interleaved_pcm, encode_flac_from_raw,
+    generate_wave_peaks, read_frame_count,
 };
 use serde_json::{Value, json};
 use tokio::fs::remove_file;
@@ -158,7 +159,13 @@ async fn process_stems(
 
 async fn deliver_stem(tools: &Tools, stem: &Stem, sample_rate: u32) -> Result<(), BoxedError> {
     convert_to_fmp4(tools, &stem.master.path, &stem.delivery.path, sample_rate).await?;
-    generate_wave_peaks(tools, &stem.master.path, &stem.wave_peaks.path, sample_rate).await
+    let request = WavePeaks {
+        from: &stem.master.path,
+        to: &stem.wave_peaks.path,
+        sample_rate,
+        total_frames: read_frame_count(&stem.master.path).await?,
+    };
+    generate_wave_peaks(tools, &request).await
 }
 
 async fn store(

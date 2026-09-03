@@ -224,7 +224,7 @@ mod tests {
         let written = decode(&fixture.tools, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
         assert_eq!(written, expected);
-        let counted = read_frame_count(&fixture.tools, &master, TARGET_RATE)
+        let counted = read_frame_count(&master)
             .await
             .expect("the master should report its duration");
         assert_eq!(counted, (expected.len() / CHANNELS) as u64);
