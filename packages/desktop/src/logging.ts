@@ -1,13 +1,7 @@
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, dialog } from 'electron';
-import {
-  destination,
-  type DestinationStream,
-  type Logger,
-  pino,
-  stdSerializers,
-} from 'pino';
+import { destination, type Logger, pino, stdSerializers } from 'pino';
 
 const keptRunCount = 20;
 const logExtension = '.log';
@@ -26,7 +20,6 @@ const pruneRuns = (logsPath: string): void => {
 
 export type DesktopLog = {
   logger: Logger;
-  destination: DestinationStream;
   path: string;
 };
 
@@ -57,7 +50,7 @@ export const createDesktopLog = (logsPath: string): DesktopLog => {
     },
     'app starting',
   );
-  return { logger, destination: logDestination, path };
+  return { logger, path };
 };
 
 export const reportFatal = (

@@ -7,7 +7,6 @@ mod form;
 mod frontend;
 mod garbage;
 mod host;
-mod proxy;
 mod realtime;
 mod router;
 mod routes;

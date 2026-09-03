@@ -8,15 +8,16 @@ use axum::{
     response::Response,
     routing::{delete, get, patch, post},
 };
-use musetric_db::{NewPreview, NewProject, ProcessingStep, ProjectEdit, blob_path};
+use musetric_db::{
+    NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, blob_path,
+};
 use musetric_media::{convert_to_flac, read_frame_count};
 use serde_json::Value;
 
 use crate::{
     blobs::{create_blob_ref, discard_blob},
-    failure::{Failure, finish},
+    failure::{Failure, finish, invalid_number, invalid_option},
     form::{Field, Form, UploadedFile, read_form},
-    proxy::forward,
     routes::{
         RouteState,
         item::{json_response, missing_message, read_items, respond_with_item},
@@ -30,6 +31,10 @@ const SAMPLE_RATE: u32 = 48000;
 const NAME_MIN_LENGTH: usize = 3;
 const INVALID_AUDIO: &str = "Uploaded audio file is invalid";
 const SHORT_NAME: &str = "body/name Too small: expected string to have >=3 characters";
+const MISSING_STEP: &str = "body/step Invalid input: expected string, received undefined";
+const BODY: &str = "body";
+const PROJECT_ID: &str = "projectId";
+const STEP_FIELD: &str = "step";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
@@ -49,10 +54,9 @@ async fn handle_list(State(state): State<RouteState>) -> Response<Body> {
 async fn handle_get(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
-    request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     respond_with_item(&state, project_id).await
 }
@@ -63,16 +67,15 @@ async fn handle_retry(
     request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
-    let (parts, body) = request.into_parts();
-    let payload = match to_bytes(body, RETRY_LIMIT).await {
+    let payload = match to_bytes(request.into_body(), RETRY_LIMIT).await {
         Ok(payload) => payload,
         Err(error) => return finish(Err(Failure::failed(error))),
     };
-    let Some(step) = read_step(&payload) else {
-        let forwarded = Request::from_parts(parts, Body::from(payload));
-        return forward(&state.proxy, forwarded).await;
+    let step = match read_step(&payload) {
+        Ok(step) => step,
+        Err(failure) => return finish(Err(failure)),
     };
     match retry(&state, project_id, step).await {
         Ok(()) => respond_with_item(&state, project_id).await,
@@ -80,9 +83,18 @@ async fn handle_retry(
     }
 }
 
-fn read_step(payload: &[u8]) -> Option<ProcessingStep> {
-    let body: Value = serde_json::from_slice(payload).ok()?;
-    ProcessingStep::parse(body.get("step")?.as_str()?)
+fn read_step(payload: &[u8]) -> Result<ProcessingStep, Failure> {
+    let asked = serde_json::from_slice::<Value>(payload)
+        .ok()
+        .and_then(|body| Some(body.get(STEP_FIELD)?.as_str()?.to_owned()))
+        .ok_or_else(|| Failure::Invalid(MISSING_STEP.to_owned()))?;
+    ProcessingStep::parse(&asked).ok_or_else(|| {
+        invalid_option(
+            BODY,
+            STEP_FIELD,
+            &PROCESSING_STEPS.map(ProcessingStep::name),
+        )
+    })
 }
 
 async fn retry(state: &RouteState, project_id: i64, step: ProcessingStep) -> Result<(), Failure> {
@@ -132,7 +144,7 @@ async fn handle_edit(
     request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     let multipart = match Multipart::from_request(request, &()).await {
         Ok(multipart) => multipart,
@@ -155,10 +167,9 @@ async fn handle_edit(
 async fn handle_remove(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
-    request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     finish(remove(&state, project_id).await)
 }

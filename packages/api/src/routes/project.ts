@@ -52,7 +52,6 @@ export const processingSchema = z.object({
   done: z.boolean().optional(),
   steps: processingStepsSchema,
 });
-export type Processing = z.infer<typeof processingSchema>;
 
 export const audioAnalysisSchema = z.object({
   sourceGainDb: z.number(),
@@ -63,7 +62,6 @@ export const audioAnalysisSchema = z.object({
     instrumental: z.number(),
   }),
 });
-export type AudioAnalysis = z.infer<typeof audioAnalysisSchema>;
 
 export const itemSchema = z.object({
   id: z.number(),

@@ -39,7 +39,6 @@ export const startApp = async (
     await importBackendModules();
   const backend = await startBackend({
     openPage: createElectronPageOpener(),
-    logDestination: log.destination,
     logger: log.logger,
   });
   if (backend === undefined) {

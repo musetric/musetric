@@ -1,6 +1,5 @@
 use std::{
     fs::{OpenOptions, create_dir_all, remove_dir_all, write},
-    net::SocketAddr,
     path::PathBuf,
     process::id,
     sync::{
@@ -10,16 +9,13 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use axum::Router;
+use crate::{realtime::Rooms, routes::RouteState, storage::Storage};
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
     open_database,
 };
 use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
 use musetric_media::Tools;
-use tokio::{net::TcpListener, sync::oneshot};
-
-use crate::{proxy::ProxyState, realtime::Rooms, routes::RouteState, storage::Storage};
 
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
 
@@ -97,25 +93,6 @@ impl Workspace {
     }
 }
 
-pub(crate) async fn start_upstream(app: Router) -> (SocketAddr, oneshot::Sender<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("the upstream should bind");
-    let address = listener
-        .local_addr()
-        .expect("the upstream should have an address");
-    let (shutdown_sender, shutdown_receiver) = oneshot::channel();
-    tokio::spawn(async move {
-        axum::serve(listener, app)
-            .with_graceful_shutdown(async {
-                let _ = shutdown_receiver.await;
-            })
-            .await
-            .expect("the upstream should stop cleanly");
-    });
-    (address, shutdown_sender)
-}
-
 struct IdleRunner;
 
 impl StepRunner for IdleRunner {
@@ -124,7 +101,7 @@ impl StepRunner for IdleRunner {
     }
 }
 
-pub(crate) fn create_route_state(proxy: ProxyState, storage: Arc<Storage>) -> RouteState {
+pub(crate) fn create_route_state(storage: Arc<Storage>) -> RouteState {
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
         writer: Arc::clone(&storage.writer),
@@ -132,7 +109,6 @@ pub(crate) fn create_route_state(proxy: ProxyState, storage: Arc<Storage>) -> Ro
         interval: QUEUE_INTERVAL,
     });
     RouteState {
-        proxy,
         rooms: Arc::new(Rooms::create()),
         storage,
         queue,

@@ -21,6 +21,23 @@ impl Failure {
     }
 }
 
+pub(crate) fn invalid_number(field: &str) -> Failure {
+    Failure::Invalid(format!(
+        "params/{field} Invalid input: expected number, received string"
+    ))
+}
+
+pub(crate) fn invalid_option(location: &str, field: &str, options: &[&str]) -> Failure {
+    let listed = options
+        .iter()
+        .map(|option| format!("\"{option}\""))
+        .collect::<Vec<_>>()
+        .join("|");
+    Failure::Invalid(format!(
+        "{location}/{field} Invalid option: expected one of {listed}"
+    ))
+}
+
 pub(crate) fn finish(result: Result<Response<Body>, Failure>) -> Response<Body> {
     result.unwrap_or_else(create_failure_response)
 }

@@ -7,37 +7,23 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "dev": "yarn project:init && yarn build:browser && node --import tsx --watch src/index.ts",
+    "dev": "yarn build:browser && node --import tsx --watch src/index.ts",
     "build:project": "tsc --build && vite build",
     "build:browser": "vite build",
-    "project:init": "node --import tsx ./scripts/init.ts",
     "project:start": "node dist/index.js",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "dependencies": {
-    "@fastify/multipart": "catalog:",
-    "@fastify/swagger": "catalog:",
     "@musetric/ai": "workspace:*",
-    "@musetric/api": "workspace:*",
-    "@musetric/backend-core": "workspace:*",
-    "@musetric/backend-db": "workspace:*",
     "@musetric/cqt": "workspace:*",
     "@musetric/ffmpeg": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/server": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "axios": "catalog:",
-    "fastify": "catalog:",
-    "fastify-sse-v2": "catalog:",
-    "fastify-type-provider-zod": "catalog:",
     "onnxruntime-web": "catalog:",
-    "openapi-types": "catalog:",
-    "pino": "catalog:",
-    "pino-pretty": "catalog:",
-    "selfsigned": "catalog:",
-    "zod": "catalog:"
+    "selfsigned": "catalog:"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",

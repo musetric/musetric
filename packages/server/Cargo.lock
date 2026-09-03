@@ -1121,8 +1121,6 @@ dependencies = [
  "clap",
  "futures-util",
  "http-body-util",
- "hyper",
- "hyper-util",
  "md5",
  "musetric-db",
  "musetric-gpu",

@@ -16,7 +16,7 @@ mod writer;
 mod tests;
 
 pub use analysis::{Analysis, AudioAnalysis};
-pub use audio::{AudioDelivery, MasterType, Recording, StemType};
+pub use audio::{AudioDelivery, MASTER_TYPES, MasterType, Recording, STEM_TYPES, StemType};
 pub use backup::create_backup_name;
 pub use blob::blob_path;
 pub use database::{OpenOptions, open_database, open_readonly, read_schema_version};

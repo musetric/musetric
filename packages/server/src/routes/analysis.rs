@@ -12,13 +12,13 @@ use musetric_db::Analysis;
 
 use crate::{
     blob_response::{CachedBlob, send_cached},
-    failure::{Failure, finish},
-    proxy::forward,
+    failure::{Failure, finish, invalid_number},
     routes::RouteState,
     storage::{Storage, read},
 };
 
 const CONTENT_TYPE_JSON: &str = "application/json";
+const PROJECT_ID: &str = "projectId";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
@@ -54,7 +54,7 @@ async fn handle(
     request: Request<Body>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return forward(&state.proxy, request).await;
+        return finish(Err(invalid_number(PROJECT_ID)));
     };
     finish(send(analysis, &state.storage, project_id, request.headers()).await)
 }

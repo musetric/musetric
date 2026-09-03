@@ -13,18 +13,17 @@
 
 - Musetric is split into a web app, a backend, audio-processing modules, and shared infrastructure packages.
 - `packages/frontend`: the main React application.
-- `packages/backend`: the Fastify server, orchestration, and runtime services.
+- `packages/backend`: the runner that starts the Rust server and opens gpu pages for it.
 - `packages/audio`: browser-side audio, waveform, spectrogram, workers, and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
 - `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.
 - `packages/api`: shared API contracts and client/server integration helpers.
-- `packages/backend-db`: backend data access, entities, and schema-related code.
 - `packages/utils`: low-level shared utilities used across packages.
-- `packages/ffmpeg`: vendored ffmpeg/ffprobe binary plus the audio codec and processing tasks (decode/encode, loudness, wave peaks, format conversion) built on it.
+- `packages/ffmpeg`: the vendored ffmpeg/ffprobe binaries and the paths that locate them.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
-- `packages/server`: the Rust backend, a self-contained Cargo workspace with its own toolchain pin and lockfile.
+- `packages/server`: the Rust backend: http api, storage, processing queue and gpu executor, a self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Ground Rules
 
