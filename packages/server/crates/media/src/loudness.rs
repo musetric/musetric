@@ -203,108 +203,28 @@ fn frame_count(seconds: f64, sample_rate: u32) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs::{create_dir_all, remove_dir_all},
-        path::PathBuf,
-        process::id,
-    };
+    use std::path::Path;
 
     use super::{analyze_lead_visual_loudness, analyze_loudness};
-    use crate::{Tools, run::run};
+    use crate::fixture::{Fixture, Signal};
 
     const SAMPLE_RATE: u32 = 48000;
     const TOLERANCE_DB: f64 = 0.1;
     const TONE: &str = "0.6*sin(440*2*PI*t)*(0.2+0.8*abs(sin(1.3*t)))|0.45*sin(523.25*2*PI*t+sin(3*t))*(0.1+0.9*abs(sin(0.7*t)))";
 
-    fn bundled_ffmpeg() -> PathBuf {
-        let platform = match std::env::consts::OS {
-            "windows" => "win32",
-            "macos" => "darwin",
-            other => other,
-        };
-        let architecture = match std::env::consts::ARCH {
-            "x86_64" => "x64",
-            "aarch64" => "arm64",
-            other => other,
-        };
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../ffmpeg/resources")
-            .join(format!("{platform}-{architecture}"))
-            .join(format!("ffmpeg{}", std::env::consts::EXE_SUFFIX))
-    }
-
-    struct Fixture {
-        directory: PathBuf,
-        tools: Tools,
-    }
-
-    impl Fixture {
-        async fn create(expression: &str, seconds: f64) -> Self {
-            let directory = std::env::temp_dir().join(format!("musetric-loudness-{}", id()));
-            create_dir_all(&directory).expect("the fixture directory should be built");
-            let ffmpeg = bundled_ffmpeg();
-            let fixture = Self {
-                directory,
-                tools: Tools {
-                    ffmpeg: ffmpeg.clone(),
-                    ffprobe: ffmpeg,
-                },
-            };
-            let arguments = vec![
-                "-hide_banner".to_owned(),
-                "-loglevel".to_owned(),
-                "error".to_owned(),
-                "-y".to_owned(),
-                "-f".to_owned(),
-                "lavfi".to_owned(),
-                "-i".to_owned(),
-                format!("aevalsrc=exprs={expression}:s={SAMPLE_RATE}:d={seconds}"),
-                "-c:a".to_owned(),
-                "pcm_s16le".to_owned(),
-                fixture.path().display().to_string(),
-            ];
-            run(&fixture.tools.ffmpeg, &arguments)
-                .await
-                .expect("the fixture should be written");
-            fixture
-        }
-
-        fn path(&self) -> PathBuf {
-            self.directory.join("fixture.wav")
-        }
-
-        async fn measured_by_ffmpeg(&self) -> (f64, f64) {
-            let arguments = vec![
-                "-hide_banner".to_owned(),
-                "-nostats".to_owned(),
-                "-i".to_owned(),
-                self.path().display().to_string(),
-                "-af".to_owned(),
-                "ebur128=peak=true".to_owned(),
-                "-f".to_owned(),
-                "null".to_owned(),
-                "-".to_owned(),
-            ];
-            let reported = read_stderr(&self.tools.ffmpeg, &arguments).await;
-            let summary = reported
-                .rfind("Integrated loudness:")
-                .map(|start| reported[start..].to_owned())
-                .expect("the filter should print a summary");
-            (
-                read_labelled(&summary, "I:"),
-                read_labelled(&summary, "Peak:"),
-            )
-        }
-    }
-
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = remove_dir_all(&self.directory);
-        }
-    }
-
-    async fn read_stderr(program: &std::path::Path, arguments: &[String]) -> String {
-        let output = tokio::process::Command::new(program)
+    async fn measured_by_ffmpeg(fixture: &Fixture, from: &Path) -> (f64, f64) {
+        let arguments = vec![
+            "-hide_banner".to_owned(),
+            "-nostats".to_owned(),
+            "-i".to_owned(),
+            from.display().to_string(),
+            "-af".to_owned(),
+            "ebur128=peak=true".to_owned(),
+            "-f".to_owned(),
+            "null".to_owned(),
+            "-".to_owned(),
+        ];
+        let output = tokio::process::Command::new(&fixture.tools.ffmpeg)
             .args(arguments)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -312,7 +232,15 @@ mod tests {
             .output()
             .await
             .expect("ffmpeg should run");
-        String::from_utf8_lossy(&output.stderr).into_owned()
+        let reported = String::from_utf8_lossy(&output.stderr).into_owned();
+        let summary = reported
+            .rfind("Integrated loudness:")
+            .map(|start| reported[start..].to_owned())
+            .expect("the filter should print a summary");
+        (
+            read_labelled(&summary, "I:"),
+            read_labelled(&summary, "Peak:"),
+        )
     }
 
     fn read_labelled(summary: &str, label: &str) -> f64 {
@@ -324,14 +252,24 @@ mod tests {
             .expect("the summary should carry the measurement")
     }
 
+    fn tone(name: &str) -> Signal<'_> {
+        Signal {
+            name,
+            expression: TONE,
+            seconds: 4.0,
+            sample_rate: SAMPLE_RATE,
+        }
+    }
+
     #[tokio::test]
     async fn measures_what_the_ffmpeg_filter_measures() {
-        let fixture = Fixture::create(TONE, 4.0).await;
+        let fixture = Fixture::create();
+        let source = fixture.write_wav(&tone("source.wav")).await;
 
-        let measured = analyze_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+        let measured = analyze_loudness(&fixture.tools, &source, SAMPLE_RATE)
             .await
             .expect("the loudness should be measured");
-        let (integrated, true_peak) = fixture.measured_by_ffmpeg().await;
+        let (integrated, true_peak) = measured_by_ffmpeg(&fixture, &source).await;
 
         assert!(
             (measured.integrated_loudness_db - integrated).abs() < TOLERANCE_DB,
@@ -347,12 +285,13 @@ mod tests {
 
     #[tokio::test]
     async fn reads_the_lead_window_in_the_same_pass() {
-        let fixture = Fixture::create(TONE, 4.0).await;
+        let fixture = Fixture::create();
+        let source = fixture.write_wav(&tone("source.wav")).await;
 
-        let visual = analyze_lead_visual_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+        let visual = analyze_lead_visual_loudness(&fixture.tools, &source, SAMPLE_RATE)
             .await
             .expect("the lead loudness should be measured");
-        let alone = analyze_loudness(&fixture.tools, &fixture.path(), SAMPLE_RATE)
+        let alone = analyze_loudness(&fixture.tools, &source, SAMPLE_RATE)
             .await
             .expect("the loudness should be measured");
 

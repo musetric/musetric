@@ -140,9 +140,13 @@ async fn process_stems(
         output: sample_rate,
     };
     tokio::try_join!(
-        encode_stem(tools, &stems.lead, rates),
-        encode_stem(tools, &stems.backing, rates),
-        encode_stem(tools, &stems.instrumental, rates),
+        encode_flac_from_raw(&stems.lead.raw, &stems.lead.master.path, rates),
+        encode_flac_from_raw(&stems.backing.raw, &stems.backing.master.path, rates),
+        encode_flac_from_raw(
+            &stems.instrumental.raw,
+            &stems.instrumental.master.path,
+            rates
+        ),
     )?;
     tokio::try_join!(
         deliver_stem(tools, &stems.lead, sample_rate),
@@ -150,10 +154,6 @@ async fn process_stems(
         deliver_stem(tools, &stems.instrumental, sample_rate),
     )?;
     Ok(())
-}
-
-async fn encode_stem(tools: &Tools, stem: &Stem, rates: SampleRates) -> Result<(), BoxedError> {
-    encode_flac_from_raw(tools, &stem.raw, &stem.master.path, rates).await
 }
 
 async fn deliver_stem(tools: &Tools, stem: &Stem, sample_rate: u32) -> Result<(), BoxedError> {
