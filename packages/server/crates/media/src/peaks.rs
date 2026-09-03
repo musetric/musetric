@@ -3,8 +3,8 @@ use std::path::Path;
 use tokio::fs::{create_dir_all, write};
 
 use crate::{
+    BoxedError,
     pcm::{CHANNELS, PcmRequest, PcmSource},
-    run::BoxedError,
 };
 
 pub const WAVE_PEAK_COUNT: usize = 3840;

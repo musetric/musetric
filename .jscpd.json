@@ -20,6 +20,7 @@
     "**/openapi.json",
     "**/package.json",
     "**/*.bench.*",
-    "**/*.test.*"
+    "**/*.test.*",
+    "**/crates/*/examples/**"
   ]
 }

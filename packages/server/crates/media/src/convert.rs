@@ -7,14 +7,18 @@ use std::{
 use tokio::{fs::create_dir_all, task::spawn_blocking};
 
 use crate::{
-    Tools,
+    AacEncoder, BoxedError,
+    aac::FRAME_SAMPLES,
     flac::FlacWriter,
+    fmp4::Fmp4Writer,
     pcm::{BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH},
     resample::{Conversion, SampleRates},
-    run::{BoxedError, run},
 };
 
-const FRAGMENT_DURATION_MICROS: u32 = 2_000_000;
+const DELIVERY_BITRATE: u32 = 256_000;
+const DELIVERY_CHANNELS: u8 = 2;
+
+const _: () = assert!(DELIVERY_CHANNELS as usize == CHANNELS);
 
 pub async fn convert_to_flac(
     source: &dyn PcmSource,
@@ -34,6 +38,33 @@ async fn encode_source(
 ) -> Result<(), BoxedError> {
     let mut sink = |chunk: &[f32]| write_frames(writer, chunk);
     source.read_pcm(request, &mut sink).await
+}
+
+pub async fn convert_to_fmp4(
+    source: &dyn PcmSource,
+    request: PcmRequest<'_>,
+    to: &Path,
+) -> Result<(), BoxedError> {
+    create_parent(to).await?;
+    let mut encoder = AacEncoder::create(request.sample_rate, DELIVERY_CHANNELS, DELIVERY_BITRATE)?;
+    let mut failure: Option<BoxedError> = None;
+    let mut sink = |chunk: &[f32]| {
+        if failure.is_none()
+            && let Err(error) = encoder.push(chunk)
+        {
+            failure = Some(error);
+        }
+    };
+    source.read_pcm(request, &mut sink).await?;
+    if let Some(error) = failure {
+        return Err(error);
+    }
+    let frames = encoder.finish()?;
+    let mut writer = Fmp4Writer::create(to, request.sample_rate, DELIVERY_CHANNELS)?;
+    for packet in &frames {
+        writer.push(packet, FRAME_SAMPLES)?;
+    }
+    writer.finish()
 }
 
 pub async fn encode_flac_from_raw(
@@ -76,48 +107,6 @@ fn write_frames(writer: &mut FlacWriter, frames: &[f32]) {
     }
 }
 
-pub async fn convert_to_fmp4(
-    tools: &Tools,
-    from: &Path,
-    to: &Path,
-    sample_rate: u32,
-) -> Result<(), BoxedError> {
-    create_parent(to).await?;
-    let fragment_duration = FRAGMENT_DURATION_MICROS.to_string();
-    let arguments = vec![
-        "-y".to_owned(),
-        "-hide_banner".to_owned(),
-        "-loglevel".to_owned(),
-        "error".to_owned(),
-        "-i".to_owned(),
-        from.display().to_string(),
-        "-map".to_owned(),
-        "0:a:0".to_owned(),
-        "-sn".to_owned(),
-        "-dn".to_owned(),
-        "-vn".to_owned(),
-        "-ar".to_owned(),
-        sample_rate.to_string(),
-        "-c:a".to_owned(),
-        "aac".to_owned(),
-        "-profile:a".to_owned(),
-        "aac_low".to_owned(),
-        "-b:a".to_owned(),
-        "256k".to_owned(),
-        "-f".to_owned(),
-        "mp4".to_owned(),
-        "-movflags".to_owned(),
-        "+frag_keyframe+empty_moov+default_base_moof".to_owned(),
-        "-frag_duration".to_owned(),
-        fragment_duration.clone(),
-        "-min_frag_duration".to_owned(),
-        fragment_duration,
-        to.display().to_string(),
-    ];
-    run(&tools.ffmpeg, &arguments).await?;
-    Ok(())
-}
-
 async fn create_parent(to: &Path) -> Result<(), BoxedError> {
     if let Some(directory) = to.parent() {
         create_dir_all(directory).await?;
@@ -129,35 +118,78 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
 mod tests {
     use std::path::Path;
 
-    use super::{convert_to_flac, encode_flac_from_raw};
+    use super::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
     use crate::{
-        fixture::{Fixture, Signal, correlation, level, read_floats},
+        fixture::{Fixture, Partial, Signal, correlation, level, read_floats},
         frames::read_frame_count,
         pcm::{CHANNELS, PcmRequest, collect_interleaved_pcm},
         resample::SampleRates,
-        run::run,
     };
 
     const SOURCE_RATE: u32 = 44100;
     const TARGET_RATE: u32 = 48000;
     const SCALE: f32 = 8_388_608.0;
     const HIGHEST: f32 = 8_388_607.0;
-    const SECONDS: f64 = 4.0;
-    const TONE: &str =
-        "0.6*sin(440*2*PI*t)*(0.2+0.8*abs(sin(1.3*t)))|0.45*sin(523.25*2*PI*t+sin(3*t))";
-    const CORRELATION: f64 = 0.998;
-    const LEVEL_TOLERANCE: f64 = 0.01;
-    const SEEK_POINTS: usize = 512;
-    const SEEK_POINT_BYTES: usize = 18;
-    const HEADER_BYTE_LENGTH: usize = 12 + 34 + SEEK_POINTS * SEEK_POINT_BYTES;
-    const SEEK_TABLE_BLOCK: u8 = 3;
+    const SECONDS: f64 = 2.0;
+    const DELIVERY_SECONDS: f64 = 4.0;
+    const CORRELATION: f64 = 0.99;
+    const LEVEL_TOLERANCE: f64 = 0.02;
+    const FRAGMENT_MARKER: &[u8] = b"moof";
+    const EXPECTED_FRAGMENTS: usize = 3;
+    const AAC_PRIMING: usize = 1024;
 
-    fn tone(name: &str, sample_rate: u32) -> Signal<'_> {
+    fn count_fragments(bytes: &[u8]) -> usize {
+        let mut position = 0usize;
+        let mut count = 0usize;
+        while position + 8 <= bytes.len() {
+            let Ok(length) = <[u8; 4]>::try_from(&bytes[position..position + 4]) else {
+                break;
+            };
+            let size = usize::try_from(u32::from_be_bytes(length)).unwrap_or(0);
+            if size < 8 || position + size > bytes.len() {
+                break;
+            }
+            if &bytes[position + 4..position + 8] == FRAGMENT_MARKER {
+                count += 1;
+            }
+            position += size;
+        }
+        count
+    }
+
+    const LEFT: [Partial; 2] = [
+        Partial {
+            frequency: 440.0,
+            amplitude: 0.6,
+            phase: 0.0,
+        },
+        Partial {
+            frequency: 523.25,
+            amplitude: 0.45,
+            phase: 1.0,
+        },
+    ];
+    const RIGHT: [Partial; 2] = [
+        Partial {
+            frequency: 330.0,
+            amplitude: 0.5,
+            phase: 0.0,
+        },
+        Partial {
+            frequency: 659.26,
+            amplitude: 0.35,
+            phase: 2.0,
+        },
+    ];
+
+    fn tone(name: &'static str, seconds: f64, sample_rate: u32) -> Signal<'static> {
         Signal {
             name,
-            expression: TONE,
-            seconds: SECONDS,
+            seconds,
             sample_rate,
+            left: &LEFT,
+            right: &RIGHT,
+            gate: None,
         }
     }
 
@@ -169,31 +201,6 @@ mod tests {
         read_floats(&bytes)
     }
 
-    async fn resampled_by_ffmpeg(fixture: &Fixture, from: &Path) -> Vec<f32> {
-        let arguments = vec![
-            "-hide_banner".to_owned(),
-            "-loglevel".to_owned(),
-            "error".to_owned(),
-            "-f".to_owned(),
-            "f32le".to_owned(),
-            "-ar".to_owned(),
-            SOURCE_RATE.to_string(),
-            "-ac".to_owned(),
-            "2".to_owned(),
-            "-i".to_owned(),
-            from.display().to_string(),
-            "-ar".to_owned(),
-            TARGET_RATE.to_string(),
-            "-f".to_owned(),
-            "f32le".to_owned(),
-            "-".to_owned(),
-        ];
-        let bytes = run(&fixture.tools.ffmpeg, &arguments)
-            .await
-            .expect("ffmpeg should resample the raw stem");
-        read_floats(&bytes)
-    }
-
     fn quantized(value: f32) -> f32 {
         (value * SCALE).round().clamp(-SCALE, HIGHEST) / SCALE
     }
@@ -201,7 +208,8 @@ mod tests {
     #[tokio::test]
     async fn keeps_every_sample_of_a_decoded_upload() {
         let fixture = Fixture::create();
-        let source = fixture.write_wav(&tone("source.wav", TARGET_RATE)).await;
+        let defined = tone("source.wav", SECONDS, TARGET_RATE);
+        let source = fixture.write_wav24(&defined);
         let master = fixture.join("master.flac");
 
         let request = PcmRequest {
@@ -212,7 +220,11 @@ mod tests {
             .await
             .expect("the upload should be converted");
 
-        let expected = decode(&fixture, &source, TARGET_RATE).await;
+        let expected = crate::fixture::render(&defined)
+            .iter()
+            .copied()
+            .map(quantized)
+            .collect::<Vec<_>>();
         let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
         assert_eq!(written, expected);
@@ -220,25 +232,13 @@ mod tests {
             .await
             .expect("the master should report its duration");
         assert_eq!(counted, (expected.len() / CHANNELS) as u64);
-
-        let stored = tokio::fs::read(&master)
-            .await
-            .expect("the master should be readable");
-        assert_eq!(stored[42], 0x80 | SEEK_TABLE_BLOCK);
-        let seek_length = u32::try_from(SEEK_POINTS * SEEK_POINT_BYTES).expect("the table fits");
-        assert_eq!(&stored[43..46], &seek_length.to_be_bytes()[1..]);
-        let first = &stored[46..46 + SEEK_POINT_BYTES];
-        assert_eq!(first[..8], [0; 8]);
-        assert_eq!(first[8..16], u64::to_be_bytes(HEADER_BYTE_LENGTH as u64));
-        assert!(first[16..18] != [0; 2]);
-        let second = &stored[46 + SEEK_POINT_BYTES..46 + 2 * SEEK_POINT_BYTES];
-        assert_eq!(second[..8], u64::to_be_bytes(u64::from(TARGET_RATE) * 2));
     }
 
     #[tokio::test]
     async fn keeps_every_sample_of_a_raw_stem() {
         let fixture = Fixture::create();
-        let raw = fixture.write_raw(&tone("stem.f32", TARGET_RATE)).await;
+        let defined = tone("stem.f32", SECONDS, TARGET_RATE);
+        let raw = fixture.write_raw(&defined);
         let master = fixture.join("master.flac");
         let rates = SampleRates {
             input: TARGET_RATE,
@@ -249,11 +249,7 @@ mod tests {
             .await
             .expect("the stem should be encoded");
 
-        let source = read_floats(
-            &tokio::fs::read(&raw)
-                .await
-                .expect("the raw stem should exist"),
-        );
+        let source = crate::fixture::render(&defined);
         let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), source.len());
         let expected = source.iter().copied().map(quantized).collect::<Vec<_>>();
@@ -261,9 +257,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resamples_the_stem_the_way_ffmpeg_does() {
+    async fn resamples_the_stem_the_way_the_reference_does() {
         let fixture = Fixture::create();
-        let raw = fixture.write_raw(&tone("stem.f32", SOURCE_RATE)).await;
+        let defined = tone("stem.f32", SECONDS, SOURCE_RATE);
+        let raw = fixture.write_raw(&defined);
         let master = fixture.join("master.flac");
         let rates = SampleRates {
             input: SOURCE_RATE,
@@ -274,12 +271,57 @@ mod tests {
             .await
             .expect("the stem should be encoded");
 
-        let expected = resampled_by_ffmpeg(&fixture, &raw).await;
+        let expected = read_floats(
+            &tokio::fs::read(Fixture::asset("resample.pcm"))
+                .await
+                .expect("the golden pcm should exist"),
+        );
         let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
         let matched = correlation(&written, &expected);
         assert!(matched > CORRELATION, "correlation {matched}");
         let gain = level(&written, &expected);
+        assert!((gain - 1.0).abs() < LEVEL_TOLERANCE, "level {gain}");
+    }
+
+    #[tokio::test]
+    async fn delivers_a_fragmented_master_the_player_reads() {
+        let fixture = Fixture::create();
+        let defined = tone("source.wav", DELIVERY_SECONDS, TARGET_RATE);
+        let source = fixture.write_wav24(&defined);
+        let master = fixture.join("master.flac");
+        let delivery = fixture.join("delivery.m4s");
+
+        let request = PcmRequest {
+            from: &source,
+            sample_rate: TARGET_RATE,
+        };
+        convert_to_flac(&fixture.pcm, request, &master)
+            .await
+            .expect("the upload should be converted");
+        convert_to_fmp4(
+            &fixture.pcm,
+            PcmRequest {
+                from: &master,
+                sample_rate: TARGET_RATE,
+            },
+            &delivery,
+        )
+        .await
+        .expect("the delivery should be muxed");
+
+        let stored = tokio::fs::read(&delivery)
+            .await
+            .expect("the delivery should be readable");
+        let fragments = count_fragments(&stored);
+        assert_eq!(fragments, EXPECTED_FRAGMENTS);
+
+        let delivered = decode(&fixture, &delivery, TARGET_RATE).await;
+        let original = crate::fixture::render(&defined);
+        let body = &delivered[AAC_PRIMING * CHANNELS..AAC_PRIMING * CHANNELS + original.len()];
+        let matched = correlation(body, &original);
+        assert!(matched > CORRELATION, "correlation {matched}");
+        let gain = level(body, &original);
         assert!((gain - 1.0).abs() < LEVEL_TOLERANCE, "level {gain}");
     }
 }

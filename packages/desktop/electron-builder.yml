@@ -58,4 +58,3 @@ extraResources:
     to: trademark.md
 asarUnpack:
   - node_modules/**/*.node
-  - node_modules/@musetric/ffmpeg/resources/**

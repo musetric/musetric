@@ -6,7 +6,7 @@ use std::{
 use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
 use musetric_media::{
-    BoxedError, Loudness, PcmRequest, PcmSource, SampleRates, Tools, WavePeaks,
+    BoxedError, Loudness, PcmRequest, PcmSource, SampleRates, WavePeaks,
     analyze_lead_visual_loudness, analyze_loudness, collect_interleaved_pcm, convert_to_fmp4,
     encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
@@ -133,7 +133,6 @@ async fn process_stems(
 ) -> Result<(), Failure> {
     let context = running.context;
     split(running, job).await?;
-    let tools = &context.storage.tools;
     let stems = running.stems;
     let rates = SampleRates {
         input: VOCALS.sample_rate,
@@ -149,7 +148,6 @@ async fn process_stems(
         ),
     )?;
     let delivery = Delivery {
-        tools,
         pcm: context.storage.pcm.as_ref(),
         sample_rate,
     };
@@ -162,7 +160,6 @@ async fn process_stems(
 }
 
 struct Delivery<'delivery> {
-    tools: &'delivery Tools,
     pcm: &'delivery dyn PcmSource,
     sample_rate: u32,
 }
@@ -174,10 +171,9 @@ fn read_at(from: &Path, sample_rate: u32) -> PcmRequest<'_> {
 async fn deliver_stem(delivery: &Delivery<'_>, stem: &Stem) -> Result<(), BoxedError> {
     let sample_rate = delivery.sample_rate;
     convert_to_fmp4(
-        delivery.tools,
-        &stem.master.path,
+        delivery.pcm,
+        read_at(&stem.master.path, sample_rate),
         &stem.delivery.path,
-        sample_rate,
     )
     .await?;
     let request = WavePeaks {

@@ -29,7 +29,6 @@
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/ffmpeg": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",

@@ -1,8 +1,8 @@
 use ebur128::{EbuR128, Mode};
 
 use crate::{
+    BoxedError,
     pcm::{CHANNELS, PcmRequest, PcmSource},
-    run::BoxedError,
 };
 
 const EPSILON: f64 = 1e-12;
@@ -223,92 +223,76 @@ fn frame_count(seconds: f64, sample_rate: u32) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use super::{analyze_lead_visual_loudness, analyze_loudness};
     use crate::{
-        fixture::{Fixture, Signal},
+        fixture::{Fixture, Partial, Signal},
         pcm::PcmRequest,
     };
 
     const SAMPLE_RATE: u32 = 48000;
+    const SECONDS: f64 = 4.0;
     const TOLERANCE_DB: f64 = 0.1;
-    const TONE: &str = "0.6*sin(440*2*PI*t)*(0.2+0.8*abs(sin(1.3*t)))|0.45*sin(523.25*2*PI*t+sin(3*t))*(0.1+0.9*abs(sin(0.7*t)))";
+    const EXPECTED_INTEGRATED_DB: f64 = -10.0;
+    const EXPECTED_PEAK_DB: f64 = -5.6;
 
-    async fn measured_by_ffmpeg(fixture: &Fixture, from: &Path) -> (f64, f64) {
-        let arguments = vec![
-            "-hide_banner".to_owned(),
-            "-nostats".to_owned(),
-            "-i".to_owned(),
-            from.display().to_string(),
-            "-af".to_owned(),
-            "ebur128=peak=true".to_owned(),
-            "-f".to_owned(),
-            "null".to_owned(),
-            "-".to_owned(),
-        ];
-        let output = tokio::process::Command::new(&fixture.tools.ffmpeg)
-            .args(arguments)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output()
-            .await
-            .expect("ffmpeg should run");
-        let reported = String::from_utf8_lossy(&output.stderr).into_owned();
-        let summary = reported
-            .rfind("Integrated loudness:")
-            .map(|start| reported[start..].to_owned())
-            .expect("the filter should print a summary");
-        (
-            read_labelled(&summary, "I:"),
-            read_labelled(&summary, "Peak:"),
-        )
-    }
-
-    fn read_labelled(summary: &str, label: &str) -> f64 {
-        summary
-            .lines()
-            .filter_map(|line| line.trim().strip_prefix(label))
-            .filter_map(|value| value.split_whitespace().next())
-            .find_map(|value| value.parse::<f64>().ok())
-            .expect("the summary should carry the measurement")
-    }
-
-    fn read_at(from: &Path) -> PcmRequest<'_> {
+    fn read_at(from: &std::path::Path) -> PcmRequest<'_> {
         PcmRequest {
             from,
             sample_rate: SAMPLE_RATE,
         }
     }
 
-    fn tone(name: &str) -> Signal<'_> {
+    const LEFT: [Partial; 2] = [
+        Partial {
+            frequency: 440.0,
+            amplitude: 0.3,
+            phase: 0.0,
+        },
+        Partial {
+            frequency: 523.25,
+            amplitude: 0.225,
+            phase: 0.0,
+        },
+    ];
+    const RIGHT: [Partial; 2] = [
+        Partial {
+            frequency: 330.0,
+            amplitude: 0.25,
+            phase: 1.0,
+        },
+        Partial {
+            frequency: 659.26,
+            amplitude: 0.175,
+            phase: 2.0,
+        },
+    ];
+
+    fn tone(name: &'static str) -> Signal<'static> {
         Signal {
             name,
-            expression: TONE,
-            seconds: 4.0,
+            seconds: SECONDS,
             sample_rate: SAMPLE_RATE,
+            left: &LEFT,
+            right: &RIGHT,
+            gate: None,
         }
     }
 
     #[tokio::test]
-    async fn measures_what_the_ffmpeg_filter_measures() {
+    async fn measures_what_the_reference_filter_measures() {
         let fixture = Fixture::create();
-        let source = fixture.write_wav(&tone("source.wav")).await;
-
+        let source = fixture.write_wav(&tone("source.wav"));
         let measured = analyze_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the loudness should be measured");
-        let (integrated, true_peak) = measured_by_ffmpeg(&fixture, &source).await;
-
         assert!(
-            (measured.integrated_loudness_db - integrated).abs() < TOLERANCE_DB,
-            "integrated: rust {} ffmpeg {integrated}",
+            (measured.integrated_loudness_db - EXPECTED_INTEGRATED_DB).abs() < TOLERANCE_DB,
+            "integrated: {}",
             measured.integrated_loudness_db
         );
         assert!(
-            (measured.true_peak_db - true_peak).abs() < TOLERANCE_DB,
-            "true peak: rust {} ffmpeg {true_peak}",
+            (measured.true_peak_db - EXPECTED_PEAK_DB).abs() < TOLERANCE_DB,
+            "true peak: {}",
             measured.true_peak_db
         );
     }
@@ -316,15 +300,13 @@ mod tests {
     #[tokio::test]
     async fn reads_the_lead_window_in_the_same_pass() {
         let fixture = Fixture::create();
-        let source = fixture.write_wav(&tone("source.wav")).await;
-
+        let source = fixture.write_wav(&tone("source.wav"));
         let visual = analyze_lead_visual_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the lead loudness should be measured");
         let alone = analyze_loudness(&fixture.pcm, read_at(&source))
             .await
             .expect("the loudness should be measured");
-
         assert!(
             (visual.loudness.integrated_loudness_db - alone.integrated_loudness_db).abs() < 1e-9
         );

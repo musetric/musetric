@@ -17,9 +17,9 @@ use symphonia::core::{
 use tokio::{sync::mpsc, task::spawn_blocking};
 
 use crate::{
+    BoxedError,
     pcm::{PcmRequest, PcmSink, PcmSource, ReadingPcm},
     resample::{Conversion, SampleRates},
-    run::BoxedError,
 };
 
 const QUEUE_DEPTH: usize = 8;
@@ -237,27 +237,50 @@ mod tests {
 
     use super::SymphoniaPcm;
     use crate::{
-        fixture::{Fixture, Signal, correlation, level, read_floats, worst_difference},
+        fixture::{Fixture, Partial, Signal, correlation, level, read_floats, worst_difference},
         pcm::{CHANNELS, PcmRequest, collect_interleaved_pcm},
-        run::run,
     };
 
     const SOURCE_RATE: u32 = 48000;
-    const SECONDS: f64 = 2.0;
-    const TONE: &str = "0.6*sin(440*2*PI*t)|0.3*sin(523.25*2*PI*t+1)";
-    const MONO_TONE: &str = "0.6*sin(440*2*PI*t)";
-    const SURROUND_TONE: &str = "0.6*sin(440*2*PI*t)|0.3*sin(523.25*2*PI*t+1)|0.2*sin(659.25*2*PI*t)|0.1*sin(80*2*PI*t)|0.15*sin(880*2*PI*t)|0.12*sin(987.77*2*PI*t)";
+    const SECONDS: f64 = 1.0;
     const TOLERANCE: f32 = 1e-6;
     const CORRELATION: f64 = 0.99;
     const LEVEL_TOLERANCE: f64 = 0.02;
     const AAC_PRIMING: usize = 1024;
 
-    fn tone<'signal>(name: &'signal str, expression: &'signal str) -> Signal<'signal> {
+    const LEFT: [Partial; 2] = [
+        Partial {
+            frequency: 440.0,
+            amplitude: 0.6,
+            phase: 0.0,
+        },
+        Partial {
+            frequency: 523.25,
+            amplitude: 0.3,
+            phase: 0.0,
+        },
+    ];
+    const RIGHT: [Partial; 2] = [
+        Partial {
+            frequency: 330.0,
+            amplitude: 0.5,
+            phase: 0.0,
+        },
+        Partial {
+            frequency: 659.26,
+            amplitude: 0.25,
+            phase: 0.0,
+        },
+    ];
+
+    fn signal(name: &'static str) -> Signal<'static> {
         Signal {
             name,
-            expression,
             seconds: SECONDS,
             sample_rate: SOURCE_RATE,
+            left: &LEFT,
+            right: &RIGHT,
+            gate: None,
         }
     }
 
@@ -272,84 +295,63 @@ mod tests {
         read_floats(&bytes)
     }
 
-    async fn read_by_ffmpeg(fixture: &Fixture, from: &Path) -> Vec<f32> {
-        let arguments = vec![
-            "-hide_banner".to_owned(),
-            "-loglevel".to_owned(),
-            "error".to_owned(),
-            "-i".to_owned(),
-            from.display().to_string(),
-            "-map".to_owned(),
-            "0:a:0".to_owned(),
-            "-ac".to_owned(),
-            "2".to_owned(),
-            "-ar".to_owned(),
-            SOURCE_RATE.to_string(),
-            "-f".to_owned(),
-            "f32le".to_owned(),
-            "-".to_owned(),
-        ];
-        let bytes = run(&fixture.tools.ffmpeg, &arguments)
-            .await
-            .expect("ffmpeg should decode the file");
-        read_floats(&bytes)
+    fn compare_exact(read: &[f32], expected: &[f32]) {
+        assert_eq!(read.len(), expected.len());
+        let worst = worst_difference(read, expected);
+        assert!(worst < TOLERANCE, "worst sample difference {worst}");
     }
 
-    async fn compare(fixture: &Fixture, source: &Path, exact: bool) {
-        let read = read_by_crate(source).await;
-        let expected = read_by_ffmpeg(fixture, source).await;
+    fn compare_lossy(read: &[f32], expected: &[f32]) {
         assert_eq!(read.len(), expected.len());
-        if exact {
-            let worst = worst_difference(&read, &expected);
-            assert!(worst < TOLERANCE, "worst sample difference {worst}");
-            return;
-        }
-        let matched = correlation(&read, &expected);
+        let matched = correlation(read, expected);
         assert!(matched > CORRELATION, "correlation {matched}");
-        let gain = level(&read, &expected);
+        let gain = level(read, expected);
         assert!((gain - 1.0).abs() < LEVEL_TOLERANCE, "level {gain}");
     }
 
-    async fn written(fixture: &Fixture, name: &str, format: &[&str]) -> std::path::PathBuf {
-        fixture.write_as(&tone(name, TONE), format).await
+    async fn golden_pcm(name: &str) -> Vec<f32> {
+        read_floats(
+            &tokio::fs::read(Fixture::asset(name))
+                .await
+                .expect("the golden pcm should exist"),
+        )
     }
 
     #[tokio::test]
     async fn reads_a_wave_file_sample_for_sample() {
         let fixture = Fixture::create();
-        let source = written(&fixture, "tone.wav", &["-c:a", "pcm_s24le"]).await;
-        compare(&fixture, &source, true).await;
+        let defined = signal("tone.wav");
+        let source = fixture.write_wav24(&defined);
+        let read = read_by_crate(&source).await;
+        let expected = crate::fixture::render(&defined)
+            .iter()
+            .map(|value| quantize24(*value))
+            .collect::<Vec<_>>();
+        compare_exact(&read, &expected);
     }
 
     #[tokio::test]
-    async fn reads_a_flac_file_sample_for_sample() {
-        let fixture = Fixture::create();
-        let source = written(&fixture, "tone.flac", &["-c:a", "flac"]).await;
-        compare(&fixture, &source, true).await;
+    async fn reads_a_committed_flac_file_sample_for_sample() {
+        let read = read_by_crate(&Fixture::asset("decode.flac")).await;
+        compare_exact(&read, &golden_pcm("decode-flac.pcm").await);
     }
 
     #[tokio::test]
     async fn reads_an_aiff_file_sample_for_sample() {
-        let fixture = Fixture::create();
-        let source = written(&fixture, "tone.aiff", &["-c:a", "pcm_s16be"]).await;
-        compare(&fixture, &source, true).await;
+        let read = read_by_crate(&Fixture::asset("decode.aiff")).await;
+        compare_exact(&read, &golden_pcm("decode-aiff.pcm").await);
     }
 
     #[tokio::test]
     async fn reads_an_apple_lossless_file_sample_for_sample() {
-        let fixture = Fixture::create();
-        let source = written(&fixture, "tone.m4a", &["-c:a", "alac"]).await;
-        compare(&fixture, &source, true).await;
+        let read = read_by_crate(&Fixture::asset("decode-alac.m4a")).await;
+        compare_exact(&read, &golden_pcm("decode-alac.pcm").await);
     }
 
     #[tokio::test]
     async fn reads_an_aac_file_after_its_encoder_priming() {
-        let fixture = Fixture::create();
-        let source = written(&fixture, "tone.m4a", &["-c:a", "aac", "-b:a", "192k"]).await;
-
-        let read = read_by_crate(&source).await;
-        let expected = read_by_ffmpeg(&fixture, &source).await;
-
+        let read = read_by_crate(&Fixture::asset("decode-aac.m4a")).await;
+        let expected = golden_pcm("decode-aac.pcm").await;
         assert_eq!(read.len(), expected.len() + AAC_PRIMING * CHANNELS);
         let trimmed = &read[AAC_PRIMING * CHANNELS..];
         let matched = correlation(trimmed, &expected);
@@ -359,43 +361,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reads_a_vorbis_file_the_way_ffmpeg_reads_it() {
-        let fixture = Fixture::create();
-        let format = ["-c:a", "vorbis", "-strict", "-2", "-q:a", "6"];
-        let source = written(&fixture, "tone.ogg", &format).await;
-        compare(&fixture, &source, false).await;
+    async fn reads_a_vorbis_file_the_way_the_reference_decodes_it() {
+        let read = read_by_crate(&Fixture::asset("decode-vorbis.ogg")).await;
+        compare_lossy(&read, &golden_pcm("decode-vorbis.pcm").await);
     }
 
     #[tokio::test]
-    async fn reads_an_mp3_file_the_way_ffmpeg_reads_it() {
-        let fixture = Fixture::create();
-        compare(&fixture, &Fixture::asset("tone.mp3"), false).await;
+    async fn reads_an_mp3_file_the_way_the_reference_decodes_it() {
+        let read = read_by_crate(&Fixture::asset("tone.mp3")).await;
+        compare_lossy(&read, &golden_pcm("tone-mp3.pcm").await);
     }
 
     #[tokio::test]
     async fn spreads_a_mono_file_over_both_channels() {
-        let fixture = Fixture::create();
-        let source = fixture
-            .write_as(&tone("mono.flac", MONO_TONE), &["-c:a", "flac"])
-            .await;
-        compare(&fixture, &source, true).await;
+        let read = read_by_crate(&Fixture::asset("decode-mono.flac")).await;
+        compare_exact(&read, &golden_pcm("decode-mono.pcm").await);
     }
 
     #[tokio::test]
-    async fn folds_a_surround_file_the_way_ffmpeg_folds_it() {
-        let fixture = Fixture::create();
-        let source = fixture
-            .write_as(&tone("surround.flac", SURROUND_TONE), &["-c:a", "flac"])
-            .await;
-        compare(&fixture, &source, true).await;
+    async fn folds_a_surround_file_the_way_the_reference_folds_it() {
+        let read = read_by_crate(&Fixture::asset("decode-surround.flac")).await;
+        compare_exact(&read, &golden_pcm("decode-surround.pcm").await);
+    }
+
+    fn quantize24(value: f32) -> f32 {
+        (value * 8_388_608.0)
+            .round()
+            .clamp(-8_388_608.0, 8_388_607.0)
+            / 8_388_608.0
     }
 
     #[tokio::test]
     async fn refuses_a_stream_it_cannot_decode() {
-        let fixture = Fixture::create();
-        let source = written(&fixture, "tone.opus", &["-c:a", "opus", "-strict", "-2"]).await;
         let request = PcmRequest {
-            from: &source,
+            from: &Fixture::asset("decode-opus.opus"),
             sample_rate: SOURCE_RATE,
         };
         let refused = collect_interleaved_pcm(&SymphoniaPcm, request).await;

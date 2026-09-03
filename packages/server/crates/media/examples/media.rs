@@ -5,17 +5,14 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use musetric_media::{
-    BoxedError, PcmRequest, SampleRates, SymphoniaPcm, Tools, WavePeaks,
-    analyze_lead_visual_loudness, analyze_loudness, convert_to_flac, convert_to_fmp4,
-    encode_flac_from_raw, generate_wave_peaks, read_frame_count,
+    BoxedError, PcmRequest, SampleRates, SymphoniaPcm, WavePeaks, analyze_lead_visual_loudness,
+    analyze_loudness, convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks,
+    read_frame_count,
 };
 
 #[derive(Parser)]
 #[command(about = "Runs one media operation the way the backend runs it")]
 struct Arguments {
-    #[arg(long)]
-    ffmpeg: PathBuf,
-
     #[command(subcommand)]
     operation: Operation,
 }
@@ -77,12 +74,7 @@ enum Operation {
 #[tokio::main]
 async fn main() -> Result<(), BoxedError> {
     let arguments = Arguments::parse();
-    let media = Media {
-        pcm: SymphoniaPcm,
-        tools: Tools {
-            ffmpeg: arguments.ffmpeg,
-        },
-    };
+    let media = Media { pcm: SymphoniaPcm };
     let reported = run(&media, arguments.operation).await?;
     let mut output = stdout().lock();
     writeln!(output, "{reported}")?;
@@ -92,7 +84,6 @@ async fn main() -> Result<(), BoxedError> {
 
 struct Media {
     pcm: SymphoniaPcm,
-    tools: Tools,
 }
 
 fn read_at(from: &PathBuf, sample_rate: u32) -> PcmRequest<'_> {
@@ -127,7 +118,7 @@ async fn run(media: &Media, operation: Operation) -> Result<String, BoxedError> 
             to,
             sample_rate,
         } => {
-            convert_to_fmp4(&media.tools, &from, &to, sample_rate).await?;
+            convert_to_fmp4(&media.pcm, read_at(&from, sample_rate), &to).await?;
             Ok(String::new())
         }
         Operation::Peaks {

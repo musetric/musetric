@@ -118,7 +118,7 @@ pub(crate) const SKEY: ModelBundle = ModelBundle {
     directory: "skey-onnx",
     sample_rate: 22050,
     layout: CacheLayout::Flat,
-    downmix: Downmix::Ffmpeg,
+    downmix: Downmix::Power,
     files: &[
         (
             "config.json",
@@ -137,7 +137,7 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
     revision: "da27c0c3e917574b5541f71251abfd2c1aabb3a1",
     directory: "whisper-onnx-hf-cache",
     sample_rate: 16000,
-    downmix: Downmix::Ffmpeg,
+    downmix: Downmix::Power,
     layout: CacheLayout::Hub,
     files: &[
         (
@@ -200,7 +200,7 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
     revision: "98064f6e42af945316fd96261a18f1befe3a4536",
     directory: "vocal-separation-roformer-onnx",
     sample_rate: 44100,
-    downmix: Downmix::Ffmpeg,
+    downmix: Downmix::Power,
     layout: CacheLayout::Flat,
     files: &[
         (
@@ -222,7 +222,7 @@ pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
     revision: "main",
     directory: "uvr_mdxnet_kara_2",
     sample_rate: 44100,
-    downmix: Downmix::Ffmpeg,
+    downmix: Downmix::Power,
     layout: CacheLayout::Flat,
     files: &[(
         LEAD_BACKING_MODEL,

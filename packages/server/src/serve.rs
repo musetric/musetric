@@ -11,7 +11,7 @@ use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
 use musetric_gpu::{Bundle, create_client};
 use musetric_jobs::{Queue, QueueOptions};
-use musetric_media::{SymphoniaPcm, Tools};
+use musetric_media::SymphoniaPcm;
 use serde_json::{Map, Value, json};
 use tokio::{
     io::{stdin, stdout},
@@ -40,7 +40,6 @@ pub struct ServerOptions {
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
-    pub ffmpeg: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: PathBuf,
     pub public: PathBuf,
@@ -57,7 +56,6 @@ pub struct EmbeddedServerOptions {
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
-    pub ffmpeg: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
@@ -93,7 +91,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
             return Err(failure.into());
         }
     }
-    let storage = create_storage(&options.database, options.blobs, options.ffmpeg)?;
+    let storage = create_storage(&options.database, options.blobs)?;
     let app = create_app(AppOptions {
         storage,
         pages: Arc::clone(&host) as Arc<dyn PageOpener>,
@@ -127,7 +125,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
 
 pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedServer, BoxedError> {
     init_database(&options.database)?;
-    let storage = create_storage(&options.database, options.blobs, options.ffmpeg)?;
+    let storage = create_storage(&options.database, options.blobs)?;
     let app = create_app(AppOptions {
         storage,
         pages: options.pages,
@@ -187,17 +185,12 @@ fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     }))
 }
 
-fn create_storage(
-    database: &Path,
-    blobs: PathBuf,
-    ffmpeg: PathBuf,
-) -> Result<Arc<Storage>, BoxedError> {
+fn create_storage(database: &Path, blobs: PathBuf) -> Result<Arc<Storage>, BoxedError> {
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),
         writer: Arc::new(Writer::open(database)?),
         blobs_path: blobs,
         pcm: Arc::new(SymphoniaPcm),
-        tools: Tools { ffmpeg },
     });
     spawn_collector(Arc::clone(&storage));
     Ok(storage)
@@ -306,7 +299,6 @@ mod tests {
                 listen: "127.0.0.1:0".to_owned(),
                 database: self.root.join("storage/db/app.db"),
                 blobs: self.root.join("storage/blobs"),
-                ffmpeg: self.root.join("runtime/ffmpeg"),
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),

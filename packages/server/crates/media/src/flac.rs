@@ -14,7 +14,7 @@ use flacenc::{
     source::{Context, Fill, FrameBuf},
 };
 
-use crate::{pcm::CHANNELS, run::BoxedError};
+use crate::{BoxedError, pcm::CHANNELS};
 
 const BITS_PER_SAMPLE: usize = 24;
 const BLOCK_FRAMES: usize = 4096;

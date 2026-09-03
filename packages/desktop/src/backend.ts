@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { ffmpegPath } from '@musetric/ffmpeg';
 import { type OpenGpuPage, startRustProxy } from '@musetric/server';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
@@ -31,7 +30,6 @@ export const startBackend = async (
       listen: '127.0.0.1:0',
       databasePath: storagePaths.databasePath,
       blobsPath: storagePaths.blobsPath,
-      ffmpegPath: ffmpegPath(),
       modelsPath: storagePaths.modelsPath,
       browserBundlePath: resourcePaths.browserBundlePath,
       publicPath: resourcePaths.publicPath,

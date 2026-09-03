@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::run::BoxedError;
+use crate::BoxedError;
 
 const HEADER_BYTE_LENGTH: usize = 42;
 const MAGIC: &[u8] = b"fLaC";
@@ -39,20 +39,33 @@ mod tests {
     use super::read_frame_count;
     use crate::{
         convert::encode_flac_from_raw,
-        fixture::{Fixture, Signal},
+        fixture::{Fixture, Partial, Signal},
         resample::SampleRates,
     };
 
     const SAMPLE_RATE: u32 = 48000;
     const SECONDS: f64 = 2.0;
-    const TONE: &str = "0.5*sin(440*2*PI*t)|0.5*sin(523.25*2*PI*t)";
+    const COMMITTED_FRAMES: u64 = 48000;
 
-    fn tone(name: &str) -> Signal<'_> {
+    const LEFT: [Partial; 1] = [Partial {
+        frequency: 440.0,
+        amplitude: 0.5,
+        phase: 0.0,
+    }];
+    const RIGHT: [Partial; 1] = [Partial {
+        frequency: 523.25,
+        amplitude: 0.5,
+        phase: 0.0,
+    }];
+
+    fn tone(name: &'static str) -> Signal<'static> {
         Signal {
             name,
-            expression: TONE,
             seconds: SECONDS,
             sample_rate: SAMPLE_RATE,
+            left: &LEFT,
+            right: &RIGHT,
+            gate: None,
         }
     }
 
@@ -68,7 +81,7 @@ mod tests {
     #[tokio::test]
     async fn counts_the_frames_of_a_master_this_crate_wrote() {
         let fixture = Fixture::create();
-        let raw = fixture.write_raw(&tone("stem.f32")).await;
+        let raw = fixture.write_raw(&tone("stem.f32"));
         let master = fixture.join("master.flac");
         let rates = SampleRates {
             input: SAMPLE_RATE,
@@ -86,21 +99,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn counts_the_frames_of_a_master_ffmpeg_wrote() {
-        let fixture = Fixture::create();
-        let master = fixture.write_flac(&tone("master.flac")).await;
-
-        let counted = read_frame_count(&master)
+    async fn counts_the_frames_of_a_committed_master() {
+        let counted = read_frame_count(&Fixture::asset("decode.flac"))
             .await
             .expect("the master should be counted");
 
-        assert_eq!(counted, expected());
+        assert_eq!(counted, COMMITTED_FRAMES);
     }
 
     #[tokio::test]
     async fn refuses_a_file_that_is_not_a_flac_stream() {
         let fixture = Fixture::create();
-        let source = fixture.write_wav(&tone("source.wav")).await;
+        let source = fixture.write_wav(&tone("source.wav"));
 
         let refused = read_frame_count(&source).await;
 
