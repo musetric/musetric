@@ -11,7 +11,7 @@ use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
 use musetric_gpu::Bundle;
 use musetric_jobs::{Queue, QueueOptions};
-use musetric_media::{FfmpegPcm, Tools};
+use musetric_media::{SymphoniaPcm, Tools};
 use reqwest::Client;
 use serde_json::{Map, Value, json};
 use tokio::{
@@ -197,7 +197,7 @@ fn create_storage(
         database: Arc::new(Reader::open(database)?),
         writer: Arc::new(Writer::open(database)?),
         blobs_path: blobs,
-        pcm: Arc::new(FfmpegPcm::create(ffmpeg.clone())),
+        pcm: Arc::new(SymphoniaPcm),
         tools: Tools { ffmpeg },
     });
     spawn_collector(Arc::clone(&storage));

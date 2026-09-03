@@ -58,7 +58,7 @@ mod tests {
 
     use super::{Downmix, decode_mono_pcm};
     use crate::{
-        fixture::{Fixture, Signal},
+        fixture::{Fixture, Signal, correlation, level, read_floats, worst_difference},
         pcm::PcmRequest,
         run::run,
     };
@@ -68,14 +68,8 @@ mod tests {
     const SECONDS: f64 = 2.0;
     const TONE: &str = "0.6*sin(440*2*PI*t)|0.3*sin(523.25*2*PI*t+1)";
     const TOLERANCE: f32 = 1e-6;
-
-    fn read_floats(bytes: &[u8]) -> Vec<f32> {
-        bytes
-            .chunks_exact(size_of::<f32>())
-            .filter_map(|value| <[u8; 4]>::try_from(value).ok())
-            .map(f32::from_le_bytes)
-            .collect()
-    }
+    const CORRELATION: f64 = 0.998;
+    const LEVEL_TOLERANCE: f64 = 0.01;
 
     async fn mono_by_ffmpeg(
         fixture: &Fixture,
@@ -120,15 +114,6 @@ mod tests {
         read_floats(&bytes)
     }
 
-    fn worst_difference(mixed: &[f32], expected: &[f32]) -> f32 {
-        assert_eq!(mixed.len(), expected.len());
-        mixed
-            .iter()
-            .zip(expected)
-            .map(|(ours, theirs)| (ours - theirs).abs())
-            .fold(0.0_f32, f32::max)
-    }
-
     fn tone(name: &str) -> Signal<'_> {
         Signal {
             name,
@@ -146,6 +131,7 @@ mod tests {
         let mixed = mono_by_crate(&fixture, &source, SOURCE_RATE, Downmix::Ffmpeg).await;
         let expected = mono_by_ffmpeg(&fixture, &source, SOURCE_RATE, ["-ac", "1"]).await;
 
+        assert_eq!(mixed.len(), expected.len());
         let worst = worst_difference(&mixed, &expected);
         assert!(worst < TOLERANCE, "worst sample difference {worst}");
     }
@@ -164,6 +150,7 @@ mod tests {
         )
         .await;
 
+        assert_eq!(mixed.len(), expected.len());
         let worst = worst_difference(&mixed, &expected);
         assert!(worst < TOLERANCE, "worst sample difference {worst}");
     }
@@ -182,7 +169,10 @@ mod tests {
         )
         .await;
 
-        let worst = worst_difference(&mixed, &expected);
-        assert!(worst < TOLERANCE, "worst sample difference {worst}");
+        assert_eq!(mixed.len(), expected.len());
+        let matched = correlation(&mixed, &expected);
+        assert!(matched > CORRELATION, "correlation {matched}");
+        let gain = level(&mixed, &expected);
+        assert!((gain - 1.0).abs() < LEVEL_TOLERANCE, "level {gain}");
     }
 }

@@ -50,7 +50,7 @@ pub async fn encode_flac_from_raw(
 fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedError> {
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
-    let mut conversion = Conversion::create(rates, usize::try_from(read_frames)?)?;
+    let mut conversion = Conversion::create(rates)?;
     let mut writer = FlacWriter::create(to, rates.output)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
@@ -63,7 +63,10 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedErr
         let converted = conversion.convert(frames.push(&buffer[..read]))?;
         write_frames(&mut writer, converted);
     }
-    write_frames(&mut writer, conversion.flush()?);
+    write_frames(
+        &mut writer,
+        conversion.flush(usize::try_from(read_frames)?)?,
+    );
     writer.finish()
 }
 
@@ -128,7 +131,7 @@ mod tests {
 
     use super::{convert_to_flac, encode_flac_from_raw};
     use crate::{
-        fixture::{Fixture, Signal},
+        fixture::{Fixture, Signal, correlation, level, read_floats},
         frames::read_frame_count,
         pcm::{CHANNELS, PcmRequest, collect_interleaved_pcm},
         resample::SampleRates,
@@ -152,14 +155,6 @@ mod tests {
             seconds: SECONDS,
             sample_rate,
         }
-    }
-
-    fn read_floats(bytes: &[u8]) -> Vec<f32> {
-        bytes
-            .chunks_exact(size_of::<f32>())
-            .filter_map(|value| <[u8; 4]>::try_from(value).ok())
-            .map(f32::from_le_bytes)
-            .collect()
     }
 
     async fn decode(fixture: &Fixture, from: &Path, sample_rate: u32) -> Vec<f32> {
@@ -197,22 +192,6 @@ mod tests {
 
     fn quantized(value: f32) -> f32 {
         (value * SCALE).round().clamp(-SCALE, HIGHEST) / SCALE
-    }
-
-    fn energy(values: &[f32]) -> f64 {
-        values.iter().map(|value| f64::from(*value).powi(2)).sum()
-    }
-
-    fn correlation(left: &[f32], right: &[f32]) -> f64 {
-        let mut product = 0.0_f64;
-        let mut left_energy = 0.0_f64;
-        let mut right_energy = 0.0_f64;
-        for (first, second) in left.iter().zip(right) {
-            product += f64::from(*first) * f64::from(*second);
-            left_energy += f64::from(*first) * f64::from(*first);
-            right_energy += f64::from(*second) * f64::from(*second);
-        }
-        product / (left_energy.sqrt() * right_energy.sqrt())
     }
 
     #[tokio::test]
@@ -281,9 +260,9 @@ mod tests {
         let expected = resampled_by_ffmpeg(&fixture, &raw).await;
         let written = decode(&fixture, &master, TARGET_RATE).await;
         assert_eq!(written.len(), expected.len());
-        let measured = correlation(&written, &expected);
-        assert!(measured > CORRELATION, "correlation {measured}");
-        let level = (energy(&written) / energy(&expected)).sqrt();
-        assert!((level - 1.0).abs() < LEVEL_TOLERANCE, "level {level}");
+        let matched = correlation(&written, &expected);
+        assert!(matched > CORRELATION, "correlation {matched}");
+        let gain = level(&written, &expected);
+        assert!((gain - 1.0).abs() < LEVEL_TOLERANCE, "level {gain}");
     }
 }

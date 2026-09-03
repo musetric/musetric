@@ -20,14 +20,15 @@ pub(crate) struct Conversion {
     input: Vec<f32>,
     produced: Vec<f32>,
     ready: Vec<f32>,
+    ratio: f64,
     delay_frames: usize,
     dropped_frames: usize,
     written_frames: usize,
-    expected_frames: usize,
+    expected_frames: Option<usize>,
 }
 
 impl Conversion {
-    pub(crate) fn create(rates: SampleRates, input_frames: usize) -> Result<Self, BoxedError> {
+    pub(crate) fn create(rates: SampleRates) -> Result<Self, BoxedError> {
         let ratio = f64::from(rates.output) / f64::from(rates.input);
         let resampler = create_resampler(rates, ratio)?;
         let delay_frames = resampler.as_ref().map_or(0, Resampler::output_delay);
@@ -36,10 +37,11 @@ impl Conversion {
             input: Vec::new(),
             produced: Vec::new(),
             ready: Vec::new(),
+            ratio,
             delay_frames,
             dropped_frames: 0,
             written_frames: 0,
-            expected_frames: expected_frames(input_frames, ratio),
+            expected_frames: None,
         })
     }
 
@@ -57,12 +59,14 @@ impl Conversion {
         Ok(&self.ready)
     }
 
-    pub(crate) fn flush(&mut self) -> Result<&[f32], BoxedError> {
+    pub(crate) fn flush(&mut self, input_frames: usize) -> Result<&[f32], BoxedError> {
         self.ready.clear();
         if self.resampler.is_none() {
             return Ok(&self.ready);
         }
-        while self.written_frames < self.expected_frames {
+        let expected = expected_frames(input_frames, self.ratio);
+        self.expected_frames = Some(expected);
+        while self.written_frames < expected {
             self.step()?;
             if self.produced.is_empty() {
                 return Err(STALLED.into());
@@ -107,7 +111,10 @@ impl Conversion {
         for frame in self.produced.chunks_exact(CHANNELS) {
             if self.dropped_frames < self.delay_frames {
                 self.dropped_frames += 1;
-            } else if self.written_frames < self.expected_frames {
+            } else if self
+                .expected_frames
+                .is_none_or(|expected| self.written_frames < expected)
+            {
                 self.ready.extend_from_slice(frame);
                 self.written_frames += 1;
             }

@@ -5,9 +5,9 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use musetric_media::{
-    BoxedError, FfmpegPcm, PcmRequest, SampleRates, Tools, WavePeaks, analyze_lead_visual_loudness,
-    analyze_loudness, convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks,
-    read_frame_count,
+    BoxedError, PcmRequest, SampleRates, SymphoniaPcm, Tools, WavePeaks,
+    analyze_lead_visual_loudness, analyze_loudness, convert_to_flac, convert_to_fmp4,
+    encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 
 #[derive(Parser)]
@@ -78,7 +78,7 @@ enum Operation {
 async fn main() -> Result<(), BoxedError> {
     let arguments = Arguments::parse();
     let media = Media {
-        pcm: FfmpegPcm::create(arguments.ffmpeg.clone()),
+        pcm: SymphoniaPcm,
         tools: Tools {
             ffmpeg: arguments.ffmpeg,
         },
@@ -91,7 +91,7 @@ async fn main() -> Result<(), BoxedError> {
 }
 
 struct Media {
-    pcm: FfmpegPcm,
+    pcm: SymphoniaPcm,
     tools: Tools,
 }
 
