@@ -5417,13 +5417,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"editorconfig-checker@npm:6.1.1":
-  version: 6.1.1
-  resolution: "editorconfig-checker@npm:6.1.1"
+"editorconfig-checker@npm:7.0.0":
+  version: 7.0.0
+  resolution: "editorconfig-checker@npm:7.0.0"
   bin:
     ec: dist/index.js
     editorconfig-checker: dist/index.js
-  checksum: 10c0/0a46ce93e2821041c4b4bbf2ab9dc30e1b4eb03d3f20e5b14bbe45767f6f2aafd5e1310ea737c15402d8e193f702a421a814041e072584250e8a7d5e63d83741
+  checksum: 10c0/017e50d5fe859d9cbd2c9f2a2ed7089380700c8e171c6fa3b09d5d3f5e55852ae280d631580e10810b5714ed090cdc56cb40b10d6a3fcceceda1bfd9465cf181
   languageName: node
   linkType: hard
 
