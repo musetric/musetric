@@ -1,7 +1,6 @@
 mod browser;
 mod gains;
 mod models;
-mod page;
 mod separation;
 mod steps;
 
@@ -14,11 +13,11 @@ use musetric_db::PendingJob;
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 
-use crate::{proxy::ProxyState, storage::Storage};
+use crate::{host::HostProcess, storage::Storage};
 
 pub(crate) struct AnalysisContext {
     pub(crate) storage: Arc<Storage>,
-    pub(crate) proxy: ProxyState,
+    pub(crate) host: Arc<HostProcess>,
     pub(crate) client: Client,
     pub(crate) models_path: PathBuf,
     pub(crate) bundle_path: PathBuf,

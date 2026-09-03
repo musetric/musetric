@@ -1,3 +1,4 @@
+import { defaultOpenJobPage } from '@musetric/ai/node';
 import { createServerApp } from '@musetric/backend-core';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
@@ -45,13 +46,13 @@ const startServer = async () => {
       modelsPath: config.modelsPath,
       browserBundlePath: config.browserBundlePath,
       publicPath: config.publicPath,
+      openPage: defaultOpenJobPage,
       tls: https,
       onLog: (line) => {
         console.log(line);
       },
     });
-    const shown = createDisplayUrl(proxy.url);
-    console.log(`Server: ${shown}\tSwagger: ${shown}/docs`);
+    console.log(`Server: ${createDisplayUrl(proxy.url)}`);
   } catch (error) {
     await proxy?.close();
     await app.close();

@@ -19,7 +19,6 @@
   "dependencies": {
     "@fastify/multipart": "catalog:",
     "@fastify/swagger": "catalog:",
-    "@fastify/swagger-ui": "catalog:",
     "@musetric/ai": "workspace:*",
     "@musetric/api": "workspace:*",
     "@musetric/backend-core": "workspace:*",

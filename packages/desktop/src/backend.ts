@@ -1,9 +1,8 @@
 import { join } from 'node:path';
-import { type OpenJobPage } from '@musetric/ai/node';
 import { type AppConfig } from '@musetric/backend-core/config';
 import { initDatabase } from '@musetric/backend-db/migrations';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
-import { startRustProxy } from '@musetric/server';
+import { type OpenGpuPage, startRustProxy } from '@musetric/server';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
 import { type FastifyInstance } from 'fastify';
@@ -29,7 +28,7 @@ const createDesktopConfig = (logDestination: DestinationStream): AppConfig => {
 };
 
 export type StartBackendOptions = {
-  openPage: OpenJobPage;
+  openPage: OpenGpuPage;
   logDestination: DestinationStream;
   logger: Logger;
 };
@@ -46,9 +45,7 @@ export const startBackend = async (
   try {
     const migration = initDatabase(config.databasePath);
     const { createServerApp } = await import('@musetric/backend-core');
-    const fastify = await createServerApp(config, {
-      openPage: options.openPage,
-    });
+    const fastify = await createServerApp(config);
     backend = fastify;
     await fastify.listen({
       port: 0,
@@ -68,6 +65,7 @@ export const startBackend = async (
       modelsPath: config.modelsPath,
       browserBundlePath: config.browserBundlePath,
       publicPath: config.publicPath,
+      openPage: options.openPage,
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustProxy' }, line);

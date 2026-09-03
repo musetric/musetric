@@ -11,12 +11,17 @@ use musetric_db::{BoxedError, Reader, Writer};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::Tools;
 use reqwest::Client;
-use tokio::{io::AsyncReadExt, net::TcpListener};
+use tokio::{
+    io::{stdin, stdout},
+    net::TcpListener,
+    sync::oneshot,
+};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
     frontend::Frontend,
     garbage::spawn_collector,
+    host::HostProcess,
     proxy::ProxyState,
     router::{RouterOptions, create_router},
     storage::Storage,
@@ -57,10 +62,11 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         },
     });
     spawn_collector(Arc::clone(&storage));
+    let (host, closed) = HostProcess::create(stdin(), stdout());
     let proxy = ProxyState::create(options.upstream.parse()?);
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
-        proxy: proxy.clone(),
+        host: Arc::clone(&host),
         client: Client::new(),
         models_path: options.models,
         bundle_path: options.browser_bundle,
@@ -85,8 +91,8 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     if let Some(tls) = options.tls {
         let config = RustlsConfig::from_pem_file(tls.certificate, tls.private_key).await?;
         let handle = Handle::<SocketAddr>::new();
-        tokio::spawn(shutdown_on_closed_stdin(handle.clone()));
-        print_ready("https", address)?;
+        tokio::spawn(shutdown_on_closed_host(handle.clone(), closed));
+        announce_ready(&host, "https", address);
         axum_server::from_tcp_rustls(socket, config)?
             .handle(handle)
             .serve(app.into_make_service())
@@ -94,9 +100,11 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         return Ok(());
     }
     let listener = TcpListener::from_std(socket)?;
-    print_ready("http", address)?;
+    announce_ready(&host, "http", address);
     axum::serve(listener, app)
-        .with_graceful_shutdown(closed_stdin())
+        .with_graceful_shutdown(async move {
+            let _ = closed.await;
+        })
         .await?;
     Ok(())
 }
@@ -114,23 +122,11 @@ fn report_bind_failure(error: io::Error) -> io::Error {
     error
 }
 
-fn print_ready(protocol: &str, address: SocketAddr) -> io::Result<()> {
-    let mut stdout = io::stdout().lock();
-    writeln!(stdout, "{READY_PREFIX}{protocol}://{address}")?;
-    stdout.flush()
+fn announce_ready(host: &HostProcess, protocol: &str, address: SocketAddr) {
+    host.announce(&format!("{READY_PREFIX}{protocol}://{address}"));
 }
 
-async fn closed_stdin() {
-    let mut stdin = tokio::io::stdin();
-    let mut buffer = [0_u8; 256];
-    while let Ok(read) = stdin.read(&mut buffer).await {
-        if read == 0 {
-            return;
-        }
-    }
-}
-
-async fn shutdown_on_closed_stdin(handle: Handle<SocketAddr>) {
-    closed_stdin().await;
+async fn shutdown_on_closed_host(handle: Handle<SocketAddr>, closed: oneshot::Receiver<()>) {
+    let _ = closed.await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 }

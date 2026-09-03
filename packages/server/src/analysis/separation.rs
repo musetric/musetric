@@ -225,7 +225,7 @@ async fn deliver(
     let waiting = session.host().expect_uploads(running.stems.uploads())?;
     session
         .run(
-            &running.context.proxy,
+            &running.context.host,
             Job {
                 api: API_NAME,
                 request: &request,
