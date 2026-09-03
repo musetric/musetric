@@ -40,10 +40,10 @@ pub async fn decode_mono_pcm(
         "pipe:1".to_owned(),
     ]);
     let finished = run(&tools.ffmpeg, &arguments).await?;
-    if finished.stdout.is_empty() {
+    if finished.is_empty() {
         return Err("ffmpeg produced no audio data".into());
     }
-    Ok(finished.stdout)
+    Ok(finished)
 }
 
 async fn read_downmix(
@@ -71,7 +71,7 @@ async fn read_channel_count(tools: &Tools, from: &Path) -> Result<u32, BoxedErro
         from.display().to_string(),
     ];
     let finished = run(&tools.ffprobe, &arguments).await?;
-    let reported = String::from_utf8_lossy(&finished.stdout);
+    let reported = String::from_utf8_lossy(&finished);
     reported
         .lines()
         .filter_map(|line| line.trim().parse::<u32>().ok())

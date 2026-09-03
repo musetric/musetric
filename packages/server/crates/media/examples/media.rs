@@ -57,6 +57,8 @@ enum Operation {
     Loudness {
         #[arg(long)]
         from: PathBuf,
+        #[arg(long)]
+        sample_rate: u32,
     },
     LeadLoudness {
         #[arg(long)]
@@ -110,8 +112,8 @@ async fn run(tools: &Tools, operation: Operation) -> Result<String, BoxedError> 
             let frames = read_frame_count(tools, &from, sample_rate).await?;
             Ok(frames.to_string())
         }
-        Operation::Loudness { from } => {
-            let loudness = analyze_loudness(tools, &from).await?;
+        Operation::Loudness { from, sample_rate } => {
+            let loudness = analyze_loudness(tools, &from, sample_rate).await?;
             Ok(serde_json::json!({
                 "integratedLoudnessDb": loudness.integrated_loudness_db,
                 "truePeakDb": loudness.true_peak_db,

@@ -24,7 +24,7 @@ pub async fn read_frame_count(
         from.display().to_string(),
     ];
     let finished = run(&tools.ffprobe, &arguments).await?;
-    let reported = String::from_utf8_lossy(&finished.stdout);
+    let reported = String::from_utf8_lossy(&finished);
     let seconds = reported
         .lines()
         .filter_map(|line| line.trim().parse::<f64>().ok())
