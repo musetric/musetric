@@ -9,9 +9,11 @@ import {
 } from './storageWorkspace.js';
 
 const snapshotHeaders = [
+  'accept-ranges',
   'cache-control',
   'content-disposition',
   'content-length',
+  'content-range',
   'content-type',
   'etag',
   'last-modified',

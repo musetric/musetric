@@ -135,10 +135,81 @@ mod tests {
             read_header(&response, "content-length"),
             Some("15".to_owned())
         );
+        assert_eq!(
+            read_header(&response, "accept-ranges"),
+            Some("bytes".to_owned())
+        );
         let body = to_bytes(response.into_body(), CHORDS.len())
             .await
             .expect("the body should be readable");
         assert_eq!(&body[..], CHORDS.as_bytes());
+    }
+
+    #[tokio::test]
+    async fn answers_a_byte_range_with_a_partial_body() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_MASTERS);
+        workspace.add_blob(BLOB_ID, AUDIO);
+        let router = create_test_router(&workspace);
+
+        let bounded = request_with_header(router.clone(), SOURCE_URL, ("range", "bytes=2-5")).await;
+        let suffix = request_with_header(router, SOURCE_URL, ("range", "bytes=-4")).await;
+
+        assert_eq!(bounded.status(), StatusCode::PARTIAL_CONTENT);
+        assert_eq!(
+            read_header(&bounded, "content-range"),
+            Some("bytes 2-5/13".to_owned())
+        );
+        assert_eq!(
+            read_header(&bounded, "content-length"),
+            Some("4".to_owned())
+        );
+        assert_eq!(read_body(bounded).await, "xtur");
+        assert_eq!(suffix.status(), StatusCode::PARTIAL_CONTENT);
+        assert_eq!(
+            read_header(&suffix, "content-range"),
+            Some("bytes 9-12/13".to_owned())
+        );
+        assert_eq!(read_body(suffix).await, "udio");
+    }
+
+    #[tokio::test]
+    async fn refuses_a_range_that_starts_after_the_body() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_MASTERS);
+        workspace.add_blob(BLOB_ID, AUDIO);
+
+        let response = request_with_header(
+            create_test_router(&workspace),
+            SOURCE_URL,
+            ("range", "bytes=40-"),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::RANGE_NOT_SATISFIABLE);
+        assert_eq!(
+            read_header(&response, "content-range"),
+            Some("bytes */13".to_owned())
+        );
+        assert_eq!(read_body(response).await, "");
+    }
+
+    async fn request_with_header(
+        router: Router,
+        url: &str,
+        header: (&str, &str),
+    ) -> Response<Body> {
+        let request = Request::builder()
+            .uri(url)
+            .header(header.0, header.1)
+            .body(Body::empty())
+            .expect("the request should be valid");
+        router
+            .oneshot(request)
+            .await
+            .expect("the router should answer")
     }
 
     #[tokio::test]

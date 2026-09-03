@@ -8,6 +8,7 @@ mod frontend;
 mod garbage;
 mod host;
 mod pages;
+mod range;
 mod realtime;
 mod router;
 mod routes;

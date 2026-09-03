@@ -63,6 +63,65 @@ test('a matching etag answers not modified', async () => {
   expect(snapshot).toMatchSnapshot();
 });
 
+test('a byte range answers a partial body', async () => {
+  const snapshots = await withTestServer(async (client) => {
+    const url = `/api/audio/project/${fixtureProjectId}/master/lead/content`;
+    return [
+      await client.capture({
+        method: 'GET',
+        url,
+        headers: { range: 'bytes=2-5' },
+      }),
+      await client.capture({
+        method: 'GET',
+        url,
+        headers: { range: 'bytes=-4' },
+      }),
+      await client.capture({
+        method: 'GET',
+        url,
+        headers: { range: 'bytes=2-40' },
+      }),
+    ];
+  });
+  expect(snapshots).toMatchSnapshot();
+});
+
+test('an unsatisfiable range is refused the same way', async () => {
+  const snapshots = await withTestServer(async (client) => {
+    const url = `/api/audio/project/${fixtureProjectId}/master/lead/content`;
+    return [
+      await client.capture({
+        method: 'GET',
+        url,
+        headers: { range: 'bytes=40-' },
+      }),
+      await client.capture({
+        method: 'GET',
+        url,
+        headers: { range: 'bytes=-0' },
+      }),
+    ];
+  });
+  expect(snapshots).toMatchSnapshot();
+});
+
+test('a matching etag wins over a byte range', async () => {
+  const snapshot = await withTestServer(async (client) => {
+    const url = `/api/audio/project/${fixtureProjectId}/master/lead/content`;
+    const first = await client.capture({ method: 'GET', url });
+    return await client.capture({
+      method: 'GET',
+      url,
+      headers: {
+        'if-none-match': first.headers.etag,
+        range: 'bytes=2-5',
+      },
+    });
+  });
+  expect(snapshot).toMatchSnapshot();
+});
+
 test('the status stream opens as server-sent events', async () => {
   const snapshot = await withTestServer(async (client) =>
     client.captureStream('/api/project/status/stream'),
