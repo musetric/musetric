@@ -7,7 +7,10 @@ use axum::{
     Router,
     body::Body,
     extract::{Request, State},
-    http::{HeaderMap, HeaderValue, Method, StatusCode, Uri},
+    http::{
+        HeaderMap, HeaderValue, Method, StatusCode, Uri,
+        header::{CONTENT_LENGTH, CONTENT_TYPE},
+    },
     response::Response,
     routing::any,
 };
@@ -17,6 +20,7 @@ use tokio_util::io::ReaderStream;
 use crate::cached_file::{CachedFile, CachedHeaders, REVALIDATE_CACHE};
 
 const INDEX: &str = "index.html";
+const OCTET_STREAM: &str = "application/octet-stream";
 const SERVER_PREFIXES: [&str; 1] = ["/api"];
 
 #[derive(Clone)]
@@ -107,7 +111,7 @@ impl Frontend {
                 send_file(&path, visit).await
             }
             FrontendSource::Assets(assets) => assets
-                .get(normalize(pathname))
+                .get(normalize(pathname)?)
                 .map(|asset| send_asset(asset, visit)),
         }
     }
@@ -127,8 +131,12 @@ fn resolve(public_path: &Path, pathname: &str) -> Option<PathBuf> {
     Some(public_path.join(relative))
 }
 
-fn normalize(pathname: &str) -> &str {
-    pathname.trim_start_matches('/')
+fn normalize(pathname: &str) -> Option<&str> {
+    let relative = pathname.trim_start_matches('/');
+    let safe = Path::new(relative)
+        .components()
+        .all(|part| matches!(part, Component::Normal(_)));
+    safe.then_some(relative)
 }
 
 fn serves_the_app(pathname: &str) -> bool {
@@ -166,16 +174,21 @@ fn send_asset(asset: FrontendAsset, visit: &Visit<'_>) -> Response<Body> {
         bytes,
         content_type,
     } = asset;
+    let length = bytes.len();
     let mut response = if visit.method == Method::HEAD {
         Response::new(Body::empty())
     } else {
         Response::new(Body::from(bytes))
     };
-    response.headers_mut().insert(
-        "content-type",
+    let headers = response.headers_mut();
+    headers.insert(
+        CONTENT_TYPE,
         HeaderValue::from_str(&content_type)
-            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+            .unwrap_or_else(|_| HeaderValue::from_static(OCTET_STREAM)),
     );
+    if let Ok(value) = HeaderValue::from_str(&length.to_string()) {
+        headers.insert(CONTENT_LENGTH, value);
+    }
     response
 }
 

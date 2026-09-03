@@ -1,7 +1,11 @@
-use std::sync::Arc;
+use std::{
+    io::{self, Write},
+    process::exit,
+    sync::Arc,
+};
 
 use musetric_server::{
-    start_embedded, EmbeddedServerOptions, Frontend, FrontendAsset, FrontendAssets,
+    EmbeddedServerOptions, Frontend, FrontendAsset, FrontendAssets, start_embedded,
 };
 use tauri::{Manager, Runtime};
 
@@ -17,10 +21,13 @@ impl<R: Runtime> FrontendAssets for TauriAssets<R> {
     }
 }
 
+const STARTUP_FAILURE: &str = "musetric could not start: ";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    if run_app().is_err() {
-        std::process::exit(1);
+    if let Err(error) = run_app() {
+        let _ = writeln!(io::stderr().lock(), "{STARTUP_FAILURE}{error}");
+        exit(1);
     }
 }
 

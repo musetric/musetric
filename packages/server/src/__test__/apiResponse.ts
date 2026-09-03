@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { ffmpegPath, ffprobePath } from '@musetric/ffmpeg';
 import { startRustProxy } from '../rustProxy.js';
+import { serverResourcesPath } from './globalSetup.js';
 import { createProjectFixture } from './projectFixture.js';
 import {
   createStorageWorkspace,
@@ -136,6 +137,7 @@ export const withTestServer = async <Result>(
     browserBundlePath: workspace.paths.browserBundlePath,
     publicPath: workspace.paths.publicPath,
     processing: false,
+    resourcesPath: serverResourcesPath,
   });
   try {
     await createProjectFixture(workspace);
