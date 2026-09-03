@@ -5,8 +5,8 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use musetric_media::{
-    BoxedError, Tools, analyze_lead_visual_loudness, analyze_loudness, convert_to_flac,
-    convert_to_fmp4, generate_wave_peaks, read_frame_count,
+    BoxedError, SampleRates, Tools, analyze_lead_visual_loudness, analyze_loudness,
+    convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 
 #[derive(Parser)]
@@ -31,6 +31,16 @@ enum Operation {
         to: PathBuf,
         #[arg(long)]
         sample_rate: u32,
+    },
+    RawFlac {
+        #[arg(long)]
+        from: PathBuf,
+        #[arg(long)]
+        to: PathBuf,
+        #[arg(long)]
+        input_sample_rate: u32,
+        #[arg(long)]
+        output_sample_rate: u32,
     },
     Fmp4 {
         #[arg(long)]
@@ -90,6 +100,19 @@ async fn run(tools: &Tools, operation: Operation) -> Result<String, BoxedError> 
             sample_rate,
         } => {
             convert_to_flac(tools, &from, &to, sample_rate).await?;
+            Ok(String::new())
+        }
+        Operation::RawFlac {
+            from,
+            to,
+            input_sample_rate,
+            output_sample_rate,
+        } => {
+            let rates = SampleRates {
+                input: input_sample_rate,
+                output: output_sample_rate,
+            };
+            encode_flac_from_raw(&from, &to, rates).await?;
             Ok(String::new())
         }
         Operation::Fmp4 {

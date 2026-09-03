@@ -7,8 +7,28 @@ use crate::{
     run::{BoxedError, run},
 };
 
-const BYTES_PER_FRAME: usize = 8;
-const READ_BUFFER_BYTE_LENGTH: usize = 64 * 1024;
+pub(crate) const CHANNELS: usize = 2;
+pub(crate) const BYTES_PER_FRAME: usize = CHANNELS * size_of::<f32>();
+pub(crate) const READ_BUFFER_BYTE_LENGTH: usize = 64 * 1024;
+
+#[derive(Default)]
+pub(crate) struct Frames {
+    carry: Vec<u8>,
+    samples: Vec<f32>,
+}
+
+impl Frames {
+    pub(crate) fn push(&mut self, bytes: &[u8]) -> &[f32] {
+        self.samples.clear();
+        self.carry.extend_from_slice(bytes);
+        let aligned = self.carry.len() - self.carry.len() % BYTES_PER_FRAME;
+        for value in self.carry[..aligned].chunks_exact(size_of::<f32>()) {
+            self.samples.push(read_float(value));
+        }
+        self.carry.drain(..aligned);
+        &self.samples
+    }
+}
 
 pub(crate) fn decode_arguments(from: &Path, sample_rate: u32) -> Vec<String> {
     vec![
@@ -58,7 +78,7 @@ pub(crate) async fn read_pcm(
         reported
     });
 
-    let mut carry = Vec::new();
+    let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
     let mut frame_index = 0_u64;
     loop {
@@ -66,13 +86,10 @@ pub(crate) async fn read_pcm(
         if read == 0 {
             break;
         }
-        carry.extend_from_slice(&buffer[..read]);
-        let aligned = carry.len() - carry.len() % BYTES_PER_FRAME;
-        for frame in carry[..aligned].chunks_exact(BYTES_PER_FRAME) {
-            on_frame(read_float(frame, 0), read_float(frame, 1), frame_index);
+        for frame in frames.push(&buffer[..read]).chunks_exact(CHANNELS) {
+            on_frame(frame[0], frame[1], frame_index);
             frame_index += 1;
         }
-        carry.drain(..aligned);
     }
 
     let status = child.wait().await?;
@@ -89,13 +106,8 @@ pub(crate) async fn read_pcm(
     Ok(())
 }
 
-fn read_float(frame: &[u8], index: usize) -> f32 {
-    let start = index * size_of::<f32>();
-    let end = start + size_of::<f32>();
-    frame
-        .get(start..end)
-        .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
-        .map_or(0.0, f32::from_le_bytes)
+fn read_float(bytes: &[u8]) -> f32 {
+    <[u8; 4]>::try_from(bytes).map_or(0.0, f32::from_le_bytes)
 }
 
 pub async fn decode_interleaved_pcm(
