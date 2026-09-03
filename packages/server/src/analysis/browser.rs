@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ModelFile, ProgressSink,
+    Bundle, Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ModelFile, ProgressSink,
     ensure_model_file,
 };
 use musetric_jobs::{StepAnswer, StepEvent, StepReport};
@@ -14,7 +14,7 @@ use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
 use crate::{
     analysis::AnalysisContext,
     blobs::create_blob_ref,
-    host::{HostProcess, PageFailure},
+    pages::{PageFailure, PageOpener},
     storage::write_database,
 };
 
@@ -98,7 +98,7 @@ pub(crate) struct BrowserAnalysis {
 
 pub(crate) struct SessionOptions {
     pub(crate) label: &'static str,
-    pub(crate) bundle_path: PathBuf,
+    pub(crate) bundle: Bundle,
     pub(crate) pcm: Vec<u8>,
     pub(crate) require_shader_f16: bool,
 }
@@ -122,7 +122,7 @@ impl Session {
         });
         let host = ExecutorHost::start(ExecutorHostOptions {
             label: options.label.to_owned(),
-            bundle_path: options.bundle_path,
+            bundle: options.bundle,
             pcm: Bytes::from(options.pcm),
             require_shader_f16: options.require_shader_f16,
             on_progress: sink,
@@ -135,10 +135,14 @@ impl Session {
         &self.host
     }
 
-    pub(crate) async fn run(&mut self, host: &HostProcess, job: Job<'_>) -> Result<Value, Failure> {
-        let page = host.open_page(&self.host.page_url()).await?;
+    pub(crate) async fn run(
+        &mut self,
+        pages: &dyn PageOpener,
+        job: Job<'_>,
+    ) -> Result<Value, Failure> {
+        let page = pages.open_page(&self.host.page_url()).await?;
         let found = self.answer(job).await;
-        host.close_page(&page);
+        pages.close_page(&page);
         found
     }
 
@@ -205,7 +209,7 @@ async fn analyze(
     .await?;
     let mut session = Session::start(SessionOptions {
         label: analysis.label,
-        bundle_path: context.bundle_path.clone(),
+        bundle: context.bundle.clone(),
         pcm,
         require_shader_f16: analysis.require_shader_f16,
     })
@@ -233,7 +237,7 @@ async fn read_result(
     let request = (analysis.build)(&session.host().pcm_url(), &hosted)?;
     session
         .run(
-            &attempt.context.host,
+            attempt.context.pages.as_ref(),
             Job {
                 api: analysis.api,
                 request: &request,

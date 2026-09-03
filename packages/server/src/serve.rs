@@ -9,6 +9,7 @@ use std::{
 use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
+use musetric_gpu::Bundle;
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::Tools;
 use reqwest::Client;
@@ -24,6 +25,7 @@ use crate::{
     frontend::Frontend,
     garbage::spawn_collector,
     host::HostProcess,
+    pages::PageOpener,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
@@ -60,8 +62,10 @@ pub struct EmbeddedServerOptions {
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
     pub models: PathBuf,
-    pub browser_bundle: PathBuf,
+    pub browser_bundle: Bundle,
     pub frontend: Frontend,
+    pub pages: Arc<dyn PageOpener>,
+    pub processing: bool,
 }
 
 pub struct EmbeddedServer {
@@ -100,9 +104,9 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     )?;
     let app = create_app(AppOptions {
         storage,
-        host: Arc::clone(&host),
+        pages: Arc::clone(&host) as Arc<dyn PageOpener>,
         models: options.models,
-        browser_bundle: options.browser_bundle,
+        browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
         processing: options.processing,
     });
@@ -139,11 +143,11 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
     )?;
     let app = create_app(AppOptions {
         storage,
-        host: HostProcess::unavailable(),
+        pages: options.pages,
         models: options.models,
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
-        processing: false,
+        processing: options.processing,
     });
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
@@ -164,9 +168,9 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
 
 struct AppOptions {
     storage: Arc<Storage>,
-    host: Arc<HostProcess>,
+    pages: Arc<dyn PageOpener>,
     models: PathBuf,
-    browser_bundle: PathBuf,
+    browser_bundle: Bundle,
     frontend: Frontend,
     processing: bool,
 }
@@ -175,10 +179,10 @@ fn create_app(options: AppOptions) -> Router {
     let storage = options.storage;
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
-        host: options.host,
+        pages: options.pages,
         client: Client::new(),
         models_path: options.models,
-        bundle_path: options.browser_bundle,
+        bundle: options.browser_bundle,
     });
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
@@ -275,16 +279,16 @@ mod tests {
     };
 
     use super::{EmbeddedServerOptions, start_embedded};
-    use crate::{Frontend, FrontendAsset, FrontendAssets};
+    use crate::{Asset, Assets, Bundle, ClosedPages, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    struct Assets;
+    struct AppAssets;
 
-    impl FrontendAssets for Assets {
-        fn get(&self, path: &str) -> Option<FrontendAsset> {
+    impl Assets for AppAssets {
+        fn get(&self, path: &str) -> Option<Asset> {
             (path == "index.html").then(|| {
-                FrontendAsset::new(
+                Asset::create(
                     b"<!doctype html><title>Musetric</title>".to_vec(),
                     "text/html; charset=utf-8".to_owned(),
                 )
@@ -318,8 +322,10 @@ mod tests {
                 ffmpeg: self.root.join("runtime/ffmpeg"),
                 ffprobe: self.root.join("runtime/ffprobe"),
                 models: self.root.join("models"),
-                browser_bundle: self.root.join("browser"),
-                frontend: Frontend::from_assets(Arc::new(Assets)),
+                browser_bundle: Bundle::Directory(self.root.join("browser")),
+                frontend: Frontend::from_assets(Arc::new(AppAssets)),
+                pages: Arc::new(ClosedPages),
+                processing: false,
             }
         }
     }

@@ -13,14 +13,16 @@ use musetric_db::PendingJob;
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 
-use crate::{host::HostProcess, storage::Storage};
+use musetric_gpu::Bundle;
+
+use crate::{pages::PageOpener, storage::Storage};
 
 pub(crate) struct AnalysisContext {
     pub(crate) storage: Arc<Storage>,
-    pub(crate) host: Arc<HostProcess>,
+    pub(crate) pages: Arc<dyn PageOpener>,
     pub(crate) client: Client,
     pub(crate) models_path: PathBuf,
-    pub(crate) bundle_path: PathBuf,
+    pub(crate) bundle: Bundle,
 }
 
 pub(crate) struct AnalysisRunner {

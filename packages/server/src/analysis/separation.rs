@@ -206,7 +206,7 @@ async fn split(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let pcm = decode_interleaved_pcm(&context.storage.tools, &source, VOCALS.sample_rate).await?;
     let mut session = Session::start(SessionOptions {
         label: LABEL,
-        bundle_path: context.bundle_path.clone(),
+        bundle: context.bundle.clone(),
         pcm,
         require_shader_f16: true,
     })
@@ -225,7 +225,7 @@ async fn deliver(
     let waiting = session.host().expect_uploads(running.stems.uploads())?;
     session
         .run(
-            &running.context.host,
+            running.context.pages.as_ref(),
             Job {
                 api: API_NAME,
                 request: &request,

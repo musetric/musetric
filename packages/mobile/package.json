@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "dev:mobile": "vite --configLoader native",
-    "build:mobile": "yarn build:icons && vite build --configLoader native",
+    "build:mobile": "yarn build:icons && vite build --configLoader native && yarn build:executor",
     "build:icons": "node ./scripts/buildIcons.ts && tauri icon -o src-tauri/gen-assets src-tauri/gen/icon.json",
     "init:android": "node ./scripts/initNative.ts android",
     "init:ios": "node ./scripts/initNative.ts ios",
@@ -20,7 +20,8 @@
     "build:ios": "yarn init:ios && tauri ios build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "build:executor": "vite build --config vite.executor.config.ts --configLoader native"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
@@ -36,6 +37,12 @@
     "vite": "catalog:"
   },
   "dependencies": {
+    "@musetric/ai": "workspace:*",
+    "@musetric/cqt": "workspace:*",
+    "@musetric/fft": "workspace:*",
+    "@musetric/utils": "workspace:*",
+    "@tauri-apps/api": "catalog:",
+    "onnxruntime-web": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   }

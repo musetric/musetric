@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use musetric_db::{
     Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemType,
 };
-use musetric_gpu::{Download, DownloadStatus, ExecutorFailure};
+use musetric_gpu::{Bundle, Download, DownloadStatus, ExecutorFailure};
 use musetric_jobs::StepAnswer;
 use musetric_media::{Downmix, LeadVisualLoudness, Loudness};
 use reqwest::Client;
@@ -33,10 +33,10 @@ const CREATE_PROJECT: &str = "
 fn create_context(workspace: &Workspace) -> AnalysisContext {
     AnalysisContext {
         storage: workspace.create_storage(),
-        host: start_fake_host(None).host,
+        pages: start_fake_host(None).host,
         client: Client::new(),
         models_path: workspace.blobs_path().join("models"),
-        bundle_path: workspace.blobs_path().join("bundle"),
+        bundle: Bundle::Directory(workspace.blobs_path().join("bundle")),
     }
 }
 

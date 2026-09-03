@@ -22,7 +22,10 @@ use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
-use crate::host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions};
+use crate::{
+    files::{Asset, Assets, Bundle},
+    host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions},
+};
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -116,7 +119,7 @@ async fn start_host(
 ) -> ExecutorHost {
     ExecutorHost::start(ExecutorHostOptions {
         label: "Fixture analysis".to_owned(),
-        bundle_path: workspace.bundle_path(),
+        bundle: Bundle::Directory(workspace.bundle_path()),
         pcm: Bytes::from_static(PCM),
         require_shader_f16,
         on_progress: reported.sink(),
@@ -380,6 +383,41 @@ async fn stores_the_upload_the_analysis_expects() {
         read_to_string(&target).expect("the upload should be stored"),
         "stem"
     );
+    host.close().await;
+}
+
+struct EchoedAssets;
+
+impl Assets for EchoedAssets {
+    fn get(&self, path: &str) -> Option<Asset> {
+        Some(Asset::create(
+            path.as_bytes().to_vec(),
+            "text/javascript".to_owned(),
+        ))
+    }
+}
+
+#[tokio::test]
+async fn asks_an_embedder_for_the_bundle_only_by_a_relative_name() {
+    let reported = Reported::create();
+    let host = ExecutorHost::start(ExecutorHostOptions {
+        label: "Fixture analysis".to_owned(),
+        bundle: Bundle::Assets(Arc::new(EchoedAssets)),
+        pcm: Bytes::from_static(PCM),
+        require_shader_f16: false,
+        on_progress: reported.sink(),
+    })
+    .await
+    .expect("the host should start");
+
+    let (status, asked) = get(&format!("{}/assets/index.js", host.base_url())).await;
+    let (encoded, _) = get(&format!("{}/%2e%2e/secret", host.base_url())).await;
+    let (escaped, _) = get(&format!("{}/../secret", host.base_url())).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(String::from_utf8_lossy(&asked), "assets/index.js");
+    assert_eq!(encoded, StatusCode::NOT_FOUND);
+    assert_eq!(escaped, StatusCode::NOT_FOUND);
     host.close().await;
 }
 

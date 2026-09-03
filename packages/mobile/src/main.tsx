@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.js';
+import { startJobPages } from './app/jobPages.js';
 
 const rootElement = document.getElementById('root');
 
@@ -13,3 +14,5 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+void startJobPages();
