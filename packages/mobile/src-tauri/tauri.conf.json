@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Musetric" }],
+    "windows": [],
     "security": {
       "csp": null
     }

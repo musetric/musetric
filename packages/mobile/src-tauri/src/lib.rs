@@ -5,7 +5,7 @@ use std::{
 };
 
 use musetric_server::{Bundle, EmbeddedServerOptions, Frontend, start_embedded};
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::{
     assets::TauriAssets,
@@ -17,6 +17,8 @@ mod pages;
 
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
+const MAIN_WINDOW: &str = "main";
+const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -55,9 +57,9 @@ fn run_app() -> tauri::Result<()> {
             .map_err(|error| std::io::Error::other(error.to_string()))?;
             let url = server.url().parse()?;
             app.manage(server);
-            app.get_webview_window("main")
-                .ok_or("The main webview was not created")?
-                .navigate(url)?;
+            WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::External(url))
+                .title(TITLE)
+                .build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![report_page])

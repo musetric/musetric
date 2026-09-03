@@ -3,7 +3,7 @@
   "identifier": "default",
   "description": "Core permissions granted to the app window",
   "windows": ["main"],
-  "permissions": ["core:default"],
+  "permissions": ["core:default", "allow-report-page"],
   "remote": {
     "urls": ["http://127.0.0.1:*", "http://localhost:*"]
   }
