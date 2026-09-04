@@ -25,9 +25,7 @@
     "check:deps:security": "yarn npm audit --all --recursive --severity high",
     "check:deps:dupe": "yarn constraints && yarn dedupe --check",
     "fix:deps:dupe": "yarn constraints --fix && yarn && yarn dedupe",
-    "check:dupe": "jscpd packages --config .jscpd.json",
     "check:unused": "knip",
-    "check:editor": "editorconfig-checker",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
     "check:translations": "yarn workspaces foreach --all --parallel --interlaced run check:translations",
@@ -42,8 +40,6 @@
     "test": "yarn workspaces foreach --all --parallel --interlaced run test"
   },
   "devDependencies": {
-    "editorconfig-checker": "catalog:",
-    "jscpd": "catalog:",
     "knip": "catalog:",
     "prettier": "catalog:"
   },

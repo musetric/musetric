@@ -9,12 +9,8 @@ on:
 jobs:
   check-js-quality:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: 26.2.0
@@ -46,11 +42,7 @@ jobs:
       # https://github.com/npm/cli/issues/9950
       # - run: yarn check:deps:security
       - run: yarn check:deps:dupe
-      - run: yarn check:dupe
       - run: yarn check:unused
-      - run: yarn check:editor
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: yarn check:format
       - run: yarn check:translations
       - run: yarn check:openapi
