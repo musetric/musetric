@@ -1,8 +1,6 @@
 mod aac;
 mod convert;
 mod decode;
-#[cfg(test)]
-mod fixture;
 mod flac;
 mod fmp4;
 mod frames;
