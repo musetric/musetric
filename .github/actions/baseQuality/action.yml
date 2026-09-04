@@ -1,0 +1,22 @@
+name: Base Quality
+description: Duplicate-code and EditorConfig checks
+
+runs:
+  using: composite
+  steps:
+    - name: Check duplicate code
+      shell: bash
+      env:
+        JSCPD_VERSION: 5.1.2
+      run: |
+        curl -fsSL --output "$RUNNER_TEMP/jscpd.tar.gz" "https://github.com/kucherenko/jscpd/releases/download/v$JSCPD_VERSION/jscpd-linux-x64-gnu.tar.gz"
+        tar -xzf "$RUNNER_TEMP/jscpd.tar.gz" -C "$RUNNER_TEMP"
+        "$RUNNER_TEMP/jscpd" packages --config .jscpd.json
+    - name: Check EditorConfig
+      shell: bash
+      env:
+        EDITORCONFIG_CHECKER_VERSION: v4.0.1
+      run: |
+        curl -fsSL --output "$RUNNER_TEMP/editorconfig-checker.tar.gz" "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/$EDITORCONFIG_CHECKER_VERSION/editorconfig-checker-linux-amd64.tar.gz"
+        tar -xzf "$RUNNER_TEMP/editorconfig-checker.tar.gz" -C "$RUNNER_TEMP"
+        "$RUNNER_TEMP/editorconfig-checker"
