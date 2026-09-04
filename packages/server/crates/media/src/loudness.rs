@@ -13,7 +13,7 @@ const MINIMUM_ACTIVE_PEAK_DB: f64 = -55.0;
 const MINIMUM_ACTIVE_DB: f64 = -70.0;
 const ACTIVE_MARGIN_DB: f64 = 20.0;
 const PERCENTILE: f64 = 0.95;
-const SILENT_INTEGRATED: &str = "The integrated loudness is not a number";
+const ABSOLUTE_GATE_LUFS: f64 = -70.0;
 const SILENT_PEAK: &str = "The true peak is not a number";
 
 #[derive(Clone, Copy)]
@@ -70,14 +70,11 @@ impl Meter {
         let left = self.state.true_peak(0)?;
         let right = self.state.true_peak(1)?;
         let peak = amplitude_to_db(left.max(right));
-        if !integrated.is_finite() {
-            return Err(SILENT_INTEGRATED.into());
-        }
         if !peak.is_finite() {
             return Err(SILENT_PEAK.into());
         }
         Ok(Loudness {
-            integrated_loudness_db: integrated,
+            integrated_loudness_db: integrated.max(ABSOLUTE_GATE_LUFS),
             true_peak_db: peak,
         })
     }
@@ -219,4 +216,95 @@ fn percentile(values: &mut [f64], ratio: f64) -> Option<f64> {
 )]
 fn frame_count(seconds: f64, sample_rate: u32) -> usize {
     (seconds * f64::from(sample_rate)).round() as usize
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{f32::consts::TAU, path::Path};
+
+    use super::{ABSOLUTE_GATE_LUFS, analyze_lead_visual_loudness, analyze_loudness};
+    use crate::pcm::{PcmRequest, PcmSink, PcmSource, ReadingPcm};
+
+    const SAMPLE_RATE: u32 = 48_000;
+    const FRAMES: usize = 192_000;
+    const CHANNELS: usize = 2;
+    const FREQUENCY_HZ: f32 = 1000.0;
+    const AMPLITUDE: f32 = 0.5;
+    const SINE_PEAK_DB: f64 = -6.02;
+    const SINE_INTEGRATED_LUFS: f64 = -6.1;
+    const TOLERANCE_DB: f64 = 0.5;
+
+    struct Samples(Vec<f32>);
+
+    impl PcmSource for Samples {
+        fn read_pcm<'source>(
+            &'source self,
+            _request: PcmRequest<'source>,
+            sink: PcmSink<'source>,
+        ) -> ReadingPcm<'source> {
+            Box::pin(async move {
+                sink(&self.0);
+                Ok(())
+            })
+        }
+    }
+
+    fn request() -> PcmRequest<'static> {
+        PcmRequest {
+            from: Path::new("/unused"),
+            sample_rate: SAMPLE_RATE,
+        }
+    }
+
+    fn silence() -> Samples {
+        Samples(vec![0.0; FRAMES * CHANNELS])
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a frame index is far below the f32 precision"
+    )]
+    fn sine() -> Samples {
+        Samples(
+            (0..FRAMES)
+                .map(|frame| {
+                    AMPLITUDE * (TAU * FREQUENCY_HZ * frame as f32 / SAMPLE_RATE as f32).sin()
+                })
+                .flat_map(|value| [value, value])
+                .collect(),
+        )
+    }
+
+    #[tokio::test]
+    async fn puts_silence_on_the_absolute_gate_instead_of_failing() {
+        let loudness = analyze_loudness(&silence(), request())
+            .await
+            .expect("silence is a legal result");
+        let lead = analyze_lead_visual_loudness(&silence(), request())
+            .await
+            .expect("silence is a legal result");
+
+        let gated = [
+            loudness.integrated_loudness_db,
+            lead.loudness.integrated_loudness_db,
+            lead.p95_rms_db,
+        ];
+        for value in gated {
+            assert!(
+                (value - ABSOLUTE_GATE_LUFS).abs() < 1e-9,
+                "the value {value} should sit on the absolute gate"
+            );
+        }
+        assert!(loudness.true_peak_db < ABSOLUTE_GATE_LUFS);
+    }
+
+    #[tokio::test]
+    async fn keeps_measuring_audio_above_the_absolute_gate() {
+        let loudness = analyze_loudness(&sine(), request())
+            .await
+            .expect("the loudness should be measured");
+
+        assert!((loudness.true_peak_db - SINE_PEAK_DB).abs() < TOLERANCE_DB);
+        assert!((loudness.integrated_loudness_db - SINE_INTEGRATED_LUFS).abs() < TOLERANCE_DB);
+    }
 }
