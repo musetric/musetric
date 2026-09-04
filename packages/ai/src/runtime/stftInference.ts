@@ -3,6 +3,7 @@ import {
   createIfftPackedStockhamC2r,
 } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
+import { yieldGpuToCompositor } from './gpuCooldown.js';
 import {
   createBindGroup,
   createBindGroupLayout,
@@ -184,6 +185,7 @@ export const createStftInferenceRuntime = async (
     ) {
       throw new Error(`${label} chunk must contain ${chunkFloats} floats`);
     }
+    await yieldGpuToCompositor();
     device.queue.writeBuffer(rawAudio, 0, input);
 
     const stftEncoder = device.createCommandEncoder();

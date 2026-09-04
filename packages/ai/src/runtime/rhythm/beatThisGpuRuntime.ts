@@ -1,6 +1,7 @@
 import { createFftPackedStockhamR2c } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
 import { beatThisModel } from '../../models/beatThisModel.js';
+import { yieldGpuToCompositor } from '../gpuCooldown.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
 import {
   assertStorageBufferLimit,
@@ -133,6 +134,7 @@ export const createBeatThisGpuRuntime = async (
     current: BeatThisGpuState,
     index: number,
   ): Promise<void> => {
+    await yieldGpuToCompositor();
     const windowBytes =
       current.windowFrames *
       beatThisModel.melBins *

@@ -1,3 +1,4 @@
+import { yieldGpuToCompositor } from '../runtime/gpuCooldown.js';
 import {
   buildCompaction,
   computePackedChunks,
@@ -131,6 +132,7 @@ export const runTranscription = async (
 
   const wordsPerChunk: TranscriptionWord[][] = chunks.map(() => []);
   for (let start = 0; start < chunks.length; start += batchSize) {
+    await yieldGpuToCompositor();
     const group = chunks.slice(start, start + batchSize);
     const slices = group.map((chunk) =>
       compacted.subarray(
