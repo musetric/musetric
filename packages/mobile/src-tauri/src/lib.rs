@@ -7,13 +7,9 @@ use std::{
 use musetric_server::{Bundle, EmbeddedServerOptions, Frontend, start_embedded};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
-use crate::{
-    assets::TauriAssets,
-    pages::{TauriPages, report_page},
-};
+use crate::assets::TauriAssets;
 
 mod assets;
-mod pages;
 
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
@@ -34,8 +30,6 @@ fn run_app() -> tauri::Result<()> {
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             let storage = root.join("storage");
-            let pages = TauriPages::create(app.handle().clone());
-            app.manage(Arc::clone(&pages));
             let server = tauri::async_runtime::block_on(start_embedded(EmbeddedServerOptions {
                 listen: "127.0.0.1:0".to_owned(),
                 database: storage.join("db/app.db"),
@@ -49,7 +43,6 @@ fn run_app() -> tauri::Result<()> {
                     app.asset_resolver(),
                     APP_PREFIX,
                 ))),
-                pages,
                 processing: true,
             }))
             .map_err(|error| std::io::Error::other(error.to_string()))?;
@@ -60,6 +53,5 @@ fn run_app() -> tauri::Result<()> {
                 .build()?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![report_page])
         .run(tauri::generate_context!())
 }

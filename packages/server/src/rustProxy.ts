@@ -9,11 +9,6 @@ import {
   type MigrationReader,
   type MigrationReport,
 } from './migration.js';
-import {
-  createPageChannel,
-  type OpenGpuPage,
-  type PageChannel,
-} from './pageChannel.js';
 
 const packagePath = dirname(dirname(fileURLToPath(import.meta.url)));
 const readyPrefix = 'MUSETRIC_PROXY_URL=';
@@ -57,7 +52,6 @@ export type StartRustProxyOptions = {
   processing?: boolean;
   resourcesPath?: string;
   tls?: RustProxyTls;
-  openPage?: OpenGpuPage;
   onLog?: (line: string) => void;
 };
 
@@ -130,7 +124,6 @@ const createLineReader = (
 
 const waitForReady = async (
   child: ChildProcess,
-  channel: PageChannel,
   migrations: MigrationReader,
   onLog: ((line: string) => void) | undefined,
 ): Promise<string> =>
@@ -147,7 +140,7 @@ const waitForReady = async (
       reject(new Error([message, ...startupLines].join('\n').trimEnd()));
     };
     const handleLine = (line: string): void => {
-      if (channel.handleLine(line) || migrations.handleLine(line)) {
+      if (migrations.handleLine(line)) {
         return;
       }
       if (!ready && line.startsWith(readyPrefix)) {
@@ -195,11 +188,9 @@ const waitForExit = async (child: ChildProcess): Promise<void> =>
 
 const stopChild = async (
   child: ChildProcess,
-  channel: PageChannel,
   exited: Promise<void>,
   tlsFiles: TlsFiles | undefined,
 ): Promise<void> => {
-  await channel.closeAll();
   if (!hasExited(child)) {
     child.stdin?.end();
     child.kill();
@@ -224,15 +215,10 @@ export const startRustProxy = async (
   const { command, args } = createCommand(options, tlsFiles);
   const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
   const exited = waitForExit(child);
-  const channel = createPageChannel({
-    child,
-    openPage: options.openPage,
-    onLog: options.onLog,
-  });
   const migrations = createMigrationReader();
 
   try {
-    const url = await waitForReady(child, channel, migrations, options.onLog);
+    const url = await waitForReady(child, migrations, options.onLog);
     const migration = migrations.report();
     if (migration === undefined) {
       throw new Error('the rust server started without reporting its schema');
@@ -243,12 +229,12 @@ export const startRustProxy = async (
         await closing;
         return;
       }
-      closing = stopChild(child, channel, exited, tlsFiles);
+      closing = stopChild(child, exited, tlsFiles);
       await closing;
     };
     return { url, migration, close };
   } catch (error) {
-    await stopChild(child, channel, exited, tlsFiles);
+    await stopChild(child, exited, tlsFiles);
     throw migrations.fail(
       error instanceof Error ? error : new Error(String(error)),
     );

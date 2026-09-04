@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { type OpenGpuPage, startRustProxy } from '@musetric/server';
+import { startRustProxy } from '@musetric/server';
 import { createStoragePaths } from '@musetric/utils/node';
 import { app } from 'electron';
 import { type Logger } from 'pino';
@@ -10,7 +10,6 @@ const createLockPath = (): string =>
   join(app.getPath('userData'), 'storage/backend.lock');
 
 export type StartBackendOptions = {
-  openPage: OpenGpuPage;
   logger: Logger;
 };
 
@@ -33,7 +32,6 @@ export const startBackend = async (
       modelsPath: storagePaths.modelsPath,
       browserBundlePath: resourcePaths.browserBundlePath,
       publicPath: resourcePaths.publicPath,
-      openPage: options.openPage,
       resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
       onLog: (line) => {
         options.logger.info({ scope: 'rustServer' }, line);

@@ -2002,7 +2002,6 @@ __metadata:
     "@webgpu/types": "catalog:"
     eslint: "catalog:"
     onnxruntime-web: "catalog:"
-    playwright: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
     vitest: "catalog:"
@@ -2296,7 +2295,6 @@ __metadata:
     "@musetric/fft": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
-    "@tauri-apps/api": "catalog:"
     "@tauri-apps/cli": "catalog:"
     "@types/node": "catalog:"
     "@types/react": "catalog:"
@@ -3501,13 +3499,6 @@ __metadata:
   peerDependencies:
     react: ^18 || ^19
   checksum: 10c0/e8994c57f6ceb2c886a4d6486a8c6a3f89bc6b1220de3e732448d7fcbeb386e9358f03c73804de72004c6ac2668d0bf1b44cedbb273d3e4b33afcbaee7b7d24d
-  languageName: node
-  linkType: hard
-
-"@tauri-apps/api@npm:2.11.1":
-  version: 2.11.1
-  resolution: "@tauri-apps/api@npm:2.11.1"
-  checksum: 10c0/78a08a64ee7eab9d34bd4ba1bdc3a2440c7e9cc5737b3f1d77bd80fa38b0cb5e9601efe04da40c947c5da2ca38dc702bec21b4ae96b18ee5f3e82980d1f0b325
   languageName: node
   linkType: hard
 

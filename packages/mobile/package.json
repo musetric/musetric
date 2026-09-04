@@ -41,7 +41,6 @@
     "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "@tauri-apps/api": "catalog:",
     "onnxruntime-web": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

@@ -18,7 +18,7 @@ use crate::{
         models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
         steps::create as create_step,
     },
-    host::tests::start_fake_host,
+    page_bridge::PageBridge,
     storage::{read, write_database},
     test_workspace::Workspace,
 };
@@ -33,7 +33,7 @@ const CREATE_PROJECT: &str = "
 fn create_context(workspace: &Workspace) -> AnalysisContext {
     AnalysisContext {
         storage: workspace.create_storage(),
-        pages: start_fake_host(None).host,
+        pages: PageBridge::create(),
         client: Client::new(),
         models_path: workspace.blobs_path().join("models"),
         bundle: Bundle::Directory(workspace.blobs_path().join("bundle")),
