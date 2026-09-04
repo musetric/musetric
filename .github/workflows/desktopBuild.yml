@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: dev builds artifacts only, release publishes packages/desktop/package.json version
+        description: dev builds artifacts only, release publishes packages/app/package.json version
         type: choice
         options:
           - dev
@@ -23,7 +23,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          declared=$(node -p "require('./packages/desktop/package.json').version")
+          declared=$(node -p "require('./packages/app/package.json').version")
           if [ "$MODE" = dev ]; then
             echo "version=$declared-dev.g${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
             exit 0
@@ -56,23 +56,21 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            platform: win
+            platform: Windows
             arch: x64
+            rustTarget: x86_64-pc-windows-msvc
           - os: windows-latest
-            platform: win
+            platform: Windows
             arch: arm64
+            rustTarget: aarch64-pc-windows-msvc
           - os: macos-latest
-            platform: mac
+            platform: macOS
             arch: x64
+            rustTarget: x86_64-apple-darwin
           - os: macos-latest
-            platform: mac
+            platform: macOS
             arch: arm64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-          - os: ubuntu-latest
-            platform: linux
-            arch: arm64
+            rustTarget: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -91,10 +89,10 @@ jobs:
       - run: yarn --immutable
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
-          MUSETRIC_SKIP_FFMPEG_FETCH: true
           ONNXRUNTIME_NODE_INSTALL: skip
-      - if: matrix.platform == 'linux' && matrix.arch == 'arm64'
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - run: rustup show
+        working-directory: packages/app
+      - run: rustup target add ${{ matrix.rustTarget }}
       - uses: actions/cache@v5
         with:
           path: |
@@ -103,30 +101,20 @@ jobs:
             packages/server/target
           key: cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-${{ matrix.arch }}-
-      - run: yarn build:desktop
-      - run: yarn workspace @musetric/desktop pack:installer --${{ matrix.platform }} --${{ matrix.arch }} --config.extraMetadata.version=${{ needs.prepare.outputs.version }}
+      - run: yarn workspace @musetric/app pack:installer -- --target ${{ matrix.rustTarget }} --version ${{ needs.prepare.outputs.version }}
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-desktop-${{ runner.os }}-${{ matrix.arch }}
+          name: musetric-desktop-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: |
-            packages/desktop/build/*.exe
-            packages/desktop/build/*.dmg
-            packages/desktop/build/*.AppImage
-      - uses: actions/upload-artifact@v7
-        with:
-          name: musetric-updater-${{ runner.os }}-${{ matrix.arch }}
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
-          path: |
-            packages/desktop/build/*.blockmap
-            packages/desktop/build/*.zip
-            packages/desktop/build/latest*.yml
+            packages/server/target/**/release/bundle/nsis/*
+            packages/server/target/**/release/bundle/dmg/*
+            packages/server/target/**/release/bundle/macos/*
 
   release:
     if: inputs.mode == 'release'
@@ -147,7 +135,7 @@ jobs:
         with:
           node-version: 26.2.0
           package-manager-cache: false
-      - run: node packages/desktop/scripts/assembleUpdateRelease.ts artifacts release
+      - run: node packages/app/scripts/assembleUpdateRelease.ts artifacts release ${{ needs.prepare.outputs.version }}
       - env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}

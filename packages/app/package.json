@@ -13,6 +13,7 @@
     "build:mobile": "yarn build:icons && vite build --configLoader native && yarn build:executor",
     "dev:desktop": "tauri dev",
     "build:desktop": "tauri build --no-bundle",
+    "pack:installer": "node ./scripts/packInstaller.ts",
     "dev:app": "tauri dev",
     "build:app": "tauri build --no-bundle",
     "build:icons": "node ./scripts/buildIcons.ts && tauri icon -o src-tauri/gen-assets src-tauri/gen/icon.json",

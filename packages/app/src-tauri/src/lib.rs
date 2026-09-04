@@ -17,6 +17,8 @@ use crate::assets::TauriAssets;
 mod assets;
 #[cfg(desktop)]
 mod lifecycle;
+#[cfg(desktop)]
+mod update;
 
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
@@ -151,6 +153,8 @@ fn setup_desktop_lifecycle(
             .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
             .build(),
     )?;
+    app.handle()
+        .plugin(tauri_plugin_updater::Builder::new().build())?;
     let Some(lock) = lifecycle::acquire_storage_lock(&root)? else {
         let (title, message) = lifecycle::storage_busy_message();
         show_error_dialog(app, title, &message);
@@ -165,6 +169,7 @@ fn setup_desktop_lifecycle(
         !cfg!(debug_assertions),
         root.display()
     );
+    update::start(app.handle());
     Ok(root)
 }
 
@@ -226,6 +231,8 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             if let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() {
                 server.close();
             }
+            #[cfg(desktop)]
+            update::install_on_exit(app);
         }
         #[cfg(target_os = "macos")]
         tauri::RunEvent::ExitRequested {
