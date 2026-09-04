@@ -47,8 +47,6 @@
     "prettier": "catalog:"
   },
   "resolutions": {
-    "@electron/asar": "4.2.1",
-    "@electron/universal": "3.0.6",
     "adm-zip": "0.6.0",
     "browserslist": "4.28.8",
     "filelist": "2.0.2",

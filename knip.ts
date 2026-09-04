@@ -5,8 +5,6 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: true,
   ignoreIssues: {
     'packages/engine/src/engine.ts': ['exports'],
-    'packages/desktop/scripts/beforePack.ts': ['exports'],
-    'packages/desktop/src/backend.ts': ['exports'],
     'packages/api/src/routes/audio.ts': ['exports'],
     'packages/api/src/routes/preview.ts': ['exports'],
   },
@@ -23,9 +21,6 @@ const config: KnipConfig = {
     },
     'packages/cqt': {
       entry: ['src/**/*.bench.ts'],
-    },
-    'packages/desktop': {
-      entry: ['scripts/**/*.ts'],
     },
     'packages/app': {
       entry: ['scripts/**/*.ts'],
