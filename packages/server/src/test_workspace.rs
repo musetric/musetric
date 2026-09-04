@@ -15,7 +15,7 @@ use musetric_db::{
     open_database,
 };
 use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
-use musetric_media::{SymphoniaPcm, Tools};
+use musetric_media::SymphoniaPcm;
 
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
 
@@ -86,9 +86,6 @@ impl Workspace {
             writer: Arc::new(Writer::open(&self.database_path()).expect("the writer should open")),
             blobs_path: self.blobs_path(),
             pcm: Arc::new(SymphoniaPcm),
-            tools: Tools {
-                ffmpeg: bundled_tool("ffmpeg"),
-            },
         })
     }
 }
@@ -119,24 +116,4 @@ impl Drop for Workspace {
     fn drop(&mut self) {
         let _ = remove_dir_all(&self.directory);
     }
-}
-
-fn bundled_tool(name: &str) -> PathBuf {
-    let platform = match std::env::consts::OS {
-        "windows" => "win32",
-        "macos" => "darwin",
-        other => other,
-    };
-    let architecture = match std::env::consts::ARCH {
-        "x86_64" => "x64",
-        "aarch64" => "arm64",
-        other => other,
-    };
-    let executable = format!("{name}{}", std::env::consts::EXE_SUFFIX);
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("ffmpeg")
-        .join("resources")
-        .join(format!("{platform}-{architecture}"))
-        .join(executable)
 }

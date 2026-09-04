@@ -19,9 +19,6 @@ struct Arguments {
     #[arg(long, help = "Directory that holds the stored blobs.")]
     blobs: PathBuf,
 
-    #[arg(long, help = "Bundled ffmpeg binary used to normalise uploaded audio.")]
-    ffmpeg: PathBuf,
-
     #[arg(long, help = "Directory that holds the downloaded analysis models.")]
     models: PathBuf,
 
@@ -71,7 +68,6 @@ async fn main() -> Result<(), BoxedError> {
         listen: arguments.listen,
         database: arguments.database,
         blobs: arguments.blobs,
-        ffmpeg: arguments.ffmpeg,
         models: arguments.models,
         browser_bundle: arguments.browser_bundle,
         public: arguments.public,

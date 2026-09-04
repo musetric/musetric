@@ -51,7 +51,6 @@ export type StartRustProxyOptions = {
   listen: string;
   databasePath: string;
   blobsPath: string;
-  ffmpegPath: string;
   modelsPath: string;
   browserBundlePath: string;
   publicPath: string;
@@ -78,8 +77,6 @@ const createCommand = (
     options.databasePath,
     '--blobs',
     options.blobsPath,
-    '--ffmpeg',
-    options.ffmpegPath,
     '--models',
     options.modelsPath,
     '--browser-bundle',

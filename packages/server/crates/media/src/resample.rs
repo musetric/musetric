@@ -3,7 +3,7 @@ use rubato::{
     audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::{pcm::CHANNELS, run::BoxedError};
+use crate::{BoxedError, pcm::CHANNELS};
 
 const SINC_LENGTH: usize = 256;
 const CHUNK_FRAMES: usize = 1024;

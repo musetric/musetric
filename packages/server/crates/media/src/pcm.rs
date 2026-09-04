@@ -1,6 +1,6 @@
 use std::{future::Future, path::Path, pin::Pin};
 
-use crate::run::BoxedError;
+use crate::BoxedError;
 
 pub(crate) const CHANNELS: usize = 2;
 pub(crate) const BYTES_PER_FRAME: usize = CHANNELS * size_of::<f32>();

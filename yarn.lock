@@ -2068,7 +2068,6 @@ __metadata:
     "@musetric/ai": "workspace:*"
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
     "@musetric/fft": "workspace:*"
     "@musetric/server": "workspace:*"
     "@musetric/utils": "workspace:*"
@@ -2109,7 +2108,6 @@ __metadata:
   resolution: "@musetric/desktop@workspace:packages/desktop"
   dependencies:
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
     "@musetric/server": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
@@ -2181,18 +2179,6 @@ __metadata:
   peerDependencies:
     eslint: 10.5.0
     typescript: ^6.0.2
-  languageName: unknown
-  linkType: soft
-
-"@musetric/ffmpeg@workspace:*, @musetric/ffmpeg@workspace:packages/ffmpeg":
-  version: 0.0.0-use.local
-  resolution: "@musetric/ffmpeg@workspace:packages/ffmpeg"
-  dependencies:
-    "@musetric/eslint-config": "workspace:*"
-    "@types/node": "catalog:"
-    "@typescript/native": "catalog:"
-    eslint: "catalog:"
-    typescript: "catalog:"
   languageName: unknown
   linkType: soft
 
@@ -2384,7 +2370,6 @@ __metadata:
   dependencies:
     "@ast-grep/cli": "catalog:"
     "@musetric/eslint-config": "workspace:*"
-    "@musetric/ffmpeg": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"

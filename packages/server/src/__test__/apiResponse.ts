@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { ffmpegPath } from '@musetric/ffmpeg';
 import { startRustProxy } from '../rustProxy.js';
 import { serverResourcesPath } from './globalSetup.js';
 import { createProjectFixture } from './projectFixture.js';
@@ -133,7 +132,6 @@ export const withTestServer = async <Result>(
     listen: '127.0.0.1:0',
     databasePath: workspace.paths.databasePath,
     blobsPath: workspace.paths.blobsPath,
-    ffmpegPath: ffmpegPath(),
     modelsPath: workspace.paths.modelsPath,
     browserBundlePath: workspace.paths.browserBundlePath,
     publicPath: workspace.paths.publicPath,
