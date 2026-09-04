@@ -20,7 +20,7 @@ mod wav;
 mod test_workspace;
 
 pub use frontend::Frontend;
-pub use musetric_db::BoxedError;
+pub use musetric_db::{BoxedError, MigrationFailure};
 pub use musetric_gpu::{Asset, Assets, Bundle};
 pub use serve::{
     EmbeddedServer, EmbeddedServerOptions, ServerOptions, TlsOptions, serve, start_embedded,
