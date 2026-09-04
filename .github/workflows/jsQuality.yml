@@ -42,7 +42,9 @@ jobs:
             packages/server/target
           key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
-      - run: yarn check:deps:security
+      # Temporarily disabled: npm's Bulk Advisory API is timing out upstream.
+      # https://github.com/npm/cli/issues/9950
+      # - run: yarn check:deps:security
       - run: yarn check:deps:dupe
       - run: yarn check:dupe
       - run: yarn check:unused
