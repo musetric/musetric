@@ -21,20 +21,14 @@ runs:
         restore-keys: yarn-${{ runner.os }}-
     - run: yarn --immutable
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
     - uses: actions/cache@v5
       with:
         path: packages/*/.eslintcache
         key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
         restore-keys: |
           eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
-    - uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          packages/server/target
-        key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
-        restore-keys: cargo-${{ runner.os }}-
     # Temporarily disabled: npm's Bulk Advisory API is timing out upstream.
     # https://github.com/npm/cli/issues/9950
     # - run: yarn check:deps:security
@@ -52,5 +46,13 @@ runs:
       shell: bash
     - run: yarn check:lint
       shell: bash
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: 1.97.1
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/server
+        shared-key: js-quality
     - run: yarn test
       shell: bash
