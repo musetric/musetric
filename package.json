@@ -12,11 +12,7 @@
   "scripts": {
     "dev": "yarn workspaces foreach --all --parallel --interlaced run dev",
     "build:project": "yarn workspaces foreach --all --topological-dev --parallel --interlaced run build:project",
-    "dev:desktop": "yarn build:project && yarn workspace @musetric/app dev:desktop",
-    "build:desktop": "yarn build:project && yarn workspace @musetric/app build:desktop",
     "pack:installer": "yarn build:project && yarn workspace @musetric/app pack:installer",
-    "dev:mobile": "yarn workspace @musetric/app dev:mobile",
-    "build:mobile": "yarn workspace @musetric/app build:mobile",
     "dev:android": "yarn workspace @musetric/app dev:android",
     "build:android": "yarn workspace @musetric/app build:android",
     "dev:ios": "yarn workspace @musetric/app dev:ios",

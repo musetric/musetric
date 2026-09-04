@@ -4,9 +4,9 @@
   "version": "../package.json",
   "identifier": "com.musetric.client",
   "build": {
-    "beforeDevCommand": "yarn build:icons && yarn dev:mobile",
+    "beforeDevCommand": "yarn build:icons && yarn dev:ui",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "yarn build:mobile",
+    "beforeBuildCommand": "yarn build:ui",
     "frontendDist": "../dist"
   },
   "app": {
