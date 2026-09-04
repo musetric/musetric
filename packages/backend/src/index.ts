@@ -1,4 +1,3 @@
-import { defaultOpenJobPage } from '@musetric/ai/node';
 import {
   isAddressInUseError,
   type RustProxy,
@@ -20,7 +19,6 @@ const start = async (): Promise<RustProxy> => {
     modelsPath: envs.modelsPath,
     browserBundlePath: envs.browserBundlePath,
     publicPath: envs.publicPath,
-    openPage: defaultOpenJobPage,
     tls: https,
     onLog: (line) => {
       console.log(line);

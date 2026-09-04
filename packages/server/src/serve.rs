@@ -13,17 +13,13 @@ use musetric_gpu::{Bundle, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use serde_json::{Map, Value, json};
-use tokio::{
-    io::{stdin, stdout},
-    net::TcpListener,
-    sync::oneshot,
-};
+use tokio::{io::stdin, net::TcpListener, sync::oneshot};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
     frontend::Frontend,
     garbage::spawn_collector,
-    host::HostProcess,
+    page_bridge::PageBridge,
     pages::PageOpener,
     router::{RouterOptions, create_router},
     storage::Storage,
@@ -60,7 +56,6 @@ pub struct EmbeddedServerOptions {
     pub models: PathBuf,
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
-    pub pages: Arc<dyn PageOpener>,
     pub processing: bool,
 }
 
@@ -84,18 +79,17 @@ impl EmbeddedServer {
 }
 
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
-    let (host, closed) = HostProcess::create(stdin(), stdout());
+    let closing = watch_parent();
     match init_database(&options.database) {
-        Ok(report) => announce_migration(&host, &report),
+        Ok(report) => announce_migration(&report),
         Err(failure) => {
-            announce_migration_failure(&host, &failure);
+            announce_migration_failure(&failure);
             return Err(failure.into());
         }
     }
     let storage = create_storage(&options.database, options.blobs)?;
     let app = create_app(AppOptions {
         storage,
-        pages: Arc::clone(&host) as Arc<dyn PageOpener>,
         models: options.models,
         browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
@@ -106,8 +100,8 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     if let Some(tls) = options.tls {
         let config = RustlsConfig::from_pem_file(tls.certificate, tls.private_key).await?;
         let handle = Handle::<SocketAddr>::new();
-        tokio::spawn(shutdown_on_closed_host(handle.clone(), closed));
-        announce_ready(&host, "https", address);
+        tokio::spawn(shutdown_on_closed_parent(handle.clone(), closing));
+        announce_ready("https", address);
         axum_server::from_tcp_rustls(socket, config)?
             .handle(handle)
             .serve(app.into_make_service())
@@ -115,10 +109,10 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         return Ok(());
     }
     let listener = TcpListener::from_std(socket)?;
-    announce_ready(&host, "http", address);
+    announce_ready("http", address);
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
-            let _ = closed.await;
+            let _ = closing.await;
         })
         .await?;
     Ok(())
@@ -129,7 +123,6 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
     let storage = create_storage(&options.database, options.blobs)?;
     let app = create_app(AppOptions {
         storage,
-        pages: options.pages,
         models: options.models,
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
@@ -154,7 +147,6 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
 
 struct AppOptions {
     storage: Arc<Storage>,
-    pages: Arc<dyn PageOpener>,
     models: PathBuf,
     browser_bundle: Bundle,
     frontend: Frontend,
@@ -163,9 +155,10 @@ struct AppOptions {
 
 fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     let storage = options.storage;
+    let pages = PageBridge::create();
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
-        pages: options.pages,
+        pages: Arc::clone(&pages) as Arc<dyn PageOpener>,
         client: create_client()?,
         models_path: options.models,
         bundle: options.browser_bundle,
@@ -184,7 +177,21 @@ fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
         frontend: options.frontend,
         storage,
         queue,
+        pages,
     }))
+}
+
+fn watch_parent() -> oneshot::Receiver<()> {
+    let (closed, closing) = oneshot::channel();
+    tokio::spawn(async move {
+        let _ = tokio::io::copy(&mut stdin(), &mut tokio::io::sink()).await;
+        let _ = closed.send(());
+    });
+    closing
+}
+
+fn announce(line: &str) {
+    let _ = writeln!(io::stdout().lock(), "{line}");
 }
 
 fn create_storage(database: &Path, blobs: PathBuf) -> Result<Arc<Storage>, BoxedError> {
@@ -211,26 +218,26 @@ fn report_bind_failure(error: io::Error) -> io::Error {
     error
 }
 
-fn announce_ready(host: &HostProcess, protocol: &str, address: SocketAddr) {
-    host.announce(&format!("{READY_PREFIX}{protocol}://{address}"));
+fn announce_ready(protocol: &str, address: SocketAddr) {
+    announce(&format!("{READY_PREFIX}{protocol}://{address}"));
 }
 
-fn announce_migration(host: &HostProcess, report: &MigrationReport) {
+fn announce_migration(report: &MigrationReport) {
     let mut described = Map::new();
     described.insert("fromVersion".to_owned(), json!(report.from_version));
     described.insert("toVersion".to_owned(), json!(report.to_version));
     insert_backup(&mut described, report.backup_path.as_deref());
-    host.announce(&format!("{MIGRATION_PREFIX}{}", Value::Object(described)));
+    announce(&format!("{MIGRATION_PREFIX}{}", Value::Object(described)));
 }
 
-fn announce_migration_failure(host: &HostProcess, failure: &MigrationFailure) {
+fn announce_migration_failure(failure: &MigrationFailure) {
     let mut described = Map::new();
     described.insert("message".to_owned(), json!(failure.to_string()));
     if let Some(version) = failure.committed_version() {
         described.insert("committedVersion".to_owned(), json!(version));
     }
     insert_backup(&mut described, failure.backup_path());
-    host.announce(&format!(
+    announce(&format!(
         "{MIGRATION_FAILED_PREFIX}{}",
         Value::Object(described)
     ));
@@ -242,8 +249,8 @@ fn insert_backup(described: &mut Map<String, Value>, backup_path: Option<&std::p
     }
 }
 
-async fn shutdown_on_closed_host(handle: Handle<SocketAddr>, closed: oneshot::Receiver<()>) {
-    let _ = closed.await;
+async fn shutdown_on_closed_parent(handle: Handle<SocketAddr>, closing: oneshot::Receiver<()>) {
+    let _ = closing.await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 }
 
@@ -261,7 +268,7 @@ mod tests {
     };
 
     use super::{EmbeddedServerOptions, start_embedded};
-    use crate::{Asset, Assets, Bundle, ClosedPages, Frontend};
+    use crate::{Asset, Assets, Bundle, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -304,7 +311,6 @@ mod tests {
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),
-                pages: Arc::new(ClosedPages),
                 processing: false,
             }
         }

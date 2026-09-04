@@ -9,7 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{realtime::Rooms, routes::RouteState, storage::Storage};
+use crate::{page_bridge::PageBridge, realtime::Rooms, routes::RouteState, storage::Storage};
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
     open_database,
@@ -110,6 +110,7 @@ pub(crate) fn create_route_state(storage: Arc<Storage>) -> RouteState {
         rooms: Arc::new(Rooms::create()),
         storage,
         queue,
+        pages: PageBridge::create(),
     }
 }
 

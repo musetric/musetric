@@ -6,17 +6,6 @@ import { type Windows } from './windows.js';
 
 const loadingPath = fileURLToPath(new URL('./loading.html', import.meta.url));
 
-const importBackendModules = async () => {
-  const [backend, gpuHost] = await Promise.all([
-    import('./backend.js'),
-    import('./electronGpuHost.js'),
-  ]);
-  return {
-    startBackend: backend.startBackend,
-    createElectronPageOpener: gpuHost.createElectronPageOpener,
-  };
-};
-
 export type StartAppOptions = {
   log: DesktopLog;
   windows: Windows;
@@ -35,12 +24,8 @@ export const startApp = async (
     loadingWindow.loadFile(loadingPath),
   );
 
-  const { startBackend, createElectronPageOpener } =
-    await importBackendModules();
-  const backend = await startBackend({
-    openPage: createElectronPageOpener(),
-    logger: log.logger,
-  });
+  const { startBackend } = await import('./backend.js');
+  const backend = await startBackend({ logger: log.logger });
   if (backend === undefined) {
     log.logger.error('the storage lock is held by another process');
     dialog.showErrorBox(

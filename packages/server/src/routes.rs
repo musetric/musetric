@@ -1,6 +1,7 @@
 mod analysis;
 mod audio;
 mod item;
+mod pages;
 mod preview;
 mod project;
 mod status;
@@ -11,18 +12,20 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use crate::{realtime, realtime::Rooms, storage::Storage};
+use crate::{page_bridge::PageBridge, realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
+    pub(crate) pages: Arc<PageBridge>,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
+        .merge(pages::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
         .merge(status::create_router())

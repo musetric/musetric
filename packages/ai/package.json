@@ -6,12 +6,6 @@
   "sideEffects": false,
   "exports": {
     "./package.json": "./package.json",
-    "./node": {
-      "monorepo": "./src/index.node.ts",
-      "types": "./dist/index.node.d.ts",
-      "import": "./dist/index.node.js",
-      "default": "./dist/index.node.js"
-    },
     "./vite": {
       "monorepo": "./src/browserBundle.vite.ts",
       "default": "./src/browserBundle.vite.ts"
@@ -25,8 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@huggingface/transformers": "catalog:",
-    "ws": "catalog:"
+    "@huggingface/transformers": "catalog:"
   },
   "peerDependencies": {
     "@musetric/cqt": "workspace:*",
@@ -45,9 +38,9 @@
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "onnxruntime-web": "catalog:",
-    "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "ws": "catalog:"
   }
 }
