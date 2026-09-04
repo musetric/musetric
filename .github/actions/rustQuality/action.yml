@@ -24,18 +24,20 @@ runs:
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
         ONNXRUNTIME_NODE_INSTALL: skip
-    - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
-      shell: bash
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: 1.97.1
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/server
+        shared-key: rust-quality
+    - uses: awalsh128/cache-apt-pkgs-action@v1.6.3
+      with:
+        packages: libgtk-3-dev libwebkit2gtk-4.1-dev
+        version: 1.0
     - run: yarn build:mobile
       shell: bash
-    - uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          packages/server/target
-        key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
-        restore-keys: cargo-${{ runner.os }}-
     - run: yarn workspace @musetric/server check:rust:ast
       shell: bash
     - run: yarn workspace @musetric/server check:rust:fmt
