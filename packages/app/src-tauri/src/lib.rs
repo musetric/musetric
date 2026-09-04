@@ -16,6 +16,8 @@ const EXECUTOR_PREFIX: &str = "executor/";
 const MAIN_WINDOW: &str = "main";
 const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
+#[cfg(target_os = "windows")]
+const WEBVIEW2_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -48,9 +50,14 @@ fn run_app() -> tauri::Result<()> {
             .map_err(|error| std::io::Error::other(error.to_string()))?;
             let url = server.url().parse()?;
             app.manage(server);
-            WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::External(url))
+            #[cfg(target_os = "windows")]
+            let window = WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::External(url))
                 .title(TITLE)
-                .build()?;
+                .additional_browser_args(WEBVIEW2_BROWSER_ARGS);
+            #[cfg(not(target_os = "windows"))]
+            let window =
+                WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::External(url)).title(TITLE);
+            window.build()?;
             Ok(())
         })
         .run(tauri::generate_context!())

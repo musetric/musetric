@@ -16,9 +16,9 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 36
-    namespace = "com.musetric.mobile"
+    namespace = "com.musetric.client"
     defaultConfig {
-        applicationId = "com.musetric.mobile"
+        applicationId = "com.musetric.client"
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()

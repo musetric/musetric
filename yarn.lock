@@ -2037,6 +2037,31 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/app@workspace:packages/app":
+  version: 0.0.0-use.local
+  resolution: "@musetric/app@workspace:packages/app"
+  dependencies:
+    "@musetric/ai": "workspace:*"
+    "@musetric/cqt": "workspace:*"
+    "@musetric/eslint-config": "workspace:*"
+    "@musetric/fft": "workspace:*"
+    "@musetric/utils": "workspace:*"
+    "@resvg/resvg-js": "catalog:"
+    "@tauri-apps/cli": "catalog:"
+    "@types/node": "catalog:"
+    "@types/react": "catalog:"
+    "@types/react-dom": "catalog:"
+    "@typescript/native": "catalog:"
+    "@vitejs/plugin-react": "catalog:"
+    eslint: "catalog:"
+    onnxruntime-web: "catalog:"
+    react: "catalog:"
+    react-dom: "catalog:"
+    typescript: "catalog:"
+    vite: "catalog:"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/audio@workspace:*, @musetric/audio@workspace:packages/audio":
   version: 0.0.0-use.local
   resolution: "@musetric/audio@workspace:packages/audio"
@@ -2258,31 +2283,6 @@ __metadata:
     react: "catalog:"
     react-dom: "catalog:"
     react-i18next: "catalog:"
-    typescript: "catalog:"
-    vite: "catalog:"
-  languageName: unknown
-  linkType: soft
-
-"@musetric/mobile@workspace:packages/mobile":
-  version: 0.0.0-use.local
-  resolution: "@musetric/mobile@workspace:packages/mobile"
-  dependencies:
-    "@musetric/ai": "workspace:*"
-    "@musetric/cqt": "workspace:*"
-    "@musetric/eslint-config": "workspace:*"
-    "@musetric/fft": "workspace:*"
-    "@musetric/utils": "workspace:*"
-    "@resvg/resvg-js": "catalog:"
-    "@tauri-apps/cli": "catalog:"
-    "@types/node": "catalog:"
-    "@types/react": "catalog:"
-    "@types/react-dom": "catalog:"
-    "@typescript/native": "catalog:"
-    "@vitejs/plugin-react": "catalog:"
-    eslint: "catalog:"
-    onnxruntime-web: "catalog:"
-    react: "catalog:"
-    react-dom: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
   languageName: unknown

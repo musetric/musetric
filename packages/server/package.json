@@ -13,7 +13,7 @@
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "check:rust:ast": "ast-grep scan . ../mobile/src-tauri",
+    "check:rust:ast": "ast-grep scan . ../app/src-tauri",
     "check:rust:fmt": "cargo fmt --all --check",
     "check:rust:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
     "check:rust:test": "cargo test --workspace --locked",

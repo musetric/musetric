@@ -1,4 +1,4 @@
-package com.musetric.mobile
+package com.musetric.client
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge

@@ -44,7 +44,7 @@ const platforms = new Map<string, Platform>([
       marker: 'project.yml',
       overlayDir: 'apple',
       staleFiles: [],
-      projectFile: 'musetric-mobile.xcodeproj',
+      projectFile: 'musetric-app.xcodeproj',
     },
   ],
 ]);

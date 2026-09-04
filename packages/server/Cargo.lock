@@ -2482,6 +2482,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "musetric-app"
+version = "0.1.0"
+dependencies = [
+ "musetric-server",
+ "tauri",
+ "tauri-build",
+ "tokio",
+]
+
+[[package]]
 name = "musetric-db"
 version = "0.1.0"
 dependencies = [
@@ -2530,16 +2540,6 @@ dependencies = [
  "rusty_aac",
  "serde_json",
  "symphonia",
- "tokio",
-]
-
-[[package]]
-name = "musetric-mobile"
-version = "0.1.0"
-dependencies = [
- "musetric-server",
- "tauri",
- "tauri-build",
  "tokio",
 ]
 

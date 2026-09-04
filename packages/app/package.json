@@ -1,8 +1,8 @@
 {
-  "name": "@musetric/mobile",
+  "name": "@musetric/app",
   "productName": "Musetric",
   "version": "0.1.0",
-  "description": "Musetric — audio separation, transcription and analysis mobile app",
+  "description": "Musetric — audio separation, transcription and analysis app",
   "author": "Musetric <musetric@gmail.com>",
   "license": "MIT",
   "repository": "github:musetric/musetric",
@@ -11,6 +11,10 @@
   "scripts": {
     "dev:mobile": "vite --configLoader native",
     "build:mobile": "yarn build:icons && vite build --configLoader native && yarn build:executor",
+    "dev:desktop": "tauri dev",
+    "build:desktop": "tauri build --no-bundle",
+    "dev:app": "tauri dev",
+    "build:app": "tauri build --no-bundle",
     "build:icons": "node ./scripts/buildIcons.ts && tauri icon -o src-tauri/gen-assets src-tauri/gen/icon.json",
     "init:android": "node ./scripts/initNative.ts android",
     "init:ios": "node ./scripts/initNative.ts ios",

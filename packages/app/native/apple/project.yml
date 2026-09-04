@@ -1,6 +1,6 @@
-name: musetric-mobile
+name: musetric-app
 options:
-  bundleIdPrefix: com.musetric.mobile
+  bundleIdPrefix: com.musetric
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Musetric
-      PRODUCT_BUNDLE_IDENTIFIER: com.musetric.mobile
+      PRODUCT_BUNDLE_IDENTIFIER: com.musetric.client
 targetTemplates:
   app:
     type: application
@@ -24,7 +24,7 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  musetric-mobile_iOS:
+  musetric-app_iOS:
     type: application
     platform: iOS
     sources:
@@ -32,14 +32,14 @@ targets:
       - path: Assets.xcassets
       - path: Externals
         buildPhase: none
-      - path: musetric-mobile_iOS
+      - path: musetric-app_iOS
       - path: assets
         buildPhase: resources
         type: folder
         optional: true
       - path: LaunchScreen.storyboard
     info:
-      path: musetric-mobile_iOS/Info.plist
+      path: musetric-app_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen

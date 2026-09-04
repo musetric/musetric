@@ -27,7 +27,7 @@ const config: KnipConfig = {
     'packages/desktop': {
       entry: ['scripts/**/*.ts'],
     },
-    'packages/mobile': {
+    'packages/app': {
       entry: ['scripts/**/*.ts'],
     },
     'packages/script': {
