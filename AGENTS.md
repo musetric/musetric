@@ -11,19 +11,18 @@
 
 ## Repository Map
 
-- Musetric is split into a web app, a backend, audio-processing modules, and shared infrastructure packages.
+- Musetric is split into a web app, a Rust host, audio-processing modules, and shared infrastructure packages.
 - `packages/frontend`: the main React application.
-- `packages/backend`: the runner that starts the Rust server and opens gpu pages for it.
+- `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView.
 - `packages/audio`: browser-side audio, waveform, spectrogram, workers, and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
 - `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/utils`: low-level shared utilities used across packages.
-- `packages/ffmpeg`: the vendored ffmpeg binary and the path that locates it.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
-- `packages/server`: the Rust backend: http api, storage, processing queue and gpu executor, a self-contained Cargo workspace with its own toolchain pin and lockfile.
+- `packages/server`: the Rust host: http api, storage, processing queue and gpu executor, a self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Ground Rules
 
@@ -90,4 +89,4 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:lint`: lint checks with automatic fixes.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
-- `yarn check:rust`: Rust formatting, Clippy, and tests, when `crates` was touched.
+- `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.

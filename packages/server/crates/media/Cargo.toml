@@ -1,6 +1,6 @@
 [package]
 name = "musetric-media"
-description = "Musetric media: the bundled ffmpeg and ffprobe wrappers"
+description = "Musetric media: decode, loudness, flac and aac"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
