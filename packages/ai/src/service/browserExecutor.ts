@@ -1,3 +1,4 @@
+import { setAndroidForegroundWork } from './androidForeground.js';
 import {
   type BrowserProgressMessage,
   reportProgressApiName,
@@ -57,6 +58,7 @@ const runJob = async (
   socket: WebSocket,
   command: JobCommand,
 ): Promise<void> => {
+  setAndroidForegroundWork(true);
   try {
     bindJobApis(socket, command);
     const api: unknown = Reflect.get(globalThis, command.api);
@@ -73,6 +75,8 @@ const runJob = async (
       jobId: command.jobId,
       error: describeError(error),
     });
+  } finally {
+    setAndroidForegroundWork(false);
   }
 };
 
