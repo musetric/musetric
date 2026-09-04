@@ -41,6 +41,13 @@ struct Arguments {
 
     #[arg(
         long,
+        conflicts_with_all = ["certificate", "private_key"],
+        help = "Serve HTTPS with a generated self-signed certificate for localhost."
+    )]
+    tls_self_signed: bool,
+
+    #[arg(
+        long,
         requires = "private_key",
         help = "PEM certificate for the public HTTPS listener."
     )]
@@ -72,6 +79,7 @@ async fn main() -> Result<(), BoxedError> {
         browser_bundle: arguments.browser_bundle,
         public: arguments.public,
         processing: arguments.processing,
+        tls_self_signed: arguments.tls_self_signed,
         tls,
     })
     .await

@@ -19,7 +19,6 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "dependencies": {
-    "@musetric/server": "workspace:*",
     "@musetric/utils": "workspace:*",
     "pino": "catalog:"
   },

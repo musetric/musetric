@@ -1,7 +1,7 @@
 import { dirname } from 'node:path';
-import { readMigrationFailure } from '@musetric/server';
 import { dialog } from 'electron';
 import { type DesktopLog, reportFatal } from './logging.js';
+import { readMigrationFailure } from './migration.js';
 
 const describeBackup = (backupPath: string): string[] => [
   `A copy of the database from before the update is in ${backupPath}`,
