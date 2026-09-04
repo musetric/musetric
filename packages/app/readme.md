@@ -7,10 +7,8 @@ the shared Rust server and runs the Musetric frontend in a WebView.
 
 | Command              | What it does                                           |
 | -------------------- | ------------------------------------------------------ |
-| `yarn dev:mobile`    | Starts Vite for desktop-browser preview                |
-| `yarn build:mobile`  | Creates the WebView bundle                             |
-| `yarn dev:desktop`   | Runs the desktop Tauri shell                           |
-| `yarn build:desktop` | Compiles the desktop shell without packaging it        |
+| `yarn dev:app`       | Runs the Tauri shell                                   |
+| `yarn build:app`     | Compiles the shell without packaging it                |
 | `yarn init:android`  | Materializes `src-tauri/gen/android`                   |
 | `yarn dev:android`   | Runs a connected device against the development server |
 | `yarn build:android` | Builds the APK                                         |

@@ -9,10 +9,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:mobile": "vite --configLoader native",
-    "build:mobile": "yarn build:icons && vite build --configLoader native && yarn build:executor",
-    "dev:desktop": "tauri dev",
-    "build:desktop": "tauri build --no-bundle",
+    "dev:ui": "vite --configLoader native",
+    "build:ui": "yarn build:icons && vite build --configLoader native && yarn build:executor",
     "pack:installer": "node ./scripts/packInstaller.ts",
     "dev:app": "tauri dev",
     "build:app": "tauri build --no-bundle",

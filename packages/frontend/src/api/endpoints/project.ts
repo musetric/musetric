@@ -82,13 +82,6 @@ export const edit = (queryClient: QueryClient, projectId: number) =>
     },
   });
 
-const requestMobileProcessingRetry = (): void => {
-  const retry = Reflect.get(globalThis, 'musetricRetryProcessing');
-  if (typeof retry === 'function') {
-    Reflect.apply(retry, globalThis, []);
-  }
-};
-
 export const retry = (queryClient: QueryClient, projectId: number) =>
   mutationOptions({
     mutationKey: ['project', 'retry', projectId],
@@ -102,7 +95,6 @@ export const retry = (queryClient: QueryClient, projectId: number) =>
       queryClient.setQueryData(list().queryKey, (projects) =>
         projects?.map((item) => (item.id === project.id ? project : item)),
       );
-      requestMobileProcessingRetry();
     },
   });
 
