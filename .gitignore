@@ -6,6 +6,7 @@ gen-assets/
 *.tgz
 tmp/
 **/backend/storage/
+**/server/storage/
 packages/server/target/
 packages/app/src-tauri/target/
 packages/app/src-tauri/gen/

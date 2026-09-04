@@ -30,7 +30,8 @@
     "**/.tsbuildinfo/**": true,
     "**/dist/**": true,
     "**/tmp/**": true,
-    "**/backend/storage/**": true
+    "**/backend/storage/**": true,
+    "**/server/storage/**": true
   },
   "search.exclude": {
     "**/node_modules/**": true,
@@ -39,6 +40,7 @@
     "**/.tsbuildinfo/**": true,
     "**/dist/**": true,
     "**/tmp/**": true,
-    "**/backend/storage/**": true
+    "**/backend/storage/**": true,
+    "**/server/storage/**": true
   }
 }
