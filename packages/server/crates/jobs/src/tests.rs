@@ -1,6 +1,6 @@
 use std::{
     fs::{create_dir_all, remove_dir_all},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::id,
     sync::{
         Arc, Mutex,
@@ -12,6 +12,7 @@ use std::{
 use musetric_db::{
     OpenOptions, PendingJob, ProcessingStep, Reader, Writer, init_database, open_database,
 };
+use tokio::time::sleep;
 
 use crate::{
     queue::{
@@ -64,11 +65,16 @@ impl Workspace {
     }
 
     fn create_queue(&self, runner: Arc<dyn StepRunner>) -> Arc<Queue> {
+        self.create_queue_with_idle(runner, Duration::from_mins(1))
+    }
+
+    fn create_queue_with_idle(&self, runner: Arc<dyn StepRunner>, idle: Duration) -> Arc<Queue> {
         Queue::create(QueueOptions {
             reader: Arc::new(Reader::open(&self.database_path()).expect("the reader should open")),
             writer: Arc::new(Writer::open(&self.database_path()).expect("the writer should open")),
             runner,
             interval: Duration::from_mins(1),
+            idle_limit: idle,
         })
     }
 }
@@ -103,6 +109,9 @@ enum Answer {
     Complete,
     Silent,
     Gone,
+    Stuck,
+    Exploded,
+    Lively,
     Failed(&'static str),
 }
 
@@ -127,32 +136,71 @@ impl FakeRunner {
             .expect("the log should be readable")
             .clone()
     }
+
+    async fn wait_seen(&self, expected: usize) {
+        for _ in 0..200 {
+            if self.seen().len() >= expected {
+                return;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    }
 }
 
 impl StepRunner for FakeRunner {
     fn run<'a>(&'a self, job: &'a PendingJob, report: &'a StepReport) -> StepOutcome<'a> {
+        self.seen
+            .lock()
+            .expect("the log should be writable")
+            .push(job.step.name());
+        match self.answer {
+            Answer::Stuck => return Box::pin(std::future::pending()),
+            Answer::Exploded if self.seen().len() == 1 => {
+                return Box::pin(async {
+                    report(StepEvent::Progress(0.5));
+                    panic!("the decoder exploded");
+                });
+            }
+            Answer::Lively => {
+                let database_path = self.database_path.clone();
+                let step = job.step;
+                return Box::pin(lively(database_path, step, report));
+            }
+            _ => {}
+        }
         Box::pin(async move {
-            self.seen
-                .lock()
-                .expect("the log should be writable")
-                .push(job.step.name());
             report(StepEvent::Progress(0.5));
             match self.answer {
                 Answer::Failed(failure) => return StepAnswer::Failed(failure.to_owned()),
                 Answer::Gone => return StepAnswer::Unavailable,
                 Answer::Silent => return StepAnswer::Finished,
-                Answer::Complete => {}
+                Answer::Complete | Answer::Stuck | Answer::Exploded | Answer::Lively => {}
             }
-            let options = OpenOptions {
-                foreign_keys: false,
-            };
-            open_database(&self.database_path, &options)
-                .expect("the database should open")
-                .execute_batch(result_statements(job.step))
-                .expect("the result should be written");
+            Self::write_result(&self.database_path, job.step);
             StepAnswer::Finished
         })
     }
+}
+
+impl FakeRunner {
+    fn write_result(database_path: &Path, step: ProcessingStep) {
+        let options = OpenOptions {
+            foreign_keys: false,
+        };
+        open_database(database_path, &options)
+            .expect("the database should open")
+            .execute_batch(result_statements(step))
+            .expect("the result should be written");
+    }
+}
+
+async fn lively(database_path: PathBuf, step: ProcessingStep, report: &StepReport) -> StepAnswer {
+    for portion in [0.25, 0.5, 0.75] {
+        sleep(Duration::from_millis(10)).await;
+        report(StepEvent::Progress(portion));
+    }
+    FakeRunner::write_result(&database_path, step);
+    StepAnswer::Finished
 }
 
 fn collect_events(events: &mut tokio::sync::broadcast::Receiver<StatusEvent>) -> Vec<StatusEvent> {
@@ -259,6 +307,105 @@ async fn keeps_a_step_pending_when_the_executor_is_gone() {
         .expect("the summary should be built");
     let separation = processing.step(ProcessingStep::Separation);
     assert_eq!(runner.seen(), vec!["separation"]);
+    assert_eq!(separation.status, StepStatus::Pending);
+    assert_eq!(separation.error, None);
+}
+
+#[tokio::test]
+async fn records_a_panicking_step_and_keeps_the_queue_alive() {
+    let workspace = Workspace::new();
+    workspace.execute(
+        "INSERT INTO AudioMaster (projectId, type, blobId)
+         VALUES (1, 'lead', 'lead-blob'), (1, 'instrumental', 'instrumental-blob');",
+    );
+    let runner = FakeRunner::create(&workspace, Answer::Exploded);
+    let queue = workspace.create_queue(runner.clone());
+
+    queue.drain().await;
+
+    assert_eq!(
+        runner.seen(),
+        vec!["transcription", "rhythm", "key", "chords"]
+    );
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    let transcription = processing.step(ProcessingStep::Transcription);
+    assert_eq!(transcription.status, StepStatus::Failed);
+    assert_eq!(
+        transcription.error.as_deref().map(str::to_owned),
+        Some("The step panicked: the decoder exploded".to_owned())
+    );
+    assert_eq!(
+        processing.step(ProcessingStep::Rhythm).status,
+        StepStatus::Done
+    );
+}
+
+#[tokio::test]
+async fn fails_a_step_that_stops_making_progress() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Stuck);
+    let queue = workspace.create_queue_with_idle(runner.clone(), Duration::from_millis(50));
+
+    queue.drain().await;
+
+    assert_eq!(runner.seen(), vec!["separation"]);
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    let separation = processing.step(ProcessingStep::Separation);
+    assert_eq!(separation.status, StepStatus::Failed);
+    assert!(
+        separation
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("no progress"))
+    );
+}
+
+#[tokio::test]
+async fn keeps_a_reporting_step_clear_of_the_idle_watchdog() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Lively);
+    let queue = workspace.create_queue_with_idle(runner.clone(), Duration::from_millis(50));
+
+    queue.drain().await;
+
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    assert_eq!(
+        processing.step(ProcessingStep::Separation).status,
+        StepStatus::Done
+    );
+}
+
+#[tokio::test]
+async fn cancels_the_running_step_when_its_project_is_removed() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Stuck);
+    let queue = workspace.create_queue_with_idle(runner.clone(), Duration::from_mins(1));
+
+    let worker = tokio::spawn({
+        let running = Arc::clone(&queue);
+        async move { running.drain().await }
+    });
+    runner.wait_seen(1).await;
+    queue.cancel_project(1);
+    worker
+        .await
+        .expect("the drain should finish after the cancel");
+
+    assert_eq!(runner.seen(), vec!["separation"]);
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    let separation = processing.step(ProcessingStep::Separation);
     assert_eq!(separation.status, StepStatus::Pending);
     assert_eq!(separation.error, None);
 }

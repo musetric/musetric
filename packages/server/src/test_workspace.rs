@@ -104,6 +104,7 @@ pub(crate) fn create_route_state(storage: Arc<Storage>) -> RouteState {
         writer: Arc::clone(&storage.writer),
         runner: Arc::new(IdleRunner),
         interval: QUEUE_INTERVAL,
+        idle_limit: QUEUE_INTERVAL,
     });
     RouteState {
         rooms: Arc::new(Rooms::create()),

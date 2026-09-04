@@ -35,6 +35,7 @@ const MIGRATION_FAILED_PREFIX: &str = "MUSETRIC_MIGRATION_FAILED=";
 const ADDRESS_IN_USE: &str = "MUSETRIC_PROXY_ERROR=address-in-use";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
+const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
 
 pub struct ServerOptions {
     pub listen: String,
@@ -174,6 +175,7 @@ fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
         writer: Arc::clone(&storage.writer),
         runner: Arc::new(runner),
         interval: PROCESSING_INTERVAL,
+        idle_limit: STEP_IDLE_LIMIT,
     });
     if options.processing {
         queue.spawn();
