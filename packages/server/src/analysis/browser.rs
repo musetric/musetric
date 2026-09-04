@@ -14,7 +14,7 @@ use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
 use crate::{
     analysis::AnalysisContext,
     blobs::create_blob_ref,
-    pages::{PageFailure, PageOpener},
+    pages::{HeldPage, PageFailure, PageOpener},
     storage::write_database,
 };
 
@@ -141,8 +141,9 @@ impl Session {
         job: Job<'_>,
     ) -> Result<Value, Failure> {
         let page = pages.open_page(&self.host.page_url()).await?;
+        let held = HeldPage::hold(pages, page);
         let found = self.answer(job).await;
-        pages.close_page(&page);
+        drop(held);
         found
     }
 

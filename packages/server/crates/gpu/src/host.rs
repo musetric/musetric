@@ -368,6 +368,15 @@ impl ExecutorHost {
     }
 }
 
+impl Drop for ExecutorHost {
+    fn drop(&mut self) {
+        self.state.closing.notify_waiters();
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(());
+        }
+    }
+}
+
 fn encode_query_value(value: &str) -> String {
     value
         .chars()

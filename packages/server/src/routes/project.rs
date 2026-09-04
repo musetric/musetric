@@ -213,6 +213,7 @@ async fn remove(state: &RouteState, project_id: i64) -> Result<Response<Body>, F
     if !removed {
         return Err(Failure::NotFound(missing_message(project_id)));
     }
+    state.queue.cancel_project(project_id);
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::OK;
     Ok(response)

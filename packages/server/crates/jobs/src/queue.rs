@@ -1,10 +1,12 @@
 use std::{
     future::Future,
+    panic::AssertUnwindSafe,
     pin::Pin,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
+use futures_util::FutureExt;
 use musetric_db::{
     BoxedError, PendingJob, ProcessingStep, Reader, StepFailure, StepResults, Writer,
 };
@@ -37,6 +39,7 @@ pub enum StepAnswer {
     Finished,
     Failed(String),
     Unavailable,
+    Cancelled,
 }
 
 pub type StepOutcome<'a> = Pin<Box<dyn Future<Output = StepAnswer> + Send + 'a>>;
@@ -56,6 +59,7 @@ pub struct QueueOptions {
     pub writer: Arc<Writer>,
     pub runner: Arc<dyn StepRunner>,
     pub interval: Duration,
+    pub idle_limit: Duration,
 }
 
 struct Snapshot {
@@ -66,6 +70,7 @@ struct Snapshot {
 struct Running {
     snapshot: Snapshot,
     step: ActiveStep,
+    activity: Instant,
 }
 
 pub struct Queue {
@@ -73,9 +78,12 @@ pub struct Queue {
     writer: Arc<Writer>,
     runner: Arc<dyn StepRunner>,
     interval: Duration,
+    idle_limit: Duration,
     running: Mutex<Option<Running>>,
     events: broadcast::Sender<StatusEvent>,
     wake: Notify,
+    cancel: Notify,
+    cancelled: Mutex<Option<i64>>,
 }
 
 fn read_pending(reader: &Reader) -> Result<Option<PendingJob>, BoxedError> {
@@ -88,6 +96,22 @@ fn read_pending(reader: &Reader) -> Result<Option<PendingJob>, BoxedError> {
     Ok(None)
 }
 
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
+    let text = panic
+        .downcast_ref::<&str>()
+        .map(|value| (*value).to_owned())
+        .or_else(|| panic.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".to_owned());
+    format!("The step panicked: {text}")
+}
+
+fn stuck_message(idle_limit: Duration) -> String {
+    format!(
+        "The step made no progress for {} seconds",
+        idle_limit.as_secs()
+    )
+}
+
 impl Queue {
     #[must_use]
     pub fn create(options: QueueOptions) -> Arc<Self> {
@@ -97,9 +121,12 @@ impl Queue {
             writer: options.writer,
             runner: options.runner,
             interval: options.interval,
+            idle_limit: options.idle_limit,
             running: Mutex::new(None),
             events,
             wake: Notify::new(),
+            cancel: Notify::new(),
+            cancelled: Mutex::new(None),
         })
     }
 
@@ -110,6 +137,13 @@ impl Queue {
 
     pub fn wake(&self) {
         self.wake.notify_one();
+    }
+
+    pub fn cancel_project(&self, project_id: i64) {
+        if let Ok(mut cancelled) = self.cancelled.lock() {
+            *cancelled = Some(project_id);
+        }
+        self.cancel.notify_one();
     }
 
     pub async fn processing(&self, project_id: i64) -> Result<Processing, BoxedError> {
@@ -170,7 +204,7 @@ impl Queue {
         self.publish(project_id).await;
         let queue = Arc::clone(self);
         let report = move |event| queue.report(event);
-        let answer = self.runner.run(&job, &report).await;
+        let answer = self.execute(&job, &report).await;
         if let StepAnswer::Failed(message) = &answer {
             self.record_failure(project_id, step, message.clone()).await;
         }
@@ -178,7 +212,41 @@ impl Queue {
             *running = None;
         }
         self.publish(project_id).await;
-        !matches!(answer, StepAnswer::Unavailable)
+        !matches!(answer, StepAnswer::Unavailable | StepAnswer::Cancelled)
+    }
+
+    async fn execute(&self, job: &PendingJob, report: &StepReport) -> StepAnswer {
+        let run = AssertUnwindSafe(self.runner.run(job, report)).catch_unwind();
+        tokio::pin!(run);
+        loop {
+            tokio::select! {
+                answered = &mut run => {
+                    return answered
+                        .unwrap_or_else(|panic| StepAnswer::Failed(panic_message(&*panic)));
+                }
+                () = self.cancel.notified() => {
+                    if self.cancelled_target() == Some(job.project_id) {
+                        return StepAnswer::Cancelled;
+                    }
+                }
+                () = sleep(self.idle_limit) => {
+                    if self.idle_for().is_none_or(|elapsed| elapsed >= self.idle_limit) {
+                        return StepAnswer::Failed(stuck_message(self.idle_limit));
+                    }
+                }
+            }
+        }
+    }
+
+    fn cancelled_target(&self) -> Option<i64> {
+        self.cancelled.lock().ok().and_then(|guard| *guard)
+    }
+
+    fn idle_for(&self) -> Option<Duration> {
+        self.running
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|running| running.activity.elapsed()))
     }
 
     async fn start(&self, job: &PendingJob) -> bool {
@@ -196,7 +264,11 @@ impl Queue {
                 progress: 0.0,
                 download: None,
             },
+            activity: Instant::now(),
         });
+        if let Ok(mut cancelled) = self.cancelled.lock() {
+            *cancelled = None;
+        }
         true
     }
 
@@ -207,6 +279,7 @@ impl Queue {
         let Some(running) = guard.as_mut() else {
             return;
         };
+        running.activity = Instant::now();
         match event {
             StepEvent::Progress(progress) => running.step.progress = progress,
             StepEvent::Download(download) => running.step.download = Some(download),
