@@ -51,6 +51,7 @@ scopes:
   - utils # packages/utils low-level shared utilities
   # App
   - backend # the server: http api, storage, processing queue
+  - app # packages/app Tauri app for desktop and mobile
   - desktop # packages/desktop Electron app
   - frontend # packages/frontend app shell (cross-feature)
   - landing # packages/landing marketing site

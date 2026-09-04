@@ -1,14 +1,14 @@
 [package]
-name = "musetric-mobile"
+name = "musetric-app"
 version = "0.1.0"
-description = "Musetric — audio separation, transcription and analysis mobile app"
+description = "Musetric — audio separation, transcription and analysis app"
 authors = ["Musetric <musetric@gmail.com>"]
 license = "MIT"
 edition = "2024"
 workspace = "../../server"
 
 [lib]
-name = "musetric_mobile_lib"
+name = "musetric_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

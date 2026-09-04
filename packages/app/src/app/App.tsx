@@ -33,6 +33,6 @@ const captionStyle: CSSProperties = {
 export const App = () => (
   <div style={screenStyle}>
     <img style={logoStyle} src={logoUrl} alt='Musetric' />
-    <p style={captionStyle}>The Musetric mobile app is coming soon.</p>
+    <p style={captionStyle}>The Musetric app is coming soon.</p>
   </div>
 );
