@@ -12,6 +12,7 @@ use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer,
 use musetric_gpu::{Bundle, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
+use rcgen::generate_simple_self_signed;
 use serde_json::{Map, Value, json};
 use tokio::{io::stdin, net::TcpListener, sync::oneshot};
 
@@ -28,7 +29,6 @@ use crate::{
 const READY_PREFIX: &str = "MUSETRIC_PROXY_URL=";
 const MIGRATION_PREFIX: &str = "MUSETRIC_MIGRATION=";
 const MIGRATION_FAILED_PREFIX: &str = "MUSETRIC_MIGRATION_FAILED=";
-const ADDRESS_IN_USE: &str = "MUSETRIC_PROXY_ERROR=address-in-use";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
@@ -41,6 +41,7 @@ pub struct ServerOptions {
     pub browser_bundle: PathBuf,
     pub public: PathBuf,
     pub processing: bool,
+    pub tls_self_signed: bool,
     pub tls: Option<TlsOptions>,
 }
 
@@ -97,8 +98,14 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     })?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
-    if let Some(tls) = options.tls {
-        let config = RustlsConfig::from_pem_file(tls.certificate, tls.private_key).await?;
+    let tls = match options.tls {
+        Some(files) => {
+            Some(RustlsConfig::from_pem_file(files.certificate, files.private_key).await?)
+        }
+        None if options.tls_self_signed => Some(self_signed_config().await?),
+        None => None,
+    };
+    if let Some(config) = tls {
         let handle = Handle::<SocketAddr>::new();
         tokio::spawn(shutdown_on_closed_parent(handle.clone(), closing));
         announce_ready("https", address);
@@ -206,16 +213,27 @@ fn create_storage(database: &Path, blobs: PathBuf) -> Result<Arc<Storage>, Boxed
 }
 
 fn bind(listen: &str) -> Result<StdTcpListener, BoxedError> {
-    let listener = StdTcpListener::bind(listen).map_err(report_bind_failure)?;
+    let listener =
+        StdTcpListener::bind(listen).map_err(|error| report_bind_failure(listen, error))?;
     listener.set_nonblocking(true)?;
     Ok(listener)
 }
 
-fn report_bind_failure(error: io::Error) -> io::Error {
+fn report_bind_failure(listen: &str, error: io::Error) -> io::Error {
     if error.kind() == io::ErrorKind::AddrInUse {
-        let _ = writeln!(io::stderr().lock(), "{ADDRESS_IN_USE}");
+        let _ = writeln!(
+            io::stderr().lock(),
+            "the address {listen} is already in use"
+        );
     }
     error
+}
+
+async fn self_signed_config() -> Result<RustlsConfig, BoxedError> {
+    let certified = generate_simple_self_signed(vec!["localhost".to_owned()])?;
+    let certificate = certified.cert.pem().into_bytes();
+    let key = certified.key_pair.serialize_pem().into_bytes();
+    Ok(RustlsConfig::from_pem(certificate, key).await?)
 }
 
 fn announce_ready(protocol: &str, address: SocketAddr) {

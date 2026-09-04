@@ -1,7 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -12,46 +10,17 @@ import {
 
 const packagePath = dirname(dirname(fileURLToPath(import.meta.url)));
 const readyPrefix = 'MUSETRIC_PROXY_URL=';
-const addressInUseMarker = 'MUSETRIC_PROXY_ERROR=address-in-use';
 
 const executableName =
   process.platform === 'win32' ? 'musetric-server.exe' : 'musetric-server';
 
-export const isAddressInUseError = (error: unknown): boolean =>
-  error instanceof Error && error.message.includes(addressInUseMarker);
-
-export type RustProxyTls = {
-  certificate: string;
-  privateKey: string;
-};
-
-type TlsFiles = {
-  directory: string;
-  certificatePath: string;
-  privateKeyPath: string;
-};
-
-const createTlsFiles = async (tls: RustProxyTls): Promise<TlsFiles> => {
-  const directory = await mkdtemp(join(tmpdir(), 'musetric-rust-proxy-'));
-  const certificatePath = join(directory, 'certificate.pem');
-  const privateKeyPath = join(directory, 'private-key.pem');
-  await Promise.all([
-    writeFile(certificatePath, tls.certificate, { mode: 0o600 }),
-    writeFile(privateKeyPath, tls.privateKey, { mode: 0o600 }),
-  ]);
-  return { directory, certificatePath, privateKeyPath };
-};
-
-export type StartRustProxyOptions = {
-  listen: string;
+export type StartServerProcessOptions = {
   databasePath: string;
   blobsPath: string;
   modelsPath: string;
   browserBundlePath: string;
   publicPath: string;
-  processing?: boolean;
   resourcesPath?: string;
-  tls?: RustProxyTls;
   onLog?: (line: string) => void;
 };
 
@@ -60,13 +29,10 @@ type Command = {
   args: string[];
 };
 
-const createCommand = (
-  options: StartRustProxyOptions,
-  tlsFiles: TlsFiles | undefined,
-): Command => {
+const createCommand = (options: StartServerProcessOptions): Command => {
   const args = [
     '--listen',
-    options.listen,
+    '127.0.0.1:0',
     '--database',
     options.databasePath,
     '--blobs',
@@ -77,17 +43,7 @@ const createCommand = (
     options.browserBundlePath,
     '--public',
     options.publicPath,
-    '--processing',
-    String(options.processing ?? true),
   ];
-  if (tlsFiles !== undefined) {
-    args.push(
-      '--certificate',
-      tlsFiles.certificatePath,
-      '--private-key',
-      tlsFiles.privateKeyPath,
-    );
-  }
   if (options.resourcesPath === undefined) {
     return {
       command: 'cargo',
@@ -95,7 +51,7 @@ const createCommand = (
         'run',
         '--quiet',
         '--manifest-path',
-        join(packagePath, 'Cargo.toml'),
+        join(packagePath, '..', 'server', 'Cargo.toml'),
         '--',
         ...args,
       ],
@@ -189,30 +145,24 @@ const waitForExit = async (child: ChildProcess): Promise<void> =>
 const stopChild = async (
   child: ChildProcess,
   exited: Promise<void>,
-  tlsFiles: TlsFiles | undefined,
 ): Promise<void> => {
   if (!hasExited(child)) {
     child.stdin?.end();
     child.kill();
   }
   await exited;
-  if (tlsFiles !== undefined) {
-    await rm(tlsFiles.directory, { force: true, recursive: true });
-  }
 };
 
-export type RustProxy = {
+export type ServerProcess = {
   url: string;
   migration: MigrationReport;
   close: () => Promise<void>;
 };
 
-export const startRustProxy = async (
-  options: StartRustProxyOptions,
-): Promise<RustProxy> => {
-  const tlsFiles =
-    options.tls === undefined ? undefined : await createTlsFiles(options.tls);
-  const { command, args } = createCommand(options, tlsFiles);
+export const startServerProcess = async (
+  options: StartServerProcessOptions,
+): Promise<ServerProcess> => {
+  const { command, args } = createCommand(options);
   const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
   const exited = waitForExit(child);
   const migrations = createMigrationReader();
@@ -229,12 +179,12 @@ export const startRustProxy = async (
         await closing;
         return;
       }
-      closing = stopChild(child, exited, tlsFiles);
+      closing = stopChild(child, exited);
       await closing;
     };
     return { url, migration, close };
   } catch (error) {
-    await stopChild(child, exited, tlsFiles);
+    await stopChild(child, exited);
     throw migrations.fail(
       error instanceof Error ? error : new Error(String(error)),
     );

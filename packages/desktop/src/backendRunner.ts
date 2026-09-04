@@ -1,4 +1,4 @@
-import { type MigrationReport } from '@musetric/server';
+import { type MigrationReport } from './migration.js';
 
 export type DesktopBackend = {
   url: string;

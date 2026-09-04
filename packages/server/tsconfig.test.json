@@ -2,7 +2,13 @@
   "extends": "../../tsconfigs/tsconfig.test.json",
   "compilerOptions": {
     "lib": ["ES2024"],
-    "types": ["node"]
+    "types": ["node"],
+    "rootDir": "."
   },
-  "references": [{ "path": "./tsconfig.src.json" }]
+  "include": [
+    "src/__test__/**/*.ts",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "eslint.config.ts"
+  ]
 }

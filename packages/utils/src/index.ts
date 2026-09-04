@@ -5,7 +5,6 @@ export * from './callEvery.js';
 export * from './callLatest.js';
 export * from './color.js';
 export * from './controlledPromise.js';
-export * from './logger.js';
 export * from './loudness.js';
 export * from './nextNumber.js';
 export * from './numberLimit.js';

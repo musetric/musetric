@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import { startRustProxy } from '../rustProxy.js';
 import { serverResourcesPath } from './globalSetup.js';
 import { createProjectFixture } from './projectFixture.js';
 import {
   createStorageWorkspace,
   type StorageWorkspace,
 } from './storageWorkspace.js';
+import { startTestServer } from './testServer.js';
 
 const snapshotHeaders = [
   'accept-ranges',
@@ -128,15 +128,13 @@ export const withTestServer = async <Result>(
   run: ServerRun<Result>,
 ): Promise<Result> => {
   const workspace = createStorageWorkspace();
-  const server = await startRustProxy({
-    listen: '127.0.0.1:0',
+  const server = await startTestServer({
+    resourcesPath: serverResourcesPath,
     databasePath: workspace.paths.databasePath,
     blobsPath: workspace.paths.blobsPath,
     modelsPath: workspace.paths.modelsPath,
     browserBundlePath: workspace.paths.browserBundlePath,
     publicPath: workspace.paths.publicPath,
-    processing: false,
-    resourcesPath: serverResourcesPath,
   });
   try {
     await createProjectFixture(workspace);

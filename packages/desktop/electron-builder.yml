@@ -42,12 +42,12 @@ files:
   - '!**/node_modules/@musetric/*/.tsbuildinfo/**'
   - '!**/node_modules/@musetric/*/tsconfig*.json'
   - '!**/node_modules/@musetric/*/eslint.config.ts'
-  - '!**/node_modules/@musetric/backend/dist-browser/**'
+  - '!**/node_modules/@musetric/server/dist-browser/**'
 extraResources:
-  - from: ../backend/storage/public
-    to: backend/storage/public
-  - from: ../backend/dist-browser
-    to: backend/dist-browser
+  - from: ../server/storage/public
+    to: server/storage/public
+  - from: ../server/dist-browser
+    to: server/dist-browser
   - from: gen-assets/server
     to: server
   - from: ../../license.md
