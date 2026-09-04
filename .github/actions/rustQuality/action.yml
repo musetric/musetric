@@ -1,0 +1,46 @@
+name: Rust Quality
+description: Rust ast, format, clippy, and test checks
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 26.2.0
+        package-manager-cache: false
+    - run: npm install -g corepack@latest
+      shell: bash
+    - run: corepack enable
+      shell: bash
+    - run: corepack prepare yarn@4.17.1 --activate
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+        restore-keys: yarn-${{ runner.os }}-
+    - run: yarn --immutable
+      shell: bash
+      env:
+        MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+        ONNXRUNTIME_NODE_INSTALL: skip
+    - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      shell: bash
+    - run: yarn build:mobile
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          packages/server/target
+        key: cargo-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-
+    - run: yarn workspace @musetric/server check:rust:ast
+      shell: bash
+    - run: yarn workspace @musetric/server check:rust:fmt
+      shell: bash
+    - run: yarn workspace @musetric/server check:rust:clippy
+      shell: bash
+    - run: yarn workspace @musetric/server check:rust:test
+      shell: bash
