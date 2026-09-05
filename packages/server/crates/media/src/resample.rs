@@ -26,7 +26,7 @@ pub(crate) struct Conversion {
 impl Conversion {
     pub(crate) fn create(rates: SampleRates) -> Result<Self, BoxedError> {
         let ratio = f64::from(rates.output) / f64::from(rates.input);
-        let resampler = create_resampler(rates, ratio)?;
+        let resampler = create_resampler(rates)?;
         let delay_frames = resampler.as_ref().map_or(0, Resampler::output_delay);
         Ok(Self {
             resampler,
@@ -118,7 +118,7 @@ impl Conversion {
     }
 }
 
-fn create_resampler(rates: SampleRates, _ratio: f64) -> Result<Option<Fft<f32>>, BoxedError> {
+fn create_resampler(rates: SampleRates) -> Result<Option<Fft<f32>>, BoxedError> {
     if rates.input == rates.output {
         return Ok(None);
     }

@@ -1,0 +1,33 @@
+id: forbid-rust-unused-args
+language: Rust
+severity: error
+message: >-
+  Naming an unused argument with an underscore prefix hides it from
+  unused_variables without removing or using it. In code that is not a trait
+  method implementation or declaration, prefer removing the argument or
+  actually using it.
+files:
+  - '**/*.rs'
+ignores:
+  - '**/target/**'
+rule:
+  all:
+    - kind: identifier
+      regex: '^_.'
+      inside:
+        kind: parameter
+        stopBy: neighbor
+    - not:
+        any:
+          - inside:
+              kind: impl_item
+              stopBy: end
+              has:
+                field: trait
+                any:
+                  - kind: type_identifier
+                  - kind: scoped_type_identifier
+                  - kind: generic_type
+          - inside:
+              kind: trait_item
+              stopBy: end
