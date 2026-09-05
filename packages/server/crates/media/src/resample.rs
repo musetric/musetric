@@ -1,11 +1,7 @@
-use rubato::{
-    Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, WindowFunction,
-    audioadapter_buffers::direct::InterleavedSlice,
-};
+use rubato::{Fft, FixedSync, Indexing, Resampler, audioadapter_buffers::direct::InterleavedSlice};
 
 use crate::{BoxedError, pcm::CHANNELS};
 
-const SINC_LENGTH: usize = 256;
 const CHUNK_FRAMES: usize = 1024;
 const STALLED: &str = "The resampler stopped producing frames before the stream ended";
 
@@ -16,7 +12,7 @@ pub struct SampleRates {
 }
 
 pub(crate) struct Conversion {
-    resampler: Option<Async<f32>>,
+    resampler: Option<Fft<f32>>,
     input: Vec<f32>,
     produced: Vec<f32>,
     ready: Vec<f32>,
@@ -122,18 +118,16 @@ impl Conversion {
     }
 }
 
-fn create_resampler(rates: SampleRates, ratio: f64) -> Result<Option<Async<f32>>, BoxedError> {
+fn create_resampler(rates: SampleRates, _ratio: f64) -> Result<Option<Fft<f32>>, BoxedError> {
     if rates.input == rates.output {
         return Ok(None);
     }
-    let parameters = SincInterpolationParameters::new(SINC_LENGTH, WindowFunction::BlackmanHarris2);
-    let resampler = Async::<f32>::new_sinc(
-        ratio,
-        1.0,
-        &parameters,
+    let resampler = Fft::<f32>::new(
+        usize::try_from(rates.input)?,
+        usize::try_from(rates.output)?,
         CHUNK_FRAMES,
         CHANNELS,
-        FixedAsync::Input,
+        FixedSync::Input,
     )?;
     Ok(Some(resampler))
 }
