@@ -229,6 +229,9 @@ export const createStftInferenceRuntime = async (
   };
 
   const release = async (): Promise<void> => {
+    await device.queue.onSubmittedWorkDone();
+    await session.release();
+    core.release();
     fftCell.dispose();
     ifftCell.dispose();
     for (const buffer of [
@@ -241,8 +244,6 @@ export const createStftInferenceRuntime = async (
     ]) {
       buffer.destroy();
     }
-    core.release();
-    await session.release();
   };
 
   return { processChunk, release };
