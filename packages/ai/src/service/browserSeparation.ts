@@ -1,3 +1,4 @@
+import { yieldGpuToCompositor } from '../runtime/gpuCooldown.js';
 import { type separateLeadBacking } from '../separation/separateLeadBacking.js';
 import { type separateVocals } from '../separation/separateVocals.js';
 import {
@@ -91,6 +92,7 @@ export const registerSeparationApi = (): void => {
       const sourceAudio = interleavedToPlanar(interleaved, request.sampleRate);
 
       const vocalsResult = await runVocalsStage(request, sourceAudio);
+      await yieldGpuToCompositor();
       const leadBackingResult = await runLeadBackingStage(
         request,
         vocalsResult.vocals,
