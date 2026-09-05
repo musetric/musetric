@@ -4,13 +4,17 @@ use std::{
     path::Path,
 };
 
-use tokio::{fs::create_dir_all, task::spawn_blocking};
+use tokio::{
+    fs::{copy, create_dir_all},
+    task::spawn_blocking,
+};
 
 use crate::{
     AacEncoder, BoxedError,
     aac::FRAME_SAMPLES,
     flac::FlacWriter,
     fmp4::Fmp4Writer,
+    frames::read_flac_info,
     pcm::{BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH},
     resample::{Conversion, SampleRates},
 };
@@ -26,9 +30,21 @@ pub async fn convert_to_flac(
     to: &Path,
 ) -> Result<(), BoxedError> {
     create_parent(to).await?;
+    if already_master(request.from, request.sample_rate).await {
+        if request.from != to {
+            copy(request.from, to).await?;
+        }
+        return Ok(());
+    }
     let mut writer = FlacWriter::create(to, request.sample_rate)?;
     encode_source(source, request, &mut writer).await?;
     writer.finish()
+}
+
+async fn already_master(from: &Path, sample_rate: u32) -> bool {
+    read_flac_info(from).await.is_ok_and(|info| {
+        info.sample_rate == sample_rate && info.channels == u32::from(DELIVERY_CHANNELS)
+    })
 }
 
 async fn encode_source(
