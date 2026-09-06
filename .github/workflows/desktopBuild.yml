@@ -49,7 +49,7 @@ jobs:
           fi
           echo "version=$declared" >> "$GITHUB_OUTPUT"
 
-  build:
+  desktop:
     needs: prepare
     strategy:
       fail-fast: false
@@ -71,7 +71,157 @@ jobs:
             platform: macOS
             arch: arm64
             rustTarget: aarch64-apple-darwin
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: x64
+            rustTarget: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            platform: Linux
+            arch: arm64
+            rustTarget: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: npm install -g corepack@latest --force
+      - run: corepack enable
+      - run: corepack prepare yarn@4.17.1 --activate
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - if: matrix.platform == 'Linux'
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.3
+        with:
+          packages: libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+          version: 1.0
+      - if: matrix.platform == 'Linux'
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.97.1
+          targets: ${{ matrix.rustTarget }}
+      - if: matrix.platform != 'Linux'
+        run: rustup show
+        working-directory: packages/app
+      - if: matrix.platform != 'Linux'
+        run: rustup target add ${{ matrix.rustTarget }}
+        working-directory: packages/app
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/server/target
+          key: cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ matrix.arch }}-
+      - run: rm -rf packages/server/target/*/release/bundle packages/server/target/release/bundle 2>/dev/null
+        shell: bash
+      - run: yarn workspace @musetric/app pack:installer -- --target ${{ matrix.rustTarget }} --version ${{ needs.prepare.outputs.version }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musetric-desktop-${{ matrix.platform }}-${{ matrix.arch }}-installer
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            packages/server/target/**/release/bundle/nsis/*.exe
+            packages/server/target/**/release/bundle/nsis/*.exe.sig
+            packages/server/target/**/release/bundle/dmg/*.dmg
+            packages/server/target/**/release/bundle/dmg/*.dmg.sig
+            packages/server/target/**/release/bundle/macos/*.app.tar.gz
+            packages/server/target/**/release/bundle/macos/*.app.tar.gz.sig
+            packages/server/target/**/release/bundle/deb/*.deb
+            packages/server/target/**/release/bundle/deb/*.deb.sig
+      - if: matrix.platform == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: musetric-desktop-${{ matrix.platform }}-${{ matrix.arch }}-appimage
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            packages/server/target/**/release/bundle/appimage/*.AppImage
+            packages/server/target/**/release/bundle/appimage/*.AppImage.sig
+
+  android:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64
+          - abi: x86_64
+            target: x86_64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: npm install -g corepack@latest --force
+      - run: corepack enable
+      - run: corepack prepare yarn@4.17.1 --activate
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/server/target
+          key: cargo-${{ runner.os }}-android-${{ matrix.target }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-android-${{ matrix.target }}-
+      - name: Init Android project
+        working-directory: packages/app
+        run: yarn init:android
+      - name: Pin Android SDK path for gradle
+        run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
+      - name: Assemble ${{ matrix.abi }} release APK
+        working-directory: packages/app
+        run: yarn build:android --target ${{ matrix.target }}
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
+      - name: Rename APK with ABI suffix
+        run: |
+          cd packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release
+          mv app-universal-release*.apk "Musetric_${{ needs.prepare.outputs.version }}_${{ matrix.abi }}.apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musetric-android-${{ matrix.abi }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+
+  ios:
+    needs: prepare
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -92,35 +242,43 @@ jobs:
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: rustup show
         working-directory: packages/app
-      - run: rustup target add ${{ matrix.rustTarget }}
       - uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             packages/server/target
-          key: cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-${{ matrix.arch }}-
-      - run: yarn workspace @musetric/app pack:installer -- --target ${{ matrix.rustTarget }} --version ${{ needs.prepare.outputs.version }}
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          key: cargo-${{ runner.os }}-ios-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-ios-
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/Library/Developer/Xcode/DerivedData
+          key: ios-xcode-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/app/native/apple/project.yml') }}
+          restore-keys: ios-xcode-${{ runner.os }}-
+      - run: brew install xcodegen
+      - name: Init iOS project
+        working-directory: packages/app
+        run: yarn init:ios
+      - name: Build iOS app (unsigned)
+        working-directory: packages/app
+        run: yarn build:ios --no-sign
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          name: musetric-ios-unsigned
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-          path: |
-            packages/server/target/**/release/bundle/nsis/*
-            packages/server/target/**/release/bundle/dmg/*
-            packages/server/target/**/release/bundle/macos/*
+          path: packages/app/src-tauri/gen/apple/build/**/*.ipa
 
   release:
     if: inputs.mode == 'release'
     needs:
       - prepare
-      - build
+      - desktop
+      - android
+      - ios
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -136,6 +294,12 @@ jobs:
           node-version: 26.2.0
           package-manager-cache: false
       - run: node packages/app/scripts/assembleUpdateRelease.ts artifacts release ${{ needs.prepare.outputs.version }}
+      - name: Copy Android and iOS artifacts into release directory
+        run: |
+          set -e
+          mkdir -p release
+          find artifacts/musetric-android-* -name "*.apk" -type f -exec cp -v {} release/ \;
+          find artifacts/musetric-ios-* -name "*.ipa" -type f -exec cp -v {} release/ \;
       - env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}

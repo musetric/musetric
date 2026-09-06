@@ -1,5 +1,12 @@
 {
   "bundle": {
-    "active": false
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "category": "Music",
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
   }
 }
