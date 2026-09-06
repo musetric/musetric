@@ -5,11 +5,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,6 +28,21 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(ForegroundBridge(this), "MusetricForeground")
     webView.addJavascriptInterface(ThermalBridge(this), "MusetricThermal")
     super.onWebViewCreate(webView)
+    applyWebViewInsets(webView)
+  }
+
+  private fun applyWebViewInsets(webView: WebView) {
+    val insetTypes =
+      WindowInsetsCompat.Type.systemBars() or
+        WindowInsetsCompat.Type.displayCutout() or
+        WindowInsetsCompat.Type.ime()
+    ViewCompat.setOnApplyWindowInsetsListener(webView) { view, windowInsets ->
+      val insets = windowInsets.getInsets(insetTypes)
+      val container = view.parent as? ViewGroup ?: view
+      container.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+      WindowInsetsCompat.CONSUMED
+    }
+    ViewCompat.requestApplyInsets(webView)
   }
 
   fun setProcessingActive(active: Boolean) {
