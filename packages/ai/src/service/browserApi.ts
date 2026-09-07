@@ -1,5 +1,7 @@
+import { type UnitProgress } from '../runtime/unitProgress.js';
+
 export const separateAudioApiName = 'musetricAiSeparateAudio';
-export const reportProgressApiName = 'musetricAiReportProgress';
+export const reportPhaseApiName = 'musetricAiReportPhase';
 
 export const stemDownloadNames = {
   lead: 'lead.pcm',
@@ -16,7 +18,12 @@ export type BrowserSeparateAudioRequest = {
   leadBackingModelUrl: string;
 };
 
-export type BrowserProgressMessage = {
-  type: 'progress';
-  progress: number;
+export type BrowserRunningPass = 'decode' | 'repair';
+
+export type BrowserRunningUnits = UnitProgress & {
+  pass: BrowserRunningPass;
 };
+
+export type BrowserPhaseMessage =
+  | { type: 'loading' }
+  | ({ type: 'running' } & BrowserRunningUnits);

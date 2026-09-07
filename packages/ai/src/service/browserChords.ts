@@ -8,7 +8,8 @@ import {
   fetchFloat32,
   fetchOk,
   registerBrowserApi,
-  reportProgress,
+  reportLoading,
+  reportRunning,
 } from './browserShared.js';
 import {
   analyzeChordsApiName,
@@ -58,9 +59,8 @@ export const registerChordsApi = (): void => {
   registerBrowserApi<BrowserAnalyzeChordsRequest, ChordResult>(
     analyzeChordsApiName,
     async (request) => {
-      await reportProgress(0);
+      await reportLoading();
       const audio = await fetchFloat32(request.pcmUrl, 'chords PCM');
-      await reportProgress(0.1);
 
       const { createChordNetGpuRuntime } =
         await import('../runtime/chords/chordNetGpuRuntime.js');
@@ -70,9 +70,8 @@ export const registerChordsApi = (): void => {
         plan,
       });
       try {
-        await reportProgress(0.4);
+        await reportRunning({ pass: 'decode', unit: 0, unitCount: 1 });
         const indices = await runtime.analyze(audio);
-        await reportProgress(1);
         return buildChordSegments(indices, chordNetModel.frameDuration);
       } finally {
         await runtime.release();

@@ -3,7 +3,8 @@ import { type KeyResult } from '../key/types.js';
 import {
   fetchFloat32,
   registerBrowserApi,
-  reportProgress,
+  reportLoading,
+  reportRunning,
 } from './browserShared.js';
 import { analyzeKeyApiName, type BrowserAnalyzeKeyRequest } from './keyApi.js';
 
@@ -36,19 +37,18 @@ export const registerKeyApi = (): void => {
   registerBrowserApi<BrowserAnalyzeKeyRequest, KeyResult>(
     analyzeKeyApiName,
     async (request) => {
-      await reportProgress(0);
+      await reportLoading();
       const audio = await fetchFloat32(request.pcmUrl, 'key PCM');
       peakNormalize(audio);
-      await reportProgress(0.1);
 
       const { createSkeyRuntime } =
         await import('../runtime/key/skeyRuntime.js');
       const runtime = await createSkeyRuntime({ modelUrl: request.modelUrl });
       try {
+        await reportRunning({ pass: 'decode', unit: 0, unitCount: 1 });
         const probs = await runtime.analyze(audio);
         const index = argmax(probs);
         const { root, mode } = keyMap[index];
-        await reportProgress(1);
         return { root, mode, confidence: probs[index] };
       } finally {
         await runtime.release();

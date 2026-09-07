@@ -15,11 +15,8 @@ use musetric_db::{
 use tokio::time::sleep;
 
 use crate::{
-    queue::{
-        Queue, QueueOptions, StatusEvent, StepAnswer, StepEvent, StepOutcome, StepReport,
-        StepRunner,
-    },
-    summary::StepStatus,
+    queue::{Queue, QueueOptions, StatusEvent, StepAnswer, StepOutcome, StepReport, StepRunner},
+    summary::{StepPass, StepPhase, StepStatus},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -157,7 +154,7 @@ impl StepRunner for FakeRunner {
             Answer::Stuck => return Box::pin(std::future::pending()),
             Answer::Exploded if self.seen().len() == 1 => {
                 return Box::pin(async {
-                    report(StepEvent::Progress(0.5));
+                    report(running_phase(1));
                     panic!("the decoder exploded");
                 });
             }
@@ -169,7 +166,7 @@ impl StepRunner for FakeRunner {
             _ => {}
         }
         Box::pin(async move {
-            report(StepEvent::Progress(0.5));
+            report(running_phase(1));
             match self.answer {
                 Answer::Failed(failure) => return StepAnswer::Failed(failure.to_owned()),
                 Answer::Gone => return StepAnswer::Unavailable,
@@ -194,10 +191,25 @@ impl FakeRunner {
     }
 }
 
+fn running_phase(unit: u32) -> StepPhase {
+    StepPhase::Running {
+        pass: StepPass::Decode,
+        unit,
+        unit_count: 2,
+    }
+}
+
+fn read_unit(phase: Option<&StepPhase>) -> Option<u32> {
+    match phase {
+        Some(&StepPhase::Running { unit, .. }) => Some(unit),
+        _ => None,
+    }
+}
+
 async fn lively(database_path: PathBuf, step: ProcessingStep, report: &StepReport) -> StepAnswer {
-    for portion in [0.25, 0.5, 0.75] {
+    for unit in [0, 1, 2] {
         sleep(Duration::from_millis(10)).await;
-        report(StepEvent::Progress(portion));
+        report(running_phase(unit));
     }
     FakeRunner::write_result(&database_path, step);
     StepAnswer::Finished
@@ -250,7 +262,7 @@ async fn records_a_failed_step_and_stops_repeating_it() {
 }
 
 #[tokio::test]
-async fn publishes_the_progress_of_a_running_step() {
+async fn publishes_the_phase_of_a_running_step() {
     let workspace = Workspace::new();
     let runner = FakeRunner::create(&workspace, Answer::Failed("Separation failed"));
     let queue = workspace.create_queue(runner);
@@ -263,10 +275,10 @@ async fn publishes_the_progress_of_a_running_step() {
         .iter()
         .filter_map(|event| {
             let step = event.processing.step(ProcessingStep::Separation);
-            (step.status == StepStatus::Processing).then_some(step.progress)
+            (step.status == StepStatus::Processing).then(|| read_unit(step.phase.as_ref()))
         })
         .collect::<Vec<_>>();
-    assert_eq!(running, vec![Some(0.0), Some(0.5)]);
+    assert_eq!(running, vec![None, Some(1)]);
     let last = collected.last().expect("an event should be published");
     assert_eq!(
         last.processing.step(ProcessingStep::Separation).status,

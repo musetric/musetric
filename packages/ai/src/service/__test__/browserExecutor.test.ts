@@ -3,7 +3,8 @@ import { startJobExecutor } from '../browserExecutor.js';
 import {
   deliverFile,
   registerBrowserApi,
-  reportProgress,
+  reportLoading,
+  reportRunning,
 } from '../browserShared.js';
 import { readSocketUrl, startFakeHost } from './jobHarness.js';
 
@@ -20,13 +21,14 @@ const announceAdapter = (shaderF16: boolean): void => {
   });
 };
 
-test('the browser client runs a job, reports progress and uploads its file', async () => {
+test('the browser client runs a job, reports phases and uploads its file', async () => {
   announceAdapter(true);
   const stem = new Float32Array([0.5, -0.5]);
   registerBrowserApi<{ gain: number }, { frames: number }>(
     apiName,
     async (request) => {
-      await reportProgress(0.5);
+      await reportLoading();
+      await reportRunning({ pass: 'decode', unit: 2, unitCount: 4 });
       await deliverFile(stemName, stem.buffer);
       return { frames: request.gain };
     },
@@ -43,7 +45,16 @@ test('the browser client runs a job, reports progress and uploads its file', asy
     const result = await host.run(apiName, { gain: 3 });
 
     expect(result).toEqual({ frames: 3 });
-    expect(host.progress).toEqual([0.5]);
+    expect(host.phases).toEqual([
+      { type: 'loading', jobId: expect.any(String) },
+      {
+        type: 'running',
+        jobId: expect.any(String),
+        pass: 'decode',
+        unit: 2,
+        unitCount: 4,
+      },
+    ]);
     expect(host.uploads.get(stemName)).toEqual(Buffer.from(stem.buffer));
   } finally {
     await host.close();

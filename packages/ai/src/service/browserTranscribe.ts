@@ -1,7 +1,8 @@
 import {
   fetchFloat32,
   registerBrowserApi,
-  reportProgress,
+  reportLoading,
+  reportRunning,
 } from './browserShared.js';
 import {
   type BrowserTranscribeRequest,
@@ -13,8 +14,8 @@ export const registerTranscribeApi = (): void => {
   registerBrowserApi<BrowserTranscribeRequest, BrowserTranscribeResult>(
     transcribeAudioApiName,
     async (request) => {
+      await reportLoading();
       const audio = await fetchFloat32(request.pcmUrl, 'transcription PCM');
-      await reportProgress(0.02);
 
       const [{ createWhisperRuntime }, { runTranscription }] =
         await Promise.all([
@@ -26,24 +27,24 @@ export const registerTranscribeApi = (): void => {
         modelId: request.modelId,
         revision: request.revision,
 
-        onLoadProgress: (fraction) => {
-          void reportProgress(0.02 + fraction * 0.38);
+        onLoading: () => {
+          void reportLoading();
         },
       });
 
       try {
-        await reportProgress(0.4);
-        const result = await runTranscription({
+        return await runTranscription({
           audio,
           language: request.language,
           detectLanguage: runtime.detectLanguage,
           transcribeBatch: runtime.transcribeBatch,
           transcribeAligned: runtime.transcribeAligned,
 
-          onProgress: async (fraction) => reportProgress(0.4 + fraction * 0.6),
+          onDecoded: async (units) =>
+            reportRunning({ pass: 'decode', ...units }),
+          onRepaired: async (units) =>
+            reportRunning({ pass: 'repair', ...units }),
         });
-        await reportProgress(1);
-        return result;
       } finally {
         await runtime.release();
       }

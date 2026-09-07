@@ -1,8 +1,5 @@
 import { setAndroidForegroundWork } from './androidForeground.js';
-import {
-  type BrowserProgressMessage,
-  reportProgressApiName,
-} from './browserApi.js';
+import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
 import { readGpuSupport } from './browserGpuSupport.js';
 import {
   deliverFileApiName,
@@ -33,13 +30,9 @@ const uploadFile = async (
 const bindJobApis = (socket: WebSocket, command: JobCommand): void => {
   Reflect.set(
     globalThis,
-    reportProgressApiName,
-    (message: BrowserProgressMessage) => {
-      send(socket, {
-        type: 'progress',
-        jobId: command.jobId,
-        progress: message.progress,
-      });
+    reportPhaseApiName,
+    (message: BrowserPhaseMessage) => {
+      send(socket, { ...message, jobId: command.jobId });
     },
   );
   Reflect.set(

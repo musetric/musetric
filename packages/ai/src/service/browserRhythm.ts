@@ -4,7 +4,8 @@ import { type RhythmResult } from '../rhythm/types.js';
 import {
   fetchFloat32,
   registerBrowserApi,
-  reportProgress,
+  reportLoading,
+  reportRunning,
 } from './browserShared.js';
 import {
   analyzeRhythmApiName,
@@ -15,9 +16,8 @@ export const registerRhythmApi = (): void => {
   registerBrowserApi<BrowserAnalyzeRhythmRequest, RhythmResult>(
     analyzeRhythmApiName,
     async (request) => {
-      await reportProgress(0);
+      await reportLoading();
       const audio = await fetchFloat32(request.pcmUrl, 'rhythm PCM');
-      await reportProgress(0.1);
 
       const { createBeatThisGpuRuntime } =
         await import('../runtime/rhythm/beatThisGpuRuntime.js');
@@ -30,14 +30,13 @@ export const registerRhythmApi = (): void => {
         filterbank,
       });
       try {
-        const logits = await runtime.analyze(audio, async (progress) => {
-          await reportProgress(0.1 + progress * 0.8);
+        const logits = await runtime.analyze(audio, async (units) => {
+          await reportRunning({ pass: 'decode', ...units });
         });
         const { beats, downbeats } = pickBeatTimes(
           logits.beat,
           logits.downbeat,
         );
-        await reportProgress(1);
         return {
           bpm: estimateBpm(beats),
           beats,

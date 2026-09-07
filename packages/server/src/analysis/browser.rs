@@ -1,13 +1,19 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Bundle, Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ModelFile, ProgressSink,
-    ensure_model_file,
+    Bundle, Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPass,
+    ExecutorPhase, ModelFile, PhaseSink, ensure_model_file,
 };
-use musetric_jobs::{StepAnswer, StepEvent, StepReport};
-use musetric_media::{Downmix, PcmRequest, decode_mono_pcm};
+use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
+use musetric_media::{
+    Downmix, MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
+};
 use serde_json::{Map, Value, json};
 use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
 
@@ -17,6 +23,8 @@ use crate::{
     pages::{HeldPage, PageFailure, PageOpener},
     storage::write_database,
 };
+
+const DECODE_REPORTS: u64 = 100;
 
 pub(crate) enum Failure {
     Refused(String),
@@ -111,21 +119,21 @@ pub(crate) struct Job<'job> {
 
 pub(crate) struct Session {
     host: ExecutorHost,
-    reported: mpsc::UnboundedReceiver<f64>,
+    reported: mpsc::UnboundedReceiver<ExecutorPhase>,
 }
 
 impl Session {
     pub(crate) async fn start(options: SessionOptions) -> Result<Self, Failure> {
-        let (progress, reported) = mpsc::unbounded_channel();
-        let sink: ProgressSink = Arc::new(move |value| {
-            let _ = progress.send(value);
+        let (phases, reported) = mpsc::unbounded_channel();
+        let sink: PhaseSink = Arc::new(move |phase| {
+            let _ = phases.send(phase);
         });
         let host = ExecutorHost::start(ExecutorHostOptions {
             label: options.label.to_owned(),
             bundle: options.bundle,
             pcm: Bytes::from(options.pcm),
             require_shader_f16: options.require_shader_f16,
-            on_progress: sink,
+            on_phase: sink,
         })
         .await?;
         Ok(Self { host, reported })
@@ -155,8 +163,8 @@ impl Session {
         loop {
             tokio::select! {
                 received = reported.recv() => {
-                    if let Some(value) = received {
-                        (job.report)(StepEvent::Progress(value));
+                    if let Some(phase) = received {
+                        (job.report)(read_phase(phase));
                     }
                 }
                 answered = &mut running => return Ok(answered?),
@@ -166,6 +174,28 @@ impl Session {
 
     pub(crate) async fn close(self) {
         self.host.close().await;
+    }
+}
+
+fn read_phase(phase: ExecutorPhase) -> StepPhase {
+    match phase {
+        ExecutorPhase::Loading => StepPhase::Loading,
+        ExecutorPhase::Running {
+            pass,
+            unit,
+            unit_count,
+        } => StepPhase::Running {
+            pass: read_pass(pass),
+            unit,
+            unit_count,
+        },
+    }
+}
+
+fn read_pass(pass: ExecutorPass) -> StepPass {
+    match pass {
+        ExecutorPass::Decode => StepPass::Decode,
+        ExecutorPass::Repair => StepPass::Repair,
     }
 }
 
@@ -198,14 +228,21 @@ async fn analyze(
     report: &StepReport,
     analysis: &BrowserAnalysis,
 ) -> Result<(), Failure> {
-    report(StepEvent::Progress(0.0));
     let files = ensure_files(context, report, &analysis.files).await?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let request = PcmRequest {
         from: &source,
         sample_rate: analysis.sample_rate,
     };
-    let pcm = decode_mono_pcm(context.storage.pcm.as_ref(), request, analysis.downmix).await?;
+    let mut decoded = decode_reporter(report, count_frames(&source, analysis.sample_rate).await?);
+    let pcm = decode_mono_pcm(MonoRequest {
+        source: context.storage.pcm.as_ref(),
+        request,
+        downmix: analysis.downmix,
+        decoded: &mut decoded,
+    })
+    .await?;
+    report(StepPhase::Loading);
     let mut session = Session::start(SessionOptions {
         label: analysis.label,
         bundle: context.bundle.clone(),
@@ -221,8 +258,8 @@ async fn analyze(
     let found = read_result(&attempt, &mut session, &files).await;
     session.close().await;
     let result = found?;
+    report(StepPhase::Saving);
     store(context, job, analysis.stored, &result).await?;
-    report(StepEvent::Progress(1.0));
     Ok(())
 }
 
@@ -264,12 +301,34 @@ async fn register_files(
     Ok(HostedModel::create(urls, None))
 }
 
+pub(crate) async fn count_frames(source: &Path, sample_rate: u32) -> Result<u64, Failure> {
+    let frames = read_frame_count(source).await?;
+    let stored = read_flac_sample_rate(source).await?;
+    Ok(frames * u64::from(sample_rate) / u64::from(stored))
+}
+
+pub(crate) fn decode_reporter(report: &StepReport, total: u64) -> impl FnMut(u64) + Send {
+    let stride = total.div_ceil(DECODE_REPORTS).max(1);
+    let mut announced = 0;
+    move |decoded| {
+        if decoded < announced + stride && decoded < total {
+            return;
+        }
+        announced = decoded;
+        report(StepPhase::Decoding { decoded, total });
+    }
+}
+
 pub(crate) async fn ensure_files(
     context: &AnalysisContext,
     report: &StepReport,
     files: &[ModelFile],
 ) -> Result<Vec<(String, PathBuf)>, Failure> {
-    let announce = |download: &Download| report(StepEvent::Download(describe(download)));
+    let announce = |download: &Download| {
+        report(StepPhase::Preparing {
+            download: Some(describe(download)),
+        });
+    };
     let mut cached = Vec::new();
     for model in files {
         cached.push((

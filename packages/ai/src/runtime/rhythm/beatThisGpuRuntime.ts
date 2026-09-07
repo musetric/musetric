@@ -3,6 +3,7 @@ import * as ort from 'onnxruntime-web/webgpu';
 import { beatThisModel } from '../../models/beatThisModel.js';
 import { yieldGpuToCompositor } from '../gpuCooldown.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
+import { type ReportUnit } from '../unitProgress.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -77,7 +78,7 @@ export type BeatThisLogits = {
 export type BeatThisGpuRuntime = {
   analyze: (
     audio: Float32Array,
-    onProgress?: (progress: number) => Promise<void>,
+    onUnit?: ReportUnit,
   ) => Promise<BeatThisLogits>;
   release: () => Promise<void>;
 };
@@ -203,7 +204,7 @@ export const createBeatThisGpuRuntime = async (
 
   const analyze = async (
     audio: Float32Array,
-    onProgress?: (progress: number) => Promise<void>,
+    onUnit?: ReportUnit,
   ): Promise<BeatThisLogits> => {
     const current = ensureState(audio.length);
     const empty = new Float32Array(current.frames).fill(emptyLogit);
@@ -212,11 +213,10 @@ export const createBeatThisGpuRuntime = async (
     device.queue.writeBuffer(current.downbeat, 0, empty);
     encodeFeatures(device, current);
 
-    for (let index = current.starts.length - 1; index >= 0; index -= 1) {
+    const unitCount = current.starts.length;
+    for (let index = unitCount - 1; index >= 0; index -= 1) {
+      await onUnit?.({ unit: unitCount - 1 - index, unitCount });
       await runWindow(current, index);
-      await onProgress?.(
-        (current.starts.length - index) / current.starts.length,
-      );
     }
 
     return {

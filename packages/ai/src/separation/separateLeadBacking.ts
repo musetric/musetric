@@ -1,6 +1,7 @@
 import { normalizePeak } from '../dsp/normalize.js';
 import { leadBackingModel } from '../models/leadBackingModel.js';
 import { type LeadBackingGpuRuntime } from '../runtime/leadBacking/leadBackingRuntime.js';
+import { type ReportUnit } from '../runtime/unitProgress.js';
 import { type StereoAudio } from './stereoAudio.js';
 
 const { nFft, compensate, channels, chunkSamples } = leadBackingModel;
@@ -73,24 +74,27 @@ const overlapAdd = (options: OverlapAddOptions): void => {
   }
 };
 
-export type SeparateLeadBackingMessage = {
-  type: 'progress';
-  progress: number;
-};
+const countMixtureSamples = (samples: number): number =>
+  trim + samples + genSamples + trim - (samples % genSamples);
+
+const stepSamples = Math.trunc((1 - overlap) * chunkSamples);
+
+export const countLeadBackingUnits = (audio: StereoAudio): number =>
+  Math.ceil(countMixtureSamples(audio.samples) / stepSamples);
 
 type DemixOptions = {
   mixture: Float32Array<ArrayBuffer>;
   samples: number;
   runtime: LeadBackingGpuRuntime;
-  onMessage: (message: SeparateLeadBackingMessage) => void | Promise<void>;
+  unitCount: number;
+  onUnit: ReportUnit;
 };
 
 const demix = async (
   options: DemixOptions,
 ): Promise<Float32Array<ArrayBuffer>> => {
-  const { mixture, samples, runtime, onMessage } = options;
-  const padSamples = genSamples + trim - (samples % genSamples);
-  const mixtureSamples = trim + samples + padSamples;
+  const { mixture, samples, runtime, unitCount, onUnit } = options;
+  const mixtureSamples = countMixtureSamples(samples);
   const padded = new Float32Array(channels * mixtureSamples);
   for (let channel = 0; channel < channels; channel++) {
     padded.set(
@@ -99,9 +103,7 @@ const demix = async (
     );
   }
 
-  const step = Math.trunc((1 - overlap) * chunkSamples);
-  const totalChunks = Math.ceil(mixtureSamples / step);
-  const progressInterval = Math.max(1, Math.floor(totalChunks / 100));
+  const step = stepSamples;
   const result = new Float32Array(channels * mixtureSamples);
   const divider = new Float32Array(channels * mixtureSamples);
   const chunk = new Float32Array(channels * chunkSamples);
@@ -112,12 +114,7 @@ const demix = async (
     start < mixtureSamples;
     chunkIndex++, start += step
   ) {
-    if (chunkIndex % progressInterval === 0) {
-      await onMessage({
-        type: 'progress',
-        progress: chunkIndex / totalChunks,
-      });
-    }
+    await onUnit({ unit: chunkIndex, unitCount });
     const length = fillChunk(chunk, padded, mixtureSamples, start);
     const separated = await runtime.processChunk(chunk);
     const window = length === chunkSamples ? fullWindow : createHanning(length);
@@ -140,7 +137,6 @@ const demix = async (
         result[sourceIndex] / Math.max(divider[sourceIndex], 1e-10);
     }
   }
-  await onMessage({ type: 'progress', progress: 1 });
   return target;
 };
 
@@ -174,7 +170,7 @@ const scaleSamples = (
 export type SeparateLeadBackingOptions = {
   audio: StereoAudio;
   runtime: LeadBackingGpuRuntime;
-  onMessage: (message: SeparateLeadBackingMessage) => void | Promise<void>;
+  onUnit: ReportUnit;
 };
 
 export type SeparateLeadBackingResult = {
@@ -198,7 +194,8 @@ export const separateLeadBacking = async (
     mixture,
     samples: audio.samples,
     runtime: options.runtime,
-    onMessage: options.onMessage,
+    unitCount: countLeadBackingUnits(audio),
+    onUnit: options.onUnit,
   });
   const backingData = new Float32Array(primary.length);
   const leadData = new Float32Array(primary.length);

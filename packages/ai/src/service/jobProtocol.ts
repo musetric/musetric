@@ -35,20 +35,30 @@ const readReady = (message: object): ExecutorReady => ({
   shaderF16: asBoolean(Reflect.get(message, 'shaderF16')),
 });
 
-export type ExecutorProgress = {
-  type: 'progress';
+export type ExecutorRunning = {
+  type: 'running';
   jobId: string;
-  progress: number;
+  pass: 'decode' | 'repair';
+  unit: number;
+  unitCount: number;
 };
 
-const readProgress = (
+const readPass = (value: unknown): ExecutorRunning['pass'] | undefined => {
+  const pass = asString(value);
+  return pass === 'decode' || pass === 'repair' ? pass : undefined;
+};
+
+const readRunning = (
   message: object,
   jobId: string,
-): ExecutorProgress | undefined => {
-  const progress = asNumber(Reflect.get(message, 'progress'));
-  return progress === undefined
-    ? undefined
-    : { type: 'progress', jobId, progress };
+): ExecutorRunning | undefined => {
+  const pass = readPass(Reflect.get(message, 'pass'));
+  const unit = asNumber(Reflect.get(message, 'unit'));
+  const unitCount = asNumber(Reflect.get(message, 'unitCount'));
+  if (pass === undefined || unit === undefined || unitCount === undefined) {
+    return undefined;
+  }
+  return { type: 'running', jobId, pass, unit, unitCount };
 };
 
 export type ExecutorFailure = {
@@ -71,8 +81,14 @@ export type ExecutorResult = {
   result: unknown;
 };
 
+export type ExecutorLoading = {
+  type: 'loading';
+  jobId: string;
+};
+
 export type ExecutorJobMessage =
-  | ExecutorProgress
+  | ExecutorLoading
+  | ExecutorRunning
   | ExecutorResult
   | ExecutorFailure;
 
@@ -93,8 +109,11 @@ export const readExecutorMessage = (
   if (jobId === undefined) {
     return undefined;
   }
-  if (kind === 'progress') {
-    return readProgress(message, jobId);
+  if (kind === 'loading') {
+    return { type: 'loading', jobId };
+  }
+  if (kind === 'running') {
+    return readRunning(message, jobId);
   }
   if (kind === 'result') {
     return { type: 'result', jobId, result: Reflect.get(message, 'result') };

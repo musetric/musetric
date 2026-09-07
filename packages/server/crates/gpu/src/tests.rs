@@ -24,7 +24,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
 use crate::{
     files::{Asset, Assets, Bundle},
-    host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions},
+    host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions, PhaseSink},
+    protocol::{ExecutorPass, ExecutorPhase},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -84,30 +85,30 @@ impl Drop for Workspace {
 }
 
 struct Reported {
-    progress: Arc<Mutex<Vec<f64>>>,
+    phases: Arc<Mutex<Vec<ExecutorPhase>>>,
 }
 
 impl Reported {
     fn create() -> Self {
         Self {
-            progress: Arc::new(Mutex::new(Vec::new())),
+            phases: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    fn sink(&self) -> Arc<dyn Fn(f64) + Send + Sync> {
-        let progress = Arc::clone(&self.progress);
-        Arc::new(move |value| {
-            progress
+    fn sink(&self) -> PhaseSink {
+        let phases = Arc::clone(&self.phases);
+        Arc::new(move |phase| {
+            phases
                 .lock()
-                .expect("the progress log should be writable")
-                .push(value);
+                .expect("the phase log should be writable")
+                .push(phase);
         })
     }
 
-    fn seen(&self) -> Vec<f64> {
-        self.progress
+    fn seen(&self) -> Vec<ExecutorPhase> {
+        self.phases
             .lock()
-            .expect("the progress log should be readable")
+            .expect("the phase log should be readable")
             .clone()
     }
 }
@@ -122,7 +123,7 @@ async fn start_host(
         bundle: Bundle::Directory(workspace.bundle_path()),
         pcm: Bytes::from_static(PCM),
         require_shader_f16,
-        on_progress: reported.sink(),
+        on_phase: reported.sink(),
     })
     .await
     .expect("the host should start")
@@ -293,7 +294,7 @@ async fn serves_a_whole_registered_directory() {
 }
 
 #[tokio::test]
-async fn runs_a_job_and_reports_its_progress() {
+async fn runs_a_job_and_reports_its_phases() {
     let workspace = Workspace::new();
     let reported = Reported::create();
     let request = json!({ "pcmUrl": "http://127.0.0.1/pcm" });
@@ -302,7 +303,18 @@ async fn runs_a_job_and_reports_its_progress() {
 
     reply(
         &mut job.executor,
-        &json!({ "type": "progress", "jobId": job_id, "progress": 0.5 }),
+        &json!({ "type": "loading", "jobId": job_id }),
+    )
+    .await;
+    reply(
+        &mut job.executor,
+        &json!({
+            "type": "running",
+            "jobId": job_id,
+            "pass": "decode",
+            "unit": 1,
+            "unitCount": 4,
+        }),
     )
     .await;
     reply(
@@ -325,7 +337,17 @@ async fn runs_a_job_and_reports_its_progress() {
             .is_some_and(|url| url.ends_with("/uploads/"))
     );
     assert_eq!(result, json!({ "segments": 3 }));
-    assert_eq!(reported.seen(), vec![0.5]);
+    assert_eq!(
+        reported.seen(),
+        vec![
+            ExecutorPhase::Loading,
+            ExecutorPhase::Running {
+                pass: ExecutorPass::Decode,
+                unit: 1,
+                unit_count: 4,
+            }
+        ]
+    );
 }
 
 #[tokio::test]
@@ -405,7 +427,7 @@ async fn asks_an_embedder_for_the_bundle_only_by_a_relative_name() {
         bundle: Bundle::Assets(Arc::new(EchoedAssets)),
         pcm: Bytes::from_static(PCM),
         require_shader_f16: false,
-        on_progress: reported.sink(),
+        on_phase: reported.sink(),
     })
     .await
     .expect("the host should start");

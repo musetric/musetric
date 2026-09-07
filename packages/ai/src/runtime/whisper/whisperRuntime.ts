@@ -31,17 +31,12 @@ const collapsedWordsPerSecond = 0.25;
 const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
 
-type LoadProgress = {
-  status?: string;
-  progress?: number;
-};
-
 export type WhisperRuntimeOptions = {
   modelHost: string;
   modelId: string;
   revision: string;
 
-  onLoadProgress?: (fraction: number) => void;
+  onLoading: () => void;
 };
 
 export type WhisperRuntime = {
@@ -80,12 +75,8 @@ export const createWhisperRuntime = async (
       session_options: {
         executionProviders: ['webgpu'],
       },
-      progress_callback: (data: LoadProgress) => {
-        if (data.status === 'progress' && typeof data.progress === 'number') {
-          options.onLoadProgress?.(
-            Math.max(0, Math.min(1, data.progress / 100)),
-          );
-        }
+      progress_callback: () => {
+        options.onLoading();
       },
     },
   );

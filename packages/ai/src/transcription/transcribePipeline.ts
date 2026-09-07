@@ -1,4 +1,5 @@
 import { yieldGpuToCompositor } from '../runtime/gpuCooldown.js';
+import { type ReportUnit } from '../runtime/unitProgress.js';
 import {
   buildCompaction,
   computePackedChunks,
@@ -107,7 +108,8 @@ export type RunTranscriptionOptions = {
   segmentGapSeconds?: number;
   batchSize?: number;
 
-  onProgress?: (fraction: number) => void | Promise<void>;
+  onDecoded?: ReportUnit;
+  onRepaired?: ReportUnit;
 };
 
 export const runTranscription = async (
@@ -131,6 +133,7 @@ export const runTranscription = async (
       : 'en');
 
   const wordsPerChunk: TranscriptionWord[][] = chunks.map(() => []);
+  await options.onDecoded?.({ unit: 0, unitCount: chunks.length });
   for (let start = 0; start < chunks.length; start += batchSize) {
     await yieldGpuToCompositor();
     const group = chunks.slice(start, start + batchSize);
@@ -148,9 +151,10 @@ export const runTranscription = async (
         end: word.end + chunk.start,
       }));
     });
-    await options.onProgress?.(
-      Math.min(start + batchSize, chunks.length) / chunks.length,
-    );
+    await options.onDecoded?.({
+      unit: Math.min(start + batchSize, chunks.length),
+      unitCount: chunks.length,
+    });
   }
 
   const repaired = await repairCollapsedWindows({
@@ -159,6 +163,7 @@ export const runTranscription = async (
     packed,
     wordsPerChunk,
     mapping,
+    onUnit: options.onRepaired,
     transcribeSlice: async (slice) =>
       options.transcribeAligned
         ? await options.transcribeAligned(slice, language)

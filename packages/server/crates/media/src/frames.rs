@@ -29,6 +29,10 @@ pub async fn read_frame_count(from: &Path) -> Result<u64, BoxedError> {
     Ok(counted)
 }
 
+pub async fn read_flac_sample_rate(from: &Path) -> Result<u32, BoxedError> {
+    Ok(read_flac_info(from).await?.sample_rate)
+}
+
 pub(crate) async fn read_flac_info(from: &Path) -> Result<FlacInfo, BoxedError> {
     let packed = read_packed(&read_header(from).await?)?;
     let channels = u32::try_from((packed >> CHANNELS_SHIFT) & CHANNELS_MASK)? + 1;

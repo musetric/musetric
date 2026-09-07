@@ -32,6 +32,16 @@ const getStatusColor = (
   return theme.palette.grey[500];
 };
 
+const getRunningValue = (
+  step: api.project.ProcessingStep,
+): number | undefined => {
+  const { unit, unitCount } = step;
+  if (step.phase !== 'running' || unit === undefined || !unitCount) {
+    return undefined;
+  }
+  return (unit / unitCount) * 100;
+};
+
 export type FlowStepProps = {
   projectId: number;
   stepName: api.project.ProcessingStepName;
@@ -46,6 +56,7 @@ export const FlowStep: FC<FlowStepProps> = (props) => {
   const queryClient = useQueryClient();
   const retry = useMutation(endpoints.project.retry(queryClient, projectId));
   const accent = getStatusColor(step.status, theme);
+  const running = getRunningValue(step);
 
   return (
     <Card
@@ -63,13 +74,8 @@ export const FlowStep: FC<FlowStepProps> = (props) => {
         </Typography>
         <FlowStepStatus step={step} />
       </Stack>
-      {step.progress !== undefined && (
-        <LinearProgress variant='determinate' value={step.progress * 100} />
-      )}
-      {step.message !== undefined && (
-        <Typography variant='body2' color='text.secondary'>
-          {step.message}
-        </Typography>
+      {running !== undefined && (
+        <LinearProgress variant='determinate' value={running} />
       )}
       {step.error && (
         <Alert
