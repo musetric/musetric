@@ -10,6 +10,8 @@ mod tests;
 use std::{path::PathBuf, sync::Arc};
 
 use musetric_db::PendingJob;
+
+pub(crate) use gains::{Gains, read_gains};
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 

@@ -200,7 +200,7 @@ async fn store(
         analyze_loudness(pcm, read_at(&stems.backing.master.path, sample_rate)),
         analyze_loudness(pcm, read_at(&stems.instrumental.master.path, sample_rate)),
     )?;
-    let analysis = measure(
+    let loudness = measure(
         source_loudness,
         &Stems {
             lead,
@@ -210,7 +210,7 @@ async fn store(
     );
     let separation = NewSeparation {
         project_id: job.project_id,
-        analysis,
+        loudness,
         master: stems.blobs(|stem| &stem.master),
         delivery: stems.blobs(|stem| &stem.delivery),
         wave_peaks: stems.blobs(|stem| &stem.wave_peaks),

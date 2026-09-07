@@ -15,19 +15,20 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-pub use analysis::{Analysis, AudioAnalysis};
+pub use analysis::{Analysis, StemLoudness};
 pub use audio::{AudioDelivery, MASTER_TYPES, MasterType, Recording, STEM_TYPES, StemType};
 pub use backup::create_backup_name;
 pub use blob::blob_path;
 pub use database::{OpenOptions, open_database, open_readonly, read_schema_version};
 pub use failure::{BoxedError, MigrationFailure};
 pub use preview::Preview;
-pub use processing::{PROCESSING_STEPS, PendingJob, ProcessingStep, StepFailure, StepResults};
+pub use processing::{
+    PROCESSING_STEPS, PendingJob, ProcessingStep, StepState, StepStatus, StepUpdate,
+};
 pub use project::ProjectItem;
 pub use reader::Reader;
 pub use runner::{MigrationReport, init_database, run_migrations};
 pub use schema::{MIGRATIONS, Migration};
 pub use writer::{
-    NewAudioAnalysis, NewPreview, NewProject, NewRecording, NewSeparation, ProjectEdit, StemBlobs,
-    Writer,
+    NewPreview, NewProject, NewRecording, NewSeparation, ProjectEdit, StemBlobs, Writer,
 };

@@ -1,6 +1,6 @@
-use rusqlite::{Connection, OptionalExtension, Result};
+use rusqlite::{Connection, OptionalExtension, Result, Transaction};
 
-use crate::processing::ProcessingStep;
+use crate::audio::MasterType;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Analysis {
@@ -11,16 +11,6 @@ pub enum Analysis {
 }
 
 impl Analysis {
-    #[must_use]
-    pub fn step(self) -> ProcessingStep {
-        match self {
-            Self::Chords => ProcessingStep::Chords,
-            Self::Key => ProcessingStep::Key,
-            Self::Rhythm => ProcessingStep::Rhythm,
-            Self::Subtitle => ProcessingStep::Transcription,
-        }
-    }
-
     #[must_use]
     pub fn table(self) -> &'static str {
         match self {
@@ -47,34 +37,59 @@ pub(crate) fn read_analysis_blob(
         .optional()
 }
 
-pub struct AudioAnalysis {
-    pub source_gain_db: f64,
-    pub lead_spectrogram_gain_db: f64,
-    pub lead_gain_db: f64,
-    pub backing_gain_db: f64,
-    pub instrumental_gain_db: f64,
+pub struct StemLoudness {
+    pub stem: MasterType,
+    pub integrated_lufs: f64,
+    pub true_peak_db: f64,
+    pub p95_rms_db: Option<f64>,
 }
 
-pub(crate) fn read_audio_analysis(
+pub(crate) fn read_stem_loudness(
     connection: &Connection,
     project_id: i64,
-) -> Result<Option<AudioAnalysis>> {
-    connection
-        .query_row(
-            "SELECT sourceGainDb, leadSpectrogramGainDb, leadGainDb, backingGainDb,
-                    instrumentalGainDb
-             FROM ProjectAudioAnalysis
-             WHERE projectId = ?1",
-            [project_id],
-            |row| {
-                Ok(AudioAnalysis {
-                    source_gain_db: row.get(0)?,
-                    lead_spectrogram_gain_db: row.get(1)?,
-                    lead_gain_db: row.get(2)?,
-                    backing_gain_db: row.get(3)?,
-                    instrumental_gain_db: row.get(4)?,
-                })
-            },
-        )
-        .optional()
+) -> Result<Vec<StemLoudness>> {
+    let mut statement = connection.prepare(
+        "SELECT stemType, integratedLufs, truePeakDb, p95RmsDb
+         FROM StemLoudness
+         WHERE projectId = ?1",
+    )?;
+    let rows = statement.query_map([project_id], |row| {
+        let name: String = row.get(0)?;
+        Ok((name, row.get(1)?, row.get(2)?, row.get(3)?))
+    })?;
+    let mut measured = Vec::new();
+    for row in rows {
+        let (name, integrated_lufs, true_peak_db, p95_rms_db) = row?;
+        if let Some(stem) = MasterType::parse(&name) {
+            measured.push(StemLoudness {
+                stem,
+                integrated_lufs,
+                true_peak_db,
+                p95_rms_db,
+            });
+        }
+    }
+    Ok(measured)
+}
+
+pub(crate) fn write_stem_loudness(
+    transaction: &Transaction,
+    project_id: i64,
+    measured: &StemLoudness,
+) -> Result<usize> {
+    transaction.execute(
+        "INSERT INTO StemLoudness (projectId, stemType, integratedLufs, truePeakDb, p95RmsDb)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(projectId, stemType) DO UPDATE SET
+           integratedLufs = excluded.integratedLufs,
+           truePeakDb = excluded.truePeakDb,
+           p95RmsDb = excluded.p95RmsDb",
+        (
+            project_id,
+            measured.stem.name(),
+            measured.integrated_lufs,
+            measured.true_peak_db,
+            measured.p95_rms_db,
+        ),
+    )
 }

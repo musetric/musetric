@@ -1,27 +1,7 @@
-use musetric_db::{PROCESSING_STEPS, ProcessingStep, StepFailure, StepResults};
+use musetric_db::{PROCESSING_STEPS, ProcessingStep, StepState, StepStatus};
 use serde_json::Value;
 
 pub const STEP_ORDER: [ProcessingStep; 5] = PROCESSING_STEPS;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StepStatus {
-    Pending,
-    Processing,
-    Failed,
-    Done,
-}
-
-impl StepStatus {
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::Processing => "processing",
-            Self::Failed => "failed",
-            Self::Done => "done",
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StepPass {
@@ -96,51 +76,22 @@ pub(crate) struct ActiveStep {
     pub(crate) phase: StepPhase,
 }
 
-pub(crate) fn build_processing(
-    results: &StepResults,
-    failures: &[StepFailure],
-    active: Option<&ActiveStep>,
-) -> Processing {
-    let steps = STEP_ORDER.map(|step| build_step(step, results, failures, active));
+pub(crate) fn build_processing(states: &[StepState], active: Option<&ActiveStep>) -> Processing {
+    let steps = STEP_ORDER.map(|step| build_step(step, states, active));
     Processing {
-        done: failures.is_empty()
-            && results.has(ProcessingStep::Transcription)
-            && results.has(ProcessingStep::Rhythm)
-            && results.has(ProcessingStep::Key)
-            && results.has(ProcessingStep::Chords),
+        done: steps.iter().all(|step| step.status == StepStatus::Done),
         steps,
     }
 }
 
-fn build_step(
-    step: ProcessingStep,
-    results: &StepResults,
-    failures: &[StepFailure],
-    active: Option<&ActiveStep>,
-) -> StepView {
-    if let Some(failure) = failures.iter().find(|failure| failure.step == step) {
-        return StepView {
-            status: StepStatus::Failed,
-            phase: None,
-            error: Some(failure.message.clone()),
-        };
-    }
-    if let Some(running) = active.filter(|running| running.step == step) {
-        return StepView {
-            status: StepStatus::Processing,
-            phase: Some(running.phase.clone()),
-            error: None,
-        };
-    }
-    let status = if results.has(step) {
-        StepStatus::Done
-    } else {
-        StepStatus::Pending
-    };
+fn build_step(step: ProcessingStep, states: &[StepState], active: Option<&ActiveStep>) -> StepView {
+    let found = states.iter().find(|state| state.step == step);
     StepView {
-        status,
-        phase: None,
-        error: None,
+        status: found.map_or(StepStatus::Pending, |state| state.status),
+        phase: active
+            .filter(|running| running.step == step)
+            .map(|running| running.phase.clone()),
+        error: found.and_then(|state| state.error.clone()),
     }
 }
 

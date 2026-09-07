@@ -8,7 +8,7 @@ use std::{
 
 use futures_util::FutureExt;
 use musetric_db::{
-    BoxedError, PendingJob, ProcessingStep, Reader, StepFailure, StepResults, Writer,
+    BoxedError, PendingJob, ProcessingStep, Reader, StepState, StepStatus, StepUpdate, Writer,
 };
 use tokio::{
     sync::{Notify, broadcast},
@@ -56,13 +56,8 @@ pub struct QueueOptions {
     pub idle_limit: Duration,
 }
 
-struct Snapshot {
-    results: StepResults,
-    failures: Vec<StepFailure>,
-}
-
 struct Running {
-    snapshot: Snapshot,
+    states: Vec<StepState>,
     step: ActiveStep,
     activity: Instant,
 }
@@ -141,17 +136,13 @@ impl Queue {
     }
 
     pub async fn processing(&self, project_id: i64) -> Result<Processing, BoxedError> {
-        let snapshot = self.read_snapshot(project_id).await?;
+        let states = self.read_states(project_id).await?;
         let guard = self.running.lock().map_err(|_| "the queue is poisoned")?;
         let active = guard
             .as_ref()
             .map(|running| &running.step)
             .filter(|step| step.project_id == project_id);
-        Ok(build_processing(
-            &snapshot.results,
-            &snapshot.failures,
-            active,
-        ))
+        Ok(build_processing(&states, active))
     }
 
     pub fn spawn(self: &Arc<Self>) {
@@ -199,14 +190,27 @@ impl Queue {
         let queue = Arc::clone(self);
         let report = move |phase| queue.report(phase);
         let answer = self.execute(&job, &report).await;
-        if let StepAnswer::Failed(message) = &answer {
-            self.record_failure(project_id, step, message.clone()).await;
-        }
+        self.settle(project_id, step, &answer).await;
         if let Ok(mut running) = self.running.lock() {
             *running = None;
         }
         self.publish(project_id).await;
         !matches!(answer, StepAnswer::Unavailable | StepAnswer::Cancelled)
+    }
+
+    async fn settle(&self, project_id: i64, step: ProcessingStep, answer: &StepAnswer) {
+        let (status, error) = match answer {
+            StepAnswer::Finished => (StepStatus::Done, None),
+            StepAnswer::Failed(message) => (StepStatus::Failed, Some(message.clone())),
+            StepAnswer::Unavailable | StepAnswer::Cancelled => (StepStatus::Pending, None),
+        };
+        self.write_status(StepUpdate {
+            project_id,
+            step,
+            status,
+            error,
+        })
+        .await;
     }
 
     async fn execute(&self, job: &PendingJob, report: &StepReport) -> StepAnswer {
@@ -244,14 +248,21 @@ impl Queue {
     }
 
     async fn start(&self, job: &PendingJob) -> bool {
-        let Ok(snapshot) = self.read_snapshot(job.project_id).await else {
+        self.write_status(StepUpdate {
+            project_id: job.project_id,
+            step: job.step,
+            status: StepStatus::Processing,
+            error: None,
+        })
+        .await;
+        let Ok(states) = self.read_states(job.project_id).await else {
             return false;
         };
         let Ok(mut running) = self.running.lock() else {
             return false;
         };
         *running = Some(Running {
-            snapshot,
+            states,
             step: ActiveStep {
                 step: job.step,
                 project_id: job.project_id,
@@ -274,20 +285,16 @@ impl Queue {
         };
         running.activity = Instant::now();
         running.step.phase = phase;
-        let processing = build_processing(
-            &running.snapshot.results,
-            &running.snapshot.failures,
-            Some(&running.step),
-        );
+        let processing = build_processing(&running.states, Some(&running.step));
         let _ = self.events.send(StatusEvent {
             project_id: running.step.project_id,
             processing,
         });
     }
 
-    async fn record_failure(&self, project_id: i64, step: ProcessingStep, message: String) {
+    async fn write_status(&self, update: StepUpdate) {
         let writer = Arc::clone(&self.writer);
-        let _ = spawn_blocking(move || writer.record_failure(project_id, step, &message)).await;
+        let _ = spawn_blocking(move || writer.set_step_status(&update)).await;
     }
 
     async fn publish(&self, project_id: i64) {
@@ -300,14 +307,8 @@ impl Queue {
         });
     }
 
-    async fn read_snapshot(&self, project_id: i64) -> Result<Snapshot, BoxedError> {
+    async fn read_states(&self, project_id: i64) -> Result<Vec<StepState>, BoxedError> {
         let reader = Arc::clone(&self.reader);
-        spawn_blocking(move || {
-            Ok::<_, BoxedError>(Snapshot {
-                results: reader.step_results(project_id)?,
-                failures: reader.step_failures(project_id)?,
-            })
-        })
-        .await?
+        spawn_blocking(move || reader.step_states(project_id)).await?
     }
 }

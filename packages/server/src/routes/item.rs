@@ -3,11 +3,12 @@ use axum::{
     http::{HeaderValue, header::CONTENT_TYPE},
     response::Response,
 };
-use musetric_db::{AudioAnalysis, ProjectItem};
+use musetric_db::ProjectItem;
 use musetric_jobs::{Processing, STEP_ORDER, StepPhase, StepView};
 use serde_json::{Map, Value, json};
 
 use crate::{
+    analysis::{Gains, read_gains},
     failure::{Failure, finish},
     routes::RouteState,
     storage::read,
@@ -52,8 +53,8 @@ pub(crate) async fn read_items(state: &RouteState) -> Result<Value, Failure> {
 
 async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, Failure> {
     let project_id = project.id;
-    let gains = read(&state.storage, move |reader| {
-        reader.audio_analysis(project_id)
+    let measured = read(&state.storage, move |reader| {
+        reader.stem_loudness(project_id)
     })
     .await?;
     let processing = state
@@ -72,21 +73,21 @@ async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, 
             json!(format!("/api/preview/{preview_id}")),
         );
     }
-    if let Some(analysis) = gains {
-        item.insert("audioAnalysis".to_owned(), build_analysis(&analysis));
+    if let Some(gains) = read_gains(&measured) {
+        item.insert("audioAnalysis".to_owned(), build_analysis(&gains));
     }
     item.insert("processing".to_owned(), build_processing(&processing));
     Ok(Value::Object(item))
 }
 
-fn build_analysis(analysis: &AudioAnalysis) -> Value {
+fn build_analysis(gains: &Gains) -> Value {
     json!({
-        "sourceGainDb": analysis.source_gain_db,
-        "leadSpectrogramGainDb": analysis.lead_spectrogram_gain_db,
+        "sourceGainDb": gains.source,
+        "leadSpectrogramGainDb": gains.lead_spectrogram,
         "practiceGainsDb": {
-            "lead": analysis.lead_gain_db,
-            "backing": analysis.backing_gain_db,
-            "instrumental": analysis.instrumental_gain_db,
+            "lead": gains.lead,
+            "backing": gains.backing,
+            "instrumental": gains.instrumental,
         },
     })
 }

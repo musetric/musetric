@@ -3,7 +3,7 @@ use std::{path::Path, sync::Mutex};
 use rusqlite::Connection;
 
 use crate::{
-    analysis::{Analysis, AudioAnalysis, read_analysis_blob, read_audio_analysis},
+    analysis::{Analysis, StemLoudness, read_analysis_blob, read_stem_loudness},
     audio::{
         AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
         read_recording,
@@ -12,10 +12,7 @@ use crate::{
     database::{OpenOptions, open_database},
     failure::BoxedError,
     preview::{Preview, read_preview},
-    processing::{
-        PendingJob, ProcessingStep, StepFailure, StepResults, read_failures, read_pending,
-        read_results,
-    },
+    processing::{PendingJob, ProcessingStep, StepState, read_pending, read_states},
     project::{ProjectItem, read_project, read_project_name, read_projects},
 };
 
@@ -56,16 +53,12 @@ impl Reader {
         self.read(read_projects)
     }
 
-    pub fn audio_analysis(&self, project_id: i64) -> Result<Option<AudioAnalysis>, BoxedError> {
-        self.read(|connection| read_audio_analysis(connection, project_id))
+    pub fn stem_loudness(&self, project_id: i64) -> Result<Vec<StemLoudness>, BoxedError> {
+        self.read(|connection| read_stem_loudness(connection, project_id))
     }
 
-    pub fn step_results(&self, project_id: i64) -> Result<StepResults, BoxedError> {
-        self.read(|connection| read_results(connection, project_id))
-    }
-
-    pub fn step_failures(&self, project_id: i64) -> Result<Vec<StepFailure>, BoxedError> {
-        self.read(|connection| read_failures(connection, project_id))
+    pub fn step_states(&self, project_id: i64) -> Result<Vec<StepState>, BoxedError> {
+        self.read(|connection| read_states(connection, project_id))
     }
 
     pub fn pending_job(&self, step: ProcessingStep) -> Result<Option<PendingJob>, BoxedError> {

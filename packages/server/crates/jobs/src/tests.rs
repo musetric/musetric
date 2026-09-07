@@ -10,13 +10,14 @@ use std::{
 };
 
 use musetric_db::{
-    OpenOptions, PendingJob, ProcessingStep, Reader, Writer, init_database, open_database,
+    OpenOptions, PendingJob, ProcessingStep, Reader, StepStatus, Writer, init_database,
+    open_database,
 };
 use tokio::time::sleep;
 
 use crate::{
     queue::{Queue, QueueOptions, StatusEvent, StepAnswer, StepOutcome, StepReport, StepRunner},
-    summary::{StepPass, StepPhase, StepStatus},
+    summary::{StepPass, StepPhase},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -25,6 +26,9 @@ const SEED: &str = "
   INSERT INTO Project (id, name, sampleRate, frameCount)
   VALUES (1, 'Fixture project', 48000, 480000);
   INSERT INTO AudioMaster (projectId, type, blobId) VALUES (1, 'source', 'source-blob');
+  INSERT INTO ProcessingStep (projectId, step, status)
+  VALUES (1, 'separation', 'pending'), (1, 'transcription', 'pending'),
+         (1, 'rhythm', 'pending'), (1, 'key', 'pending'), (1, 'chords', 'pending');
 ";
 
 struct Workspace {
@@ -104,7 +108,6 @@ fn result_statements(step: ProcessingStep) -> &'static str {
 
 enum Answer {
     Complete,
-    Silent,
     Gone,
     Stuck,
     Exploded,
@@ -170,7 +173,6 @@ impl StepRunner for FakeRunner {
             match self.answer {
                 Answer::Failed(failure) => return StepAnswer::Failed(failure.to_owned()),
                 Answer::Gone => return StepAnswer::Unavailable,
-                Answer::Silent => return StepAnswer::Finished,
                 Answer::Complete | Answer::Stuck | Answer::Exploded | Answer::Lively => {}
             }
             Self::write_result(&self.database_path, job.step);
@@ -287,25 +289,6 @@ async fn publishes_the_phase_of_a_running_step() {
 }
 
 #[tokio::test]
-async fn leaves_a_step_that_produced_nothing_to_the_next_round() {
-    let workspace = Workspace::new();
-    let runner = FakeRunner::create(&workspace, Answer::Silent);
-    let queue = workspace.create_queue(runner.clone());
-
-    queue.drain().await;
-
-    assert_eq!(runner.seen(), vec!["separation"]);
-    let processing = queue
-        .processing(1)
-        .await
-        .expect("the summary should be built");
-    assert_eq!(
-        processing.step(ProcessingStep::Separation).status,
-        StepStatus::Pending
-    );
-}
-
-#[tokio::test]
 async fn keeps_a_step_pending_when_the_executor_is_gone() {
     let workspace = Workspace::new();
     let runner = FakeRunner::create(&workspace, Answer::Gone);
@@ -328,7 +311,8 @@ async fn records_a_panicking_step_and_keeps_the_queue_alive() {
     let workspace = Workspace::new();
     workspace.execute(
         "INSERT INTO AudioMaster (projectId, type, blobId)
-         VALUES (1, 'lead', 'lead-blob'), (1, 'instrumental', 'instrumental-blob');",
+         VALUES (1, 'lead', 'lead-blob'), (1, 'instrumental', 'instrumental-blob');
+         UPDATE ProcessingStep SET status = 'done' WHERE step = 'separation';",
     );
     let runner = FakeRunner::create(&workspace, Answer::Exploded);
     let queue = workspace.create_queue(runner.clone());

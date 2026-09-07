@@ -202,9 +202,11 @@ fn announce(line: &str) {
 }
 
 fn create_storage(database: &Path, blobs: PathBuf) -> Result<Arc<Storage>, BoxedError> {
+    let writer = Writer::open(database)?;
+    writer.abandon_running_steps()?;
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),
-        writer: Arc::new(Writer::open(database)?),
+        writer: Arc::new(writer),
         blobs_path: blobs,
         pcm: Arc::new(SymphoniaPcm),
     });
