@@ -23,6 +23,7 @@ use crate::{
     garbage::spawn_collector,
     page_bridge::PageBridge,
     pages::PageOpener,
+    publish::Publication,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
@@ -219,6 +220,7 @@ fn create_storage(
         blobs_path: blobs,
         work_path: work,
         pcm: Arc::new(SymphoniaPcm),
+        publication: Publication::default(),
     });
     spawn_collector(Arc::clone(&storage));
     Ok(storage)

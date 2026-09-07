@@ -9,7 +9,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{page_bridge::PageBridge, realtime::Rooms, routes::RouteState, storage::Storage};
+use crate::{
+    page_bridge::PageBridge, publish::Publication, realtime::Rooms, routes::RouteState,
+    storage::Storage,
+};
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
     open_database,
@@ -91,6 +94,7 @@ impl Workspace {
             blobs_path: self.blobs_path(),
             work_path: self.work_path(),
             pcm: Arc::new(SymphoniaPcm),
+            publication: Publication::default(),
         })
     }
 }

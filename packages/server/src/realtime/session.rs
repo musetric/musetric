@@ -13,7 +13,8 @@ use tokio::{
 
 use crate::{
     blobs::{StagedBlob, close_area, open_area, recording_area, stage_blob},
-    storage::{Storage, read_database, write_database},
+    publish::publish,
+    storage::{Storage, read_database},
     wav::{BYTES_PER_SAMPLE, HEADER_BYTE_LENGTH, create_header},
 };
 
@@ -193,8 +194,13 @@ async fn reserve_blobs(
     let area = recording_area(&storage.work_path, project_id);
     open_area(&area).await?;
     let reserved = write_reserved_blobs(storage, &area, sample_rate, frame_count).await;
-    close_area(&area).await;
-    let (audio, wave) = reserved?;
+    let (audio, wave) = match reserved {
+        Ok(blobs) => blobs,
+        Err(error) => {
+            close_area(&area).await;
+            return Err(error);
+        }
+    };
     let recording = NewRecording {
         project_id,
         blob_id: audio.blob_id().to_owned(),
@@ -202,7 +208,12 @@ async fn reserve_blobs(
         sample_rate,
         frame_count,
     };
-    write_database(storage, move |writer| writer.create_recording(&recording)).await?;
+    let recorded = publish(storage, &[&audio, &wave], move |writer| {
+        writer.create_recording(&recording)
+    })
+    .await;
+    close_area(&area).await;
+    recorded?;
     Ok(ReservedBlobs {
         audio_path: blob_path(&storage.blobs_path, audio.blob_id()),
         wave_path: blob_path(&storage.blobs_path, wave.blob_id()),
@@ -221,8 +232,6 @@ async fn write_reserved_blobs(
     let wave = stage_blob(area, &storage.blobs_path);
     create_reserved_wav(audio.path(), sample_rate, frame_count).await?;
     write_empty_peaks(wave.path()).await?;
-    audio.commit().await?;
-    wave.commit().await?;
     Ok((audio, wave))
 }
 
