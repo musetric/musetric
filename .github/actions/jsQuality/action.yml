@@ -40,8 +40,6 @@ runs:
       shell: bash
     - run: yarn check:translations
       shell: bash
-    - run: yarn check:openapi
-      shell: bash
     - run: yarn check:ts
       shell: bash
     - run: yarn check:lint

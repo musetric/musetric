@@ -17,7 +17,6 @@
     "**/vitest.config.ts",
     "**/vitest.bench.config.ts",
     "**/index.html",
-    "**/openapi.json",
     "**/package.json",
     "**/*.bench.*",
     "**/*.test.*"
