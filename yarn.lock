@@ -2182,7 +2182,6 @@ __metadata:
     onnxruntime-web: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
-    vitest: "catalog:"
   languageName: unknown
   linkType: soft
 

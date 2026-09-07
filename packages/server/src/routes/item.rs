@@ -81,12 +81,12 @@ async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, 
 
 fn build_analysis(analysis: &AudioAnalysis) -> Value {
     json!({
-        "sourceGainDb": number(analysis.source_gain_db),
-        "leadSpectrogramGainDb": number(analysis.lead_spectrogram_gain_db),
+        "sourceGainDb": analysis.source_gain_db,
+        "leadSpectrogramGainDb": analysis.lead_spectrogram_gain_db,
         "practiceGainsDb": {
-            "lead": number(analysis.lead_gain_db),
-            "backing": number(analysis.backing_gain_db),
-            "instrumental": number(analysis.instrumental_gain_db),
+            "lead": analysis.lead_gain_db,
+            "backing": analysis.backing_gain_db,
+            "instrumental": analysis.instrumental_gain_db,
         },
     })
 }
@@ -103,7 +103,7 @@ fn build_step(step: &StepView) -> Value {
     let mut view = Map::new();
     view.insert("status".to_owned(), json!(step.status.name()));
     if let Some(progress) = step.progress {
-        view.insert("progress".to_owned(), number(progress));
+        view.insert("progress".to_owned(), json!(progress));
     }
     if let Some(download) = step.download.as_ref() {
         view.insert("download".to_owned(), download.clone());
@@ -112,16 +112,4 @@ fn build_step(step: &StepView) -> Value {
         view.insert("error".to_owned(), json!(error));
     }
     Value::Object(view)
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "the value is checked to be a whole number inside the safe integer range"
-)]
-fn number(value: f64) -> Value {
-    const SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
-    if value.fract() == 0.0 && value.abs() <= SAFE_INTEGER {
-        return json!(value as i64);
-    }
-    json!(value)
 }
