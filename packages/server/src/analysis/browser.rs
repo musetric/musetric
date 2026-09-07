@@ -21,7 +21,7 @@ use crate::{
     analysis::AnalysisContext,
     blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
     pages::{HeldPage, PageFailure, PageOpener},
-    storage::write_database,
+    publish::publish,
 };
 
 const DECODE_REPORTS: u64 = 100;
@@ -361,15 +361,19 @@ pub(crate) async fn store(
     open_area(&area).await?;
     let staged = stage_blob(&area, &context.storage.blobs_path);
     let written = write_payload(&staged, result).await;
+    if written.is_ok() {
+        let project_id = job.project_id;
+        let blob_id = staged.blob_id().to_owned();
+        let recorded = publish(&context.storage, &[&staged], move |writer| {
+            writer.apply_analysis_result(stored, project_id, &blob_id)
+        })
+        .await;
+        close_area(&area).await;
+        recorded?;
+        return Ok(());
+    }
     close_area(&area).await;
-    written?;
-    let project_id = job.project_id;
-    let blob_id = staged.blob_id().to_owned();
-    write_database(&context.storage, move |writer| {
-        writer.apply_analysis_result(stored, project_id, &blob_id)
-    })
-    .await?;
-    Ok(())
+    written
 }
 
 async fn write_payload(staged: &StagedBlob, result: &Value) -> Result<(), Failure> {
@@ -377,6 +381,5 @@ async fn write_payload(staged: &StagedBlob, result: &Value) -> Result<(), Failur
     write(staged.path(), payload)
         .await
         .map_err(|error| error.to_string())?;
-    staged.commit().await.map_err(|error| error.to_string())?;
     Ok(())
 }

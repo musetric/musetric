@@ -13,6 +13,7 @@ use tokio::{
 
 use crate::{
     failure::Failure,
+    publish::hold_publications,
     storage::{Storage, read},
 };
 
@@ -29,20 +30,41 @@ pub(crate) fn spawn_collector(storage: Arc<Storage>) {
 }
 
 pub(crate) async fn collect(storage: &Arc<Storage>, retention: Duration) -> Result<(), Failure> {
+    let candidates = read_candidates(&storage.blobs_path, retention).await?;
+    if candidates.is_empty() {
+        return Ok(());
+    }
+    let _held = hold_publications(storage).await;
+    remove_unreferenced(storage, candidates).await
+}
+
+async fn remove_unreferenced(
+    storage: &Arc<Storage>,
+    candidates: Vec<StoredBlob>,
+) -> Result<(), Failure> {
     let referenced = read(storage, musetric_db::Reader::referenced_blob_ids).await?;
     let known: HashSet<String> = referenced.into_iter().collect();
-    let stored = list_blobs(&storage.blobs_path)
-        .await
-        .map_err(Failure::failed)?;
-    for blob in stored {
+    for blob in candidates {
         if known.contains(&blob.blob_id) {
             continue;
         }
-        if has_exceeded_retention(&blob.path, retention).await {
-            let _ = remove_file(&blob.path).await;
-        }
+        let _ = remove_file(&blob.path).await;
     }
     Ok(())
+}
+
+async fn read_candidates(
+    blobs_path: &Path,
+    retention: Duration,
+) -> Result<Vec<StoredBlob>, Failure> {
+    let stored = list_blobs(blobs_path).await.map_err(Failure::failed)?;
+    let mut candidates = Vec::new();
+    for blob in stored {
+        if has_exceeded_retention(&blob.path, retention).await {
+            candidates.push(blob);
+        }
+    }
+    Ok(candidates)
 }
 
 struct StoredBlob {
@@ -103,7 +125,7 @@ async fn has_exceeded_retention(path: &Path, retention: Duration) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use super::collect;
+    use super::{collect, read_candidates, remove_unreferenced};
     use crate::test_workspace::Workspace;
 
     const KEPT_BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
@@ -119,6 +141,32 @@ mod tests {
       INSERT INTO AudioMaster (projectId, type, blobId)
       VALUES (1, 'source', '1f2e3d4c-0000-4000-8000-000000000001');
     ";
+
+    const PUBLISHED_BLOB_ID: &str = "3d4e5f60-0000-4000-8000-000000000004";
+    const REFERENCE_PUBLISHED: &str = "
+      INSERT INTO AudioMaster (projectId, type, blobId)
+      VALUES (1, 'instrumental', '3d4e5f60-0000-4000-8000-000000000004');
+    ";
+
+    #[tokio::test]
+    async fn keeps_a_blob_referenced_after_the_candidates_were_listed() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_SOURCE);
+        workspace.add_blob(PUBLISHED_BLOB_ID, BLOB);
+        workspace.age_blob(PUBLISHED_BLOB_ID, OLD);
+        let storage = workspace.create_storage();
+        let candidates = read_candidates(&storage.blobs_path, RETENTION)
+            .await
+            .expect("the candidates should be listed");
+        assert_eq!(candidates.len(), 1);
+
+        workspace.seed(REFERENCE_PUBLISHED);
+        remove_unreferenced(&storage, candidates)
+            .await
+            .expect("the collection should finish");
+
+        assert!(workspace.has_blob(PUBLISHED_BLOB_ID));
+    }
 
     #[tokio::test]
     async fn removes_only_the_stale_unreferenced_blobs() {

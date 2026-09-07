@@ -4,7 +4,7 @@ use musetric_db::{BoxedError, Reader, Writer};
 use musetric_media::PcmSource;
 use tokio::task::spawn_blocking;
 
-use crate::failure::Failure;
+use crate::{failure::Failure, publish::Publication};
 
 pub(crate) struct Storage {
     pub(crate) database: Arc<Reader>,
@@ -12,6 +12,7 @@ pub(crate) struct Storage {
     pub(crate) blobs_path: PathBuf,
     pub(crate) work_path: PathBuf,
     pub(crate) pcm: Arc<dyn PcmSource>,
+    pub(crate) publication: Publication,
 }
 
 pub(crate) async fn read_database<Value>(

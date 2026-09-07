@@ -8,6 +8,7 @@ mod frontend;
 mod garbage;
 mod page_bridge;
 mod pages;
+mod publish;
 mod range;
 mod realtime;
 mod router;

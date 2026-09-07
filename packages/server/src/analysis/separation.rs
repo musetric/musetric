@@ -23,7 +23,8 @@ use crate::{
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
     },
     blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
-    storage::{read_database, write_database},
+    publish::publish,
+    storage::read_database,
 };
 
 const LABEL: &str = "Headless AI separation";
@@ -48,11 +49,8 @@ impl Stem {
         }
     }
 
-    async fn commit(&self) -> Result<(), Failure> {
-        self.master.commit().await?;
-        self.delivery.commit().await?;
-        self.wave_peaks.commit().await?;
-        Ok(())
+    fn staged(&self) -> [&StagedBlob; 3] {
+        [&self.master, &self.delivery, &self.wave_peaks]
     }
 }
 
@@ -75,11 +73,8 @@ impl Separated {
         [&self.lead, &self.backing, &self.instrumental]
     }
 
-    async fn commit(&self) -> Result<(), Failure> {
-        for stem in self.each() {
-            stem.commit().await?;
-        }
-        Ok(())
+    fn staged(&self) -> Vec<&StagedBlob> {
+        self.each().into_iter().flat_map(Stem::staged).collect()
     }
 
     fn uploads(&self) -> HashMap<String, PathBuf> {
@@ -228,8 +223,7 @@ async fn store(
         delivery: stems.blobs(|stem| &stem.delivery),
         wave_peaks: stems.blobs(|stem| &stem.wave_peaks),
     };
-    stems.commit().await?;
-    write_database(&context.storage, move |writer| {
+    publish(&context.storage, &stems.staged(), move |writer| {
         writer.apply_separation_result(&separation)
     })
     .await?;

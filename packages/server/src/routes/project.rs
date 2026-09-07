@@ -15,9 +15,10 @@ use musetric_media::{PcmRequest, convert_to_flac, read_frame_count};
 use serde_json::Value;
 
 use crate::{
-    blobs::{stage_blob, upload_area},
+    blobs::{StagedBlob, stage_blob, upload_area},
     failure::{Failure, finish, invalid_number, invalid_option},
     form::{Field, Form, UploadTarget, UploadedFile, read_form},
+    publish::publish,
     routes::{
         RouteState,
         item::{json_response, missing_message, read_items, respond_with_item},
@@ -191,12 +192,8 @@ async fn read_upload(storage: &Arc<Storage>, multipart: Multipart) -> Result<For
     .await
 }
 
-async fn commit_preview(preview: Option<&UploadedFile>) -> Result<Option<NewPreview>, Failure> {
-    let Some(file) = preview else {
-        return Ok(None);
-    };
-    file.staged.commit().await.map_err(Failure::failed)?;
-    Ok(Some(create_preview(file)))
+fn staged_preview(preview: Option<&UploadedFile>) -> Vec<&StagedBlob> {
+    preview.map(|file| &file.staged).into_iter().collect()
 }
 
 async fn create(state: &RouteState, form: &Form) -> Result<i64, Failure> {
@@ -204,15 +201,18 @@ async fn create(state: &RouteState, form: &Form) -> Result<i64, Failure> {
     let song = normalize_song(&state.storage, input.song).await?;
     let project = NewProject {
         name: input.name,
-        song_blob_id: song.blob_id,
+        song_blob_id: song.staged.blob_id().to_owned(),
         sample_rate: i64::from(SAMPLE_RATE),
         frame_count: song.frame_count,
-        preview: commit_preview(input.preview).await?,
+        preview: input.preview.map(create_preview),
     };
-    write(&state.storage, move |writer| {
+    let mut staged = staged_preview(input.preview);
+    staged.push(&song.staged);
+    publish(&state.storage, &staged, move |writer| {
         writer.create_project(&project)
     })
     .await
+    .map_err(Failure::failed)
 }
 
 async fn edit(state: &RouteState, project_id: i64, form: &Form) -> Result<(), Failure> {
@@ -220,10 +220,16 @@ async fn edit(state: &RouteState, project_id: i64, form: &Form) -> Result<(), Fa
     let change = ProjectEdit {
         project_id,
         name: input.name,
-        preview: commit_preview(input.preview).await?,
+        preview: input.preview.map(create_preview),
         without_preview: input.without_preview,
     };
-    let found = write(&state.storage, move |writer| writer.edit_project(&change)).await?;
+    let found = publish(
+        &state.storage,
+        &staged_preview(input.preview),
+        move |writer| writer.edit_project(&change),
+    )
+    .await
+    .map_err(Failure::failed)?;
     if found {
         return Ok(());
     }
@@ -348,7 +354,7 @@ fn read_without_preview(form: &Form, issues: &mut Vec<String>) -> bool {
 }
 
 struct NormalizedSong {
-    blob_id: String,
+    staged: StagedBlob,
     frame_count: i64,
 }
 
@@ -363,10 +369,9 @@ async fn normalize_song(
         normalized.discard().await;
         return Err(Failure::Invalid(INVALID_AUDIO.to_owned()));
     };
-    normalized.commit().await.map_err(Failure::failed)?;
     uploaded.staged.discard().await;
     Ok(NormalizedSong {
-        blob_id: normalized.blob_id().to_owned(),
+        staged: normalized,
         frame_count,
     })
 }
