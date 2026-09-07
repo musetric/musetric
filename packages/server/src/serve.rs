@@ -1,4 +1,5 @@
 use std::{
+    fs::{create_dir_all, remove_dir_all},
     io::{self, Write},
     net::{SocketAddr, TcpListener as StdTcpListener},
     path::{Path, PathBuf},
@@ -37,6 +38,7 @@ pub struct ServerOptions {
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
+    pub work: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: PathBuf,
     pub public: PathBuf,
@@ -54,6 +56,7 @@ pub struct EmbeddedServerOptions {
     pub listen: String,
     pub database: PathBuf,
     pub blobs: PathBuf,
+    pub work: PathBuf,
     pub models: PathBuf,
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
@@ -88,7 +91,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
             return Err(failure.into());
         }
     }
-    let storage = create_storage(&options.database, options.blobs)?;
+    let storage = create_storage(&options.database, options.blobs, options.work)?;
     let app = create_app(AppOptions {
         storage,
         models: options.models,
@@ -127,7 +130,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
 
 pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedServer, BoxedError> {
     init_database(&options.database)?;
-    let storage = create_storage(&options.database, options.blobs)?;
+    let storage = create_storage(&options.database, options.blobs, options.work)?;
     let app = create_app(AppOptions {
         storage,
         models: options.models,
@@ -201,13 +204,20 @@ fn announce(line: &str) {
     let _ = writeln!(io::stdout().lock(), "{line}");
 }
 
-fn create_storage(database: &Path, blobs: PathBuf) -> Result<Arc<Storage>, BoxedError> {
+fn create_storage(
+    database: &Path,
+    blobs: PathBuf,
+    work: PathBuf,
+) -> Result<Arc<Storage>, BoxedError> {
     let writer = Writer::open(database)?;
     writer.abandon_running_steps()?;
+    remove_dir_all(&work).ok();
+    create_dir_all(&work)?;
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),
         writer: Arc::new(writer),
         blobs_path: blobs,
+        work_path: work,
         pcm: Arc::new(SymphoniaPcm),
     });
     spawn_collector(Arc::clone(&storage));
@@ -328,6 +338,7 @@ mod tests {
                 listen: "127.0.0.1:0".to_owned(),
                 database: self.root.join("storage/db/app.db"),
                 blobs: self.root.join("storage/blobs"),
+                work: self.root.join("storage/work"),
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),

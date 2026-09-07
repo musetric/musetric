@@ -12,7 +12,7 @@ use tokio::{
 };
 
 use crate::{
-    blobs::{create_blob_ref, discard_blob},
+    blobs::{StagedBlob, close_area, open_area, recording_area, stage_blob},
     storage::{Storage, read_database, write_database},
     wav::{BYTES_PER_SAMPLE, HEADER_BYTE_LENGTH, create_header},
 };
@@ -190,40 +190,40 @@ async fn reserve_blobs(
     sample_rate: i64,
     frame_count: i64,
 ) -> Result<ReservedBlobs, BoxedError> {
-    let audio = create_blob_ref(&storage.blobs_path);
-    let wave = create_blob_ref(&storage.blobs_path);
-    if let Err(error) = create_reserved_wav(&audio.path, sample_rate, frame_count).await {
-        discard_reserved_blobs(storage, &audio.blob_id, &wave.blob_id).await;
-        return Err(error);
-    }
-    if let Err(error) = write_empty_peaks(&wave.path).await {
-        discard_reserved_blobs(storage, &audio.blob_id, &wave.blob_id).await;
-        return Err(error);
-    }
+    let area = recording_area(&storage.work_path, project_id);
+    open_area(&area).await?;
+    let reserved = write_reserved_blobs(storage, &area, sample_rate, frame_count).await;
+    close_area(&area).await;
+    let (audio, wave) = reserved?;
     let recording = NewRecording {
         project_id,
-        blob_id: audio.blob_id.clone(),
-        wave_blob_id: wave.blob_id.clone(),
+        blob_id: audio.blob_id().to_owned(),
+        wave_blob_id: wave.blob_id().to_owned(),
         sample_rate,
         frame_count,
     };
-    if let Err(error) =
-        write_database(storage, move |writer| writer.create_recording(&recording)).await
-    {
-        discard_reserved_blobs(storage, &audio.blob_id, &wave.blob_id).await;
-        return Err(error);
-    }
+    write_database(storage, move |writer| writer.create_recording(&recording)).await?;
     Ok(ReservedBlobs {
-        audio_path: audio.path,
-        wave_path: wave.path,
+        audio_path: blob_path(&storage.blobs_path, audio.blob_id()),
+        wave_path: blob_path(&storage.blobs_path, wave.blob_id()),
         sample_rate,
         frame_count,
     })
 }
 
-async fn discard_reserved_blobs(storage: &Arc<Storage>, audio_blob_id: &str, wave_blob_id: &str) {
-    discard_blob(&storage.blobs_path, audio_blob_id).await;
-    discard_blob(&storage.blobs_path, wave_blob_id).await;
+async fn write_reserved_blobs(
+    storage: &Arc<Storage>,
+    area: &Path,
+    sample_rate: i64,
+    frame_count: i64,
+) -> Result<(StagedBlob, StagedBlob), BoxedError> {
+    let audio = stage_blob(area, &storage.blobs_path);
+    let wave = stage_blob(area, &storage.blobs_path);
+    create_reserved_wav(audio.path(), sample_rate, frame_count).await?;
+    write_empty_peaks(wave.path()).await?;
+    audio.commit().await?;
+    wave.commit().await?;
+    Ok((audio, wave))
 }
 
 async fn reuse_blobs(

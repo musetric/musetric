@@ -10,6 +10,7 @@ pub(crate) struct Storage {
     pub(crate) database: Arc<Reader>,
     pub(crate) writer: Arc<Writer>,
     pub(crate) blobs_path: PathBuf,
+    pub(crate) work_path: PathBuf,
     pub(crate) pcm: Arc<dyn PcmSource>,
 }
 

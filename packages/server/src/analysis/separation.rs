@@ -11,7 +11,6 @@ use musetric_media::{
     encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 use serde_json::{Value, json};
-use tokio::fs::remove_file;
 
 use crate::{
     analysis::{
@@ -23,7 +22,7 @@ use crate::{
         gains::{Stems, measure},
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
     },
-    blobs::{BlobRef, create_blob_ref},
+    blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
     storage::{read_database, write_database},
 };
 
@@ -33,22 +32,27 @@ const RAW_SUFFIX: &str = "raw";
 const STEMS: [&str; 3] = ["lead", "backing", "instrumental"];
 
 struct Stem {
-    master: BlobRef,
+    master: StagedBlob,
     raw: PathBuf,
-    delivery: BlobRef,
-    wave_peaks: BlobRef,
+    delivery: StagedBlob,
+    wave_peaks: StagedBlob,
 }
 
 impl Stem {
-    fn create(blobs_path: &Path) -> Self {
-        let master = create_blob_ref(blobs_path);
-        let raw = master.path.with_extension(RAW_SUFFIX);
+    fn create(area: &Path, blobs_path: &Path, name: &str) -> Self {
         Self {
-            master,
-            raw,
-            delivery: create_blob_ref(blobs_path),
-            wave_peaks: create_blob_ref(blobs_path),
+            master: stage_blob(area, blobs_path),
+            raw: area.join(format!("{name}.{RAW_SUFFIX}")),
+            delivery: stage_blob(area, blobs_path),
+            wave_peaks: stage_blob(area, blobs_path),
         }
+    }
+
+    async fn commit(&self) -> Result<(), Failure> {
+        self.master.commit().await?;
+        self.delivery.commit().await?;
+        self.wave_peaks.commit().await?;
+        Ok(())
     }
 }
 
@@ -59,16 +63,23 @@ struct Separated {
 }
 
 impl Separated {
-    fn create(blobs_path: &Path) -> Self {
+    fn create(area: &Path, blobs_path: &Path) -> Self {
         Self {
-            lead: Stem::create(blobs_path),
-            backing: Stem::create(blobs_path),
-            instrumental: Stem::create(blobs_path),
+            lead: Stem::create(area, blobs_path, STEMS[0]),
+            backing: Stem::create(area, blobs_path, STEMS[1]),
+            instrumental: Stem::create(area, blobs_path, STEMS[2]),
         }
     }
 
     fn each(&self) -> [&Stem; 3] {
         [&self.lead, &self.backing, &self.instrumental]
+    }
+
+    async fn commit(&self) -> Result<(), Failure> {
+        for stem in self.each() {
+            stem.commit().await?;
+        }
+        Ok(())
     }
 
     fn uploads(&self) -> HashMap<String, PathBuf> {
@@ -79,11 +90,11 @@ impl Separated {
             .collect()
     }
 
-    fn blobs(&self, read: fn(&Stem) -> &BlobRef) -> StemBlobs {
+    fn blobs(&self, read: fn(&Stem) -> &StagedBlob) -> StemBlobs {
         StemBlobs {
-            lead: read(&self.lead).blob_id.clone(),
-            backing: read(&self.backing).blob_id.clone(),
-            instrumental: read(&self.instrumental).blob_id.clone(),
+            lead: read(&self.lead).blob_id().to_owned(),
+            backing: read(&self.backing).blob_id().to_owned(),
+            instrumental: read(&self.instrumental).blob_id().to_owned(),
         }
     }
 }
@@ -99,16 +110,18 @@ pub(crate) async fn run(
     job: &PendingJob,
     report: &StepReport,
 ) -> StepAnswer {
-    let stems = Separated::create(&context.storage.blobs_path);
+    let area = step_area(&context.storage.work_path, job.project_id, job.step);
+    if let Err(error) = open_area(&area).await {
+        return answer(Err(Failure::from(error.to_string())));
+    }
+    let stems = Separated::create(&area, &context.storage.blobs_path);
     let running = Run {
         context,
         report,
         stems: &stems,
     };
     let found = separate(&running, job).await;
-    for stem in stems.each() {
-        let _ = remove_file(&stem.raw).await;
-    }
+    close_area(&area).await;
     answer(found)
 }
 
@@ -141,11 +154,11 @@ async fn process_stems(
         output: sample_rate,
     };
     tokio::try_join!(
-        encode_flac_from_raw(&stems.lead.raw, &stems.lead.master.path, rates),
-        encode_flac_from_raw(&stems.backing.raw, &stems.backing.master.path, rates),
+        encode_flac_from_raw(&stems.lead.raw, stems.lead.master.path(), rates),
+        encode_flac_from_raw(&stems.backing.raw, stems.backing.master.path(), rates),
         encode_flac_from_raw(
             &stems.instrumental.raw,
-            &stems.instrumental.master.path,
+            stems.instrumental.master.path(),
             rates
         ),
     )?;
@@ -174,14 +187,14 @@ async fn deliver_stem(delivery: &Delivery<'_>, stem: &Stem) -> Result<(), BoxedE
     let sample_rate = delivery.sample_rate;
     convert_to_fmp4(
         delivery.pcm,
-        read_at(&stem.master.path, sample_rate),
-        &stem.delivery.path,
+        read_at(stem.master.path(), sample_rate),
+        stem.delivery.path(),
     )
     .await?;
     let request = WavePeaks {
-        source: read_at(&stem.master.path, sample_rate),
-        to: &stem.wave_peaks.path,
-        total_frames: read_frame_count(&stem.master.path).await?,
+        source: read_at(stem.master.path(), sample_rate),
+        to: stem.wave_peaks.path(),
+        total_frames: read_frame_count(stem.master.path()).await?,
     };
     generate_wave_peaks(delivery.pcm, &request).await
 }
@@ -196,9 +209,9 @@ async fn store(
     let pcm = context.storage.pcm.as_ref();
     let stems = running.stems;
     let (lead, backing, instrumental) = tokio::try_join!(
-        analyze_lead_visual_loudness(pcm, read_at(&stems.lead.master.path, sample_rate)),
-        analyze_loudness(pcm, read_at(&stems.backing.master.path, sample_rate)),
-        analyze_loudness(pcm, read_at(&stems.instrumental.master.path, sample_rate)),
+        analyze_lead_visual_loudness(pcm, read_at(stems.lead.master.path(), sample_rate)),
+        analyze_loudness(pcm, read_at(stems.backing.master.path(), sample_rate)),
+        analyze_loudness(pcm, read_at(stems.instrumental.master.path(), sample_rate)),
     )?;
     let loudness = measure(
         source_loudness,
@@ -215,6 +228,7 @@ async fn store(
         delivery: stems.blobs(|stem| &stem.delivery),
         wave_peaks: stems.blobs(|stem| &stem.wave_peaks),
     };
+    stems.commit().await?;
     write_database(&context.storage, move |writer| {
         writer.apply_separation_result(&separation)
     })
@@ -307,23 +321,26 @@ mod tests {
 
     #[test]
     fn sends_every_stem_to_the_master_it_encodes() {
-        let stems = Separated::create(Path::new("/blobs"));
+        let area = Path::new("/work/1/separation");
+        let stems = Separated::create(area, Path::new("/blobs"));
 
         let uploads = stems.uploads();
         let masters = stems.blobs(|stem| &stem.master);
         let named = [
-            ("lead.pcm", &stems.lead, masters.lead),
-            ("backing.pcm", &stems.backing, masters.backing),
+            ("lead.pcm", "lead", &stems.lead, masters.lead),
+            ("backing.pcm", "backing", &stems.backing, masters.backing),
             (
                 "instrumental.pcm",
+                "instrumental",
                 &stems.instrumental,
                 masters.instrumental,
             ),
         ];
-        for (name, stem, blob_id) in named {
-            assert_eq!(uploads.get(name), Some(&stem.raw));
-            assert_eq!(stem.raw, stem.master.path.with_extension(RAW_SUFFIX));
-            assert_eq!(blob_id, stem.master.blob_id);
+        for (upload, name, stem, blob_id) in named {
+            assert_eq!(uploads.get(upload), Some(&stem.raw));
+            assert_eq!(stem.raw, area.join(format!("{name}.{RAW_SUFFIX}")));
+            assert_eq!(blob_id, stem.master.blob_id());
+            assert_eq!(stem.master.path(), area.join(stem.master.blob_id()));
         }
         assert_eq!(uploads.len(), 3);
     }
