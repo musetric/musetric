@@ -13,9 +13,6 @@ const config: KnipConfig = {
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
   workspaces: {
-    'packages/api': {
-      entry: ['scripts/**/*.ts'],
-    },
     'packages/fft': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },
