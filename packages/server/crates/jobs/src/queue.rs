@@ -10,14 +10,13 @@ use futures_util::FutureExt;
 use musetric_db::{
     BoxedError, PendingJob, ProcessingStep, Reader, StepFailure, StepResults, Writer,
 };
-use serde_json::Value;
 use tokio::{
     sync::{Notify, broadcast},
     task::spawn_blocking,
     time::sleep,
 };
 
-use crate::summary::{ActiveStep, Processing, build_processing};
+use crate::summary::{ActiveStep, Processing, StepPhase, build_processing};
 
 const EVENT_CAPACITY: usize = 64;
 const QUEUE_ORDER: [ProcessingStep; 5] = [
@@ -28,12 +27,7 @@ const QUEUE_ORDER: [ProcessingStep; 5] = [
     ProcessingStep::Separation,
 ];
 
-pub enum StepEvent {
-    Progress(f64),
-    Download(Value),
-}
-
-pub type StepReport = dyn Fn(StepEvent) + Send + Sync;
+pub type StepReport = dyn Fn(StepPhase) + Send + Sync;
 
 pub enum StepAnswer {
     Finished,
@@ -203,7 +197,7 @@ impl Queue {
         }
         self.publish(project_id).await;
         let queue = Arc::clone(self);
-        let report = move |event| queue.report(event);
+        let report = move |phase| queue.report(phase);
         let answer = self.execute(&job, &report).await;
         if let StepAnswer::Failed(message) = &answer {
             self.record_failure(project_id, step, message.clone()).await;
@@ -261,8 +255,7 @@ impl Queue {
             step: ActiveStep {
                 step: job.step,
                 project_id: job.project_id,
-                progress: 0.0,
-                download: None,
+                phase: StepPhase::Preparing { download: None },
             },
             activity: Instant::now(),
         });
@@ -272,7 +265,7 @@ impl Queue {
         true
     }
 
-    fn report(&self, event: StepEvent) {
+    fn report(&self, phase: StepPhase) {
         let Ok(mut guard) = self.running.lock() else {
             return;
         };
@@ -280,10 +273,7 @@ impl Queue {
             return;
         };
         running.activity = Instant::now();
-        match event {
-            StepEvent::Progress(progress) => running.step.progress = progress,
-            StepEvent::Download(download) => running.step.download = Some(download),
-        }
+        running.step.phase = phase;
         let processing = build_processing(
             &running.snapshot.results,
             &running.snapshot.failures,

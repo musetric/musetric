@@ -1,6 +1,7 @@
 import {
-  type BrowserProgressMessage,
-  reportProgressApiName,
+  type BrowserPhaseMessage,
+  type BrowserRunningUnits,
+  reportPhaseApiName,
 } from './browserApi.js';
 import { deliverFileApiName } from './jobProtocol.js';
 
@@ -15,14 +16,20 @@ declare const document: {
   body: { appendChild: (node: AnchorElement) => void };
 };
 
-export const reportProgress = async (progress: number): Promise<void> => {
-  const api: unknown = Reflect.get(globalThis, reportProgressApiName);
+const reportPhase = async (message: BrowserPhaseMessage): Promise<void> => {
+  const api: unknown = Reflect.get(globalThis, reportPhaseApiName);
   if (typeof api !== 'function') {
-    throw new Error('AI progress API is not initialized');
+    throw new Error('AI phase API is not initialized');
   }
-  const message: BrowserProgressMessage = { type: 'progress', progress };
   await Reflect.apply(api, undefined, [message]);
 };
+
+export const reportLoading = async (): Promise<void> =>
+  reportPhase({ type: 'loading' });
+
+export const reportRunning = async (
+  units: BrowserRunningUnits,
+): Promise<void> => reportPhase({ type: 'running', ...units });
 
 const downloadFile = async (
   name: string,

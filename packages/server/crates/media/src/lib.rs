@@ -15,10 +15,10 @@ use std::error::Error;
 pub use aac::{AacEncoder, FRAME_SAMPLES};
 pub use convert::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
 pub use decode::SymphoniaPcm;
-pub use frames::read_frame_count;
+pub use frames::{read_flac_sample_rate, read_frame_count};
 pub use loudness::{LeadVisualLoudness, Loudness, analyze_lead_visual_loudness, analyze_loudness};
-pub use mono::{Downmix, decode_mono_pcm};
-pub use pcm::{PcmRequest, PcmSink, PcmSource, ReadingPcm, collect_interleaved_pcm};
+pub use mono::{Downmix, MonoRequest, decode_mono_pcm};
+pub use pcm::{DecodedFrames, PcmRequest, PcmSink, PcmSource, ReadingPcm, collect_interleaved_pcm};
 pub use peaks::{WAVE_PEAK_COUNT, WavePeaks, generate_wave_peaks};
 pub use resample::SampleRates;
 

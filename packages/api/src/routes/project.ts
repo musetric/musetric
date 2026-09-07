@@ -31,11 +31,26 @@ export const processingStepNameSchema = z.enum([
 ]);
 export type ProcessingStepName = z.infer<typeof processingStepNameSchema>;
 
+export const processingPhaseSchema = z.enum([
+  'preparing',
+  'decoding',
+  'loading',
+  'running',
+  'saving',
+]);
+export type ProcessingPhase = z.infer<typeof processingPhaseSchema>;
+
+export const processingPassSchema = z.enum(['decode', 'repair']);
+
 export const processingStepSchema = z.object({
   status: processingStepStatusSchema,
-  progress: z.number().optional(),
+  phase: processingPhaseSchema.optional(),
   download: downloadSchema.optional(),
-  message: z.string().optional(),
+  decoded: z.number().optional(),
+  total: z.number().optional(),
+  pass: processingPassSchema.optional(),
+  unit: z.number().optional(),
+  unitCount: z.number().optional(),
   error: z.string().optional(),
 });
 export type ProcessingStep = z.infer<typeof processingStepSchema>;

@@ -71,21 +71,22 @@ fn encode(event: &StatusEvent) -> String {
 
 #[cfg(test)]
 mod tests {
-    use musetric_jobs::{Processing, StatusEvent, StepStatus, StepView};
+    use musetric_jobs::{Processing, StatusEvent, StepPass, StepPhase, StepStatus, StepView};
 
     use super::encode;
 
     const EXPECTED: &str = "data: {\"processing\":{\"done\":false,\"steps\":{\
-\"chords\":{\"status\":\"pending\"},\"key\":{\"status\":\"pending\"},\
-\"rhythm\":{\"status\":\"pending\"},\
-\"separation\":{\"progress\":1.0,\"status\":\"done\"},\
-\"transcription\":{\"progress\":0.5,\"status\":\"processing\"}}},\"projectId\":7}\n\n";
+\"chords\":{\"status\":\"pending\"},\
+\"key\":{\"decoded\":441000,\"phase\":\"decoding\",\"status\":\"processing\",\"total\":1764000},\
+\"rhythm\":{\"phase\":\"saving\",\"status\":\"processing\"},\
+\"separation\":{\"status\":\"done\"},\
+\"transcription\":{\"pass\":\"decode\",\"phase\":\"running\",\"status\":\"processing\",\
+\"unit\":3,\"unitCount\":12}}},\"projectId\":7}\n\n";
 
-    fn create_step(status: StepStatus, progress: Option<f64>) -> StepView {
+    fn create_step(status: StepStatus, phase: Option<StepPhase>) -> StepView {
         StepView {
             status,
-            progress,
-            download: None,
+            phase,
             error: None,
         }
     }
@@ -97,10 +98,23 @@ mod tests {
             processing: Processing {
                 done: false,
                 steps: [
-                    create_step(StepStatus::Done, Some(1.0)),
-                    create_step(StepStatus::Processing, Some(0.5)),
-                    create_step(StepStatus::Pending, None),
-                    create_step(StepStatus::Pending, None),
+                    create_step(StepStatus::Done, None),
+                    create_step(
+                        StepStatus::Processing,
+                        Some(StepPhase::Running {
+                            pass: StepPass::Decode,
+                            unit: 3,
+                            unit_count: 12,
+                        }),
+                    ),
+                    create_step(StepStatus::Processing, Some(StepPhase::Saving)),
+                    create_step(
+                        StepStatus::Processing,
+                        Some(StepPhase::Decoding {
+                            decoded: 441_000,
+                            total: 1_764_000,
+                        }),
+                    ),
                     create_step(StepStatus::Pending, None),
                 ],
             },

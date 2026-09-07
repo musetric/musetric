@@ -11,5 +11,6 @@ pub use cache::{
     Download, DownloadReport, DownloadStatus, ModelFile, create_client, ensure_model_file,
 };
 pub use files::{Asset, Assets, Bundle, read_relative};
-pub use host::{BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ProgressSink};
+pub use host::{BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, PhaseSink};
+pub use protocol::{ExecutorPass, ExecutorPhase};
 pub use upload::UploadWait;

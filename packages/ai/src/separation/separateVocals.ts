@@ -1,5 +1,6 @@
 import { normalizePeak, subtractPlanarStereo } from '../dsp/normalize.js';
 import { vocalsModel } from '../models/vocalsModel.js';
+import { type ReportUnit } from '../runtime/unitProgress.js';
 import { type VocalsGpuRuntime } from '../runtime/vocals/vocalsRuntime.js';
 import { type StereoAudio } from './stereoAudio.js';
 
@@ -89,6 +90,9 @@ const validateAudio = (audio: StereoAudio): void => {
   }
 };
 
+const getStepSize = (sampleRate: number): number =>
+  Math.min(8 * sampleRate, vocalsModel.chunkSamples);
+
 type ChunkWindow = {
   start: number;
   length: number;
@@ -110,15 +114,13 @@ const getChunkWindow = (offset: number, samples: number): ChunkWindow => {
   return { start: 0, length: samples };
 };
 
-export type SeparateVocalsMessage = {
-  type: 'progress';
-  progress: number;
-};
+export const countVocalsUnits = (audio: StereoAudio): number =>
+  Math.ceil(audio.samples / getStepSize(audio.sampleRate));
 
 export type SeparateVocalsOptions = {
   audio: StereoAudio;
   runtime: VocalsGpuRuntime;
-  onMessage: (message: SeparateVocalsMessage) => void | Promise<void>;
+  onUnit: ReportUnit;
 };
 
 export type SeparateVocalsResult = {
@@ -133,10 +135,7 @@ export const separateVocals = async (
   validateAudio(sourceAudio);
 
   const mixture = normalizePeak(sourceAudio.data, 0.9, 0);
-  const stepSize = Math.min(
-    8 * sourceAudio.sampleRate,
-    vocalsModel.chunkSamples,
-  );
+  const stepSize = getStepSize(sourceAudio.sampleRate);
   const window = createHammingWindow();
   const chunk = new Float32Array(
     vocalsModel.channels * vocalsModel.chunkSamples,
@@ -144,17 +143,14 @@ export const separateVocals = async (
   const separatedChunk = new Float32Array(chunk.length);
   const target = new Float32Array(mixture.length);
   const counter = new Float32Array(mixture.length);
-  const totalSteps = Math.ceil(sourceAudio.samples / stepSize);
+  const unitCount = countVocalsUnits(sourceAudio);
 
   for (
     let stepIndex = 0, offset = 0;
     offset < sourceAudio.samples;
     stepIndex++, offset += stepSize
   ) {
-    await options.onMessage({
-      type: 'progress',
-      progress: stepIndex / totalSteps,
-    });
+    await options.onUnit({ unit: stepIndex, unitCount });
 
     const chunkWindow = getChunkWindow(offset, sourceAudio.samples);
     fillChunk({
@@ -186,8 +182,6 @@ export const separateVocals = async (
     0.9,
     0,
   );
-
-  await options.onMessage({ type: 'progress', progress: 1 });
 
   return {
     vocals: createStereoAudio(sourceAudio, vocals),

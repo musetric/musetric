@@ -28,8 +28,8 @@ use crate::{
         Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
     },
     protocol::{
-        ExecutorMessage, JOB_SOCKET_PATH, JOB_URL_PARAMETER, UPLOAD_ROUTE, read_executor_message,
-        write_job_command,
+        ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, JOB_URL_PARAMETER, UPLOAD_ROUTE,
+        read_executor_message, write_job_command,
     },
     upload::{PendingUpload, UploadWait, receive_upload},
 };
@@ -60,14 +60,14 @@ impl Display for ExecutorFailure {
 
 impl std::error::Error for ExecutorFailure {}
 
-pub type ProgressSink = Arc<dyn Fn(f64) + Send + Sync>;
+pub type PhaseSink = Arc<dyn Fn(ExecutorPhase) + Send + Sync>;
 
 pub struct ExecutorHostOptions {
     pub label: String,
     pub bundle: Bundle,
     pub pcm: Bytes,
     pub require_shader_f16: bool,
-    pub on_progress: ProgressSink,
+    pub on_phase: PhaseSink,
 }
 
 pub(crate) struct HostState {
@@ -75,7 +75,7 @@ pub(crate) struct HostState {
     bundle: Bundle,
     pcm: Bytes,
     require_shader_f16: bool,
-    on_progress: ProgressSink,
+    on_phase: PhaseSink,
     files: Mutex<HashMap<String, PathBuf>>,
     directories: Mutex<HashMap<String, PathBuf>>,
     uploads: Mutex<Vec<PendingUpload>>,
@@ -95,7 +95,7 @@ impl HostState {
                 adapter,
                 shader_f16,
             } => self.report_ready(adapter, shader_f16),
-            ExecutorMessage::Progress { progress } => (self.on_progress)(progress),
+            ExecutorMessage::Phase(phase) => (self.on_phase)(phase),
             ExecutorMessage::Answer { job_id, result } => self.answer(&job_id, Ok(result)),
             ExecutorMessage::Failure { job_id, error } => {
                 self.answer(&job_id, Err(ExecutorFailure::Refused(error)));
@@ -216,7 +216,7 @@ impl ExecutorHost {
             bundle: options.bundle,
             pcm: options.pcm,
             require_shader_f16: options.require_shader_f16,
-            on_progress: options.on_progress,
+            on_phase: options.on_phase,
             files: Mutex::new(HashMap::new()),
             directories: Mutex::new(HashMap::new()),
             uploads: Mutex::new(Vec::new()),

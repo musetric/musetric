@@ -4,7 +4,7 @@ use std::{
 };
 
 use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
-use musetric_jobs::{StepAnswer, StepEvent, StepReport};
+use musetric_jobs::{StepAnswer, StepPhase, StepReport};
 use musetric_media::{
     BoxedError, Loudness, PcmRequest, PcmSource, SampleRates, WavePeaks,
     analyze_lead_visual_loudness, analyze_loudness, collect_interleaved_pcm, convert_to_fmp4,
@@ -16,7 +16,10 @@ use tokio::fs::remove_file;
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{Failure, Job, Session, SessionOptions, answer, ensure_files},
+        browser::{
+            Failure, Job, Session, SessionOptions, answer, count_frames, decode_reporter,
+            ensure_files,
+        },
         gains::{Stems, measure},
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
     },
@@ -111,7 +114,6 @@ pub(crate) async fn run(
 
 async fn separate(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let context = running.context;
-    (running.report)(StepEvent::Progress(0.0));
     let sample_rate = read_sample_rate(context, job.project_id).await?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let source_analysis = async {
@@ -122,7 +124,6 @@ async fn separate(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let stems = process_stems(running, job, sample_rate);
     let (source_loudness, ()) = tokio::try_join!(source_analysis, stems)?;
     store(running, job, sample_rate, source_loudness).await?;
-    (running.report)(StepEvent::Progress(1.0));
     Ok(())
 }
 
@@ -133,6 +134,7 @@ async fn process_stems(
 ) -> Result<(), Failure> {
     let context = running.context;
     split(running, job).await?;
+    (running.report)(StepPhase::Saving);
     let stems = running.stems;
     let rates = SampleRates {
         input: VOCALS.sample_rate,
@@ -226,11 +228,14 @@ async fn split(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
     let mut models = ensure_files(context, report, &VOCALS.cached(&context.models_path)).await?;
     models.extend(ensure_files(context, report, &LEAD_BACKING.cached(&context.models_path)).await?);
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
+    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
     let pcm = collect_interleaved_pcm(
         context.storage.pcm.as_ref(),
         read_at(&source, VOCALS.sample_rate),
+        &mut decoded,
     )
     .await?;
+    report(StepPhase::Loading);
     let mut session = Session::start(SessionOptions {
         label: LABEL,
         bundle: context.bundle.clone(),

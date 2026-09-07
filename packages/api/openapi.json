@@ -14,6 +14,7 @@
                   "chords": {
                     "additionalProperties": false,
                     "properties": {
+                      "decoded": { "type": "number" },
                       "download": {
                         "additionalProperties": false,
                         "properties": {
@@ -30,12 +31,27 @@
                         "type": "object"
                       },
                       "error": { "type": "string" },
-                      "message": { "type": "string" },
-                      "progress": { "type": "number" },
+                      "pass": {
+                        "enum": ["decode", "repair"],
+                        "type": "string"
+                      },
+                      "phase": {
+                        "enum": [
+                          "preparing",
+                          "decoding",
+                          "loading",
+                          "running",
+                          "saving"
+                        ],
+                        "type": "string"
+                      },
                       "status": {
                         "enum": ["pending", "processing", "failed", "done"],
                         "type": "string"
-                      }
+                      },
+                      "total": { "type": "number" },
+                      "unit": { "type": "number" },
+                      "unitCount": { "type": "number" }
                     },
                     "required": ["status"],
                     "type": "object"
@@ -43,6 +59,7 @@
                   "key": {
                     "additionalProperties": false,
                     "properties": {
+                      "decoded": { "type": "number" },
                       "download": {
                         "additionalProperties": false,
                         "properties": {
@@ -59,12 +76,27 @@
                         "type": "object"
                       },
                       "error": { "type": "string" },
-                      "message": { "type": "string" },
-                      "progress": { "type": "number" },
+                      "pass": {
+                        "enum": ["decode", "repair"],
+                        "type": "string"
+                      },
+                      "phase": {
+                        "enum": [
+                          "preparing",
+                          "decoding",
+                          "loading",
+                          "running",
+                          "saving"
+                        ],
+                        "type": "string"
+                      },
                       "status": {
                         "enum": ["pending", "processing", "failed", "done"],
                         "type": "string"
-                      }
+                      },
+                      "total": { "type": "number" },
+                      "unit": { "type": "number" },
+                      "unitCount": { "type": "number" }
                     },
                     "required": ["status"],
                     "type": "object"
@@ -72,6 +104,7 @@
                   "rhythm": {
                     "additionalProperties": false,
                     "properties": {
+                      "decoded": { "type": "number" },
                       "download": {
                         "additionalProperties": false,
                         "properties": {
@@ -88,12 +121,27 @@
                         "type": "object"
                       },
                       "error": { "type": "string" },
-                      "message": { "type": "string" },
-                      "progress": { "type": "number" },
+                      "pass": {
+                        "enum": ["decode", "repair"],
+                        "type": "string"
+                      },
+                      "phase": {
+                        "enum": [
+                          "preparing",
+                          "decoding",
+                          "loading",
+                          "running",
+                          "saving"
+                        ],
+                        "type": "string"
+                      },
                       "status": {
                         "enum": ["pending", "processing", "failed", "done"],
                         "type": "string"
-                      }
+                      },
+                      "total": { "type": "number" },
+                      "unit": { "type": "number" },
+                      "unitCount": { "type": "number" }
                     },
                     "required": ["status"],
                     "type": "object"
@@ -101,6 +149,7 @@
                   "separation": {
                     "additionalProperties": false,
                     "properties": {
+                      "decoded": { "type": "number" },
                       "download": {
                         "additionalProperties": false,
                         "properties": {
@@ -117,12 +166,27 @@
                         "type": "object"
                       },
                       "error": { "type": "string" },
-                      "message": { "type": "string" },
-                      "progress": { "type": "number" },
+                      "pass": {
+                        "enum": ["decode", "repair"],
+                        "type": "string"
+                      },
+                      "phase": {
+                        "enum": [
+                          "preparing",
+                          "decoding",
+                          "loading",
+                          "running",
+                          "saving"
+                        ],
+                        "type": "string"
+                      },
                       "status": {
                         "enum": ["pending", "processing", "failed", "done"],
                         "type": "string"
-                      }
+                      },
+                      "total": { "type": "number" },
+                      "unit": { "type": "number" },
+                      "unitCount": { "type": "number" }
                     },
                     "required": ["status"],
                     "type": "object"
@@ -130,6 +194,7 @@
                   "transcription": {
                     "additionalProperties": false,
                     "properties": {
+                      "decoded": { "type": "number" },
                       "download": {
                         "additionalProperties": false,
                         "properties": {
@@ -146,12 +211,27 @@
                         "type": "object"
                       },
                       "error": { "type": "string" },
-                      "message": { "type": "string" },
-                      "progress": { "type": "number" },
+                      "pass": {
+                        "enum": ["decode", "repair"],
+                        "type": "string"
+                      },
+                      "phase": {
+                        "enum": [
+                          "preparing",
+                          "decoding",
+                          "loading",
+                          "running",
+                          "saving"
+                        ],
+                        "type": "string"
+                      },
                       "status": {
                         "enum": ["pending", "processing", "failed", "done"],
                         "type": "string"
-                      }
+                      },
+                      "total": { "type": "number" },
+                      "unit": { "type": "number" },
+                      "unitCount": { "type": "number" }
                     },
                     "required": ["status"],
                     "type": "object"
@@ -660,6 +740,7 @@
                             "chords": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -676,8 +757,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -686,7 +779,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -694,6 +790,7 @@
                             "key": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -710,8 +807,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -720,7 +829,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -728,6 +840,7 @@
                             "rhythm": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -744,8 +857,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -754,7 +879,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -762,6 +890,7 @@
                             "separation": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -778,8 +907,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -788,7 +929,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -796,6 +940,7 @@
                             "transcription": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -812,8 +957,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -822,7 +979,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -964,6 +1124,7 @@
                             "chords": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -980,8 +1141,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -990,7 +1163,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -998,6 +1174,7 @@
                             "key": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1014,8 +1191,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1024,7 +1213,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1032,6 +1224,7 @@
                             "rhythm": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1048,8 +1241,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1058,7 +1263,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1066,6 +1274,7 @@
                             "separation": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1082,8 +1291,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1092,7 +1313,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1100,6 +1324,7 @@
                             "transcription": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1116,8 +1341,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1126,7 +1363,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1372,6 +1612,7 @@
                             "chords": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1388,8 +1629,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1398,7 +1651,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1406,6 +1662,7 @@
                             "key": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1422,8 +1679,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1432,7 +1701,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1440,6 +1712,7 @@
                             "rhythm": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1456,8 +1729,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1466,7 +1751,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1474,6 +1762,7 @@
                             "separation": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1490,8 +1779,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1500,7 +1801,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1508,6 +1812,7 @@
                             "transcription": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1524,8 +1829,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1534,7 +1851,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1669,6 +1989,7 @@
                             "chords": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1685,8 +2006,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1695,7 +2028,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1703,6 +2039,7 @@
                             "key": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1719,8 +2056,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1729,7 +2078,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1737,6 +2089,7 @@
                             "rhythm": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1753,8 +2106,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1763,7 +2128,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1771,6 +2139,7 @@
                             "separation": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1787,8 +2156,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1797,7 +2178,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1805,6 +2189,7 @@
                             "transcription": {
                               "additionalProperties": false,
                               "properties": {
+                                "decoded": { "type": "number" },
                                 "download": {
                                   "additionalProperties": false,
                                   "properties": {
@@ -1821,8 +2206,20 @@
                                   "type": "object"
                                 },
                                 "error": { "type": "string" },
-                                "message": { "type": "string" },
-                                "progress": { "type": "number" },
+                                "pass": {
+                                  "enum": ["decode", "repair"],
+                                  "type": "string"
+                                },
+                                "phase": {
+                                  "enum": [
+                                    "preparing",
+                                    "decoding",
+                                    "loading",
+                                    "running",
+                                    "saving"
+                                  ],
+                                  "type": "string"
+                                },
                                 "status": {
                                   "enum": [
                                     "pending",
@@ -1831,7 +2228,10 @@
                                     "done"
                                   ],
                                   "type": "string"
-                                }
+                                },
+                                "total": { "type": "number" },
+                                "unit": { "type": "number" },
+                                "unitCount": { "type": "number" }
                               },
                               "required": ["status"],
                               "type": "object"
@@ -1951,6 +2351,7 @@
                               "chords": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "decoded": { "type": "number" },
                                   "download": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -1971,8 +2372,20 @@
                                     "type": "object"
                                   },
                                   "error": { "type": "string" },
-                                  "message": { "type": "string" },
-                                  "progress": { "type": "number" },
+                                  "pass": {
+                                    "enum": ["decode", "repair"],
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "enum": [
+                                      "preparing",
+                                      "decoding",
+                                      "loading",
+                                      "running",
+                                      "saving"
+                                    ],
+                                    "type": "string"
+                                  },
                                   "status": {
                                     "enum": [
                                       "pending",
@@ -1981,7 +2394,10 @@
                                       "done"
                                     ],
                                     "type": "string"
-                                  }
+                                  },
+                                  "total": { "type": "number" },
+                                  "unit": { "type": "number" },
+                                  "unitCount": { "type": "number" }
                                 },
                                 "required": ["status"],
                                 "type": "object"
@@ -1989,6 +2405,7 @@
                               "key": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "decoded": { "type": "number" },
                                   "download": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -2009,8 +2426,20 @@
                                     "type": "object"
                                   },
                                   "error": { "type": "string" },
-                                  "message": { "type": "string" },
-                                  "progress": { "type": "number" },
+                                  "pass": {
+                                    "enum": ["decode", "repair"],
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "enum": [
+                                      "preparing",
+                                      "decoding",
+                                      "loading",
+                                      "running",
+                                      "saving"
+                                    ],
+                                    "type": "string"
+                                  },
                                   "status": {
                                     "enum": [
                                       "pending",
@@ -2019,7 +2448,10 @@
                                       "done"
                                     ],
                                     "type": "string"
-                                  }
+                                  },
+                                  "total": { "type": "number" },
+                                  "unit": { "type": "number" },
+                                  "unitCount": { "type": "number" }
                                 },
                                 "required": ["status"],
                                 "type": "object"
@@ -2027,6 +2459,7 @@
                               "rhythm": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "decoded": { "type": "number" },
                                   "download": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -2047,8 +2480,20 @@
                                     "type": "object"
                                   },
                                   "error": { "type": "string" },
-                                  "message": { "type": "string" },
-                                  "progress": { "type": "number" },
+                                  "pass": {
+                                    "enum": ["decode", "repair"],
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "enum": [
+                                      "preparing",
+                                      "decoding",
+                                      "loading",
+                                      "running",
+                                      "saving"
+                                    ],
+                                    "type": "string"
+                                  },
                                   "status": {
                                     "enum": [
                                       "pending",
@@ -2057,7 +2502,10 @@
                                       "done"
                                     ],
                                     "type": "string"
-                                  }
+                                  },
+                                  "total": { "type": "number" },
+                                  "unit": { "type": "number" },
+                                  "unitCount": { "type": "number" }
                                 },
                                 "required": ["status"],
                                 "type": "object"
@@ -2065,6 +2513,7 @@
                               "separation": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "decoded": { "type": "number" },
                                   "download": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -2085,8 +2534,20 @@
                                     "type": "object"
                                   },
                                   "error": { "type": "string" },
-                                  "message": { "type": "string" },
-                                  "progress": { "type": "number" },
+                                  "pass": {
+                                    "enum": ["decode", "repair"],
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "enum": [
+                                      "preparing",
+                                      "decoding",
+                                      "loading",
+                                      "running",
+                                      "saving"
+                                    ],
+                                    "type": "string"
+                                  },
                                   "status": {
                                     "enum": [
                                       "pending",
@@ -2095,7 +2556,10 @@
                                       "done"
                                     ],
                                     "type": "string"
-                                  }
+                                  },
+                                  "total": { "type": "number" },
+                                  "unit": { "type": "number" },
+                                  "unitCount": { "type": "number" }
                                 },
                                 "required": ["status"],
                                 "type": "object"
@@ -2103,6 +2567,7 @@
                               "transcription": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "decoded": { "type": "number" },
                                   "download": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -2123,8 +2588,20 @@
                                     "type": "object"
                                   },
                                   "error": { "type": "string" },
-                                  "message": { "type": "string" },
-                                  "progress": { "type": "number" },
+                                  "pass": {
+                                    "enum": ["decode", "repair"],
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "enum": [
+                                      "preparing",
+                                      "decoding",
+                                      "loading",
+                                      "running",
+                                      "saving"
+                                    ],
+                                    "type": "string"
+                                  },
                                   "status": {
                                     "enum": [
                                       "pending",
@@ -2133,7 +2610,10 @@
                                       "done"
                                     ],
                                     "type": "string"
-                                  }
+                                  },
+                                  "total": { "type": "number" },
+                                  "unit": { "type": "number" },
+                                  "unitCount": { "type": "number" }
                                 },
                                 "required": ["status"],
                                 "type": "object"

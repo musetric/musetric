@@ -5,6 +5,6 @@ mod summary;
 mod tests;
 
 pub use queue::{
-    Queue, QueueOptions, StatusEvent, StepAnswer, StepEvent, StepOutcome, StepReport, StepRunner,
+    Queue, QueueOptions, StatusEvent, StepAnswer, StepOutcome, StepReport, StepRunner,
 };
-pub use summary::{Processing, STEP_ORDER, StepStatus, StepView};
+pub use summary::{Processing, STEP_ORDER, StepPass, StepPhase, StepStatus, StepView};

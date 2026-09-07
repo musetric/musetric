@@ -6,6 +6,7 @@ import {
 } from 'node:http';
 import { type WebSocket, WebSocketServer } from 'ws';
 import {
+  type ExecutorJobMessage,
   type ExecutorReady,
   jobSocketPath,
   jobUrlParameter,
@@ -40,7 +41,7 @@ type PendingJob = {
 export type FakeHost = {
   pageUrl: string;
   ready: Promise<ExecutorReady>;
-  progress: number[];
+  phases: ExecutorJobMessage[];
   uploads: Map<string, Buffer>;
   run: (api: string, request: unknown) => Promise<unknown>;
   close: () => Promise<void>;
@@ -48,7 +49,7 @@ export type FakeHost = {
 
 export const startFakeHost = async (): Promise<FakeHost> => {
   const uploads = new Map<string, Buffer>();
-  const progress: number[] = [];
+  const phases: ExecutorJobMessage[] = [];
   const jobs = new Map<string, PendingJob>();
   const connected = Promise.withResolvers<WebSocket>();
   const ready = Promise.withResolvers<ExecutorReady>();
@@ -84,8 +85,8 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         ready.resolve(message);
         return;
       }
-      if (message.type === 'progress') {
-        progress.push(message.progress);
+      if (message.type === 'loading' || message.type === 'running') {
+        phases.push(message);
         return;
       }
       const pending = jobs.get(message.jobId);
@@ -108,7 +109,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
   return {
     pageUrl,
     ready: ready.promise,
-    progress,
+    phases,
     uploads,
     run: async (api, request) => {
       const socket = await connected.promise;

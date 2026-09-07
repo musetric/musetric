@@ -4,7 +4,7 @@ use axum::{
     response::Response,
 };
 use musetric_db::{AudioAnalysis, ProjectItem};
-use musetric_jobs::{Processing, STEP_ORDER, StepView};
+use musetric_jobs::{Processing, STEP_ORDER, StepPhase, StepView};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -102,14 +102,36 @@ pub(crate) fn build_processing(processing: &Processing) -> Value {
 fn build_step(step: &StepView) -> Value {
     let mut view = Map::new();
     view.insert("status".to_owned(), json!(step.status.name()));
-    if let Some(progress) = step.progress {
-        view.insert("progress".to_owned(), json!(progress));
-    }
-    if let Some(download) = step.download.as_ref() {
-        view.insert("download".to_owned(), download.clone());
+    if let Some(phase) = step.phase.as_ref() {
+        view.insert("phase".to_owned(), json!(phase.name()));
+        describe_phase(phase, &mut view);
     }
     if let Some(error) = step.error.as_ref() {
         view.insert("error".to_owned(), json!(error));
     }
     Value::Object(view)
+}
+
+fn describe_phase(phase: &StepPhase, view: &mut Map<String, Value>) {
+    match phase {
+        StepPhase::Preparing { download } => {
+            if let Some(announced) = download.as_ref() {
+                view.insert("download".to_owned(), announced.clone());
+            }
+        }
+        StepPhase::Decoding { decoded, total } => {
+            view.insert("decoded".to_owned(), json!(decoded));
+            view.insert("total".to_owned(), json!(total));
+        }
+        StepPhase::Running {
+            pass,
+            unit,
+            unit_count,
+        } => {
+            view.insert("pass".to_owned(), json!(pass.name()));
+            view.insert("unit".to_owned(), json!(unit));
+            view.insert("unitCount".to_owned(), json!(unit_count));
+        }
+        StepPhase::Loading | StepPhase::Saving => {}
+    }
 }

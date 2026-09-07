@@ -18,6 +18,8 @@ pub type ReadingPcm<'reading> =
 
 pub type PcmSink<'sink> = &'sink mut (dyn FnMut(&[f32]) + Send);
 
+pub type DecodedFrames<'decoded> = &'decoded mut (dyn FnMut(u64) + Send);
+
 pub trait PcmSource: Send + Sync {
     fn read_pcm<'source>(
         &'source self,
@@ -52,9 +54,10 @@ fn read_float(bytes: &[u8]) -> f32 {
 pub async fn collect_interleaved_pcm(
     source: &dyn PcmSource,
     request: PcmRequest<'_>,
+    decoded: DecodedFrames<'_>,
 ) -> Result<Vec<u8>, BoxedError> {
     let mut collected = Vec::new();
-    read_into(source, request, &mut collected).await?;
+    read_into(source, request, &mut collected, decoded).await?;
     if collected.is_empty() {
         return Err(NO_AUDIO.into());
     }
@@ -65,11 +68,17 @@ async fn read_into(
     source: &dyn PcmSource,
     request: PcmRequest<'_>,
     collected: &mut Vec<u8>,
+    decoded: DecodedFrames<'_>,
 ) -> Result<(), BoxedError> {
+    let mut frames = 0_u64;
     let mut sink = |chunk: &[f32]| {
-        for sample in chunk {
-            collected.extend_from_slice(&sample.to_le_bytes());
+        for frame in chunk.chunks_exact(CHANNELS) {
+            for sample in frame {
+                collected.extend_from_slice(&sample.to_le_bytes());
+            }
+            frames += 1;
         }
+        decoded(frames);
     };
     source.read_pcm(request, &mut sink).await
 }

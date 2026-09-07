@@ -1,3 +1,4 @@
+import { type ReportUnit } from '../runtime/unitProgress.js';
 import { type Chunk, type Mapping } from './audioCompaction.js';
 import { isHallucination } from './hallucinationFilter.js';
 import { sampleRate, type Span } from './spectralChunker.js';
@@ -127,6 +128,8 @@ export type RepairOptions = {
   mapping: Mapping[];
 
   transcribeSlice: (audio: Float32Array) => Promise<TranscriptionWord[]>;
+
+  onUnit?: ReportUnit;
 
   log?: (message: string) => void;
 };
@@ -302,12 +305,17 @@ export const repairCollapsedWindows = async (
   const snap = buildSnap(mapping);
   const flagged = flagCollapsedWindows(options, result, payloads);
   const context: RepairContext = { options, result, flagged, payloads, snap };
+  const unitCount = flagged.filter(Boolean).length;
 
+  let unit = 0;
+  await options.onUnit?.({ unit, unitCount });
   for (let index = 0; index < chunks.length; index++) {
     if (!flagged[index]) {
       continue;
     }
     const repair = await repairWindow(context, index);
+    unit += 1;
+    await options.onUnit?.({ unit, unitCount });
     if (!repair) {
       continue;
     }

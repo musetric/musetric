@@ -23,11 +23,57 @@ impl StepStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepPass {
+    Decode,
+    Repair,
+}
+
+impl StepPass {
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Decode => "decode",
+            Self::Repair => "repair",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum StepPhase {
+    Preparing {
+        download: Option<Value>,
+    },
+    Decoding {
+        decoded: u64,
+        total: u64,
+    },
+    Loading,
+    Running {
+        pass: StepPass,
+        unit: u32,
+        unit_count: u32,
+    },
+    Saving,
+}
+
+impl StepPhase {
+    #[must_use]
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Preparing { .. } => "preparing",
+            Self::Decoding { .. } => "decoding",
+            Self::Loading => "loading",
+            Self::Running { .. } => "running",
+            Self::Saving => "saving",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct StepView {
     pub status: StepStatus,
-    pub progress: Option<f64>,
-    pub download: Option<Value>,
+    pub phase: Option<StepPhase>,
     pub error: Option<String>,
 }
 
@@ -47,8 +93,7 @@ impl Processing {
 pub(crate) struct ActiveStep {
     pub(crate) step: ProcessingStep,
     pub(crate) project_id: i64,
-    pub(crate) progress: f64,
-    pub(crate) download: Option<Value>,
+    pub(crate) phase: StepPhase,
 }
 
 pub(crate) fn build_processing(
@@ -76,31 +121,25 @@ fn build_step(
     if let Some(failure) = failures.iter().find(|failure| failure.step == step) {
         return StepView {
             status: StepStatus::Failed,
-            progress: None,
-            download: None,
+            phase: None,
             error: Some(failure.message.clone()),
         };
     }
     if let Some(running) = active.filter(|running| running.step == step) {
         return StepView {
             status: StepStatus::Processing,
-            progress: Some(running.progress),
-            download: running.download.clone(),
+            phase: Some(running.phase.clone()),
             error: None,
         };
     }
-    if results.has(step) {
-        return StepView {
-            status: StepStatus::Done,
-            progress: Some(1.0),
-            download: None,
-            error: None,
-        };
-    }
+    let status = if results.has(step) {
+        StepStatus::Done
+    } else {
+        StepStatus::Pending
+    };
     StepView {
-        status: StepStatus::Pending,
-        progress: None,
-        download: None,
+        status,
+        phase: None,
         error: None,
     }
 }
