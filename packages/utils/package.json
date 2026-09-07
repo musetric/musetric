@@ -29,12 +29,6 @@
       "types": "./dist/index.gpu.d.ts",
       "import": "./dist/index.gpu.js",
       "default": "./dist/index.gpu.js"
-    },
-    "./node": {
-      "monorepo": "./src/index.node.ts",
-      "types": "./dist/index.node.d.ts",
-      "import": "./dist/index.node.js",
-      "default": "./dist/index.node.js"
     }
   },
   "scripts": {

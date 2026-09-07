@@ -78,7 +78,7 @@ mod tests {
     const EXPECTED: &str = "data: {\"processing\":{\"done\":false,\"steps\":{\
 \"chords\":{\"status\":\"pending\"},\"key\":{\"status\":\"pending\"},\
 \"rhythm\":{\"status\":\"pending\"},\
-\"separation\":{\"progress\":1,\"status\":\"done\"},\
+\"separation\":{\"progress\":1.0,\"status\":\"done\"},\
 \"transcription\":{\"progress\":0.5,\"status\":\"processing\"}}},\"projectId\":7}\n\n";
 
     fn create_step(status: StepStatus, progress: Option<f64>) -> StepView {
