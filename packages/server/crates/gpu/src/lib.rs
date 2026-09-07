@@ -2,7 +2,7 @@ mod cache;
 mod files;
 mod host;
 mod protocol;
-mod upload;
+mod units;
 
 #[cfg(test)]
 mod tests;
@@ -11,6 +11,8 @@ pub use cache::{
     Download, DownloadReport, DownloadStatus, ModelFile, create_client, ensure_model_file,
 };
 pub use files::{Asset, Assets, Bundle, read_relative};
-pub use host::{BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, PhaseSink};
+pub use host::{
+    BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, JobTicket, PhaseSink,
+};
 pub use protocol::{ExecutorPass, ExecutorPhase};
-pub use upload::UploadWait;
+pub use units::{UnitCompleted, UnitReject, UnitSession, UnitTarget, UnitWrite};

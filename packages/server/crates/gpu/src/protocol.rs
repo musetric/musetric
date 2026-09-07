@@ -2,7 +2,6 @@ use serde_json::{Value, json};
 
 pub(crate) const JOB_URL_PARAMETER: &str = "jobs";
 pub(crate) const JOB_SOCKET_PATH: &str = "/jobs";
-pub(crate) const UPLOAD_ROUTE: &str = "/uploads/";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExecutorPass {
@@ -31,10 +30,28 @@ pub enum ExecutorPhase {
 }
 
 pub(crate) enum ExecutorMessage {
-    Ready { adapter: bool, shader_f16: bool },
+    Ready {
+        adapter: bool,
+        shader_f16: bool,
+    },
     Phase(ExecutorPhase),
-    Answer { job_id: String, result: Value },
-    Failure { job_id: String, error: String },
+    Answer {
+        job_id: String,
+        result: Value,
+    },
+    Failure {
+        job_id: String,
+        error: String,
+    },
+    UnitOpened {
+        job_id: String,
+        attempt_id: String,
+    },
+    UnitDone {
+        job_id: String,
+        attempt_id: String,
+        unit: u32,
+    },
 }
 
 pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
@@ -58,6 +75,15 @@ pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
             job_id,
             error: message.get("error")?.as_str()?.to_owned(),
         }),
+        "unitOpened" => Some(ExecutorMessage::UnitOpened {
+            job_id,
+            attempt_id: message.get("attemptId")?.as_str()?.to_owned(),
+        }),
+        "unitDone" => Some(ExecutorMessage::UnitDone {
+            job_id,
+            attempt_id: message.get("attemptId")?.as_str()?.to_owned(),
+            unit: read_count(&message, "unit")?,
+        }),
         _ => None,
     }
 }
@@ -74,18 +100,37 @@ fn read_count(message: &Value, name: &str) -> Option<u32> {
     u32::try_from(message.get(name)?.as_u64()?).ok()
 }
 
-pub(crate) fn write_job_command(
-    job_id: &str,
-    api: &str,
-    upload_url: &str,
-    request: &Value,
-) -> String {
+pub(crate) fn write_job_command(job_id: &str, api: &str, request: &Value) -> String {
     json!({
         "type": "job",
         "jobId": job_id,
         "api": api,
-        "uploadUrl": upload_url,
         "request": request,
+    })
+    .to_string()
+}
+
+pub(crate) fn write_unit_command(
+    job_id: &str,
+    attempt_id: &str,
+    unit: u32,
+    unit_count: u32,
+) -> String {
+    json!({
+        "type": "unit",
+        "jobId": job_id,
+        "attemptId": attempt_id,
+        "unit": unit,
+        "unitCount": unit_count,
+    })
+    .to_string()
+}
+
+pub(crate) fn write_unit_close(job_id: &str, attempt_id: &str) -> String {
+    json!({
+        "type": "unitClose",
+        "jobId": job_id,
+        "attemptId": attempt_id,
     })
     .to_string()
 }

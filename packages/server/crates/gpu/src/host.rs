@@ -12,7 +12,7 @@ use axum::{
     extract::{Request, State, WebSocketUpgrade, ws::Message, ws::WebSocket},
     http::{HeaderValue, StatusCode, header::CONTENT_TYPE},
     response::{IntoResponse, Response},
-    routing::{any, get},
+    routing::{any, get, put},
 };
 use serde_json::Value;
 use tokio::{
@@ -28,10 +28,10 @@ use crate::{
         Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
     },
     protocol::{
-        ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, JOB_URL_PARAMETER, UPLOAD_ROUTE,
-        read_executor_message, write_job_command,
+        ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, JOB_URL_PARAMETER, read_executor_message,
+        write_job_command, write_unit_close, write_unit_command,
     },
-    upload::{PendingUpload, UploadWait, receive_upload},
+    units::{UnitOutput, UnitSession, receive_output, receive_window},
 };
 
 pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
@@ -68,6 +68,7 @@ pub struct ExecutorHostOptions {
     pub pcm: Bytes,
     pub require_shader_f16: bool,
     pub on_phase: PhaseSink,
+    pub units: Option<Arc<dyn UnitSession>>,
 }
 
 pub(crate) struct HostState {
@@ -76,10 +77,11 @@ pub(crate) struct HostState {
     pcm: Bytes,
     require_shader_f16: bool,
     on_phase: PhaseSink,
+    units: Option<Arc<dyn UnitSession>>,
     files: Mutex<HashMap<String, PathBuf>>,
     directories: Mutex<HashMap<String, PathBuf>>,
-    uploads: Mutex<Vec<PendingUpload>>,
     jobs: Mutex<HashMap<String, oneshot::Sender<Result<Value, ExecutorFailure>>>>,
+    active: Mutex<Option<String>>,
     ready: Mutex<Option<oneshot::Sender<Result<(), ExecutorFailure>>>>,
     outgoing: Mutex<Option<mpsc::UnboundedSender<Message>>>,
     closing: Notify,
@@ -100,6 +102,14 @@ impl HostState {
             ExecutorMessage::Failure { job_id, error } => {
                 self.answer(&job_id, Err(ExecutorFailure::Refused(error)));
             }
+            ExecutorMessage::UnitOpened { job_id, attempt_id } => {
+                self.unit_opened(&job_id, &attempt_id);
+            }
+            ExecutorMessage::UnitDone {
+                job_id,
+                attempt_id,
+                unit,
+            } => self.unit_done(&job_id, &attempt_id, unit),
         }
     }
 
@@ -135,29 +145,43 @@ impl HostState {
         if let Some(sender) = taken {
             let _ = sender.send(result);
         }
+        self.retire(job_id);
     }
 
-    pub(crate) fn refuse_uploads(&self, name: &str) {
-        let Ok(mut uploads) = self.uploads.lock() else {
-            return;
-        };
-        for upload in uploads.iter_mut() {
-            upload.refuse(&format!("Unexpected executor upload: {name}"));
+    fn retire(&self, job_id: &str) {
+        if let Ok(mut active) = self.active.lock()
+            && active.as_deref() == Some(job_id)
+        {
+            *active = None;
         }
     }
 
-    pub(crate) fn take_upload_target(&self, name: &str) -> Option<PathBuf> {
-        let uploads = self.uploads.lock().ok()?;
-        uploads.iter().find_map(|upload| upload.target(name))
+    fn unit_opened(&self, job_id: &str, attempt_id: &str) {
+        let active = self.active.lock().ok().and_then(|guard| guard.clone());
+        if active.as_deref() != Some(job_id) {
+            return;
+        }
+        if let Some(units) = &self.units
+            && let Err(error) = units.opened(attempt_id)
+        {
+            self.answer(job_id, Err(ExecutorFailure::Refused(error)));
+        }
     }
 
-    pub(crate) fn complete_upload(&self, name: &str) {
-        let Ok(mut uploads) = self.uploads.lock() else {
+    fn unit_done(&self, job_id: &str, attempt_id: &str, unit: u32) {
+        let active = self.active.lock().ok().and_then(|guard| guard.clone());
+        if active.as_deref() != Some(job_id) {
             return;
-        };
-        for upload in uploads.iter_mut() {
-            upload.complete(name);
         }
+        if let Some(units) = &self.units
+            && let Err(error) = units.done(attempt_id, unit)
+        {
+            self.answer(job_id, Err(ExecutorFailure::Refused(error)));
+        }
+    }
+
+    pub(crate) fn units(&self) -> Option<Arc<dyn UnitSession>> {
+        self.units.clone()
     }
 
     fn attach(&self, outgoing: mpsc::UnboundedSender<Message>) {
@@ -180,11 +204,13 @@ impl HostState {
                 let _ = sender.send(Err(ExecutorFailure::Unavailable));
             }
         }
-        if let Ok(mut uploads) = self.uploads.lock() {
-            for upload in uploads.iter_mut() {
-                upload.refuse(DISCONNECTED);
-            }
+        if let Ok(mut active) = self.active.lock() {
+            *active = None;
         }
+    }
+
+    fn send_text(&self, message: String) -> Result<(), ExecutorFailure> {
+        self.send(Message::Text(message.into()))
     }
 
     fn send(&self, message: Message) -> Result<(), ExecutorFailure> {
@@ -208,6 +234,18 @@ pub struct ExecutorHost {
     served: JoinHandle<()>,
 }
 
+pub struct JobTicket {
+    receiver: oneshot::Receiver<Result<Value, ExecutorFailure>>,
+}
+
+impl JobTicket {
+    pub async fn wait(self) -> Result<Value, ExecutorFailure> {
+        self.receiver
+            .await
+            .map_err(|_| ExecutorFailure::Unavailable)?
+    }
+}
+
 impl ExecutorHost {
     pub async fn start(options: ExecutorHostOptions) -> Result<Self, BoxedError> {
         let (ready_sender, ready_receiver) = oneshot::channel();
@@ -217,10 +255,11 @@ impl ExecutorHost {
             pcm: options.pcm,
             require_shader_f16: options.require_shader_f16,
             on_phase: options.on_phase,
+            units: options.units,
             files: Mutex::new(HashMap::new()),
             directories: Mutex::new(HashMap::new()),
-            uploads: Mutex::new(Vec::new()),
             jobs: Mutex::new(HashMap::new()),
+            active: Mutex::new(None),
             ready: Mutex::new(Some(ready_sender)),
             outgoing: Mutex::new(None),
             closing: Notify::new(),
@@ -266,6 +305,10 @@ impl ExecutorHost {
     #[must_use]
     pub fn pcm_url(&self) -> String {
         format!("{}{PCM_ROUTE}", self.base_url)
+    }
+
+    pub fn attempt_url(&self, attempt_id: &str) -> String {
+        format!("{}/attempt/{attempt_id}", self.base_url)
     }
 
     pub async fn register_file(&self, path: &Path) -> Result<String, BoxedError> {
@@ -332,7 +375,7 @@ impl ExecutorHost {
         Ok(())
     }
 
-    pub async fn run(&self, api: &str, request: &Value) -> Result<Value, ExecutorFailure> {
+    pub fn send_job(&self, api: &str, request: &Value) -> Result<JobTicket, ExecutorFailure> {
         let job_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         self.state
@@ -340,23 +383,42 @@ impl ExecutorHost {
             .lock()
             .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
             .insert(job_id.clone(), sender);
-        let upload_url = format!("{}{UPLOAD_ROUTE}", self.base_url);
-        let command = write_job_command(&job_id, api, &upload_url, request);
-        self.state.send(Message::Text(command.into()))?;
-        receiver.await.map_err(|_| ExecutorFailure::Unavailable)?
+        if let Ok(mut active) = self.state.active.lock() {
+            *active = Some(job_id.clone());
+        }
+        let command = write_job_command(&job_id, api, request);
+        self.state.send_text(command)?;
+        Ok(JobTicket { receiver })
     }
 
-    pub fn expect_uploads(
+    pub async fn run(&self, api: &str, request: &Value) -> Result<Value, ExecutorFailure> {
+        self.send_job(api, request)?.wait().await
+    }
+
+    pub fn send_unit(
         &self,
-        targets: HashMap<String, PathBuf>,
-    ) -> Result<UploadWait, BoxedError> {
-        let (upload, wait) = PendingUpload::create(targets);
+        attempt_id: &str,
+        unit: u32,
+        unit_count: u32,
+    ) -> Result<(), ExecutorFailure> {
+        let job_id = self.active_job()?;
+        let command = write_unit_command(&job_id, attempt_id, unit, unit_count);
+        self.state.send_text(command)
+    }
+
+    pub fn send_unit_close(&self, attempt_id: &str) -> Result<(), ExecutorFailure> {
+        let job_id = self.active_job()?;
+        let command = write_unit_close(&job_id, attempt_id);
+        self.state.send_text(command)
+    }
+
+    fn active_job(&self) -> Result<String, ExecutorFailure> {
         self.state
-            .uploads
+            .active
             .lock()
-            .map_err(|_| "the host is poisoned")?
-            .push(upload);
-        Ok(wait)
+            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
+            .clone()
+            .ok_or(ExecutorFailure::Unavailable)
     }
 
     pub async fn close(mut self) {
@@ -394,6 +456,14 @@ fn create_router(state: Arc<HostState>) -> Router {
         .route(PCM_ROUTE, get(handle_pcm))
         .route("/files/{token}/{name}", get(handle_file))
         .route("/models/{token}/{*name}", get(handle_directory))
+        .route(
+            "/attempt/{attempt}/unit/{unit}",
+            get(handle_unit_window).post(unit_method_not_allowed),
+        )
+        .route(
+            "/attempt/{attempt}/unit/{unit}/{output}",
+            put(handle_unit_output).get(unit_method_not_allowed),
+        )
         .route(JOB_SOCKET_PATH, any(handle_socket))
         .fallback(any(handle_asset))
         .with_state(state)
@@ -455,12 +525,31 @@ async fn handle_directory(
     }
 }
 
+async fn handle_unit_window(
+    State(state): State<Arc<HostState>>,
+    axum::extract::Path((attempt, unit)): axum::extract::Path<(String, u32)>,
+) -> Response {
+    receive_window(&state, &attempt, unit)
+}
+
+async fn handle_unit_output(
+    State(state): State<Arc<HostState>>,
+    axum::extract::Path((attempt, unit, output)): axum::extract::Path<(String, u32, String)>,
+    request: Request,
+) -> Response {
+    receive_output(UnitOutput::create(&state, &attempt, unit, &output), request).await
+}
+
+async fn unit_method_not_allowed() -> Response {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        "the unit route expects another method",
+    )
+        .into_response()
+}
+
 async fn handle_asset(State(state): State<Arc<HostState>>, request: Request) -> Response {
-    let pathname = request.uri().path().to_owned();
-    if request.method() == axum::http::Method::PUT && pathname.starts_with(UPLOAD_ROUTE) {
-        return receive_upload(&state, &pathname, request).await;
-    }
-    match state.bundle.send(&pathname).await {
+    match state.bundle.send(request.uri().path()).await {
         Some(response) => response,
         None => missing(),
     }

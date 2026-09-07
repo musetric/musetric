@@ -1,30 +1,20 @@
 import { setAndroidForegroundWork } from './androidForeground.js';
 import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
 import { readGpuSupport } from './browserGpuSupport.js';
+import { dispatchUnitEvent } from './browserUnitServing.js';
 import {
-  deliverFileApiName,
   type ExecutorMessage,
+  type ExecutorUnitDone,
+  type ExecutorUnitOpened,
   type JobCommand,
   readJobCommand,
+  readUnitEvent,
+  unitDoneApiName,
+  unitOpenedApiName,
 } from './jobProtocol.js';
 
 const send = (socket: WebSocket, message: ExecutorMessage): void => {
   socket.send(JSON.stringify(message));
-};
-
-const uploadFile = async (
-  command: JobCommand,
-  name: string,
-  bytes: ArrayBuffer,
-): Promise<void> => {
-  const response = await fetch(`${command.uploadUrl}${name}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/octet-stream' },
-    body: bytes,
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to upload ${name}: HTTP ${response.status}`);
-  }
 };
 
 const bindJobApis = (socket: WebSocket, command: JobCommand): void => {
@@ -35,11 +25,25 @@ const bindJobApis = (socket: WebSocket, command: JobCommand): void => {
       send(socket, { ...message, jobId: command.jobId });
     },
   );
+  Reflect.set(globalThis, unitOpenedApiName, (attemptId: string) => {
+    const message: ExecutorUnitOpened = {
+      type: 'unitOpened',
+      jobId: command.jobId,
+      attemptId,
+    };
+    send(socket, message);
+  });
   Reflect.set(
     globalThis,
-    deliverFileApiName,
-    async (name: string, bytes: ArrayBuffer) => {
-      await uploadFile(command, name, bytes);
+    unitDoneApiName,
+    (attemptId: string, unit: number) => {
+      const message: ExecutorUnitDone = {
+        type: 'unitDone',
+        jobId: command.jobId,
+        attemptId,
+        unit,
+      };
+      send(socket, message);
     },
   );
 };
@@ -96,6 +100,11 @@ export const startJobExecutor = (jobUrl: string): void => {
   });
   socket.addEventListener('message', (event: MessageEvent<unknown>) => {
     if (typeof event.data !== 'string') {
+      return;
+    }
+    const unitEvent = readUnitEvent(event.data);
+    if (unitEvent) {
+      dispatchUnitEvent(unitEvent);
       return;
     }
     const command = readJobCommand(event.data);

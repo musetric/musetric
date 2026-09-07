@@ -5,8 +5,8 @@ This project includes or adapts portions of the following third-party works.
 ## Ultimate Vocal Remover GUI / MDX-Net
 
 - Source: https://github.com/Anjok07/ultimatevocalremovergui
-- Usage: UVR MDX-Net karaoke model, model parameters, tensor layout, and demix overlap-add behavior reimplemented in TypeScript/WebGPU.
-- Local files: `packages/ai/src/models/leadBackingModel.ts`, `packages/ai/src/separation/separateLeadBacking.ts`, `packages/ai/src/runtime/leadBacking/leadBackingRuntime.ts`, `packages/ai/src/runtime/leadBacking/pack.wgsl.ts`, `packages/ai/src/runtime/leadBacking/unpack.wgsl.ts`.
+- Usage: UVR MDX-Net karaoke model, model parameters, tensor layout, and demix overlap-add behavior reimplemented in the Rust host and TypeScript/WebGPU.
+- Local files: `packages/ai/src/models/leadBackingModel.ts`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/leadBacking/leadBackingRuntime.ts`, `packages/ai/src/runtime/leadBacking/pack.wgsl.ts`, `packages/ai/src/runtime/leadBacking/unpack.wgsl.ts`.
 - License: MIT, as stated in the upstream README.
 - Credit: Ultimate Vocal Remover GUI / UVR developers, including Anjok07 and aufr33; original MDX-Net AI code credited upstream to Kuielab and Woosung Choi.
 
@@ -16,7 +16,7 @@ The upstream repository README asks third-party application developers who use U
 
 - Source: https://github.com/lucidrains/BS-RoFormer
 - Usage: Mel-Band RoFormer source-separation architecture and model contract used by the vocal separation ONNX pipeline.
-- Local files: `packages/ai/src/models/vocalsModel.ts`, `packages/ai/src/separation/separateVocals.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
+- Local files: `packages/ai/src/models/vocalsModel.ts`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
