@@ -4,14 +4,14 @@ use axum::extract::Multipart;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    blobs::{create_blob_file, create_blob_ref, discard_blob},
+    blobs::{StagedBlob, stage_blob},
     failure::Failure,
 };
 
 const DEFAULT_CONTENT_TYPE: &str = "application/octet-stream";
 
 pub(crate) struct UploadedFile {
-    pub(crate) blob_id: String,
+    pub(crate) staged: StagedBlob,
     pub(crate) filename: String,
     pub(crate) content_type: String,
 }
@@ -50,18 +50,23 @@ impl Form {
         }
     }
 
-    pub(crate) async fn discard(&self, blobs_path: &Path) {
+    pub(crate) async fn discard(&self) {
         for value in self.values.values() {
             if let FormValue::File(file) = value {
-                discard_blob(blobs_path, &file.blob_id).await;
+                file.staged.discard().await;
             }
         }
     }
 }
 
+pub(crate) struct UploadTarget<'target> {
+    pub(crate) area: &'target Path,
+    pub(crate) blobs_path: &'target Path,
+}
+
 pub(crate) async fn read_form(
     mut multipart: Multipart,
-    blobs_path: &Path,
+    target: UploadTarget<'_>,
 ) -> Result<Form, Failure> {
     let mut values = HashMap::new();
     while let Some(mut field) = multipart.next_field().await.map_err(Failure::failed)? {
@@ -73,9 +78,9 @@ pub(crate) async fn read_form(
             .to_owned();
         let value = match uploaded_name {
             Some(filename) => {
-                let blob_id = store_field(&mut field, blobs_path).await?;
+                let staged = store_field(&mut field, &target).await?;
                 FormValue::File(UploadedFile {
-                    blob_id,
+                    staged,
                     filename,
                     content_type,
                 })
@@ -89,15 +94,13 @@ pub(crate) async fn read_form(
 
 async fn store_field(
     field: &mut axum::extract::multipart::Field<'_>,
-    blobs_path: &Path,
-) -> Result<String, Failure> {
-    let reference = create_blob_ref(blobs_path);
-    let mut file = create_blob_file(&reference)
-        .await
-        .map_err(Failure::failed)?;
+    target: &UploadTarget<'_>,
+) -> Result<StagedBlob, Failure> {
+    let staged = stage_blob(target.area, target.blobs_path);
+    let mut file = staged.create().await.map_err(Failure::failed)?;
     while let Some(chunk) = field.chunk().await.map_err(Failure::failed)? {
         file.write_all(&chunk).await.map_err(Failure::failed)?;
     }
     file.flush().await.map_err(Failure::failed)?;
-    Ok(reference.blob_id)
+    Ok(staged)
 }

@@ -57,6 +57,7 @@ fn run_app() -> tauri::Result<()> {
                     listen: "127.0.0.1:0".to_owned(),
                     database: storage.join("db/app.db"),
                     blobs: storage.join("blobs"),
+                    work: storage.join("work"),
                     models: root.join("models"),
                     browser_bundle: Bundle::Assets(Arc::new(TauriAssets::create(
                         app.asset_resolver(),

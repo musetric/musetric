@@ -19,6 +19,12 @@ struct Arguments {
     #[arg(long, help = "Directory that holds the stored blobs.")]
     blobs: PathBuf,
 
+    #[arg(
+        long,
+        help = "Directory that holds files a step is still writing, outside the blob tree."
+    )]
+    work: PathBuf,
+
     #[arg(long, help = "Directory that holds the downloaded analysis models.")]
     models: PathBuf,
 
@@ -75,6 +81,7 @@ async fn main() -> Result<(), BoxedError> {
         listen: arguments.listen,
         database: arguments.database,
         blobs: arguments.blobs,
+        work: arguments.work,
         models: arguments.models,
         browser_bundle: arguments.browser_bundle,
         public: arguments.public,

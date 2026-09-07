@@ -10,15 +10,14 @@ use axum::{
 };
 use musetric_db::{
     NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, StepStatus, StepUpdate,
-    blob_path,
 };
 use musetric_media::{PcmRequest, convert_to_flac, read_frame_count};
 use serde_json::Value;
 
 use crate::{
-    blobs::{create_blob_ref, discard_blob},
+    blobs::{stage_blob, upload_area},
     failure::{Failure, finish, invalid_number, invalid_option},
-    form::{Field, Form, UploadedFile, read_form},
+    form::{Field, Form, UploadTarget, UploadedFile, read_form},
     routes::{
         RouteState,
         item::{json_response, missing_message, read_items, respond_with_item},
@@ -127,13 +126,13 @@ async fn retry(state: &RouteState, project_id: i64, step: ProcessingStep) -> Res
 }
 
 async fn handle_create(State(state): State<RouteState>, multipart: Multipart) -> Response<Body> {
-    let form = match read_form(multipart, &state.storage.blobs_path).await {
+    let form = match read_upload(&state.storage, multipart).await {
         Ok(form) => form,
         Err(failure) => return finish(Err(failure)),
     };
     let created = create(&state, &form).await;
     if created.is_err() {
-        form.discard(&state.storage.blobs_path).await;
+        form.discard().await;
     }
     match created {
         Ok(project_id) => {
@@ -156,13 +155,13 @@ async fn handle_edit(
         Ok(multipart) => multipart,
         Err(rejection) => return finish(Err(Failure::failed(rejection.body_text()))),
     };
-    let form = match read_form(multipart, &state.storage.blobs_path).await {
+    let form = match read_upload(&state.storage, multipart).await {
         Ok(form) => form,
         Err(failure) => return finish(Err(failure)),
     };
     let edited = edit(&state, project_id, &form).await;
     if edited.is_err() {
-        form.discard(&state.storage.blobs_path).await;
+        form.discard().await;
     }
     match edited {
         Ok(()) => respond_with_item(&state, project_id).await,
@@ -180,15 +179,35 @@ async fn handle_remove(
     finish(remove(&state, project_id).await)
 }
 
+async fn read_upload(storage: &Arc<Storage>, multipart: Multipart) -> Result<Form, Failure> {
+    let area = upload_area(&storage.work_path);
+    read_form(
+        multipart,
+        UploadTarget {
+            area: &area,
+            blobs_path: &storage.blobs_path,
+        },
+    )
+    .await
+}
+
+async fn commit_preview(preview: Option<&UploadedFile>) -> Result<Option<NewPreview>, Failure> {
+    let Some(file) = preview else {
+        return Ok(None);
+    };
+    file.staged.commit().await.map_err(Failure::failed)?;
+    Ok(Some(create_preview(file)))
+}
+
 async fn create(state: &RouteState, form: &Form) -> Result<i64, Failure> {
     let input = read_create_input(form)?;
-    let song = normalize_song(&state.storage, &input.song.blob_id).await?;
+    let song = normalize_song(&state.storage, input.song).await?;
     let project = NewProject {
         name: input.name,
         song_blob_id: song.blob_id,
         sample_rate: i64::from(SAMPLE_RATE),
         frame_count: song.frame_count,
-        preview: input.preview.map(create_preview),
+        preview: commit_preview(input.preview).await?,
     };
     write(&state.storage, move |writer| {
         writer.create_project(&project)
@@ -201,7 +220,7 @@ async fn edit(state: &RouteState, project_id: i64, form: &Form) -> Result<(), Fa
     let change = ProjectEdit {
         project_id,
         name: input.name,
-        preview: input.preview.map(create_preview),
+        preview: commit_preview(input.preview).await?,
         without_preview: input.without_preview,
     };
     let found = write(&state.storage, move |writer| writer.edit_project(&change)).await?;
@@ -227,7 +246,7 @@ async fn remove(state: &RouteState, project_id: i64) -> Result<Response<Body>, F
 
 fn create_preview(file: &UploadedFile) -> NewPreview {
     NewPreview {
-        blob_id: file.blob_id.clone(),
+        blob_id: file.staged.blob_id().to_owned(),
         filename: file.filename.clone(),
         content_type: file.content_type.clone(),
     }
@@ -335,18 +354,19 @@ struct NormalizedSong {
 
 async fn normalize_song(
     storage: &Arc<Storage>,
-    uploaded_blob_id: &str,
+    uploaded: &UploadedFile,
 ) -> Result<NormalizedSong, Failure> {
-    let normalized = create_blob_ref(&storage.blobs_path);
-    let uploaded_path = blob_path(&storage.blobs_path, uploaded_blob_id);
-    let measured = convert_and_measure(storage, &uploaded_path, &normalized.path).await;
+    let area = upload_area(&storage.work_path);
+    let normalized = stage_blob(&area, &storage.blobs_path);
+    let measured = convert_and_measure(storage, uploaded.staged.path(), normalized.path()).await;
     let Some(frame_count) = measured else {
-        discard_blob(&storage.blobs_path, &normalized.blob_id).await;
+        normalized.discard().await;
         return Err(Failure::Invalid(INVALID_AUDIO.to_owned()));
     };
-    discard_blob(&storage.blobs_path, uploaded_blob_id).await;
+    normalized.commit().await.map_err(Failure::failed)?;
+    uploaded.staged.discard().await;
     Ok(NormalizedSong {
-        blob_id: normalized.blob_id,
+        blob_id: normalized.blob_id().to_owned(),
         frame_count,
     })
 }

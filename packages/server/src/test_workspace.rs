@@ -48,6 +48,10 @@ impl Workspace {
         self.directory.join("blobs")
     }
 
+    pub(crate) fn work_path(&self) -> PathBuf {
+        self.directory.join("work")
+    }
+
     pub(crate) fn seed(&self, statements: &str) {
         let options = DatabaseOptions {
             foreign_keys: false,
@@ -85,6 +89,7 @@ impl Workspace {
             ),
             writer: Arc::new(Writer::open(&self.database_path()).expect("the writer should open")),
             blobs_path: self.blobs_path(),
+            work_path: self.work_path(),
             pcm: Arc::new(SymphoniaPcm),
         })
     }

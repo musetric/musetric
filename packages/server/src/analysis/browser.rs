@@ -15,11 +15,11 @@ use musetric_media::{
     Downmix, MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
 };
 use serde_json::{Map, Value, json};
-use tokio::{fs::create_dir_all, fs::write, sync::mpsc};
+use tokio::{fs::write, sync::mpsc};
 
 use crate::{
     analysis::AnalysisContext,
-    blobs::create_blob_ref,
+    blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
     pages::{HeldPage, PageFailure, PageOpener},
     storage::write_database,
 };
@@ -357,21 +357,26 @@ pub(crate) async fn store(
     stored: Analysis,
     result: &Value,
 ) -> Result<(), Failure> {
-    let blob = create_blob_ref(&context.storage.blobs_path);
-    let payload = serde_json::to_string_pretty(result).map_err(|error| error.to_string())?;
-    if let Some(directory) = blob.path.parent() {
-        create_dir_all(directory)
-            .await
-            .map_err(|error| error.to_string())?;
-    }
-    write(&blob.path, payload)
-        .await
-        .map_err(|error| error.to_string())?;
+    let area = step_area(&context.storage.work_path, job.project_id, job.step);
+    open_area(&area).await?;
+    let staged = stage_blob(&area, &context.storage.blobs_path);
+    let written = write_payload(&staged, result).await;
+    close_area(&area).await;
+    written?;
     let project_id = job.project_id;
-    let blob_id = blob.blob_id;
+    let blob_id = staged.blob_id().to_owned();
     write_database(&context.storage, move |writer| {
         writer.apply_analysis_result(stored, project_id, &blob_id)
     })
     .await?;
+    Ok(())
+}
+
+async fn write_payload(staged: &StagedBlob, result: &Value) -> Result<(), Failure> {
+    let payload = serde_json::to_string_pretty(result).map_err(|error| error.to_string())?;
+    write(staged.path(), payload)
+        .await
+        .map_err(|error| error.to_string())?;
+    staged.commit().await.map_err(|error| error.to_string())?;
     Ok(())
 }

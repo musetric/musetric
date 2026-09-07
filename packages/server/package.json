@@ -8,7 +8,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "dev": "yarn build:browser && cargo run --quiet --locked -- --listen 0.0.0.0:3000 --tls-self-signed --database storage/db/app.db --blobs storage/blobs --models storage/models --browser-bundle dist-browser --public storage/public",
+    "dev": "yarn build:browser && cargo run --quiet --locked -- --listen 0.0.0.0:3000 --tls-self-signed --database storage/db/app.db --blobs storage/blobs --work storage/work --models storage/models --browser-bundle dist-browser --public storage/public",
     "build:browser": "vite build --configLoader native",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
