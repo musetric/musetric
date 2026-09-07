@@ -1,4 +1,4 @@
-use musetric_db::NewAudioAnalysis;
+use musetric_db::{MasterType, StemLoudness};
 use musetric_media::{LeadVisualLoudness, Loudness};
 
 const SOURCE_TARGET_LUFS: f64 = -16.0;
@@ -22,37 +22,64 @@ pub(crate) struct Stems {
     pub(crate) instrumental: Loudness,
 }
 
-pub(crate) fn measure(source: Loudness, stems: &Stems) -> NewAudioAnalysis {
-    let source_gain_db = source_gain(source);
-    let practice = practice_gains(source_gain_db, stems);
-    NewAudioAnalysis {
-        source_integrated_loudness_db: source.integrated_loudness_db,
-        source_true_peak_db: source.true_peak_db,
-        source_gain_db,
-        lead_integrated_loudness_db: stems.lead.loudness.integrated_loudness_db,
-        lead_true_peak_db: stems.lead.loudness.true_peak_db,
-        lead_p95_rms_db: stems.lead.p95_rms_db,
-        lead_spectrogram_gain_db: lead_spectrogram_gain(&stems.lead),
-        backing_integrated_loudness_db: stems.backing.integrated_loudness_db,
-        backing_true_peak_db: stems.backing.true_peak_db,
-        instrumental_integrated_loudness_db: stems.instrumental.integrated_loudness_db,
-        instrumental_true_peak_db: stems.instrumental.true_peak_db,
-        lead_gain_db: practice.lead,
-        backing_gain_db: practice.backing,
-        instrumental_gain_db: practice.instrumental,
+pub(crate) fn measure(source: Loudness, stems: &Stems) -> Vec<StemLoudness> {
+    vec![
+        plain(MasterType::Source, source),
+        StemLoudness {
+            stem: MasterType::Lead,
+            integrated_lufs: stems.lead.loudness.integrated_loudness_db,
+            true_peak_db: stems.lead.loudness.true_peak_db,
+            p95_rms_db: Some(stems.lead.p95_rms_db),
+        },
+        plain(MasterType::Backing, stems.backing),
+        plain(MasterType::Instrumental, stems.instrumental),
+    ]
+}
+
+fn plain(stem: MasterType, loudness: Loudness) -> StemLoudness {
+    StemLoudness {
+        stem,
+        integrated_lufs: loudness.integrated_loudness_db,
+        true_peak_db: loudness.true_peak_db,
+        p95_rms_db: None,
     }
 }
 
-fn source_gain(source: Loudness) -> f64 {
-    let wanted = (SOURCE_TARGET_LUFS - source.integrated_loudness_db)
+pub(crate) struct Gains {
+    pub(crate) source: f64,
+    pub(crate) lead_spectrogram: f64,
+    pub(crate) lead: f64,
+    pub(crate) backing: f64,
+    pub(crate) instrumental: f64,
+}
+
+pub(crate) fn read_gains(measured: &[StemLoudness]) -> Option<Gains> {
+    let find = |stem: MasterType| measured.iter().find(|row| row.stem == stem);
+    let source = find(MasterType::Source)?;
+    let lead = find(MasterType::Lead)?;
+    let backing = find(MasterType::Backing)?;
+    let instrumental = find(MasterType::Instrumental)?;
+    let source_gain_db = source_gain(source);
+    let practice = practice_gains(source_gain_db, lead, backing, instrumental);
+    Some(Gains {
+        source: source_gain_db,
+        lead_spectrogram: lead_spectrogram_gain(lead)?,
+        lead: practice.lead,
+        backing: practice.backing,
+        instrumental: practice.instrumental,
+    })
+}
+
+fn source_gain(source: &StemLoudness) -> f64 {
+    let wanted = (SOURCE_TARGET_LUFS - source.integrated_lufs)
         .min(SOURCE_TRUE_PEAK_CEILING_DB - source.true_peak_db);
     wanted.clamp(SOURCE_GAIN_MINIMUM_DB, SOURCE_GAIN_MAXIMUM_DB)
 }
 
-fn lead_spectrogram_gain(lead: &LeadVisualLoudness) -> f64 {
-    let wanted = (LEAD_VISUAL_TARGET_P95_RMS_DB - lead.p95_rms_db)
+fn lead_spectrogram_gain(lead: &StemLoudness) -> Option<f64> {
+    let wanted = (LEAD_VISUAL_TARGET_P95_RMS_DB - lead.p95_rms_db?)
         .clamp(LEAD_VISUAL_GAIN_MINIMUM_DB, LEAD_VISUAL_GAIN_MAXIMUM_DB);
-    wanted.min(LEAD_VISUAL_PEAK_CEILING_DB - lead.loudness.true_peak_db)
+    Some(wanted.min(LEAD_VISUAL_PEAK_CEILING_DB - lead.true_peak_db))
 }
 
 struct PracticeGains {
@@ -61,9 +88,13 @@ struct PracticeGains {
     instrumental: f64,
 }
 
-fn practice_gains(source_gain_db: f64, stems: &Stems) -> PracticeGains {
-    let lead_loudness_db = stems.lead.loudness.integrated_loudness_db;
-    if lead_loudness_db < SILENT_STEM_LUFS {
+fn practice_gains(
+    source_gain_db: f64,
+    lead: &StemLoudness,
+    backing: &StemLoudness,
+    instrumental: &StemLoudness,
+) -> PracticeGains {
+    if lead.integrated_lufs < SILENT_STEM_LUFS {
         return PracticeGains {
             lead: source_gain_db,
             backing: source_gain_db,
@@ -72,9 +103,9 @@ fn practice_gains(source_gain_db: f64, stems: &Stems) -> PracticeGains {
     }
     let backing_target_lufs = SOURCE_TARGET_LUFS - PRACTICE_VOCAL_RATIO_DB;
     PracticeGains {
-        lead: stem_gain(SOURCE_TARGET_LUFS - lead_loudness_db),
-        backing: stem_gain(backing_target_lufs - stems.backing.integrated_loudness_db),
-        instrumental: stem_gain(backing_target_lufs - stems.instrumental.integrated_loudness_db),
+        lead: stem_gain(SOURCE_TARGET_LUFS - lead.integrated_lufs),
+        backing: stem_gain(backing_target_lufs - backing.integrated_lufs),
+        instrumental: stem_gain(backing_target_lufs - instrumental.integrated_lufs),
     }
 }
 

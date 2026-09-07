@@ -9,7 +9,8 @@ use axum::{
     routing::{delete, get, patch, post},
 };
 use musetric_db::{
-    NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, blob_path,
+    NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, StepStatus, StepUpdate,
+    blob_path,
 };
 use musetric_media::{PcmRequest, convert_to_flac, read_frame_count};
 use serde_json::Value;
@@ -102,18 +103,23 @@ async fn retry(state: &RouteState, project_id: i64, step: ProcessingStep) -> Res
     if found.is_none() {
         return Err(Failure::NotFound(missing_message(project_id)));
     }
-    let failures = read(&state.storage, move |reader| {
-        reader.step_failures(project_id)
-    })
-    .await?;
-    if !failures.iter().any(|failure| failure.step == step) {
+    let states = read(&state.storage, move |reader| reader.step_states(project_id)).await?;
+    let failed = states
+        .iter()
+        .any(|recorded| recorded.step == step && recorded.status == StepStatus::Failed);
+    if !failed {
         return Err(Failure::NotFound(format!(
             "Processing step {} is not failed",
             step.name()
         )));
     }
     write(&state.storage, move |writer| {
-        writer.clear_failure(project_id, step)
+        writer.set_step_status(&StepUpdate {
+            project_id,
+            step,
+            status: StepStatus::Pending,
+            error: None,
+        })
     })
     .await?;
     state.queue.wake();

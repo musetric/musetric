@@ -1,5 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, Result, Transaction};
 
+use crate::audio::MasterType;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessingStep {
     Separation,
@@ -41,28 +43,51 @@ impl ProcessingStep {
         }
     }
 
-    fn source(self) -> &'static str {
+    #[must_use]
+    pub fn source(self) -> MasterType {
         match self {
-            Self::Separation => "source",
-            Self::Transcription => "lead",
-            Self::Rhythm | Self::Key | Self::Chords => "instrumental",
+            Self::Separation => MasterType::Source,
+            Self::Transcription => MasterType::Lead,
+            Self::Rhythm | Self::Key | Self::Chords => MasterType::Instrumental,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepStatus {
+    Pending,
+    Processing,
+    Done,
+    Failed,
+}
+
+impl StepStatus {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "pending" => Some(Self::Pending),
+            "processing" => Some(Self::Processing),
+            "done" => Some(Self::Done),
+            "failed" => Some(Self::Failed),
+            _ => None,
         }
     }
 
-    fn produced(self, project: &str) -> String {
+    #[must_use]
+    pub fn name(self) -> &'static str {
         match self {
-            Self::Separation => format!(
-                "SELECT 1 FROM AudioMaster AS Produced
-                 WHERE Produced.projectId = {project} AND Produced.type = 'lead'"
-            ),
-            Self::Transcription => {
-                format!("SELECT 1 FROM Subtitle WHERE Subtitle.projectId = {project}")
-            }
-            Self::Rhythm => format!("SELECT 1 FROM Rhythm WHERE Rhythm.projectId = {project}"),
-            Self::Key => format!("SELECT 1 FROM Key WHERE Key.projectId = {project}"),
-            Self::Chords => format!("SELECT 1 FROM Chords WHERE Chords.projectId = {project}"),
+            Self::Pending => "pending",
+            Self::Processing => "processing",
+            Self::Done => "done",
+            Self::Failed => "failed",
         }
     }
+}
+
+pub struct StepState {
+    pub step: ProcessingStep,
+    pub status: StepStatus,
+    pub error: Option<String>,
 }
 
 pub struct PendingJob {
@@ -71,104 +96,92 @@ pub struct PendingJob {
     pub blob_id: String,
 }
 
-pub struct StepFailure {
+pub struct StepUpdate {
+    pub project_id: i64,
     pub step: ProcessingStep,
-    pub message: String,
+    pub status: StepStatus,
+    pub error: Option<String>,
 }
 
-pub struct StepResults {
-    completed: Vec<ProcessingStep>,
-}
-
-impl StepResults {
-    #[must_use]
-    pub fn has(&self, step: ProcessingStep) -> bool {
-        self.completed.contains(&step)
+pub(crate) fn create_steps(transaction: &Transaction, project_id: i64) -> Result<()> {
+    for step in PROCESSING_STEPS {
+        transaction.execute(
+            "INSERT INTO ProcessingStep (projectId, step, status) VALUES (?1, ?2, ?3)",
+            (project_id, step.name(), StepStatus::Pending.name()),
+        )?;
     }
+    Ok(())
 }
 
 pub(crate) fn read_pending(
     connection: &Connection,
     step: ProcessingStep,
 ) -> Result<Option<PendingJob>> {
-    let produced = step.produced("Master.projectId");
-    let query = format!(
-        "SELECT Master.projectId, Master.blobId
-         FROM AudioMaster AS Master
-         WHERE Master.type = ?1
-           AND NOT EXISTS ({produced})
-           AND NOT EXISTS (
-             SELECT 1 FROM ProcessingError
-             WHERE ProcessingError.projectId = Master.projectId
-               AND ProcessingError.step = ?2
-           )"
-    );
     connection
-        .query_row(&query, (step.source(), step.name()), |row| {
-            Ok(PendingJob {
-                step,
-                project_id: row.get(0)?,
-                blob_id: row.get(1)?,
-            })
-        })
+        .query_row(
+            "SELECT Step.projectId, Master.blobId
+             FROM ProcessingStep AS Step
+             JOIN AudioMaster AS Master
+               ON Master.projectId = Step.projectId AND Master.type = ?2
+             WHERE Step.step = ?1 AND Step.status = ?3
+             ORDER BY Step.projectId
+             LIMIT 1",
+            (
+                step.name(),
+                step.source().name(),
+                StepStatus::Pending.name(),
+            ),
+            |row| {
+                Ok(PendingJob {
+                    step,
+                    project_id: row.get(0)?,
+                    blob_id: row.get(1)?,
+                })
+            },
+        )
         .optional()
 }
 
-pub(crate) fn read_failures(connection: &Connection, project_id: i64) -> Result<Vec<StepFailure>> {
-    let mut statement =
-        connection.prepare("SELECT step, message FROM ProcessingError WHERE projectId = ?1")?;
+pub(crate) fn read_states(connection: &Connection, project_id: i64) -> Result<Vec<StepState>> {
+    let mut statement = connection
+        .prepare("SELECT step, status, error FROM ProcessingStep WHERE projectId = ?1")?;
     let rows = statement.query_map([project_id], |row| {
         let name: String = row.get(0)?;
-        let message: String = row.get(1)?;
-        Ok((name, message))
+        let recorded: String = row.get(1)?;
+        let error: Option<String> = row.get(2)?;
+        Ok((name, recorded, error))
     })?;
-    let mut failures = Vec::new();
+    let mut found = Vec::new();
     for row in rows {
-        let (name, message) = row?;
-        if let Some(step) = ProcessingStep::parse(&name) {
-            failures.push(StepFailure { step, message });
+        let (name, recorded, error) = row?;
+        if let Some(step) = ProcessingStep::parse(&name)
+            && let Some(status) = StepStatus::parse(&recorded)
+        {
+            found.push(StepState {
+                step,
+                status,
+                error,
+            });
         }
     }
-    Ok(failures)
+    Ok(found)
 }
 
-pub(crate) fn read_results(connection: &Connection, project_id: i64) -> Result<StepResults> {
-    let mut completed = Vec::new();
-    for step in PROCESSING_STEPS {
-        let produced = step.produced("?1");
-        let found: bool = connection.query_row(
-            &format!("SELECT EXISTS ({produced})"),
-            [project_id],
-            |row| row.get(0),
-        )?;
-        if found {
-            completed.push(step);
-        }
-    }
-    Ok(StepResults { completed })
-}
-
-pub(crate) fn write_failure(
-    transaction: &Transaction,
-    project_id: i64,
-    step: ProcessingStep,
-    message: &str,
-) -> Result<usize> {
+pub(crate) fn write_status(transaction: &Transaction, update: &StepUpdate) -> Result<usize> {
     transaction.execute(
-        "INSERT INTO ProcessingError (projectId, step, message)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(projectId, step) DO UPDATE SET message = excluded.message",
-        (project_id, step.name(), message),
+        "UPDATE ProcessingStep SET status = ?3, error = ?4 WHERE projectId = ?1 AND step = ?2",
+        (
+            update.project_id,
+            update.step.name(),
+            update.status.name(),
+            update.error.as_deref(),
+        ),
     )
 }
 
-pub(crate) fn clear_failure(
-    transaction: &Transaction,
-    project_id: i64,
-    step: ProcessingStep,
-) -> Result<usize> {
+pub(crate) fn abandon_running(transaction: &Transaction) -> Result<usize> {
     transaction.execute(
-        "DELETE FROM ProcessingError WHERE projectId = ?1 AND step = ?2",
-        (project_id, step.name()),
+        "UPDATE ProcessingStep SET status = ?1 WHERE status = ?2",
+        (StepStatus::Pending.name(), StepStatus::Processing.name()),
     )
 }

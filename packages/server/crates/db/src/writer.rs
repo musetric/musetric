@@ -3,10 +3,10 @@ use std::{path::Path, sync::Mutex};
 use rusqlite::{Connection, OptionalExtension, Result, Transaction, TransactionBehavior};
 
 use crate::{
-    analysis::Analysis,
+    analysis::{Analysis, StemLoudness, write_stem_loudness},
     database::{OpenOptions, open_database},
     failure::BoxedError,
-    processing::{ProcessingStep, clear_failure, write_failure},
+    processing::{StepUpdate, abandon_running, create_steps, write_status},
 };
 
 pub struct NewPreview {
@@ -23,23 +23,6 @@ pub struct NewProject {
     pub preview: Option<NewPreview>,
 }
 
-pub struct NewAudioAnalysis {
-    pub source_integrated_loudness_db: f64,
-    pub source_true_peak_db: f64,
-    pub source_gain_db: f64,
-    pub lead_integrated_loudness_db: f64,
-    pub lead_true_peak_db: f64,
-    pub lead_p95_rms_db: f64,
-    pub lead_spectrogram_gain_db: f64,
-    pub backing_integrated_loudness_db: f64,
-    pub backing_true_peak_db: f64,
-    pub instrumental_integrated_loudness_db: f64,
-    pub instrumental_true_peak_db: f64,
-    pub lead_gain_db: f64,
-    pub backing_gain_db: f64,
-    pub instrumental_gain_db: f64,
-}
-
 pub struct StemBlobs {
     pub lead: String,
     pub backing: String,
@@ -48,7 +31,7 @@ pub struct StemBlobs {
 
 pub struct NewSeparation {
     pub project_id: i64,
-    pub analysis: NewAudioAnalysis,
+    pub loudness: Vec<StemLoudness>,
     pub master: StemBlobs,
     pub delivery: StemBlobs,
     pub wave_peaks: StemBlobs,
@@ -92,6 +75,7 @@ impl Writer {
                 "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, 'source', ?2)",
                 (project_id, &project.song_blob_id),
             )?;
+            create_steps(transaction, project_id)?;
             if let Some(preview) = project.preview.as_ref() {
                 insert_preview(transaction, project_id, preview)?;
             }
@@ -164,14 +148,15 @@ impl Writer {
                 ),
                 (project_id, blob_id),
             )?;
-            clear_failure(transaction, project_id, analysis.step())?;
             Ok(())
         })
     }
 
     pub fn apply_separation_result(&self, result: &NewSeparation) -> Result<(), BoxedError> {
         self.write(|transaction| {
-            write_audio_analysis(transaction, result.project_id, &result.analysis)?;
+            for measured in &result.loudness {
+                write_stem_loudness(transaction, result.project_id, measured)?;
+            }
             for (stem, blob_id) in stems(&result.master) {
                 transaction.execute(
                     "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, ?2, ?3)
@@ -192,28 +177,19 @@ impl Writer {
                     (result.project_id, stem, blob_id, wave_blob_id),
                 )?;
             }
-            clear_failure(transaction, result.project_id, ProcessingStep::Separation)?;
             Ok(())
         })
     }
 
-    pub fn record_failure(
-        &self,
-        project_id: i64,
-        step: ProcessingStep,
-        message: &str,
-    ) -> Result<(), BoxedError> {
+    pub fn set_step_status(&self, update: &StepUpdate) -> Result<bool, BoxedError> {
         self.write(|transaction| {
-            write_failure(transaction, project_id, step, message)?;
-            Ok(())
+            let written = write_status(transaction, update)?;
+            Ok(written != 0)
         })
     }
 
-    pub fn clear_failure(&self, project_id: i64, step: ProcessingStep) -> Result<bool, BoxedError> {
-        self.write(|transaction| {
-            let cleared = clear_failure(transaction, project_id, step)?;
-            Ok(cleared != 0)
-        })
+    pub fn abandon_running_steps(&self) -> Result<usize, BoxedError> {
+        self.write(abandon_running)
     }
 
     fn write<Value>(
@@ -237,55 +213,6 @@ fn stems(blobs: &StemBlobs) -> [(&'static str, &str); 3] {
         ("backing", blobs.backing.as_str()),
         ("instrumental", blobs.instrumental.as_str()),
     ]
-}
-
-fn write_audio_analysis(
-    transaction: &Transaction,
-    project_id: i64,
-    analysis: &NewAudioAnalysis,
-) -> Result<usize> {
-    transaction.execute(
-        "INSERT INTO ProjectAudioAnalysis (
-           projectId, sourceIntegratedLoudnessDb, sourceTruePeakDb, sourceGainDb,
-           leadIntegratedLoudnessDb, leadTruePeakDb, leadP95RmsDb, leadSpectrogramGainDb,
-           backingIntegratedLoudnessDb, backingTruePeakDb,
-           instrumentalIntegratedLoudnessDb, instrumentalTruePeakDb,
-           leadGainDb, backingGainDb, instrumentalGainDb
-         )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
-         ON CONFLICT(projectId) DO UPDATE SET
-           sourceIntegratedLoudnessDb = excluded.sourceIntegratedLoudnessDb,
-           sourceTruePeakDb = excluded.sourceTruePeakDb,
-           sourceGainDb = excluded.sourceGainDb,
-           leadIntegratedLoudnessDb = excluded.leadIntegratedLoudnessDb,
-           leadTruePeakDb = excluded.leadTruePeakDb,
-           leadP95RmsDb = excluded.leadP95RmsDb,
-           leadSpectrogramGainDb = excluded.leadSpectrogramGainDb,
-           backingIntegratedLoudnessDb = excluded.backingIntegratedLoudnessDb,
-           backingTruePeakDb = excluded.backingTruePeakDb,
-           instrumentalIntegratedLoudnessDb = excluded.instrumentalIntegratedLoudnessDb,
-           instrumentalTruePeakDb = excluded.instrumentalTruePeakDb,
-           leadGainDb = excluded.leadGainDb,
-           backingGainDb = excluded.backingGainDb,
-           instrumentalGainDb = excluded.instrumentalGainDb",
-        (
-            project_id,
-            analysis.source_integrated_loudness_db,
-            analysis.source_true_peak_db,
-            analysis.source_gain_db,
-            analysis.lead_integrated_loudness_db,
-            analysis.lead_true_peak_db,
-            analysis.lead_p95_rms_db,
-            analysis.lead_spectrogram_gain_db,
-            analysis.backing_integrated_loudness_db,
-            analysis.backing_true_peak_db,
-            analysis.instrumental_integrated_loudness_db,
-            analysis.instrumental_true_peak_db,
-            analysis.lead_gain_db,
-            analysis.backing_gain_db,
-            analysis.instrumental_gain_db,
-        ),
-    )
 }
 
 fn project_exists(transaction: &Transaction, project_id: i64) -> Result<bool> {

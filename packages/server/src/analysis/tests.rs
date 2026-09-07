@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use musetric_db::{
-    Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemType,
+    Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemLoudness,
+    StemType,
 };
 use musetric_gpu::{Bundle, Download, DownloadStatus, ExecutorFailure};
 use musetric_jobs::StepAnswer;
@@ -14,7 +15,7 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{BrowserAnalysis, HostedModel, Serve, answer, describe, store},
-        gains::{Stems, measure},
+        gains::{Stems, measure, read_gains},
         models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
         steps::create as create_step,
     },
@@ -26,8 +27,6 @@ use crate::{
 const CREATE_PROJECT: &str = "
   INSERT INTO Project (id, name, sampleRate, frameCount)
   VALUES (1, 'Fixture project', 48000, 480000);
-  INSERT INTO ProcessingError (projectId, step, message)
-  VALUES (1, 'chords', 'Fixture failure');
 ";
 
 fn create_context(workspace: &Workspace) -> AnalysisContext {
@@ -71,10 +70,6 @@ async fn stores_the_chords_the_executor_answered() {
         written,
         "{\n  \"segments\": [\n    {\n      \"end\": 1,\n      \"label\": \"C\",\n      \"start\": 0\n    }\n  ]\n}"
     );
-    let failures = read(&context.storage, |database| database.step_failures(1))
-        .await
-        .expect("the failures should be read");
-    assert!(failures.is_empty());
 }
 
 #[test]
@@ -269,8 +264,6 @@ fn keeps_the_separation_out_of_the_step_table() {
 const SEPARATION_PROJECT: &str = "
   INSERT INTO Project (id, name, sampleRate, frameCount)
   VALUES (2, 'Fixture project', 48000, 480000);
-  INSERT INTO ProcessingError (projectId, step, message)
-  VALUES (2, 'separation', 'Fixture failure');
 ";
 
 fn create_loudness(integrated_loudness_db: f64, true_peak_db: f64) -> Loudness {
@@ -291,19 +284,27 @@ fn create_stems(lead_integrated_loudness_db: f64) -> Stems {
     }
 }
 
+fn find_stem(measured: &[StemLoudness], stem: MasterType) -> &StemLoudness {
+    measured
+        .iter()
+        .find(|row| row.stem == stem)
+        .expect("the stem should be measured")
+}
+
 fn describe_gains(lead_integrated_loudness_db: f64) -> Value {
-    let analysis = measure(
+    let measured = measure(
         create_loudness(-20.0, -3.0),
         &create_stems(lead_integrated_loudness_db),
     );
+    let gains = read_gains(&measured).expect("every stem should be measured");
     json!({
-        "source": analysis.source_gain_db,
-        "spectrogram": analysis.lead_spectrogram_gain_db,
-        "lead": analysis.lead_gain_db,
-        "backing": analysis.backing_gain_db,
-        "instrumental": analysis.instrumental_gain_db,
-        "leadP95Rms": analysis.lead_p95_rms_db,
-        "instrumentalLoudness": analysis.instrumental_integrated_loudness_db,
+        "source": gains.source,
+        "spectrogram": gains.lead_spectrogram,
+        "lead": gains.lead,
+        "backing": gains.backing,
+        "instrumental": gains.instrumental,
+        "leadP95Rms": find_stem(&measured, MasterType::Lead).p95_rms_db,
+        "instrumentalLoudness": find_stem(&measured, MasterType::Instrumental).integrated_lufs,
     })
 }
 
@@ -357,7 +358,7 @@ async fn records_every_stem_the_separation_produced() {
     let storage = workspace.create_storage();
     let separation = NewSeparation {
         project_id: 2,
-        analysis: measure(create_loudness(-20.0, -3.0), &create_stems(-25.0)),
+        loudness: measure(create_loudness(-20.0, -3.0), &create_stems(-25.0)),
         master: create_blobs("master"),
         delivery: create_blobs("delivery"),
         wave_peaks: create_blobs("wave"),
@@ -372,24 +373,20 @@ async fn records_every_stem_the_separation_produced() {
     let recorded = read(&storage, |database| {
         let master = database.master_blob(2, MasterType::Backing)?;
         let delivery = database.delivery(2, StemType::Instrumental)?;
-        let analysis = database.audio_analysis(2)?;
-        let failures = database.step_failures(2)?;
-        Ok((master, delivery, analysis, failures))
+        let measured = database.stem_loudness(2)?;
+        Ok((master, delivery, measured))
     })
     .await
     .expect("the separation should be read");
-    let (master, delivery, analysis, failures) = recorded;
+    let (master, delivery, measured) = recorded;
     assert_eq!(master.as_deref(), Some("master-backing"));
     let delivered = delivery.expect("the instrumental delivery should be recorded");
     assert_eq!(delivered.blob_id, "delivery-instrumental");
     assert_eq!(delivered.wave_blob_id, "wave-instrumental");
+    let gains = read_gains(&measured).expect("every stem should be recorded");
+    assert_eq!(json!(gains.source), json!(2.0));
     assert_eq!(
-        json!(
-            analysis
-                .expect("the audio analysis should be recorded")
-                .source_gain_db
-        ),
-        json!(2.0)
+        json!(find_stem(&measured, MasterType::Lead).p95_rms_db),
+        json!(-30.0)
     );
-    assert!(failures.is_empty());
 }

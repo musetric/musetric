@@ -9,14 +9,19 @@ const CREATE_PROJECT: &str = "
   );
 ";
 
-const CREATE_PROCESSING_ERROR: &str = "
-  CREATE TABLE ProcessingError (
+const CREATE_PROCESSING_STEP: &str = "
+  CREATE TABLE ProcessingStep (
     projectId INTEGER NOT NULL,
     step TEXT NOT NULL CHECK (step IN ('separation', 'transcription', 'rhythm', 'key', 'chords')),
-    message TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'failed')),
+    error TEXT,
     PRIMARY KEY (projectId, step),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
+";
+
+const CREATE_PROCESSING_STEP_INDEX: &str = "
+  CREATE INDEX ProcessingStep_step_status_index ON ProcessingStep (step, status);
 ";
 
 const CREATE_AUDIO_MASTER: &str = "
@@ -34,23 +39,14 @@ const CREATE_AUDIO_MASTER_INDEX: &str = "
   CREATE INDEX AudioMaster_projectId_type_index ON AudioMaster (projectId, type);
 ";
 
-const CREATE_PROJECT_AUDIO_ANALYSIS: &str = "
-  CREATE TABLE ProjectAudioAnalysis (
-    projectId INTEGER PRIMARY KEY,
-    sourceIntegratedLoudnessDb REAL NOT NULL,
-    sourceTruePeakDb REAL NOT NULL,
-    sourceGainDb REAL NOT NULL,
-    leadIntegratedLoudnessDb REAL NOT NULL,
-    leadTruePeakDb REAL NOT NULL,
-    leadP95RmsDb REAL NOT NULL,
-    leadSpectrogramGainDb REAL NOT NULL,
-    backingIntegratedLoudnessDb REAL NOT NULL,
-    backingTruePeakDb REAL NOT NULL,
-    instrumentalIntegratedLoudnessDb REAL NOT NULL,
-    instrumentalTruePeakDb REAL NOT NULL,
-    leadGainDb REAL NOT NULL,
-    backingGainDb REAL NOT NULL,
-    instrumentalGainDb REAL NOT NULL,
+const CREATE_STEM_LOUDNESS: &str = "
+  CREATE TABLE StemLoudness (
+    projectId INTEGER NOT NULL,
+    stemType TEXT NOT NULL CHECK (stemType IN ('source', 'lead', 'backing', 'instrumental')),
+    integratedLufs REAL NOT NULL,
+    truePeakDb REAL NOT NULL,
+    p95RmsDb REAL,
+    PRIMARY KEY (projectId, stemType),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 ";
@@ -133,10 +129,11 @@ const CREATE_RECORDING: &str = "
 
 const V001_INITIAL: Migration = &[
     CREATE_PROJECT,
-    CREATE_PROCESSING_ERROR,
+    CREATE_PROCESSING_STEP,
+    CREATE_PROCESSING_STEP_INDEX,
     CREATE_AUDIO_MASTER,
     CREATE_AUDIO_MASTER_INDEX,
-    CREATE_PROJECT_AUDIO_ANALYSIS,
+    CREATE_STEM_LOUDNESS,
     CREATE_AUDIO_DELIVERY,
     CREATE_AUDIO_DELIVERY_INDEX,
     CREATE_PREVIEW,
