@@ -1,16 +1,14 @@
 import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
-import {
-  buildChordSegments,
-  type ChordResult,
-} from '../chords/chordSegments.js';
+import { buildChordSegments } from '../chords/chordSegments.js';
 import { chordNetModel } from '../models/chordNetModel.js';
 import {
-  fetchFloat32,
   fetchOk,
+  floatsFromBytes,
+  jsonBytes,
   registerBrowserApi,
   reportLoading,
-  reportRunning,
 } from './browserShared.js';
+import { serveUnits } from './browserUnitServing.js';
 import {
   analyzeChordsApiName,
   type BrowserAnalyzeChordsRequest,
@@ -56,12 +54,10 @@ const fetchCqtPlan = async (
 };
 
 export const registerChordsApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeChordsRequest, ChordResult>(
+  registerBrowserApi<BrowserAnalyzeChordsRequest, void>(
     analyzeChordsApiName,
     async (request) => {
       await reportLoading();
-      const audio = await fetchFloat32(request.pcmUrl, 'chords PCM');
-
       const { createChordNetGpuRuntime } =
         await import('../runtime/chords/chordNetGpuRuntime.js');
       const plan = await fetchCqtPlan(request.planUrl, request.planManifestUrl);
@@ -70,9 +66,18 @@ export const registerChordsApi = (): void => {
         plan,
       });
       try {
-        await reportRunning({ pass: 'decode', unit: 0, unitCount: 1 });
-        const indices = await runtime.analyze(audio);
-        return buildChordSegments(indices, chordNetModel.frameDuration);
+        await serveUnits({
+          attemptId: request.attemptId,
+          attemptUrl: request.attemptUrl,
+          outputs: request.outputs,
+          run: async (bytes) => {
+            const audio = floatsFromBytes(bytes);
+            const indices = await runtime.analyze(audio);
+            return jsonBytes(
+              buildChordSegments(indices, chordNetModel.frameDuration),
+            );
+          },
+        });
       } finally {
         await runtime.release();
       }

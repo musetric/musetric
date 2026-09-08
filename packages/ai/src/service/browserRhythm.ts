@@ -3,22 +3,22 @@ import { estimateBpm, estimateMeter } from '../rhythm/rhythmSummary.js';
 import { type RhythmResult } from '../rhythm/types.js';
 import {
   fetchFloat32,
+  floatsFromBytes,
+  jsonBytes,
   registerBrowserApi,
   reportLoading,
-  reportRunning,
 } from './browserShared.js';
+import { serveUnits } from './browserUnitServing.js';
 import {
   analyzeRhythmApiName,
   type BrowserAnalyzeRhythmRequest,
 } from './rhythmApi.js';
 
 export const registerRhythmApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeRhythmRequest, RhythmResult>(
+  registerBrowserApi<BrowserAnalyzeRhythmRequest, void>(
     analyzeRhythmApiName,
     async (request) => {
       await reportLoading();
-      const audio = await fetchFloat32(request.pcmUrl, 'rhythm PCM');
-
       const { createBeatThisGpuRuntime } =
         await import('../runtime/rhythm/beatThisGpuRuntime.js');
       const filterbank = await fetchFloat32(
@@ -30,19 +30,26 @@ export const registerRhythmApi = (): void => {
         filterbank,
       });
       try {
-        const logits = await runtime.analyze(audio, async (units) => {
-          await reportRunning({ pass: 'decode', ...units });
+        await serveUnits({
+          attemptId: request.attemptId,
+          attemptUrl: request.attemptUrl,
+          outputs: request.outputs,
+          run: async (bytes) => {
+            const audio = floatsFromBytes(bytes);
+            const logits = await runtime.analyze(audio);
+            const { beats, downbeats } = pickBeatTimes(
+              logits.beat,
+              logits.downbeat,
+            );
+            const result: RhythmResult = {
+              bpm: estimateBpm(beats),
+              beats,
+              downbeats,
+              meter: estimateMeter(beats, downbeats),
+            };
+            return jsonBytes(result);
+          },
         });
-        const { beats, downbeats } = pickBeatTimes(
-          logits.beat,
-          logits.downbeat,
-        );
-        return {
-          bpm: estimateBpm(beats),
-          beats,
-          downbeats,
-          meter: estimateMeter(beats, downbeats),
-        };
       } finally {
         await runtime.release();
       }

@@ -1,11 +1,12 @@
 import { keyMap } from '../key/keyMap.js';
 import { type KeyResult } from '../key/types.js';
 import {
-  fetchFloat32,
+  floatsFromBytes,
+  jsonBytes,
   registerBrowserApi,
   reportLoading,
-  reportRunning,
 } from './browserShared.js';
+import { serveUnits } from './browserUnitServing.js';
 import { analyzeKeyApiName, type BrowserAnalyzeKeyRequest } from './keyApi.js';
 
 const peakNormalize = (audio: Float32Array): void => {
@@ -34,22 +35,32 @@ const argmax = (values: Float32Array): number => {
 };
 
 export const registerKeyApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeKeyRequest, KeyResult>(
+  registerBrowserApi<BrowserAnalyzeKeyRequest, void>(
     analyzeKeyApiName,
     async (request) => {
       await reportLoading();
-      const audio = await fetchFloat32(request.pcmUrl, 'key PCM');
-      peakNormalize(audio);
-
       const { createSkeyRuntime } =
         await import('../runtime/key/skeyRuntime.js');
       const runtime = await createSkeyRuntime({ modelUrl: request.modelUrl });
       try {
-        await reportRunning({ pass: 'decode', unit: 0, unitCount: 1 });
-        const probs = await runtime.analyze(audio);
-        const index = argmax(probs);
-        const { root, mode } = keyMap[index];
-        return { root, mode, confidence: probs[index] };
+        await serveUnits({
+          attemptId: request.attemptId,
+          attemptUrl: request.attemptUrl,
+          outputs: request.outputs,
+          run: async (bytes) => {
+            const audio = floatsFromBytes(bytes);
+            peakNormalize(audio);
+            const probs = await runtime.analyze(audio);
+            const index = argmax(probs);
+            const { root, mode } = keyMap[index];
+            const result: KeyResult = {
+              root,
+              mode,
+              confidence: probs[index],
+            };
+            return jsonBytes(result);
+          },
+        });
       } finally {
         await runtime.release();
       }

@@ -1,7 +1,9 @@
 export const analyzeChordsApiName = 'musetricAiAnalyzeChords';
 
 export type BrowserAnalyzeChordsRequest = {
-  pcmUrl: string;
+  attemptId: string;
+  attemptUrl: string;
+  outputs: string[];
   modelUrl: string;
   planUrl: string;
   planManifestUrl?: string;

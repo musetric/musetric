@@ -4,7 +4,11 @@ import {
   type BrowserVocalsUnitsRequest,
   separateUnitsApiName,
 } from './browserApi.js';
-import { registerBrowserApi, reportLoading } from './browserShared.js';
+import {
+  floatsFromBytes,
+  registerBrowserApi,
+  reportLoading,
+} from './browserShared.js';
 import { serveUnits } from './browserUnitServing.js';
 
 type Stage = {
@@ -64,7 +68,14 @@ export const registerSeparationApi = (): void => {
           attemptId: request.attemptId,
           attemptUrl: request.attemptUrl,
           outputs: request.outputs,
-          run: stage.run,
+          run: async (bytes) => {
+            const output = await stage.run(floatsFromBytes(bytes));
+            return new Uint8Array(
+              output.buffer,
+              output.byteOffset,
+              output.byteLength,
+            );
+          },
         });
       } finally {
         await stage.release();

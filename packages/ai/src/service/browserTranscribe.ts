@@ -1,9 +1,10 @@
 import {
-  fetchFloat32,
+  floatsFromBytes,
+  jsonBytes,
   registerBrowserApi,
   reportLoading,
-  reportRunning,
 } from './browserShared.js';
+import { serveUnits } from './browserUnitServing.js';
 import {
   type BrowserTranscribeRequest,
   type BrowserTranscribeResult,
@@ -11,12 +12,10 @@ import {
 } from './transcribeApi.js';
 
 export const registerTranscribeApi = (): void => {
-  registerBrowserApi<BrowserTranscribeRequest, BrowserTranscribeResult>(
+  registerBrowserApi<BrowserTranscribeRequest, void>(
     transcribeAudioApiName,
     async (request) => {
       await reportLoading();
-      const audio = await fetchFloat32(request.pcmUrl, 'transcription PCM');
-
       const [{ createWhisperRuntime }, { runTranscription }] =
         await Promise.all([
           import('../runtime/whisper/whisperRuntime.js'),
@@ -26,24 +25,26 @@ export const registerTranscribeApi = (): void => {
         modelHost: request.modelHost,
         modelId: request.modelId,
         revision: request.revision,
-
         onLoading: () => {
           void reportLoading();
         },
       });
-
       try {
-        return await runTranscription({
-          audio,
-          language: request.language,
-          detectLanguage: runtime.detectLanguage,
-          transcribeBatch: runtime.transcribeBatch,
-          transcribeAligned: runtime.transcribeAligned,
-
-          onDecoded: async (units) =>
-            reportRunning({ pass: 'decode', ...units }),
-          onRepaired: async (units) =>
-            reportRunning({ pass: 'repair', ...units }),
+        await serveUnits({
+          attemptId: request.attemptId,
+          attemptUrl: request.attemptUrl,
+          outputs: request.outputs,
+          run: async (bytes) => {
+            const audio = floatsFromBytes(bytes);
+            const segments: BrowserTranscribeResult = await runTranscription({
+              audio,
+              language: request.language,
+              detectLanguage: runtime.detectLanguage,
+              transcribeBatch: runtime.transcribeBatch,
+              transcribeAligned: runtime.transcribeAligned,
+            });
+            return jsonBytes(segments);
+          },
         });
       } finally {
         await runtime.release();

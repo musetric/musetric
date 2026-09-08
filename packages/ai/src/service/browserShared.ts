@@ -1,8 +1,4 @@
-import {
-  type BrowserPhaseMessage,
-  type BrowserRunningUnits,
-  reportPhaseApiName,
-} from './browserApi.js';
+import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
 
 const reportPhase = async (message: BrowserPhaseMessage): Promise<void> => {
   const api: unknown = Reflect.get(globalThis, reportPhaseApiName);
@@ -14,10 +10,6 @@ const reportPhase = async (message: BrowserPhaseMessage): Promise<void> => {
 
 export const reportLoading = async (): Promise<void> =>
   reportPhase({ type: 'loading' });
-
-export const reportRunning = async (
-  units: BrowserRunningUnits,
-): Promise<void> => reportPhase({ type: 'running', ...units });
 
 export const fetchOk = async (
   url: string,
@@ -37,6 +29,17 @@ export const fetchFloat32 = async (
   const response = await fetchOk(url, label);
   return new Float32Array(await response.arrayBuffer());
 };
+
+export const floatsFromBytes = (
+  bytes: Uint8Array,
+): Float32Array<ArrayBuffer> => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new Float32Array(copy.buffer);
+};
+
+export const jsonBytes = (value: unknown): Uint8Array =>
+  new TextEncoder().encode(JSON.stringify(value));
 
 export const registerBrowserApi = <Request, Result>(
   apiName: string,

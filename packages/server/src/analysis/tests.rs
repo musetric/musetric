@@ -162,7 +162,7 @@ fn create_hosted(analysis: &BrowserAnalysis) -> HostedModel {
 fn describe_step(step: ProcessingStep) -> Option<Value> {
     let analysis = create_step(step, std::path::Path::new("/models"))?;
     let hosted = create_hosted(&analysis);
-    let request = (analysis.build)("http://host/pcm", &hosted)
+    let request = (analysis.build)("attempt-1", "http://host/attempt/attempt-1", &hosted)
         .map_err(|_| "the request should be built")
         .expect("the request should be built");
     Some(json!({
@@ -186,7 +186,9 @@ fn asks_the_browser_for_the_rhythm_it_stores_as_rhythm() {
             "mean": true,
             "f16": false,
             "request": {
-                "pcmUrl": "http://host/pcm",
+                "attemptId": "attempt-1",
+                "attemptUrl": "http://host/attempt/attempt-1",
+                "outputs": ["result"],
                 "modelUrl": "http://host/files/beat_this.onnx",
                 "filterbankUrl": "http://host/files/mel-filterbank.bin",
             },
@@ -206,7 +208,9 @@ fn asks_the_browser_for_the_key_without_a_mean_downmix() {
             "mean": false,
             "f16": false,
             "request": {
-                "pcmUrl": "http://host/pcm",
+                "attemptId": "attempt-1",
+                "attemptUrl": "http://host/attempt/attempt-1",
+                "outputs": ["result"],
                 "modelUrl": "http://host/files/skey.onnx",
             },
         }))
@@ -225,7 +229,9 @@ fn points_the_transcription_at_the_whole_model_directory() {
             "mean": false,
             "f16": true,
             "request": {
-                "pcmUrl": "http://host/pcm",
+                "attemptId": "attempt-1",
+                "attemptUrl": "http://host/attempt/attempt-1",
+                "outputs": ["result"],
                 "sampleRate": 16000,
                 "modelHost": "http://host/models",
                 "modelId": "musetric/whisper-large-v3-turbo-onnx",
