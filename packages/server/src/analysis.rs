@@ -2,6 +2,8 @@ mod browser;
 mod gains;
 mod models;
 mod separation;
+mod separation_units;
+mod stem_signal;
 mod steps;
 
 #[cfg(test)]

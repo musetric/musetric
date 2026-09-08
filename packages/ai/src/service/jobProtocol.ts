@@ -1,7 +1,5 @@
 export const jobUrlParameter = 'jobs';
-export const deliverFileApiName = 'musetricAiDeliverFile';
 export const jobSocketPath = '/jobs';
-export const uploadRoute = '/uploads/';
 
 const asObject = (value: unknown): object | undefined =>
   typeof value === 'object' && value ? value : undefined;
@@ -75,6 +73,44 @@ const readFailure = (
   return error === undefined ? undefined : { type: 'failed', jobId, error };
 };
 
+const readAttemptId = (message: object): string | undefined =>
+  asString(Reflect.get(message, 'attemptId'));
+
+export type ExecutorUnitOpened = {
+  type: 'unitOpened';
+  jobId: string;
+  attemptId: string;
+};
+
+const readUnitOpened = (
+  message: object,
+  jobId: string,
+): ExecutorUnitOpened | undefined => {
+  const attemptId = readAttemptId(message);
+  return attemptId === undefined
+    ? undefined
+    : { type: 'unitOpened', jobId, attemptId };
+};
+
+export type ExecutorUnitDone = {
+  type: 'unitDone';
+  jobId: string;
+  attemptId: string;
+  unit: number;
+};
+
+const readUnitDone = (
+  message: object,
+  jobId: string,
+): ExecutorUnitDone | undefined => {
+  const attemptId = readAttemptId(message);
+  const unit = asNumber(Reflect.get(message, 'unit'));
+  if (attemptId === undefined || unit === undefined) {
+    return undefined;
+  }
+  return { type: 'unitDone', jobId, attemptId, unit };
+};
+
 export type ExecutorResult = {
   type: 'result';
   jobId: string;
@@ -90,7 +126,9 @@ export type ExecutorJobMessage =
   | ExecutorLoading
   | ExecutorRunning
   | ExecutorResult
-  | ExecutorFailure;
+  | ExecutorFailure
+  | ExecutorUnitOpened
+  | ExecutorUnitDone;
 
 export type ExecutorMessage = ExecutorReady | ExecutorJobMessage;
 
@@ -121,6 +159,12 @@ export const readExecutorMessage = (
   if (kind === 'failed') {
     return readFailure(message, jobId);
   }
+  if (kind === 'unitOpened') {
+    return readUnitOpened(message, jobId);
+  }
+  if (kind === 'unitDone') {
+    return readUnitDone(message, jobId);
+  }
   return undefined;
 };
 
@@ -128,7 +172,6 @@ export type JobCommand = {
   type: 'job';
   jobId: string;
   api: string;
-  uploadUrl: string;
   request: unknown;
 };
 
@@ -139,15 +182,57 @@ export const readJobCommand = (text: string): JobCommand | undefined => {
   }
   const jobId = asString(Reflect.get(message, 'jobId'));
   const api = asString(Reflect.get(message, 'api'));
-  const uploadUrl = asString(Reflect.get(message, 'uploadUrl'));
-  if (jobId === undefined || api === undefined || uploadUrl === undefined) {
+  if (jobId === undefined || api === undefined) {
     return undefined;
   }
   return {
     type: 'job',
     jobId,
     api,
-    uploadUrl,
     request: Reflect.get(message, 'request'),
   };
 };
+
+export type UnitCommand = {
+  type: 'unit';
+  jobId: string;
+  attemptId: string;
+  unit: number;
+  unitCount: number;
+};
+
+export type UnitCloseCommand = {
+  type: 'unitClose';
+  jobId: string;
+  attemptId: string;
+};
+
+export type UnitEvent = UnitCommand | UnitCloseCommand;
+
+export const readUnitEvent = (text: string): UnitEvent | undefined => {
+  const message = parse(text);
+  if (!message) {
+    return undefined;
+  }
+  const kind = asString(Reflect.get(message, 'type'));
+  const jobId = asString(Reflect.get(message, 'jobId'));
+  const attemptId = readAttemptId(message);
+  if (jobId === undefined || attemptId === undefined) {
+    return undefined;
+  }
+  if (kind === 'unitClose') {
+    return { type: 'unitClose', jobId, attemptId };
+  }
+  if (kind !== 'unit') {
+    return undefined;
+  }
+  const unit = asNumber(Reflect.get(message, 'unit'));
+  const unitCount = asNumber(Reflect.get(message, 'unitCount'));
+  if (unit === undefined || unitCount === undefined) {
+    return undefined;
+  }
+  return { type: 'unit', jobId, attemptId, unit, unitCount };
+};
+
+export const unitOpenedApiName = 'musetricAiSendUnitOpened';
+export const unitDoneApiName = 'musetricAiSendUnitDone';

@@ -1,6 +1,5 @@
 use std::{
-    collections::HashMap,
-    fs::{create_dir_all, read_to_string, remove_dir_all, write},
+    fs::{create_dir_all, remove_dir_all, write},
     path::PathBuf,
     process::id,
     sync::{
@@ -26,6 +25,7 @@ use crate::{
     files::{Asset, Assets, Bundle},
     host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions, PhaseSink},
     protocol::{ExecutorPass, ExecutorPhase},
+    units::{UnitCompleted, UnitReject, UnitSession, UnitTarget},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -72,10 +72,6 @@ impl Workspace {
         write(&path, content).expect("the nested file should be written");
         root
     }
-
-    fn target(&self, name: &str) -> PathBuf {
-        self.directory.join("uploads").join(name)
-    }
 }
 
 impl Drop for Workspace {
@@ -118,15 +114,45 @@ async fn start_host(
     require_shader_f16: bool,
     reported: &Reported,
 ) -> ExecutorHost {
+    start_session(workspace, require_shader_f16, reported, None).await
+}
+
+async fn start_session(
+    workspace: &Workspace,
+    require_shader_f16: bool,
+    reported: &Reported,
+    units: Option<Arc<dyn UnitSession>>,
+) -> ExecutorHost {
     ExecutorHost::start(ExecutorHostOptions {
         label: "Fixture analysis".to_owned(),
         bundle: Bundle::Directory(workspace.bundle_path()),
         pcm: Bytes::from_static(PCM),
         require_shader_f16,
         on_phase: reported.sink(),
+        units,
     })
     .await
     .expect("the host should start")
+}
+
+async fn ready_units(
+    workspace: &Workspace,
+    reported: &Reported,
+    units: &Arc<CountedUnits>,
+) -> (ExecutorHost, Executor) {
+    let host = start_session(
+        workspace,
+        false,
+        reported,
+        Some(Arc::clone(units) as Arc<dyn UnitSession>),
+    )
+    .await;
+    let mut executor = connect_executor(&host).await;
+    announce(&mut executor, true, false).await;
+    host.wait_ready()
+        .await
+        .expect("the executor should be ready");
+    (host, executor)
 }
 
 fn create_client() -> Client<HttpConnector, Body> {
@@ -153,14 +179,6 @@ async fn get(url: &str) -> (StatusCode, Vec<u8>) {
         .body(Body::empty())
         .expect("the request should build");
     read_response(request).await
-}
-
-async fn put(url: &str, content: &'static str) -> StatusCode {
-    let uri: Uri = url.parse().expect("the url should be valid");
-    let request = Request::put(uri)
-        .body(Body::from(content))
-        .expect("the request should build");
-    read_response(request).await.0
 }
 
 type Executor =
@@ -331,11 +349,6 @@ async fn runs_a_job_and_reports_its_phases() {
     assert_eq!(job.command["type"], "job");
     assert_eq!(job.command["api"], API);
     assert_eq!(job.command["request"]["pcmUrl"], "http://127.0.0.1/pcm");
-    assert!(
-        job.command["uploadUrl"]
-            .as_str()
-            .is_some_and(|url| url.ends_with("/uploads/"))
-    );
     assert_eq!(result, json!({ "segments": 3 }));
     assert_eq!(
         reported.seen(),
@@ -388,26 +401,6 @@ async fn fails_a_job_the_executor_could_not_finish() {
     assert_eq!(failure.to_string(), "the model did not load");
 }
 
-#[tokio::test]
-async fn stores_the_upload_the_analysis_expects() {
-    let workspace = Workspace::new();
-    let reported = Reported::create();
-    let host = start_host(&workspace, false, &reported).await;
-    let target = workspace.target("lead.raw");
-    let targets = HashMap::from([("lead.raw".to_owned(), target.clone())]);
-
-    let wait = host.expect_uploads(targets).expect("the uploads register");
-    let stored = put(&format!("{}/uploads/lead.raw", host.base_url()), "stem").await;
-
-    assert_eq!(stored, StatusCode::NO_CONTENT);
-    wait.wait().await.expect("the upload should complete");
-    assert_eq!(
-        read_to_string(&target).expect("the upload should be stored"),
-        "stem"
-    );
-    host.close().await;
-}
-
 struct EchoedAssets;
 
 impl Assets for EchoedAssets {
@@ -428,6 +421,7 @@ async fn asks_an_embedder_for_the_bundle_only_by_a_relative_name() {
         pcm: Bytes::from_static(PCM),
         require_shader_f16: false,
         on_phase: reported.sink(),
+        units: None,
     })
     .await
     .expect("the host should start");
@@ -440,27 +434,6 @@ async fn asks_an_embedder_for_the_bundle_only_by_a_relative_name() {
     assert_eq!(String::from_utf8_lossy(&asked), "assets/index.js");
     assert_eq!(encoded, StatusCode::NOT_FOUND);
     assert_eq!(escaped, StatusCode::NOT_FOUND);
-    host.close().await;
-}
-
-#[tokio::test]
-async fn refuses_an_upload_the_analysis_did_not_ask_for() {
-    let workspace = Workspace::new();
-    let reported = Reported::create();
-    let host = start_host(&workspace, false, &reported).await;
-    let target = workspace.target("lead.raw");
-    let targets = HashMap::from([("lead.raw".to_owned(), target.clone())]);
-
-    let wait = host.expect_uploads(targets).expect("the uploads register");
-    let refused = put(&format!("{}/uploads/other.raw", host.base_url()), "stem").await;
-
-    assert_eq!(refused, StatusCode::BAD_REQUEST);
-    let reported_failure = wait.wait().await.expect_err("the uploads should fail");
-    assert_eq!(
-        reported_failure.to_string(),
-        "Unexpected executor upload: other.raw"
-    );
-    assert!(!target.exists());
     host.close().await;
 }
 
@@ -481,4 +454,124 @@ async fn fails_a_running_job_when_the_executor_disappears() {
         .expect("the job task should finish")
         .expect_err("the job should fail");
     assert!(matches!(failure, ExecutorFailure::Unavailable));
+}
+
+struct CountedUnits {
+    done: Mutex<Vec<(String, u32)>>,
+}
+
+impl CountedUnits {
+    fn create() -> Arc<Self> {
+        Arc::new(Self {
+            done: Mutex::new(Vec::new()),
+        })
+    }
+
+    fn seen(&self) -> Vec<(String, u32)> {
+        self.done
+            .lock()
+            .expect("the log should be readable")
+            .clone()
+    }
+}
+
+impl UnitSession for CountedUnits {
+    fn window(&self, _attempt: &str, _unit: u32) -> Result<Bytes, UnitReject> {
+        Ok(Bytes::new())
+    }
+
+    fn target(&self, _attempt: &str, _unit: u32, _output: &str) -> Result<UnitTarget, UnitReject> {
+        Ok(UnitTarget::Confirm)
+    }
+
+    fn completed<'a>(
+        &'a self,
+        _attempt: &'a str,
+        _unit: u32,
+        _output: &'a str,
+    ) -> UnitCompleted<'a> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn aborted(&self, _attempt: &str, _unit: u32, _output: &str) {}
+
+    fn opened(&self, _attempt: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn done(&self, attempt: &str, unit: u32) -> Result<(), String> {
+        if unit >= 4 {
+            return Err("the done event points outside the plan".to_owned());
+        }
+        self.done
+            .lock()
+            .expect("the log should be writable")
+            .push((attempt.to_owned(), unit));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn drives_units_over_the_job_socket() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let units = CountedUnits::create();
+    let (host, mut executor) = ready_units(&workspace, &reported, &units).await;
+
+    let ticket = host
+        .send_job(API, &json!({ "pcmUrl": "http://127.0.0.1/pcm" }))
+        .expect("the job should start");
+    host.send_unit("attempt-1", 3, 7)
+        .expect("the unit event should be sent");
+    let _job_command = take_command(&mut executor).await;
+    let command = take_command(&mut executor).await;
+
+    assert_eq!(command["type"], "unit");
+    assert_eq!(command["attemptId"], "attempt-1");
+    assert_eq!(command["unit"], 3);
+    assert_eq!(command["unitCount"], 7);
+    let job_id = read_job_id(&command);
+    reply(
+        &mut executor,
+        &json!({ "type": "unitDone", "jobId": job_id, "attemptId": "attempt-1", "unit": 3 }),
+    )
+    .await;
+    reply(
+        &mut executor,
+        &json!({ "type": "result", "jobId": job_id, "result": 1 }),
+    )
+    .await;
+
+    ticket.wait().await.expect("the job should answer");
+    assert_eq!(units.seen(), vec![("attempt-1".to_owned(), 3)]);
+    host.close().await;
+}
+
+#[tokio::test]
+async fn fails_the_job_when_a_done_event_points_outside_the_plan() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let units = CountedUnits::create();
+    let (host, mut executor) = ready_units(&workspace, &reported, &units).await;
+
+    let ticket = host
+        .send_job(API, &Value::Null)
+        .expect("the job should start");
+    host.send_unit("attempt-1", 0, 4)
+        .expect("the unit event should be sent");
+    let _job_command = take_command(&mut executor).await;
+    let command = take_command(&mut executor).await;
+    let job_id = read_job_id(&command);
+    reply(
+        &mut executor,
+        &json!({ "type": "unitDone", "jobId": job_id, "attemptId": "attempt-1", "unit": 9 }),
+    )
+    .await;
+
+    let failure = ticket.wait().await.expect_err("the job should fail");
+    assert_eq!(
+        failure.to_string(),
+        "the done event points outside the plan"
+    );
+    host.close().await;
 }

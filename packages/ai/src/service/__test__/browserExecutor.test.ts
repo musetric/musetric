@@ -1,15 +1,15 @@
 import { expect, test } from 'vitest';
 import { startJobExecutor } from '../browserExecutor.js';
+import { registerBrowserApi, reportLoading } from '../browserShared.js';
+import { registerUnitReceiver } from '../browserUnitServing.js';
 import {
-  deliverFile,
-  registerBrowserApi,
-  reportLoading,
-  reportRunning,
-} from '../browserShared.js';
+  type UnitCloseCommand,
+  type UnitCommand,
+  unitDoneApiName,
+} from '../jobProtocol.js';
 import { readSocketUrl, startFakeHost } from './jobHarness.js';
 
 const apiName = 'musetricAiExecutorTestApi';
-const stemName = 'lead.pcm';
 
 const announceAdapter = (shaderF16: boolean): void => {
   const features = {
@@ -21,15 +21,12 @@ const announceAdapter = (shaderF16: boolean): void => {
   });
 };
 
-test('the browser client runs a job, reports phases and uploads its file', async () => {
+test('the browser client runs a job and reports its phases', async () => {
   announceAdapter(true);
-  const stem = new Float32Array([0.5, -0.5]);
   registerBrowserApi<{ gain: number }, { frames: number }>(
     apiName,
     async (request) => {
       await reportLoading();
-      await reportRunning({ pass: 'decode', unit: 2, unitCount: 4 });
-      await deliverFile(stemName, stem.buffer);
       return { frames: request.gain };
     },
   );
@@ -47,15 +44,57 @@ test('the browser client runs a job, reports phases and uploads its file', async
     expect(result).toEqual({ frames: 3 });
     expect(host.phases).toEqual([
       { type: 'loading', jobId: expect.any(String) },
+    ]);
+  } finally {
+    await host.close();
+  }
+});
+
+test('the browser client forwards unit events and confirms them', async () => {
+  announceAdapter(true);
+  const received: (UnitCommand | UnitCloseCommand)[] = [];
+  registerBrowserApi<unknown, void>(apiName, async () => {
+    const closed = Promise.withResolvers<void>();
+    registerUnitReceiver(async (event) => {
+      received.push(event);
+      if (event.type === 'unit') {
+        const done: unknown = Reflect.get(globalThis, unitDoneApiName);
+        if (typeof done !== 'function') {
+          throw new Error('AI unit done API is not initialized');
+        }
+        await Reflect.apply(done, undefined, [event.attemptId, event.unit]);
+      }
+      if (event.type === 'unitClose') {
+        closed.resolve();
+      }
+    });
+    try {
+      await closed.promise;
+    } finally {
+      registerUnitReceiver(undefined);
+    }
+  });
+  const host = await startFakeHost();
+
+  try {
+    startJobExecutor(readSocketUrl(host.pageUrl));
+    await host.ready;
+    const answered = host.run(apiName, {});
+    host.sendUnit('attempt-9', 2, 4);
+    host.sendUnitClose('attempt-9');
+
+    await answered;
+    expect(received).toEqual([
       {
-        type: 'running',
-        jobId: expect.any(String),
-        pass: 'decode',
+        type: 'unit',
+        jobId: 'unit-pump',
+        attemptId: 'attempt-9',
         unit: 2,
         unitCount: 4,
       },
+      { type: 'unitClose', jobId: 'unit-pump', attemptId: 'attempt-9' },
     ]);
-    expect(host.uploads.get(stemName)).toEqual(Buffer.from(stem.buffer));
+    expect(host.unitDone).toEqual([{ attemptId: 'attempt-9', unit: 2 }]);
   } finally {
     await host.close();
   }

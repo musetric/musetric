@@ -15,6 +15,8 @@ mod router;
 mod routes;
 mod serve;
 mod storage;
+mod unit_fold;
+mod unit_plan;
 mod wav;
 
 #[cfg(test)]

@@ -1,22 +1,7 @@
 import { type UnitProgress } from '../runtime/unitProgress.js';
 
-export const separateAudioApiName = 'musetricAiSeparateAudio';
+export const separateUnitsApiName = 'musetricAiSeparateUnits';
 export const reportPhaseApiName = 'musetricAiReportPhase';
-
-export const stemDownloadNames = {
-  lead: 'lead.pcm',
-  backing: 'backing.pcm',
-  instrumental: 'instrumental.pcm',
-} as const;
-
-export type BrowserSeparateAudioRequest = {
-  pcmUrl: string;
-  sampleRate: number;
-  vocalsModelUrl: string;
-  vocalsModelDataUrl: string;
-  vocalsModelDataPath: string;
-  leadBackingModelUrl: string;
-};
 
 export type BrowserRunningPass = 'decode' | 'repair';
 
@@ -27,3 +12,25 @@ export type BrowserRunningUnits = UnitProgress & {
 export type BrowserPhaseMessage =
   | { type: 'loading' }
   | ({ type: 'running' } & BrowserRunningUnits);
+
+export type BrowserVocalsUnitsRequest = {
+  attemptId: string;
+  attemptUrl: string;
+  stage: 'vocals';
+  outputs: string[];
+  vocalsModelUrl: string;
+  vocalsModelDataUrl: string;
+  vocalsModelDataPath: string;
+};
+
+export type BrowserLeadBackingUnitsRequest = {
+  attemptId: string;
+  attemptUrl: string;
+  stage: 'leadBacking';
+  outputs: string[];
+  leadBackingModelUrl: string;
+};
+
+export type BrowserSeparateUnitsRequest =
+  | BrowserVocalsUnitsRequest
+  | BrowserLeadBackingUnitsRequest;

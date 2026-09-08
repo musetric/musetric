@@ -26,6 +26,7 @@ use crate::{
 
 const DECODE_REPORTS: u64 = 100;
 
+#[derive(Debug)]
 pub(crate) enum Failure {
     Refused(String),
     Unreachable,
@@ -110,7 +111,6 @@ pub(crate) struct SessionOptions {
     pub(crate) pcm: Vec<u8>,
     pub(crate) require_shader_f16: bool,
 }
-
 pub(crate) struct Job<'job> {
     pub(crate) api: &'job str,
     pub(crate) request: &'job Value,
@@ -134,6 +134,7 @@ impl Session {
             pcm: Bytes::from(options.pcm),
             require_shader_f16: options.require_shader_f16,
             on_phase: sink,
+            units: None,
         })
         .await?;
         Ok(Self { host, reported })
@@ -177,7 +178,7 @@ impl Session {
     }
 }
 
-fn read_phase(phase: ExecutorPhase) -> StepPhase {
+pub(crate) fn read_phase(phase: ExecutorPhase) -> StepPhase {
     match phase {
         ExecutorPhase::Loading => StepPhase::Loading,
         ExecutorPhase::Running {

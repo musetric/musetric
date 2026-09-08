@@ -1,34 +1,44 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{path::Path, path::PathBuf, sync::Arc};
 
+use axum::body::Bytes;
 use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
-use musetric_jobs::{StepAnswer, StepPhase, StepReport};
+use musetric_gpu::{
+    ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPhase, PhaseSink, UnitSession,
+};
+use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
 use musetric_media::{
     BoxedError, Loudness, PcmRequest, PcmSource, SampleRates, WavePeaks,
     analyze_lead_visual_loudness, analyze_loudness, collect_interleaved_pcm, convert_to_fmp4,
     encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 use serde_json::{Value, json};
+use tokio::{fs, sync::mpsc};
+use uuid::Uuid;
 
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{
-            Failure, Job, Session, SessionOptions, answer, count_frames, decode_reporter,
-            ensure_files,
-        },
+        browser::{Failure, answer, count_frames, decode_reporter, ensure_files, read_phase},
         gains::{Stems, measure},
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
+        separation_units::{SeparationUnits, StageRegistration},
+        stem_signal::{
+            CHANNELS, MAX_PEAK, apply_scale, crop, deinterleave, interleaved_from_planar,
+            normalize_peak, peak_of, place_padded, planar_from_interleaved, residual,
+            subtract_planar,
+        },
     },
     blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
+    pages::HeldPage,
     publish::publish,
     storage::read_database,
+    unit_plan::{LEAD_BACKING_COMPENSATE, PlanRules, UnitPlan},
 };
 
 const LABEL: &str = "Headless AI separation";
-const API_NAME: &str = "musetricAiSeparateAudio";
+const API_NAME: &str = "musetricAiSeparateUnits";
+const UNIT_OUTPUT: &str = "separated";
+const INCOMING_AREA: &str = "incoming";
 const RAW_SUFFIX: &str = "raw";
 const STEMS: [&str; 3] = ["lead", "backing", "instrumental"];
 
@@ -69,19 +79,10 @@ impl Separated {
         }
     }
 
-    fn each(&self) -> [&Stem; 3] {
-        [&self.lead, &self.backing, &self.instrumental]
-    }
-
     fn staged(&self) -> Vec<&StagedBlob> {
-        self.each().into_iter().flat_map(Stem::staged).collect()
-    }
-
-    fn uploads(&self) -> HashMap<String, PathBuf> {
-        STEMS
-            .iter()
-            .zip(self.each())
-            .map(|(name, stem)| (format!("{name}.pcm"), stem.raw.clone()))
+        [&self.lead, &self.backing, &self.instrumental]
+            .into_iter()
+            .flat_map(Stem::staged)
             .collect()
     }
 
@@ -94,10 +95,251 @@ impl Separated {
     }
 }
 
+struct Produced {
+    instrumental: Vec<f32>,
+    lead: Vec<f32>,
+    backing: Vec<f32>,
+}
+
+struct ModelUrls {
+    vocals: String,
+    vocals_data: String,
+    lead_backing: String,
+}
+
+struct StageProgress {
+    first: u32,
+    total: u32,
+}
+
 struct Run<'run> {
     context: &'run AnalysisContext,
     report: &'run StepReport,
     stems: &'run Separated,
+}
+
+type Reported = mpsc::UnboundedReceiver<ExecutorPhase>;
+
+struct Attempt<'run> {
+    running: &'run Run<'run>,
+    host: ExecutorHost,
+    units: Arc<SeparationUnits>,
+    reported: Reported,
+}
+
+impl<'run> Attempt<'run> {
+    async fn create(
+        running: &'run Run<'run>,
+        units: &Arc<SeparationUnits>,
+    ) -> Result<Self, Failure> {
+        let (phases, reported) = mpsc::unbounded_channel();
+        let sink: PhaseSink = Arc::new(move |phase| {
+            let _ = phases.send(phase);
+        });
+        let host = ExecutorHost::start(ExecutorHostOptions {
+            label: LABEL.to_owned(),
+            bundle: running.context.bundle.clone(),
+            pcm: Bytes::from(Vec::new()),
+            require_shader_f16: true,
+            on_phase: sink,
+            units: Some(Arc::clone(units) as Arc<dyn UnitSession>),
+        })
+        .await?;
+        Ok(Self {
+            running,
+            host,
+            units: Arc::clone(units),
+            reported,
+        })
+    }
+
+    async fn close(self) {
+        self.host.close().await;
+    }
+
+    async fn produce(
+        &mut self,
+        mixture: &Arc<Vec<f32>>,
+        samples: u64,
+        models: &[(String, PathBuf)],
+    ) -> Result<Produced, Failure> {
+        let page = self
+            .running
+            .context
+            .pages
+            .open_page(&self.host.page_url())
+            .await?;
+        let held = HeldPage::hold(self.running.context.pages.as_ref(), page);
+        self.host.wait_ready().await?;
+        let hosted = register_models(&self.host, models).await?;
+        let outcome = self.stages(mixture, samples, &hosted).await;
+        drop(held);
+        outcome
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the padded mixture indexes in-memory stems"
+    )]
+    async fn stages(
+        &mut self,
+        mixture: &Arc<Vec<f32>>,
+        samples: u64,
+        hosted: &ModelUrls,
+    ) -> Result<Produced, Failure> {
+        let vocals_plan = UnitPlan::vocals(VOCALS.sample_rate, samples);
+        let (lead_backing_plan, layout) = UnitPlan::lead_backing(samples);
+        let vocals_units = vocals_plan.unit_count();
+        let total = vocals_units + lead_backing_plan.unit_count();
+        let vocals_id = Uuid::new_v4().to_string();
+        let vocals_request = json!({
+            "attemptId": vocals_id,
+            "attemptUrl": self.host.attempt_url(&vocals_id),
+            "stage": "vocals",
+            "outputs": [UNIT_OUTPUT],
+            "vocalsModelUrl": hosted.vocals,
+            "vocalsModelDataUrl": hosted.vocals_data,
+            "vocalsModelDataPath": VOCALS_MODEL_DATA,
+        });
+        self.stage(
+            StageRegistration {
+                attempt: vocals_id.clone(),
+                plan: vocals_plan,
+                input: Arc::clone(mixture),
+                outputs: vec![UNIT_OUTPUT.to_owned()],
+                rules: PlanRules::VocalsV1,
+            },
+            vocals_request,
+            StageProgress { first: 0, total },
+        )
+        .await?;
+        let raw_vocals = self.units.finalize(&vocals_id)?;
+        let vocals = normalize_peak(&raw_vocals, MAX_PEAK);
+        let instrumental = normalize_peak(&subtract_planar(mixture, &raw_vocals), MAX_PEAK);
+
+        let peak = peak_of(&vocals);
+        if peak == 0.0 {
+            return Err(Failure::Refused(
+                "The vocals signal appears to be silent".to_owned(),
+            ));
+        }
+        let scaled = apply_scale(&vocals, 1.0 / peak);
+        let padded = Arc::new(place_padded(
+            &scaled,
+            layout.trim as usize,
+            layout.mixture_samples as usize,
+        ));
+        let lead_backing_id = Uuid::new_v4().to_string();
+        let lead_backing_request = json!({
+            "attemptId": lead_backing_id,
+            "attemptUrl": self.host.attempt_url(&lead_backing_id),
+            "stage": "leadBacking",
+            "outputs": [UNIT_OUTPUT],
+            "leadBackingModelUrl": hosted.lead_backing,
+        });
+        self.stage(
+            StageRegistration {
+                attempt: lead_backing_id.clone(),
+                plan: lead_backing_plan,
+                input: Arc::clone(&padded),
+                outputs: vec![UNIT_OUTPUT.to_owned()],
+                rules: PlanRules::LeadBackingV1,
+            },
+            lead_backing_request,
+            StageProgress {
+                first: vocals_units,
+                total,
+            },
+        )
+        .await?;
+        let folded = self.units.finalize(&lead_backing_id)?;
+        let backing_norm = crop(&folded, layout.trim as usize, samples as usize);
+        let backing = normalize_peak(&apply_scale(&backing_norm, peak), MAX_PEAK);
+        let lead = normalize_peak(
+            &residual(&scaled, &backing_norm, LEAD_BACKING_COMPENSATE, peak),
+            MAX_PEAK,
+        );
+        Ok(Produced {
+            instrumental,
+            lead,
+            backing,
+        })
+    }
+
+    async fn stage(
+        &mut self,
+        registration: StageRegistration,
+        request: Value,
+        progress: StageProgress,
+    ) -> Result<(), Failure> {
+        let count = registration.plan.unit_count();
+        let attempt_id = registration.attempt.clone();
+        self.units.register(registration)?;
+        let ticket = self.host.send_job(API_NAME, &request)?;
+        let mut answered = Box::pin(async move { ticket.wait().await });
+        tokio::select! {
+            finished = &mut answered => return early_job(finished),
+            outcome = self.units.wait_opened(&attempt_id) => outcome?,
+        }
+        for index in 0..count {
+            (self.running.report)(StepPhase::Running {
+                pass: StepPass::Decode,
+                unit: progress.first + index,
+                unit_count: progress.total,
+            });
+            self.host.send_unit(&attempt_id, index, count)?;
+            self.drain_phases();
+            tokio::select! {
+                finished = &mut answered => return early_job(finished),
+                outcome = self.units.folded(&attempt_id, index) => outcome?,
+            }
+        }
+        self.host.send_unit_close(&attempt_id)?;
+        loop {
+            tokio::select! {
+                finished = &mut answered => {
+                    finished.map_err(Failure::from)?;
+                    return Ok(());
+                }
+                received = self.reported.recv() => {
+                    if let Some(phase) = received {
+                        (self.running.report)(read_phase(phase));
+                    }
+                }
+            }
+        }
+    }
+
+    fn drain_phases(&mut self) {
+        while let Ok(phase) = self.reported.try_recv() {
+            (self.running.report)(read_phase(phase));
+        }
+    }
+}
+
+fn early_job(finished: Result<Value, ExecutorFailure>) -> Result<(), Failure> {
+    finished.map_err(Failure::from)?;
+    Err(Failure::Refused(
+        "the separation job answered before the close".to_owned(),
+    ))
+}
+
+async fn register_models(
+    host: &ExecutorHost,
+    models: &[(String, PathBuf)],
+) -> Result<ModelUrls, Failure> {
+    let cached = |name: &str| {
+        models
+            .iter()
+            .find(|(file, _)| file == name)
+            .map(|(_, path)| path.clone())
+            .ok_or_else(|| Failure::Refused(format!("The model cache is missing {name}")))
+    };
+    Ok(ModelUrls {
+        vocals: host.register_file(&cached(VOCALS_MODEL)?).await?,
+        vocals_data: host.register_file(&cached(VOCALS_MODEL_DATA)?).await?,
+        lead_backing: host.register_file(&cached(LEAD_BACKING_MODEL)?).await?,
+    })
 }
 
 pub(crate) async fn run(
@@ -141,7 +383,7 @@ async fn process_stems(
     sample_rate: u32,
 ) -> Result<(), Failure> {
     let context = running.context;
-    split(running, job).await?;
+    separate_units(running, job).await?;
     (running.report)(StepPhase::Saving);
     let stems = running.stems;
     let rates = SampleRates {
@@ -169,6 +411,35 @@ async fn process_stems(
     Ok(())
 }
 
+async fn separate_units(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
+    let context = running.context;
+    let report = running.report;
+    let mut models = ensure_files(context, report, &VOCALS.cached(&context.models_path)).await?;
+    models.extend(ensure_files(context, report, &LEAD_BACKING.cached(&context.models_path)).await?);
+    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
+    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
+    let pcm = collect_interleaved_pcm(
+        context.storage.pcm.as_ref(),
+        read_at(&source, VOCALS.sample_rate),
+        &mut decoded,
+    )
+    .await?;
+    let mixture = Arc::new(normalize_peak(
+        &planar_from_interleaved(&deinterleave(&pcm)),
+        MAX_PEAK,
+    ));
+    let samples = (mixture.len() / CHANNELS) as u64;
+    (report)(StepPhase::Loading);
+    let area = step_area(&context.storage.work_path, job.project_id, job.step);
+    let units = Arc::new(SeparationUnits::create(area.join(INCOMING_AREA)));
+    let mut attempt = Attempt::create(running, &units).await?;
+    let outcome = attempt.produce(&mixture, samples, &models).await;
+    attempt.close().await;
+    let produced = outcome?;
+    write_stems(running.stems, &produced).await?;
+    Ok(())
+}
+
 struct Delivery<'delivery> {
     pcm: &'delivery dyn PcmSource,
     sample_rate: u32,
@@ -176,6 +447,26 @@ struct Delivery<'delivery> {
 
 fn read_at(from: &Path, sample_rate: u32) -> PcmRequest<'_> {
     PcmRequest { from, sample_rate }
+}
+
+async fn write_stems(stems: &Separated, produced: &Produced) -> Result<(), Failure> {
+    tokio::try_join!(
+        write_raw(&stems.instrumental.raw, &produced.instrumental),
+        write_raw(&stems.lead.raw, &produced.lead),
+        write_raw(&stems.backing.raw, &produced.backing),
+    )?;
+    Ok(())
+}
+
+async fn write_raw(path: &Path, planar: &[f32]) -> Result<(), Failure> {
+    if let Some(directory) = path.parent() {
+        fs::create_dir_all(directory)
+            .await
+            .map_err(|error| Failure::from(error.to_string()))?;
+    }
+    fs::write(path, interleaved_from_planar(planar))
+        .await
+        .map_err(|error| Failure::from(error.to_string()))
 }
 
 async fn deliver_stem(delivery: &Delivery<'_>, stem: &Stem) -> Result<(), BoxedError> {
@@ -230,72 +521,6 @@ async fn store(
     Ok(())
 }
 
-async fn split(running: &Run<'_>, job: &PendingJob) -> Result<(), Failure> {
-    let context = running.context;
-    let report = running.report;
-    let mut models = ensure_files(context, report, &VOCALS.cached(&context.models_path)).await?;
-    models.extend(ensure_files(context, report, &LEAD_BACKING.cached(&context.models_path)).await?);
-    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
-    let pcm = collect_interleaved_pcm(
-        context.storage.pcm.as_ref(),
-        read_at(&source, VOCALS.sample_rate),
-        &mut decoded,
-    )
-    .await?;
-    report(StepPhase::Loading);
-    let mut session = Session::start(SessionOptions {
-        label: LABEL,
-        bundle: context.bundle.clone(),
-        pcm,
-        require_shader_f16: true,
-    })
-    .await?;
-    let found = deliver(running, &mut session, &models).await;
-    session.close().await;
-    found
-}
-
-async fn deliver(
-    running: &Run<'_>,
-    session: &mut Session,
-    models: &[(String, PathBuf)],
-) -> Result<(), Failure> {
-    let request = build_request(session, models).await?;
-    let waiting = session.host().expect_uploads(running.stems.uploads())?;
-    session
-        .run(
-            running.context.pages.as_ref(),
-            Job {
-                api: API_NAME,
-                request: &request,
-                report: running.report,
-            },
-        )
-        .await?;
-    waiting.wait().await?;
-    Ok(())
-}
-
-async fn build_request(session: &Session, models: &[(String, PathBuf)]) -> Result<Value, Failure> {
-    let host = session.host();
-    let read = |name: &str| {
-        models
-            .iter()
-            .find(|(file, _)| file == name)
-            .map(|(_, path)| path.clone())
-            .ok_or_else(|| Failure::Refused(format!("The model cache is missing {name}")))
-    };
-    Ok(json!({
-        "pcmUrl": host.pcm_url(),
-        "sampleRate": VOCALS.sample_rate,
-        "vocalsModelUrl": host.register_file(&read(VOCALS_MODEL)?).await?,
-        "vocalsModelDataUrl": host.register_file(&read(VOCALS_MODEL_DATA)?).await?,
-        "vocalsModelDataPath": VOCALS_MODEL_DATA,
-        "leadBackingModelUrl": host.register_file(&read(LEAD_BACKING_MODEL)?).await?,
-    }))
-}
-
 async fn read_sample_rate(context: &AnalysisContext, project_id: i64) -> Result<u32, Failure> {
     let found = read_database(&context.storage, move |database| {
         database.project(project_id)
@@ -314,28 +539,18 @@ mod tests {
     use super::{RAW_SUFFIX, Separated};
 
     #[test]
-    fn sends_every_stem_to_the_master_it_encodes() {
+    fn stores_every_stem_next_to_the_master_it_encodes() {
         let area = Path::new("/work/1/separation");
         let stems = Separated::create(area, Path::new("/blobs"));
 
-        let uploads = stems.uploads();
-        let masters = stems.blobs(|stem| &stem.master);
-        let named = [
-            ("lead.pcm", "lead", &stems.lead, masters.lead),
-            ("backing.pcm", "backing", &stems.backing, masters.backing),
-            (
-                "instrumental.pcm",
-                "instrumental",
-                &stems.instrumental,
-                masters.instrumental,
-            ),
+        let masters = [
+            ("lead", &stems.lead),
+            ("backing", &stems.backing),
+            ("instrumental", &stems.instrumental),
         ];
-        for (upload, name, stem, blob_id) in named {
-            assert_eq!(uploads.get(upload), Some(&stem.raw));
+        for (name, stem) in masters {
             assert_eq!(stem.raw, area.join(format!("{name}.{RAW_SUFFIX}")));
-            assert_eq!(blob_id, stem.master.blob_id());
             assert_eq!(stem.master.path(), area.join(stem.master.blob_id()));
         }
-        assert_eq!(uploads.len(), 3);
     }
 }
