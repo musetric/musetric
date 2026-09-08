@@ -155,6 +155,20 @@ impl SeparationUnits {
             .ok_or_else(|| Failure::Refused("the attempt is not active".to_owned()))
     }
 
+    fn planned(&self, attempt: &str, unit: u32) -> Result<Arc<Stage>, UnitReject> {
+        let stage = self
+            .stages
+            .lock()
+            .map_err(|_| UnitReject::Bad(POISONED_UNITS.to_owned()))?
+            .get(attempt)
+            .cloned()
+            .ok_or(UnitReject::Stale)?;
+        if unit >= stage.plan.unit_count() {
+            return Err(UnitReject::Bad("the unit is outside the plan".to_owned()));
+        }
+        Ok(stage)
+    }
+
     fn lock_state(stage: &Stage) -> Result<MutexGuard<'_, StageState>, Failure> {
         stage
             .state
@@ -245,32 +259,14 @@ impl SeparationUnits {
 
 impl UnitSession for SeparationUnits {
     fn window(&self, attempt: &str, unit: u32) -> Result<Bytes, UnitReject> {
-        let stage = self
-            .stages
-            .lock()
-            .map_err(|_| UnitReject::Bad(POISONED_UNITS.to_owned()))?
-            .get(attempt)
-            .cloned()
-            .ok_or(UnitReject::Stale)?;
-        if unit >= stage.plan.unit_count() {
-            return Err(UnitReject::Bad("the unit is outside the plan".to_owned()));
-        }
+        let stage = self.planned(attempt, unit)?;
         Ok(Bytes::from(
             stage.plan.window_bytes(&stage.input, unit as usize),
         ))
     }
 
     fn target(&self, attempt: &str, unit: u32, output: &str) -> Result<UnitTarget, UnitReject> {
-        let stage = self
-            .stages
-            .lock()
-            .map_err(|_| UnitReject::Bad(POISONED_UNITS.to_owned()))?
-            .get(attempt)
-            .cloned()
-            .ok_or(UnitReject::Stale)?;
-        if unit >= stage.plan.unit_count() {
-            return Err(UnitReject::Bad("the unit is outside the plan".to_owned()));
-        }
+        let stage = self.planned(attempt, unit)?;
         if !stage.outputs.iter().any(|name| name == output) {
             return Err(UnitReject::Bad(format!(
                 "the unit output {output} is not declared"

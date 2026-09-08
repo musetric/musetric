@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures_util::{SinkExt, StreamExt};
-use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, PhaseSink, UnitSession};
+use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, JobTicket, PhaseSink, UnitSession};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use tokio::time::timeout;
@@ -400,10 +400,8 @@ async fn reply(socket: &mut Socket, message: &Value) {
         .expect("the reply should be sent");
 }
 
-#[tokio::test]
-async fn drives_units_through_the_job_socket() {
-    let workspace = Workspace::new();
-    let (host, units) = start_units(&workspace).await;
+async fn ready_job(workspace: &Workspace) -> (ExecutorHost, Socket, JobTicket) {
+    let (host, units) = start_units(workspace).await;
     units
         .register(registration(ATTEMPT, &["a"]))
         .expect("the stage should register");
@@ -412,12 +410,18 @@ async fn drives_units_through_the_job_socket() {
     host.wait_ready()
         .await
         .expect("the executor should be ready");
-
     let ticket = host
         .send_job("musetricAiSeparateUnits", &Value::Null)
         .expect("the job should start");
     host.send_unit(ATTEMPT, 0, 2)
         .expect("the unit event should be sent");
+    (host, socket, ticket)
+}
+
+#[tokio::test]
+async fn drives_units_through_the_job_socket() {
+    let workspace = Workspace::new();
+    let (host, mut socket, ticket) = ready_job(&workspace).await;
     let _job = take_command(&mut socket).await;
     let command = take_command(&mut socket).await;
 
@@ -444,21 +448,7 @@ async fn drives_units_through_the_job_socket() {
 #[tokio::test]
 async fn fails_the_job_on_a_done_event_outside_the_plan() {
     let workspace = Workspace::new();
-    let (host, units) = start_units(&workspace).await;
-    units
-        .register(registration(ATTEMPT, &["a"]))
-        .expect("the stage should register");
-    let mut socket = connect_executor(&host).await;
-    announce(&mut socket).await;
-    host.wait_ready()
-        .await
-        .expect("the executor should be ready");
-
-    let ticket = host
-        .send_job("musetricAiSeparateUnits", &Value::Null)
-        .expect("the job should start");
-    host.send_unit(ATTEMPT, 0, 2)
-        .expect("the unit event should be sent");
+    let (host, mut socket, ticket) = ready_job(&workspace).await;
     let command = take_command(&mut socket).await;
     let job_id = command["jobId"].as_str().expect("the job id").to_owned();
     reply(

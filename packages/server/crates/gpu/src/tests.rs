@@ -114,16 +114,45 @@ async fn start_host(
     require_shader_f16: bool,
     reported: &Reported,
 ) -> ExecutorHost {
+    start_session(workspace, require_shader_f16, reported, None).await
+}
+
+async fn start_session(
+    workspace: &Workspace,
+    require_shader_f16: bool,
+    reported: &Reported,
+    units: Option<Arc<dyn UnitSession>>,
+) -> ExecutorHost {
     ExecutorHost::start(ExecutorHostOptions {
         label: "Fixture analysis".to_owned(),
         bundle: Bundle::Directory(workspace.bundle_path()),
         pcm: Bytes::from_static(PCM),
         require_shader_f16,
         on_phase: reported.sink(),
-        units: None,
+        units,
     })
     .await
     .expect("the host should start")
+}
+
+async fn ready_units(
+    workspace: &Workspace,
+    reported: &Reported,
+    units: &Arc<CountedUnits>,
+) -> (ExecutorHost, Executor) {
+    let host = start_session(
+        workspace,
+        false,
+        reported,
+        Some(Arc::clone(units) as Arc<dyn UnitSession>),
+    )
+    .await;
+    let mut executor = connect_executor(&host).await;
+    announce(&mut executor, true, false).await;
+    host.wait_ready()
+        .await
+        .expect("the executor should be ready");
+    (host, executor)
 }
 
 fn create_client() -> Client<HttpConnector, Body> {
@@ -487,21 +516,7 @@ async fn drives_units_over_the_job_socket() {
     let workspace = Workspace::new();
     let reported = Reported::create();
     let units = CountedUnits::create();
-    let host = ExecutorHost::start(ExecutorHostOptions {
-        label: "Fixture analysis".to_owned(),
-        bundle: Bundle::Directory(workspace.bundle_path()),
-        pcm: Bytes::from_static(PCM),
-        require_shader_f16: false,
-        on_phase: reported.sink(),
-        units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-    })
-    .await
-    .expect("the host should start");
-    let mut executor = connect_executor(&host).await;
-    announce(&mut executor, true, false).await;
-    host.wait_ready()
-        .await
-        .expect("the executor should be ready");
+    let (host, mut executor) = ready_units(&workspace, &reported, &units).await;
 
     let ticket = host
         .send_job(API, &json!({ "pcmUrl": "http://127.0.0.1/pcm" }))
@@ -537,21 +552,7 @@ async fn fails_the_job_when_a_done_event_points_outside_the_plan() {
     let workspace = Workspace::new();
     let reported = Reported::create();
     let units = CountedUnits::create();
-    let host = ExecutorHost::start(ExecutorHostOptions {
-        label: "Fixture analysis".to_owned(),
-        bundle: Bundle::Directory(workspace.bundle_path()),
-        pcm: Bytes::from_static(PCM),
-        require_shader_f16: false,
-        on_phase: reported.sink(),
-        units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-    })
-    .await
-    .expect("the host should start");
-    let mut executor = connect_executor(&host).await;
-    announce(&mut executor, true, false).await;
-    host.wait_ready()
-        .await
-        .expect("the executor should be ready");
+    let (host, mut executor) = ready_units(&workspace, &reported, &units).await;
 
     let ticket = host
         .send_job(API, &Value::Null)
