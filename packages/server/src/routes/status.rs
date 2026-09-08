@@ -81,7 +81,8 @@ mod tests {
 \"rhythm\":{\"phase\":\"saving\",\"status\":\"processing\"},\
 \"separation\":{\"status\":\"done\"},\
 \"transcription\":{\"pass\":\"decode\",\"phase\":\"running\",\"status\":\"processing\",\
-\"unit\":3,\"unitCount\":12}}},\"projectId\":7}\n\n";
+\"unit\":3,\"unitCount\":12},\
+\"voices\":{\"status\":\"done\"}}},\"projectId\":7}\n\n";
 
     fn create_step(status: StepStatus, phase: Option<StepPhase>) -> StepView {
         StepView {
@@ -98,6 +99,7 @@ mod tests {
             processing: Processing {
                 done: false,
                 steps: [
+                    create_step(StepStatus::Done, None),
                     create_step(StepStatus::Done, None),
                     create_step(
                         StepStatus::Processing,

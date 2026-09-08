@@ -16,32 +16,21 @@ const LEAD_VISUAL_PEAK_CEILING_DB: f64 = 3.0;
 const LEAD_VISUAL_GAIN_MINIMUM_DB: f64 = -12.0;
 const LEAD_VISUAL_GAIN_MAXIMUM_DB: f64 = 48.0;
 
-pub(crate) struct Stems {
-    pub(crate) lead: LeadVisualLoudness,
-    pub(crate) backing: Loudness,
-    pub(crate) instrumental: Loudness,
-}
-
-pub(crate) fn measure(source: Loudness, stems: &Stems) -> Vec<StemLoudness> {
-    vec![
-        plain(MasterType::Source, source),
-        StemLoudness {
-            stem: MasterType::Lead,
-            integrated_lufs: stems.lead.loudness.integrated_loudness_db,
-            true_peak_db: stems.lead.loudness.true_peak_db,
-            p95_rms_db: Some(stems.lead.p95_rms_db),
-        },
-        plain(MasterType::Backing, stems.backing),
-        plain(MasterType::Instrumental, stems.instrumental),
-    ]
-}
-
-fn plain(stem: MasterType, loudness: Loudness) -> StemLoudness {
+pub(crate) fn plain_loudness(stem: MasterType, loudness: Loudness) -> StemLoudness {
     StemLoudness {
         stem,
         integrated_lufs: loudness.integrated_loudness_db,
         true_peak_db: loudness.true_peak_db,
         p95_rms_db: None,
+    }
+}
+
+pub(crate) fn lead_loudness(measured: &LeadVisualLoudness) -> StemLoudness {
+    StemLoudness {
+        stem: MasterType::Lead,
+        integrated_lufs: measured.loudness.integrated_loudness_db,
+        true_peak_db: measured.loudness.true_peak_db,
+        p95_rms_db: Some(measured.p95_rms_db),
     }
 }
 

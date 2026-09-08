@@ -10,8 +10,6 @@ use musetric_db::BoxedError;
 
 const TAIL_NAME: &str = "separated.tail";
 const INPUT_NAME: &str = "input.f32";
-const MIXTURE_NAME: &str = "mixture.f32";
-const VOCALS_NAME: &str = "vocals.f32";
 const CHECKPOINTS: &str = "checkpoints";
 const INCOMING: &str = "incoming";
 
@@ -54,14 +52,6 @@ impl CheckpointDir {
 
     pub(crate) async fn write_input(&self, samples: &[f32]) -> Result<(), BoxedError> {
         self.write_samples(INPUT_NAME, samples).await
-    }
-
-    pub(crate) async fn write_mixture(&self, samples: &[f32]) -> Result<(), BoxedError> {
-        self.write_samples(MIXTURE_NAME, samples).await
-    }
-
-    pub(crate) async fn write_vocals(&self, samples: &[f32]) -> Result<(), BoxedError> {
-        self.write_samples(VOCALS_NAME, samples).await
     }
 
     #[cfg(test)]

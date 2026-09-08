@@ -5,14 +5,16 @@ use crate::audio::MasterType;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessingStep {
     Separation,
+    Voices,
     Transcription,
     Rhythm,
     Key,
     Chords,
 }
 
-pub const PROCESSING_STEPS: [ProcessingStep; 5] = [
+pub const PROCESSING_STEPS: [ProcessingStep; 6] = [
     ProcessingStep::Separation,
+    ProcessingStep::Voices,
     ProcessingStep::Transcription,
     ProcessingStep::Rhythm,
     ProcessingStep::Key,
@@ -24,6 +26,7 @@ impl ProcessingStep {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "separation" => Some(Self::Separation),
+            "voices" => Some(Self::Voices),
             "transcription" => Some(Self::Transcription),
             "rhythm" => Some(Self::Rhythm),
             "key" => Some(Self::Key),
@@ -36,6 +39,7 @@ impl ProcessingStep {
     pub fn name(self) -> &'static str {
         match self {
             Self::Separation => "separation",
+            Self::Voices => "voices",
             Self::Transcription => "transcription",
             Self::Rhythm => "rhythm",
             Self::Key => "key",
@@ -47,6 +51,7 @@ impl ProcessingStep {
     pub fn source(self) -> MasterType {
         match self {
             Self::Separation => MasterType::Source,
+            Self::Voices => MasterType::Vocals,
             Self::Transcription => MasterType::Lead,
             Self::Rhythm | Self::Key | Self::Chords => MasterType::Instrumental,
         }

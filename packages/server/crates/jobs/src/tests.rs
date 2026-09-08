@@ -27,8 +27,9 @@ const SEED: &str = "
   VALUES (1, 'Fixture project', 48000, 480000);
   INSERT INTO AudioMaster (projectId, type, blobId) VALUES (1, 'source', 'source-blob');
   INSERT INTO ProcessingStep (projectId, step, status)
-  VALUES (1, 'separation', 'pending'), (1, 'transcription', 'pending'),
-         (1, 'rhythm', 'pending'), (1, 'key', 'pending'), (1, 'chords', 'pending');
+  VALUES (1, 'separation', 'pending'), (1, 'voices', 'pending'),
+         (1, 'transcription', 'pending'), (1, 'rhythm', 'pending'),
+         (1, 'key', 'pending'), (1, 'chords', 'pending');
 ";
 
 struct Workspace {
@@ -90,8 +91,11 @@ fn result_statements(step: ProcessingStep) -> &'static str {
     match step {
         ProcessingStep::Separation => {
             "INSERT INTO AudioMaster (projectId, type, blobId)
-             VALUES (1, 'lead', 'lead-blob'), (1, 'backing', 'backing-blob'),
-                    (1, 'instrumental', 'instrumental-blob');"
+             VALUES (1, 'vocals', 'vocals-blob'), (1, 'instrumental', 'instrumental-blob');"
+        }
+        ProcessingStep::Voices => {
+            "INSERT INTO AudioMaster (projectId, type, blobId)
+             VALUES (1, 'lead', 'lead-blob'), (1, 'backing', 'backing-blob');"
         }
         ProcessingStep::Transcription => {
             "INSERT INTO Subtitle (projectId, blobId) VALUES (1, 'subtitle-blob');"
@@ -235,7 +239,14 @@ async fn runs_every_pending_step_once() {
 
     assert_eq!(
         runner.seen(),
-        vec!["separation", "transcription", "rhythm", "key", "chords"]
+        vec![
+            "separation",
+            "voices",
+            "transcription",
+            "rhythm",
+            "key",
+            "chords"
+        ]
     );
     let processing = queue
         .processing(1)

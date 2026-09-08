@@ -3,6 +3,7 @@ import { createApiRoute } from '../common/apiRoute.js';
 
 export const masterTypeSchema = z.enum([
   'source',
+  'vocals',
   'lead',
   'backing',
   'instrumental',

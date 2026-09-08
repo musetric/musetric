@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use musetric_db::{
-    Analysis, MasterType, NewSeparation, PendingJob, ProcessingStep, StemBlobs, StemLoudness,
+    Analysis, MasterType, NewDelivery, NewStem, NewStems, PendingJob, ProcessingStep, StemLoudness,
     StemType,
 };
 use musetric_gpu::{Bundle, Download, DownloadStatus, ExecutorFailure};
@@ -15,12 +15,12 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{BrowserAnalysis, HostedModel, Serve, answer, describe, store},
-        gains::{Stems, measure, read_gains},
+        gains::{lead_loudness, plain_loudness, read_gains},
         models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
         steps::create as create_step,
     },
     page_bridge::PageBridge,
-    storage::{read, write_database},
+    storage::{Storage, read, write_database},
     test_workspace::Workspace,
 };
 
@@ -262,9 +262,10 @@ fn caches_the_whisper_bundle_the_way_transformers_asks_for_it() {
 }
 
 #[test]
-fn keeps_the_separation_out_of_the_step_table() {
+fn keeps_the_stem_steps_out_of_the_step_table() {
     assert!(describe_step(ProcessingStep::Chords).is_some());
     assert!(describe_step(ProcessingStep::Separation).is_none());
+    assert!(describe_step(ProcessingStep::Voices).is_none());
 }
 
 const SEPARATION_PROJECT: &str = "
@@ -279,15 +280,27 @@ fn create_loudness(integrated_loudness_db: f64, true_peak_db: f64) -> Loudness {
     }
 }
 
-fn create_stems(lead_integrated_loudness_db: f64) -> Stems {
-    Stems {
-        lead: LeadVisualLoudness {
+fn separation_loudness() -> Vec<StemLoudness> {
+    vec![
+        plain_loudness(MasterType::Source, create_loudness(-20.0, -3.0)),
+        plain_loudness(MasterType::Instrumental, create_loudness(-8.0, -1.5)),
+    ]
+}
+
+fn voices_loudness(lead_integrated_loudness_db: f64) -> Vec<StemLoudness> {
+    vec![
+        lead_loudness(&LeadVisualLoudness {
             loudness: create_loudness(lead_integrated_loudness_db, -2.0),
             p95_rms_db: -30.0,
-        },
-        backing: create_loudness(-30.0, -4.0),
-        instrumental: create_loudness(-8.0, -1.5),
-    }
+        }),
+        plain_loudness(MasterType::Backing, create_loudness(-30.0, -4.0)),
+    ]
+}
+
+fn measure_stems(lead_integrated_loudness_db: f64) -> Vec<StemLoudness> {
+    let mut measured = separation_loudness();
+    measured.extend(voices_loudness(lead_integrated_loudness_db));
+    measured
 }
 
 fn find_stem(measured: &[StemLoudness], stem: MasterType) -> &StemLoudness {
@@ -298,10 +311,7 @@ fn find_stem(measured: &[StemLoudness], stem: MasterType) -> &StemLoudness {
 }
 
 fn describe_gains(lead_integrated_loudness_db: f64) -> Value {
-    let measured = measure(
-        create_loudness(-20.0, -3.0),
-        &create_stems(lead_integrated_loudness_db),
-    );
+    let measured = measure_stems(lead_integrated_loudness_db);
     let gains = read_gains(&measured).expect("every stem should be measured");
     json!({
         "source": gains.source,
@@ -349,50 +359,113 @@ fn leaves_a_step_pending_when_the_gpu_executor_disconnects() {
     assert!(matches!(result, StepAnswer::Unavailable));
 }
 
-fn create_blobs(prefix: &str) -> StemBlobs {
-    StemBlobs {
-        lead: format!("{prefix}-lead"),
-        backing: format!("{prefix}-backing"),
-        instrumental: format!("{prefix}-instrumental"),
+fn create_stem(stem: MasterType, delivered: bool) -> NewStem {
+    let name = stem.name();
+    NewStem {
+        stem,
+        master_blob_id: format!("master-{name}"),
+        delivery: delivered.then(|| NewDelivery {
+            blob_id: format!("delivery-{name}"),
+            wave_blob_id: format!("wave-{name}"),
+        }),
     }
 }
 
+async fn record_stems(storage: &Arc<Storage>, loudness: Vec<StemLoudness>, stems: Vec<NewStem>) {
+    let recorded = NewStems {
+        project_id: 2,
+        loudness,
+        stems,
+    };
+    write_database(storage, move |writer| writer.apply_stems_result(&recorded))
+        .await
+        .expect("the stems should be recorded");
+}
+
+async fn record_separation(storage: &Arc<Storage>) {
+    record_stems(
+        storage,
+        separation_loudness(),
+        vec![
+            create_stem(MasterType::Vocals, false),
+            create_stem(MasterType::Instrumental, true),
+        ],
+    )
+    .await;
+}
+
 #[tokio::test]
-async fn records_every_stem_the_separation_produced() {
+async fn records_the_stems_of_both_separation_steps() {
     let workspace = Workspace::new();
     workspace.seed(SEPARATION_PROJECT);
     let storage = workspace.create_storage();
-    let separation = NewSeparation {
-        project_id: 2,
-        loudness: measure(create_loudness(-20.0, -3.0), &create_stems(-25.0)),
-        master: create_blobs("master"),
-        delivery: create_blobs("delivery"),
-        wave_peaks: create_blobs("wave"),
-    };
-
-    write_database(&storage, move |writer| {
-        writer.apply_separation_result(&separation)
-    })
-    .await
-    .expect("the separation should be recorded");
+    record_separation(&storage).await;
+    record_stems(
+        &storage,
+        voices_loudness(-25.0),
+        vec![
+            create_stem(MasterType::Lead, true),
+            create_stem(MasterType::Backing, true),
+        ],
+    )
+    .await;
 
     let recorded = read(&storage, |database| {
-        let master = database.master_blob(2, MasterType::Backing)?;
-        let delivery = database.delivery(2, StemType::Instrumental)?;
+        let vocals = database.master_blob(2, MasterType::Vocals)?;
+        let backing = database.master_blob(2, MasterType::Backing)?;
+        let instrumental = database.delivery(2, StemType::Instrumental)?;
+        let lead = database.delivery(2, StemType::Lead)?;
         let measured = database.stem_loudness(2)?;
-        Ok((master, delivery, measured))
+        Ok((vocals, backing, instrumental, lead, measured))
     })
     .await
-    .expect("the separation should be read");
-    let (master, delivery, measured) = recorded;
-    assert_eq!(master.as_deref(), Some("master-backing"));
-    let delivered = delivery.expect("the instrumental delivery should be recorded");
+    .expect("the stems should be read");
+    let (vocals, backing, instrumental, lead, measured) = recorded;
+    assert_eq!(vocals.as_deref(), Some("master-vocals"));
+    assert_eq!(backing.as_deref(), Some("master-backing"));
+    let delivered = instrumental.expect("the instrumental delivery should be recorded");
     assert_eq!(delivered.blob_id, "delivery-instrumental");
     assert_eq!(delivered.wave_blob_id, "wave-instrumental");
+    assert!(lead.is_some());
     let gains = read_gains(&measured).expect("every stem should be recorded");
     assert_eq!(json!(gains.source), json!(2.0));
     assert_eq!(
         json!(find_stem(&measured, MasterType::Lead).p95_rms_db),
         json!(-30.0)
     );
+}
+
+#[tokio::test]
+async fn keeps_the_instrumental_when_the_voices_step_runs_again() {
+    let workspace = Workspace::new();
+    workspace.seed(SEPARATION_PROJECT);
+    let storage = workspace.create_storage();
+    record_separation(&storage).await;
+
+    record_stems(
+        &storage,
+        voices_loudness(-25.0),
+        vec![NewStem {
+            stem: MasterType::Lead,
+            master_blob_id: "retried-lead".to_owned(),
+            delivery: Some(NewDelivery {
+                blob_id: "retried-delivery-lead".to_owned(),
+                wave_blob_id: "retried-wave-lead".to_owned(),
+            }),
+        }],
+    )
+    .await;
+
+    let recorded = read(&storage, |database| {
+        let instrumental = database.master_blob(2, MasterType::Instrumental)?;
+        let vocals = database.master_blob(2, MasterType::Vocals)?;
+        let lead = database.master_blob(2, MasterType::Lead)?;
+        Ok((instrumental, vocals, lead))
+    })
+    .await
+    .expect("the stems should be read");
+    let (instrumental, vocals, lead) = recorded;
+    assert_eq!(instrumental.as_deref(), Some("master-instrumental"));
+    assert_eq!(vocals.as_deref(), Some("master-vocals"));
+    assert_eq!(lead.as_deref(), Some("retried-lead"));
 }

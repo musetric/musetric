@@ -31,7 +31,7 @@ pub(crate) struct StageRegistration {
     pub(crate) resume: Option<StageResume>,
 }
 
-pub(crate) struct SeparationUnits {
+pub(crate) struct StageUnits {
     root: PathBuf,
     stages: Mutex<HashMap<String, Arc<Stage>>>,
 }
@@ -53,9 +53,9 @@ struct StageState {
     receivers: HashMap<u32, oneshot::Receiver<()>>,
 }
 
-const POISONED_UNITS: &str = "the separation units are poisoned";
+const POISONED_UNITS: &str = "the stage units are poisoned";
 
-impl SeparationUnits {
+impl StageUnits {
     pub(crate) fn create(root: PathBuf) -> Self {
         Self {
             root,
@@ -146,7 +146,7 @@ impl SeparationUnits {
         let fold = stage
             .fold
             .lock()
-            .map_err(|_| Failure::Refused("the separation fold is poisoned".to_owned()))?;
+            .map_err(|_| Failure::Refused("the stage fold is poisoned".to_owned()))?;
         Ok(fold.to_bytes())
     }
 
@@ -173,7 +173,7 @@ impl SeparationUnits {
         let fold = stage
             .fold
             .lock()
-            .map_err(|_| Failure::Refused("the separation fold is poisoned".to_owned()))?;
+            .map_err(|_| Failure::Refused("the stage fold is poisoned".to_owned()))?;
         Ok(fold.finalize())
     }
 
@@ -267,7 +267,7 @@ impl SeparationUnits {
             let mut fold = stage
                 .fold
                 .lock()
-                .map_err(|_| "the separation fold is poisoned".to_owned())?;
+                .map_err(|_| "the stage fold is poisoned".to_owned())?;
             let mut guard =
                 Self::lock_state(stage).map_err(|_| "the attempt state is poisoned".to_owned())?;
             if guard.folded.contains(&unit) {
@@ -288,7 +288,7 @@ impl SeparationUnits {
     }
 }
 
-impl UnitSession for SeparationUnits {
+impl UnitSession for StageUnits {
     fn window(&self, attempt: &str, unit: u32) -> Result<Bytes, UnitReject> {
         let stage = self.planned(attempt, unit)?;
         Ok(Bytes::from(

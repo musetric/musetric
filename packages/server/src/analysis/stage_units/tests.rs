@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
-use super::{SeparationUnits, StageRegistration};
+use super::{StageRegistration, StageUnits};
 use crate::unit_plan::{PlanRules, PlanUnit, UnitPlan};
 
 const ANSWER: Duration = Duration::from_secs(5);
@@ -57,8 +57,8 @@ impl Drop for Workspace {
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-async fn start_units(workspace: &Workspace) -> (ExecutorHost, Arc<SeparationUnits>) {
-    let units = Arc::new(SeparationUnits::create(workspace.incoming()));
+async fn start_units(workspace: &Workspace) -> (ExecutorHost, Arc<StageUnits>) {
+    let units = Arc::new(StageUnits::create(workspace.incoming()));
     let sink: PhaseSink = Arc::new(|_| {});
     let host = ExecutorHost::start(ExecutorHostOptions {
         label: "Fixture separation".to_owned(),

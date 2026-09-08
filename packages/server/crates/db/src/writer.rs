@@ -4,6 +4,7 @@ use rusqlite::{Connection, OptionalExtension, Result, Transaction, TransactionBe
 
 use crate::{
     analysis::{Analysis, StemLoudness, write_stem_loudness},
+    audio::MasterType,
     database::{OpenOptions, open_database},
     failure::BoxedError,
     processing::{
@@ -26,18 +27,21 @@ pub struct NewProject {
     pub preview: Option<NewPreview>,
 }
 
-pub struct StemBlobs {
-    pub lead: String,
-    pub backing: String,
-    pub instrumental: String,
+pub struct NewDelivery {
+    pub blob_id: String,
+    pub wave_blob_id: String,
 }
 
-pub struct NewSeparation {
+pub struct NewStem {
+    pub stem: MasterType,
+    pub master_blob_id: String,
+    pub delivery: Option<NewDelivery>,
+}
+
+pub struct NewStems {
     pub project_id: i64,
     pub loudness: Vec<StemLoudness>,
-    pub master: StemBlobs,
-    pub delivery: StemBlobs,
-    pub wave_peaks: StemBlobs,
+    pub stems: Vec<NewStem>,
 }
 
 pub struct NewRecording {
@@ -155,30 +159,13 @@ impl Writer {
         })
     }
 
-    pub fn apply_separation_result(&self, result: &NewSeparation) -> Result<(), BoxedError> {
+    pub fn apply_stems_result(&self, result: &NewStems) -> Result<(), BoxedError> {
         self.write(|transaction| {
             for measured in &result.loudness {
                 write_stem_loudness(transaction, result.project_id, measured)?;
             }
-            for (stem, blob_id) in stems(&result.master) {
-                transaction.execute(
-                    "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, ?2, ?3)
-                     ON CONFLICT(projectId, type) DO UPDATE SET blobId = excluded.blobId",
-                    (result.project_id, stem, blob_id),
-                )?;
-            }
-            for ((stem, blob_id), (_, wave_blob_id)) in stems(&result.delivery)
-                .into_iter()
-                .zip(stems(&result.wave_peaks))
-            {
-                transaction.execute(
-                    "INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
-                     VALUES (?1, ?2, ?3, ?4)
-                     ON CONFLICT(projectId, stemType) DO UPDATE SET
-                       blobId = excluded.blobId,
-                       waveBlobId = excluded.waveBlobId",
-                    (result.project_id, stem, blob_id, wave_blob_id),
-                )?;
+            for stem in &result.stems {
+                write_stem(transaction, result.project_id, stem)?;
             }
             Ok(())
         })
@@ -229,12 +216,29 @@ impl Writer {
     }
 }
 
-fn stems(blobs: &StemBlobs) -> [(&'static str, &str); 3] {
-    [
-        ("lead", blobs.lead.as_str()),
-        ("backing", blobs.backing.as_str()),
-        ("instrumental", blobs.instrumental.as_str()),
-    ]
+fn write_stem(transaction: &Transaction, project_id: i64, stem: &NewStem) -> Result<()> {
+    transaction.execute(
+        "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, ?2, ?3)
+         ON CONFLICT(projectId, type) DO UPDATE SET blobId = excluded.blobId",
+        (project_id, stem.stem.name(), &stem.master_blob_id),
+    )?;
+    let Some(delivery) = stem.delivery.as_ref() else {
+        return Ok(());
+    };
+    transaction.execute(
+        "INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(projectId, stemType) DO UPDATE SET
+           blobId = excluded.blobId,
+           waveBlobId = excluded.waveBlobId",
+        (
+            project_id,
+            stem.stem.name(),
+            &delivery.blob_id,
+            &delivery.wave_blob_id,
+        ),
+    )?;
+    Ok(())
 }
 
 fn project_exists(transaction: &Transaction, project_id: i64) -> Result<bool> {

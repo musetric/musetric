@@ -12,7 +12,9 @@ const CREATE_PROJECT: &str = "
 const CREATE_PROCESSING_STEP: &str = "
   CREATE TABLE ProcessingStep (
     projectId INTEGER NOT NULL,
-    step TEXT NOT NULL CHECK (step IN ('separation', 'transcription', 'rhythm', 'key', 'chords')),
+    step TEXT NOT NULL CHECK (
+      step IN ('separation', 'voices', 'transcription', 'rhythm', 'key', 'chords')
+    ),
     status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'failed')),
     error TEXT,
     attemptId TEXT,
@@ -37,7 +39,9 @@ const CREATE_AUDIO_MASTER: &str = "
   CREATE TABLE AudioMaster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('source', 'lead', 'backing', 'instrumental')),
+    type TEXT NOT NULL CHECK (
+      type IN ('source', 'vocals', 'lead', 'backing', 'instrumental')
+    ),
     blobId TEXT NOT NULL UNIQUE,
     UNIQUE(projectId, type),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
@@ -51,7 +55,9 @@ const CREATE_AUDIO_MASTER_INDEX: &str = "
 const CREATE_STEM_LOUDNESS: &str = "
   CREATE TABLE StemLoudness (
     projectId INTEGER NOT NULL,
-    stemType TEXT NOT NULL CHECK (stemType IN ('source', 'lead', 'backing', 'instrumental')),
+    stemType TEXT NOT NULL CHECK (
+      stemType IN ('source', 'vocals', 'lead', 'backing', 'instrumental')
+    ),
     integratedLufs REAL NOT NULL,
     truePeakDb REAL NOT NULL,
     p95RmsDb REAL,
