@@ -3,16 +3,19 @@ mod gains;
 mod json_units;
 mod models;
 mod separation;
-mod separation_units;
+mod stage_attempt;
+mod stage_units;
+mod stem_files;
 mod stem_signal;
 mod steps;
+mod voices;
 
 #[cfg(test)]
 mod tests;
 
 use std::{path::PathBuf, sync::Arc};
 
-use musetric_db::PendingJob;
+use musetric_db::{PendingJob, ProcessingStep};
 
 pub(crate) use gains::{Gains, read_gains};
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
@@ -45,6 +48,9 @@ impl StepRunner for AnalysisRunner {
         match steps::create(job.step, &self.context.models_path) {
             Some(analysis) => {
                 Box::pin(async move { browser::run(&self.context, job, report, &analysis).await })
+            }
+            None if job.step == ProcessingStep::Voices => {
+                Box::pin(voices::run(&self.context, job, report))
             }
             None => Box::pin(separation::run(&self.context, job, report)),
         }

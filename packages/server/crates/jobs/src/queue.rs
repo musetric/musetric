@@ -20,8 +20,9 @@ use tokio::{
 use crate::summary::{ActiveStep, Processing, StepPhase, build_processing};
 
 const EVENT_CAPACITY: usize = 64;
-const QUEUE_ORDER: [ProcessingStep; 5] = [
+const QUEUE_ORDER: [ProcessingStep; 6] = [
     ProcessingStep::Transcription,
+    ProcessingStep::Voices,
     ProcessingStep::Rhythm,
     ProcessingStep::Key,
     ProcessingStep::Chords,

@@ -57,7 +57,7 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             serve: Serve::Directory(WHISPER.root(models_path)),
             build: build_transcription,
         }),
-        ProcessingStep::Separation => None,
+        ProcessingStep::Separation | ProcessingStep::Voices => None,
     }
 }
 

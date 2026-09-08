@@ -1,7 +1,8 @@
 use rusqlite::{Connection, OptionalExtension, Result};
 
-pub const MASTER_TYPES: [MasterType; 4] = [
+pub const MASTER_TYPES: [MasterType; 5] = [
     MasterType::Source,
+    MasterType::Vocals,
     MasterType::Lead,
     MasterType::Backing,
     MasterType::Instrumental,
@@ -12,6 +13,7 @@ pub const STEM_TYPES: [StemType; 3] = [StemType::Lead, StemType::Backing, StemTy
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MasterType {
     Source,
+    Vocals,
     Lead,
     Backing,
     Instrumental,
@@ -22,6 +24,7 @@ impl MasterType {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "source" => Some(Self::Source),
+            "vocals" => Some(Self::Vocals),
             "lead" => Some(Self::Lead),
             "backing" => Some(Self::Backing),
             "instrumental" => Some(Self::Instrumental),
@@ -33,6 +36,7 @@ impl MasterType {
     pub fn name(self) -> &'static str {
         match self {
             Self::Source => "source",
+            Self::Vocals => "vocals",
             Self::Lead => "lead",
             Self::Backing => "backing",
             Self::Instrumental => "instrumental",

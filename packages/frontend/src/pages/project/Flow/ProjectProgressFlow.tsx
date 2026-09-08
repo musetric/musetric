@@ -37,6 +37,12 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
             />
             <FlowStep
               projectId={project.id}
+              stepName='voices'
+              title={t('pages.project.progress.steps.voices')}
+              step={project.processing.steps.voices}
+            />
+            <FlowStep
+              projectId={project.id}
               stepName='transcription'
               title={t('pages.project.progress.steps.transcription')}
               step={project.processing.steps.transcription}

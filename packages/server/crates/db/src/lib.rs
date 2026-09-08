@@ -31,5 +31,5 @@ pub use reader::Reader;
 pub use runner::{MigrationReport, init_database, run_migrations};
 pub use schema::{MIGRATIONS, Migration};
 pub use writer::{
-    NewPreview, NewProject, NewRecording, NewSeparation, ProjectEdit, StemBlobs, Writer,
+    NewDelivery, NewPreview, NewProject, NewRecording, NewStem, NewStems, ProjectEdit, Writer,
 };
