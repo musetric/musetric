@@ -2,6 +2,7 @@ mod analysis;
 mod blob_response;
 mod blobs;
 mod cached_file;
+mod checkpoint;
 mod failure;
 mod form;
 mod frontend;

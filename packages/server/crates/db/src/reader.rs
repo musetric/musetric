@@ -12,7 +12,10 @@ use crate::{
     database::{OpenOptions, open_database},
     failure::BoxedError,
     preview::{Preview, read_preview},
-    processing::{PendingJob, ProcessingStep, StepState, read_pending, read_states},
+    processing::{
+        PendingJob, ProcessingStep, StepCheckpoint, StepState, read_checkpoint, read_pending,
+        read_states,
+    },
     project::{ProjectItem, read_project, read_project_name, read_projects},
 };
 
@@ -63,6 +66,14 @@ impl Reader {
 
     pub fn pending_job(&self, step: ProcessingStep) -> Result<Option<PendingJob>, BoxedError> {
         self.read(|connection| read_pending(connection, step))
+    }
+
+    pub fn step_checkpoint(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+    ) -> Result<Option<StepCheckpoint>, BoxedError> {
+        self.read(move |connection| read_checkpoint(connection, project_id, step))
     }
 
     pub fn master_blob(

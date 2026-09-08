@@ -380,17 +380,23 @@ async fn keeps_a_reporting_step_clear_of_the_idle_watchdog() {
     );
 }
 
-#[tokio::test]
-async fn cancels_the_running_step_when_its_project_is_removed() {
-    let workspace = Workspace::new();
-    let runner = FakeRunner::create(&workspace, Answer::Stuck);
+async fn drain_until_stuck(
+    workspace: &Workspace,
+) -> (Arc<Queue>, Arc<FakeRunner>, tokio::task::JoinHandle<()>) {
+    let runner = FakeRunner::create(workspace, Answer::Stuck);
     let queue = workspace.create_queue_with_idle(runner.clone(), Duration::from_mins(1));
-
     let worker = tokio::spawn({
         let running = Arc::clone(&queue);
         async move { running.drain().await }
     });
     runner.wait_seen(1).await;
+    (queue, runner, worker)
+}
+
+#[tokio::test]
+async fn cancels_the_running_step_when_its_project_is_removed() {
+    let workspace = Workspace::new();
+    let (queue, runner, worker) = drain_until_stuck(&workspace).await;
     queue.cancel_project(1);
     worker
         .await
@@ -404,4 +410,24 @@ async fn cancels_the_running_step_when_its_project_is_removed() {
     let separation = processing.step(ProcessingStep::Separation);
     assert_eq!(separation.status, StepStatus::Pending);
     assert_eq!(separation.error, None);
+}
+
+#[tokio::test]
+async fn keeps_the_first_cancel_when_another_project_is_cancelled() {
+    let workspace = Workspace::new();
+    let (queue, _, worker) = drain_until_stuck(&workspace).await;
+    queue.cancel_project(2);
+    queue.cancel_project(1);
+    worker
+        .await
+        .expect("the drain should finish after the cancel");
+
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    assert_eq!(
+        processing.step(ProcessingStep::Separation).status,
+        StepStatus::Pending
+    );
 }

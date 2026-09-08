@@ -2877,6 +2877,7 @@ dependencies = [
  "rcgen",
  "reqwest",
  "serde_json",
+ "sha2 0.11.0",
  "time",
  "tokio",
  "tokio-tungstenite",

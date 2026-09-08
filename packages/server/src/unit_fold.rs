@@ -45,6 +45,39 @@ impl FoldAccumulator {
         }
     }
 
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity((self.target.len() + self.counter.len()) * 4);
+        for value in self.target.iter().chain(&self.counter) {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "signal sizes stay far below the address space"
+    )]
+    pub(crate) fn from_bytes(bytes: &[u8], frames: u64, channels: u32) -> Option<Self> {
+        let length = frames as usize * channels as usize;
+        if bytes.len() != length * 8 {
+            return None;
+        }
+        let mut target = Vec::with_capacity(length);
+        let mut counter = Vec::with_capacity(length);
+        for raw in bytes[..length * 4].chunks_exact(4) {
+            target.push(f32::from_le_bytes(raw.try_into().ok()?));
+        }
+        for raw in bytes[length * 4..].chunks_exact(4) {
+            counter.push(f32::from_le_bytes(raw.try_into().ok()?));
+        }
+        Some(Self {
+            target,
+            counter,
+            channels,
+            frames: frames as usize,
+        })
+    }
+
     #[expect(
         clippy::cast_possible_truncation,
         reason = "the division reproduces the browser float32 arithmetic"

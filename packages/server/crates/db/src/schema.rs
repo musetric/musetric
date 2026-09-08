@@ -15,6 +15,15 @@ const CREATE_PROCESSING_STEP: &str = "
     step TEXT NOT NULL CHECK (step IN ('separation', 'transcription', 'rhythm', 'key', 'chords')),
     status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'failed')),
     error TEXT,
+    attemptId TEXT,
+    computationId TEXT,
+    checkpointGeneration INTEGER NOT NULL DEFAULT 0,
+    pass TEXT,
+    nextUnit INTEGER NOT NULL DEFAULT 0,
+    unitCount INTEGER NOT NULL DEFAULT 0,
+    prefixFrames INTEGER NOT NULL DEFAULT 0,
+    tailHash TEXT,
+    tailBytes INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (projectId, step),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );

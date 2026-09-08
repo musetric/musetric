@@ -119,6 +119,8 @@ async fn retry(state: &RouteState, project_id: i64, step: ProcessingStep) -> Res
             step,
             status: StepStatus::Pending,
             error: None,
+            required: StepStatus::Failed,
+            attempt_id: None,
         })
     })
     .await?;

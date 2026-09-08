@@ -1,9 +1,10 @@
 use std::{
+    collections::HashSet,
     future::Future,
     panic::AssertUnwindSafe,
     pin::Pin,
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use futures_util::FutureExt;
@@ -72,7 +73,7 @@ pub struct Queue {
     events: broadcast::Sender<StatusEvent>,
     wake: Notify,
     cancel: Notify,
-    cancelled: Mutex<Option<i64>>,
+    cancelled: Mutex<HashSet<i64>>,
 }
 
 fn read_pending(reader: &Reader) -> Result<Option<PendingJob>, BoxedError> {
@@ -115,7 +116,7 @@ impl Queue {
             events,
             wake: Notify::new(),
             cancel: Notify::new(),
-            cancelled: Mutex::new(None),
+            cancelled: Mutex::new(HashSet::new()),
         })
     }
 
@@ -130,7 +131,7 @@ impl Queue {
 
     pub fn cancel_project(&self, project_id: i64) {
         if let Ok(mut cancelled) = self.cancelled.lock() {
-            *cancelled = Some(project_id);
+            cancelled.insert(project_id);
         }
         self.cancel.notify_one();
     }
@@ -176,8 +177,10 @@ impl Queue {
 
     async fn next_job(&self) -> Option<PendingJob> {
         let reader = Arc::clone(&self.reader);
-        let found = spawn_blocking(move || read_pending(&reader)).await;
-        found.ok()?.ok()?
+        spawn_blocking(move || read_pending(&reader))
+            .await
+            .ok()?
+            .ok()?
     }
 
     async fn run_job(self: &Arc<Self>, job: PendingJob) -> bool {
@@ -204,13 +207,19 @@ impl Queue {
             StepAnswer::Failed(message) => (StepStatus::Failed, Some(message.clone())),
             StepAnswer::Unavailable | StepAnswer::Cancelled => (StepStatus::Pending, None),
         };
-        self.write_status(StepUpdate {
-            project_id,
-            step,
-            status,
-            error,
-        })
-        .await;
+        let _ = self
+            .write_status(StepUpdate {
+                project_id,
+                step,
+                status,
+                error,
+                required: StepStatus::Processing,
+                attempt_id: None,
+            })
+            .await;
+        if let Ok(mut cancelled) = self.cancelled.lock() {
+            cancelled.remove(&project_id);
+        }
     }
 
     async fn execute(&self, job: &PendingJob, report: &StepReport) -> StepAnswer {
@@ -223,7 +232,7 @@ impl Queue {
                         .unwrap_or_else(|panic| StepAnswer::Failed(panic_message(&*panic)));
                 }
                 () = self.cancel.notified() => {
-                    if self.cancelled_target() == Some(job.project_id) {
+                    if self.project_cancelled(job.project_id) {
                         return StepAnswer::Cancelled;
                     }
                 }
@@ -236,8 +245,11 @@ impl Queue {
         }
     }
 
-    fn cancelled_target(&self) -> Option<i64> {
-        self.cancelled.lock().ok().and_then(|guard| *guard)
+    fn project_cancelled(&self, project_id: i64) -> bool {
+        self.cancelled
+            .lock()
+            .ok()
+            .is_some_and(|guard| guard.contains(&project_id))
     }
 
     fn idle_for(&self) -> Option<Duration> {
@@ -248,13 +260,27 @@ impl Queue {
     }
 
     async fn start(&self, job: &PendingJob) -> bool {
-        self.write_status(StepUpdate {
-            project_id: job.project_id,
-            step: job.step,
-            status: StepStatus::Processing,
-            error: None,
-        })
-        .await;
+        let attempt_id = format!(
+            "{}-{}",
+            job.project_id,
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
+        let claimed = self
+            .write_status(StepUpdate {
+                project_id: job.project_id,
+                step: job.step,
+                status: StepStatus::Processing,
+                error: None,
+                required: StepStatus::Pending,
+                attempt_id: Some(attempt_id),
+            })
+            .await;
+        if !claimed.unwrap_or(false) {
+            return false;
+        }
         let Ok(states) = self.read_states(job.project_id).await else {
             return false;
         };
@@ -270,9 +296,6 @@ impl Queue {
             },
             activity: Instant::now(),
         });
-        if let Ok(mut cancelled) = self.cancelled.lock() {
-            *cancelled = None;
-        }
         true
     }
 
@@ -292,9 +315,9 @@ impl Queue {
         });
     }
 
-    async fn write_status(&self, update: StepUpdate) {
+    async fn write_status(&self, update: StepUpdate) -> Result<bool, BoxedError> {
         let writer = Arc::clone(&self.writer);
-        let _ = spawn_blocking(move || writer.set_step_status(&update)).await;
+        spawn_blocking(move || writer.set_step_status(&update)).await?
     }
 
     async fn publish(&self, project_id: i64) {

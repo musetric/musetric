@@ -97,6 +97,7 @@ fn registration(attempt: &str, outputs: &[&str]) -> StageRegistration {
         ]),
         outputs: outputs.iter().map(|name| (*name).to_owned()).collect(),
         rules: PlanRules::LeadBackingV1,
+        resume: None,
     }
 }
 

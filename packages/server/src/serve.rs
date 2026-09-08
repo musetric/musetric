@@ -1,5 +1,5 @@
 use std::{
-    fs::{create_dir_all, remove_dir_all},
+    fs::create_dir_all,
     io::{self, Write},
     net::{SocketAddr, TcpListener as StdTcpListener},
     path::{Path, PathBuf},
@@ -212,7 +212,6 @@ fn create_storage(
 ) -> Result<Arc<Storage>, BoxedError> {
     let writer = Writer::open(database)?;
     writer.abandon_running_steps()?;
-    remove_dir_all(&work).ok();
     create_dir_all(&work)?;
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),
