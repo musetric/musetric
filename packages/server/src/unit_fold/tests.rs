@@ -112,3 +112,22 @@ fn repeats_the_same_summation_for_the_same_input() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn round_trips_the_accumulator_through_bytes() {
+    let plan = UnitPlan::create(
+        PlanRules::LeadBackingV1,
+        2,
+        4,
+        vec![PlanUnit {
+            start: 0,
+            length: 4,
+        }],
+    );
+    let mut fold = FoldAccumulator::create(4, 2);
+    fold.add(&plan, 0, &stereo(&[0.25, -0.5, 0.125, -0.125]));
+    let restored =
+        FoldAccumulator::from_bytes(&fold.to_bytes(), 4, 2).expect("the fold should decode");
+    assert_eq!(fold.finalize(), restored.finalize());
+    assert!(FoldAccumulator::from_bytes(&[0, 1, 2], 4, 2).is_none());
+}

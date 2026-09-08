@@ -23,7 +23,8 @@ pub use database::{OpenOptions, open_database, open_readonly, read_schema_versio
 pub use failure::{BoxedError, MigrationFailure};
 pub use preview::Preview;
 pub use processing::{
-    PROCESSING_STEPS, PendingJob, ProcessingStep, StepState, StepStatus, StepUpdate,
+    CheckpointWrite, PROCESSING_STEPS, PendingJob, ProcessingStep, StepCheckpoint, StepState,
+    StepStatus, StepUpdate,
 };
 pub use project::ProjectItem;
 pub use reader::Reader;

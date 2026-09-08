@@ -6,7 +6,10 @@ use crate::{
     analysis::{Analysis, StemLoudness, write_stem_loudness},
     database::{OpenOptions, open_database},
     failure::BoxedError,
-    processing::{StepUpdate, abandon_running, create_steps, write_status},
+    processing::{
+        CheckpointWrite, ProcessingStep, StepUpdate, abandon_running, bind_attempt, create_steps,
+        write_checkpoint, write_status,
+    },
 };
 
 pub struct NewPreview {
@@ -184,6 +187,25 @@ impl Writer {
     pub fn set_step_status(&self, update: &StepUpdate) -> Result<bool, BoxedError> {
         self.write(|transaction| {
             let written = write_status(transaction, update)?;
+            Ok(written != 0)
+        })
+    }
+
+    pub fn bind_attempt(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+        attempt_id: String,
+    ) -> Result<bool, BoxedError> {
+        self.write(move |transaction| {
+            let written = bind_attempt(transaction, project_id, step, &attempt_id)?;
+            Ok(written != 0)
+        })
+    }
+
+    pub fn commit_checkpoint(&self, write: &CheckpointWrite) -> Result<bool, BoxedError> {
+        self.write(|transaction| {
+            let written = write_checkpoint(transaction, write)?;
             Ok(written != 0)
         })
     }

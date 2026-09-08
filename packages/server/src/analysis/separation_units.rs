@@ -17,12 +17,18 @@ use crate::{
 const PART_SUFFIX: &str = ".part";
 const STAGE_LOST: &str = "the attempt is not active";
 
+pub(crate) struct StageResume {
+    pub(crate) fold: FoldAccumulator,
+    pub(crate) next_unit: u32,
+}
+
 pub(crate) struct StageRegistration {
     pub(crate) attempt: String,
     pub(crate) plan: UnitPlan,
     pub(crate) input: Arc<Vec<f32>>,
     pub(crate) outputs: Vec<String>,
     pub(crate) rules: PlanRules,
+    pub(crate) resume: Option<StageResume>,
 }
 
 pub(crate) struct SeparationUnits {
@@ -65,10 +71,20 @@ impl SeparationUnits {
         }
         let frames = u64::try_from(registration.input.len() / registration.plan.channels as usize)
             .unwrap_or(0);
-        let fold = FoldAccumulator::create(frames, registration.plan.channels);
+        let resume = registration.resume;
+        let next_unit = resume.as_ref().map_or(0, |value| value.next_unit);
+        let fold = match resume {
+            Some(value) => value.fold,
+            None => FoldAccumulator::create(frames, registration.plan.channels),
+        };
         let mut senders = HashMap::new();
         let mut receivers = HashMap::new();
+        let mut folded = HashSet::new();
         for unit in 0..registration.plan.unit_count() {
+            if unit < next_unit {
+                folded.insert(unit);
+                continue;
+            }
             let (sender, receiver) = oneshot::channel();
             senders.insert(unit, sender);
             receivers.insert(unit, receiver);
@@ -80,7 +96,7 @@ impl SeparationUnits {
             outputs: registration.outputs,
             state: Mutex::new(StageState {
                 accepted: HashSet::new(),
-                folded: HashSet::new(),
+                folded,
                 opened: Some(opened),
                 opened_receiver: Some(opened_receiver),
                 senders,
@@ -123,6 +139,21 @@ impl SeparationUnits {
         receiver
             .await
             .map_err(|_| Failure::Refused("the unit fold was dropped".to_owned()))
+    }
+
+    pub(crate) fn snapshot(&self, attempt: &str) -> Result<Vec<u8>, Failure> {
+        let stage = self.stage(attempt)?;
+        let fold = stage
+            .fold
+            .lock()
+            .map_err(|_| Failure::Refused("the separation fold is poisoned".to_owned()))?;
+        Ok(fold.to_bytes())
+    }
+
+    pub(crate) fn next_unit(&self, attempt: &str) -> Result<u32, Failure> {
+        let stage = self.stage(attempt)?;
+        let guard = Self::lock_state(&stage)?;
+        Ok(u32::try_from(guard.folded.len()).unwrap_or(0))
     }
 
     pub(crate) fn finalize(&self, attempt: &str) -> Result<Vec<f32>, Failure> {

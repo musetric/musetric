@@ -1,7 +1,9 @@
 use std::{path::Path, path::PathBuf, sync::Arc};
 
 use axum::body::Bytes;
-use musetric_db::{NewSeparation, PendingJob, StemBlobs, blob_path};
+use musetric_db::{
+    CheckpointWrite, NewSeparation, PendingJob, ProcessingStep, StemBlobs, blob_path,
+};
 use musetric_gpu::{
     ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPhase, PhaseSink, UnitSession,
 };
@@ -21,25 +23,30 @@ use crate::{
         browser::{Failure, answer, count_frames, decode_reporter, ensure_files, read_phase},
         gains::{Stems, measure},
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
-        separation_units::{SeparationUnits, StageRegistration},
+        separation_units::{SeparationUnits, StageRegistration, StageResume},
         stem_signal::{
             CHANNELS, MAX_PEAK, apply_scale, crop, deinterleave, interleaved_from_planar,
             normalize_peak, peak_of, place_padded, planar_from_interleaved, residual,
             subtract_planar,
         },
     },
-    blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
+    blobs::{StagedBlob, close_area, ensure_area, stage_blob, step_area},
+    checkpoint::{CheckpointDir, area_root, computation_id, digest_samples, restore_refused},
     pages::HeldPage,
     publish::publish,
-    storage::read_database,
+    storage::{read_database, write_database},
+    unit_fold::FoldAccumulator,
     unit_plan::{LEAD_BACKING_COMPENSATE, PlanRules, UnitPlan},
 };
 
 const LABEL: &str = "Headless AI separation";
 const API_NAME: &str = "musetricAiSeparateUnits";
 const UNIT_OUTPUT: &str = "separated";
-const INCOMING_AREA: &str = "incoming";
 const RAW_SUFFIX: &str = "raw";
+const CHECKPOINT_EVERY: u32 = 2;
+const VOCALS_PASS: &str = "vocals";
+const LEAD_PASS: &str = "leadBacking";
+const DSP_VERSION: &str = "separation-dsp-v1";
 const STEMS: [&str; 3] = ["lead", "backing", "instrumental"];
 
 struct Stem {
@@ -116,22 +123,31 @@ struct Run<'run> {
     context: &'run AnalysisContext,
     report: &'run StepReport,
     stems: &'run Separated,
+    project_id: i64,
+    step: ProcessingStep,
 }
 
 type Reported = mpsc::UnboundedReceiver<ExecutorPhase>;
+
+struct AttemptParts {
+    units: Arc<SeparationUnits>,
+    computation: String,
+    store: CheckpointDir,
+}
 
 struct Attempt<'run> {
     running: &'run Run<'run>,
     host: ExecutorHost,
     units: Arc<SeparationUnits>,
     reported: Reported,
+    computation: String,
+    store: CheckpointDir,
+    pass: &'static str,
 }
 
 impl<'run> Attempt<'run> {
-    async fn create(
-        running: &'run Run<'run>,
-        units: &Arc<SeparationUnits>,
-    ) -> Result<Self, Failure> {
+    async fn create(running: &'run Run<'run>, parts: AttemptParts) -> Result<Self, Failure> {
+        let units = &parts.units;
         let (phases, reported) = mpsc::unbounded_channel();
         let sink: PhaseSink = Arc::new(move |phase| {
             let _ = phases.send(phase);
@@ -148,8 +164,11 @@ impl<'run> Attempt<'run> {
         Ok(Self {
             running,
             host,
-            units: Arc::clone(units),
+            units: parts.units,
             reported,
+            computation: parts.computation,
+            store: parts.store,
+            pass: VOCALS_PASS,
         })
     }
 
@@ -201,6 +220,8 @@ impl<'run> Attempt<'run> {
             "vocalsModelDataUrl": hosted.vocals_data,
             "vocalsModelDataPath": VOCALS_MODEL_DATA,
         });
+        self.pass = VOCALS_PASS;
+        let vocals_resume = self.resume_fold(samples, 2).await?;
         self.stage(
             StageRegistration {
                 attempt: vocals_id.clone(),
@@ -208,12 +229,17 @@ impl<'run> Attempt<'run> {
                 input: Arc::clone(mixture),
                 outputs: vec![UNIT_OUTPUT.to_owned()],
                 rules: PlanRules::VocalsV1,
+                resume: vocals_resume,
             },
             vocals_request,
             StageProgress { first: 0, total },
         )
         .await?;
         let raw_vocals = self.units.finalize(&vocals_id)?;
+        self.store
+            .write_vocals(&raw_vocals)
+            .await
+            .map_err(|error| Failure::from(error.to_string()))?;
         let vocals = normalize_peak(&raw_vocals, MAX_PEAK);
         let instrumental = normalize_peak(&subtract_planar(mixture, &raw_vocals), MAX_PEAK);
 
@@ -237,6 +263,10 @@ impl<'run> Attempt<'run> {
             "outputs": [UNIT_OUTPUT],
             "leadBackingModelUrl": hosted.lead_backing,
         });
+        self.pass = LEAD_PASS;
+        let lead_resume = self
+            .resume_fold(u64::try_from(padded.len() / CHANNELS).unwrap_or(0), 2)
+            .await?;
         self.stage(
             StageRegistration {
                 attempt: lead_backing_id.clone(),
@@ -244,6 +274,7 @@ impl<'run> Attempt<'run> {
                 input: Arc::clone(&padded),
                 outputs: vec![UNIT_OUTPUT.to_owned()],
                 rules: PlanRules::LeadBackingV1,
+                resume: lead_resume,
             },
             lead_backing_request,
             StageProgress {
@@ -275,13 +306,15 @@ impl<'run> Attempt<'run> {
         let count = registration.plan.unit_count();
         let attempt_id = registration.attempt.clone();
         self.units.register(registration)?;
+        self.bind(&attempt_id).await?;
+        let start = self.units.next_unit(&attempt_id)?;
         let ticket = self.host.send_job(API_NAME, &request)?;
         let mut answered = Box::pin(async move { ticket.wait().await });
         tokio::select! {
             finished = &mut answered => return early_job(finished),
             outcome = self.units.wait_opened(&attempt_id) => outcome?,
         }
-        for index in 0..count {
+        for index in start..count {
             (self.running.report)(StepPhase::Running {
                 pass: StepPass::Decode,
                 unit: progress.first + index,
@@ -293,6 +326,7 @@ impl<'run> Attempt<'run> {
                 finished = &mut answered => return early_job(finished),
                 outcome = self.units.folded(&attempt_id, index) => outcome?,
             }
+            self.persist(&attempt_id, index + 1, count).await?;
         }
         self.host.send_unit_close(&attempt_id)?;
         loop {
@@ -314,6 +348,103 @@ impl<'run> Attempt<'run> {
         while let Ok(phase) = self.reported.try_recv() {
             (self.running.report)(read_phase(phase));
         }
+    }
+
+    async fn bind(&self, attempt: &str) -> Result<(), Failure> {
+        let project_id = self.running.project_id;
+        let step = self.running.step;
+        let attempt_id = attempt.to_owned();
+        let bound = write_database(&self.running.context.storage, move |writer| {
+            writer.bind_attempt(project_id, step, attempt_id)
+        })
+        .await?;
+        if bound {
+            Ok(())
+        } else {
+            Err(Failure::Refused("the attempt is not active".to_owned()))
+        }
+    }
+
+    async fn persist(&self, attempt: &str, next_unit: u32, count: u32) -> Result<(), Failure> {
+        if next_unit != count && !next_unit.is_multiple_of(CHECKPOINT_EVERY) {
+            return Ok(());
+        }
+        let bytes = self.units.snapshot(attempt)?;
+        let previous = read_database(&self.running.context.storage, {
+            let project_id = self.running.project_id;
+            let step = self.running.step;
+            move |reader| reader.step_checkpoint(project_id, step)
+        })
+        .await?
+        .map_or(0, |cursor| cursor.generation);
+        let generation = previous + 1;
+        let stored = self
+            .store
+            .write_tail(generation, &bytes)
+            .await
+            .map_err(|error| Failure::from(error.to_string()))?;
+        let committed = write_database(&self.running.context.storage, {
+            let write = CheckpointWrite {
+                project_id: self.running.project_id,
+                step: self.running.step,
+                attempt_id: attempt.to_owned(),
+                computation_id: self.computation.clone(),
+                generation,
+                pass: self.pass.to_owned(),
+                next_unit,
+                unit_count: count,
+                prefix_frames: 0,
+                tail_hash: stored.digest,
+                tail_bytes: i64::try_from(stored.bytes.len()).unwrap_or(0),
+            };
+            move |writer| writer.commit_checkpoint(&write)
+        })
+        .await?;
+        if !committed {
+            return Err(Failure::Refused("the attempt is not active".to_owned()));
+        }
+        if previous > 0 {
+            self.store.discard(previous).await;
+        }
+        Ok(())
+    }
+
+    async fn resume_fold(
+        &self,
+        frames: u64,
+        channels: u32,
+    ) -> Result<Option<StageResume>, Failure> {
+        let project_id = self.running.project_id;
+        let step = self.running.step;
+        let found = read_database(&self.running.context.storage, move |reader| {
+            reader.step_checkpoint(project_id, step)
+        })
+        .await?;
+        let Some(cursor) = found else {
+            return Ok(None);
+        };
+        if cursor.computation_id.as_deref() != Some(self.computation.as_str())
+            || cursor.pass.as_deref() != Some(self.pass)
+            || cursor.generation == 0
+        {
+            return Ok(None);
+        }
+        let tail = self
+            .store
+            .read_tail(cursor.generation)
+            .await
+            .map_err(|_| Failure::Refused(restore_refused("the tail file is missing")))?;
+        if Some(tail.digest.as_str()) != cursor.tail_hash.as_deref() {
+            return Err(Failure::Refused(restore_refused(
+                "the tail hash does not match",
+            )));
+        }
+        let fold = FoldAccumulator::from_bytes(&tail.bytes, frames, channels)
+            .ok_or_else(|| Failure::Refused(restore_refused("the tail is not a fold")))?;
+        Ok(Some(StageResume {
+            fold,
+            next_unit: cursor.next_unit,
+        }))
     }
 }
 
@@ -348,7 +479,7 @@ pub(crate) async fn run(
     report: &StepReport,
 ) -> StepAnswer {
     let area = step_area(&context.storage.work_path, job.project_id, job.step);
-    if let Err(error) = open_area(&area).await {
+    if let Err(error) = ensure_area(&area).await {
         return answer(Err(Failure::from(error.to_string())));
     }
     let stems = Separated::create(&area, &context.storage.blobs_path);
@@ -356,9 +487,13 @@ pub(crate) async fn run(
         context,
         report,
         stems: &stems,
+        project_id: job.project_id,
+        step: job.step,
     };
     let found = separate(&running, job).await;
-    close_area(&area).await;
+    if found.is_ok() {
+        close_area(&area).await;
+    }
     answer(found)
 }
 
@@ -430,9 +565,37 @@ async fn separate_units(running: &Run<'_>, job: &PendingJob) -> Result<(), Failu
     ));
     let samples = (mixture.len() / CHANNELS) as u64;
     (report)(StepPhase::Loading);
-    let area = step_area(&context.storage.work_path, job.project_id, job.step);
-    let units = Arc::new(SeparationUnits::create(area.join(INCOMING_AREA)));
-    let mut attempt = Attempt::create(running, &units).await?;
+    let computation = computation_id(&[
+        DSP_VERSION,
+        &digest_samples(&mixture),
+        VOCALS.files[0].1,
+        VOCALS.files[1].1,
+        LEAD_BACKING.files[0].1,
+    ]);
+    let store = CheckpointDir::create(area_root(
+        &context.storage.work_path,
+        job.project_id,
+        job.step.name(),
+        &computation,
+    ));
+    store
+        .write_mixture(&mixture)
+        .await
+        .map_err(|error| Failure::from(error.to_string()))?;
+    store
+        .write_input(&mixture)
+        .await
+        .map_err(|error| Failure::from(error.to_string()))?;
+    let units = Arc::new(SeparationUnits::create(store.incoming_root()));
+    let mut attempt = Attempt::create(
+        running,
+        AttemptParts {
+            units,
+            computation,
+            store,
+        },
+    )
+    .await?;
     let outcome = attempt.produce(&mixture, samples, &models).await;
     attempt.close().await;
     let produced = outcome?;

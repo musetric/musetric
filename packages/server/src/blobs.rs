@@ -25,6 +25,11 @@ pub(crate) async fn open_area(area: &Path) -> Result<(), BoxedError> {
     Ok(())
 }
 
+pub(crate) async fn ensure_area(area: &Path) -> Result<(), BoxedError> {
+    create_dir_all(area).await?;
+    Ok(())
+}
+
 pub(crate) async fn close_area(area: &Path) {
     let _ = remove_dir_all(area).await;
 }
