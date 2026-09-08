@@ -22,19 +22,27 @@ const FLOAT_BYTES: usize = 4;
 pub type UnitCompleted<'session> =
     Pin<Box<dyn Future<Output = Result<(), String>> + Send + 'session>>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UnitPayload {
+    Floats,
+    Bytes,
+}
+
 pub struct UnitWrite {
     part: PathBuf,
     ready: PathBuf,
     expected: u64,
+    payload: UnitPayload,
 }
 
 impl UnitWrite {
     #[must_use]
-    pub fn create(part: PathBuf, ready: PathBuf, expected: u64) -> Self {
+    pub fn create(part: PathBuf, ready: PathBuf, expected: u64, payload: UnitPayload) -> Self {
         Self {
             part,
             ready,
             expected,
+            payload,
         }
     }
 }
@@ -220,7 +228,7 @@ async fn store_output(
     write: UnitWrite,
     body: Body,
 ) -> Result<(), OutputFailure> {
-    if let Err(failure) = write_part(&write.part, write.expected, body).await {
+    if let Err(failure) = write_part(&write, body).await {
         context
             .units
             .aborted(context.attempt, context.unit, context.output);
@@ -254,13 +262,13 @@ async fn promote_part(part: &PathBuf, ready: &PathBuf) -> Result<(), OutputFailu
         .map_err(|error| OutputFailure::Storage(error.to_string()))
 }
 
-async fn write_part(part: &PathBuf, expected: u64, mut body: Body) -> Result<(), OutputFailure> {
-    if let Some(directory) = part.parent()
+async fn write_part(write: &UnitWrite, mut body: Body) -> Result<(), OutputFailure> {
+    if let Some(directory) = write.part.parent()
         && let Err(error) = create_dir_all(directory).await
     {
         return Err(OutputFailure::Storage(error.to_string()));
     }
-    let mut file = File::create(part)
+    let mut file = File::create(&write.part)
         .await
         .map_err(|error| OutputFailure::Storage(error.to_string()))?;
     let mut carry: Vec<u8> = Vec::new();
@@ -271,14 +279,28 @@ async fn write_part(part: &PathBuf, expected: u64, mut body: Body) -> Result<(),
             continue;
         };
         carry.extend_from_slice(chunk.as_ref());
-        let aligned = carry.len() - carry.len() % FLOAT_BYTES;
-        if written + aligned as u64 > expected {
+        let take = match write.payload {
+            UnitPayload::Floats => carry.len() - carry.len() % FLOAT_BYTES,
+            UnitPayload::Bytes => carry.len(),
+        };
+        if written + take as u64 > write.expected {
             return Err(OutputFailure::Length);
         }
-        write_samples(&mut file, &carry[..aligned], &mut written).await?;
-        carry.drain(..aligned);
+        if write.payload == UnitPayload::Floats {
+            write_samples(&mut file, &carry[..take], &mut written).await?;
+        } else {
+            file.write_all(&carry[..take])
+                .await
+                .map_err(|error| OutputFailure::Storage(error.to_string()))?;
+            written += take as u64;
+        }
+        carry.drain(..take);
     }
-    if !carry.is_empty() || written != expected {
+    let complete = match write.payload {
+        UnitPayload::Floats => carry.is_empty() && written == write.expected,
+        UnitPayload::Bytes => carry.is_empty() && written > 0 && written <= write.expected,
+    };
+    if !complete {
         return Err(OutputFailure::Length);
     }
     file.flush()

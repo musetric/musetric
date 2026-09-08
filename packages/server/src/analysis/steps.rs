@@ -61,33 +61,53 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
     }
 }
 
-fn build_chords(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+fn build_chords(
+    attempt_id: &str,
+    attempt_url: &str,
+    files: &HostedModel,
+) -> Result<Value, Failure> {
     Ok(json!({
-        "pcmUrl": pcm_url,
+        "attemptId": attempt_id,
+        "attemptUrl": attempt_url,
+        "outputs": ["result"],
         "modelUrl": files.url(CHORD_NET_MODEL)?,
         "planUrl": files.url(CHORD_NET_PLAN)?,
         "planManifestUrl": files.url(CHORD_NET_PLAN_MANIFEST)?,
     }))
 }
 
-fn build_rhythm(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+fn build_rhythm(
+    attempt_id: &str,
+    attempt_url: &str,
+    files: &HostedModel,
+) -> Result<Value, Failure> {
     Ok(json!({
-        "pcmUrl": pcm_url,
+        "attemptId": attempt_id,
+        "attemptUrl": attempt_url,
+        "outputs": ["result"],
         "modelUrl": files.url(BEAT_THIS_MODEL)?,
         "filterbankUrl": files.url(BEAT_THIS_FILTERBANK)?,
     }))
 }
 
-fn build_key(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result<Value, Failure> {
     Ok(json!({
-        "pcmUrl": pcm_url,
+        "attemptId": attempt_id,
+        "attemptUrl": attempt_url,
+        "outputs": ["result"],
         "modelUrl": files.url(SKEY_MODEL)?,
     }))
 }
 
-fn build_transcription(pcm_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+fn build_transcription(
+    attempt_id: &str,
+    attempt_url: &str,
+    files: &HostedModel,
+) -> Result<Value, Failure> {
     Ok(json!({
-        "pcmUrl": pcm_url,
+        "attemptId": attempt_id,
+        "attemptUrl": attempt_url,
+        "outputs": ["result"],
         "sampleRate": WHISPER.sample_rate,
         "modelHost": files.root()?,
         "modelId": WHISPER.model_id,

@@ -5,7 +5,7 @@ use std::{
 };
 
 use axum::body::Bytes;
-use musetric_gpu::{UnitCompleted, UnitReject, UnitSession, UnitTarget, UnitWrite};
+use musetric_gpu::{UnitCompleted, UnitPayload, UnitReject, UnitSession, UnitTarget, UnitWrite};
 use tokio::{fs, sync::oneshot};
 
 use crate::{
@@ -317,6 +317,7 @@ impl UnitSession for SeparationUnits {
             self.part_path(attempt, unit, output),
             self.ready_path(attempt, unit, output),
             Self::expected(&stage),
+            UnitPayload::Floats,
         )))
     }
 

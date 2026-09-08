@@ -7,8 +7,8 @@ use std::{
 use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Bundle, Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPass,
-    ExecutorPhase, ModelFile, PhaseSink, ensure_model_file,
+    Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPass, ExecutorPhase,
+    ModelFile, PhaseSink, UnitSession, ensure_model_file,
 };
 use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
 use musetric_media::{
@@ -16,12 +16,14 @@ use musetric_media::{
 };
 use serde_json::{Map, Value, json};
 use tokio::{fs::write, sync::mpsc};
+use uuid::Uuid;
 
 use crate::{
-    analysis::AnalysisContext,
-    blobs::{StagedBlob, close_area, open_area, stage_blob, step_area},
-    pages::{HeldPage, PageFailure, PageOpener},
+    analysis::{AnalysisContext, json_units::JsonUnits},
+    blobs::{StagedBlob, close_area, ensure_area, stage_blob, step_area},
+    pages::{HeldPage, PageFailure},
     publish::publish,
+    storage::write_database,
 };
 
 const DECODE_REPORTS: u64 = 100;
@@ -91,7 +93,7 @@ impl HostedModel {
     }
 }
 
-pub(crate) type BuildRequest = fn(&str, &HostedModel) -> Result<Value, Failure>;
+pub(crate) type BuildRequest = fn(&str, &str, &HostedModel) -> Result<Value, Failure>;
 
 pub(crate) struct BrowserAnalysis {
     pub(crate) label: &'static str,
@@ -103,79 +105,6 @@ pub(crate) struct BrowserAnalysis {
     pub(crate) files: Vec<ModelFile>,
     pub(crate) serve: Serve,
     pub(crate) build: BuildRequest,
-}
-
-pub(crate) struct SessionOptions {
-    pub(crate) label: &'static str,
-    pub(crate) bundle: Bundle,
-    pub(crate) pcm: Vec<u8>,
-    pub(crate) require_shader_f16: bool,
-}
-pub(crate) struct Job<'job> {
-    pub(crate) api: &'job str,
-    pub(crate) request: &'job Value,
-    pub(crate) report: &'job StepReport,
-}
-
-pub(crate) struct Session {
-    host: ExecutorHost,
-    reported: mpsc::UnboundedReceiver<ExecutorPhase>,
-}
-
-impl Session {
-    pub(crate) async fn start(options: SessionOptions) -> Result<Self, Failure> {
-        let (phases, reported) = mpsc::unbounded_channel();
-        let sink: PhaseSink = Arc::new(move |phase| {
-            let _ = phases.send(phase);
-        });
-        let host = ExecutorHost::start(ExecutorHostOptions {
-            label: options.label.to_owned(),
-            bundle: options.bundle,
-            pcm: Bytes::from(options.pcm),
-            require_shader_f16: options.require_shader_f16,
-            on_phase: sink,
-            units: None,
-        })
-        .await?;
-        Ok(Self { host, reported })
-    }
-
-    pub(crate) fn host(&self) -> &ExecutorHost {
-        &self.host
-    }
-
-    pub(crate) async fn run(
-        &mut self,
-        pages: &dyn PageOpener,
-        job: Job<'_>,
-    ) -> Result<Value, Failure> {
-        let page = pages.open_page(&self.host.page_url()).await?;
-        let held = HeldPage::hold(pages, page);
-        let found = self.answer(job).await;
-        drop(held);
-        found
-    }
-
-    async fn answer(&mut self, job: Job<'_>) -> Result<Value, Failure> {
-        let Self { host, reported } = self;
-        host.wait_ready().await?;
-        let running = host.run(job.api, job.request);
-        tokio::pin!(running);
-        loop {
-            tokio::select! {
-                received = reported.recv() => {
-                    if let Some(phase) = received {
-                        (job.report)(read_phase(phase));
-                    }
-                }
-                answered = &mut running => return Ok(answered?),
-            }
-        }
-    }
-
-    pub(crate) async fn close(self) {
-        self.host.close().await;
-    }
 }
 
 pub(crate) fn read_phase(phase: ExecutorPhase) -> StepPhase {
@@ -198,12 +127,6 @@ fn read_pass(pass: ExecutorPass) -> StepPass {
         ExecutorPass::Decode => StepPass::Decode,
         ExecutorPass::Repair => StepPass::Repair,
     }
-}
-
-struct Attempt<'attempt> {
-    context: &'attempt AnalysisContext,
-    report: &'attempt StepReport,
-    analysis: &'attempt BrowserAnalysis,
 }
 
 pub(crate) async fn run(
@@ -244,44 +167,121 @@ async fn analyze(
     })
     .await?;
     report(StepPhase::Loading);
-    let mut session = Session::start(SessionOptions {
-        label: analysis.label,
-        bundle: context.bundle.clone(),
-        pcm,
-        require_shader_f16: analysis.require_shader_f16,
-    })
-    .await?;
-    let attempt = Attempt {
+    let result = drive(DriveJob {
         context,
+        job,
         report,
         analysis,
-    };
-    let found = read_result(&attempt, &mut session, &files).await;
-    session.close().await;
-    let result = found?;
+        pcm,
+        files,
+    })
+    .await?;
     report(StepPhase::Saving);
     store(context, job, analysis.stored, &result).await?;
     Ok(())
 }
 
-async fn read_result(
-    attempt: &Attempt<'_>,
-    session: &mut Session,
-    files: &[(String, PathBuf)],
-) -> Result<Value, Failure> {
-    let analysis = attempt.analysis;
-    let hosted = register_files(session.host(), &analysis.serve, files).await?;
-    let request = (analysis.build)(&session.host().pcm_url(), &hosted)?;
-    session
-        .run(
-            attempt.context.pages.as_ref(),
-            Job {
-                api: analysis.api,
-                request: &request,
-                report: attempt.report,
-            },
-        )
-        .await
+struct DriveJob<'drive> {
+    context: &'drive AnalysisContext,
+    job: &'drive PendingJob,
+    report: &'drive StepReport,
+    analysis: &'drive BrowserAnalysis,
+    pcm: Vec<u8>,
+    files: Vec<(String, PathBuf)>,
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "the unit handshake is a linear sequence of selects"
+)]
+async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
+    let attempt_id = Uuid::new_v4().to_string();
+    let area = step_area(
+        &job.context.storage.work_path,
+        job.job.project_id,
+        job.job.step,
+    );
+    ensure_area(&area).await?;
+    let units = Arc::new(JsonUnits::create(area.join("incoming")));
+    units.register(attempt_id.clone(), Arc::new(job.pcm))?;
+    let (phases, mut reported) = mpsc::unbounded_channel();
+    let sink: PhaseSink = Arc::new(move |phase| {
+        let _ = phases.send(phase);
+    });
+    let host = ExecutorHost::start(ExecutorHostOptions {
+        label: job.analysis.label.to_owned(),
+        bundle: job.context.bundle.clone(),
+        pcm: Bytes::from(Vec::new()),
+        require_shader_f16: job.analysis.require_shader_f16,
+        on_phase: sink,
+        units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
+    })
+    .await?;
+    let page = job.context.pages.open_page(&host.page_url()).await?;
+    let held = HeldPage::hold(job.context.pages.as_ref(), page);
+    host.wait_ready().await?;
+    let bound = write_database(&job.context.storage, {
+        let project_id = job.job.project_id;
+        let step = job.job.step;
+        let attempt = attempt_id.clone();
+        move |writer| writer.bind_attempt(project_id, step, attempt)
+    })
+    .await?;
+    if !bound {
+        drop(held);
+        host.close().await;
+        return Err(Failure::Refused("the attempt is not active".to_owned()));
+    }
+    let hosted = register_files(&host, &job.analysis.serve, &job.files).await?;
+    let request = (job.analysis.build)(&attempt_id, &host.attempt_url(&attempt_id), &hosted)?;
+    let ticket = host.send_job(job.analysis.api, &request)?;
+    let mut answered = Box::pin(async move { ticket.wait().await });
+    tokio::select! {
+        finished = &mut answered => {
+            drop(held);
+            host.close().await;
+            return early_job(finished);
+        }
+        outcome = units.wait_opened(&attempt_id) => outcome?,
+    }
+    (job.report)(StepPhase::Running {
+        pass: StepPass::Decode,
+        unit: 0,
+        unit_count: 1,
+    });
+    host.send_unit(&attempt_id, 0, 1)?;
+    tokio::select! {
+        finished = &mut answered => {
+            drop(held);
+            host.close().await;
+            return early_job(finished);
+        }
+        outcome = units.folded(&attempt_id) => outcome?,
+    }
+    host.send_unit_close(&attempt_id)?;
+    loop {
+        tokio::select! {
+            finished = &mut answered => {
+                finished.map_err(Failure::from)?;
+                break;
+            }
+            received = reported.recv() => {
+                if let Some(phase) = received {
+                    (job.report)(read_phase(phase));
+                }
+            }
+        }
+    }
+    drop(held);
+    host.close().await;
+    units.finalize(&attempt_id)
+}
+
+fn early_job(finished: Result<Value, ExecutorFailure>) -> Result<Value, Failure> {
+    finished.map_err(Failure::from)?;
+    Err(Failure::Refused(
+        "the analysis job answered before the close".to_owned(),
+    ))
 }
 
 async fn register_files(
@@ -359,7 +359,7 @@ pub(crate) async fn store(
     result: &Value,
 ) -> Result<(), Failure> {
     let area = step_area(&context.storage.work_path, job.project_id, job.step);
-    open_area(&area).await?;
+    ensure_area(&area).await?;
     let staged = stage_blob(&area, &context.storage.blobs_path);
     let written = write_payload(&staged, result).await;
     if written.is_ok() {

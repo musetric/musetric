@@ -1,4 +1,4 @@
-import { fetchFloat32 } from './browserShared.js';
+import { fetchOk } from './browserShared.js';
 import {
   type UnitCloseCommand,
   type UnitCommand,
@@ -61,25 +61,21 @@ export type UnitServing = {
   attemptId: string;
   attemptUrl: string;
   outputs: string[];
-  run: (input: Float32Array<ArrayBuffer>) => Promise<Float32Array<ArrayBuffer>>;
+  run: (input: Uint8Array, unit: number) => Promise<Uint8Array>;
 };
 
 const putOutput = async (
   serving: UnitServing,
   unit: number,
   output: string,
-  separated: Float32Array<ArrayBuffer>,
+  body: Uint8Array,
 ): Promise<void> => {
   const response = await fetch(
     `${serving.attemptUrl}/unit/${String(unit)}/${output}`,
     {
       method: 'PUT',
       headers: { 'content-type': 'application/octet-stream' },
-      body: new Uint8Array(
-        separated.buffer,
-        separated.byteOffset,
-        separated.byteLength,
-      ),
+      body: Uint8Array.from(body),
     },
   );
   if (!response.ok) {
@@ -106,6 +102,11 @@ const announceOpened = async (attemptId: string): Promise<void> =>
 const confirmUnit = async (attemptId: string, unit: number): Promise<void> =>
   callAttemptApi(unitDoneApiName, [attemptId, unit]);
 
+const fetchBytes = async (url: string): Promise<Uint8Array> => {
+  const response = await fetchOk(url, 'the unit window');
+  return new Uint8Array(await response.arrayBuffer());
+};
+
 export const serveUnits = async (serving: UnitServing): Promise<void> => {
   const closed = Promise.withResolvers<void>();
   const receive = async (
@@ -118,13 +119,12 @@ export const serveUnits = async (serving: UnitServing): Promise<void> => {
       closed.resolve();
       return;
     }
-    const input = await fetchFloat32(
+    const input = await fetchBytes(
       `${serving.attemptUrl}/unit/${String(event.unit)}`,
-      'the unit window',
     );
-    const separated = await serving.run(input);
+    const produced = await serving.run(input, event.unit);
     for (const output of serving.outputs) {
-      await putOutput(serving, event.unit, output, separated);
+      await putOutput(serving, event.unit, output, produced);
     }
     await confirmUnit(serving.attemptId, event.unit);
   };

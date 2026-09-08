@@ -1,6 +1,8 @@
 export const analyzeKeyApiName = 'musetricAiAnalyzeKey';
 
 export type BrowserAnalyzeKeyRequest = {
-  pcmUrl: string;
+  attemptId: string;
+  attemptUrl: string;
+  outputs: string[];
   modelUrl: string;
 };

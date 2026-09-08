@@ -1,7 +1,9 @@
 export const analyzeRhythmApiName = 'musetricAiAnalyzeRhythm';
 
 export type BrowserAnalyzeRhythmRequest = {
-  pcmUrl: string;
+  attemptId: string;
+  attemptUrl: string;
+  outputs: string[];
   modelUrl: string;
   filterbankUrl: string;
 };

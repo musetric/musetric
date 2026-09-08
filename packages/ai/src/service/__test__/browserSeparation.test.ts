@@ -10,8 +10,11 @@ const serving = {
   attemptId: attempt,
   attemptUrl: '',
   outputs: ['separated'],
-  run: async (input: Float32Array<ArrayBuffer>) =>
-    Promise.resolve(Float32Array.from(input, (value) => value * 2)),
+  run: async (input: Uint8Array) => {
+    const values = new Float32Array(input.slice().buffer);
+    const output = Float32Array.from(values, (value) => value * 2);
+    return Promise.resolve(new Uint8Array(output.buffer));
+  },
 };
 
 const floatBytes = (values: number[]): Buffer =>
