@@ -380,11 +380,6 @@ mod tests {
         let page_id = page_id_of(&opened);
         reply(&bridge, &page_id, "opened", "");
 
-        assert!(
-            asking
-                .await
-                .expect("the request should finish")
-                .is_ok()
-        );
+        assert!(asking.await.expect("the request should finish").is_ok());
     }
 }
