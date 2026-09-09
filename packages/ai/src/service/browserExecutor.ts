@@ -1,7 +1,7 @@
 import { setAndroidForegroundWork } from './androidForeground.js';
 import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
 import { readGpuSupport } from './browserGpuSupport.js';
-import { dispatchUnitEvent } from './browserUnitServing.js';
+import { abandonUnitServing, dispatchUnitEvent } from './browserUnitServing.js';
 import {
   type ExecutorMessage,
   type ExecutorUnitDone,
@@ -93,6 +93,12 @@ export const startJobExecutor = (jobUrl: string): void => {
     throw new Error('The job executor accepts a local socket url only');
   }
   const socket = new WebSocket(socketUrl);
+  socket.addEventListener('close', () => {
+    abandonUnitServing('the executor lost its connection to the host');
+  });
+  socket.addEventListener('error', () => {
+    abandonUnitServing('the executor connection to the host failed');
+  });
   socket.addEventListener('open', () => {
     void readGpuSupport().then((support) => {
       send(socket, { type: 'ready', ...support });
