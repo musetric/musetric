@@ -1,10 +1,10 @@
-import { vocalsModel } from '../../models/vocalsModel.js';
 import {
   createBindGroup,
   createBindGroupLayout,
   createComputePipeline,
   createStorageBuffer,
 } from '../helpers.js';
+import { type VocalsGraph } from '../modelGraphs.js';
 import {
   createStftInferenceRuntime,
   type StftInferenceCore,
@@ -26,6 +26,7 @@ export type VocalsGpuRuntime = {
 };
 
 export type VocalsGpuRuntimeOptions = {
+  graph: VocalsGraph;
   modelUrl: string;
   modelDataUrl: string;
   modelDataPath: string;
@@ -34,13 +35,18 @@ export type VocalsGpuRuntimeOptions = {
 export const createVocalsGpuRuntime = async (
   options: VocalsGpuRuntimeOptions,
 ): Promise<VocalsGpuRuntime> => {
-  const { nFft, frames } = vocalsModel;
+  const { graph } = options;
+  const { nFft, frames } = graph;
   const packedBins = (nFft / 2 + 1) * 2;
   const modelBytes = packedBins * frames * 2 * Float32Array.BYTES_PER_ELEMENT;
+  const shape = [1, packedBins, frames, 2];
 
   const runtime: StftInferenceRuntime = await createStftInferenceRuntime({
     label: 'Vocals',
-    model: vocalsModel,
+    model: graph,
+    geometry: graph,
+    inputShape: shape,
+    outputShape: shape,
     modelUrl: options.modelUrl,
     externalData: [{ path: options.modelDataPath, data: options.modelDataUrl }],
     frameShader: vocalsFrameShader,

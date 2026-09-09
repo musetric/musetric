@@ -1,6 +1,5 @@
 import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
 import { buildChordSegments } from '../chords/chordSegments.js';
-import { chordNetModel } from '../models/chordNetModel.js';
 import {
   fetchOk,
   floatsFromBytes,
@@ -62,6 +61,7 @@ export const registerChordsApi = (): void => {
         await import('../runtime/chords/chordNetGpuRuntime.js');
       const plan = await fetchCqtPlan(request.planUrl, request.planManifestUrl);
       const runtime = await createChordNetGpuRuntime({
+        graph: request.graph,
         modelUrl: request.modelUrl,
         plan,
       });
@@ -74,7 +74,7 @@ export const registerChordsApi = (): void => {
             const audio = floatsFromBytes(bytes);
             const indices = await runtime.analyze(audio);
             return jsonBytes(
-              buildChordSegments(indices, chordNetModel.frameDuration),
+              buildChordSegments(indices, request.graph.frameDuration),
             );
           },
         });

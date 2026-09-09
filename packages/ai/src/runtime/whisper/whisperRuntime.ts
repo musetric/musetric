@@ -4,9 +4,9 @@ import {
   pipeline,
   Tensor,
 } from '@huggingface/transformers';
-import { whisperModel } from '../../models/whisperModel.js';
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
+import { type WhisperGraph } from '../modelGraphs.js';
 import {
   createWhisperDecoder,
   type DecodeGuard,
@@ -32,6 +32,7 @@ const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
 
 export type WhisperRuntimeOptions = {
+  graph: WhisperGraph;
   modelHost: string;
   modelId: string;
   revision: string;
@@ -70,7 +71,7 @@ export const createWhisperRuntime = async (
       revision: options.revision,
       subfolder: '',
       device: 'webgpu',
-      dtype: { ...whisperModel.dtype },
+      dtype: { ...options.graph.dtype },
 
       session_options: {
         executionProviders: ['webgpu'],

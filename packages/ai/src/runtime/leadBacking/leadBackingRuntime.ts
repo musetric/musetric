@@ -1,10 +1,10 @@
-import { leadBackingModel } from '../../models/leadBackingModel.js';
 import {
   createBindGroup,
   createBindGroupLayout,
   createComputePipeline,
   createStorageBuffer,
 } from '../helpers.js';
+import { type LeadBackingGraph } from '../modelGraphs.js';
 import {
   createStftInferenceRuntime,
   type StftInferenceCore,
@@ -23,21 +23,27 @@ export type LeadBackingGpuRuntime = {
 };
 
 export type LeadBackingGpuRuntimeOptions = {
+  graph: LeadBackingGraph;
   modelUrl: string;
 };
 
 export const createLeadBackingGpuRuntime = async (
   options: LeadBackingGpuRuntimeOptions,
 ): Promise<LeadBackingGpuRuntime> => {
-  const { nFft, dimF, dimT, channels } = leadBackingModel;
-  const frames = dimT;
+  const { graph } = options;
+  const { nFft, frames, channels, dimF } = graph;
+  const dimT = frames;
   const windowCount = channels * frames;
   const freqs = nFft / 2 + 1;
   const modelBytes = 4 * dimF * dimT * Float32Array.BYTES_PER_ELEMENT;
+  const shape = [1, 4, dimF, dimT];
 
   const runtime: StftInferenceRuntime = await createStftInferenceRuntime({
     label: 'Lead/backing',
-    model: { ...leadBackingModel, frames },
+    model: graph,
+    geometry: graph,
+    inputShape: shape,
+    outputShape: shape,
     modelUrl: options.modelUrl,
     frameShader: leadBackingFrameShader,
     overlapAddShader: leadBackingOverlapAddShader,

@@ -5,7 +5,6 @@ import {
   getCqtFrameCount,
 } from '@musetric/cqt/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
-import { chordNetModel } from '../../models/chordNetModel.js';
 import {
   createBindGroup,
   createBindGroupLayout,
@@ -14,6 +13,7 @@ import {
   createStorageBuffer,
   dispatch1d,
 } from '../helpers.js';
+import { type ChordNetGraph } from '../modelGraphs.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -24,6 +24,8 @@ import { chordPadFeaturesShader } from './padFeatures.wgsl.js';
 import { chordSmoothArgmaxShader } from './smoothArgmax.wgsl.js';
 
 ort.env.logLevel = 'error';
+
+const smoothingKernel = 9;
 
 type ChordNetGpuState = {
   sampleCount: number;
@@ -42,19 +44,23 @@ type ChordNetGpuState = {
   smoothBindGroup: GPUBindGroup;
 };
 
-const createState = (
-  device: GPUDevice,
-  cqtCell: ReturnType<typeof createCqt>,
-  plan: CqtPlan,
-  sampleCount: number,
-): ChordNetGpuState => {
+type CreateStateOptions = {
+  graph: ChordNetGraph;
+  device: GPUDevice;
+  cqtCell: ReturnType<typeof createCqt>;
+  plan: CqtPlan;
+  sampleCount: number;
+};
+
+const createState = (options: CreateStateOptions): ChordNetGpuState => {
+  const { graph, device, cqtCell, plan, sampleCount } = options;
   const frameCount = getCqtFrameCount(sampleCount, plan);
-  const windowCount = Math.ceil(frameCount / chordNetModel.sequenceLength);
-  const cqtFloatCount = frameCount * chordNetModel.inputBins;
+  const windowCount = Math.ceil(frameCount / graph.sequenceLength);
+  const cqtFloatCount = frameCount * graph.inputBins;
   const modelInputFloatCount =
-    windowCount * chordNetModel.sequenceLength * chordNetModel.inputBins;
+    windowCount * graph.sequenceLength * graph.inputBins;
   const logitsFloatCount =
-    windowCount * chordNetModel.sequenceLength * chordNetModel.chordCount;
+    windowCount * graph.sequenceLength * graph.chordCount;
   const input = createStorageBuffer(
     device,
     sampleCount * Float32Array.BYTES_PER_ELEMENT,
@@ -96,7 +102,7 @@ const createState = (
     constants: {
       frameCount,
       outputFloatCount: modelInputFloatCount,
-      binCount: chordNetModel.inputBins,
+      binCount: graph.inputBins,
     },
   });
   const padBindGroup = createBindGroup(device, padLayout, [
@@ -113,9 +119,9 @@ const createState = (
     code: chordSmoothArgmaxShader,
     constants: {
       frameCount,
-      seqLen: chordNetModel.sequenceLength,
-      chordCount: chordNetModel.chordCount,
-      smoothingRadius: (chordNetModel.smoothingKernel - 1) / 2,
+      seqLen: graph.sequenceLength,
+      chordCount: graph.chordCount,
+      smoothingRadius: (smoothingKernel - 1) / 2,
     },
   });
   const smoothBindGroup = createBindGroup(device, smoothLayout, [
@@ -159,6 +165,7 @@ export type ChordNetGpuRuntime = {
 };
 
 export type ChordNetGpuRuntimeOptions = {
+  graph: ChordNetGraph;
   modelUrl: string;
   plan: CqtPlan;
 };
@@ -166,12 +173,12 @@ export type ChordNetGpuRuntimeOptions = {
 export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
-  const { modelUrl, plan } = options;
+  const { graph, modelUrl, plan } = options;
   await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(modelUrl, {
     executionProviders: ['webgpu'],
     graphOptimizationLevel: 'all',
-    preferredOutputLocation: { [chordNetModel.outputName]: 'gpu-buffer' },
+    preferredOutputLocation: { [graph.outputName]: 'gpu-buffer' },
   });
   const webgpu = await getMusetricWebGpuDevice();
   assertStorageBufferLimit({
@@ -191,7 +198,7 @@ export const createChordNetGpuRuntime = async (
     if (state !== undefined) {
       destroyState(state);
     }
-    state = createState(device, cqtCell, plan, sampleCount);
+    state = createState({ graph, device, cqtCell, plan, sampleCount });
     return state;
   };
 
@@ -207,34 +214,24 @@ export const createChordNetGpuRuntime = async (
       padPass,
       current.padPipeline,
       current.padBindGroup,
-      current.windowCount *
-        chordNetModel.sequenceLength *
-        chordNetModel.inputBins,
+      current.windowCount * graph.sequenceLength * graph.inputBins,
     );
     padPass.end();
     device.queue.submit([cqtEncoder.finish()]);
 
     const input = ort.Tensor.fromGpuBuffer(current.modelInput, {
       dataType: 'float32',
-      dims: [
-        current.windowCount,
-        chordNetModel.sequenceLength,
-        chordNetModel.inputBins,
-      ],
+      dims: [current.windowCount, graph.sequenceLength, graph.inputBins],
     });
     const output = ort.Tensor.fromGpuBuffer(current.logits, {
       dataType: 'float32',
-      dims: [
-        current.windowCount,
-        chordNetModel.sequenceLength,
-        chordNetModel.chordCount,
-      ],
+      dims: [current.windowCount, graph.sequenceLength, graph.chordCount],
     });
     const result = await session.run(
-      { [chordNetModel.inputName]: input },
-      { [chordNetModel.outputName]: output },
+      { [graph.inputName]: input },
+      { [graph.outputName]: output },
     );
-    const logits = result[chordNetModel.outputName];
+    const logits = result[graph.outputName];
     if (logits.gpuBuffer !== current.logits) {
       logits.dispose();
       throw new Error(

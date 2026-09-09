@@ -1,5 +1,4 @@
 import { type createFftPackedStockhamR2c } from '@musetric/fft/gpu';
-import { beatThisModel } from '../../models/beatThisModel.js';
 import {
   createBindGroup,
   createBindGroupLayout,
@@ -7,38 +6,45 @@ import {
   createReadbackBuffer,
   createStorageBuffer,
 } from '../helpers.js';
+import { type BeatThisGraph } from '../modelGraphs.js';
 import { rhythmFrameShader } from './frame.wgsl.js';
 import { rhythmMelShader } from './mel.wgsl.js';
 import { rhythmWindowsShader } from './windows.wgsl.js';
 
-export const getFrameCount = (sampleCount: number): number =>
-  Math.floor(sampleCount / beatThisModel.hopLength) + 1;
+export const getFrameCount = (
+  graph: BeatThisGraph,
+  sampleCount: number,
+): number => Math.floor(sampleCount / graph.hopLength) + 1;
 
-export const getWindowStarts = (frames: number): number[] => {
-  const stride = beatThisModel.chunkSize - 2 * beatThisModel.borderSize;
+export const getWindowStarts = (
+  graph: BeatThisGraph,
+  frames: number,
+): number[] => {
+  const stride = graph.chunkSize - 2 * graph.borderSize;
   const starts: number[] = [];
   for (
-    let start = -beatThisModel.borderSize;
-    start < frames - beatThisModel.borderSize;
+    let start = -graph.borderSize;
+    start < frames - graph.borderSize;
     start += stride
   ) {
     starts.push(start);
   }
   if (frames > stride && starts.length > 0) {
-    starts[starts.length - 1] =
-      frames - (beatThisModel.chunkSize - beatThisModel.borderSize);
+    starts[starts.length - 1] = frames - (graph.chunkSize - graph.borderSize);
   }
   return starts;
 };
 
-export const getWindowFrames = (frames: number): number => {
-  const stride = beatThisModel.chunkSize - 2 * beatThisModel.borderSize;
-  return frames > stride
-    ? beatThisModel.chunkSize
-    : frames + 2 * beatThisModel.borderSize;
+export const getWindowFrames = (
+  graph: BeatThisGraph,
+  frames: number,
+): number => {
+  const stride = graph.chunkSize - 2 * graph.borderSize;
+  return frames > stride ? graph.chunkSize : frames + 2 * graph.borderSize;
 };
 
 export type BeatThisGpuState = {
+  graph: BeatThisGraph;
   sampleCount: number;
   frames: number;
   windowFrames: number;
@@ -64,6 +70,7 @@ export type BeatThisGpuState = {
 };
 
 export type CreateBeatThisGpuStateOptions = {
+  graph: BeatThisGraph;
   device: GPUDevice;
   fftCell: ReturnType<typeof createFftPackedStockhamR2c>;
   filterbank: GPUBuffer;
@@ -73,11 +80,11 @@ export type CreateBeatThisGpuStateOptions = {
 export const createBeatThisGpuState = (
   options: CreateBeatThisGpuStateOptions,
 ): BeatThisGpuState => {
-  const { device, fftCell, filterbank, sampleCount } = options;
-  const bins = beatThisModel.nFft / 2 + 1;
-  const frames = getFrameCount(sampleCount);
-  const windowFrames = getWindowFrames(frames);
-  const starts = getWindowStarts(frames);
+  const { graph, device, fftCell, filterbank, sampleCount } = options;
+  const bins = graph.nFft / 2 + 1;
+  const frames = getFrameCount(graph, sampleCount);
+  const windowFrames = getWindowFrames(graph, frames);
+  const starts = getWindowStarts(graph, frames);
 
   const rawAudio = createStorageBuffer(
     device,
@@ -85,11 +92,11 @@ export const createBeatThisGpuState = (
   );
   const wave = createStorageBuffer(
     device,
-    frames * (beatThisModel.nFft + 2) * Float32Array.BYTES_PER_ELEMENT,
+    frames * (graph.nFft + 2) * Float32Array.BYTES_PER_ELEMENT,
   );
   const spect = createStorageBuffer(
     device,
-    frames * beatThisModel.melBins * Float32Array.BYTES_PER_ELEMENT,
+    frames * graph.melBins * Float32Array.BYTES_PER_ELEMENT,
   );
   const startsBuffer = createStorageBuffer(
     device,
@@ -99,12 +106,12 @@ export const createBeatThisGpuState = (
     device,
     starts.length *
       windowFrames *
-      beatThisModel.melBins *
+      graph.melBins *
       Float32Array.BYTES_PER_ELEMENT,
   );
   const windowInput = createStorageBuffer(
     device,
-    windowFrames * beatThisModel.melBins * Float32Array.BYTES_PER_ELEMENT,
+    windowFrames * graph.melBins * Float32Array.BYTES_PER_ELEMENT,
   );
   const beatWindow = createStorageBuffer(
     device,
@@ -138,9 +145,9 @@ export const createBeatThisGpuState = (
     layout: frameLayout,
     code: rhythmFrameShader,
     constants: {
-      nFft: beatThisModel.nFft,
-      hop: beatThisModel.hopLength,
-      pad: beatThisModel.nFft / 2,
+      nFft: graph.nFft,
+      hop: graph.hopLength,
+      pad: graph.nFft / 2,
       frames,
       samples: sampleCount,
     },
@@ -157,12 +164,12 @@ export const createBeatThisGpuState = (
     layout: melLayout,
     code: rhythmMelShader,
     constants: {
-      nFft: beatThisModel.nFft,
+      nFft: graph.nFft,
       bins,
-      melBins: beatThisModel.melBins,
+      melBins: graph.melBins,
       frames,
-      fftScale: 1 / Math.sqrt(beatThisModel.nFft),
-      logMultiplier: beatThisModel.logMultiplier,
+      fftScale: 1 / Math.sqrt(graph.nFft),
+      logMultiplier: graph.logMultiplier,
     },
   });
   const melBindGroup = createBindGroup(device, melLayout, [
@@ -181,7 +188,7 @@ export const createBeatThisGpuState = (
     layout: windowsLayout,
     code: rhythmWindowsShader,
     constants: {
-      melBins: beatThisModel.melBins,
+      melBins: graph.melBins,
       frames,
       windowFrames,
       windowCount: starts.length,
@@ -196,10 +203,11 @@ export const createBeatThisGpuState = (
   const fft = fftCell.get({
     wave,
     spectrum: wave,
-    config: { windowSize: beatThisModel.nFft, windowCount: frames },
+    config: { windowSize: graph.nFft, windowCount: frames },
   });
 
   return {
+    graph,
     sampleCount,
     frames,
     windowFrames,

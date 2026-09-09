@@ -1,4 +1,6 @@
-import { beatThisModel } from '../models/beatThisModel.js';
+const peakRadius = 3;
+const peakThreshold = 0;
+const deduplicateWidth = 1;
 
 const localMaxima = (logits: Float32Array, radius: number): number[] => {
   const peaks: number[] = [];
@@ -11,7 +13,7 @@ const localMaxima = (logits: Float32Array, radius: number): number[] => {
         best = logits[j];
       }
     }
-    if (logits[i] === best && logits[i] > beatThisModel.peakThreshold) {
+    if (logits[i] === best && logits[i] > peakThreshold) {
       peaks.push(i);
     }
   }
@@ -61,8 +63,7 @@ const snapToNearest = (times: number[], targets: number[]): number[] => {
 const unique = (values: number[]): number[] =>
   [...new Set(values)].sort((a, b) => a - b);
 
-const pickTimes = (logits: Float32Array): number[] => {
-  const { peakRadius, deduplicateWidth, fps } = beatThisModel;
+const pickTimes = (logits: Float32Array, fps: number): number[] => {
   const peaks = deduplicatePeaks(
     localMaxima(logits, peakRadius),
     deduplicateWidth,
@@ -78,8 +79,9 @@ export type BeatTimes = {
 export const pickBeatTimes = (
   beatLogits: Float32Array,
   downbeatLogits: Float32Array,
+  fps: number,
 ): BeatTimes => {
-  const beats = pickTimes(beatLogits);
-  const downbeats = pickTimes(downbeatLogits);
+  const beats = pickTimes(beatLogits, fps);
+  const downbeats = pickTimes(downbeatLogits, fps);
   return { beats, downbeats: unique(snapToNearest(downbeats, beats)) };
 };

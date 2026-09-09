@@ -16,7 +16,7 @@ use crate::{
         AnalysisContext,
         browser::{Failure, count_frames, decode_reporter, ensure_files},
         gains::{lead_loudness, plain_loudness},
-        models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS},
+        models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, lead_backing_graph},
         stage_attempt::{
             StageAttempt, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model, run_step,
         },
@@ -164,6 +164,7 @@ async fn produce(
         "stage": "leadBacking",
         "outputs": [UNIT_OUTPUT],
         "leadBackingModelUrl": model,
+        "graph": lead_backing_graph(),
     });
     let frames = u64::try_from(padded.len() / CHANNELS).unwrap_or(0);
     let resume = attempt.resume(frames, 2).await?;

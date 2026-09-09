@@ -41,7 +41,10 @@ export const registerKeyApi = (): void => {
       await reportLoading();
       const { createSkeyRuntime } =
         await import('../runtime/key/skeyRuntime.js');
-      const runtime = await createSkeyRuntime({ modelUrl: request.modelUrl });
+      const runtime = await createSkeyRuntime({
+        graph: request.graph,
+        modelUrl: request.modelUrl,
+      });
       try {
         await serveUnits({
           attemptId: request.attemptId,

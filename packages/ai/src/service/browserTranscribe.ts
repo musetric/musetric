@@ -22,6 +22,7 @@ export const registerTranscribeApi = (): void => {
           import('../transcription/transcribePipeline.js'),
         ]);
       const runtime = await createWhisperRuntime({
+        graph: request.graph,
         modelHost: request.modelHost,
         modelId: request.modelId,
         revision: request.revision,
