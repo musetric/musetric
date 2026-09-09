@@ -12,12 +12,14 @@ type UnitQueue = {
   receiver: UnitReceiver | undefined;
   events: (UnitCommand | UnitCloseCommand)[];
   pumping: boolean;
+  abandon: ((reason: Error) => void) | undefined;
 };
 
 const unitQueue: UnitQueue = {
   receiver: undefined,
   events: [],
   pumping: false,
+  abandon: undefined,
 };
 
 const pump = async (): Promise<void> => {
@@ -55,6 +57,10 @@ export const dispatchUnitEvent = (
 ): void => {
   unitQueue.events.push(event);
   void pump();
+};
+
+export const abandonUnitServing = (reason: string): void => {
+  unitQueue.abandon?.(new Error(reason));
 };
 
 export type UnitServing = {
@@ -129,10 +135,12 @@ export const serveUnits = async (serving: UnitServing): Promise<void> => {
     await confirmUnit(serving.attemptId, event.unit);
   };
   registerUnitReceiver(receive);
+  unitQueue.abandon = closed.reject;
   try {
     await announceOpened(serving.attemptId);
     await closed.promise;
   } finally {
+    unitQueue.abandon = undefined;
     registerUnitReceiver(undefined);
   }
 };

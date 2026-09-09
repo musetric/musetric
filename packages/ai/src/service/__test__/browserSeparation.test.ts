@@ -62,3 +62,51 @@ test('the unit serving fetches every window, uploads the output and confirms the
     await host.close();
   }
 });
+
+const waitFor = async (check: () => boolean): Promise<void> => {
+  for (let tick = 0; tick < 200; tick += 1) {
+    if (check()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('the condition never happened');
+};
+
+test('the unit serving gives up when the host connection drops', async () => {
+  const host = await startFakeHost();
+  const dropped = 'attempt-dropped';
+  host.windows.set(`${dropped}/0`, floatBytes([1, -1, 1, -1]));
+  const released = Promise.withResolvers<void>();
+  registerBrowserApi('musetricAiAbandonTest', async () => {
+    try {
+      await serveUnits({
+        attemptId: dropped,
+        attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${dropped}`,
+        outputs: ['separated'],
+        run: async () => Promise.resolve(new Uint8Array(16)),
+      });
+    } finally {
+      released.resolve();
+    }
+  });
+
+  startJobExecutor(readSocketUrl(host.pageUrl));
+  await host.ready;
+  void host.run('musetricAiAbandonTest', {}).catch(() => undefined);
+  host.sendUnit(dropped, 0, 2);
+  await waitFor(() => host.unitDone.length > 0);
+
+  await host.close();
+
+  const settled = await Promise.race([
+    released.promise.then(() => 'released' as const),
+    new Promise<'stuck'>((resolve) => {
+      setTimeout(() => {
+        resolve('stuck');
+      }, 3000);
+    }),
+  ]);
+
+  expect(settled).toBe('released');
+});
