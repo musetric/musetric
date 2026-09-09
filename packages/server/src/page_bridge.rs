@@ -21,9 +21,15 @@ const FAILED_TYPE: &str = "failed";
 type PageAnswer = Result<(), String>;
 type Outgoing = mpsc::UnboundedSender<String>;
 
+struct Pending {
+    owner: Outgoing,
+    answer: oneshot::Sender<PageAnswer>,
+}
+
 pub(crate) struct PageBridge {
     pages: Mutex<Vec<Outgoing>>,
-    pending: Mutex<HashMap<String, oneshot::Sender<PageAnswer>>>,
+    pending: Mutex<HashMap<String, Pending>>,
+    owners: Mutex<HashMap<String, Outgoing>>,
 }
 
 impl PageBridge {
@@ -31,6 +37,7 @@ impl PageBridge {
         Arc::new(Self {
             pages: Mutex::new(Vec::new()),
             pending: Mutex::new(HashMap::new()),
+            owners: Mutex::new(HashMap::new()),
         })
     }
 
@@ -44,7 +51,10 @@ impl PageBridge {
         if let Ok(mut pages) = self.pages.lock() {
             pages.retain(|candidate| !candidate.same_channel(outgoing));
         }
-        self.break_pending();
+        if let Ok(mut owners) = self.owners.lock() {
+            owners.retain(|_, owner| !owner.same_channel(outgoing));
+        }
+        self.break_pending(outgoing);
     }
 
     pub(crate) fn accept(&self, text: &str) {
@@ -67,13 +77,18 @@ impl PageBridge {
         }
     }
 
-    fn break_pending(&self) {
-        let taken = self
-            .pending
-            .lock()
-            .ok()
-            .map(|mut pending| pending.drain().collect::<Vec<_>>());
-        drop(taken);
+    fn break_pending(&self, outgoing: &Outgoing) {
+        let orphaned = self.pending.lock().ok().map(|mut pending| {
+            let ids: Vec<String> = pending
+                .iter()
+                .filter(|(_, waiting)| waiting.owner.same_channel(outgoing))
+                .map(|(page_id, _)| page_id.clone())
+                .collect();
+            ids.into_iter()
+                .filter_map(|page_id| pending.remove(&page_id))
+                .collect::<Vec<_>>()
+        });
+        drop(orphaned);
     }
 
     fn answer(&self, page_id: &str, answer: PageAnswer) {
@@ -82,28 +97,38 @@ impl PageBridge {
             .lock()
             .ok()
             .and_then(|mut pending| pending.remove(page_id));
-        if let Some(sender) = taken {
-            let _ = sender.send(answer);
+        if let Some(waiting) = taken {
+            let _ = waiting.answer.send(answer);
         }
     }
 
-    fn send(&self, line: String) -> bool {
-        let pages = self.pages.lock().ok();
-        let Some(first) = pages.as_ref().and_then(|connected| connected.first()) else {
-            return false;
-        };
-        first.send(line).is_ok()
+    fn pick(&self) -> Option<Outgoing> {
+        let mut pages = self.pages.lock().ok()?;
+        pages.retain(|candidate| !candidate.is_closed());
+        pages.first().cloned()
+    }
+
+    fn owner_of(&self, page_id: &str) -> Option<Outgoing> {
+        self.owners.lock().ok()?.remove(page_id)
     }
 
     fn remember(
         &self,
         page_id: String,
-        sender: oneshot::Sender<PageAnswer>,
+        owner: &Outgoing,
+        answer: oneshot::Sender<PageAnswer>,
     ) -> Result<(), PageFailure> {
+        let waiting = Pending {
+            owner: owner.clone(),
+            answer,
+        };
         self.pending
             .lock()
             .map_err(|_| PageFailure::Unreachable)?
-            .insert(page_id, sender);
+            .insert(page_id.clone(), waiting);
+        if let Ok(mut owners) = self.owners.lock() {
+            owners.insert(page_id, owner.clone());
+        }
         Ok(())
     }
 
@@ -111,18 +136,24 @@ impl PageBridge {
         if let Ok(mut pending) = self.pending.lock() {
             pending.remove(page_id);
         }
+        if let Ok(mut owners) = self.owners.lock() {
+            owners.remove(page_id);
+        }
     }
 
     async fn request_page(&self, url: &str) -> Result<OpenedPage, PageFailure> {
         let page_id = uuid::Uuid::new_v4().to_string();
+        let Some(target) = self.pick() else {
+            return Err(PageFailure::Unreachable);
+        };
         let (sender, receiver) = oneshot::channel();
-        self.remember(page_id.clone(), sender)?;
+        self.remember(page_id.clone(), &target, sender)?;
         let request = json!({
             "type": OPEN_TYPE,
             "id": page_id,
             "url": url,
         });
-        if !self.send(request.to_string()) {
+        if target.send(request.to_string()).is_err() {
             self.forget(&page_id);
             return Err(PageFailure::Unreachable);
         }
@@ -134,17 +165,26 @@ impl PageBridge {
         };
         match answered {
             Ok(Ok(())) => Ok(OpenedPage::create(page_id)),
-            Ok(Err(message)) => Err(PageFailure::Refused(message)),
-            Err(_) => Err(PageFailure::Unreachable),
+            Ok(Err(message)) => {
+                self.forget(&page_id);
+                Err(PageFailure::Refused(message))
+            }
+            Err(_) => {
+                self.forget(&page_id);
+                Err(PageFailure::Unreachable)
+            }
         }
     }
 
     fn close(&self, page_id: &str) {
+        let Some(owner) = self.owner_of(page_id) else {
+            return;
+        };
         let close = json!({
             "type": CLOSE_TYPE,
             "id": page_id,
         });
-        self.send(close.to_string());
+        let _ = owner.send(close.to_string());
     }
 }
 
@@ -290,5 +330,56 @@ mod tests {
 
         let answered = asking.await.expect("the request should finish");
         assert!(answered.is_ok());
+    }
+
+    #[tokio::test]
+    async fn never_sends_a_close_to_a_page_that_did_not_open_the_frame() {
+        let bridge = PageBridge::create();
+        let mut first = attach_fake_page(&bridge);
+        let asking = { spawn_open(&bridge) };
+        let opened = next_line(&mut first).await;
+        let page_id = page_id_of(&opened);
+        reply(&bridge, &page_id, "opened", "");
+        let opened_page = asking
+            .await
+            .expect("the request should finish")
+            .expect("the page should open");
+
+        bridge.detach(&first.channel);
+        let mut second = attach_fake_page(&bridge);
+        bridge.close_page(&opened_page);
+
+        assert!(second.incoming.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn keeps_a_pending_open_when_another_page_disconnects() {
+        let bridge = PageBridge::create();
+        let mut first = attach_fake_page(&bridge);
+        let second = attach_fake_page(&bridge);
+        let asking = { spawn_open(&bridge) };
+        let opened = next_line(&mut first).await;
+        let page_id = page_id_of(&opened);
+
+        bridge.detach(&second.channel);
+        reply(&bridge, &page_id, "opened", "");
+
+        let answered = asking.await.expect("the request should finish");
+        assert!(answered.is_ok());
+    }
+
+    #[tokio::test]
+    async fn skips_a_page_whose_channel_is_gone() {
+        let bridge = PageBridge::create();
+        let dead = attach_fake_page(&bridge);
+        drop(dead);
+        let mut live = attach_fake_page(&bridge);
+        let asking = { spawn_open(&bridge) };
+
+        let opened = next_line(&mut live).await;
+        let page_id = page_id_of(&opened);
+        reply(&bridge, &page_id, "opened", "");
+
+        assert!(asking.await.expect("the request should finish").is_ok());
     }
 }
