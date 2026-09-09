@@ -16,7 +16,7 @@ use crate::{
         AnalysisContext,
         browser::{BrowserAnalysis, HostedModel, Serve, answer, describe, store},
         gains::{lead_loudness, plain_loudness, read_gains},
-        models::{CHORD_NET, CHORD_NET_MODEL, WHISPER},
+        models::{CHORD_NET, CHORD_NET_MODEL, WHISPER, beat_this_graph, skey_graph, whisper_graph},
         steps::create as create_step,
     },
     page_bridge::PageBridge,
@@ -191,6 +191,7 @@ fn asks_the_browser_for_the_rhythm_it_stores_as_rhythm() {
                 "outputs": ["result"],
                 "modelUrl": "http://host/files/beat_this.onnx",
                 "filterbankUrl": "http://host/files/mel-filterbank.bin",
+                "graph": beat_this_graph(),
             },
         }))
     );
@@ -212,6 +213,7 @@ fn asks_the_browser_for_the_key_without_a_mean_downmix() {
                 "attemptUrl": "http://host/attempt/attempt-1",
                 "outputs": ["result"],
                 "modelUrl": "http://host/files/skey.onnx",
+                "graph": skey_graph(),
             },
         }))
     );
@@ -236,6 +238,7 @@ fn points_the_transcription_at_the_whole_model_directory() {
                 "modelHost": "http://host/models",
                 "modelId": "musetric/whisper-large-v3-turbo-onnx",
                 "revision": "da27c0c3e917574b5541f71251abfd2c1aabb3a1",
+                "graph": whisper_graph(),
             },
         }))
     );

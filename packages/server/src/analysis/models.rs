@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use musetric_gpu::ModelFile;
 use musetric_media::Downmix;
+use serde_json::{Value, json};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CacheLayout {
@@ -50,6 +51,44 @@ impl ModelBundle {
     }
 }
 
+pub(crate) struct ChunkGeometry {
+    pub(crate) n_fft: u32,
+    pub(crate) hop: u32,
+    pub(crate) frames: u32,
+    pub(crate) channels: u32,
+    pub(crate) chunk_samples: u32,
+}
+
+const fn geometry(n_fft: u32, hop: u32, frames: u32, channels: u32) -> ChunkGeometry {
+    ChunkGeometry {
+        n_fft,
+        hop,
+        frames,
+        channels,
+        chunk_samples: hop * (frames - 1),
+    }
+}
+
+impl ChunkGeometry {
+    fn fields(&self) -> Value {
+        json!({
+            "nFft": self.n_fft,
+            "hop": self.hop,
+            "frames": self.frames,
+            "channels": self.channels,
+            "chunkSamples": self.chunk_samples,
+        })
+    }
+}
+
+fn merge(mut base: Value, extra: Value) -> Value {
+    let (Some(target), Value::Object(source)) = (base.as_object_mut(), extra) else {
+        return base;
+    };
+    target.extend(source);
+    base
+}
+
 pub(crate) const CHORD_NET_MODEL: &str = "chordnet.onnx";
 pub(crate) const CHORD_NET_PLAN: &str = "cqt-plan.bin";
 pub(crate) const CHORD_NET_PLAN_MANIFEST: &str = "cqt-plan.manifest.json";
@@ -82,6 +121,17 @@ pub(crate) const CHORD_NET: ModelBundle = ModelBundle {
     ],
 };
 
+pub(crate) fn chord_net_graph() -> Value {
+    json!({
+        "inputName": "features",
+        "outputName": "logits",
+        "frameDuration": 2048.0 / 22050.0,
+        "sequenceLength": 108,
+        "inputBins": 144,
+        "chordCount": 170,
+    })
+}
+
 pub(crate) const BEAT_THIS_MODEL: &str = "beat_this.onnx";
 pub(crate) const BEAT_THIS_FILTERBANK: &str = "mel-filterbank.bin";
 
@@ -109,6 +159,21 @@ pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
     ],
 };
 
+pub(crate) fn beat_this_graph() -> Value {
+    json!({
+        "inputName": "spect",
+        "beatOutputName": "beat",
+        "downbeatOutputName": "downbeat",
+        "nFft": 1024,
+        "hopLength": 441,
+        "fps": 50,
+        "melBins": 128,
+        "logMultiplier": 1000,
+        "chunkSize": 1500,
+        "borderSize": 6,
+    })
+}
+
 pub(crate) const SKEY_MODEL: &str = "skey.onnx";
 
 pub(crate) const SKEY: ModelBundle = ModelBundle {
@@ -130,6 +195,13 @@ pub(crate) const SKEY: ModelBundle = ModelBundle {
         ),
     ],
 };
+
+pub(crate) fn skey_graph() -> Value {
+    json!({
+        "inputName": "audio",
+        "outputName": "probs",
+    })
+}
 
 pub(crate) const WHISPER: ModelBundle = ModelBundle {
     label: "Whisper transcription model",
@@ -191,6 +263,15 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
     ],
 };
 
+pub(crate) fn whisper_graph() -> Value {
+    json!({
+        "dtype": {
+            "encoder_model": "q4",
+            "decoder_model_merged": "fp16",
+        },
+    })
+}
+
 pub(crate) const VOCALS_MODEL: &str = "syhft_core_t1100.onnx";
 pub(crate) const VOCALS_MODEL_DATA: &str = "syhft_core_t1100.onnx.data";
 
@@ -214,6 +295,19 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
     ],
 };
 
+pub(crate) const VOCALS_GEOMETRY: ChunkGeometry = geometry(2048, 441, 1100, 2);
+
+pub(crate) fn vocals_graph() -> Value {
+    merge(
+        VOCALS_GEOMETRY.fields(),
+        json!({
+            "inputName": "stft_repr",
+            "outputName": "masks",
+            "minStorageBuffersPerShaderStage": 9,
+        }),
+    )
+}
+
 pub(crate) const LEAD_BACKING_MODEL: &str = "UVR_MDXNET_KARA_2.onnx";
 
 pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
@@ -229,3 +323,16 @@ pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
         "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
     )],
 };
+
+pub(crate) const LEAD_BACKING_GEOMETRY: ChunkGeometry = geometry(5120, 1024, 256, 2);
+
+pub(crate) fn lead_backing_graph() -> Value {
+    merge(
+        LEAD_BACKING_GEOMETRY.fields(),
+        json!({
+            "inputName": "input",
+            "outputName": "output",
+            "dimF": 2048,
+        }),
+    )
+}

@@ -7,7 +7,8 @@ use crate::analysis::{
     browser::{BrowserAnalysis, Failure, HostedModel, Serve},
     models::{
         BEAT_THIS, BEAT_THIS_FILTERBANK, BEAT_THIS_MODEL, CHORD_NET, CHORD_NET_MODEL,
-        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, WHISPER,
+        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, WHISPER, beat_this_graph,
+        chord_net_graph, skey_graph, whisper_graph,
     },
 };
 
@@ -73,6 +74,7 @@ fn build_chords(
         "modelUrl": files.url(CHORD_NET_MODEL)?,
         "planUrl": files.url(CHORD_NET_PLAN)?,
         "planManifestUrl": files.url(CHORD_NET_PLAN_MANIFEST)?,
+        "graph": chord_net_graph(),
     }))
 }
 
@@ -87,6 +89,7 @@ fn build_rhythm(
         "outputs": ["result"],
         "modelUrl": files.url(BEAT_THIS_MODEL)?,
         "filterbankUrl": files.url(BEAT_THIS_FILTERBANK)?,
+        "graph": beat_this_graph(),
     }))
 }
 
@@ -96,6 +99,7 @@ fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result
         "attemptUrl": attempt_url,
         "outputs": ["result"],
         "modelUrl": files.url(SKEY_MODEL)?,
+        "graph": skey_graph(),
     }))
 }
 
@@ -112,5 +116,6 @@ fn build_transcription(
         "modelHost": files.root()?,
         "modelId": WHISPER.model_id,
         "revision": WHISPER.revision,
+        "graph": whisper_graph(),
     }))
 }

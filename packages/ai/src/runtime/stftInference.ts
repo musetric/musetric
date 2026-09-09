@@ -14,6 +14,7 @@ import {
   dispatch2d,
   type Dispatch2dOptions,
 } from './helpers.js';
+import { type ChunkGeometry } from './modelGraphs.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -40,16 +41,9 @@ export type StftInferenceRuntime = {
 };
 
 export type StftInferenceModel = {
-  nFft: number;
-  hop: number;
-  channels: number;
-  chunkSamples: number;
-  frames: number;
   inputName: string;
   outputName: string;
   minStorageBuffersPerShaderStage?: number;
-  inputShape: readonly number[];
-  outputShape: readonly number[];
 };
 
 export type StftInferenceBuffers = {
@@ -69,6 +63,9 @@ export type StftInferenceCore = {
 export type StftInferenceOptions = {
   label: string;
   model: StftInferenceModel;
+  geometry: ChunkGeometry;
+  inputShape: readonly number[];
+  outputShape: readonly number[];
   modelUrl: string;
   externalData?: NonNullable<
     ort.InferenceSession.SessionOptions['externalData']
@@ -81,8 +78,9 @@ export type StftInferenceOptions = {
 export const createStftInferenceRuntime = async (
   options: StftInferenceOptions,
 ): Promise<StftInferenceRuntime> => {
-  const { label, model, frameShader, overlapAddShader, createCore } = options;
-  const { nFft, hop, channels, chunkSamples, frames } = model;
+  const { label, model, geometry, frameShader, overlapAddShader, createCore } =
+    options;
+  const { nFft, hop, channels, chunkSamples, frames } = geometry;
   const pad = nFft / 2;
   const windowCount = channels * frames;
   const chunkFloats = channels * chunkSamples;
@@ -168,11 +166,11 @@ export const createStftInferenceRuntime = async (
   });
   const inputTensor = ort.Tensor.fromGpuBuffer(core.modelInput, {
     dataType: 'float32',
-    dims: [...model.inputShape],
+    dims: [...options.inputShape],
   });
   const outputTensor = ort.Tensor.fromGpuBuffer(core.modelOutput, {
     dataType: 'float32',
-    dims: [...model.outputShape],
+    dims: [...options.outputShape],
   });
 
   const processChunk = async (

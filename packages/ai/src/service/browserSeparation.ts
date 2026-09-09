@@ -22,6 +22,7 @@ const createVocalsStage = async (
   const { createVocalsGpuRuntime } =
     await import('../runtime/vocals/vocalsRuntime.js');
   const runtime = await createVocalsGpuRuntime({
+    graph: request.graph,
     modelUrl: request.vocalsModelUrl,
     modelDataUrl: request.vocalsModelDataUrl,
     modelDataPath: request.vocalsModelDataPath,
@@ -42,6 +43,7 @@ const createLeadBackingStage = async (
   const { createLeadBackingGpuRuntime } =
     await import('../runtime/leadBacking/leadBackingRuntime.js');
   const runtime = await createLeadBackingGpuRuntime({
+    graph: request.graph,
     modelUrl: request.leadBackingModelUrl,
   });
   return {

@@ -1,3 +1,7 @@
+import {
+  type LeadBackingGraph,
+  type VocalsGraph,
+} from '../runtime/modelGraphs.js';
 import { type UnitProgress } from '../runtime/unitProgress.js';
 
 export const separateUnitsApiName = 'musetricAiSeparateUnits';
@@ -18,6 +22,7 @@ export type BrowserVocalsUnitsRequest = {
   attemptUrl: string;
   stage: 'vocals';
   outputs: string[];
+  graph: VocalsGraph;
   vocalsModelUrl: string;
   vocalsModelDataUrl: string;
   vocalsModelDataPath: string;
@@ -28,6 +33,7 @@ export type BrowserLeadBackingUnitsRequest = {
   attemptUrl: string;
   stage: 'leadBacking';
   outputs: string[];
+  graph: LeadBackingGraph;
   leadBackingModelUrl: string;
 };
 

@@ -26,6 +26,7 @@ export const registerRhythmApi = (): void => {
         'rhythm mel filterbank',
       );
       const runtime = await createBeatThisGpuRuntime({
+        graph: request.graph,
         modelUrl: request.modelUrl,
         filterbank,
       });
@@ -40,6 +41,7 @@ export const registerRhythmApi = (): void => {
             const { beats, downbeats } = pickBeatTimes(
               logits.beat,
               logits.downbeat,
+              request.graph.fps,
             );
             const result: RhythmResult = {
               bpm: estimateBpm(beats),

@@ -1,7 +1,7 @@
 mod browser;
 mod gains;
 mod json_units;
-mod models;
+pub(crate) mod models;
 mod separation;
 mod stage_attempt;
 mod stage_units;

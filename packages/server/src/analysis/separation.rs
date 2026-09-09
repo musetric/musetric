@@ -14,7 +14,7 @@ use crate::{
         AnalysisContext,
         browser::{Failure, count_frames, decode_reporter, ensure_files},
         gains::plain_loudness,
-        models::{VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA},
+        models::{VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA, vocals_graph},
         stage_attempt::{
             StageAttempt, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model, run_step,
         },
@@ -176,6 +176,7 @@ async fn produce(
         "vocalsModelUrl": model,
         "vocalsModelDataUrl": model_data,
         "vocalsModelDataPath": VOCALS_MODEL_DATA,
+        "graph": vocals_graph(),
     });
     let resume = attempt.resume(samples, 2).await?;
     let outcome = attempt

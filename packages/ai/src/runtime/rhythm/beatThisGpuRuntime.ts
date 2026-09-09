@@ -1,8 +1,8 @@
 import { createFftPackedStockhamR2c } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
-import { beatThisModel } from '../../models/beatThisModel.js';
 import { yieldGpuToCompositor } from '../gpuCooldown.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
+import { type BeatThisGraph } from '../modelGraphs.js';
 import { type ReportUnit } from '../unitProgress.js';
 import {
   assertStorageBufferLimit,
@@ -44,7 +44,7 @@ const encodeFeatures = (device: GPUDevice, state: BeatThisGpuState): void => {
     pass: framePass,
     pipeline: state.framePipeline,
     bindGroup: state.frameBindGroup,
-    x: beatThisModel.nFft,
+    x: state.graph.nFft,
     y: state.frames,
   });
   framePass.end();
@@ -54,7 +54,7 @@ const encodeFeatures = (device: GPUDevice, state: BeatThisGpuState): void => {
     pass: melPass,
     pipeline: state.melPipeline,
     bindGroup: state.melBindGroup,
-    x: beatThisModel.melBins,
+    x: state.graph.melBins,
     y: state.frames,
   });
   melPass.end();
@@ -63,7 +63,7 @@ const encodeFeatures = (device: GPUDevice, state: BeatThisGpuState): void => {
     pass: windowsPass,
     pipeline: state.windowsPipeline,
     bindGroup: state.windowsBindGroup,
-    x: beatThisModel.melBins,
+    x: state.graph.melBins,
     y: state.windowFrames * state.starts.length,
   });
   windowsPass.end();
@@ -84,6 +84,7 @@ export type BeatThisGpuRuntime = {
 };
 
 export type BeatThisGpuRuntimeOptions = {
+  graph: BeatThisGraph;
   modelUrl: string;
   filterbank: Float32Array;
 };
@@ -91,13 +92,14 @@ export type BeatThisGpuRuntimeOptions = {
 export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
+  const { graph } = options;
   await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(options.modelUrl, {
     executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: {
-      [beatThisModel.beatOutputName]: 'gpu-buffer',
-      [beatThisModel.downbeatOutputName]: 'gpu-buffer',
+      [graph.beatOutputName]: 'gpu-buffer',
+      [graph.downbeatOutputName]: 'gpu-buffer',
     },
   });
   const webgpu = await getMusetricWebGpuDevice();
@@ -123,6 +125,7 @@ export const createBeatThisGpuRuntime = async (
       destroyBeatThisGpuState(state);
     }
     state = createBeatThisGpuState({
+      graph,
       device,
       fftCell,
       filterbank,
@@ -137,9 +140,7 @@ export const createBeatThisGpuRuntime = async (
   ): Promise<void> => {
     await yieldGpuToCompositor();
     const windowBytes =
-      current.windowFrames *
-      beatThisModel.melBins *
-      Float32Array.BYTES_PER_ELEMENT;
+      current.windowFrames * graph.melBins * Float32Array.BYTES_PER_ELEMENT;
     const copyEncoder = device.createCommandEncoder();
     copyEncoder.copyBufferToBuffer(
       current.windows,
@@ -152,28 +153,24 @@ export const createBeatThisGpuRuntime = async (
 
     const input = ort.Tensor.fromGpuBuffer(current.windowInput, {
       dataType: 'float32',
-      dims: [1, current.windowFrames, beatThisModel.melBins],
+      dims: [1, current.windowFrames, graph.melBins],
     });
     const result = await session.run(
-      { [beatThisModel.modelInputName]: input },
+      { [graph.inputName]: input },
       {
-        [beatThisModel.beatOutputName]: ort.Tensor.fromGpuBuffer(
-          current.beatWindow,
-          { dataType: 'float32', dims: [1, current.windowFrames] },
-        ),
-        [beatThisModel.downbeatOutputName]: ort.Tensor.fromGpuBuffer(
+        [graph.beatOutputName]: ort.Tensor.fromGpuBuffer(current.beatWindow, {
+          dataType: 'float32',
+          dims: [1, current.windowFrames],
+        }),
+        [graph.downbeatOutputName]: ort.Tensor.fromGpuBuffer(
           current.downbeatWindow,
           { dataType: 'float32', dims: [1, current.windowFrames] },
         ),
       },
     );
     const pairs = [
-      [beatThisModel.beatOutputName, current.beatWindow, current.beat],
-      [
-        beatThisModel.downbeatOutputName,
-        current.downbeatWindow,
-        current.downbeat,
-      ],
+      [graph.beatOutputName, current.beatWindow, current.beat],
+      [graph.downbeatOutputName, current.downbeatWindow, current.downbeat],
     ] as const;
     for (const [name, windowBuffer] of pairs) {
       if (result[name].gpuBuffer !== windowBuffer) {
@@ -184,16 +181,16 @@ export const createBeatThisGpuRuntime = async (
       }
     }
 
-    const at = current.starts[index] + beatThisModel.borderSize;
+    const at = current.starts[index] + graph.borderSize;
     const count = Math.min(
-      current.windowFrames - 2 * beatThisModel.borderSize,
+      current.windowFrames - 2 * graph.borderSize,
       current.frames - at,
     );
     const writeEncoder = device.createCommandEncoder();
     for (const [, windowBuffer, target] of pairs) {
       writeEncoder.copyBufferToBuffer(
         windowBuffer,
-        beatThisModel.borderSize * Float32Array.BYTES_PER_ELEMENT,
+        graph.borderSize * Float32Array.BYTES_PER_ELEMENT,
         target,
         at * Float32Array.BYTES_PER_ELEMENT,
         count * Float32Array.BYTES_PER_ELEMENT,

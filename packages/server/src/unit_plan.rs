@@ -1,14 +1,11 @@
 use std::collections::BTreeMap;
 
+use crate::analysis::models::{LEAD_BACKING_GEOMETRY, VOCALS_GEOMETRY};
+
 const TAU: f64 = 2.0 * std::f64::consts::PI;
 
-const VOCALS_HOP: u32 = 441;
-const VOCALS_FRAMES: u32 = 1100;
 const VOCALS_STEP_SECONDS: u32 = 8;
 
-const LEAD_BACKING_N_FFT: u32 = 5120;
-const LEAD_BACKING_HOP: u32 = 1024;
-const LEAD_BACKING_FRAMES: u32 = 256;
 const LEAD_BACKING_OVERLAP: f64 = 0.25;
 pub(crate) const LEAD_BACKING_COMPENSATE: f64 = 1.065;
 
@@ -90,7 +87,7 @@ impl UnitPlan {
         reason = "the traversal mirrors the browser loop over non-negative offsets"
     )]
     pub(crate) fn vocals(sample_rate: u32, samples: u64) -> Self {
-        let chunk_samples = VOCALS_HOP * (VOCALS_FRAMES - 1);
+        let chunk_samples = VOCALS_GEOMETRY.chunk_samples;
         let step = u64::from(VOCALS_STEP_SECONDS * sample_rate).min(u64::from(chunk_samples));
         let mut units = Vec::new();
         let mut offset = 0_u64;
@@ -114,7 +111,12 @@ impl UnitPlan {
             units.push(unit);
             offset += step;
         }
-        Self::create(PlanRules::VocalsV1, 2, chunk_samples, units)
+        Self::create(
+            PlanRules::VocalsV1,
+            VOCALS_GEOMETRY.channels,
+            chunk_samples,
+            units,
+        )
     }
 
     #[expect(
@@ -123,8 +125,8 @@ impl UnitPlan {
         reason = "the traversal mirrors the browser loop over non-negative offsets"
     )]
     pub(crate) fn lead_backing(samples: u64) -> (Self, LeadBackingLayout) {
-        let chunk_samples = LEAD_BACKING_HOP * (LEAD_BACKING_FRAMES - 1);
-        let trim = LEAD_BACKING_N_FFT / 2;
+        let chunk_samples = LEAD_BACKING_GEOMETRY.chunk_samples;
+        let trim = LEAD_BACKING_GEOMETRY.n_fft / 2;
         let gen_samples = chunk_samples - 2 * trim;
         let mixture_samples = 2 * u64::from(trim) + samples + u64::from(gen_samples)
             - samples % u64::from(gen_samples);
@@ -140,7 +142,12 @@ impl UnitPlan {
             start += step;
         }
         (
-            Self::create(PlanRules::LeadBackingV1, 2, chunk_samples, units),
+            Self::create(
+                PlanRules::LeadBackingV1,
+                LEAD_BACKING_GEOMETRY.channels,
+                chunk_samples,
+                units,
+            ),
             LeadBackingLayout {
                 trim,
                 mixture_samples,
