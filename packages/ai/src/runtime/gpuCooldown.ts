@@ -1,25 +1,9 @@
-export const gpuCooldownMs = (
-  isAndroid: boolean,
-  thermalStatus: number,
-): number => {
-  if (!isAndroid) {
-    return 0;
-  }
-  if (thermalStatus >= 3) {
-    return 10_000;
-  }
-  if (thermalStatus >= 2) {
-    return 3_000;
-  }
-  return 1_000;
-};
+const throttledThermalStatus = 2;
+const criticalThermalStatus = 3;
+const maxThermalWaits = 60;
 
-const readAndroidUserAgent = (): boolean => {
-  const { navigator } = globalThis;
-  return (
-    typeof navigator === 'object' && navigator.userAgent.includes('Android')
-  );
-};
+export const gpuCooldownMs = (thermalStatus: number): number =>
+  thermalStatus >= throttledThermalStatus ? 1_000 : 0;
 
 const readThermalStatus = (): number => {
   const bridge = Reflect.get(globalThis, 'MusetricThermal');
@@ -34,15 +18,24 @@ const readThermalStatus = (): number => {
   return typeof status === 'number' ? status : 0;
 };
 
+const wait = async (milliseconds: number): Promise<void> =>
+  new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, milliseconds);
+  });
+
 export const yieldGpuToCompositor = async (): Promise<void> => {
-  const cooldownMilliseconds = gpuCooldownMs(
-    readAndroidUserAgent(),
-    readThermalStatus(),
-  );
-  if (cooldownMilliseconds === 0) {
+  if (Reflect.get(globalThis, 'MusetricYieldOff') === true) {
     return;
   }
-  await new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, cooldownMilliseconds);
-  });
+  for (let waits = 0; waits < maxThermalWaits; waits += 1) {
+    const thermalStatus = readThermalStatus();
+    const cooldownMilliseconds = gpuCooldownMs(thermalStatus);
+    if (cooldownMilliseconds === 0) {
+      return;
+    }
+    await wait(cooldownMilliseconds);
+    if (thermalStatus < criticalThermalStatus) {
+      return;
+    }
+  }
 };
