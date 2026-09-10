@@ -22,6 +22,7 @@ type TokenId = number | bigint;
 type GenerateOutput = {
   sequences: { tolist: () => TokenId[][] };
   token_timestamps: { tolist: () => number[][] };
+  past_key_values?: { dispose: () => Promise<void> };
 };
 
 export type WhisperModelInternals = {
@@ -114,6 +115,14 @@ export const createWhisperDecoder = (
       return_token_timestamps: true,
       ...generateArgs(audio, language, guard),
     });
+    const cache = output.past_key_values;
+    if (cache) {
+      try {
+        await cache.dispose();
+      } catch (error) {
+        console.log(`whisper decode: cache dispose failed: ${String(error)}`);
+      }
+    }
 
     const [rawTokens] = output.sequences.tolist();
     const [rawTimes] = output.token_timestamps.tolist();
@@ -160,6 +169,14 @@ export const createWhisperDecoder = (
       return_timestamps: false,
       ...generateArgs(audio, language, undefined),
     });
+    const cache = output.past_key_values;
+    if (cache) {
+      try {
+        await cache.dispose();
+      } catch (error) {
+        console.log(`whisper decode: cache dispose failed: ${String(error)}`);
+      }
+    }
 
     const [ids] = output.sequences.tolist();
     const [times] = output.token_timestamps.tolist();
