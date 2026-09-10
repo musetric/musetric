@@ -22,6 +22,7 @@ musetric-jobs = { path = "crates/jobs" }
 musetric-media = { path = "crates/media" }
 rcgen = "=0.13.2"
 reqwest = { version = "=0.13.4", default-features = false, features = ["rustls"] }
+serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.11.0"
 time = { version = "=0.3.55", features = ["formatting", "macros"] }

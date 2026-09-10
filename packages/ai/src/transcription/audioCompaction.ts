@@ -1,10 +1,9 @@
 import { computeChunks, sampleRate, type Span } from './spectralChunker.js';
 
-const seamPadSeconds = 2.0;
-
 export const computePackedChunks = (
   audio: Float32Array,
   chunkSize: number,
+  seamSeconds: number,
   minChunk?: number,
 ): Span[][] => {
   const spans = computeChunks(audio, chunkSize, minChunk);
@@ -13,7 +12,7 @@ export const computePackedChunks = (
   let currentTotal = 0;
   for (const [start, end] of spans) {
     const duration = end - start;
-    let seam = current.length > 0 ? seamPadSeconds : 0;
+    let seam = current.length > 0 ? seamSeconds : 0;
     if (current.length > 0 && currentTotal + seam + duration > chunkSize) {
       packed.push(current);
       current = [];
@@ -29,47 +28,52 @@ export const computePackedChunks = (
   return packed;
 };
 
+export type Mapping = [number, number, number];
+
 export type Chunk = {
   start: number;
   end: number;
   segments: Span[];
 };
 
-export type Mapping = [number, number, number];
-
-export type Compaction = {
-  compacted: Float32Array;
-  chunks: Chunk[];
-  mapping: Mapping[];
+type Piece = {
+  from: number;
+  to: number;
+  pad: boolean;
 };
 
-export const buildCompaction = (
-  audio: Float32Array,
+export type Layout = {
+  chunks: Chunk[];
+  mapping: Mapping[];
+  pieces: Piece[];
+  totalSamples: number;
+};
+
+export const buildLayout = (
   packedChunks: Span[][],
-): Compaction => {
-  const pieces: Float32Array[] = [];
+  seamSeconds: number,
+): Layout => {
   const chunks: Chunk[] = [];
   const mapping: Mapping[] = [];
-  const padSamples = Math.round(seamPadSeconds * sampleRate);
-  const pad = new Float32Array(padSamples);
+  const pieces: Piece[] = [];
   let cursor = 0;
   for (const chunk of packedChunks) {
     const chunkStart = cursor;
     let prevEnd: number | undefined = undefined;
     for (const [start, end] of chunk) {
-      const lo = Math.max(0, Math.round(start * sampleRate));
-      const hi = Math.min(audio.length, Math.round(end * sampleRate));
+      const lo = Math.round(start * sampleRate);
+      const hi = Math.round(end * sampleRate);
       if (hi <= lo) {
         continue;
       }
-      if (prevEnd !== undefined && padSamples) {
-        pieces.push(pad);
-        mapping.push([cursor, cursor + seamPadSeconds, prevEnd]);
-        cursor += seamPadSeconds;
+      if (prevEnd !== undefined && seamSeconds > 0) {
+        const padSamples = Math.round(seamSeconds * sampleRate);
+        pieces.push({ from: 0, to: padSamples, pad: true });
+        mapping.push([cursor, cursor + seamSeconds, prevEnd]);
+        cursor += seamSeconds;
       }
-      const piece = audio.subarray(lo, hi);
-      const duration = piece.length / sampleRate;
-      pieces.push(piece);
+      pieces.push({ from: lo, to: hi, pad: false });
+      const duration = (hi - lo) / sampleRate;
       mapping.push([cursor, cursor + duration, lo / sampleRate]);
       cursor += duration;
       prevEnd = end;
@@ -82,17 +86,35 @@ export const buildCompaction = (
       });
     }
   }
-  let totalLength = 0;
+  let totalSamples = 0;
   for (const piece of pieces) {
-    totalLength += piece.length;
+    totalSamples += piece.to - piece.from;
   }
-  const compacted = new Float32Array(totalLength);
+  return { chunks, mapping, pieces, totalSamples };
+};
+
+export type Compaction = {
+  compacted: Float32Array<ArrayBuffer>;
+  chunks: Chunk[];
+  mapping: Mapping[];
+};
+
+export const buildCompaction = (
+  audio: Float32Array,
+  packedChunks: Span[][],
+  seamSeconds: number,
+): Compaction => {
+  const layout = buildLayout(packedChunks, seamSeconds);
+  const compacted = new Float32Array(layout.totalSamples);
   let writeOffset = 0;
-  for (const piece of pieces) {
-    compacted.set(piece, writeOffset);
-    writeOffset += piece.length;
+  for (const piece of layout.pieces) {
+    const length = piece.to - piece.from;
+    if (!piece.pad) {
+      compacted.set(audio.subarray(piece.from, piece.to), writeOffset);
+    }
+    writeOffset += length;
   }
-  return { compacted, chunks, mapping };
+  return { compacted, chunks: layout.chunks, mapping: layout.mapping };
 };
 
 export const mapTime = (

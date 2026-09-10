@@ -4,7 +4,7 @@ use std::{
 };
 
 use axum::body::Bytes;
-use musetric_db::{CheckpointWrite, PendingJob, ProcessingStep};
+use musetric_db::{PendingJob, ProcessingStep};
 use musetric_gpu::{
     ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPhase, PhaseSink, UnitSession,
 };
@@ -16,6 +16,7 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{Failure, answer, read_phase},
+        checkpoint_persist::{CheckpointCursor, persist_tail},
         stage_units::{StageRegistration, StageResume, StageUnits},
     },
     blobs::{StagedBlob, close_area, ensure_area, step_area},
@@ -277,43 +278,21 @@ impl<'run> StageAttempt<'run> {
             return Ok(());
         }
         let bytes = self.units.snapshot(attempt)?;
-        let previous = read_database(&self.running.context.storage, {
-            let project_id = self.running.project_id;
-            let step = self.running.step;
-            move |reader| reader.step_checkpoint(project_id, step)
-        })
-        .await?
-        .map_or(0, |cursor| cursor.generation);
-        let generation = previous + 1;
-        let stored = self
-            .store
-            .write_tail(generation, &bytes)
-            .await
-            .map_err(|error| Failure::from(error.to_string()))?;
-        let committed = write_database(&self.running.context.storage, {
-            let write = CheckpointWrite {
+        persist_tail(
+            &self.running.context.storage,
+            &self.store,
+            bytes,
+            CheckpointCursor {
                 project_id: self.running.project_id,
                 step: self.running.step,
-                attempt_id: attempt.to_owned(),
-                computation_id: self.computation.clone(),
-                generation,
-                pass: self.pass.to_owned(),
+                attempt_id: attempt,
+                computation_id: &self.computation,
+                pass: self.pass,
                 next_unit,
                 unit_count: count,
-                prefix_frames: 0,
-                tail_hash: stored.digest,
-                tail_bytes: i64::try_from(stored.bytes.len()).unwrap_or(0),
-            };
-            move |writer| writer.commit_checkpoint(&write)
-        })
-        .await?;
-        if !committed {
-            return Err(Failure::Refused(NOT_ACTIVE.to_owned()));
-        }
-        if previous > 0 {
-            self.store.discard(previous).await;
-        }
-        Ok(())
+            },
+        )
+        .await
     }
 }
 

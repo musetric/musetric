@@ -69,7 +69,7 @@ describe('buildCompaction + mapTime', () => {
         [5, 7],
       ],
     ];
-    const { compacted, chunks, mapping } = buildCompaction(audio, packed);
+    const { compacted, chunks, mapping } = buildCompaction(audio, packed, 2.0);
 
     expect(compacted).toHaveLength(sampleRate * 6);
     expect(chunks).toHaveLength(1);
@@ -87,7 +87,7 @@ describe('computePackedChunks', () => {
   it('groups spans within the chunk-size budget', () => {
     const audio = new Float32Array(sampleRate * 6);
     makeTone(audio, sampleRate, sampleRate * 5);
-    const packed = computePackedChunks(audio, 30);
+    const packed = computePackedChunks(audio, 30, 2.0);
     for (const group of packed) {
       const voiced = group.reduce((sum, span) => sum + (span[1] - span[0]), 0);
       expect(voiced).toBeLessThanOrEqual(30);

@@ -2877,6 +2877,7 @@ dependencies = [
  "musetric-media",
  "rcgen",
  "reqwest",
+ "serde",
  "serde_json",
  "sha2 0.11.0",
  "time",

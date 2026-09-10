@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use musetric_db::{
     Analysis, MasterType, NewDelivery, NewStem, NewStems, PendingJob, ProcessingStep, StemLoudness,
@@ -143,9 +143,7 @@ fn points_every_chord_model_file_at_its_cache_entry() {
 }
 
 fn create_hosted(analysis: &BrowserAnalysis) -> HostedModel {
-    if matches!(analysis.serve, Serve::Directory(_)) {
-        return HostedModel::create(HashMap::new(), Some("http://host/models".to_owned()));
-    }
+    let Serve::Files = analysis.serve;
     let urls = analysis
         .files
         .iter()
@@ -156,7 +154,7 @@ fn create_hosted(analysis: &BrowserAnalysis) -> HostedModel {
             )
         })
         .collect();
-    HostedModel::create(urls, None)
+    HostedModel::create(urls)
 }
 
 fn describe_step(step: ProcessingStep) -> Option<Value> {
@@ -221,11 +219,21 @@ fn asks_the_browser_for_the_key_without_a_mean_downmix() {
 
 #[test]
 fn points_the_transcription_at_the_whole_model_directory() {
-    let described = describe_step(ProcessingStep::Transcription);
+    let request = crate::analysis::transcribe::request_json(
+        "attempt-1",
+        "http://host/attempt/attempt-1",
+        "http://host/models",
+    );
 
     assert_eq!(
-        described,
-        Some(json!({
+        json!({
+            "api": "musetricAiTranscribeAudio",
+            "table": "Subtitle",
+            "mean": false,
+            "f16": true,
+            "request": request,
+        }),
+        json!({
             "api": "musetricAiTranscribeAudio",
             "table": "Subtitle",
             "mean": false,
@@ -235,12 +243,14 @@ fn points_the_transcription_at_the_whole_model_directory() {
                 "attemptUrl": "http://host/attempt/attempt-1",
                 "outputs": ["result"],
                 "sampleRate": 16000,
+                "chunkSize": 30.0,
+                "seamSeconds": 2.0,
                 "modelHost": "http://host/models",
                 "modelId": "musetric/whisper-large-v3-turbo-onnx",
                 "revision": "da27c0c3e917574b5541f71251abfd2c1aabb3a1",
                 "graph": whisper_graph(),
             },
-        }))
+        })
     );
 }
 

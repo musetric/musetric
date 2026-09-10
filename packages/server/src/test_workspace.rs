@@ -13,10 +13,12 @@ use crate::{
     page_bridge::PageBridge, publish::Publication, realtime::Rooms, routes::RouteState,
     storage::Storage,
 };
+use axum::http::StatusCode;
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
     open_database,
 };
+use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, PhaseSink, UnitSession};
 use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
 use musetric_media::SymphoniaPcm;
 
@@ -53,6 +55,35 @@ impl Workspace {
 
     pub(crate) fn work_path(&self) -> PathBuf {
         self.directory.join("work")
+    }
+
+    pub(crate) fn unit_incoming_path(&self) -> PathBuf {
+        self.work_path().join("incoming")
+    }
+
+    fn unit_bundle_path(&self) -> PathBuf {
+        let bundle = self.work_path().join("unit-bundle");
+        create_dir_all(&bundle).expect("the unit bundle should be created");
+        write(bundle.join("index.js"), "fixture;").expect("the unit bundle should be written");
+        bundle
+    }
+
+    pub(crate) async fn start_unit_host(
+        &self,
+        label: &str,
+        units: Arc<dyn UnitSession>,
+    ) -> ExecutorHost {
+        let sink: PhaseSink = Arc::new(|_| {});
+        ExecutorHost::start(ExecutorHostOptions {
+            label: label.to_owned(),
+            bundle: Bundle::Directory(self.unit_bundle_path()),
+            pcm: Vec::new().into(),
+            require_shader_f16: false,
+            on_phase: sink,
+            units: Some(units),
+        })
+        .await
+        .expect("the unit host should start")
     }
 
     pub(crate) fn seed(&self, statements: &str) {
@@ -97,6 +128,23 @@ impl Workspace {
             publication: Publication::default(),
         })
     }
+}
+
+pub(crate) async fn get_unit_window(base: &str, attempt: &str, unit: u32) -> (StatusCode, Vec<u8>) {
+    let response = reqwest::Client::new()
+        .get(format!("{base}/attempt/{attempt}/unit/{unit}"))
+        .send()
+        .await
+        .expect("the unit window should answer");
+    let status = response.status();
+    (
+        status,
+        response
+            .bytes()
+            .await
+            .expect("the unit window body")
+            .to_vec(),
+    )
 }
 
 struct IdleRunner;

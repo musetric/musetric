@@ -7,8 +7,8 @@ use crate::analysis::{
     browser::{BrowserAnalysis, Failure, HostedModel, Serve},
     models::{
         BEAT_THIS, BEAT_THIS_FILTERBANK, BEAT_THIS_MODEL, CHORD_NET, CHORD_NET_MODEL,
-        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, WHISPER, beat_this_graph,
-        chord_net_graph, skey_graph, whisper_graph,
+        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, beat_this_graph,
+        chord_net_graph, skey_graph,
     },
 };
 
@@ -47,18 +47,7 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             serve: Serve::Files,
             build: build_key,
         }),
-        ProcessingStep::Transcription => Some(BrowserAnalysis {
-            label: "Headless transcription",
-            api: "musetricAiTranscribeAudio",
-            stored: Analysis::Subtitle,
-            sample_rate: WHISPER.sample_rate,
-            downmix: WHISPER.downmix,
-            require_shader_f16: true,
-            files: WHISPER.cached(models_path),
-            serve: Serve::Directory(WHISPER.root(models_path)),
-            build: build_transcription,
-        }),
-        ProcessingStep::Separation | ProcessingStep::Voices => None,
+        ProcessingStep::Separation | ProcessingStep::Voices | ProcessingStep::Transcription => None,
     }
 }
 
@@ -100,22 +89,5 @@ fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result
         "outputs": ["result"],
         "modelUrl": files.url(SKEY_MODEL)?,
         "graph": skey_graph(),
-    }))
-}
-
-fn build_transcription(
-    attempt_id: &str,
-    attempt_url: &str,
-    files: &HostedModel,
-) -> Result<Value, Failure> {
-    Ok(json!({
-        "attemptId": attempt_id,
-        "attemptUrl": attempt_url,
-        "outputs": ["result"],
-        "sampleRate": WHISPER.sample_rate,
-        "modelHost": files.root()?,
-        "modelId": WHISPER.model_id,
-        "revision": WHISPER.revision,
-        "graph": whisper_graph(),
     }))
 }
