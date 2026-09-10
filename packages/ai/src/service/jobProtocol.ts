@@ -233,6 +233,3 @@ export const readUnitEvent = (text: string): UnitEvent | undefined => {
   }
   return { type: 'unit', jobId, attemptId, unit, unitCount };
 };
-
-export const unitOpenedApiName = 'musetricAiSendUnitOpened';
-export const unitDoneApiName = 'musetricAiSendUnitDone';

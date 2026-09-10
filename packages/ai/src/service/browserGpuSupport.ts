@@ -1,5 +1,3 @@
-export const gpuSupportApiName = 'musetricAiReadGpuSupport';
-
 export type GpuSupport = {
   adapter: boolean;
   shaderF16: boolean;

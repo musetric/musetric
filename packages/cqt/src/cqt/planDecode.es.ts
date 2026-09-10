@@ -231,13 +231,16 @@ export const decodeCqtPlanArtifact = (artifact: Uint8Array): CqtPlan => {
   return plan;
 };
 
+declare const crypto: {
+  subtle: {
+    digest: (algorithm: string, data: ArrayBuffer) => Promise<ArrayBuffer>;
+  };
+};
+
 const toSha256Hex = (digest: ArrayBuffer): string =>
   Array.from(new Uint8Array(digest), (value) =>
     value.toString(16).padStart(2, '0'),
   ).join('');
-
-const isObject = (value: unknown): value is object =>
-  typeof value === 'object' && Boolean(value);
 
 export const getCqtPlanPayloadSha256 = async (
   artifact: Uint8Array,
@@ -251,27 +254,9 @@ export const getCqtPlanPayloadSha256 = async (
   if (headerByteLength + payloadSize !== bytes.byteLength) {
     throw new RangeError('CQT plan artifact has an invalid payload size');
   }
-  const cryptoLike: unknown = Reflect.get(globalThis, 'crypto');
-  if (!isObject(cryptoLike)) {
-    throw new Error('Web Crypto SHA-256 is not available');
-  }
-  const subtle: unknown = Reflect.get(cryptoLike, 'subtle');
-  if (!isObject(subtle)) {
-    throw new Error('Web Crypto SHA-256 is not available');
-  }
-  const digest: unknown = Reflect.get(subtle, 'digest');
-  if (typeof digest !== 'function') {
-    throw new Error('Web Crypto SHA-256 is not available');
-  }
   const payload = bytes.slice(headerByteLength);
-  const result: unknown = await Reflect.apply(digest, subtle, [
-    'SHA-256',
-    payload.buffer,
-  ]);
-  if (!(result instanceof ArrayBuffer)) {
-    throw new Error('Web Crypto SHA-256 returned an invalid digest');
-  }
-  return toSha256Hex(result);
+  const digest = await crypto.subtle.digest('SHA-256', payload.buffer);
+  return toSha256Hex(digest);
 };
 
 export const verifyCqtPlanArtifact = async (

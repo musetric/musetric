@@ -1,67 +1,5 @@
 import { fetchOk } from './browserShared.js';
-import {
-  type UnitCloseCommand,
-  type UnitCommand,
-  unitDoneApiName,
-  unitOpenedApiName,
-} from './jobProtocol.js';
-
-type UnitReceiver = (event: UnitCommand | UnitCloseCommand) => Promise<void>;
-
-type UnitQueue = {
-  receiver: UnitReceiver | undefined;
-  events: (UnitCommand | UnitCloseCommand)[];
-  pumping: boolean;
-  abandon: ((reason: Error) => void) | undefined;
-};
-
-const unitQueue: UnitQueue = {
-  receiver: undefined,
-  events: [],
-  pumping: false,
-  abandon: undefined,
-};
-
-const pump = async (): Promise<void> => {
-  if (unitQueue.pumping) {
-    return;
-  }
-  unitQueue.pumping = true;
-  try {
-    while (unitQueue.receiver && unitQueue.events.length > 0) {
-      const event = unitQueue.events.shift();
-      if (event === undefined) {
-        break;
-      }
-      await unitQueue.receiver(event);
-    }
-  } finally {
-    unitQueue.pumping = false;
-    if (unitQueue.receiver && unitQueue.events.length > 0) {
-      void pump();
-    }
-  }
-};
-
-export const registerUnitReceiver = (next: UnitReceiver | undefined): void => {
-  unitQueue.receiver = next;
-  if (!next) {
-    unitQueue.events.length = 0;
-    return;
-  }
-  void pump();
-};
-
-export const dispatchUnitEvent = (
-  event: UnitCommand | UnitCloseCommand,
-): void => {
-  unitQueue.events.push(event);
-  void pump();
-};
-
-export const abandonUnitServing = (reason: string): void => {
-  unitQueue.abandon?.(new Error(reason));
-};
+import { type UnitEvent } from './jobProtocol.js';
 
 export type UnitServing = {
   attemptId: string;
@@ -91,56 +29,95 @@ const putOutput = async (
   }
 };
 
-const callAttemptApi = async (
-  apiName: string,
-  args: unknown[],
-): Promise<void> => {
-  const api: unknown = Reflect.get(globalThis, apiName);
-  if (typeof api !== 'function') {
-    throw new Error('AI unit API is not initialized');
-  }
-  await Reflect.apply(api, undefined, args);
-};
-
-const announceOpened = async (attemptId: string): Promise<void> =>
-  callAttemptApi(unitOpenedApiName, [attemptId]);
-
-const confirmUnit = async (attemptId: string, unit: number): Promise<void> =>
-  callAttemptApi(unitDoneApiName, [attemptId, unit]);
-
 const fetchBytes = async (url: string): Promise<Uint8Array> => {
   const response = await fetchOk(url, 'the unit window');
   return new Uint8Array(await response.arrayBuffer());
 };
 
-export const serveUnits = async (serving: UnitServing): Promise<void> => {
-  const closed = Promise.withResolvers<void>();
-  const receive = async (
-    event: UnitCommand | UnitCloseCommand,
-  ): Promise<void> => {
-    if (event.attemptId !== serving.attemptId) {
+type UnitReceiver = (event: UnitEvent) => Promise<void>;
+
+export type UnitHost = {
+  unitOpened: (jobId: string, attemptId: string) => void;
+  unitDone: (jobId: string, attemptId: string, unit: number) => void;
+};
+
+export type UnitServer = {
+  serve: (jobId: string, serving: UnitServing) => Promise<void>;
+  dispatch: (event: UnitEvent) => void;
+  abandon: (reason: string) => void;
+};
+
+export const createUnitServer = (host: UnitHost): UnitServer => {
+  const events: UnitEvent[] = [];
+  let receiver: UnitReceiver | undefined = undefined;
+  let pumping = false;
+  let rejectServing: ((reason: Error) => void) | undefined = undefined;
+
+  const pump = async (): Promise<void> => {
+    if (pumping) {
       return;
     }
-    if (event.type === 'unitClose') {
-      closed.resolve();
-      return;
+    pumping = true;
+    try {
+      while (receiver && events.length > 0) {
+        const event = events.shift();
+        if (event === undefined) {
+          break;
+        }
+        await receiver(event);
+      }
+    } finally {
+      pumping = false;
+      if (receiver && events.length > 0) {
+        void pump();
+      }
     }
-    const input = await fetchBytes(
-      `${serving.attemptUrl}/unit/${String(event.unit)}`,
-    );
-    const produced = await serving.run(input, event.unit);
-    for (const output of serving.outputs) {
-      await putOutput(serving, event.unit, output, produced);
-    }
-    await confirmUnit(serving.attemptId, event.unit);
   };
-  registerUnitReceiver(receive);
-  unitQueue.abandon = closed.reject;
-  try {
-    await announceOpened(serving.attemptId);
-    await closed.promise;
-  } finally {
-    unitQueue.abandon = undefined;
-    registerUnitReceiver(undefined);
-  }
+
+  const setReceiver = (next: UnitReceiver | undefined): void => {
+    receiver = next;
+    if (!next) {
+      events.length = 0;
+      return;
+    }
+    void pump();
+  };
+
+  return {
+    serve: async (jobId, serving) => {
+      const closed = Promise.withResolvers<void>();
+      setReceiver(async (event) => {
+        if (event.attemptId !== serving.attemptId) {
+          return;
+        }
+        if (event.type === 'unitClose') {
+          closed.resolve();
+          return;
+        }
+        const input = await fetchBytes(
+          `${serving.attemptUrl}/unit/${String(event.unit)}`,
+        );
+        const produced = await serving.run(input, event.unit);
+        for (const output of serving.outputs) {
+          await putOutput(serving, event.unit, output, produced);
+        }
+        host.unitDone(jobId, serving.attemptId, event.unit);
+      });
+      rejectServing = closed.reject;
+      try {
+        host.unitOpened(jobId, serving.attemptId);
+        await closed.promise;
+      } finally {
+        rejectServing = undefined;
+        setReceiver(undefined);
+      }
+    },
+    dispatch: (event) => {
+      events.push(event);
+      void pump();
+    },
+    abandon: (reason) => {
+      rejectServing?.(new Error(reason));
+    },
+  };
 };

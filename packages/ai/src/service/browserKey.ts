@@ -1,13 +1,8 @@
 import { keyMap } from '../key/keyMap.js';
 import { type KeyResult } from '../key/types.js';
-import {
-  floatsFromBytes,
-  jsonBytes,
-  registerBrowserApi,
-  reportLoading,
-} from './browserShared.js';
-import { serveUnits } from './browserUnitServing.js';
-import { analyzeKeyApiName, type BrowserAnalyzeKeyRequest } from './keyApi.js';
+import { createBrowserJobApi } from './browserJob.js';
+import { floatsFromBytes, jsonBytes } from './browserShared.js';
+import { type BrowserAnalyzeKeyRequest } from './keyApi.js';
 
 const peakNormalize = (audio: Float32Array): void => {
   let peak = 0;
@@ -34,39 +29,35 @@ const argmax = (values: Float32Array): number => {
   return best;
 };
 
-export const registerKeyApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeKeyRequest, void>(
-    analyzeKeyApiName,
-    async (request) => {
-      await reportLoading();
-      const { createSkeyRuntime } =
-        await import('../runtime/key/skeyRuntime.js');
-      const runtime = await createSkeyRuntime({
-        graph: request.graph,
-        modelUrl: request.modelUrl,
+export const analyzeKey = createBrowserJobApi<BrowserAnalyzeKeyRequest>(
+  async (request, context) => {
+    context.reportLoading();
+    const { createSkeyRuntime } = await import('../runtime/key/skeyRuntime.js');
+    const runtime = await createSkeyRuntime({
+      graph: request.graph,
+      modelUrl: request.modelUrl,
+    });
+    try {
+      await context.serveUnits({
+        attemptId: request.attemptId,
+        attemptUrl: request.attemptUrl,
+        outputs: request.outputs,
+        run: async (bytes) => {
+          const audio = floatsFromBytes(bytes);
+          peakNormalize(audio);
+          const probs = await runtime.analyze(audio);
+          const index = argmax(probs);
+          const { root, mode } = keyMap[index];
+          const result: KeyResult = {
+            root,
+            mode,
+            confidence: probs[index],
+          };
+          return jsonBytes(result);
+        },
       });
-      try {
-        await serveUnits({
-          attemptId: request.attemptId,
-          attemptUrl: request.attemptUrl,
-          outputs: request.outputs,
-          run: async (bytes) => {
-            const audio = floatsFromBytes(bytes);
-            peakNormalize(audio);
-            const probs = await runtime.analyze(audio);
-            const index = argmax(probs);
-            const { root, mode } = keyMap[index];
-            const result: KeyResult = {
-              root,
-              mode,
-              confidence: probs[index],
-            };
-            return jsonBytes(result);
-          },
-        });
-      } finally {
-        await runtime.release();
-      }
-    },
-  );
-};
+    } finally {
+      await runtime.release();
+    }
+  },
+);

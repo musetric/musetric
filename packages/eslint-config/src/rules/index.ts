@@ -8,6 +8,7 @@ import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
 import { noDynamicTranslationKeysRule } from './noDynamicTranslationKeys.js';
 import { noFragmentedTypeDeclarationsRule } from './noFragmentedTypeDeclarations.js';
 import { noFunctionDeclarationsRule } from './noFunctionDeclarations.js';
+import { noGlobalStateRule } from './noGlobalState.js';
 import { noImmediateInlineFunctionCallsRule } from './noImmediateInlineFunctionCalls.js';
 import { noInlineParameterDestructuringRule } from './noInlineParameterDestructuring.js';
 import { noInlineParameterObjectTypesRule } from './noInlineParameterObjectTypes.js';
@@ -39,6 +40,7 @@ export const musetricRules = {
   'no-dynamic-translation-keys': noDynamicTranslationKeysRule,
   'no-fragmented-type-declarations': noFragmentedTypeDeclarationsRule,
   'no-function-declarations': noFunctionDeclarationsRule,
+  'no-global-state': noGlobalStateRule,
   'no-immediate-inline-function-calls': noImmediateInlineFunctionCallsRule,
   'no-inline-parameter-destructuring': noInlineParameterDestructuringRule,
   'no-inline-parameter-object-types': noInlineParameterObjectTypesRule,

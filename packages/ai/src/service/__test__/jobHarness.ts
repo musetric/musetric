@@ -166,7 +166,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
     outputs,
     run: async (api, request) => {
       const socket = await active();
-      const jobId = globalThis.crypto.randomUUID();
+      const jobId = crypto.randomUUID();
       const answered = new Promise<unknown>((resolve, reject) => {
         jobs.set(jobId, { resolve, reject });
       });

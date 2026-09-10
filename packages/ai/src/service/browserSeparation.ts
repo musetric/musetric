@@ -1,15 +1,10 @@
+import { createBrowserJobApi } from './browserJob.js';
+import { floatsFromBytes } from './browserShared.js';
 import {
   type BrowserLeadBackingUnitsRequest,
   type BrowserSeparateUnitsRequest,
   type BrowserVocalsUnitsRequest,
-  separateUnitsApiName,
-} from './browserApi.js';
-import {
-  floatsFromBytes,
-  registerBrowserApi,
-  reportLoading,
-} from './browserShared.js';
-import { serveUnits } from './browserUnitServing.js';
+} from './separationApi.js';
 
 type Stage = {
   run: (input: Float32Array<ArrayBuffer>) => Promise<Float32Array<ArrayBuffer>>;
@@ -59,29 +54,26 @@ const createStage = async (
     ? await createVocalsStage(request)
     : await createLeadBackingStage(request);
 
-export const registerSeparationApi = (): void => {
-  registerBrowserApi<BrowserSeparateUnitsRequest, void>(
-    separateUnitsApiName,
-    async (request) => {
-      await reportLoading();
-      const stage = await createStage(request);
-      try {
-        await serveUnits({
-          attemptId: request.attemptId,
-          attemptUrl: request.attemptUrl,
-          outputs: request.outputs,
-          run: async (bytes) => {
-            const output = await stage.run(floatsFromBytes(bytes));
-            return new Uint8Array(
-              output.buffer,
-              output.byteOffset,
-              output.byteLength,
-            );
-          },
-        });
-      } finally {
-        await stage.release();
-      }
-    },
-  );
-};
+export const separateUnits = createBrowserJobApi<BrowserSeparateUnitsRequest>(
+  async (request, context) => {
+    context.reportLoading();
+    const stage = await createStage(request);
+    try {
+      await context.serveUnits({
+        attemptId: request.attemptId,
+        attemptUrl: request.attemptUrl,
+        outputs: request.outputs,
+        run: async (bytes) => {
+          const output = await stage.run(floatsFromBytes(bytes));
+          return new Uint8Array(
+            output.buffer,
+            output.byteOffset,
+            output.byteLength,
+          );
+        },
+      });
+    } finally {
+      await stage.release();
+    }
+  },
+);
