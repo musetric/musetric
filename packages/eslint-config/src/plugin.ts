@@ -12,6 +12,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-dynamic-translation-keys': 'error',
   'musetric/no-fragmented-type-declarations': 'error',
   'musetric/no-function-declarations': 'error',
+  'musetric/no-global-state': 'error',
   'musetric/no-immediate-inline-function-calls': 'error',
   'musetric/no-inline-parameter-destructuring': 'error',
   'musetric/no-inline-parameter-object-types': 'error',

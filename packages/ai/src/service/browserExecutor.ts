@@ -1,81 +1,20 @@
-import { setAndroidForegroundWork } from './androidForeground.js';
-import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
+import { type ForegroundBridge } from './androidForeground.js';
 import { readGpuSupport } from './browserGpuSupport.js';
-import { abandonUnitServing, dispatchUnitEvent } from './browserUnitServing.js';
+import { type BrowserJobApis } from './browserJob.js';
+import { createUnitServer } from './browserUnitServing.js';
 import {
   type ExecutorMessage,
-  type ExecutorUnitDone,
-  type ExecutorUnitOpened,
   type JobCommand,
   readJobCommand,
   readUnitEvent,
-  unitDoneApiName,
-  unitOpenedApiName,
 } from './jobProtocol.js';
 
 const send = (socket: WebSocket, message: ExecutorMessage): void => {
   socket.send(JSON.stringify(message));
 };
 
-const bindJobApis = (socket: WebSocket, command: JobCommand): void => {
-  Reflect.set(
-    globalThis,
-    reportPhaseApiName,
-    (message: BrowserPhaseMessage) => {
-      send(socket, { ...message, jobId: command.jobId });
-    },
-  );
-  Reflect.set(globalThis, unitOpenedApiName, (attemptId: string) => {
-    const message: ExecutorUnitOpened = {
-      type: 'unitOpened',
-      jobId: command.jobId,
-      attemptId,
-    };
-    send(socket, message);
-  });
-  Reflect.set(
-    globalThis,
-    unitDoneApiName,
-    (attemptId: string, unit: number) => {
-      const message: ExecutorUnitDone = {
-        type: 'unitDone',
-        jobId: command.jobId,
-        attemptId,
-        unit,
-      };
-      send(socket, message);
-    },
-  );
-};
-
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-const runJob = async (
-  socket: WebSocket,
-  command: JobCommand,
-): Promise<void> => {
-  setAndroidForegroundWork(true);
-  try {
-    bindJobApis(socket, command);
-    const api: unknown = Reflect.get(globalThis, command.api);
-    if (typeof api !== 'function') {
-      throw new Error(`Browser API ${command.api} is not initialized`);
-    }
-    const result: unknown = await Reflect.apply(api, undefined, [
-      command.request,
-    ]);
-    send(socket, { type: 'result', jobId: command.jobId, result });
-  } catch (error) {
-    send(socket, {
-      type: 'failed',
-      jobId: command.jobId,
-      error: describeError(error),
-    });
-  } finally {
-    setAndroidForegroundWork(false);
-  }
-};
 
 const loopbackHosts = ['127.0.0.1', 'localhost', '[::1]', '::1'];
 
@@ -87,17 +26,65 @@ const readSocketUrl = (jobUrl: string): string | undefined => {
   return loopbackHosts.includes(url.hostname) ? url.toString() : undefined;
 };
 
-export const startJobExecutor = (jobUrl: string): void => {
-  const socketUrl = readSocketUrl(jobUrl);
+export type JobExecutorOptions = {
+  jobUrl: string;
+  apis: BrowserJobApis;
+  foreground: ForegroundBridge | undefined;
+};
+
+export const startJobExecutor = (options: JobExecutorOptions): void => {
+  const socketUrl = readSocketUrl(options.jobUrl);
   if (socketUrl === undefined) {
     throw new Error('The job executor accepts a local socket url only');
   }
   const socket = new WebSocket(socketUrl);
+  const unitServer = createUnitServer({
+    unitOpened: (jobId, attemptId) => {
+      send(socket, { type: 'unitOpened', jobId, attemptId });
+    },
+    unitDone: (jobId, attemptId, unit) => {
+      send(socket, { type: 'unitDone', jobId, attemptId, unit });
+    },
+  });
+  let runningJobs = 0;
+
+  const runJob = async (command: JobCommand): Promise<void> => {
+    runningJobs += 1;
+    if (runningJobs === 1) {
+      options.foreground?.setActive(true);
+    }
+    try {
+      const api = options.apis[command.api];
+      if (!api) {
+        throw new Error(`Browser API ${command.api} is not initialized`);
+      }
+      const result = await api(command.request, {
+        reportLoading: () => {
+          send(socket, { type: 'loading', jobId: command.jobId });
+        },
+        serveUnits: async (serving) =>
+          await unitServer.serve(command.jobId, serving),
+      });
+      send(socket, { type: 'result', jobId: command.jobId, result });
+    } catch (error) {
+      send(socket, {
+        type: 'failed',
+        jobId: command.jobId,
+        error: describeError(error),
+      });
+    } finally {
+      runningJobs -= 1;
+      if (runningJobs === 0) {
+        options.foreground?.setActive(false);
+      }
+    }
+  };
+
   socket.addEventListener('close', () => {
-    abandonUnitServing('the executor lost its connection to the host');
+    unitServer.abandon('the executor lost its connection to the host');
   });
   socket.addEventListener('error', () => {
-    abandonUnitServing('the executor connection to the host failed');
+    unitServer.abandon('the executor connection to the host failed');
   });
   socket.addEventListener('open', () => {
     void readGpuSupport().then((support) => {
@@ -110,12 +97,12 @@ export const startJobExecutor = (jobUrl: string): void => {
     }
     const unitEvent = readUnitEvent(event.data);
     if (unitEvent) {
-      dispatchUnitEvent(unitEvent);
+      unitServer.dispatch(unitEvent);
       return;
     }
     const command = readJobCommand(event.data);
     if (command) {
-      void runJob(socket, command);
+      void runJob(command);
     }
   });
 };

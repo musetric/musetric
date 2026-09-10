@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { startJobExecutor } from '../browserExecutor.js';
-import { registerBrowserApi } from '../browserShared.js';
-import { serveUnits } from '../browserUnitServing.js';
+import { type BrowserJobApis, createBrowserJobApi } from '../browserJob.js';
+import { type UnitServing } from '../browserUnitServing.js';
 import { readSocketUrl, startFakeHost } from './jobHarness.js';
 
 const attempt = 'attempt-1';
@@ -29,19 +29,28 @@ const readFloats = (buffer: Buffer): number[] => [
   ),
 ];
 
+const servingApiName = 'musetricAiServeUnitsTest';
+
+const servingApis = (unitServing: UnitServing): BrowserJobApis => ({
+  [servingApiName]: createBrowserJobApi<unknown>(async (_request, context) => {
+    await context.serveUnits(unitServing);
+  }),
+});
+
 test('the unit serving fetches every window, uploads the output and confirms the unit', async () => {
   const host = await startFakeHost();
   host.windows.set(`${attempt}/0`, floatBytes([0.5, -0.5, 0.25, 0.25]));
   host.windows.set(`${attempt}/1`, floatBytes([1, -1, 2, -2]));
   serving.attemptUrl = `${host.pageUrl.split('/?')[0]}/attempt/${attempt}`;
-  registerBrowserApi('musetricAiServeUnitsTest', async () => {
-    await serveUnits(serving);
-  });
 
   try {
-    startJobExecutor(readSocketUrl(host.pageUrl));
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis: servingApis(serving),
+      foreground: undefined,
+    });
     await host.ready;
-    const answered = host.run('musetricAiServeUnitsTest', {});
+    const answered = host.run(servingApiName, {});
     host.sendUnit(attempt, 0, 2);
     host.sendUnit(attempt, 1, 2);
     host.sendUnitClose(attempt);
@@ -78,22 +87,30 @@ test('the unit serving gives up when the host connection drops', async () => {
   const dropped = 'attempt-dropped';
   host.windows.set(`${dropped}/0`, floatBytes([1, -1, 1, -1]));
   const released = Promise.withResolvers<void>();
-  registerBrowserApi('musetricAiAbandonTest', async () => {
-    try {
-      await serveUnits({
-        attemptId: dropped,
-        attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${dropped}`,
-        outputs: ['separated'],
-        run: async () => Promise.resolve(new Uint8Array(16)),
-      });
-    } finally {
-      released.resolve();
-    }
-  });
+  const apis: BrowserJobApis = {
+    [servingApiName]: createBrowserJobApi<unknown>(
+      async (_request, context) => {
+        try {
+          await context.serveUnits({
+            attemptId: dropped,
+            attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${dropped}`,
+            outputs: ['separated'],
+            run: async () => Promise.resolve(new Uint8Array(16)),
+          });
+        } finally {
+          released.resolve();
+        }
+      },
+    ),
+  };
 
-  startJobExecutor(readSocketUrl(host.pageUrl));
+  startJobExecutor({
+    jobUrl: readSocketUrl(host.pageUrl),
+    apis,
+    foreground: undefined,
+  });
   await host.ready;
-  void host.run('musetricAiAbandonTest', {}).catch(() => undefined);
+  void host.run(servingApiName, {}).catch(() => undefined);
   host.sendUnit(dropped, 0, 2);
   await waitFor(() => host.unitDone.length > 0);
 

@@ -1,16 +1,3 @@
-import { type BrowserPhaseMessage, reportPhaseApiName } from './browserApi.js';
-
-const reportPhase = async (message: BrowserPhaseMessage): Promise<void> => {
-  const api: unknown = Reflect.get(globalThis, reportPhaseApiName);
-  if (typeof api !== 'function') {
-    throw new Error('AI phase API is not initialized');
-  }
-  await Reflect.apply(api, undefined, [message]);
-};
-
-export const reportLoading = async (): Promise<void> =>
-  reportPhase({ type: 'loading' });
-
 export const fetchOk = async (
   url: string,
   label: string,
@@ -40,10 +27,3 @@ export const floatsFromBytes = (
 
 export const jsonBytes = (value: unknown): Uint8Array =>
   new TextEncoder().encode(JSON.stringify(value));
-
-export const registerBrowserApi = <Request, Result>(
-  apiName: string,
-  handler: (request: Request) => Promise<Result>,
-): void => {
-  Reflect.set(globalThis, apiName, handler);
-};

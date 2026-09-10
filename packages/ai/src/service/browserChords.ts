@@ -1,17 +1,8 @@
 import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
 import { buildChordSegments } from '../chords/chordSegments.js';
-import {
-  fetchOk,
-  floatsFromBytes,
-  jsonBytes,
-  registerBrowserApi,
-  reportLoading,
-} from './browserShared.js';
-import { serveUnits } from './browserUnitServing.js';
-import {
-  analyzeChordsApiName,
-  type BrowserAnalyzeChordsRequest,
-} from './chordsApi.js';
+import { createBrowserJobApi } from './browserJob.js';
+import { fetchOk, floatsFromBytes, jsonBytes } from './browserShared.js';
+import { type BrowserAnalyzeChordsRequest } from './chordsApi.js';
 
 type CqtPlanManifest = {
   payloadSha256: string;
@@ -52,35 +43,32 @@ const fetchCqtPlan = async (
   return plan;
 };
 
-export const registerChordsApi = (): void => {
-  registerBrowserApi<BrowserAnalyzeChordsRequest, void>(
-    analyzeChordsApiName,
-    async (request) => {
-      await reportLoading();
-      const { createChordNetGpuRuntime } =
-        await import('../runtime/chords/chordNetGpuRuntime.js');
-      const plan = await fetchCqtPlan(request.planUrl, request.planManifestUrl);
-      const runtime = await createChordNetGpuRuntime({
-        graph: request.graph,
-        modelUrl: request.modelUrl,
-        plan,
+export const analyzeChords = createBrowserJobApi<BrowserAnalyzeChordsRequest>(
+  async (request, context) => {
+    context.reportLoading();
+    const { createChordNetGpuRuntime } =
+      await import('../runtime/chords/chordNetGpuRuntime.js');
+    const plan = await fetchCqtPlan(request.planUrl, request.planManifestUrl);
+    const runtime = await createChordNetGpuRuntime({
+      graph: request.graph,
+      modelUrl: request.modelUrl,
+      plan,
+    });
+    try {
+      await context.serveUnits({
+        attemptId: request.attemptId,
+        attemptUrl: request.attemptUrl,
+        outputs: request.outputs,
+        run: async (bytes) => {
+          const audio = floatsFromBytes(bytes);
+          const indices = await runtime.analyze(audio);
+          return jsonBytes(
+            buildChordSegments(indices, request.graph.frameDuration),
+          );
+        },
       });
-      try {
-        await serveUnits({
-          attemptId: request.attemptId,
-          attemptUrl: request.attemptUrl,
-          outputs: request.outputs,
-          run: async (bytes) => {
-            const audio = floatsFromBytes(bytes);
-            const indices = await runtime.analyze(audio);
-            return jsonBytes(
-              buildChordSegments(indices, request.graph.frameDuration),
-            );
-          },
-        });
-      } finally {
-        await runtime.release();
-      }
-    },
-  );
-};
+    } finally {
+      await runtime.release();
+    }
+  },
+);

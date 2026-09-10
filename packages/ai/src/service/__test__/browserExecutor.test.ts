@@ -1,12 +1,6 @@
 import { expect, test } from 'vitest';
 import { startJobExecutor } from '../browserExecutor.js';
-import { registerBrowserApi, reportLoading } from '../browserShared.js';
-import { registerUnitReceiver } from '../browserUnitServing.js';
-import {
-  type UnitCloseCommand,
-  type UnitCommand,
-  unitDoneApiName,
-} from '../jobProtocol.js';
+import { type BrowserJobApis, createBrowserJobApi } from '../browserJob.js';
 import { readSocketUrl, startFakeHost } from './jobHarness.js';
 
 const apiName = 'musetricAiExecutorTestApi';
@@ -15,7 +9,7 @@ const announceAdapter = (shaderF16: boolean): void => {
   const features = {
     has: (feature: string) => feature === 'shader-f16' && shaderF16,
   };
-  Object.defineProperty(globalThis.navigator, 'gpu', {
+  Object.defineProperty(navigator, 'gpu', {
     configurable: true,
     value: { requestAdapter: async () => Promise.resolve({ features }) },
   });
@@ -23,17 +17,22 @@ const announceAdapter = (shaderF16: boolean): void => {
 
 test('the browser client runs a job and reports its phases', async () => {
   announceAdapter(true);
-  registerBrowserApi<{ gain: number }, { frames: number }>(
-    apiName,
-    async (request) => {
-      await reportLoading();
-      return { frames: request.gain };
-    },
-  );
+  const apis: BrowserJobApis = {
+    [apiName]: createBrowserJobApi<{ gain: number }>(
+      async (request, context) => {
+        context.reportLoading();
+        return Promise.resolve({ frames: request.gain });
+      },
+    ),
+  };
   const host = await startFakeHost();
 
   try {
-    startJobExecutor(readSocketUrl(host.pageUrl));
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis,
+      foreground: undefined,
+    });
     expect(await host.ready).toEqual({
       type: 'ready',
       adapter: true,
@@ -52,49 +51,40 @@ test('the browser client runs a job and reports its phases', async () => {
 
 test('the browser client forwards unit events and confirms them', async () => {
   announceAdapter(true);
-  const received: (UnitCommand | UnitCloseCommand)[] = [];
-  registerBrowserApi<unknown, void>(apiName, async () => {
-    const closed = Promise.withResolvers<void>();
-    registerUnitReceiver(async (event) => {
-      received.push(event);
-      if (event.type === 'unit') {
-        const done: unknown = Reflect.get(globalThis, unitDoneApiName);
-        if (typeof done !== 'function') {
-          throw new Error('AI unit done API is not initialized');
-        }
-        await Reflect.apply(done, undefined, [event.attemptId, event.unit]);
-      }
-      if (event.type === 'unitClose') {
-        closed.resolve();
-      }
-    });
-    try {
-      await closed.promise;
-    } finally {
-      registerUnitReceiver(undefined);
-    }
-  });
+  const attempt = 'attempt-9';
+  const served: number[] = [];
   const host = await startFakeHost();
+  host.windows.set(`${attempt}/2`, Buffer.alloc(4));
+  const apis: BrowserJobApis = {
+    [apiName]: createBrowserJobApi<{ attemptId: string }>(
+      async (request, context) => {
+        await context.serveUnits({
+          attemptId: request.attemptId,
+          attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${request.attemptId}`,
+          outputs: [],
+          run: async (input, unit) => {
+            served.push(unit);
+            return Promise.resolve(input);
+          },
+        });
+      },
+    ),
+  };
 
   try {
-    startJobExecutor(readSocketUrl(host.pageUrl));
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis,
+      foreground: undefined,
+    });
     await host.ready;
-    const answered = host.run(apiName, {});
-    host.sendUnit('attempt-9', 2, 4);
-    host.sendUnitClose('attempt-9');
+    const answered = host.run(apiName, { attemptId: attempt });
+    host.sendUnit(attempt, 2, 4);
+    host.sendUnitClose(attempt);
 
     await answered;
-    expect(received).toEqual([
-      {
-        type: 'unit',
-        jobId: 'unit-pump',
-        attemptId: 'attempt-9',
-        unit: 2,
-        unitCount: 4,
-      },
-      { type: 'unitClose', jobId: 'unit-pump', attemptId: 'attempt-9' },
-    ]);
-    expect(host.unitDone).toEqual([{ attemptId: 'attempt-9', unit: 2 }]);
+    expect(served).toEqual([2]);
+    expect(host.unitDone).toEqual([{ attemptId: attempt, unit: 2 }]);
   } finally {
     await host.close();
   }
@@ -105,7 +95,11 @@ test('the browser client announces an adapter without shader-f16', async () => {
   const host = await startFakeHost();
 
   try {
-    startJobExecutor(readSocketUrl(host.pageUrl));
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis: {},
+      foreground: undefined,
+    });
 
     expect(await host.ready).toEqual({
       type: 'ready',
@@ -119,13 +113,19 @@ test('the browser client announces an adapter without shader-f16', async () => {
 
 test('the browser client reports a failing job back to the host', async () => {
   announceAdapter(true);
-  registerBrowserApi<unknown, never>(apiName, () => {
-    throw new Error('the runtime ran out of memory');
-  });
+  const apis: BrowserJobApis = {
+    [apiName]: createBrowserJobApi<unknown>(() => {
+      throw new Error('the runtime ran out of memory');
+    }),
+  };
   const host = await startFakeHost();
 
   try {
-    startJobExecutor(readSocketUrl(host.pageUrl));
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis,
+      foreground: undefined,
+    });
 
     await expect(host.run(apiName, {})).rejects.toThrow(
       'the runtime ran out of memory',
@@ -135,11 +135,36 @@ test('the browser client reports a failing job back to the host', async () => {
   }
 });
 
+test('the browser client rejects a job for an api it does not have', async () => {
+  announceAdapter(true);
+  const host = await startFakeHost();
+
+  try {
+    startJobExecutor({
+      jobUrl: readSocketUrl(host.pageUrl),
+      apis: {},
+      foreground: undefined,
+    });
+
+    await expect(host.run(apiName, {})).rejects.toThrow('is not initialized');
+  } finally {
+    await host.close();
+  }
+});
+
 test('the browser client refuses a socket url outside the machine', () => {
   expect(() => {
-    startJobExecutor('ws://example.com/jobs');
+    startJobExecutor({
+      jobUrl: 'ws://example.com/jobs',
+      apis: {},
+      foreground: undefined,
+    });
   }).toThrow('accepts a local socket url only');
   expect(() => {
-    startJobExecutor('http://127.0.0.1/jobs');
+    startJobExecutor({
+      jobUrl: 'http://127.0.0.1/jobs',
+      apis: {},
+      foreground: undefined,
+    });
   }).toThrow('accepts a local socket url only');
 });
