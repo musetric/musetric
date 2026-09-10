@@ -1,75 +1,29 @@
-use std::{
-    path::PathBuf,
-    process::id,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{sync::Arc, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, JobTicket, PhaseSink, UnitSession};
+use musetric_gpu::{ExecutorHost, JobTicket, UnitSession};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
 use super::{StageRegistration, StageUnits};
-use crate::unit_plan::{PlanRules, PlanUnit, UnitPlan};
+use crate::{
+    test_workspace::{Workspace, get_unit_window},
+    unit_plan::{PlanRules, PlanUnit, UnitPlan},
+};
 
 const ANSWER: Duration = Duration::from_secs(5);
 const ATTEMPT: &str = "attempt-1";
 const EXPECTED: usize = 32;
-struct Workspace {
-    directory: PathBuf,
-}
-
-impl Workspace {
-    fn new() -> Self {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("the clock should be after the epoch")
-            .as_nanos();
-        let ordinal = WORKSPACE_COUNT.fetch_add(1, Ordering::Relaxed);
-        let directory =
-            std::env::temp_dir().join(format!("musetric-units-{}-{stamp}-{ordinal}", id()));
-        std::fs::create_dir_all(directory.join("bundle")).expect("the workspace should be created");
-        std::fs::write(directory.join("bundle").join("index.js"), "fixture;")
-            .expect("the bundle asset should be written");
-        Self { directory }
-    }
-
-    fn bundle_path(&self) -> PathBuf {
-        self.directory.join("bundle")
-    }
-
-    fn incoming(&self) -> PathBuf {
-        self.directory.join("incoming")
-    }
-}
-
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.directory);
-    }
-}
-
-static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
-
 async fn start_units(workspace: &Workspace) -> (ExecutorHost, Arc<StageUnits>) {
-    let units = Arc::new(StageUnits::create(workspace.incoming()));
-    let sink: PhaseSink = Arc::new(|_| {});
-    let host = ExecutorHost::start(ExecutorHostOptions {
-        label: "Fixture separation".to_owned(),
-        bundle: Bundle::Directory(workspace.bundle_path()),
-        pcm: Vec::new().into(),
-        require_shader_f16: false,
-        on_phase: sink,
-        units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-    })
-    .await
-    .expect("the host should start");
+    let units = Arc::new(StageUnits::create(workspace.unit_incoming_path()));
+    let host = workspace
+        .start_unit_host(
+            "Fixture separation",
+            Arc::clone(&units) as Arc<dyn UnitSession>,
+        )
+        .await;
     (host, units)
 }
 
@@ -106,19 +60,6 @@ fn samples(chunk: [f32; 4]) -> Vec<u8> {
     [channel.clone(), channel].concat()
 }
 
-async fn get_window(base: &str, attempt: &str, unit: u32) -> (StatusCode, Vec<u8>) {
-    let response = Client::new()
-        .get(format!("{base}/attempt/{attempt}/unit/{unit}"))
-        .send()
-        .await
-        .expect("the window should answer");
-    let status = response.status();
-    (
-        status,
-        response.bytes().await.expect("the window body").to_vec(),
-    )
-}
-
 async fn put_output(url: String, body: Vec<u8>) -> StatusCode {
     Client::new()
         .put(url)
@@ -142,7 +83,7 @@ async fn serves_exactly_the_declared_window() {
         .expect("the stage should register");
     let base = host.base_url().to_owned();
 
-    let (status, body) = get_window(&base, ATTEMPT, 0).await;
+    let (status, body) = get_unit_window(&base, ATTEMPT, 0).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body.len(), EXPECTED);
     let found: Vec<f32> = body
@@ -152,9 +93,9 @@ async fn serves_exactly_the_declared_window() {
     assert_eq!(&found[0..4], &[1.0, 2.0, 3.0, 4.0]);
     assert_eq!(&found[4..8], &[7.0, 8.0, 9.0, 10.0]);
 
-    let (missing_unit, _) = get_window(&base, ATTEMPT, 9).await;
+    let (missing_unit, _) = get_unit_window(&base, ATTEMPT, 9).await;
     assert_eq!(missing_unit, StatusCode::BAD_REQUEST);
-    let (foreign, _) = get_window(&base, "other", 0).await;
+    let (foreign, _) = get_unit_window(&base, "other", 0).await;
     assert_eq!(foreign, StatusCode::CONFLICT);
     host.close().await;
 }
@@ -178,7 +119,13 @@ async fn folds_a_unit_once_its_output_is_complete() {
         .await
         .expect("the fold should not hang")
         .expect("the unit should fold");
-    assert!(!workspace.incoming().join(ATTEMPT).join("0").exists());
+    assert!(
+        !workspace
+            .unit_incoming_path()
+            .join(ATTEMPT)
+            .join("0")
+            .exists()
+    );
 
     let repeated = put_output(
         output_url(&base, ATTEMPT, 0, "a"),
@@ -228,7 +175,7 @@ async fn keeps_the_fold_untouched_after_a_truncated_output() {
     assert_eq!(truncated, StatusCode::BAD_REQUEST);
     assert!(
         !workspace
-            .incoming()
+            .unit_incoming_path()
             .join(ATTEMPT)
             .join("0")
             .join("a.part")

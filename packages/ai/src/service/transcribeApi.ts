@@ -1,5 +1,4 @@
 import { type WhisperGraph } from '../runtime/modelGraphs.js';
-import { type PayloadSegment } from '../transcription/types.js';
 
 export const transcribeAudioApiName = 'musetricAiTranscribeAudio';
 
@@ -8,11 +7,11 @@ export type BrowserTranscribeRequest = {
   attemptUrl: string;
   outputs: string[];
   sampleRate: number;
+  chunkSize: number;
+  seamSeconds: number;
   graph: WhisperGraph;
   modelHost: string;
   modelId: string;
   revision: string;
   language?: string;
 };
-
-export type BrowserTranscribeResult = PayloadSegment[];

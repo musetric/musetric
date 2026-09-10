@@ -1,4 +1,5 @@
 mod browser;
+mod checkpoint_persist;
 mod gains;
 mod json_units;
 pub(crate) mod models;
@@ -8,6 +9,8 @@ mod stage_units;
 mod stem_files;
 mod stem_signal;
 mod steps;
+mod transcribe;
+mod transcribe_units;
 mod voices;
 
 #[cfg(test)]
@@ -45,14 +48,19 @@ impl AnalysisRunner {
 
 impl StepRunner for AnalysisRunner {
     fn run<'a>(&'a self, job: &'a PendingJob, report: &'a StepReport) -> StepOutcome<'a> {
-        match steps::create(job.step, &self.context.models_path) {
-            Some(analysis) => {
-                Box::pin(async move { browser::run(&self.context, job, report, &analysis).await })
+        match job.step {
+            ProcessingStep::Transcription => Box::pin(transcribe::run(&self.context, job, report)),
+            _ => {
+                match steps::create(job.step, &self.context.models_path) {
+                    Some(analysis) => Box::pin(async move {
+                        browser::run(&self.context, job, report, &analysis).await
+                    }),
+                    None if job.step == ProcessingStep::Voices => {
+                        Box::pin(voices::run(&self.context, job, report))
+                    }
+                    None => Box::pin(separation::run(&self.context, job, report)),
+                }
             }
-            None if job.step == ProcessingStep::Voices => {
-                Box::pin(voices::run(&self.context, job, report))
-            }
-            None => Box::pin(separation::run(&self.context, job, report)),
         }
     }
 }

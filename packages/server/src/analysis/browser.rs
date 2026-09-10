@@ -66,17 +66,15 @@ impl From<String> for Failure {
 
 pub(crate) enum Serve {
     Files,
-    Directory(PathBuf),
 }
 
 pub(crate) struct HostedModel {
     urls: HashMap<String, String>,
-    root: Option<String>,
 }
 
 impl HostedModel {
-    pub(crate) fn create(urls: HashMap<String, String>, root: Option<String>) -> Self {
-        Self { urls, root }
+    pub(crate) fn create(urls: HashMap<String, String>) -> Self {
+        Self { urls }
     }
 
     pub(crate) fn url(&self, file: &str) -> Result<&str, Failure> {
@@ -84,12 +82,6 @@ impl HostedModel {
             .get(file)
             .map(String::as_str)
             .ok_or_else(|| Failure::Refused(format!("The model cache is missing {file}")))
-    }
-
-    pub(crate) fn root(&self) -> Result<&str, Failure> {
-        self.root.as_deref().ok_or_else(|| {
-            Failure::Refused("The model cache is not served as a directory".to_owned())
-        })
     }
 }
 
@@ -289,17 +281,12 @@ async fn register_files(
     serve: &Serve,
     files: &[(String, PathBuf)],
 ) -> Result<HostedModel, Failure> {
-    if let Serve::Directory(root) = serve {
-        return Ok(HostedModel::create(
-            HashMap::new(),
-            Some(host.register_directory(root).await?),
-        ));
-    }
+    let Serve::Files = serve;
     let mut urls = HashMap::new();
     for (file, path) in files {
         urls.insert(file.clone(), host.register_file(path).await?);
     }
-    Ok(HostedModel::create(urls, None))
+    Ok(HostedModel::create(urls))
 }
 
 pub(crate) async fn count_frames(source: &Path, sample_rate: u32) -> Result<u64, Failure> {
