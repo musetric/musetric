@@ -2866,6 +2866,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-server",
+ "bytemuck",
  "clap",
  "futures-util",
  "http-body-util",
