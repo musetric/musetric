@@ -1,3 +1,5 @@
+use bytemuck::cast_slice;
+
 use crate::unit_plan::UnitPlan;
 
 const COUNTER_FLOOR: f64 = 1e-10;
@@ -47,9 +49,8 @@ impl FoldAccumulator {
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity((self.target.len() + self.counter.len()) * 4);
-        for value in self.target.iter().chain(&self.counter) {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
+        bytes.extend_from_slice(cast_slice::<f32, u8>(&self.target));
+        bytes.extend_from_slice(cast_slice::<f32, u8>(&self.counter));
         bytes
     }
 

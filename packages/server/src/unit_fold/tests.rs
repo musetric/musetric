@@ -131,3 +131,11 @@ fn round_trips_the_accumulator_through_bytes() {
     assert_eq!(fold.finalize(), restored.finalize());
     assert!(FoldAccumulator::from_bytes(&[0, 1, 2], 4, 2).is_none());
 }
+
+#[test]
+fn encodes_the_fold_as_little_endian_f32_pairs() {
+    let mut fold = FoldAccumulator::create(1, 1);
+    fold.target[0] = 1.0;
+    fold.counter[0] = 2.0;
+    assert_eq!(fold.to_bytes(), vec![0, 0, 128, 63, 0, 0, 0, 64]);
+}
