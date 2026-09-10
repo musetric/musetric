@@ -12,7 +12,7 @@ const isCqtPlanManifest = (value: unknown): value is CqtPlanManifest => {
   if (typeof value !== 'object' || !value) {
     return false;
   }
-  return typeof Reflect.get(value, 'payloadSha256') === 'string';
+  return 'payloadSha256' in value && typeof value.payloadSha256 === 'string';
 };
 
 const fetchPlanManifest = async (

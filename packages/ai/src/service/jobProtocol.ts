@@ -1,8 +1,13 @@
 export const jobUrlParameter = 'jobs';
 export const jobSocketPath = '/jobs';
 
-const asObject = (value: unknown): object | undefined =>
-  typeof value === 'object' && value ? value : undefined;
+const asObject = (value: unknown): Record<string, unknown> | undefined => {
+  if (typeof value !== 'object' || !value) {
+    return undefined;
+  }
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  return value as Record<string, unknown>;
+};
 
 const asString = (value: unknown): string | undefined =>
   typeof value === 'string' ? value : undefined;
@@ -13,7 +18,7 @@ const asNumber = (value: unknown): number | undefined =>
 const asBoolean = (value: unknown): boolean =>
   typeof value === 'boolean' && value;
 
-const parse = (text: string): object | undefined => {
+const parse = (text: string): Record<string, unknown> | undefined => {
   try {
     return asObject(JSON.parse(text));
   } catch {
@@ -27,10 +32,10 @@ export type ExecutorReady = {
   shaderF16: boolean;
 };
 
-const readReady = (message: object): ExecutorReady => ({
+const readReady = (message: Record<string, unknown>): ExecutorReady => ({
   type: 'ready',
-  adapter: asBoolean(Reflect.get(message, 'adapter')),
-  shaderF16: asBoolean(Reflect.get(message, 'shaderF16')),
+  adapter: asBoolean(message['adapter']),
+  shaderF16: asBoolean(message['shaderF16']),
 });
 
 export type ExecutorRunning = {
@@ -47,12 +52,12 @@ const readPass = (value: unknown): ExecutorRunning['pass'] | undefined => {
 };
 
 const readRunning = (
-  message: object,
+  message: Record<string, unknown>,
   jobId: string,
 ): ExecutorRunning | undefined => {
-  const pass = readPass(Reflect.get(message, 'pass'));
-  const unit = asNumber(Reflect.get(message, 'unit'));
-  const unitCount = asNumber(Reflect.get(message, 'unitCount'));
+  const pass = readPass(message['pass']);
+  const unit = asNumber(message['unit']);
+  const unitCount = asNumber(message['unitCount']);
   if (pass === undefined || unit === undefined || unitCount === undefined) {
     return undefined;
   }
@@ -66,15 +71,15 @@ export type ExecutorFailure = {
 };
 
 const readFailure = (
-  message: object,
+  message: Record<string, unknown>,
   jobId: string,
 ): ExecutorFailure | undefined => {
-  const error = asString(Reflect.get(message, 'error'));
+  const error = asString(message['error']);
   return error === undefined ? undefined : { type: 'failed', jobId, error };
 };
 
-const readAttemptId = (message: object): string | undefined =>
-  asString(Reflect.get(message, 'attemptId'));
+const readAttemptId = (message: Record<string, unknown>): string | undefined =>
+  asString(message['attemptId']);
 
 export type ExecutorUnitOpened = {
   type: 'unitOpened';
@@ -83,7 +88,7 @@ export type ExecutorUnitOpened = {
 };
 
 const readUnitOpened = (
-  message: object,
+  message: Record<string, unknown>,
   jobId: string,
 ): ExecutorUnitOpened | undefined => {
   const attemptId = readAttemptId(message);
@@ -100,11 +105,11 @@ export type ExecutorUnitDone = {
 };
 
 const readUnitDone = (
-  message: object,
+  message: Record<string, unknown>,
   jobId: string,
 ): ExecutorUnitDone | undefined => {
   const attemptId = readAttemptId(message);
-  const unit = asNumber(Reflect.get(message, 'unit'));
+  const unit = asNumber(message['unit']);
   if (attemptId === undefined || unit === undefined) {
     return undefined;
   }
@@ -139,11 +144,11 @@ export const readExecutorMessage = (
   if (!message) {
     return undefined;
   }
-  const kind = asString(Reflect.get(message, 'type'));
+  const kind = asString(message['type']);
   if (kind === 'ready') {
     return readReady(message);
   }
-  const jobId = asString(Reflect.get(message, 'jobId'));
+  const jobId = asString(message['jobId']);
   if (jobId === undefined) {
     return undefined;
   }
@@ -154,7 +159,7 @@ export const readExecutorMessage = (
     return readRunning(message, jobId);
   }
   if (kind === 'result') {
-    return { type: 'result', jobId, result: Reflect.get(message, 'result') };
+    return { type: 'result', jobId, result: message['result'] };
   }
   if (kind === 'failed') {
     return readFailure(message, jobId);
@@ -177,11 +182,11 @@ export type JobCommand = {
 
 export const readJobCommand = (text: string): JobCommand | undefined => {
   const message = parse(text);
-  if (!message || asString(Reflect.get(message, 'type')) !== 'job') {
+  if (!message || asString(message['type']) !== 'job') {
     return undefined;
   }
-  const jobId = asString(Reflect.get(message, 'jobId'));
-  const api = asString(Reflect.get(message, 'api'));
+  const jobId = asString(message['jobId']);
+  const api = asString(message['api']);
   if (jobId === undefined || api === undefined) {
     return undefined;
   }
@@ -189,7 +194,7 @@ export const readJobCommand = (text: string): JobCommand | undefined => {
     type: 'job',
     jobId,
     api,
-    request: Reflect.get(message, 'request'),
+    request: message['request'],
   };
 };
 
@@ -214,8 +219,8 @@ export const readUnitEvent = (text: string): UnitEvent | undefined => {
   if (!message) {
     return undefined;
   }
-  const kind = asString(Reflect.get(message, 'type'));
-  const jobId = asString(Reflect.get(message, 'jobId'));
+  const kind = asString(message['type']);
+  const jobId = asString(message['jobId']);
   const attemptId = readAttemptId(message);
   if (jobId === undefined || attemptId === undefined) {
     return undefined;
@@ -226,8 +231,8 @@ export const readUnitEvent = (text: string): UnitEvent | undefined => {
   if (kind !== 'unit') {
     return undefined;
   }
-  const unit = asNumber(Reflect.get(message, 'unit'));
-  const unitCount = asNumber(Reflect.get(message, 'unitCount'));
+  const unit = asNumber(message['unit']);
+  const unitCount = asNumber(message['unitCount']);
   if (unit === undefined || unitCount === undefined) {
     return undefined;
   }

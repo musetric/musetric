@@ -1,13 +1,16 @@
 type SetSinkId = (sinkId: string) => Promise<void>;
 
+type AudioContextWithSetSinkId = AudioContext & {
+  setSinkId?: SetSinkId;
+};
+
 const getAudioContextSetSinkId = (
   context: AudioContext,
 ): SetSinkId | undefined => {
-  const value: unknown = Reflect.get(context, 'setSinkId');
-  if (typeof value === 'function') {
-    return async (sinkId) => {
-      await Reflect.apply(value, context, [sinkId]);
-    };
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const contextWithSetSinkId = context as AudioContextWithSetSinkId;
+  if (contextWithSetSinkId.setSinkId) {
+    return contextWithSetSinkId.setSinkId.bind(contextWithSetSinkId);
   }
 
   return undefined;

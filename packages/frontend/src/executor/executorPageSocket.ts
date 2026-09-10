@@ -3,8 +3,13 @@ import { closeExecutorFrame, openExecutorFrame } from './executorFrames.js';
 const socketPath = '/api/pages';
 const reconnectDelayMs = 3000;
 
-const asObject = (value: unknown): object | undefined =>
-  typeof value === 'object' && value ? value : undefined;
+const asObject = (value: unknown): Record<string, unknown> | undefined => {
+  if (typeof value !== 'object' || !value) {
+    return undefined;
+  }
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  return value as Record<string, unknown>;
+};
 
 const asString = (value: unknown): string | undefined =>
   typeof value === 'string' ? value : undefined;
@@ -26,13 +31,13 @@ const readRequest = (text: string): ExecutorPageRequest | undefined => {
   if (!object) {
     return undefined;
   }
-  const id = asString(Reflect.get(object, 'id'));
-  const type = asString(Reflect.get(object, 'type'));
+  const id = asString(object['id']);
+  const type = asString(object['type']);
   if (!id || !type) {
     return undefined;
   }
   if (type === 'open') {
-    const url = asString(Reflect.get(object, 'url'));
+    const url = asString(object['url']);
     return url === undefined ? undefined : { type, id, url };
   }
   return type === 'close' ? { type: 'close', id } : undefined;

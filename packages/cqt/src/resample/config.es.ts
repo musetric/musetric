@@ -29,7 +29,7 @@ export const validateHalfBandDownsamplePlan = (
       'Downsample delay must be a non-negative safe integer',
     );
   }
-  const rawBoundary: unknown = Reflect.get(plan, 'boundary');
+  const rawBoundary: unknown = plan.boundary;
   if (rawBoundary !== 'constant') {
     throw new RangeError('Only constant downsample boundaries are supported');
   }
