@@ -1,0 +1,153 @@
+name: Publish package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Workspace package to publish
+        type: choice
+        required: true
+        default: '@musetric/eslint-config'
+        options:
+          - '@musetric/eslint-config'
+      mode:
+        description: 'dev publishes with --tag dev (testing); release is a normal publish'
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - release
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      workspace: ${{ steps.resolve.outputs.workspace }}
+      publish-version: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: npm install -g corepack@latest --force
+      - run: corepack enable
+      - run: corepack prepare yarn@4.17.1 --activate
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - id: resolve
+        env:
+          PACKAGE_NAME: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          workspace=$(yarn workspaces list --json | jq -r --arg n "$PACKAGE_NAME" 'select(.name == $n) | .location')
+          if [ -z "$workspace" ]; then
+            echo "Workspace $PACKAGE_NAME not found" >&2
+            exit 1
+          fi
+          echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
+      - id: version
+        env:
+          MODE: ${{ inputs.mode }}
+          SHA: ${{ github.sha }}
+          PKG_JSON: ${{ steps.resolve.outputs.workspace }}/package.json
+          PKG_NAME: ${{ inputs.package }}
+        run: |
+          declared=$(node -p "require(process.env.PKG_JSON).version")
+          case "$MODE" in
+            dev)
+              publish="${declared}-dev.g${SHA:0:7}"
+              ;;
+            release)
+              publish="$declared"
+              if ! printf '%s' "$publish" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                echo "not a release version: $publish" >&2
+                exit 1
+              fi
+              latest=$(npm view "${PKG_NAME}@latest" version 2>/dev/null || echo "")
+              if [ -n "$latest" ] && [ "$publish" = "$latest" ]; then
+                echo "$publish is already published" >&2
+                exit 1
+              fi
+              if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "${latest%%-*}" "${publish%%-*}" | sort -V | tail -1)" != "${publish%%-*}" ]; then
+                echo "$publish is older than the published $latest" >&2
+                exit 1
+              fi
+              ;;
+          esac
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.2.0
+          package-manager-cache: false
+      - run: npm install -g corepack@latest --force
+      - run: corepack enable
+      - run: corepack prepare yarn@4.17.1 --activate
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          ONNXRUNTIME_NODE_INSTALL: skip
+
+      - name: Bump version for dev
+        if: inputs.mode == 'dev'
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${{ needs.prepare.outputs.publish-version }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Build
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        run: yarn run build:project
+
+      - name: Copy root license
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        run: cp ../../license.md license.md
+
+      - name: Publish to npm
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$MODE" = dev ]; then
+            yarn npm publish --access public --tag dev
+          else
+            yarn npm publish --access public --tag latest
+          fi
+
+      - name: Remove temporary license
+        if: always()
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        run: rm -f license.md
+
+      - name: Restore package.json
+        if: always() && inputs.mode == 'dev'
+        working-directory: ${{ needs.prepare.outputs.workspace }}
+        run: git restore package.json

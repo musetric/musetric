@@ -1,11 +1,29 @@
 {
   "name": "@musetric/eslint-config",
   "version": "0.1.0",
+  "description": "Shared ESLint configuration for Musetric projects.",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/musetric/musetric.git",
+    "directory": "packages/eslint-config"
+  },
   "exports": {
     "./package.json": "./package.json",
-    ".": "./src/index.ts"
+    ".": {
+      "monorepo": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build:project": "tsc --build",
