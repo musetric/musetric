@@ -63,7 +63,7 @@ jobs:
           PKG_JSON: ${{ steps.resolve.outputs.workspace }}/package.json
           PKG_NAME: ${{ inputs.package }}
         run: |
-          declared=$(node -p "require(process.env.PKG_JSON).version")
+          declared=$(node -p "require(\"./\" + process.env.PKG_JSON).version")
           case "$MODE" in
             dev)
               publish="${declared}-dev.g${SHA:0:7}"
