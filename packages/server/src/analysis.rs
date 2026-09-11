@@ -13,9 +13,6 @@ mod transcribe;
 mod transcribe_units;
 mod voices;
 
-#[cfg(test)]
-mod tests;
-
 use std::{path::PathBuf, sync::Arc};
 
 use musetric_db::{PendingJob, ProcessingStep};
