@@ -53,7 +53,6 @@ scopes:
   - backend # the server: http api, storage, processing queue
   - app # packages/app Tauri app for desktop and mobile
   - frontend # packages/frontend app shell (cross-feature)
-  - landing # packages/landing marketing site
   # Quality & tooling
   - agent # agent guidance & config (AGENTS.md, AI tooling)
   - bench # benchmarks & perf measurement (packages/performance)
