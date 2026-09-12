@@ -35,13 +35,8 @@ export const getWindowStarts = (
   return starts;
 };
 
-export const getWindowFrames = (
-  graph: BeatThisGraph,
-  frames: number,
-): number => {
-  const stride = graph.chunkSize - 2 * graph.borderSize;
-  return frames > stride ? graph.chunkSize : frames + 2 * graph.borderSize;
-};
+export const getWindowFrames = (graph: BeatThisGraph): number =>
+  graph.chunkSize;
 
 export type BeatThisGpuState = {
   graph: BeatThisGraph;
@@ -83,7 +78,7 @@ export const createBeatThisGpuState = (
   const { graph, device, fftCell, filterbank, sampleCount } = options;
   const bins = graph.nFft / 2 + 1;
   const frames = getFrameCount(graph, sampleCount);
-  const windowFrames = getWindowFrames(graph, frames);
+  const windowFrames = getWindowFrames(graph);
   const starts = getWindowStarts(graph, frames);
 
   const rawAudio = createStorageBuffer(

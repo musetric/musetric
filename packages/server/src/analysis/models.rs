@@ -138,7 +138,7 @@ pub(crate) const BEAT_THIS_FILTERBANK: &str = "mel-filterbank.bin";
 pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
     label: "Rhythm analysis model",
     model_id: "musetric/beat-this-onnx",
-    revision: "45ba973e6c1fbee08a8a75b485e1c5adf45d2bc4",
+    revision: "a076df6f20345e133a73b6d2068b68b60e48fafb",
     directory: "beat-this-onnx",
     sample_rate: 22050,
     layout: CacheLayout::Flat,
@@ -146,11 +146,11 @@ pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
     files: &[
         (
             "config.json",
-            "56cc961ddc588c57787c20c01ec6ab483b23af1049e65bd33d599a81803acd69",
+            "46e93c11d7afb78e3eba72cac26e1aced47b9b6558379f928c19b0cf95c9af1d",
         ),
         (
             BEAT_THIS_MODEL,
-            "3472a3957f25f4c3a2d68b46ee4b784e065a8ebd46132796c1a6bdd817229253",
+            "d6b41a44dbf555e90593f60dc86aea3689e1f5db427956e4c9036c8dfde970e8",
         ),
         (
             BEAT_THIS_FILTERBANK,
@@ -169,7 +169,7 @@ pub(crate) fn beat_this_graph() -> Value {
         "fps": 50,
         "melBins": 128,
         "logMultiplier": 1000,
-        "chunkSize": 1500,
+        "chunkSize": 513,
         "borderSize": 6,
     })
 }
