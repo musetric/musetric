@@ -1,5 +1,8 @@
 import { pickBeatTimes } from '../rhythm/beatPeaks.js';
-import { estimateBpm, estimateMeter } from '../rhythm/rhythmSummary.js';
+import {
+  consecutiveProbeBpms,
+  summarizeRhythm,
+} from '../rhythm/rhythmSummary.js';
 import { type RhythmResult } from '../rhythm/types.js';
 import { createBrowserJobApi } from './browserJob.js';
 import { fetchFloat32, floatsFromBytes, jsonBytes } from './browserShared.js';
@@ -32,12 +35,13 @@ export const analyzeRhythm = createBrowserJobApi<BrowserAnalyzeRhythmRequest>(
             logits.downbeat,
             request.graph.fps,
           );
-          const result: RhythmResult = {
-            bpm: estimateBpm(beats),
+          const duration =
+            audio.length / (request.graph.hopLength * request.graph.fps);
+          const result: RhythmResult = summarizeRhythm(
             beats,
             downbeats,
-            meter: estimateMeter(beats, downbeats),
-          };
+            consecutiveProbeBpms(beats, duration),
+          );
           return jsonBytes(result);
         },
       });
