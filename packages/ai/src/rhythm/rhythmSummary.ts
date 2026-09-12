@@ -1,6 +1,8 @@
 const minBeats = 2;
 const minIntervalsForIqr = 4;
 const defaultMeter = 4;
+const minPreferredBpm = 60;
+const maxPreferredBpm = 160;
 
 const percentile = (sorted: number[], ratio: number): number => {
   const position = ratio * (sorted.length - 1);
@@ -42,7 +44,7 @@ const withoutOutliers = (intervals: number[]): number[] => {
   return filtered.length > 0 ? filtered : intervals;
 };
 
-export const estimateBpm = (beats: number[]): number => {
+const estimateBpm = (beats: number[]): number => {
   if (beats.length < minBeats) {
     return 0;
   }
@@ -58,7 +60,96 @@ export const estimateBpm = (beats: number[]): number => {
   return 60 / interval;
 };
 
-export const estimateMeter = (beats: number[], downbeats: number[]): number => {
+const mapProbeBpm = (bpm: number): number => {
+  if (bpm >= minPreferredBpm && bpm <= maxPreferredBpm) {
+    return bpm;
+  }
+  if (bpm > maxPreferredBpm) {
+    const half = bpm / 2;
+    if (half >= minPreferredBpm && half <= maxPreferredBpm) {
+      return half;
+    }
+  }
+  return 0;
+};
+
+const probeCount = 5;
+const probeSeconds = 60;
+const minProbeSeconds = 20;
+
+export const consecutiveProbeBpms = (
+  beats: number[],
+  duration: number,
+): number[] => {
+  if (duration < minProbeSeconds) {
+    return [estimateBpm(beats)];
+  }
+  const length = Math.min(probeSeconds, duration);
+  const bpms: number[] = [];
+  for (
+    let start = 0;
+    start + minProbeSeconds <= duration && bpms.length < probeCount;
+    start += length
+  ) {
+    const window: number[] = [];
+    for (const time of beats) {
+      if (time >= start && time < start + length) {
+        window.push(time - start);
+      }
+    }
+    bpms.push(estimateBpm(window));
+  }
+  return bpms;
+};
+
+const consensusBpm = (bpms: number[]): number => {
+  const mapped: number[] = [];
+  for (const bpm of bpms) {
+    const value = mapProbeBpm(bpm);
+    if (value > 0) {
+      mapped.push(value);
+    }
+  }
+  if (mapped.length === 0) {
+    return 0;
+  }
+  const sorted = [...mapped].sort((left, right) => left - right);
+  let bestStart = 0;
+  let bestSize = 1;
+  let start = 0;
+  for (let end = 0; end < sorted.length; end += 1) {
+    while (sorted[end] / sorted[start] > 1.08) {
+      start += 1;
+    }
+    const size = end - start + 1;
+    if (size > bestSize) {
+      bestSize = size;
+      bestStart = start;
+    }
+  }
+  return median(sorted.slice(bestStart, bestStart + bestSize));
+};
+
+const everyOtherBeat = (beats: number[], origin: number): number[] => {
+  if (beats.length < minBeats) {
+    return beats;
+  }
+  const intervals = differences(beats);
+  if (intervals.length === 0) {
+    return beats;
+  }
+  const step = median(intervals);
+  if (step <= 0) {
+    return beats;
+  }
+  const kept = beats.filter((time) => {
+    const index = Math.round((time - origin) / step);
+    return index % 2 === 0;
+  });
+  return kept.length >= minBeats ? kept : beats;
+};
+
+const estimateMeter = (beats: number[], downbeats: number[]): number => {
   if (downbeats.length < minBeats || beats.length < minBeats) {
     return defaultMeter;
   }
@@ -76,4 +167,44 @@ export const estimateMeter = (beats: number[], downbeats: number[]): number => {
     return defaultMeter;
   }
   return roundHalfToEven(median(counts));
+};
+
+type ListeningTempo = {
+  bpm: number;
+  beats: number[];
+  downbeats: number[];
+  meter: number;
+};
+
+export const summarizeRhythm = (
+  beats: number[],
+  downbeats: number[],
+  probeBpms: number[],
+): ListeningTempo => {
+  const bpm = consensusBpm(
+    probeBpms.length > 0 ? probeBpms : [estimateBpm(beats)],
+  );
+  const rawBpm = estimateBpm(beats);
+  if (bpm <= 0 || rawBpm <= 0 || rawBpm / bpm < 1.5) {
+    return {
+      bpm,
+      beats,
+      downbeats,
+      meter: estimateMeter(beats, downbeats),
+    };
+  }
+  const origin = downbeats.length > 0 ? downbeats[0] : beats[0];
+  const foldedBeats = everyOtherBeat(beats, origin);
+  const foldedDownbeats: number[] = [];
+  for (const time of downbeats) {
+    if (foldedBeats.includes(time)) {
+      foldedDownbeats.push(time);
+    }
+  }
+  return {
+    bpm,
+    beats: foldedBeats,
+    downbeats: foldedDownbeats,
+    meter: estimateMeter(foldedBeats, foldedDownbeats),
+  };
 };
