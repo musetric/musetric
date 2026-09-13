@@ -125,3 +125,30 @@ test('the unit serving gives up when the host connection drops', async () => {
 
   expect(settled).toBe('released');
 });
+
+test('the unit serving fails the job when the host refuses an output', async () => {
+  const host = await startFakeHost();
+  host.windows.set(`${attempt}/0`, floatBytes([0.5, -0.5, 0.25, 0.25]));
+  host.refusals.set(
+    `${attempt}/0/separated`,
+    'the plan carries a span outside the audio',
+  );
+  serving.attemptUrl = `${host.baseUrl}/attempt/${attempt}`;
+
+  try {
+    startJobExecutor({
+      jobUrl: host.socketUrl,
+      apis: servingApis(serving),
+    });
+    await host.ready;
+    const answered = host.run(servingApiName, {});
+    host.sendUnit(attempt, 0, 1);
+
+    await expect(answered).rejects.toThrow(
+      'HTTP 500 the plan carries a span outside the audio',
+    );
+    expect(host.unitDone).toEqual([]);
+  } finally {
+    await host.close();
+  }
+});
