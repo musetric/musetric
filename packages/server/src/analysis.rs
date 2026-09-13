@@ -23,11 +23,10 @@ use reqwest::Client;
 
 use musetric_gpu::ExecutorHost;
 
-use crate::{pages::PageOpener, storage::Storage};
+use crate::storage::Storage;
 
 pub(crate) struct AnalysisContext {
     pub(crate) storage: Arc<Storage>,
-    pub(crate) pages: Arc<dyn PageOpener>,
     pub(crate) client: Client,
     pub(crate) models_path: PathBuf,
     pub(crate) host: Arc<ExecutorHost>,

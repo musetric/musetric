@@ -1,7 +1,7 @@
 mod analysis;
 mod audio;
+mod executor;
 mod item;
-mod pages;
 mod preview;
 mod project;
 mod status;
@@ -12,20 +12,22 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use crate::{page_bridge::PageBridge, realtime, realtime::Rooms, storage::Storage};
+use musetric_gpu::ExecutorHost;
+
+use crate::{realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
-    pub(crate) pages: Arc<PageBridge>,
+    pub(crate) executor: Arc<ExecutorHost>,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
-        .merge(pages::create_router())
+        .merge(executor::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
         .merge(status::create_router())
@@ -87,8 +89,8 @@ mod tests {
       VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001', 'preview.png', 'image/png');
     ";
 
-    fn create_test_router(workspace: &Workspace) -> Router {
-        create_router(create_route_state(workspace.create_storage()))
+    async fn create_test_router(workspace: &Workspace) -> Router {
+        create_router(create_route_state(workspace, workspace.create_storage()).await)
     }
 
     fn read_header(response: &Response<Body>, name: &str) -> Option<String> {
@@ -121,13 +123,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn announces_the_executor_document_on_the_loopback() {
+        let workspace = Workspace::new();
+
+        let response = request(create_test_router(&workspace).await, "/api/executor").await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let announced = read_body(response).await;
+        assert!(announced.starts_with("{\"url\":\"http://127.0.0.1:"));
+    }
+
+    #[tokio::test]
     async fn sends_the_blob_named_after_the_project() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
 
-        let response = request(create_test_router(&workspace), "/api/chords/project/1").await;
+        let response = request(
+            create_test_router(&workspace).await,
+            "/api/chords/project/1",
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -154,7 +171,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_MASTERS);
         workspace.add_blob(BLOB_ID, AUDIO);
-        let router = create_test_router(&workspace);
+        let router = create_test_router(&workspace).await;
 
         let bounded = request_with_header(router.clone(), SOURCE_URL, ("range", "bytes=2-5")).await;
         let suffix = request_with_header(router, SOURCE_URL, ("range", "bytes=-4")).await;
@@ -185,7 +202,7 @@ mod tests {
         workspace.add_blob(BLOB_ID, AUDIO);
 
         let response = request_with_header(
-            create_test_router(&workspace),
+            create_test_router(&workspace).await,
             SOURCE_URL,
             ("range", "bytes=40-"),
         )
@@ -221,7 +238,7 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_CHORDS);
         workspace.add_blob(BLOB_ID, CHORDS);
-        let router = create_test_router(&workspace);
+        let router = create_test_router(&workspace).await;
         let first = request(router.clone(), "/api/chords/project/1").await;
         let etag = read_header(&first, "etag").expect("the answer should carry an etag");
 
@@ -244,12 +261,23 @@ mod tests {
     async fn tells_a_missing_row_a_missing_project_and_a_missing_blob_apart() {
         let workspace = Workspace::new();
 
-        let without_row = request(create_test_router(&workspace), "/api/chords/project/1").await;
+        let without_row = request(
+            create_test_router(&workspace).await,
+            "/api/chords/project/1",
+        )
+        .await;
         workspace.seed(CREATE_CHORDS);
-        let without_project =
-            request(create_test_router(&workspace), "/api/chords/project/1").await;
+        let without_project = request(
+            create_test_router(&workspace).await,
+            "/api/chords/project/1",
+        )
+        .await;
         workspace.seed(CREATE_PROJECT);
-        let without_blob = request(create_test_router(&workspace), "/api/chords/project/1").await;
+        let without_blob = request(
+            create_test_router(&workspace).await,
+            "/api/chords/project/1",
+        )
+        .await;
 
         assert_eq!(without_row.status(), StatusCode::NOT_FOUND);
         assert_eq!(
@@ -274,7 +302,11 @@ mod tests {
     async fn refuses_a_project_id_it_cannot_read() {
         let workspace = Workspace::new();
 
-        let response = request(create_test_router(&workspace), "/api/chords/project/abc").await;
+        let response = request(
+            create_test_router(&workspace).await,
+            "/api/chords/project/abc",
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
@@ -290,7 +322,7 @@ mod tests {
         workspace.seed(CREATE_MASTERS);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, AUDIO);
-        let router = create_test_router(&workspace);
+        let router = create_test_router(&workspace).await;
 
         let source = request(router.clone(), SOURCE_URL).await;
         let lead = request(router, LEAD_URL).await;
@@ -313,7 +345,7 @@ mod tests {
         workspace.seed(CREATE_DELIVERY);
         workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
-        let router = create_test_router(&workspace);
+        let router = create_test_router(&workspace).await;
 
         let content = request(router.clone(), DELIVERY_URL).await;
         let wave = request(router, WAVE_URL).await;
@@ -334,7 +366,7 @@ mod tests {
     async fn hands_out_an_empty_take_when_nothing_is_recorded() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
-        let router = create_test_router(&workspace);
+        let router = create_test_router(&workspace).await;
 
         let content = request(router.clone(), RECORDING_URL).await;
         let wave = request(router, RECORDING_WAVE_URL).await;
@@ -371,7 +403,7 @@ mod tests {
         let workspace = Workspace::new();
 
         let response = request(
-            create_test_router(&workspace),
+            create_test_router(&workspace).await,
             "/api/audio/project/1/delivery/vocals/content",
         )
         .await;
@@ -390,7 +422,7 @@ mod tests {
         workspace.seed(CREATE_PREVIEW);
         workspace.add_blob(BLOB_ID, PREVIEW);
 
-        let response = request(create_test_router(&workspace), "/api/preview/1").await;
+        let response = request(create_test_router(&workspace).await, "/api/preview/1").await;
 
         assert_eq!(
             read_header(&response, "content-type"),

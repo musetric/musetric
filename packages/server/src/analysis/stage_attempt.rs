@@ -20,7 +20,6 @@ use crate::{
     },
     blobs::{StagedBlob, close_area, ensure_area, step_area},
     checkpoint::{CheckpointDir, area_root, restore_refused},
-    pages::HeldPage,
     storage::{read_database, write_database},
     unit_fold::FoldAccumulator,
 };
@@ -134,14 +133,9 @@ impl<'run> StageAttempt<'run> {
         })
     }
 
-    pub(crate) async fn open(&self) -> Result<HeldPage<'run>, Failure> {
-        let pages = self.running.context.pages.as_ref();
-        let page = pages
-            .open_page(&self.running.context.host.page_url())
-            .await?;
-        let held = HeldPage::hold(pages, page);
+    pub(crate) async fn open(&self) -> Result<(), Failure> {
         self.session.wait_ready().await?;
-        Ok(held)
+        Ok(())
     }
 
     pub(crate) async fn register(&self, path: &Path) -> Result<String, Failure> {

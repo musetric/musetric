@@ -305,14 +305,7 @@ type Socket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect_executor(host: &UnitHost) -> Socket {
-    let page = host.page_url();
-    let socket_url = page
-        .split_once("jobs=")
-        .expect("the page url should carry the socket")
-        .1
-        .replace("%3A", ":")
-        .replace("%2F", "/");
-    let (socket, _) = connect_async(socket_url)
+    let (socket, _) = connect_async(host.socket_url())
         .await
         .expect("the executor should connect");
     socket

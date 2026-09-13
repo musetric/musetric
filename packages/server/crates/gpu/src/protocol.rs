@@ -1,6 +1,5 @@
 use serde_json::{Value, json};
 
-pub(crate) const JOB_URL_PARAMETER: &str = "jobs";
 pub(crate) const JOB_SOCKET_PATH: &str = "/jobs";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { startJobExecutor } from '../browserExecutor.js';
 import { type BrowserJobApis, createBrowserJobApi } from '../browserJob.js';
 import { type UnitServing } from '../browserUnitServing.js';
-import { readSocketUrl, startFakeHost } from './jobHarness.js';
+import { startFakeHost } from './jobHarness.js';
 
 const attempt = 'attempt-1';
 
@@ -41,11 +41,11 @@ test('the unit serving fetches every window, uploads the output and confirms the
   const host = await startFakeHost();
   host.windows.set(`${attempt}/0`, floatBytes([0.5, -0.5, 0.25, 0.25]));
   host.windows.set(`${attempt}/1`, floatBytes([1, -1, 2, -2]));
-  serving.attemptUrl = `${host.pageUrl.split('/?')[0]}/attempt/${attempt}`;
+  serving.attemptUrl = `${host.baseUrl}/attempt/${attempt}`;
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis: servingApis(serving),
       foreground: undefined,
     });
@@ -93,7 +93,7 @@ test('the unit serving gives up when the host connection drops', async () => {
         try {
           await context.serveUnits({
             attemptId: dropped,
-            attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${dropped}`,
+            attemptUrl: `${host.baseUrl}/attempt/${dropped}`,
             outputs: ['separated'],
             run: async () => Promise.resolve(new Uint8Array(16)),
           });
@@ -105,7 +105,7 @@ test('the unit serving gives up when the host connection drops', async () => {
   };
 
   startJobExecutor({
-    jobUrl: readSocketUrl(host.pageUrl),
+    jobUrl: host.socketUrl,
     apis,
     foreground: undefined,
   });

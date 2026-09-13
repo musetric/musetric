@@ -20,7 +20,6 @@ use uuid::Uuid;
 use crate::{
     analysis::{AnalysisContext, json_units::JsonUnits},
     blobs::{StagedBlob, close_area, ensure_area, stage_blob, step_area},
-    pages::{HeldPage, PageFailure},
     publish::publish,
     storage::write_database,
 };
@@ -40,20 +39,12 @@ impl From<musetric_db::BoxedError> for Failure {
     }
 }
 
-impl From<PageFailure> for Failure {
-    fn from(failure: PageFailure) -> Self {
-        match failure {
-            PageFailure::Refused(message) => Self::Refused(message),
-            PageFailure::Unreachable => Self::ExecutorAbsent,
-        }
-    }
-}
-
 impl From<ExecutorFailure> for Failure {
     fn from(failure: ExecutorFailure) -> Self {
         match failure {
             ExecutorFailure::Refused(message) => Self::Refused(message),
-            ExecutorFailure::Unavailable => Self::ExecutorLost,
+            ExecutorFailure::Absent => Self::ExecutorAbsent,
+            ExecutorFailure::Lost => Self::ExecutorLost,
         }
     }
 }
@@ -207,12 +198,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         on_phase: sink,
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
     });
-    let page = job
-        .context
-        .pages
-        .open_page(&job.context.host.page_url())
-        .await?;
-    let held = HeldPage::hold(job.context.pages.as_ref(), page);
     session.wait_ready().await?;
     let bound = write_database(&job.context.storage, {
         let project_id = job.job.project_id;
@@ -222,7 +207,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     })
     .await?;
     if !bound {
-        drop(held);
         return Err(Failure::Refused("the attempt is not active".to_owned()));
     }
     let hosted = register_files(&session, &job.analysis.serve, &job.files).await?;
@@ -231,7 +215,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     let mut answered = Box::pin(async move { ticket.wait().await });
     tokio::select! {
         finished = &mut answered => {
-            drop(held);
             return early_job(finished);
         }
         outcome = units.wait_opened(&attempt_id) => outcome?,
@@ -244,7 +227,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     session.send_unit(&attempt_id, 0, 1)?;
     tokio::select! {
         finished = &mut answered => {
-            drop(held);
             return early_job(finished);
         }
         outcome = units.folded(&attempt_id) => outcome?,
@@ -263,7 +245,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
             }
         }
     }
-    drop(held);
     units.finalize(&attempt_id)
 }
 

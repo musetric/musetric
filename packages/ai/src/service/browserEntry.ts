@@ -7,7 +7,7 @@ import { analyzeRhythm } from './browserRhythm.js';
 import { separateUnits } from './browserSeparation.js';
 import { transcribeAudio } from './browserTranscribe.js';
 import { analyzeChordsApiName } from './chordsApi.js';
-import { jobUrlParameter } from './jobProtocol.js';
+import { jobSocketPath } from './jobProtocol.js';
 import { analyzeKeyApiName } from './keyApi.js';
 import { analyzeRhythmApiName } from './rhythmApi.js';
 import { separateUnitsApiName } from './separationApi.js';
@@ -21,8 +21,23 @@ const apis: BrowserJobApis = {
   [analyzeKeyApiName]: analyzeKey,
 };
 
-const jobUrl =
-  new URLSearchParams(location.search).get(jobUrlParameter) ?? undefined;
-if (jobUrl !== undefined) {
-  startJobExecutor({ jobUrl, apis, foreground: readAndroidForeground() });
-}
+const reconnectDelayMs = 3000;
+
+const readJobUrl = (): string => {
+  const url = new URL(jobSocketPath, location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.href;
+};
+
+const connect = (): void => {
+  startJobExecutor({
+    jobUrl: readJobUrl(),
+    apis,
+    foreground: readAndroidForeground(),
+    onClosed: () => {
+      setTimeout(connect, reconnectDelayMs);
+    },
+  });
+};
+
+connect();

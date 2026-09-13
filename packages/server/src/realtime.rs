@@ -402,8 +402,9 @@ mod tests {
         }
     }
 
-    async fn start_server(storage: Arc<Storage>) -> (String, TestServer) {
-        let application: Router = routes::create_router(create_route_state(storage));
+    async fn start_server(workspace: &Workspace, storage: Arc<Storage>) -> (String, TestServer) {
+        let application: Router =
+            routes::create_router(create_route_state(workspace, storage).await);
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("the test server should bind");
@@ -560,7 +561,7 @@ mod tests {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
         let storage = workspace.create_storage();
-        let (base, _server) = start_server(Arc::clone(&storage)).await;
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
         let samples = [-1.0_f32, 0.5, 1.0, -0.25];
@@ -609,7 +610,7 @@ mod tests {
     async fn frees_the_player_before_it_rebuilds_the_peaks() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (owner, mut listener) = start_recording_room(&base).await;
 
         drop(owner);
@@ -642,7 +643,7 @@ mod tests {
     async fn ignores_a_second_recorder_while_the_first_one_holds_the_player() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
         send_json(&mut listener, start_message(FRAME_COUNT)).await;
@@ -682,7 +683,7 @@ mod tests {
     async fn refuses_a_packet_that_arrives_before_the_recording_starts() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let mut lonely = connect(&base).await;
 
         send_packet(&mut lonely, chunk(0, &[0.5_f32])).await;
@@ -700,7 +701,7 @@ mod tests {
     async fn refuses_a_recording_start_without_a_frame_count() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let mut lonely = connect(&base).await;
 
         send_json(
@@ -719,7 +720,7 @@ mod tests {
     async fn refuses_a_project_that_does_not_exist() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (mut missing, _) = connect_async(realtime_url(&base, 404))
             .await
             .expect("the client should connect");
@@ -734,7 +735,7 @@ mod tests {
     async fn skips_a_packet_that_starts_past_the_recorded_frames() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
         send_packet(&mut owner, chunk(64, &[0.5_f32])).await;
@@ -750,7 +751,7 @@ mod tests {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
         let storage = workspace.create_storage();
-        let (base, _server) = start_server(Arc::clone(&storage)).await;
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
         send_json(&mut owner, json!({ "type": "recording.finish" })).await;
@@ -802,7 +803,7 @@ mod tests {
     async fn synchronizes_player_revisions_between_room_members() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(workspace.create_storage()).await;
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (mut owner, mut listener) = connect_room(&base).await;
 
         send_json(&mut owner, json!({ "type": "player.play" })).await;
