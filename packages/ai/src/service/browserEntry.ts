@@ -1,4 +1,3 @@
-import { readAndroidForeground } from './androidForeground.js';
 import { analyzeChords } from './browserChords.js';
 import { startJobExecutor } from './browserExecutor.js';
 import { type BrowserJobApis } from './browserJob.js';
@@ -33,7 +32,6 @@ const connect = (): void => {
   startJobExecutor({
     jobUrl: readJobUrl(),
     apis,
-    foreground: readAndroidForeground(),
     onClosed: () => {
       setTimeout(connect, reconnectDelayMs);
     },

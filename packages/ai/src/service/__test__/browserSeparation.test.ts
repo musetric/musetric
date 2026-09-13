@@ -47,7 +47,6 @@ test('the unit serving fetches every window, uploads the output and confirms the
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis: servingApis(serving),
-      foreground: undefined,
     });
     await host.ready;
     const answered = host.run(servingApiName, {});
@@ -107,7 +106,6 @@ test('the unit serving gives up when the host connection drops', async () => {
   startJobExecutor({
     jobUrl: host.socketUrl,
     apis,
-    foreground: undefined,
   });
   await host.ready;
   void host.run(servingApiName, {}).catch(() => undefined);

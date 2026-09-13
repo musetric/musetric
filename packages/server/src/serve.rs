@@ -50,6 +50,7 @@ pub struct ServerOptions {
 pub enum ExecutorSurface {
     Shell,
     Page,
+    ForegroundPage,
 }
 
 impl ExecutorSurface {
@@ -58,6 +59,7 @@ impl ExecutorSurface {
         match self {
             Self::Shell => "shell",
             Self::Page => "page",
+            Self::ForegroundPage => "foregroundPage",
         }
     }
 }

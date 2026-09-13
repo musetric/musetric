@@ -31,7 +31,6 @@ test('the browser client runs a job and reports its phases', async () => {
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis,
-      foreground: undefined,
     });
     expect(await host.ready).toEqual({
       type: 'ready',
@@ -75,7 +74,6 @@ test('the browser client forwards unit events and confirms them', async () => {
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis,
-      foreground: undefined,
     });
     await host.ready;
     const answered = host.run(apiName, { attemptId: attempt });
@@ -98,7 +96,6 @@ test('the browser client announces an adapter without shader-f16', async () => {
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis: {},
-      foreground: undefined,
     });
 
     expect(await host.ready).toEqual({
@@ -124,7 +121,6 @@ test('the browser client reports a failing job back to the host', async () => {
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis,
-      foreground: undefined,
     });
 
     await expect(host.run(apiName, {})).rejects.toThrow(
@@ -143,7 +139,6 @@ test('the browser client rejects a job for an api it does not have', async () =>
     startJobExecutor({
       jobUrl: host.socketUrl,
       apis: {},
-      foreground: undefined,
     });
 
     await expect(host.run(apiName, {})).rejects.toThrow('is not initialized');
@@ -157,14 +152,12 @@ test('the browser client refuses a socket url outside the machine', () => {
     startJobExecutor({
       jobUrl: 'ws://example.com/jobs',
       apis: {},
-      foreground: undefined,
     });
   }).toThrow('accepts a local socket url only');
   expect(() => {
     startJobExecutor({
       jobUrl: 'http://127.0.0.1/jobs',
       apis: {},
-      foreground: undefined,
     });
   }).toThrow('accepts a local socket url only');
 });
