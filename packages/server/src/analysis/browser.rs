@@ -10,7 +10,7 @@ use musetric_gpu::{
     Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPass, ExecutorPhase,
     ModelFile, PhaseSink, UnitSession, ensure_model_file,
 };
-use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
+use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport, StepWaiting};
 use musetric_media::{
     Downmix, MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
 };
@@ -31,7 +31,8 @@ const DECODE_REPORTS: u64 = 100;
 #[derive(Debug)]
 pub(crate) enum Failure {
     Refused(String),
-    Unreachable,
+    ExecutorAbsent,
+    ExecutorLost,
 }
 
 impl From<musetric_db::BoxedError> for Failure {
@@ -44,7 +45,7 @@ impl From<PageFailure> for Failure {
     fn from(failure: PageFailure) -> Self {
         match failure {
             PageFailure::Refused(message) => Self::Refused(message),
-            PageFailure::Unreachable => Self::Unreachable,
+            PageFailure::Unreachable => Self::ExecutorAbsent,
         }
     }
 }
@@ -53,7 +54,7 @@ impl From<ExecutorFailure> for Failure {
     fn from(failure: ExecutorFailure) -> Self {
         match failure {
             ExecutorFailure::Refused(message) => Self::Refused(message),
-            ExecutorFailure::Unavailable => Self::Unreachable,
+            ExecutorFailure::Unavailable => Self::ExecutorLost,
         }
     }
 }
@@ -134,7 +135,8 @@ pub(crate) fn answer(found: Result<(), Failure>) -> StepAnswer {
     match found {
         Ok(()) => StepAnswer::Finished,
         Err(Failure::Refused(message)) => StepAnswer::Failed(message),
-        Err(Failure::Unreachable) => StepAnswer::Unavailable,
+        Err(Failure::ExecutorAbsent) => StepAnswer::Waiting(StepWaiting::Absent),
+        Err(Failure::ExecutorLost) => StepAnswer::Waiting(StepWaiting::Lost),
     }
 }
 

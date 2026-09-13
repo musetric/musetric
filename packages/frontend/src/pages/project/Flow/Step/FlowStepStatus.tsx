@@ -1,6 +1,7 @@
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { Chip, type ChipProps } from '@mui/material';
 import { type api } from '@musetric/api';
@@ -44,6 +45,13 @@ const statusIcon: Record<api.project.ProcessingStepStatus, JSX.Element> = {
   done: <CheckCircleIcon fontSize='small' />,
 };
 
+const getWaitingTranslations = (
+  t: TFunction,
+): Record<api.project.ProcessingWaitingReason, string> => ({
+  absent: t('pages.project.progress.waiting.absent'),
+  lost: t('pages.project.progress.waiting.lost'),
+});
+
 const getPhaseLabel = (
   step: api.project.ProcessingStep,
   t: TFunction,
@@ -61,12 +69,15 @@ const getPhaseLabel = (
 const getCountLabel = (
   step: api.project.ProcessingStep,
 ): string | undefined => {
-  const { decoded, total, unit, unitCount } = step;
+  const { decoded, total, unit, unitCount, waiting } = step;
   if (step.phase === 'decoding' && decoded !== undefined && total) {
     return `${((decoded / total) * 100).toFixed(0)}%`;
   }
   if (step.phase === 'running' && unit !== undefined && unitCount) {
     return `${unit.toFixed(0)} / ${unitCount.toFixed(0)}`;
+  }
+  if (waiting?.limit !== undefined) {
+    return `${waiting.attempt.toFixed(0)} / ${waiting.limit.toFixed(0)}`;
   }
   return undefined;
 };
@@ -78,16 +89,30 @@ export const FlowStepStatus: FC<FlowStepStatusProps> = (props) => {
   const { step } = props;
   const { t } = useTranslation();
 
+  const { waiting } = step;
   const phaseLabel = getPhaseLabel(step, t);
-  const label = phaseLabel ?? getStatusTranslations(t)[step.status];
+  const waitingLabel =
+    waiting === undefined
+      ? undefined
+      : getWaitingTranslations(t)[waiting.reason];
+  const label =
+    phaseLabel ?? waitingLabel ?? getStatusTranslations(t)[step.status];
   const count = getCountLabel(step);
 
   return (
     <Chip
       size='small'
       variant='outlined'
-      color={statusChipColor[step.status]}
-      icon={statusIcon[step.status]}
+      color={
+        waitingLabel === undefined ? statusChipColor[step.status] : 'warning'
+      }
+      icon={
+        waitingLabel === undefined ? (
+          statusIcon[step.status]
+        ) : (
+          <PauseCircleOutlineIcon fontSize='small' />
+        )
+      }
       label={count === undefined ? label : `${label} • ${count}`}
     />
   );

@@ -50,11 +50,35 @@ impl StepPhase {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepWaiting {
+    Absent,
+    Lost,
+}
+
+impl StepWaiting {
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Absent => "absent",
+            Self::Lost => "lost",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StepWait {
+    pub reason: StepWaiting,
+    pub attempt: u32,
+    pub limit: Option<u32>,
+}
+
 #[derive(Clone, Debug)]
 pub struct StepView {
     pub status: StepStatus,
     pub phase: Option<StepPhase>,
     pub error: Option<String>,
+    pub wait: Option<StepWait>,
 }
 
 #[derive(Clone, Debug)]
@@ -76,22 +100,40 @@ pub(crate) struct ActiveStep {
     pub(crate) phase: StepPhase,
 }
 
-pub(crate) fn build_processing(states: &[StepState], active: Option<&ActiveStep>) -> Processing {
-    let steps = STEP_ORDER.map(|step| build_step(step, states, active));
+pub(crate) struct ParkedStep {
+    pub(crate) step: ProcessingStep,
+    pub(crate) wait: StepWait,
+}
+
+pub(crate) fn build_processing(
+    states: &[StepState],
+    active: Option<&ActiveStep>,
+    parked: Option<&ParkedStep>,
+) -> Processing {
+    let steps = STEP_ORDER.map(|step| build_step(step, states, active, parked));
     Processing {
         done: steps.iter().all(|step| step.status == StepStatus::Done),
         steps,
     }
 }
 
-fn build_step(step: ProcessingStep, states: &[StepState], active: Option<&ActiveStep>) -> StepView {
+fn build_step(
+    step: ProcessingStep,
+    states: &[StepState],
+    active: Option<&ActiveStep>,
+    parked: Option<&ParkedStep>,
+) -> StepView {
     let found = states.iter().find(|state| state.step == step);
+    let current = found.map_or(StepStatus::Pending, |state| state.status);
     StepView {
-        status: found.map_or(StepStatus::Pending, |state| state.status),
+        status: current,
         phase: active
             .filter(|running| running.step == step)
             .map(|running| running.phase.clone()),
         error: found.and_then(|state| state.error.clone()),
+        wait: parked
+            .filter(|waiting| waiting.step == step && current == StepStatus::Pending)
+            .map(|waiting| waiting.wait),
     }
 }
 

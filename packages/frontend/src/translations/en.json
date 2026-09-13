@@ -71,6 +71,8 @@
   "pages.project.progress.steps.transcription": "Transcribes lead vocals",
   "pages.project.progress.steps.voices": "Splits lead and backing vocals",
   "pages.project.progress.trackTitle": "Intelligent processing line",
+  "pages.project.progress.waiting.absent": "Waiting for the GPU worker",
+  "pages.project.progress.waiting.lost": "Reconnecting to the GPU worker",
   "pages.project.realtime.error": "Unexpected realtime connection error. Reopen the project to continue.",
   "pages.project.settings.fields.fourier.label": "Fourier",
   "pages.project.settings.fields.maxFrequency.label": "Max frequency",

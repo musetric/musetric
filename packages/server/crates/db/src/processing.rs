@@ -2,7 +2,7 @@ use rusqlite::{Connection, OptionalExtension, Result, Transaction};
 
 use crate::audio::MasterType;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ProcessingStep {
     Separation,
     Voices,
