@@ -25,7 +25,7 @@ use crate::{
     files::{Asset, Assets, Bundle},
     host::{
         BoxedError, ExecutorFailure, ExecutorHost, ExecutorSession, ExecutorSessionOptions,
-        JobTicket, PhaseSink,
+        JobTicket, Liveness, PhaseSink,
     },
     protocol::{ExecutorPass, ExecutorPhase},
     units::{UnitCompleted, UnitReject, UnitSession, UnitTarget},
@@ -232,6 +232,23 @@ async fn read_response(request: Request<Body>) -> (StatusCode, Vec<u8>) {
     (status, collected.to_bytes().to_vec())
 }
 
+async fn read_cache_control(url: &str) -> String {
+    let uri: Uri = url.parse().expect("the url should be valid");
+    let request = Request::get(uri)
+        .body(Body::empty())
+        .expect("the request should build");
+    let response = create_client()
+        .request(request)
+        .await
+        .expect("the host should answer");
+    response
+        .headers()
+        .get("cache-control")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned()
+}
+
 async fn get(url: &str) -> (StatusCode, Vec<u8>) {
     let uri: Uri = url.parse().expect("the url should be valid");
     let request = Request::get(uri)
@@ -325,12 +342,14 @@ async fn serves_the_page_the_bundle_and_the_registered_files() {
         .await
         .expect("the file should register");
     let (page_status, page) = get(&format!("{}/", host.base_url())).await;
+    let page_cache = read_cache_control(&format!("{}/", host.base_url())).await;
     let (file_status, file) = get(&file_url).await;
     let (asset_status, asset) = get(&format!("{}/index.js", host.base_url())).await;
     let (missing_status, _) = get(&format!("{}/nothing.js", host.base_url())).await;
 
     assert_eq!(page_status, StatusCode::OK);
     assert!(String::from_utf8_lossy(&page).contains("/index.js"));
+    assert_eq!(page_cache, "no-store");
     assert_eq!(file_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&file), "fixture model");
     assert!(file_url.ends_with("/model.onnx"));
@@ -387,6 +406,41 @@ async fn serves_a_second_session_over_the_same_connection() {
     let (stale, _) = get(&file_url).await;
     assert_eq!(stale, StatusCode::NOT_FOUND);
     ticket.wait().await.expect("the second job should answer");
+    host.close().await;
+}
+
+#[tokio::test]
+async fn drops_an_executor_that_stops_answering_the_host() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = ExecutorHost::start_with(
+        Bundle::Directory(workspace.bundle_path()),
+        Liveness {
+            ping: Duration::from_millis(20),
+            silence: Duration::from_millis(120),
+        },
+    )
+    .await
+    .expect("the host should start");
+    let mut executor = connect_socket(&host.socket_url()).await;
+    announce(&mut executor, true, false).await;
+    let session = open_session(&host, &reported);
+    session
+        .wait_ready()
+        .await
+        .expect("the host should be ready");
+    let ticket = session
+        .send_job(API, &Value::Null)
+        .expect("the job should start");
+    let command = take_command(&mut executor).await;
+
+    let silent = timeout(ANSWER, ticket.wait())
+        .await
+        .expect("the job should not hang")
+        .expect_err("the job should fail");
+
+    assert_eq!(command["type"], "job");
+    assert!(matches!(silent, ExecutorFailure::Lost));
     host.close().await;
 }
 

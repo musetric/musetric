@@ -115,6 +115,9 @@ const readUnitDone = (
   return { type: 'unitDone', jobId, attemptId, unit };
 };
 
+export const isPingCommand = (text: string): boolean =>
+  asString(parse(text)?.['type']) === 'ping';
+
 export type ExecutorResult = {
   type: 'result';
   jobId: string;
@@ -134,7 +137,14 @@ export type ExecutorJobMessage =
   | ExecutorUnitOpened
   | ExecutorUnitDone;
 
-export type ExecutorMessage = ExecutorReady | ExecutorJobMessage;
+export type ExecutorAlive = {
+  type: 'pong';
+};
+
+export type ExecutorMessage =
+  | ExecutorReady
+  | ExecutorAlive
+  | ExecutorJobMessage;
 
 export const readExecutorMessage = (
   text: string,
@@ -144,6 +154,9 @@ export const readExecutorMessage = (
     return undefined;
   }
   const kind = asString(message['type']);
+  if (kind === 'pong') {
+    return { type: 'pong' };
+  }
   if (kind === 'ready') {
     return readReady(message);
   }

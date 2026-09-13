@@ -23,8 +23,9 @@ const putOutput = async (
     },
   );
   if (!response.ok) {
+    const reason = await response.text();
     throw new Error(
-      `Failed to upload ${output} of unit ${String(unit)}: HTTP ${String(response.status)}`,
+      `Failed to upload ${output} of unit ${String(unit)}: HTTP ${String(response.status)} ${reason}`,
     );
   }
 };
@@ -66,6 +67,11 @@ export const createUnitServer = (host: UnitHost): UnitServer => {
         }
         await receiver(event);
       }
+    } catch (error) {
+      events.length = 0;
+      rejectServing?.(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     } finally {
       pumping = false;
       if (receiver && events.length > 0) {

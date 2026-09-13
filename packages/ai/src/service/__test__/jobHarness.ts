@@ -49,17 +49,22 @@ export type FakeHost = {
   unitDone: UnitDoneEvent[];
   windows: Map<string, Buffer>;
   outputs: Map<string, Buffer>;
+  refusals: Map<string, string>;
   run: (api: string, request: unknown) => Promise<unknown>;
   sendUnit: (attemptId: string, unit: number, unitCount: number) => void;
   sendUnitClose: (attemptId: string) => void;
+  ping: () => void;
+  alive: string[];
   close: () => Promise<void>;
 };
 
 export const startFakeHost = async (): Promise<FakeHost> => {
   const phases: ExecutorJobMessage[] = [];
+  const alive: string[] = [];
   const unitDone: UnitDoneEvent[] = [];
   const windows = new Map<string, Buffer>();
   const outputs = new Map<string, Buffer>();
+  const refusals = new Map<string, string>();
   const jobs = new Map<string, PendingJob>();
   const sockets: WebSocket[] = [];
   const pending: string[] = [];
@@ -99,6 +104,12 @@ export const startFakeHost = async (): Promise<FakeHost> => {
     );
     if (request.method === 'PUT' && output) {
       const key = `${output[1]}/${output[2]}/${output[3]}`;
+      const refusal = refusals.get(key);
+      if (refusal !== undefined) {
+        response.writeHead(500, { 'content-type': 'text/plain' });
+        response.end(refusal);
+        return;
+      }
       outputs.set(key, await readBody(request));
       response.writeHead(204);
       response.end();
@@ -131,7 +142,8 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         phases.push(message);
         return;
       }
-      if (message.type === 'unitOpened') {
+      if (message.type === 'unitOpened' || message.type === 'pong') {
+        alive.push(message.type);
         return;
       }
       if (message.type === 'unitDone') {
@@ -164,6 +176,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
     unitDone,
     windows,
     outputs,
+    refusals,
     run: async (api, request) => {
       const socket = await active();
       const jobId = crypto.randomUUID();
@@ -191,6 +204,10 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         }),
       );
     },
+    ping: () => {
+      sendAll(JSON.stringify({ type: 'ping' }));
+    },
+    alive,
     sendUnitClose: (attemptId) => {
       sendAll(
         JSON.stringify({

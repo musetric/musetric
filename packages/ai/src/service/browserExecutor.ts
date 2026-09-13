@@ -3,6 +3,7 @@ import { type BrowserJobApis } from './browserJob.js';
 import { createUnitServer } from './browserUnitServing.js';
 import {
   type ExecutorMessage,
+  isPingCommand,
   type JobCommand,
   readJobCommand,
   readUnitEvent,
@@ -92,6 +93,10 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
   });
   socket.addEventListener('message', (event: MessageEvent<unknown>) => {
     if (typeof event.data !== 'string') {
+      return;
+    }
+    if (isPingCommand(event.data)) {
+      send(socket, { type: 'pong' });
       return;
     }
     const unitEvent = readUnitEvent(event.data);

@@ -10,7 +10,10 @@ use axum::{
     Router,
     body::Body,
     extract::{Request, State, WebSocketUpgrade, ws::Message, ws::WebSocket},
-    http::{HeaderValue, StatusCode, header::CONTENT_TYPE},
+    http::{
+        HeaderValue, StatusCode,
+        header::{CACHE_CONTROL, CONTENT_TYPE},
+    },
     response::{IntoResponse, Response},
     routing::{any, get, put},
 };
@@ -19,22 +22,34 @@ use tokio::{
     net::TcpListener,
     sync::{Notify, mpsc, oneshot, watch},
     task::JoinHandle,
-    time::timeout,
+    time::{Instant, interval, timeout},
 };
 use uuid::Uuid;
 
 use crate::{
-    files::{Bundle, LOADER_HTML, OCTET_STREAM, read_content_type, resolve_asset, send_file},
+    files::{
+        Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
+    },
     protocol::{
         ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, read_executor_message, write_job_command,
-        write_unit_close, write_unit_command,
+        write_ping_command, write_unit_close, write_unit_command,
     },
     units::{UnitOutput, UnitSession, receive_output, receive_window},
 };
 
 pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
+#[derive(Clone, Copy)]
+pub(crate) struct Liveness {
+    pub(crate) ping: Duration,
+    pub(crate) silence: Duration,
+}
+
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_LIVENESS: Liveness = Liveness {
+    ping: Duration::from_secs(15),
+    silence: Duration::from_secs(90),
+};
 const HTML: &str = "text/html; charset=utf-8";
 const FILES_ROUTE: &str = "/files/";
 const MODELS_ROUTE: &str = "/models/";
@@ -226,6 +241,7 @@ struct Leader {
 
 pub(crate) struct HostState {
     bundle: Bundle,
+    liveness: Liveness,
     connections: Mutex<Vec<Connection>>,
     leader: watch::Sender<Option<Leader>>,
     session: Mutex<Option<Arc<SessionState>>>,
@@ -245,11 +261,14 @@ impl HostState {
             self.report_ready(outgoing, adapter, shader_f16);
             return;
         }
+        if matches!(read, ExecutorMessage::Alive) {
+            return;
+        }
         let Some(session) = self.session() else {
             return;
         };
         match read {
-            ExecutorMessage::Ready { .. } => {}
+            ExecutorMessage::Ready { .. } | ExecutorMessage::Alive => {}
             ExecutorMessage::Phase(phase) => (session.on_phase)(phase),
             ExecutorMessage::Answer { job_id, result } => session.answer(&job_id, Ok(result)),
             ExecutorMessage::Failure { job_id, error } => {
@@ -344,9 +363,17 @@ impl JobTicket {
 
 impl ExecutorHost {
     pub async fn start(bundle: Bundle) -> Result<Arc<Self>, BoxedError> {
+        Self::start_with(bundle, DEFAULT_LIVENESS).await
+    }
+
+    pub(crate) async fn start_with(
+        bundle: Bundle,
+        liveness: Liveness,
+    ) -> Result<Arc<Self>, BoxedError> {
         let (leader, _) = watch::channel(None);
         let state = Arc::new(HostState {
             bundle,
+            liveness,
             connections: Mutex::new(Vec::new()),
             leader,
             session: Mutex::new(None),
@@ -578,9 +605,9 @@ fn create_router(state: Arc<HostState>) -> Router {
 
 async fn handle_page() -> Response {
     let mut response = Response::new(Body::from(LOADER_HTML));
-    response
-        .headers_mut()
-        .insert(CONTENT_TYPE, HeaderValue::from_static(HTML));
+    let headers = response.headers_mut();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static(HTML));
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static(NO_STORE));
     response
 }
 
@@ -679,9 +706,25 @@ async fn read_socket(
     mut queued: mpsc::UnboundedReceiver<Message>,
     outgoing: &Outgoing,
 ) {
+    let liveness = state.liveness;
+    let mut heard = Instant::now();
+    let mut asking = interval(liveness.ping);
+    asking.tick().await;
     loop {
         tokio::select! {
             () = state.closing.notified() => return,
+            _ = asking.tick() => {
+                if heard.elapsed() >= liveness.silence {
+                    return;
+                }
+                if socket
+                    .send(Message::Text(write_ping_command().into()))
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
             sending = queued.recv() => {
                 let Some(message) = sending else {
                     return;
@@ -694,6 +737,7 @@ async fn read_socket(
                 let Some(Ok(message)) = received else {
                     return;
                 };
+                heard = Instant::now();
                 if let Message::Text(text) = message {
                     state.accept(text.as_str(), outgoing);
                 }

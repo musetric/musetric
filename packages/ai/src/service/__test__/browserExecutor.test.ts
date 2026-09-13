@@ -161,3 +161,17 @@ test('the browser client refuses a socket url outside the machine', () => {
     });
   }).toThrow('accepts a local socket url only');
 });
+
+test('the browser client answers a ping so the host can see it is alive', async () => {
+  announceAdapter(true);
+  const host = await startFakeHost();
+
+  try {
+    startJobExecutor({ jobUrl: host.socketUrl, apis: {} });
+    await host.ready;
+    host.ping();
+    await expect.poll(() => host.alive, { timeout: 2000 }).toEqual(['pong']);
+  } finally {
+    await host.close();
+  }
+});

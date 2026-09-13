@@ -29,6 +29,7 @@ pub enum ExecutorPhase {
 }
 
 pub(crate) enum ExecutorMessage {
+    Alive,
     Ready {
         adapter: bool,
         shader_f16: bool,
@@ -56,6 +57,9 @@ pub(crate) enum ExecutorMessage {
 pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
     let message: Value = serde_json::from_str(text).ok()?;
     let kind = message.get("type")?.as_str()?;
+    if kind == "pong" {
+        return Some(ExecutorMessage::Alive);
+    }
     if kind == "ready" {
         return Some(ExecutorMessage::Ready {
             adapter: read_flag(&message, "adapter"),
@@ -97,6 +101,10 @@ fn read_running(message: &Value) -> Option<ExecutorPhase> {
 
 fn read_count(message: &Value, name: &str) -> Option<u32> {
     u32::try_from(message.get(name)?.as_u64()?).ok()
+}
+
+pub(crate) fn write_ping_command() -> String {
+    json!({ "type": "ping" }).to_string()
 }
 
 pub(crate) fn write_job_command(job_id: &str, api: &str, request: &Value) -> String {
