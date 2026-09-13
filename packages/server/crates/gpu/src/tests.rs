@@ -121,8 +121,8 @@ impl Hosted {
         self.host.base_url()
     }
 
-    fn page_url(&self) -> String {
-        self.host.page_url()
+    fn socket_url(&self) -> String {
+        self.host.socket_url()
     }
 
     async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
@@ -244,16 +244,10 @@ type Executor =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect_executor(host: &Hosted) -> Executor {
-    connect_page(&host.page_url()).await
+    connect_socket(&host.socket_url()).await
 }
 
-async fn connect_page(page: &str) -> Executor {
-    let socket_url = page
-        .split_once("jobs=")
-        .expect("the page url should carry the socket")
-        .1
-        .replace("%3A", ":")
-        .replace("%2F", "/");
+async fn connect_socket(socket_url: &str) -> Executor {
     let (socket, _) = connect_async(socket_url)
         .await
         .expect("the executor should connect");
@@ -330,14 +324,13 @@ async fn serves_the_page_the_bundle_and_the_registered_files() {
         .register_file(&registered)
         .await
         .expect("the file should register");
-    let (page_status, page) = get(&host.page_url()).await;
+    let (page_status, page) = get(&format!("{}/", host.base_url())).await;
     let (file_status, file) = get(&file_url).await;
     let (asset_status, asset) = get(&format!("{}/index.js", host.base_url())).await;
     let (missing_status, _) = get(&format!("{}/nothing.js", host.base_url())).await;
 
     assert_eq!(page_status, StatusCode::OK);
     assert!(String::from_utf8_lossy(&page).contains("/index.js"));
-    assert!(host.page_url().contains("jobs=ws%3A%2F%2F"));
     assert_eq!(file_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&file), "fixture model");
     assert!(file_url.ends_with("/model.onnx"));
@@ -347,26 +340,40 @@ async fn serves_the_page_the_bundle_and_the_registered_files() {
     host.close().await;
 }
 
+async fn finish_job(socket: &mut Executor, result: Value) -> Value {
+    let command = take_command(socket).await;
+    reply(
+        socket,
+        &json!({ "type": "result", "jobId": read_job_id(&command), "result": result }),
+    )
+    .await;
+    command
+}
+
 #[tokio::test]
-async fn opens_a_second_session_while_the_first_executor_lingers() {
+async fn serves_a_second_session_over_the_same_connection() {
     let workspace = Workspace::new();
     let reported = Reported::create();
     let host = ExecutorHost::start(Bundle::Directory(workspace.bundle_path()))
         .await
         .expect("the host should start");
+    let mut executor = connect_socket(&host.socket_url()).await;
+    announce(&mut executor, true, false).await;
+
     let first = open_session(&host, &reported);
     let file_url = first
         .register_file(&workspace.file("model.onnx", "fixture model"))
         .await
         .expect("the file should register");
-    let mut lingering = connect_page(&host.page_url()).await;
-    announce(&mut lingering, true, false).await;
     first.wait_ready().await.expect("the first should be ready");
+    let opening = first
+        .send_job(API, &Value::Null)
+        .expect("the first job should start");
+    finish_job(&mut executor, json!(1)).await;
+    opening.wait().await.expect("the first job should answer");
     drop(first);
 
     let second = open_session(&host, &reported);
-    let mut executor = connect_page(&host.page_url()).await;
-    announce(&mut executor, true, false).await;
     second
         .wait_ready()
         .await
@@ -374,17 +381,59 @@ async fn opens_a_second_session_while_the_first_executor_lingers() {
     let ticket = second
         .send_job(API, &Value::Null)
         .expect("the second job should start");
-    let command = take_command(&mut executor).await;
+    let command = finish_job(&mut executor, json!(2)).await;
 
     assert_eq!(command["type"], "job");
     let (stale, _) = get(&file_url).await;
     assert_eq!(stale, StatusCode::NOT_FOUND);
-    reply(
-        &mut executor,
-        &json!({ "type": "result", "jobId": read_job_id(&command), "result": 2 }),
-    )
-    .await;
     ticket.wait().await.expect("the second job should answer");
+    host.close().await;
+}
+
+#[tokio::test]
+async fn hands_the_lease_to_the_next_executor_when_the_leader_drops() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = ExecutorHost::start(Bundle::Directory(workspace.bundle_path()))
+        .await
+        .expect("the host should start");
+    let mut leading = connect_socket(&host.socket_url()).await;
+    announce(&mut leading, true, false).await;
+    let first = open_session(&host, &reported);
+    first
+        .wait_ready()
+        .await
+        .expect("the leader should be ready");
+    let mut standby = connect_socket(&host.socket_url()).await;
+    announce(&mut standby, true, false).await;
+    let ticket = first
+        .send_job(API, &Value::Null)
+        .expect("the leading job should start");
+    let leading_command = take_command(&mut leading).await;
+
+    leading
+        .close(None)
+        .await
+        .expect("the leading socket should close");
+    let failure = timeout(ANSWER, ticket.wait())
+        .await
+        .expect("the job should not hang")
+        .expect_err("the job should fail");
+    drop(first);
+    let second = open_session(&host, &reported);
+    second
+        .wait_ready()
+        .await
+        .expect("the standby should take the lease");
+    let handed = second
+        .send_job(API, &Value::Null)
+        .expect("the handed job should start");
+    let standby_command = finish_job(&mut standby, json!(3)).await;
+
+    assert_eq!(leading_command["type"], "job");
+    assert!(matches!(failure, ExecutorFailure::Lost));
+    assert_eq!(standby_command["type"], "job");
+    handed.wait().await.expect("the handed job should answer");
     host.close().await;
 }
 
@@ -547,7 +596,7 @@ async fn fails_a_running_job_when_the_executor_disappears() {
         .expect("the job should not hang")
         .expect("the job task should finish")
         .expect_err("the job should fail");
-    assert!(matches!(failure, ExecutorFailure::Unavailable));
+    assert!(matches!(failure, ExecutorFailure::Lost));
 }
 
 struct CountedUnits {

@@ -26,7 +26,6 @@ use crate::{
     },
     blobs::{ensure_area, step_area},
     checkpoint::{CheckpointDir, area_root, computation_id, digest_samples, restore_refused},
-    pages::HeldPage,
     storage::{read_database, write_database},
 };
 
@@ -136,8 +135,6 @@ async fn drive(
         on_phase: sink,
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
     });
-    let page = context.pages.open_page(&context.host.page_url()).await?;
-    let held = HeldPage::hold(context.pages.as_ref(), page);
     let opened = open_attempt(context, job, &session, &attempt_id).await;
     let outcome = match opened {
         Ok(ticket) => {
@@ -160,7 +157,6 @@ async fn drive(
         }
         Err(failure) => Err(failure),
     };
-    drop(held);
     outcome?;
     units.finalize()
 }

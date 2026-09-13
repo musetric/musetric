@@ -160,7 +160,7 @@ async fn produce(
     samples: u64,
     models: &[(String, PathBuf)],
 ) -> Result<Vec<f32>, Failure> {
-    let held = attempt.open().await?;
+    attempt.open().await?;
     let model = attempt
         .register(&cached_model(models, VOCALS_MODEL)?)
         .await?;
@@ -179,7 +179,7 @@ async fn produce(
         "graph": vocals_graph(),
     });
     let resume = attempt.resume(samples, 2).await?;
-    let outcome = attempt
+    attempt
         .run(
             StageRegistration {
                 attempt: attempt_id,
@@ -191,9 +191,7 @@ async fn produce(
             },
             request,
         )
-        .await;
-    drop(held);
-    outcome
+        .await
 }
 
 async fn store(

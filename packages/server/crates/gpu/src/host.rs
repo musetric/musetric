@@ -26,8 +26,8 @@ use uuid::Uuid;
 use crate::{
     files::{Bundle, LOADER_HTML, OCTET_STREAM, read_content_type, resolve_asset, send_file},
     protocol::{
-        ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, JOB_URL_PARAMETER, read_executor_message,
-        write_job_command, write_unit_close, write_unit_command,
+        ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, read_executor_message, write_job_command,
+        write_unit_close, write_unit_command,
     },
     units::{UnitOutput, UnitSession, receive_output, receive_window},
 };
@@ -39,19 +39,22 @@ const HTML: &str = "text/html; charset=utf-8";
 const FILES_ROUTE: &str = "/files/";
 const MODELS_ROUTE: &str = "/models/";
 const DISCONNECTED: &str = "the gpu executor disconnected";
+const UNCONNECTED: &str = "no gpu executor is connected";
 const POISONED: &str = "the gpu executor host is poisoned";
 
 #[derive(Debug)]
 pub enum ExecutorFailure {
     Refused(String),
-    Unavailable,
+    Absent,
+    Lost,
 }
 
 impl Display for ExecutorFailure {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Refused(message) => formatter.write_str(message),
-            Self::Unavailable => formatter.write_str(DISCONNECTED),
+            Self::Absent => formatter.write_str(UNCONNECTED),
+            Self::Lost => formatter.write_str(DISCONNECTED),
         }
     }
 }
@@ -176,10 +179,17 @@ impl SessionState {
         Ok(())
     }
 
+    fn serves(&self, outgoing: &Outgoing) -> bool {
+        self.executor.lock().is_ok_and(|held| {
+            held.as_ref()
+                .is_some_and(|serving| serving.same_channel(outgoing))
+        })
+    }
+
     fn abandon(&self) {
         if let Ok(mut answers) = self.answers.lock() {
             for (_, sender) in answers.drain() {
-                let _ = sender.send(Err(ExecutorFailure::Unavailable));
+                let _ = sender.send(Err(ExecutorFailure::Lost));
             }
         }
         if let Ok(mut active) = self.active.lock() {
@@ -195,42 +205,51 @@ impl SessionState {
             .executor
             .lock()
             .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?;
-        let outgoing = held.as_ref().ok_or(ExecutorFailure::Unavailable)?;
+        let outgoing = held.as_ref().ok_or(ExecutorFailure::Lost)?;
         outgoing
             .send(Message::Text(message.into()))
-            .map_err(|_| ExecutorFailure::Unavailable)?;
+            .map_err(|_| ExecutorFailure::Lost)?;
         Ok(())
     }
 }
 
+struct Connection {
+    outgoing: Outgoing,
+    capabilities: Option<Capabilities>,
+}
+
+#[derive(Clone)]
+struct Leader {
+    outgoing: Outgoing,
+    capabilities: Capabilities,
+}
+
 pub(crate) struct HostState {
     bundle: Bundle,
-    outgoing: Mutex<Option<Outgoing>>,
-    capabilities: watch::Sender<Option<Capabilities>>,
+    connections: Mutex<Vec<Connection>>,
+    leader: watch::Sender<Option<Leader>>,
     session: Mutex<Option<Arc<SessionState>>>,
     closing: Notify,
 }
 
 impl HostState {
-    fn accept(&self, message: &str) {
+    fn accept(&self, message: &str, outgoing: &Outgoing) {
         let Some(read) = read_executor_message(message) else {
             return;
         };
+        if let ExecutorMessage::Ready {
+            adapter,
+            shader_f16,
+        } = read
+        {
+            self.report_ready(outgoing, adapter, shader_f16);
+            return;
+        }
         let Some(session) = self.session() else {
-            if let ExecutorMessage::Ready {
-                adapter,
-                shader_f16,
-            } = read
-            {
-                self.report_ready(adapter, shader_f16);
-            }
             return;
         };
         match read {
-            ExecutorMessage::Ready {
-                adapter,
-                shader_f16,
-            } => self.report_ready(adapter, shader_f16),
+            ExecutorMessage::Ready { .. } => {}
             ExecutorMessage::Phase(phase) => (session.on_phase)(phase),
             ExecutorMessage::Answer { job_id, result } => session.answer(&job_id, Ok(result)),
             ExecutorMessage::Failure { job_id, error } => {
@@ -247,11 +266,33 @@ impl HostState {
         }
     }
 
-    fn report_ready(&self, adapter: bool, shader_f16: bool) {
-        let _ = self.capabilities.send(Some(Capabilities {
-            adapter,
-            shader_f16,
-        }));
+    fn report_ready(&self, outgoing: &Outgoing, adapter: bool, shader_f16: bool) {
+        if let Ok(mut connections) = self.connections.lock()
+            && let Some(found) = connections
+                .iter_mut()
+                .find(|connection| connection.outgoing.same_channel(outgoing))
+        {
+            found.capabilities = Some(Capabilities {
+                adapter,
+                shader_f16,
+            });
+        }
+        self.publish_leader();
+    }
+
+    fn publish_leader(&self) {
+        let found = self.connections.lock().ok().and_then(|connections| {
+            connections
+                .iter()
+                .find(|connection| connection.capabilities.is_some())
+                .and_then(|connection| {
+                    connection.capabilities.map(|capabilities| Leader {
+                        outgoing: connection.outgoing.clone(),
+                        capabilities,
+                    })
+                })
+        });
+        let _ = self.leader.send_replace(found);
     }
 
     pub(crate) fn session(&self) -> Option<Arc<SessionState>> {
@@ -263,31 +304,24 @@ impl HostState {
     }
 
     fn attach(&self, outgoing: Outgoing) {
-        if let Ok(mut stored) = self.outgoing.lock() {
-            *stored = Some(outgoing);
+        if let Ok(mut connections) = self.connections.lock() {
+            connections.push(Connection {
+                outgoing,
+                capabilities: None,
+            });
         }
     }
 
     fn detach(&self, outgoing: &Outgoing) {
-        let owned = self.outgoing.lock().is_ok_and(|stored| {
-            stored
-                .as_ref()
-                .is_some_and(|held| held.same_channel(outgoing))
-        });
-        if !owned {
-            return;
+        if let Ok(mut connections) = self.connections.lock() {
+            connections.retain(|connection| !connection.outgoing.same_channel(outgoing));
         }
-        if let Ok(mut stored) = self.outgoing.lock() {
-            *stored = None;
-        }
-        let _ = self.capabilities.send(None);
-        if let Some(session) = self.session() {
+        self.publish_leader();
+        if let Some(session) = self.session()
+            && session.serves(outgoing)
+        {
             session.abandon();
         }
-    }
-
-    fn connected(&self) -> Option<Outgoing> {
-        self.outgoing.lock().ok()?.clone()
     }
 }
 
@@ -304,19 +338,17 @@ pub struct JobTicket {
 
 impl JobTicket {
     pub async fn wait(self) -> Result<Value, ExecutorFailure> {
-        self.receiver
-            .await
-            .map_err(|_| ExecutorFailure::Unavailable)?
+        self.receiver.await.map_err(|_| ExecutorFailure::Lost)?
     }
 }
 
 impl ExecutorHost {
     pub async fn start(bundle: Bundle) -> Result<Arc<Self>, BoxedError> {
-        let (capabilities, _) = watch::channel(None);
+        let (leader, _) = watch::channel(None);
         let state = Arc::new(HostState {
             bundle,
-            outgoing: Mutex::new(None),
-            capabilities,
+            connections: Mutex::new(Vec::new()),
+            leader,
             session: Mutex::new(None),
             closing: Notify::new(),
         });
@@ -345,7 +377,6 @@ impl ExecutorHost {
         if let Ok(mut held) = self.state.session.lock() {
             *held = Some(Arc::clone(&session));
         }
-        let _ = self.state.capabilities.send(None);
         ExecutorSession {
             host: Arc::clone(self),
             state: session,
@@ -353,21 +384,16 @@ impl ExecutorHost {
     }
 
     #[must_use]
-    pub fn page_url(&self) -> String {
-        let socket_url = format!(
-            "{}{JOB_SOCKET_PATH}",
-            self.base_url.replace("http://", "ws://")
-        );
-        format!(
-            "{}/?{JOB_URL_PARAMETER}={}",
-            self.base_url,
-            encode_query_value(&socket_url)
-        )
+    pub fn base_url(&self) -> &str {
+        &self.base_url
     }
 
     #[must_use]
-    pub fn base_url(&self) -> &str {
-        &self.base_url
+    pub fn socket_url(&self) -> String {
+        format!(
+            "{}{JOB_SOCKET_PATH}",
+            self.base_url.replace("http://", "ws://")
+        )
     }
 
     pub async fn close(&self) {
@@ -400,22 +426,14 @@ pub struct ExecutorSession {
 
 impl ExecutorSession {
     pub async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
-        let mut changes = self.host.state.capabilities.subscribe();
-        let waited = timeout(READY_TIMEOUT, wait_capabilities(&mut changes)).await;
+        let mut changes = self.host.state.leader.subscribe();
+        let waited = timeout(READY_TIMEOUT, wait_leader(&mut changes)).await;
         let Ok(announced) = waited else {
-            return Err(ExecutorFailure::Refused(format!(
-                "{} executor did not connect in time",
-                self.state.label
-            )));
+            return Err(ExecutorFailure::Absent);
         };
-        let found = announced.ok_or(ExecutorFailure::Unavailable)?;
-        self.state.accept_capabilities(found)?;
-        let outgoing = self
-            .host
-            .state
-            .connected()
-            .ok_or(ExecutorFailure::Unavailable)?;
-        self.state.capture(outgoing)
+        let leader = announced.ok_or(ExecutorFailure::Lost)?;
+        self.state.accept_capabilities(leader.capabilities)?;
+        self.state.capture(leader.outgoing)
     }
 
     #[must_use]
@@ -510,7 +528,7 @@ impl ExecutorSession {
             .lock()
             .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?
             .clone()
-            .ok_or(ExecutorFailure::Unavailable)
+            .ok_or(ExecutorFailure::Lost)
     }
 }
 
@@ -530,27 +548,14 @@ impl Drop for ExecutorSession {
     }
 }
 
-async fn wait_capabilities(
-    changes: &mut watch::Receiver<Option<Capabilities>>,
-) -> Option<Capabilities> {
+async fn wait_leader(changes: &mut watch::Receiver<Option<Leader>>) -> Option<Leader> {
     loop {
-        let current = *changes.borrow_and_update();
+        let current = changes.borrow_and_update().clone();
         if current.is_some() {
             return current;
         }
         changes.changed().await.ok()?;
     }
-}
-
-fn encode_query_value(value: &str) -> String {
-    value
-        .chars()
-        .map(|letter| match letter {
-            ':' => "%3A".to_owned(),
-            '/' => "%2F".to_owned(),
-            other => other.to_string(),
-        })
-        .collect()
 }
 
 fn create_router(state: Arc<HostState>) -> Router {
@@ -664,7 +669,7 @@ async fn handle_socket(State(state): State<Arc<HostState>>, upgrade: WebSocketUp
 async fn serve_socket(socket: WebSocket, state: Arc<HostState>) {
     let (outgoing, queued) = mpsc::unbounded_channel();
     state.attach(outgoing.clone());
-    read_socket(socket, &state, queued).await;
+    read_socket(socket, &state, queued, &outgoing).await;
     state.detach(&outgoing);
 }
 
@@ -672,6 +677,7 @@ async fn read_socket(
     mut socket: WebSocket,
     state: &Arc<HostState>,
     mut queued: mpsc::UnboundedReceiver<Message>,
+    outgoing: &Outgoing,
 ) {
     loop {
         tokio::select! {
@@ -689,7 +695,7 @@ async fn read_socket(
                     return;
                 };
                 if let Message::Text(text) = message {
-                    state.accept(text.as_str());
+                    state.accept(text.as_str(), outgoing);
                 }
             }
         }

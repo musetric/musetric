@@ -1,4 +1,3 @@
-export const jobUrlParameter = 'jobs';
 export const jobSocketPath = '/jobs';
 
 const asObject = (value: unknown): Record<string, unknown> | undefined => {

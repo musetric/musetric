@@ -21,8 +21,6 @@ use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
     frontend::Frontend,
     garbage::spawn_collector,
-    page_bridge::PageBridge,
-    pages::PageOpener,
     publish::Publication,
     router::{RouterOptions, create_router},
     storage::Storage,
@@ -168,14 +166,12 @@ struct AppOptions {
 
 async fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     let storage = options.storage;
-    let pages = PageBridge::create();
     let host = ExecutorHost::start(options.browser_bundle).await?;
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
-        pages: Arc::clone(&pages) as Arc<dyn PageOpener>,
         client: create_client()?,
         models_path: options.models,
-        host,
+        host: Arc::clone(&host),
     });
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
@@ -191,7 +187,7 @@ async fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
         frontend: options.frontend,
         storage,
         queue,
-        pages,
+        executor: host,
     }))
 }
 

@@ -9,10 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{
-    page_bridge::PageBridge, publish::Publication, realtime::Rooms, routes::RouteState,
-    storage::Storage,
-};
+use crate::{publish::Publication, realtime::Rooms, routes::RouteState, storage::Storage};
 use axum::http::StatusCode;
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
@@ -40,8 +37,8 @@ impl UnitHost {
         self.host.base_url()
     }
 
-    pub(crate) fn page_url(&self) -> String {
-        self.host.page_url()
+    pub(crate) fn socket_url(&self) -> String {
+        self.host.socket_url()
     }
 
     pub(crate) async fn close(self) {
@@ -178,7 +175,7 @@ impl StepRunner for IdleRunner {
     }
 }
 
-pub(crate) fn create_route_state(storage: Arc<Storage>) -> RouteState {
+pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Storage>) -> RouteState {
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),
         writer: Arc::clone(&storage.writer),
@@ -186,11 +183,14 @@ pub(crate) fn create_route_state(storage: Arc<Storage>) -> RouteState {
         interval: QUEUE_INTERVAL,
         idle_limit: QUEUE_INTERVAL,
     });
+    let executor = ExecutorHost::start(Bundle::Directory(workspace.unit_bundle_path()))
+        .await
+        .expect("the executor host should start");
     RouteState {
         rooms: Arc::new(Rooms::create()),
         storage,
         queue,
-        pages: PageBridge::create(),
+        executor,
     }
 }
 

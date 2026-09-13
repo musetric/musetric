@@ -30,6 +30,7 @@ export type JobExecutorOptions = {
   jobUrl: string;
   apis: BrowserJobApis;
   foreground: ForegroundBridge | undefined;
+  onClosed?: () => void;
 };
 
 export const startJobExecutor = (options: JobExecutorOptions): void => {
@@ -80,11 +81,22 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
     }
   };
 
+  let closed = false;
+  const reportClosed = (): void => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    options.onClosed?.();
+  };
+
   socket.addEventListener('close', () => {
     unitServer.abandon('the executor lost its connection to the host');
+    reportClosed();
   });
   socket.addEventListener('error', () => {
     unitServer.abandon('the executor connection to the host failed');
+    reportClosed();
   });
   socket.addEventListener('open', () => {
     void readGpuSupport().then((support) => {

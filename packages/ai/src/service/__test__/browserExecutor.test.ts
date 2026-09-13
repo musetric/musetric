@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { startJobExecutor } from '../browserExecutor.js';
 import { type BrowserJobApis, createBrowserJobApi } from '../browserJob.js';
-import { readSocketUrl, startFakeHost } from './jobHarness.js';
+import { startFakeHost } from './jobHarness.js';
 
 const apiName = 'musetricAiExecutorTestApi';
 
@@ -29,7 +29,7 @@ test('the browser client runs a job and reports its phases', async () => {
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis,
       foreground: undefined,
     });
@@ -60,7 +60,7 @@ test('the browser client forwards unit events and confirms them', async () => {
       async (request, context) => {
         await context.serveUnits({
           attemptId: request.attemptId,
-          attemptUrl: `${host.pageUrl.split('/?')[0]}/attempt/${request.attemptId}`,
+          attemptUrl: `${host.baseUrl}/attempt/${request.attemptId}`,
           outputs: [],
           run: async (input, unit) => {
             served.push(unit);
@@ -73,7 +73,7 @@ test('the browser client forwards unit events and confirms them', async () => {
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis,
       foreground: undefined,
     });
@@ -96,7 +96,7 @@ test('the browser client announces an adapter without shader-f16', async () => {
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis: {},
       foreground: undefined,
     });
@@ -122,7 +122,7 @@ test('the browser client reports a failing job back to the host', async () => {
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis,
       foreground: undefined,
     });
@@ -141,7 +141,7 @@ test('the browser client rejects a job for an api it does not have', async () =>
 
   try {
     startJobExecutor({
-      jobUrl: readSocketUrl(host.pageUrl),
+      jobUrl: host.socketUrl,
       apis: {},
       foreground: undefined,
     });

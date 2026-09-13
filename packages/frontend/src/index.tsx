@@ -5,7 +5,7 @@ import { endpoints } from './api/index.js';
 import { queryClient } from './api/queryClient.js';
 import { App } from './app/index.js';
 import { engine } from './engine/engine.js';
-import { startExecutorPageSocket } from './executor/executorPageSocket.js';
+import { mountExecutorFrame } from './executor/executorFrame.js';
 import { initI18next } from './translations/index.js';
 
 const runApp = async () => {
@@ -20,7 +20,9 @@ const runApp = async () => {
   await initI18next();
   await engine.boot();
   await queryClient.prefetchQuery(endpoints.project.list());
-  startExecutorPageSocket();
+  void queryClient.fetchQuery(endpoints.executor.get()).then((executor) => {
+    mountExecutorFrame(executor.url);
+  });
 
   createRoot(rootElement).render(
     <StrictMode>

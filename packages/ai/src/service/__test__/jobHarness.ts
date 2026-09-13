@@ -9,7 +9,6 @@ import {
   type ExecutorJobMessage,
   type ExecutorReady,
   jobSocketPath,
-  jobUrlParameter,
   readExecutorMessage,
 } from '../jobProtocol.js';
 
@@ -43,7 +42,8 @@ export type UnitDoneEvent = {
 };
 
 export type FakeHost = {
-  pageUrl: string;
+  baseUrl: string;
+  socketUrl: string;
   ready: Promise<ExecutorReady>;
   phases: ExecutorJobMessage[];
   unitDone: UnitDoneEvent[];
@@ -153,12 +153,12 @@ export const startFakeHost = async (): Promise<FakeHost> => {
 
   const baseUrl = await listenLocally(server);
   const socketUrl = `${baseUrl.replace('http://', 'ws://')}${jobSocketPath}`;
-  const pageUrl = `${baseUrl}/?${jobUrlParameter}=${encodeURIComponent(socketUrl)}`;
 
   const active = async (): Promise<WebSocket> => await connected.promise;
 
   return {
-    pageUrl,
+    baseUrl,
+    socketUrl,
     ready: ready.promise,
     phases,
     unitDone,
@@ -213,12 +213,4 @@ export const startFakeHost = async (): Promise<FakeHost> => {
       });
     },
   };
-};
-
-export const readSocketUrl = (pageUrl: string): string => {
-  const found = new URL(pageUrl).searchParams.get(jobUrlParameter) ?? undefined;
-  if (found === undefined) {
-    throw new Error('the page url should carry the job socket url');
-  }
-  return found;
 };

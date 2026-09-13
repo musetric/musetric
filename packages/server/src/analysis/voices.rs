@@ -153,7 +153,7 @@ async fn produce(
     plan: UnitPlan,
     models: &[(String, PathBuf)],
 ) -> Result<Vec<f32>, Failure> {
-    let held = attempt.open().await?;
+    attempt.open().await?;
     let model = attempt
         .register(&cached_model(models, LEAD_BACKING_MODEL)?)
         .await?;
@@ -168,7 +168,7 @@ async fn produce(
     });
     let frames = u64::try_from(padded.len() / CHANNELS).unwrap_or(0);
     let resume = attempt.resume(frames, 2).await?;
-    let outcome = attempt
+    attempt
         .run(
             StageRegistration {
                 attempt: attempt_id,
@@ -180,9 +180,7 @@ async fn produce(
             },
             request,
         )
-        .await;
-    drop(held);
-    outcome
+        .await
 }
 
 async fn store(running: &StageRun<'_>, stems: &Voices, sample_rate: u32) -> Result<(), Failure> {
