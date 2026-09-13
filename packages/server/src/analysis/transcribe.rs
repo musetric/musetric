@@ -1,9 +1,8 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPhase, JobTicket, PhaseSink,
+    ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, JobTicket, PhaseSink,
     UnitSession,
 };
 use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
@@ -131,18 +130,15 @@ async fn drive(
     let sink: PhaseSink = Arc::new(move |phase| {
         let _ = phases.send(phase);
     });
-    let host = ExecutorHost::start(ExecutorHostOptions {
+    let session = context.host.open(ExecutorSessionOptions {
         label: LABEL.to_owned(),
-        bundle: context.bundle.clone(),
-        pcm: Bytes::from(Vec::new()),
         require_shader_f16: true,
         on_phase: sink,
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-    })
-    .await?;
-    let page = context.pages.open_page(&host.page_url()).await?;
+    });
+    let page = context.pages.open_page(&context.host.page_url()).await?;
     let held = HeldPage::hold(context.pages.as_ref(), page);
-    let opened = open_attempt(context, job, &host, &attempt_id).await;
+    let opened = open_attempt(context, job, &session, &attempt_id).await;
     let outcome = match opened {
         Ok(ticket) => {
             attempt(
@@ -154,7 +150,7 @@ async fn drive(
                     attempt_id: &attempt_id,
                     computation: &computation,
                     checkpoint: &checkpoint,
-                    host: &host,
+                    session: &session,
                     units: &units,
                 },
                 ticket,
@@ -165,7 +161,6 @@ async fn drive(
         Err(failure) => Err(failure),
     };
     drop(held);
-    host.close().await;
     outcome?;
     units.finalize()
 }
@@ -265,7 +260,7 @@ struct Run<'run> {
     attempt_id: &'run str,
     computation: &'run str,
     checkpoint: &'run CheckpointDir,
-    host: &'run ExecutorHost,
+    session: &'run ExecutorSession,
     units: &'run Arc<TranscribeUnits>,
 }
 
@@ -276,7 +271,7 @@ impl Run<'_> {
             unit: step.unit,
             unit_count: step.count,
         });
-        self.host
+        self.session
             .send_unit(self.attempt_id, step.unit, step.count)
             .map_err(Failure::from)?;
         while let Ok(phase) = self.reported.try_recv() {
@@ -311,7 +306,7 @@ impl Run<'_> {
     }
 
     async fn finish(&mut self, answered: &mut Answered) -> Result<(), Failure> {
-        self.host
+        self.session
             .send_unit_close(self.attempt_id)
             .map_err(Failure::from)?;
         loop {
@@ -372,10 +367,10 @@ async fn attempt(
 async fn open_attempt(
     context: &AnalysisContext,
     job: &PendingJob,
-    host: &ExecutorHost,
+    session: &ExecutorSession,
     attempt_id: &str,
 ) -> Result<JobTicket, Failure> {
-    host.wait_ready().await?;
+    session.wait_ready().await?;
     let project_id = job.project_id;
     let step = job.step;
     let attempt = attempt_id.to_owned();
@@ -387,9 +382,9 @@ async fn open_attempt(
         return Err(Failure::Refused(NOT_ACTIVE.to_owned()));
     }
     let models = WHISPER.root(&context.models_path);
-    let hosted = host.register_directory(&models).await?;
-    let request = request_json(attempt_id, &host.attempt_url(attempt_id), &hosted);
-    host.send_job(API_NAME, &request).map_err(Failure::from)
+    let hosted = session.register_directory(&models).await?;
+    let request = request_json(attempt_id, &session.attempt_url(attempt_id), &hosted);
+    session.send_job(API_NAME, &request).map_err(Failure::from)
 }
 
 pub(crate) fn request_json(attempt_id: &str, attempt_url: &str, model_host: &str) -> Value {

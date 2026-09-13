@@ -18,7 +18,9 @@ use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
     open_database,
 };
-use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, PhaseSink, UnitSession};
+use musetric_gpu::{
+    Bundle, ExecutorHost, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
+};
 use musetric_jobs::{
     Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner, StepWaiting,
 };
@@ -27,6 +29,25 @@ use musetric_media::SymphoniaPcm;
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+pub(crate) struct UnitHost {
+    host: Arc<ExecutorHost>,
+    pub(crate) session: ExecutorSession,
+}
+
+impl UnitHost {
+    pub(crate) fn base_url(&self) -> &str {
+        self.host.base_url()
+    }
+
+    pub(crate) fn page_url(&self) -> String {
+        self.host.page_url()
+    }
+
+    pub(crate) async fn close(self) {
+        self.host.close().await;
+    }
+}
 
 pub(crate) struct Workspace {
     directory: PathBuf,
@@ -74,18 +95,18 @@ impl Workspace {
         &self,
         label: &str,
         units: Arc<dyn UnitSession>,
-    ) -> ExecutorHost {
+    ) -> UnitHost {
         let sink: PhaseSink = Arc::new(|_| {});
-        ExecutorHost::start(ExecutorHostOptions {
+        let host = ExecutorHost::start(Bundle::Directory(self.unit_bundle_path()))
+            .await
+            .expect("the unit host should start");
+        let session = host.open(ExecutorSessionOptions {
             label: label.to_owned(),
-            bundle: Bundle::Directory(self.unit_bundle_path()),
-            pcm: Vec::new().into(),
             require_shader_f16: false,
             on_phase: sink,
             units: Some(units),
-        })
-        .await
-        .expect("the unit host should start")
+        });
+        UnitHost { host, session }
     }
 
     pub(crate) fn seed(&self, statements: &str) {

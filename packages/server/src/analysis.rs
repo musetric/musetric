@@ -21,7 +21,7 @@ pub(crate) use gains::{Gains, read_gains};
 use musetric_jobs::{StepOutcome, StepReport, StepRunner};
 use reqwest::Client;
 
-use musetric_gpu::Bundle;
+use musetric_gpu::ExecutorHost;
 
 use crate::{pages::PageOpener, storage::Storage};
 
@@ -30,7 +30,7 @@ pub(crate) struct AnalysisContext {
     pub(crate) pages: Arc<dyn PageOpener>,
     pub(crate) client: Client,
     pub(crate) models_path: PathBuf,
-    pub(crate) bundle: Bundle,
+    pub(crate) host: Arc<ExecutorHost>,
 }
 
 pub(crate) struct AnalysisRunner {

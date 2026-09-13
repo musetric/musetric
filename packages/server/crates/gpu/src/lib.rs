@@ -12,7 +12,8 @@ pub use cache::{
 };
 pub use files::{Asset, Assets, Bundle, read_relative};
 pub use host::{
-    BoxedError, ExecutorFailure, ExecutorHost, ExecutorHostOptions, JobTicket, PhaseSink,
+    BoxedError, ExecutorFailure, ExecutorHost, ExecutorSession, ExecutorSessionOptions, JobTicket,
+    PhaseSink,
 };
 pub use protocol::{ExecutorPass, ExecutorPhase};
 pub use units::{UnitCompleted, UnitPayload, UnitReject, UnitSession, UnitTarget, UnitWrite};

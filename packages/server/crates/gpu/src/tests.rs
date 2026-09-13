@@ -23,14 +23,16 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
 use crate::{
     files::{Asset, Assets, Bundle},
-    host::{ExecutorFailure, ExecutorHost, ExecutorHostOptions, PhaseSink},
+    host::{
+        BoxedError, ExecutorFailure, ExecutorHost, ExecutorSession, ExecutorSessionOptions,
+        JobTicket, PhaseSink,
+    },
     protocol::{ExecutorPass, ExecutorPhase},
     units::{UnitCompleted, UnitReject, UnitSession, UnitTarget},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-const PCM: &[u8] = b"fixture pcm bytes";
 const BUNDLE_ASSET: &str = "console.log('bundle');\n";
 const API: &str = "musetricAiAnalyzeFixture";
 const ANSWER: Duration = Duration::from_secs(5);
@@ -109,12 +111,69 @@ impl Reported {
     }
 }
 
+struct Hosted {
+    host: Arc<ExecutorHost>,
+    session: ExecutorSession,
+}
+
+impl Hosted {
+    fn base_url(&self) -> &str {
+        self.host.base_url()
+    }
+
+    fn page_url(&self) -> String {
+        self.host.page_url()
+    }
+
+    async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
+        self.session.wait_ready().await
+    }
+
+    async fn register_file(&self, path: &std::path::Path) -> Result<String, BoxedError> {
+        self.session.register_file(path).await
+    }
+
+    async fn register_directory(&self, path: &std::path::Path) -> Result<String, BoxedError> {
+        self.session.register_directory(path).await
+    }
+
+    async fn run(&self, api: &str, request: &Value) -> Result<Value, ExecutorFailure> {
+        self.session.run(api, request).await
+    }
+
+    fn send_job(&self, api: &str, request: &Value) -> Result<JobTicket, ExecutorFailure> {
+        self.session.send_job(api, request)
+    }
+
+    fn send_unit(
+        &self,
+        attempt_id: &str,
+        unit: u32,
+        unit_count: u32,
+    ) -> Result<(), ExecutorFailure> {
+        self.session.send_unit(attempt_id, unit, unit_count)
+    }
+
+    async fn close(self) {
+        self.host.close().await;
+    }
+}
+
 async fn start_host(
     workspace: &Workspace,
     require_shader_f16: bool,
     reported: &Reported,
-) -> ExecutorHost {
+) -> Hosted {
     start_session(workspace, require_shader_f16, reported, None).await
+}
+
+fn open_session(host: &Arc<ExecutorHost>, reported: &Reported) -> ExecutorSession {
+    host.open(ExecutorSessionOptions {
+        label: "Fixture analysis".to_owned(),
+        require_shader_f16: false,
+        on_phase: reported.sink(),
+        units: None,
+    })
 }
 
 async fn start_session(
@@ -122,24 +181,24 @@ async fn start_session(
     require_shader_f16: bool,
     reported: &Reported,
     units: Option<Arc<dyn UnitSession>>,
-) -> ExecutorHost {
-    ExecutorHost::start(ExecutorHostOptions {
+) -> Hosted {
+    let host = ExecutorHost::start(Bundle::Directory(workspace.bundle_path()))
+        .await
+        .expect("the host should start");
+    let session = host.open(ExecutorSessionOptions {
         label: "Fixture analysis".to_owned(),
-        bundle: Bundle::Directory(workspace.bundle_path()),
-        pcm: Bytes::from_static(PCM),
         require_shader_f16,
         on_phase: reported.sink(),
         units,
-    })
-    .await
-    .expect("the host should start")
+    });
+    Hosted { host, session }
 }
 
 async fn ready_units(
     workspace: &Workspace,
     reported: &Reported,
     units: &Arc<CountedUnits>,
-) -> (ExecutorHost, Executor) {
+) -> (Hosted, Executor) {
     let host = start_session(
         workspace,
         false,
@@ -184,8 +243,11 @@ async fn get(url: &str) -> (StatusCode, Vec<u8>) {
 type Executor =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-async fn connect_executor(host: &ExecutorHost) -> Executor {
-    let page = host.page_url();
+async fn connect_executor(host: &Hosted) -> Executor {
+    connect_page(&host.page_url()).await
+}
+
+async fn connect_page(page: &str) -> Executor {
     let socket_url = page
         .split_once("jobs=")
         .expect("the page url should carry the socket")
@@ -258,7 +320,7 @@ fn read_job_id(command: &Value) -> String {
 }
 
 #[tokio::test]
-async fn serves_the_page_the_pcm_and_the_registered_files() {
+async fn serves_the_page_the_bundle_and_the_registered_files() {
     let workspace = Workspace::new();
     let reported = Reported::create();
     let host = start_host(&workspace, false, &reported).await;
@@ -269,7 +331,6 @@ async fn serves_the_page_the_pcm_and_the_registered_files() {
         .await
         .expect("the file should register");
     let (page_status, page) = get(&host.page_url()).await;
-    let (pcm_status, pcm) = get(&host.pcm_url()).await;
     let (file_status, file) = get(&file_url).await;
     let (asset_status, asset) = get(&format!("{}/index.js", host.base_url())).await;
     let (missing_status, _) = get(&format!("{}/nothing.js", host.base_url())).await;
@@ -277,14 +338,53 @@ async fn serves_the_page_the_pcm_and_the_registered_files() {
     assert_eq!(page_status, StatusCode::OK);
     assert!(String::from_utf8_lossy(&page).contains("/index.js"));
     assert!(host.page_url().contains("jobs=ws%3A%2F%2F"));
-    assert_eq!(pcm_status, StatusCode::OK);
-    assert_eq!(pcm, PCM);
     assert_eq!(file_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&file), "fixture model");
     assert!(file_url.ends_with("/model.onnx"));
     assert_eq!(asset_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&asset), BUNDLE_ASSET);
     assert_eq!(missing_status, StatusCode::NOT_FOUND);
+    host.close().await;
+}
+
+#[tokio::test]
+async fn opens_a_second_session_while_the_first_executor_lingers() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = ExecutorHost::start(Bundle::Directory(workspace.bundle_path()))
+        .await
+        .expect("the host should start");
+    let first = open_session(&host, &reported);
+    let file_url = first
+        .register_file(&workspace.file("model.onnx", "fixture model"))
+        .await
+        .expect("the file should register");
+    let mut lingering = connect_page(&host.page_url()).await;
+    announce(&mut lingering, true, false).await;
+    first.wait_ready().await.expect("the first should be ready");
+    drop(first);
+
+    let second = open_session(&host, &reported);
+    let mut executor = connect_page(&host.page_url()).await;
+    announce(&mut executor, true, false).await;
+    second
+        .wait_ready()
+        .await
+        .expect("the second should be ready");
+    let ticket = second
+        .send_job(API, &Value::Null)
+        .expect("the second job should start");
+    let command = take_command(&mut executor).await;
+
+    assert_eq!(command["type"], "job");
+    let (stale, _) = get(&file_url).await;
+    assert_eq!(stale, StatusCode::NOT_FOUND);
+    reply(
+        &mut executor,
+        &json!({ "type": "result", "jobId": read_job_id(&command), "result": 2 }),
+    )
+    .await;
+    ticket.wait().await.expect("the second job should answer");
     host.close().await;
 }
 
@@ -415,16 +515,10 @@ impl Assets for EchoedAssets {
 #[tokio::test]
 async fn asks_an_embedder_for_the_bundle_only_by_a_relative_name() {
     let reported = Reported::create();
-    let host = ExecutorHost::start(ExecutorHostOptions {
-        label: "Fixture analysis".to_owned(),
-        bundle: Bundle::Assets(Arc::new(EchoedAssets)),
-        pcm: Bytes::from_static(PCM),
-        require_shader_f16: false,
-        on_phase: reported.sink(),
-        units: None,
-    })
-    .await
-    .expect("the host should start");
+    let _unused = reported.sink();
+    let host = ExecutorHost::start(Bundle::Assets(Arc::new(EchoedAssets)))
+        .await
+        .expect("the host should start");
 
     let (status, asked) = get(&format!("{}/assets/index.js", host.base_url())).await;
     let (encoded, _) = get(&format!("{}/%2e%2e/secret", host.base_url())).await;

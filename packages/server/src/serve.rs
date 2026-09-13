@@ -10,7 +10,7 @@ use std::{
 use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
-use musetric_gpu::{Bundle, create_client};
+use musetric_gpu::{Bundle, ExecutorHost, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use rcgen::generate_simple_self_signed;
@@ -99,7 +99,8 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
         processing: options.processing,
-    })?;
+    })
+    .await?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let tls = match options.tls {
@@ -138,7 +139,8 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
         processing: options.processing,
-    })?;
+    })
+    .await?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let listener = TcpListener::from_std(socket)?;
@@ -164,15 +166,16 @@ struct AppOptions {
     processing: bool,
 }
 
-fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
+async fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     let storage = options.storage;
     let pages = PageBridge::create();
+    let host = ExecutorHost::start(options.browser_bundle).await?;
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         pages: Arc::clone(&pages) as Arc<dyn PageOpener>,
         client: create_client()?,
         models_path: options.models,
-        bundle: options.browser_bundle,
+        host,
     });
     let queue = Queue::create(QueueOptions {
         reader: Arc::clone(&storage.database),

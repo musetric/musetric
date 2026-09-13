@@ -143,7 +143,7 @@ async fn separate_vocals(
     )
     .await?;
     let outcome = produce(&mut attempt, &mixture, samples, &models).await;
-    attempt.close().await;
+    attempt.close();
     let raw_vocals = outcome?;
     let vocals = normalize_peak(&raw_vocals, MAX_PEAK);
     let instrumental = normalize_peak(&subtract_planar(&mixture, &raw_vocals), MAX_PEAK);
