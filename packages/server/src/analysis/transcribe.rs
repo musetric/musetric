@@ -15,7 +15,8 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{
-            Failure, answer, count_frames, decode_reporter, ensure_files, read_phase, store,
+            Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
+            require_executor, store,
         },
         checkpoint_persist::{CheckpointCursor, persist_tail},
         models::{WHISPER, whisper_graph},
@@ -54,6 +55,7 @@ async fn transcribe(
     report: &StepReport,
 ) -> Result<(), Failure> {
     ensure_files(context, report, &WHISPER.cached(&context.models_path)).await?;
+    require_executor(context)?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let mut decoded = decode_reporter(report, count_frames(&source, WHISPER.sample_rate).await?);
     let pcm = decode_mono_pcm(MonoRequest {
@@ -67,7 +69,6 @@ async fn transcribe(
     })
     .await?;
     let samples = decode_samples(&pcm);
-    (report)(StepPhase::Loading);
     let result = drive(context, job, report, samples).await?;
     (report)(StepPhase::Saving);
     store(context, job, Analysis::Subtitle, &result).await
@@ -138,6 +139,7 @@ async fn drive(
     let opened = open_attempt(context, job, &session, &attempt_id).await;
     let outcome = match opened {
         Ok(ticket) => {
+            (report)(StepPhase::Loading);
             attempt(
                 Run {
                     context,

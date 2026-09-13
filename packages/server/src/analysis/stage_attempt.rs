@@ -3,20 +3,27 @@ use std::{
     sync::Arc,
 };
 
-use musetric_db::{PendingJob, ProcessingStep};
+use musetric_db::{PendingJob, ProcessingStep, blob_path};
 use musetric_gpu::{
-    ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
+    ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, ModelFile, PhaseSink,
+    UnitSession,
 };
 use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
+use musetric_media::collect_interleaved_pcm;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{Failure, answer, read_phase},
+        browser::{
+            Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
+            require_executor,
+        },
         checkpoint_persist::{CheckpointCursor, persist_tail},
+        models::VOCALS,
         stage_units::{StageRegistration, StageResume, StageUnits},
+        stem_files::read_at,
     },
     blobs::{StagedBlob, close_area, ensure_area, step_area},
     checkpoint::{CheckpointDir, area_root, restore_refused},
@@ -135,6 +142,7 @@ impl<'run> StageAttempt<'run> {
 
     pub(crate) async fn open(&self) -> Result<(), Failure> {
         self.session.wait_ready().await?;
+        (self.running.report)(StepPhase::Loading);
         Ok(())
     }
 
@@ -286,6 +294,31 @@ impl<'run> StageAttempt<'run> {
         )
         .await
     }
+}
+
+pub(crate) struct StageInput {
+    pub(crate) models: Vec<(String, PathBuf)>,
+    pub(crate) pcm: Vec<u8>,
+}
+
+pub(crate) async fn read_stage_input(
+    running: &StageRun<'_>,
+    job: &PendingJob,
+    files: &[ModelFile],
+) -> Result<StageInput, Failure> {
+    let context = running.context;
+    let report = running.report;
+    let models = ensure_files(context, report, files).await?;
+    require_executor(context)?;
+    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
+    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
+    let pcm = collect_interleaved_pcm(
+        context.storage.pcm.as_ref(),
+        read_at(&source, VOCALS.sample_rate),
+        &mut decoded,
+    )
+    .await?;
+    Ok(StageInput { models, pcm })
 }
 
 pub(crate) fn cached_model(models: &[(String, PathBuf)], name: &str) -> Result<PathBuf, Failure> {

@@ -221,6 +221,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     });
     if options.processing {
         queue.spawn();
+        wake_on_arrival(&host, &queue);
     }
     let executor_url = host.base_url().to_owned();
     let router = create_router(RouterOptions {
@@ -234,6 +235,16 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         router,
         executor_url,
     })
+}
+
+fn wake_on_arrival(host: &ExecutorHost, queue: &Arc<Queue>) {
+    let mut arrivals = host.arrivals();
+    let waking = Arc::clone(queue);
+    tokio::spawn(async move {
+        while arrivals.next().await {
+            waking.wake();
+        }
+    });
 }
 
 fn watch_parent() -> oneshot::Receiver<()> {
