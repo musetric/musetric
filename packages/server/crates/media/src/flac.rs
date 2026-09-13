@@ -31,6 +31,7 @@ const STREAM_INFO_BLOCK: u8 = 0;
 const SEEK_TABLE_BLOCK: u8 = 3;
 const STREAM_INFO_BYTES: u8 = 34;
 const STREAM_INFO_USIZE: usize = 34;
+const FRAME_OVERHEAD_BYTES: usize = 32;
 const NOT_A_MARKER: &str = "The flac stream info should serialize into bytes";
 const OVERFLOWED: &str = "The flac header value does not fit its field";
 
@@ -42,6 +43,7 @@ struct FramePosition {
 
 pub(crate) struct FlacWriter {
     configuration: Verified<Configuration>,
+    verbatim: Verified<Configuration>,
     stream: Stream,
     frames: FrameBuf,
     context: Context,
@@ -58,9 +60,8 @@ pub(crate) struct FlacWriter {
 
 impl FlacWriter {
     pub(crate) fn create(to: &Path, sample_rate: u32) -> Result<Self, BoxedError> {
-        let configuration = Configuration::default()
-            .into_verified()
-            .map_err(|(_, failure)| describe(failure))?;
+        let configuration = verify(Configuration::default())?;
+        let verbatim = verify(verbatim_configuration())?;
         let mut stream = Stream::new(usize::try_from(sample_rate)?, CHANNELS, BITS_PER_SAMPLE)
             .map_err(describe)?;
         stream
@@ -72,6 +73,7 @@ impl FlacWriter {
         file.write_all(&header)?;
         Ok(Self {
             configuration,
+            verbatim,
             stream,
             frames: FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).map_err(describe)?,
             context: Context::new(BITS_PER_SAMPLE, CHANNELS),
@@ -113,15 +115,10 @@ impl FlacWriter {
             .context
             .current_frame_number()
             .ok_or("The flac writer lost the frame number")?;
-        let frame = encode_fixed_size_frame(
-            &self.configuration,
-            &self.frames,
-            number,
-            self.stream.stream_info(),
-        )
-        .map_err(describe)?;
-        let mut sink = ByteSink::new();
-        frame.write(&mut sink).map_err(describe)?;
+        let mut sink = encode_frame(&self.configuration, &self.frames, number, &self.stream)?;
+        if sink.as_slice().len() > raw_byte_length(self.pending.len()) {
+            sink = encode_frame(&self.verbatim, &self.frames, number, &self.stream)?;
+        }
         let encoded = sink.as_slice();
         self.smallest_frame = self.smallest_frame.min(encoded.len());
         self.largest_frame = self.largest_frame.max(encoded.len());
@@ -161,6 +158,36 @@ impl FlacWriter {
         file.flush()?;
         Ok(())
     }
+}
+
+fn verify(configuration: Configuration) -> Result<Verified<Configuration>, BoxedError> {
+    configuration
+        .into_verified()
+        .map_err(|(_, failure)| describe(failure))
+}
+
+fn verbatim_configuration() -> Configuration {
+    let mut configuration = Configuration::default();
+    configuration.subframe_coding.use_fixed = false;
+    configuration.subframe_coding.use_lpc = false;
+    configuration
+}
+
+fn encode_frame(
+    configuration: &Verified<Configuration>,
+    frames: &FrameBuf,
+    number: usize,
+    stream: &Stream,
+) -> Result<ByteSink, BoxedError> {
+    let frame = encode_fixed_size_frame(configuration, frames, number, stream.stream_info())
+        .map_err(describe)?;
+    let mut sink = ByteSink::new();
+    frame.write(&mut sink).map_err(describe)?;
+    Ok(sink)
+}
+
+const fn raw_byte_length(samples: usize) -> usize {
+    samples * BITS_PER_SAMPLE.div_ceil(8) + FRAME_OVERHEAD_BYTES
 }
 
 fn write_header(stream: &Stream, seek_table: &[u8]) -> Result<Vec<u8>, BoxedError> {
@@ -242,7 +269,11 @@ fn quantize(value: f32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{SEEK_POINT_BYTES, SEEK_POINTS, containing_frame, seek_spacing, seek_table};
+    use super::{
+        BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
+        containing_frame, raw_byte_length, seek_spacing, seek_table,
+    };
+    use crate::pcm::CHANNELS;
 
     const RATE: u32 = 48_000;
 
@@ -272,6 +303,36 @@ mod tests {
             offset: first_sample * 7,
             bytes: 4096,
         }
+    }
+
+    fn noise(state: &mut u32) -> f32 {
+        *state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+        f32::from(u16::try_from(*state >> 16).expect("the noise is 16 bits")) / 32_768.0 - 1.0
+    }
+
+    #[test]
+    fn keeps_every_frame_within_its_raw_samples() {
+        let blocks = 4;
+        let path = std::env::temp_dir().join(format!("musetric-flac-{}.flac", std::process::id()));
+        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let mut state = 1;
+        for _ in 0..BLOCK_FRAMES * blocks {
+            let sample = noise(&mut state) / 8.0;
+            writer.push(sample, sample);
+        }
+        writer.finish().expect("the stream should be finished");
+        let written = std::fs::metadata(&path)
+            .expect("the stream should exist")
+            .len();
+        std::fs::remove_file(&path).expect("the stream should be removed");
+
+        let header = MAGIC.len() + 4 + STREAM_INFO_USIZE + 4 + SEEK_POINTS * SEEK_POINT_BYTES;
+        let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS);
+        let limit = u64::try_from(header + raw * blocks).expect("the limit fits");
+        assert!(
+            written <= limit,
+            "{written} bytes written for a {limit} byte limit"
+        );
     }
 
     #[test]
