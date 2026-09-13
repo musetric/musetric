@@ -17,7 +17,7 @@ use tokio::time::sleep;
 
 use crate::{
     queue::{Queue, QueueOptions, StatusEvent, StepAnswer, StepOutcome, StepReport, StepRunner},
-    summary::{StepPass, StepPhase},
+    summary::{StepPass, StepPhase, StepWait, StepWaiting},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -113,6 +113,8 @@ fn result_statements(step: ProcessingStep) -> &'static str {
 enum Answer {
     Complete,
     Gone,
+    Dropped,
+    Flaky,
     Stuck,
     Exploded,
     Lively,
@@ -159,6 +161,14 @@ impl StepRunner for FakeRunner {
             .push(job.step.name());
         match self.answer {
             Answer::Stuck => return Box::pin(std::future::pending()),
+            Answer::Gone => return Box::pin(async { StepAnswer::Waiting(StepWaiting::Absent) }),
+            Answer::Dropped => return Box::pin(async { StepAnswer::Waiting(StepWaiting::Lost) }),
+            Answer::Flaky => {
+                return Box::pin(async move {
+                    report(running_phase(1));
+                    StepAnswer::Waiting(StepWaiting::Lost)
+                });
+            }
             Answer::Exploded if self.seen().len() == 1 => {
                 return Box::pin(async {
                     report(running_phase(1));
@@ -176,8 +186,13 @@ impl StepRunner for FakeRunner {
             report(running_phase(1));
             match self.answer {
                 Answer::Failed(failure) => return StepAnswer::Failed(failure.to_owned()),
-                Answer::Gone => return StepAnswer::Unavailable,
-                Answer::Complete | Answer::Stuck | Answer::Exploded | Answer::Lively => {}
+                Answer::Complete
+                | Answer::Gone
+                | Answer::Dropped
+                | Answer::Flaky
+                | Answer::Stuck
+                | Answer::Exploded
+                | Answer::Lively => {}
             }
             Self::write_result(&self.database_path, job.step);
             StepAnswer::Finished
@@ -315,6 +330,86 @@ async fn keeps_a_step_pending_when_the_executor_is_gone() {
     assert_eq!(runner.seen(), vec!["separation"]);
     assert_eq!(separation.status, StepStatus::Pending);
     assert_eq!(separation.error, None);
+    assert_eq!(
+        separation.wait,
+        Some(StepWait {
+            reason: StepWaiting::Absent,
+            attempt: 1,
+            limit: None,
+        })
+    );
+}
+
+#[tokio::test]
+async fn counts_the_wait_without_limit_while_no_executor_is_connected() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Gone);
+    let queue = workspace.create_queue(runner.clone());
+
+    for _ in 0..6 {
+        queue.drain().await;
+    }
+
+    let separation = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built")
+        .step(ProcessingStep::Separation)
+        .clone();
+    assert_eq!(separation.status, StepStatus::Pending);
+    assert_eq!(separation.wait.and_then(|wait| wait.limit), None);
+    assert_eq!(separation.wait.map(|wait| wait.attempt), Some(6));
+}
+
+#[tokio::test]
+async fn fails_a_step_when_the_executor_never_runs_a_unit() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Dropped);
+    let queue = workspace.create_queue(runner.clone());
+
+    let mut waited = Vec::new();
+    for _ in 0..5 {
+        queue.drain().await;
+        let separation = queue
+            .processing(1)
+            .await
+            .expect("the summary should be built")
+            .step(ProcessingStep::Separation)
+            .clone();
+        waited.push((separation.status, separation.wait));
+    }
+
+    let (status, wait) = waited.pop().expect("the last attempt should be recorded");
+    assert_eq!(status, StepStatus::Failed);
+    assert_eq!(wait, None);
+    assert!(waited.iter().all(|(seen, _)| *seen == StepStatus::Pending));
+}
+
+#[tokio::test]
+async fn never_gives_up_on_a_step_whose_executor_ran_a_unit() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Flaky);
+    let queue = workspace.create_queue(runner.clone());
+
+    for _ in 0..8 {
+        queue.drain().await;
+    }
+
+    let separation = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built")
+        .step(ProcessingStep::Separation)
+        .clone();
+    assert_eq!(separation.status, StepStatus::Pending);
+    assert_eq!(
+        separation.wait,
+        Some(StepWait {
+            reason: StepWaiting::Lost,
+            attempt: 0,
+            limit: None,
+        })
+    );
 }
 
 #[tokio::test]

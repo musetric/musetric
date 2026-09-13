@@ -43,6 +43,17 @@ export type ProcessingPhase = z.infer<typeof processingPhaseSchema>;
 
 export const processingPassSchema = z.enum(['decode', 'repair']);
 
+export const processingWaitingReasonSchema = z.enum(['absent', 'lost']);
+export type ProcessingWaitingReason = z.infer<
+  typeof processingWaitingReasonSchema
+>;
+
+export const processingWaitingSchema = z.object({
+  reason: processingWaitingReasonSchema,
+  attempt: z.number(),
+  limit: z.number().optional(),
+});
+
 export const processingStepSchema = z.object({
   status: processingStepStatusSchema,
   phase: processingPhaseSchema.optional(),
@@ -53,6 +64,7 @@ export const processingStepSchema = z.object({
   unit: z.number().optional(),
   unitCount: z.number().optional(),
   error: z.string().optional(),
+  waiting: processingWaitingSchema.optional(),
 });
 export type ProcessingStep = z.infer<typeof processingStepSchema>;
 

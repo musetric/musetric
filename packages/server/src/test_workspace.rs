@@ -19,7 +19,9 @@ use musetric_db::{
     open_database,
 };
 use musetric_gpu::{Bundle, ExecutorHost, ExecutorHostOptions, PhaseSink, UnitSession};
-use musetric_jobs::{Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner};
+use musetric_jobs::{
+    Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner, StepWaiting,
+};
 use musetric_media::SymphoniaPcm;
 
 const QUEUE_INTERVAL: Duration = Duration::from_mins(1);
@@ -151,7 +153,7 @@ struct IdleRunner;
 
 impl StepRunner for IdleRunner {
     fn run<'a>(&'a self, _job: &'a PendingJob, _report: &'a StepReport) -> StepOutcome<'a> {
-        Box::pin(async { StepAnswer::Unavailable })
+        Box::pin(async { StepAnswer::Waiting(StepWaiting::Absent) })
     }
 }
 

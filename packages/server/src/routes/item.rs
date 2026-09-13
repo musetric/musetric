@@ -4,7 +4,7 @@ use axum::{
     response::Response,
 };
 use musetric_db::ProjectItem;
-use musetric_jobs::{Processing, STEP_ORDER, StepPhase, StepView};
+use musetric_jobs::{Processing, STEP_ORDER, StepPhase, StepView, StepWait};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -109,6 +109,19 @@ fn build_step(step: &StepView) -> Value {
     }
     if let Some(error) = step.error.as_ref() {
         view.insert("error".to_owned(), json!(error));
+    }
+    if let Some(wait) = step.wait {
+        view.insert("waiting".to_owned(), build_wait(wait));
+    }
+    Value::Object(view)
+}
+
+fn build_wait(wait: StepWait) -> Value {
+    let mut view = Map::new();
+    view.insert("reason".to_owned(), json!(wait.reason.name()));
+    view.insert("attempt".to_owned(), json!(wait.attempt));
+    if let Some(limit) = wait.limit {
+        view.insert("limit".to_owned(), json!(limit));
     }
     Value::Object(view)
 }

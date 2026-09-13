@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     future::Future,
     panic::AssertUnwindSafe,
     pin::Pin,
@@ -17,9 +17,12 @@ use tokio::{
     time::sleep,
 };
 
-use crate::summary::{ActiveStep, Processing, StepPhase, build_processing};
+use crate::summary::{
+    ActiveStep, ParkedStep, Processing, StepPhase, StepWait, StepWaiting, build_processing,
+};
 
 const EVENT_CAPACITY: usize = 64;
+const ATTACH_LIMIT: u32 = 5;
 const QUEUE_ORDER: [ProcessingStep; 6] = [
     ProcessingStep::Transcription,
     ProcessingStep::Voices,
@@ -34,7 +37,7 @@ pub type StepReport = dyn Fn(StepPhase) + Send + Sync;
 pub enum StepAnswer {
     Finished,
     Failed(String),
-    Unavailable,
+    Waiting(StepWaiting),
     Cancelled,
 }
 
@@ -62,6 +65,7 @@ struct Running {
     states: Vec<StepState>,
     step: ActiveStep,
     activity: Instant,
+    executor_ran: bool,
 }
 
 pub struct Queue {
@@ -71,6 +75,7 @@ pub struct Queue {
     interval: Duration,
     idle_limit: Duration,
     running: Mutex<Option<Running>>,
+    parked: Mutex<HashMap<(i64, ProcessingStep), StepWait>>,
     events: broadcast::Sender<StatusEvent>,
     wake: Notify,
     cancel: Notify,
@@ -103,6 +108,29 @@ fn stuck_message(idle_limit: Duration) -> String {
     )
 }
 
+fn attach_message(attempts: u32) -> String {
+    format!("No gpu executor ran a unit in {attempts} attempts")
+}
+
+fn next_wait(previous: Option<StepWait>, reason: StepWaiting, progressed: bool) -> StepWait {
+    let attempt = if progressed {
+        0
+    } else {
+        previous
+            .filter(|wait| wait.reason == reason)
+            .map_or(1, |wait| wait.attempt + 1)
+    };
+    StepWait {
+        reason,
+        attempt,
+        limit: (reason == StepWaiting::Lost && !progressed).then_some(ATTACH_LIMIT),
+    }
+}
+
+fn exhausted(wait: StepWait) -> bool {
+    wait.limit.is_some_and(|limit| wait.attempt >= limit)
+}
+
 impl Queue {
     #[must_use]
     pub fn create(options: QueueOptions) -> Arc<Self> {
@@ -114,6 +142,7 @@ impl Queue {
             interval: options.interval,
             idle_limit: options.idle_limit,
             running: Mutex::new(None),
+            parked: Mutex::new(HashMap::new()),
             events,
             wake: Notify::new(),
             cancel: Notify::new(),
@@ -144,7 +173,8 @@ impl Queue {
             .as_ref()
             .map(|running| &running.step)
             .filter(|step| step.project_id == project_id);
-        Ok(build_processing(&states, active))
+        let parked = self.parked_step(project_id);
+        Ok(build_processing(&states, active, parked.as_ref()))
     }
 
     pub fn spawn(self: &Arc<Self>) {
@@ -199,15 +229,76 @@ impl Queue {
             *running = None;
         }
         self.publish(project_id).await;
-        !matches!(answer, StepAnswer::Unavailable | StepAnswer::Cancelled)
+        !matches!(answer, StepAnswer::Waiting(_) | StepAnswer::Cancelled)
+    }
+
+    fn resolve(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+        answer: &StepAnswer,
+    ) -> (StepStatus, Option<String>) {
+        match answer {
+            StepAnswer::Finished => {
+                self.unpark(project_id, step);
+                (StepStatus::Done, None)
+            }
+            StepAnswer::Failed(message) => {
+                self.unpark(project_id, step);
+                (StepStatus::Failed, Some(message.clone()))
+            }
+            StepAnswer::Cancelled => {
+                self.unpark(project_id, step);
+                (StepStatus::Pending, None)
+            }
+            StepAnswer::Waiting(reason) => self.park(project_id, step, *reason),
+        }
+    }
+
+    fn park(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+        reason: StepWaiting,
+    ) -> (StepStatus, Option<String>) {
+        let progressed = self.executor_ran();
+        let Ok(mut parked) = self.parked.lock() else {
+            return (StepStatus::Pending, None);
+        };
+        let wait = next_wait(parked.get(&(project_id, step)).copied(), reason, progressed);
+        if exhausted(wait) {
+            parked.remove(&(project_id, step));
+            return (StepStatus::Failed, Some(attach_message(wait.attempt)));
+        }
+        parked.insert((project_id, step), wait);
+        (StepStatus::Pending, None)
+    }
+
+    fn unpark(&self, project_id: i64, step: ProcessingStep) {
+        if let Ok(mut parked) = self.parked.lock() {
+            parked.remove(&(project_id, step));
+        }
+    }
+
+    fn parked_step(&self, project_id: i64) -> Option<ParkedStep> {
+        let parked = self.parked.lock().ok()?;
+        parked
+            .iter()
+            .find(|((owner, _), _)| *owner == project_id)
+            .map(|((_, step), wait)| ParkedStep {
+                step: *step,
+                wait: *wait,
+            })
+    }
+
+    fn executor_ran(&self) -> bool {
+        self.running
+            .lock()
+            .is_ok_and(|guard| guard.as_ref().is_some_and(|running| running.executor_ran))
     }
 
     async fn settle(&self, project_id: i64, step: ProcessingStep, answer: &StepAnswer) {
-        let (status, error) = match answer {
-            StepAnswer::Finished => (StepStatus::Done, None),
-            StepAnswer::Failed(message) => (StepStatus::Failed, Some(message.clone())),
-            StepAnswer::Unavailable | StepAnswer::Cancelled => (StepStatus::Pending, None),
-        };
+        let (status, error) = self.resolve(project_id, step, answer);
         let _ = self
             .write_status(StepUpdate {
                 project_id,
@@ -296,6 +387,7 @@ impl Queue {
                 phase: StepPhase::Preparing { download: None },
             },
             activity: Instant::now(),
+            executor_ran: false,
         });
         true
     }
@@ -308,8 +400,10 @@ impl Queue {
             return;
         };
         running.activity = Instant::now();
+        running.executor_ran |= matches!(phase, StepPhase::Running { .. });
         running.step.phase = phase;
-        let processing = build_processing(&running.states, Some(&running.step));
+        let parked = self.parked_step(running.step.project_id);
+        let processing = build_processing(&running.states, Some(&running.step), parked.as_ref());
         let _ = self.events.send(StatusEvent {
             project_id: running.step.project_id,
             processing,

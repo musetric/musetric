@@ -71,12 +71,14 @@ fn encode(event: &StatusEvent) -> String {
 
 #[cfg(test)]
 mod tests {
-    use musetric_jobs::{Processing, StatusEvent, StepPass, StepPhase, StepStatus, StepView};
+    use musetric_jobs::{
+        Processing, StatusEvent, StepPass, StepPhase, StepStatus, StepView, StepWait, StepWaiting,
+    };
 
     use super::encode;
 
     const EXPECTED: &str = "data: {\"processing\":{\"done\":false,\"steps\":{\
-\"chords\":{\"status\":\"pending\"},\
+\"chords\":{\"status\":\"pending\",\"waiting\":{\"attempt\":2,\"limit\":5,\"reason\":\"lost\"}},\
 \"key\":{\"decoded\":441000,\"phase\":\"decoding\",\"status\":\"processing\",\"total\":1764000},\
 \"rhythm\":{\"phase\":\"saving\",\"status\":\"processing\"},\
 \"separation\":{\"status\":\"done\"},\
@@ -89,6 +91,16 @@ mod tests {
             status,
             phase,
             error: None,
+            wait: None,
+        }
+    }
+
+    fn create_waiting_step(wait: StepWait) -> StepView {
+        StepView {
+            status: StepStatus::Pending,
+            phase: None,
+            error: None,
+            wait: Some(wait),
         }
     }
 
@@ -117,7 +129,11 @@ mod tests {
                             total: 1_764_000,
                         }),
                     ),
-                    create_step(StepStatus::Pending, None),
+                    create_waiting_step(StepWait {
+                        reason: StepWaiting::Lost,
+                        attempt: 2,
+                        limit: Some(5),
+                    }),
                 ],
             },
         };
