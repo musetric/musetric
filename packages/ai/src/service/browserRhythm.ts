@@ -4,6 +4,7 @@ import {
   summarizeRhythm,
 } from '../rhythm/rhythmSummary.js';
 import { type RhythmResult } from '../rhythm/types.js';
+import { createBeatThisGpuRuntime } from '../runtime/rhythm/beatThisGpuRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
 import { fetchFloat32, floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserAnalyzeRhythmRequest } from './rhythmApi.js';
@@ -11,8 +12,6 @@ import { type BrowserAnalyzeRhythmRequest } from './rhythmApi.js';
 export const analyzeRhythm = createBrowserJobApi<BrowserAnalyzeRhythmRequest>(
   async (request, context) => {
     context.reportLoading();
-    const { createBeatThisGpuRuntime } =
-      await import('../runtime/rhythm/beatThisGpuRuntime.js');
     const filterbank = await fetchFloat32(
       request.filterbankUrl,
       'rhythm mel filterbank',
