@@ -1,4 +1,7 @@
-import { type WhisperRuntime } from '../runtime/whisper/whisperRuntime.js';
+import {
+  createWhisperRuntime,
+  type WhisperRuntime,
+} from '../runtime/whisper/whisperRuntime.js';
 import { buildLayout } from '../transcription/audioCompaction.js';
 import { type Span } from '../transcription/spectralChunker.js';
 import {
@@ -130,8 +133,7 @@ export const transcribeAudio = createBrowserJobApi<BrowserTranscribeRequest>(
       if (cached !== undefined) {
         return cached;
       }
-      const module = await import('../runtime/whisper/whisperRuntime.js');
-      const created = module.createWhisperRuntime({
+      const created = createWhisperRuntime({
         graph: request.graph,
         modelHost: request.modelHost,
         modelId: request.modelId,

@@ -1,3 +1,5 @@
+import { createLeadBackingGpuRuntime } from '../runtime/leadBacking/leadBackingRuntime.js';
+import { createVocalsGpuRuntime } from '../runtime/vocals/vocalsRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
 import { floatsFromBytes } from './browserShared.js';
 import {
@@ -14,8 +16,6 @@ type Stage = {
 const createVocalsStage = async (
   request: BrowserVocalsUnitsRequest,
 ): Promise<Stage> => {
-  const { createVocalsGpuRuntime } =
-    await import('../runtime/vocals/vocalsRuntime.js');
   const runtime = await createVocalsGpuRuntime({
     graph: request.graph,
     modelUrl: request.vocalsModelUrl,
@@ -35,8 +35,6 @@ const createVocalsStage = async (
 const createLeadBackingStage = async (
   request: BrowserLeadBackingUnitsRequest,
 ): Promise<Stage> => {
-  const { createLeadBackingGpuRuntime } =
-    await import('../runtime/leadBacking/leadBackingRuntime.js');
   const runtime = await createLeadBackingGpuRuntime({
     graph: request.graph,
     modelUrl: request.leadBackingModelUrl,
