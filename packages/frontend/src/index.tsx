@@ -21,7 +21,9 @@ const runApp = async () => {
   await engine.boot();
   await queryClient.prefetchQuery(endpoints.project.list());
   void queryClient.fetchQuery(endpoints.executor.get()).then((executor) => {
-    mountExecutorFrame(executor.url);
+    if (executor.surface === 'page') {
+      mountExecutorFrame(executor.url);
+    }
   });
 
   createRoot(rootElement).render(

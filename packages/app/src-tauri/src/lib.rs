@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use musetric_server::{Bundle, EmbeddedServerOptions, Frontend, start_embedded};
+use musetric_server::{Bundle, EmbeddedServerOptions, ExecutorSurface, Frontend, start_embedded};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(desktop)]
@@ -23,6 +23,14 @@ mod update;
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
 const MAIN_WINDOW: &str = "main";
+#[cfg(desktop)]
+const EXECUTOR_WINDOW: &str = "executor";
+#[cfg(desktop)]
+const EXECUTOR_TITLE: &str = "Musetric executor";
+#[cfg(desktop)]
+const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::Shell;
+#[cfg(mobile)]
+const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::Page;
 const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
 #[cfg(desktop)]
@@ -35,6 +43,8 @@ const LOG_FILE_SIZE: u128 = 100 * 1024 * 1024;
 const KEPT_LOG_COUNT: usize = 20;
 #[cfg(target_os = "windows")]
 const WEBVIEW2_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu";
+#[cfg(target_os = "windows")]
+const EXECUTOR_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -68,6 +78,7 @@ fn run_app() -> tauri::Result<()> {
                         APP_PREFIX,
                     ))),
                     processing: true,
+                    executor_surface: EXECUTOR_SURFACE,
                 }));
             #[cfg(desktop)]
             let server = match server_result {
@@ -80,12 +91,34 @@ fn run_app() -> tauri::Result<()> {
             #[cfg(mobile)]
             let server = server_result.map_err(|error| io::Error::other(error.to_string()))?;
             let url = WebviewUrl::External(server.url().parse()?);
+            #[cfg(desktop)]
+            let executor_url = WebviewUrl::External(server.executor_url().parse()?);
             app.manage(server);
+            #[cfg(desktop)]
+            create_executor_window(app.handle(), executor_url)?;
             create_main_window(app.handle(), url)?;
             Ok(())
         })
         .build(tauri::generate_context!())?;
     app.run(|handle, event| handle_run_event(handle, &event));
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn create_executor_window<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    url: WebviewUrl,
+) -> tauri::Result<()> {
+    #[cfg(target_os = "windows")]
+    let builder = WebviewWindowBuilder::new(app, EXECUTOR_WINDOW, url)
+        .additional_browser_args(EXECUTOR_BROWSER_ARGS);
+    #[cfg(not(target_os = "windows"))]
+    let builder = WebviewWindowBuilder::new(app, EXECUTOR_WINDOW, url);
+    builder
+        .title(EXECUTOR_TITLE)
+        .visible(false)
+        .skip_taskbar(true)
+        .build()?;
     Ok(())
 }
 
@@ -152,6 +185,7 @@ fn setup_desktop_lifecycle(
     app.handle().plugin(
         tauri_plugin_window_state::Builder::default()
             .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+            .with_denylist(&[EXECUTOR_WINDOW])
             .build(),
     )?;
     app.handle()
@@ -246,6 +280,12 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             has_visible_windows: false,
             ..
         } => open_main_window(app),
+        #[cfg(all(desktop, not(target_os = "macos")))]
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } if label == MAIN_WINDOW => app.exit(0),
         _ => {}
     }
 }

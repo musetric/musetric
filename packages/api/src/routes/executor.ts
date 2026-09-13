@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { createApiRoute } from '../common/apiRoute.js';
 
+export const executorSurfaceSchema = z.enum(['shell', 'page']);
+
 export const executorSchema = z.object({
   url: z.string(),
+  surface: executorSurfaceSchema,
 });
 
 export namespace get {

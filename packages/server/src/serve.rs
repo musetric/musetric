@@ -46,6 +46,22 @@ pub struct ServerOptions {
     pub tls: Option<TlsOptions>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutorSurface {
+    Shell,
+    Page,
+}
+
+impl ExecutorSurface {
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Shell => "shell",
+            Self::Page => "page",
+        }
+    }
+}
+
 pub struct TlsOptions {
     pub certificate: PathBuf,
     pub private_key: PathBuf,
@@ -60,10 +76,12 @@ pub struct EmbeddedServerOptions {
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
     pub processing: bool,
+    pub executor_surface: ExecutorSurface,
 }
 
 pub struct EmbeddedServer {
     url: String,
+    executor_url: String,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -71,6 +89,11 @@ impl EmbeddedServer {
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
+    }
+
+    #[must_use]
+    pub fn executor_url(&self) -> &str {
+        &self.executor_url
     }
 
     pub fn close(&self) {
@@ -97,8 +120,10 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
         browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
         processing: options.processing,
+        executor_surface: ExecutorSurface::Page,
     })
-    .await?;
+    .await?
+    .router;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let tls = match options.tls {
@@ -137,14 +162,19 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
         processing: options.processing,
+        executor_surface: options.executor_surface,
     })
     .await?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let listener = TcpListener::from_std(socket)?;
     let (shutdown, closed) = oneshot::channel();
+    let CreatedApp {
+        router,
+        executor_url,
+    } = app;
     tokio::spawn(async move {
-        let _ = axum::serve(listener, app)
+        let _ = axum::serve(listener, router)
             .with_graceful_shutdown(async move {
                 let _ = closed.await;
             })
@@ -152,6 +182,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
     });
     Ok(EmbeddedServer {
         url: format!("http://{address}"),
+        executor_url,
         shutdown: Mutex::new(Some(shutdown)),
     })
 }
@@ -162,9 +193,15 @@ struct AppOptions {
     browser_bundle: Bundle,
     frontend: Frontend,
     processing: bool,
+    executor_surface: ExecutorSurface,
 }
 
-async fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
+struct CreatedApp {
+    router: Router,
+    executor_url: String,
+}
+
+async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let storage = options.storage;
     let host = ExecutorHost::start(options.browser_bundle).await?;
     let runner = AnalysisRunner::create(AnalysisContext {
@@ -183,12 +220,18 @@ async fn create_app(options: AppOptions) -> Result<Router, BoxedError> {
     if options.processing {
         queue.spawn();
     }
-    Ok(create_router(RouterOptions {
+    let executor_url = host.base_url().to_owned();
+    let router = create_router(RouterOptions {
         frontend: options.frontend,
         storage,
         queue,
         executor: host,
-    }))
+        executor_surface: options.executor_surface,
+    });
+    Ok(CreatedApp {
+        router,
+        executor_url,
+    })
 }
 
 fn watch_parent() -> oneshot::Receiver<()> {
@@ -297,7 +340,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::{EmbeddedServerOptions, start_embedded};
+    use super::{EmbeddedServerOptions, ExecutorSurface, start_embedded};
     use crate::{Asset, Assets, Bundle, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -341,6 +384,7 @@ mod tests {
                 work: self.root.join("storage/work"),
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
+                executor_surface: ExecutorSurface::Page,
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),
                 processing: false,
             }
