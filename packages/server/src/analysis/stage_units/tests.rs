@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use musetric_gpu::{ExecutorHost, JobTicket, UnitSession};
+use musetric_gpu::{JobTicket, UnitSession};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use tokio::time::timeout;
@@ -9,14 +9,14 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
 use super::{StageRegistration, StageUnits};
 use crate::{
-    test_workspace::{Workspace, get_unit_window},
+    test_workspace::{UnitHost, Workspace, get_unit_window},
     unit_plan::{PlanRules, PlanUnit, UnitPlan},
 };
 
 const ANSWER: Duration = Duration::from_secs(5);
 const ATTEMPT: &str = "attempt-1";
 const EXPECTED: usize = 32;
-async fn start_units(workspace: &Workspace) -> (ExecutorHost, Arc<StageUnits>) {
+async fn start_units(workspace: &Workspace) -> (UnitHost, Arc<StageUnits>) {
     let units = Arc::new(StageUnits::create(workspace.unit_incoming_path()));
     let host = workspace
         .start_unit_host(
@@ -304,7 +304,7 @@ async fn refuses_an_output_with_non_finite_samples() {
 type Socket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-async fn connect_executor(host: &ExecutorHost) -> Socket {
+async fn connect_executor(host: &UnitHost) -> Socket {
     let page = host.page_url();
     let socket_url = page
         .split_once("jobs=")
@@ -348,20 +348,23 @@ async fn reply(socket: &mut Socket, message: &Value) {
         .expect("the reply should be sent");
 }
 
-async fn ready_job(workspace: &Workspace) -> (ExecutorHost, Socket, JobTicket) {
+async fn ready_job(workspace: &Workspace) -> (UnitHost, Socket, JobTicket) {
     let (host, units) = start_units(workspace).await;
     units
         .register(registration(ATTEMPT, &["a"]))
         .expect("the stage should register");
     let mut socket = connect_executor(&host).await;
     announce(&mut socket).await;
-    host.wait_ready()
+    host.session
+        .wait_ready()
         .await
         .expect("the executor should be ready");
     let ticket = host
+        .session
         .send_job("musetricAiSeparateUnits", &Value::Null)
         .expect("the job should start");
-    host.send_unit(ATTEMPT, 0, 2)
+    host.session
+        .send_unit(ATTEMPT, 0, 2)
         .expect("the unit event should be sent");
     (host, socket, ticket)
 }

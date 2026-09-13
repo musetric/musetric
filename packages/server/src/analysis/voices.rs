@@ -132,7 +132,7 @@ async fn split_voices(
     )
     .await?;
     let outcome = produce(&mut attempt, &padded, plan, &models).await;
-    attempt.close().await;
+    attempt.close();
     let folded = outcome?;
     let backing_norm = crop(&folded, layout.trim as usize, samples as usize);
     let backing = normalize_peak(&apply_scale(&backing_norm, peak), MAX_PEAK);

@@ -4,11 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use axum::body::Bytes;
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Download, ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPass, ExecutorPhase,
-    ModelFile, PhaseSink, UnitSession, ensure_model_file,
+    Download, ExecutorFailure, ExecutorPass, ExecutorPhase, ExecutorSession,
+    ExecutorSessionOptions, ModelFile, PhaseSink, UnitSession, ensure_model_file,
 };
 use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport, StepWaiting};
 use musetric_media::{
@@ -202,18 +201,19 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     let sink: PhaseSink = Arc::new(move |phase| {
         let _ = phases.send(phase);
     });
-    let host = ExecutorHost::start(ExecutorHostOptions {
+    let session = job.context.host.open(ExecutorSessionOptions {
         label: job.analysis.label.to_owned(),
-        bundle: job.context.bundle.clone(),
-        pcm: Bytes::from(Vec::new()),
         require_shader_f16: job.analysis.require_shader_f16,
         on_phase: sink,
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-    })
-    .await?;
-    let page = job.context.pages.open_page(&host.page_url()).await?;
+    });
+    let page = job
+        .context
+        .pages
+        .open_page(&job.context.host.page_url())
+        .await?;
     let held = HeldPage::hold(job.context.pages.as_ref(), page);
-    host.wait_ready().await?;
+    session.wait_ready().await?;
     let bound = write_database(&job.context.storage, {
         let project_id = job.job.project_id;
         let step = job.job.step;
@@ -223,17 +223,15 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     .await?;
     if !bound {
         drop(held);
-        host.close().await;
         return Err(Failure::Refused("the attempt is not active".to_owned()));
     }
-    let hosted = register_files(&host, &job.analysis.serve, &job.files).await?;
-    let request = (job.analysis.build)(&attempt_id, &host.attempt_url(&attempt_id), &hosted)?;
-    let ticket = host.send_job(job.analysis.api, &request)?;
+    let hosted = register_files(&session, &job.analysis.serve, &job.files).await?;
+    let request = (job.analysis.build)(&attempt_id, &session.attempt_url(&attempt_id), &hosted)?;
+    let ticket = session.send_job(job.analysis.api, &request)?;
     let mut answered = Box::pin(async move { ticket.wait().await });
     tokio::select! {
         finished = &mut answered => {
             drop(held);
-            host.close().await;
             return early_job(finished);
         }
         outcome = units.wait_opened(&attempt_id) => outcome?,
@@ -243,16 +241,15 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         unit: 0,
         unit_count: 1,
     });
-    host.send_unit(&attempt_id, 0, 1)?;
+    session.send_unit(&attempt_id, 0, 1)?;
     tokio::select! {
         finished = &mut answered => {
             drop(held);
-            host.close().await;
             return early_job(finished);
         }
         outcome = units.folded(&attempt_id) => outcome?,
     }
-    host.send_unit_close(&attempt_id)?;
+    session.send_unit_close(&attempt_id)?;
     loop {
         tokio::select! {
             finished = &mut answered => {
@@ -267,7 +264,6 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         }
     }
     drop(held);
-    host.close().await;
     units.finalize(&attempt_id)
 }
 
@@ -279,14 +275,14 @@ fn early_job(finished: Result<Value, ExecutorFailure>) -> Result<Value, Failure>
 }
 
 async fn register_files(
-    host: &ExecutorHost,
+    session: &ExecutorSession,
     serve: &Serve,
     files: &[(String, PathBuf)],
 ) -> Result<HostedModel, Failure> {
     let Serve::Files = serve;
     let mut urls = HashMap::new();
     for (file, path) in files {
-        urls.insert(file.clone(), host.register_file(path).await?);
+        urls.insert(file.clone(), session.register_file(path).await?);
     }
     Ok(HostedModel::create(urls))
 }

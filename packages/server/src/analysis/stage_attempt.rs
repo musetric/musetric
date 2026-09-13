@@ -3,10 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use axum::body::Bytes;
 use musetric_db::{PendingJob, ProcessingStep};
 use musetric_gpu::{
-    ExecutorFailure, ExecutorHost, ExecutorHostOptions, ExecutorPhase, PhaseSink, UnitSession,
+    ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
 };
 use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
 use serde_json::Value;
@@ -90,7 +89,7 @@ pub(crate) struct StageStart<'start> {
 
 pub(crate) struct StageAttempt<'run> {
     running: &'run StageRun<'run>,
-    host: ExecutorHost,
+    session: ExecutorSession,
     units: Arc<StageUnits>,
     reported: mpsc::UnboundedReceiver<ExecutorPhase>,
     pass: &'static str,
@@ -118,18 +117,15 @@ impl<'run> StageAttempt<'run> {
         let sink: PhaseSink = Arc::new(move |phase| {
             let _ = phases.send(phase);
         });
-        let host = ExecutorHost::start(ExecutorHostOptions {
+        let session = running.context.host.open(ExecutorSessionOptions {
             label: start.label.to_owned(),
-            bundle: running.context.bundle.clone(),
-            pcm: Bytes::from(Vec::new()),
             require_shader_f16: true,
             on_phase: sink,
             units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-        })
-        .await?;
+        });
         Ok(Self {
             running,
-            host,
+            session,
             units,
             reported,
             pass: start.pass,
@@ -140,22 +136,24 @@ impl<'run> StageAttempt<'run> {
 
     pub(crate) async fn open(&self) -> Result<HeldPage<'run>, Failure> {
         let pages = self.running.context.pages.as_ref();
-        let page = pages.open_page(&self.host.page_url()).await?;
+        let page = pages
+            .open_page(&self.running.context.host.page_url())
+            .await?;
         let held = HeldPage::hold(pages, page);
-        self.host.wait_ready().await?;
+        self.session.wait_ready().await?;
         Ok(held)
     }
 
     pub(crate) async fn register(&self, path: &Path) -> Result<String, Failure> {
-        Ok(self.host.register_file(path).await?)
+        Ok(self.session.register_file(path).await?)
     }
 
     pub(crate) fn attempt_url(&self, attempt_id: &str) -> String {
-        self.host.attempt_url(attempt_id)
+        self.session.attempt_url(attempt_id)
     }
 
-    pub(crate) async fn close(self) {
-        self.host.close().await;
+    pub(crate) fn close(self) {
+        drop(self.session);
     }
 
     pub(crate) async fn resume(
@@ -216,7 +214,7 @@ impl<'run> StageAttempt<'run> {
         self.units.register(registration)?;
         self.bind(&attempt_id).await?;
         let start = self.units.next_unit(&attempt_id)?;
-        let ticket = self.host.send_job(API_NAME, &request)?;
+        let ticket = self.session.send_job(API_NAME, &request)?;
         let mut answered = Box::pin(async move { ticket.wait().await });
         tokio::select! {
             finished = &mut answered => return early_job(finished),
@@ -228,7 +226,7 @@ impl<'run> StageAttempt<'run> {
                 unit: index,
                 unit_count: count,
             });
-            self.host.send_unit(&attempt_id, index, count)?;
+            self.session.send_unit(&attempt_id, index, count)?;
             self.drain_phases();
             tokio::select! {
                 finished = &mut answered => return early_job(finished),
@@ -236,7 +234,7 @@ impl<'run> StageAttempt<'run> {
             }
             self.persist(&attempt_id, index + 1, count).await?;
         }
-        self.host.send_unit_close(&attempt_id)?;
+        self.session.send_unit_close(&attempt_id)?;
         loop {
             tokio::select! {
                 finished = &mut answered => {

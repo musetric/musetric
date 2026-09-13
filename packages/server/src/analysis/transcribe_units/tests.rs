@@ -4,7 +4,7 @@
 )]
 use std::sync::Arc;
 
-use musetric_gpu::{ExecutorHost, UnitSession};
+use musetric_gpu::UnitSession;
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use tokio::time::{Duration, timeout};
@@ -12,7 +12,7 @@ use tokio::time::{Duration, timeout};
 use super::{
     ChunkRange, Plan, Restored, Span, StartPass, TranscribeState, TranscribeUnits, restore_state,
 };
-use crate::test_workspace::{Workspace, get_unit_window};
+use crate::test_workspace::{UnitHost, Workspace, get_unit_window};
 
 const ANSWER: Duration = Duration::from_secs(5);
 const ATTEMPT: &str = "attempt-1";
@@ -42,7 +42,7 @@ fn units_for(workspace: &Workspace, state: TranscribeState) -> Arc<TranscribeUni
     ))
 }
 
-async fn start_host(workspace: &Workspace, units: Arc<TranscribeUnits>) -> ExecutorHost {
+async fn start_host(workspace: &Workspace, units: Arc<TranscribeUnits>) -> UnitHost {
     workspace
         .start_unit_host("Fixture transcription", units as Arc<dyn UnitSession>)
         .await

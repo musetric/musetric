@@ -8,7 +8,7 @@ use std::{
 
 use axum::{
     Router,
-    body::{Body, Bytes},
+    body::Body,
     extract::{Request, State, WebSocketUpgrade, ws::Message, ws::WebSocket},
     http::{HeaderValue, StatusCode, header::CONTENT_TYPE},
     response::{IntoResponse, Response},
@@ -17,16 +17,14 @@ use axum::{
 use serde_json::Value;
 use tokio::{
     net::TcpListener,
-    sync::{Notify, mpsc, oneshot},
+    sync::{Notify, mpsc, oneshot, watch},
     task::JoinHandle,
     time::timeout,
 };
 use uuid::Uuid;
 
 use crate::{
-    files::{
-        Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
-    },
+    files::{Bundle, LOADER_HTML, OCTET_STREAM, read_content_type, resolve_asset, send_file},
     protocol::{
         ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, JOB_URL_PARAMETER, read_executor_message,
         write_job_command, write_unit_close, write_unit_command,
@@ -38,10 +36,10 @@ pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const HTML: &str = "text/html; charset=utf-8";
-const PCM_ROUTE: &str = "/pcm";
 const FILES_ROUTE: &str = "/files/";
 const MODELS_ROUTE: &str = "/models/";
 const DISCONNECTED: &str = "the gpu executor disconnected";
+const POISONED: &str = "the gpu executor host is poisoned";
 
 #[derive(Debug)]
 pub enum ExecutorFailure {
@@ -62,86 +60,71 @@ impl std::error::Error for ExecutorFailure {}
 
 pub type PhaseSink = Arc<dyn Fn(ExecutorPhase) + Send + Sync>;
 
-pub struct ExecutorHostOptions {
+type Outgoing = mpsc::UnboundedSender<Message>;
+type Answers = Mutex<HashMap<String, oneshot::Sender<Result<Value, ExecutorFailure>>>>;
+
+pub struct ExecutorSessionOptions {
     pub label: String,
-    pub bundle: Bundle,
-    pub pcm: Bytes,
     pub require_shader_f16: bool,
     pub on_phase: PhaseSink,
     pub units: Option<Arc<dyn UnitSession>>,
 }
 
-pub(crate) struct HostState {
+#[derive(Clone, Copy)]
+struct Capabilities {
+    adapter: bool,
+    shader_f16: bool,
+}
+
+pub(crate) struct SessionState {
     label: String,
-    bundle: Bundle,
-    pcm: Bytes,
     require_shader_f16: bool,
     on_phase: PhaseSink,
     units: Option<Arc<dyn UnitSession>>,
     files: Mutex<HashMap<String, PathBuf>>,
     directories: Mutex<HashMap<String, PathBuf>>,
-    jobs: Mutex<HashMap<String, oneshot::Sender<Result<Value, ExecutorFailure>>>>,
+    answers: Answers,
     active: Mutex<Option<String>>,
-    ready: Mutex<Option<oneshot::Sender<Result<(), ExecutorFailure>>>>,
-    outgoing: Mutex<Option<mpsc::UnboundedSender<Message>>>,
-    closing: Notify,
+    executor: Mutex<Option<Outgoing>>,
 }
 
-impl HostState {
-    fn accept(&self, message: &str) {
-        let Some(read) = read_executor_message(message) else {
-            return;
-        };
-        match read {
-            ExecutorMessage::Ready {
-                adapter,
-                shader_f16,
-            } => self.report_ready(adapter, shader_f16),
-            ExecutorMessage::Phase(phase) => (self.on_phase)(phase),
-            ExecutorMessage::Answer { job_id, result } => self.answer(&job_id, Ok(result)),
-            ExecutorMessage::Failure { job_id, error } => {
-                self.answer(&job_id, Err(ExecutorFailure::Refused(error)));
-            }
-            ExecutorMessage::UnitOpened { job_id, attempt_id } => {
-                self.unit_opened(&job_id, &attempt_id);
-            }
-            ExecutorMessage::UnitDone {
-                job_id,
-                attempt_id,
-                unit,
-            } => self.unit_done(&job_id, &attempt_id, unit),
+impl SessionState {
+    fn create(options: ExecutorSessionOptions) -> Self {
+        Self {
+            label: options.label,
+            require_shader_f16: options.require_shader_f16,
+            on_phase: options.on_phase,
+            units: options.units,
+            files: Mutex::new(HashMap::new()),
+            directories: Mutex::new(HashMap::new()),
+            answers: Mutex::new(HashMap::new()),
+            active: Mutex::new(None),
+            executor: Mutex::new(None),
         }
     }
 
-    fn report_ready(&self, adapter: bool, shader_f16: bool) {
-        let outcome = if adapter {
-            if self.require_shader_f16 && !shader_f16 {
-                Err(ExecutorFailure::Refused(format!(
-                    "{} adapter does not support required shader-f16",
-                    self.label
-                )))
-            } else {
-                Ok(())
-            }
-        } else {
-            Err(ExecutorFailure::Refused(format!(
+    fn accept_capabilities(&self, found: Capabilities) -> Result<(), ExecutorFailure> {
+        if !found.adapter {
+            return Err(ExecutorFailure::Refused(format!(
                 "{} could not get a WebGPU adapter",
                 self.label
-            )))
-        };
-        if let Ok(mut ready) = self.ready.lock()
-            && let Some(sender) = ready.take()
-        {
-            let _ = sender.send(outcome);
+            )));
         }
+        if self.require_shader_f16 && !found.shader_f16 {
+            return Err(ExecutorFailure::Refused(format!(
+                "{} adapter does not support required shader-f16",
+                self.label
+            )));
+        }
+        Ok(())
     }
 
     fn answer(&self, job_id: &str, result: Result<Value, ExecutorFailure>) {
         let taken = self
-            .jobs
+            .answers
             .lock()
             .ok()
-            .and_then(|mut jobs| jobs.remove(job_id));
+            .and_then(|mut answers| answers.remove(job_id));
         if let Some(sender) = taken {
             let _ = sender.send(result);
         }
@@ -156,9 +139,14 @@ impl HostState {
         }
     }
 
+    fn owns(&self, job_id: &str) -> bool {
+        self.active
+            .lock()
+            .is_ok_and(|guard| guard.as_deref() == Some(job_id))
+    }
+
     fn unit_opened(&self, job_id: &str, attempt_id: &str) {
-        let active = self.active.lock().ok().and_then(|guard| guard.clone());
-        if active.as_deref() != Some(job_id) {
+        if !self.owns(job_id) {
             return;
         }
         if let Some(units) = &self.units
@@ -169,8 +157,7 @@ impl HostState {
     }
 
     fn unit_done(&self, job_id: &str, attempt_id: &str, unit: u32) {
-        let active = self.active.lock().ok().and_then(|guard| guard.clone());
-        if active.as_deref() != Some(job_id) {
+        if !self.owns(job_id) {
             return;
         }
         if let Some(units) = &self.units
@@ -180,58 +167,135 @@ impl HostState {
         }
     }
 
-    pub(crate) fn units(&self) -> Option<Arc<dyn UnitSession>> {
-        self.units.clone()
+    fn capture(&self, outgoing: Outgoing) -> Result<(), ExecutorFailure> {
+        let mut held = self
+            .executor
+            .lock()
+            .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?;
+        *held = Some(outgoing);
+        Ok(())
     }
 
-    fn attach(&self, outgoing: mpsc::UnboundedSender<Message>) {
-        if let Ok(mut stored) = self.outgoing.lock() {
-            *stored = Some(outgoing);
-        }
-    }
-
-    fn disconnect(&self) {
-        if let Ok(mut stored) = self.outgoing.lock() {
-            *stored = None;
-        }
-        if let Ok(mut ready) = self.ready.lock()
-            && let Some(sender) = ready.take()
-        {
-            let _ = sender.send(Err(ExecutorFailure::Unavailable));
-        }
-        if let Ok(mut jobs) = self.jobs.lock() {
-            for (_, sender) in jobs.drain() {
+    fn abandon(&self) {
+        if let Ok(mut answers) = self.answers.lock() {
+            for (_, sender) in answers.drain() {
                 let _ = sender.send(Err(ExecutorFailure::Unavailable));
             }
         }
         if let Ok(mut active) = self.active.lock() {
             *active = None;
         }
+        if let Ok(mut held) = self.executor.lock() {
+            *held = None;
+        }
     }
 
     fn send_text(&self, message: String) -> Result<(), ExecutorFailure> {
-        self.send(Message::Text(message.into()))
-    }
-
-    fn send(&self, message: Message) -> Result<(), ExecutorFailure> {
-        let stored = self
-            .outgoing
+        let held = self
+            .executor
             .lock()
-            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?;
-        let outgoing = stored.as_ref().ok_or(ExecutorFailure::Unavailable)?;
+            .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?;
+        let outgoing = held.as_ref().ok_or(ExecutorFailure::Unavailable)?;
         outgoing
-            .send(message)
+            .send(Message::Text(message.into()))
             .map_err(|_| ExecutorFailure::Unavailable)?;
         Ok(())
+    }
+}
+
+pub(crate) struct HostState {
+    bundle: Bundle,
+    outgoing: Mutex<Option<Outgoing>>,
+    capabilities: watch::Sender<Option<Capabilities>>,
+    session: Mutex<Option<Arc<SessionState>>>,
+    closing: Notify,
+}
+
+impl HostState {
+    fn accept(&self, message: &str) {
+        let Some(read) = read_executor_message(message) else {
+            return;
+        };
+        let Some(session) = self.session() else {
+            if let ExecutorMessage::Ready {
+                adapter,
+                shader_f16,
+            } = read
+            {
+                self.report_ready(adapter, shader_f16);
+            }
+            return;
+        };
+        match read {
+            ExecutorMessage::Ready {
+                adapter,
+                shader_f16,
+            } => self.report_ready(adapter, shader_f16),
+            ExecutorMessage::Phase(phase) => (session.on_phase)(phase),
+            ExecutorMessage::Answer { job_id, result } => session.answer(&job_id, Ok(result)),
+            ExecutorMessage::Failure { job_id, error } => {
+                session.answer(&job_id, Err(ExecutorFailure::Refused(error)));
+            }
+            ExecutorMessage::UnitOpened { job_id, attempt_id } => {
+                session.unit_opened(&job_id, &attempt_id);
+            }
+            ExecutorMessage::UnitDone {
+                job_id,
+                attempt_id,
+                unit,
+            } => session.unit_done(&job_id, &attempt_id, unit),
+        }
+    }
+
+    fn report_ready(&self, adapter: bool, shader_f16: bool) {
+        let _ = self.capabilities.send(Some(Capabilities {
+            adapter,
+            shader_f16,
+        }));
+    }
+
+    pub(crate) fn session(&self) -> Option<Arc<SessionState>> {
+        self.session.lock().ok()?.clone()
+    }
+
+    pub(crate) fn units(&self) -> Option<Arc<dyn UnitSession>> {
+        self.session()?.units.clone()
+    }
+
+    fn attach(&self, outgoing: Outgoing) {
+        if let Ok(mut stored) = self.outgoing.lock() {
+            *stored = Some(outgoing);
+        }
+    }
+
+    fn detach(&self, outgoing: &Outgoing) {
+        let owned = self.outgoing.lock().is_ok_and(|stored| {
+            stored
+                .as_ref()
+                .is_some_and(|held| held.same_channel(outgoing))
+        });
+        if !owned {
+            return;
+        }
+        if let Ok(mut stored) = self.outgoing.lock() {
+            *stored = None;
+        }
+        let _ = self.capabilities.send(None);
+        if let Some(session) = self.session() {
+            session.abandon();
+        }
+    }
+
+    fn connected(&self) -> Option<Outgoing> {
+        self.outgoing.lock().ok()?.clone()
     }
 }
 
 pub struct ExecutorHost {
     state: Arc<HostState>,
     base_url: String,
-    ready: Mutex<Option<oneshot::Receiver<Result<(), ExecutorFailure>>>>,
-    shutdown: Option<oneshot::Sender<()>>,
-    served: JoinHandle<()>,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    served: Mutex<Option<JoinHandle<()>>>,
 }
 
 pub struct JobTicket {
@@ -247,21 +311,13 @@ impl JobTicket {
 }
 
 impl ExecutorHost {
-    pub async fn start(options: ExecutorHostOptions) -> Result<Self, BoxedError> {
-        let (ready_sender, ready_receiver) = oneshot::channel();
+    pub async fn start(bundle: Bundle) -> Result<Arc<Self>, BoxedError> {
+        let (capabilities, _) = watch::channel(None);
         let state = Arc::new(HostState {
-            label: options.label,
-            bundle: options.bundle,
-            pcm: options.pcm,
-            require_shader_f16: options.require_shader_f16,
-            on_phase: options.on_phase,
-            units: options.units,
-            files: Mutex::new(HashMap::new()),
-            directories: Mutex::new(HashMap::new()),
-            jobs: Mutex::new(HashMap::new()),
-            active: Mutex::new(None),
-            ready: Mutex::new(Some(ready_sender)),
+            bundle,
             outgoing: Mutex::new(None),
+            capabilities,
+            session: Mutex::new(None),
             closing: Notify::new(),
         });
         let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -275,13 +331,25 @@ impl ExecutorHost {
                 })
                 .await;
         });
-        Ok(Self {
+        Ok(Arc::new(Self {
             state,
             base_url,
-            ready: Mutex::new(Some(ready_receiver)),
-            shutdown: Some(shutdown),
-            served,
-        })
+            shutdown: Mutex::new(Some(shutdown)),
+            served: Mutex::new(Some(served)),
+        }))
+    }
+
+    #[must_use]
+    pub fn open(self: &Arc<Self>, options: ExecutorSessionOptions) -> ExecutorSession {
+        let session = Arc::new(SessionState::create(options));
+        if let Ok(mut held) = self.state.session.lock() {
+            *held = Some(Arc::clone(&session));
+        }
+        let _ = self.state.capabilities.send(None);
+        ExecutorSession {
+            host: Arc::clone(self),
+            state: session,
+        }
     }
 
     #[must_use]
@@ -302,13 +370,57 @@ impl ExecutorHost {
         &self.base_url
     }
 
-    #[must_use]
-    pub fn pcm_url(&self) -> String {
-        format!("{}{PCM_ROUTE}", self.base_url)
+    pub async fn close(&self) {
+        self.state.closing.notify_waiters();
+        let sender = self.shutdown.lock().ok().and_then(|mut held| held.take());
+        if let Some(shutdown) = sender {
+            let _ = shutdown.send(());
+        }
+        let served = self.served.lock().ok().and_then(|mut held| held.take());
+        if let Some(handle) = served {
+            let _ = handle.await;
+        }
+    }
+}
+
+impl Drop for ExecutorHost {
+    fn drop(&mut self) {
+        self.state.closing.notify_waiters();
+        let sender = self.shutdown.lock().ok().and_then(|mut held| held.take());
+        if let Some(shutdown) = sender {
+            let _ = shutdown.send(());
+        }
+    }
+}
+
+pub struct ExecutorSession {
+    host: Arc<ExecutorHost>,
+    state: Arc<SessionState>,
+}
+
+impl ExecutorSession {
+    pub async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
+        let mut changes = self.host.state.capabilities.subscribe();
+        let waited = timeout(READY_TIMEOUT, wait_capabilities(&mut changes)).await;
+        let Ok(announced) = waited else {
+            return Err(ExecutorFailure::Refused(format!(
+                "{} executor did not connect in time",
+                self.state.label
+            )));
+        };
+        let found = announced.ok_or(ExecutorFailure::Unavailable)?;
+        self.state.accept_capabilities(found)?;
+        let outgoing = self
+            .host
+            .state
+            .connected()
+            .ok_or(ExecutorFailure::Unavailable)?;
+        self.state.capture(outgoing)
     }
 
+    #[must_use]
     pub fn attempt_url(&self, attempt_id: &str) -> String {
-        format!("{}/attempt/{attempt_id}", self.base_url)
+        format!("{}/attempt/{attempt_id}", self.host.base_url)
     }
 
     pub async fn register_file(&self, path: &Path) -> Result<String, BoxedError> {
@@ -329,9 +441,9 @@ impl ExecutorHost {
         self.state
             .files
             .lock()
-            .map_err(|_| "the host is poisoned")?
+            .map_err(|_| POISONED)?
             .insert(token.clone(), path.to_path_buf());
-        Ok(format!("{}{FILES_ROUTE}{token}/{name}", self.base_url))
+        Ok(format!("{}{FILES_ROUTE}{token}/{name}", self.host.base_url))
     }
 
     pub async fn register_directory(&self, path: &Path) -> Result<String, BoxedError> {
@@ -350,38 +462,18 @@ impl ExecutorHost {
         self.state
             .directories
             .lock()
-            .map_err(|_| "the host is poisoned")?
+            .map_err(|_| POISONED)?
             .insert(token.clone(), path.to_path_buf());
-        Ok(format!("{}{MODELS_ROUTE}{token}", self.base_url))
-    }
-
-    pub async fn wait_ready(&self) -> Result<(), ExecutorFailure> {
-        let receiver = self
-            .ready
-            .lock()
-            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
-            .take()
-            .ok_or_else(|| {
-                ExecutorFailure::Refused("the gpu executor was already awaited".to_owned())
-            })?;
-        let waited = timeout(READY_TIMEOUT, receiver).await;
-        let Ok(answered) = waited else {
-            return Err(ExecutorFailure::Refused(format!(
-                "{} executor did not connect in time",
-                self.state.label
-            )));
-        };
-        answered.map_err(|_| ExecutorFailure::Unavailable)??;
-        Ok(())
+        Ok(format!("{}{MODELS_ROUTE}{token}", self.host.base_url))
     }
 
     pub fn send_job(&self, api: &str, request: &Value) -> Result<JobTicket, ExecutorFailure> {
         let job_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         self.state
-            .jobs
+            .answers
             .lock()
-            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
+            .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?
             .insert(job_id.clone(), sender);
         if let Ok(mut active) = self.state.active.lock() {
             *active = Some(job_id.clone());
@@ -416,26 +508,37 @@ impl ExecutorHost {
         self.state
             .active
             .lock()
-            .map_err(|_| ExecutorFailure::Refused("the host is poisoned".to_owned()))?
+            .map_err(|_| ExecutorFailure::Refused(POISONED.to_owned()))?
             .clone()
             .ok_or(ExecutorFailure::Unavailable)
     }
+}
 
-    pub async fn close(mut self) {
-        self.state.closing.notify_waiters();
-        if let Some(shutdown) = self.shutdown.take() {
-            let _ = shutdown.send(());
+impl Drop for ExecutorSession {
+    fn drop(&mut self) {
+        self.state.abandon();
+        let mine = self.host.state.session.lock().is_ok_and(|held| {
+            held.as_ref()
+                .is_some_and(|open| Arc::ptr_eq(open, &self.state))
+        });
+        if !mine {
+            return;
         }
-        let _ = (&mut self.served).await;
+        if let Ok(mut held) = self.host.state.session.lock() {
+            *held = None;
+        }
     }
 }
 
-impl Drop for ExecutorHost {
-    fn drop(&mut self) {
-        self.state.closing.notify_waiters();
-        if let Some(shutdown) = self.shutdown.take() {
-            let _ = shutdown.send(());
+async fn wait_capabilities(
+    changes: &mut watch::Receiver<Option<Capabilities>>,
+) -> Option<Capabilities> {
+    loop {
+        let current = *changes.borrow_and_update();
+        if current.is_some() {
+            return current;
         }
+        changes.changed().await.ok()?;
     }
 }
 
@@ -453,7 +556,6 @@ fn encode_query_value(value: &str) -> String {
 fn create_router(state: Arc<HostState>) -> Router {
     Router::new()
         .route("/", get(handle_page))
-        .route(PCM_ROUTE, get(handle_pcm))
         .route("/files/{token}/{name}", get(handle_file))
         .route("/models/{token}/{*name}", get(handle_directory))
         .route(
@@ -477,23 +579,17 @@ async fn handle_page() -> Response {
     response
 }
 
-async fn handle_pcm(State(state): State<Arc<HostState>>) -> Response {
-    let mut response = Response::new(Body::from(state.pcm.clone()));
-    let headers = response.headers_mut();
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static(OCTET_STREAM));
-    headers.insert("cache-control", HeaderValue::from_static(NO_STORE));
-    response
-}
-
 async fn handle_file(
     State(state): State<Arc<HostState>>,
     axum::extract::Path((token, _name)): axum::extract::Path<(String, String)>,
 ) -> Response {
-    let found = state
-        .files
-        .lock()
-        .ok()
-        .and_then(|files| files.get(&token).cloned());
+    let found = state.session().and_then(|session| {
+        session
+            .files
+            .lock()
+            .ok()
+            .and_then(|files| files.get(&token).cloned())
+    });
     let Some(path) = found else {
         return missing();
     };
@@ -507,11 +603,13 @@ async fn handle_directory(
     State(state): State<Arc<HostState>>,
     axum::extract::Path((token, name)): axum::extract::Path<(String, String)>,
 ) -> Response {
-    let found = state
-        .directories
-        .lock()
-        .ok()
-        .and_then(|directories| directories.get(&token).cloned());
+    let found = state.session().and_then(|session| {
+        session
+            .directories
+            .lock()
+            .ok()
+            .and_then(|directories| directories.get(&token).cloned())
+    });
     let Some(root) = found else {
         return missing();
     };
@@ -565,9 +663,9 @@ async fn handle_socket(State(state): State<Arc<HostState>>, upgrade: WebSocketUp
 
 async fn serve_socket(socket: WebSocket, state: Arc<HostState>) {
     let (outgoing, queued) = mpsc::unbounded_channel();
-    state.attach(outgoing);
+    state.attach(outgoing.clone());
     read_socket(socket, &state, queued).await;
-    state.disconnect();
+    state.detach(&outgoing);
 }
 
 async fn read_socket(
