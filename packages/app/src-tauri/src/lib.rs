@@ -42,9 +42,7 @@ const LOG_FILE_SIZE: u128 = 100 * 1024 * 1024;
 #[cfg(desktop)]
 const KEPT_LOG_COUNT: usize = 20;
 #[cfg(target_os = "windows")]
-const WEBVIEW2_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu";
-#[cfg(target_os = "windows")]
-const EXECUTOR_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
+const WEBVIEW2_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --disable-webgpu-blocklist --ignore-gpu-blocklist --force_high_performance_gpu --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -111,7 +109,7 @@ fn create_executor_window<R: tauri::Runtime>(
 ) -> tauri::Result<()> {
     #[cfg(target_os = "windows")]
     let builder = WebviewWindowBuilder::new(app, EXECUTOR_WINDOW, url)
-        .additional_browser_args(EXECUTOR_BROWSER_ARGS);
+        .additional_browser_args(WEBVIEW2_BROWSER_ARGS);
     #[cfg(not(target_os = "windows"))]
     let builder = WebviewWindowBuilder::new(app, EXECUTOR_WINDOW, url);
     builder
