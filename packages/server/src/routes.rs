@@ -14,7 +14,7 @@ use musetric_jobs::Queue;
 
 use musetric_gpu::ExecutorHost;
 
-use crate::{realtime, realtime::Rooms, storage::Storage};
+use crate::{realtime, realtime::Rooms, serve::ExecutorSurface, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
@@ -22,6 +22,7 @@ pub(crate) struct RouteState {
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
+    pub(crate) executor_surface: ExecutorSurface,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
@@ -129,8 +130,14 @@ mod tests {
         let response = request(create_test_router(&workspace).await, "/api/executor").await;
 
         assert_eq!(response.status(), StatusCode::OK);
-        let announced = read_body(response).await;
-        assert!(announced.starts_with("{\"url\":\"http://127.0.0.1:"));
+        let announced: serde_json::Value =
+            serde_json::from_str(&read_body(response).await).expect("the body should be json");
+        assert_eq!(announced["surface"], "page");
+        assert!(
+            announced["url"]
+                .as_str()
+                .is_some_and(|url| url.starts_with("http://127.0.0.1:"))
+        );
     }
 
     #[tokio::test]

@@ -18,6 +18,8 @@ use musetric_db::{
 use musetric_gpu::{
     Bundle, ExecutorHost, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
 };
+
+use crate::serve::ExecutorSurface;
 use musetric_jobs::{
     Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner, StepWaiting,
 };
@@ -191,6 +193,7 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         storage,
         queue,
         executor,
+        executor_surface: ExecutorSurface::Page,
     }
 }
 
