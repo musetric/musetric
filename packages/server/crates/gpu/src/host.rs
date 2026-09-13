@@ -361,6 +361,23 @@ impl JobTicket {
     }
 }
 
+pub struct ExecutorArrivals {
+    changes: watch::Receiver<Option<Leader>>,
+}
+
+impl ExecutorArrivals {
+    pub async fn next(&mut self) -> bool {
+        loop {
+            if self.changes.changed().await.is_err() {
+                return false;
+            }
+            if self.changes.borrow_and_update().is_some() {
+                return true;
+            }
+        }
+    }
+}
+
 impl ExecutorHost {
     pub async fn start(bundle: Bundle) -> Result<Arc<Self>, BoxedError> {
         Self::start_with(bundle, DEFAULT_LIVENESS).await
@@ -407,6 +424,18 @@ impl ExecutorHost {
         ExecutorSession {
             host: Arc::clone(self),
             state: session,
+        }
+    }
+
+    #[must_use]
+    pub fn has_executor(&self) -> bool {
+        self.state.leader.borrow().is_some()
+    }
+
+    #[must_use]
+    pub fn arrivals(&self) -> ExecutorArrivals {
+        ExecutorArrivals {
+            changes: self.state.leader.subscribe(),
         }
     }
 

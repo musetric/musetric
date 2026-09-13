@@ -5,18 +5,19 @@ use std::{
 
 use musetric_db::{MasterType, NewStems, PendingJob, blob_path};
 use musetric_jobs::{StepAnswer, StepPhase, StepReport};
-use musetric_media::{Loudness, SampleRates, analyze_loudness, collect_interleaved_pcm};
+use musetric_media::{Loudness, SampleRates, analyze_loudness};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{Failure, count_frames, decode_reporter, ensure_files},
+        browser::Failure,
         gains::plain_loudness,
         models::{VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA, vocals_graph},
         stage_attempt::{
-            StageAttempt, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model, run_step,
+            StageAttempt, StageInput, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model,
+            read_stage_input, run_step,
         },
         stage_units::StageRegistration,
         stem_files::{StemFiles, read_at},
@@ -109,23 +110,13 @@ async fn separate_vocals(
     job: &PendingJob,
     stems: &Separated,
 ) -> Result<(), Failure> {
-    let context = running.context;
-    let report = running.report;
-    let models = ensure_files(context, report, &VOCALS.cached(&context.models_path)).await?;
-    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
-    let pcm = collect_interleaved_pcm(
-        context.storage.pcm.as_ref(),
-        read_at(&source, VOCALS.sample_rate),
-        &mut decoded,
-    )
-    .await?;
+    let StageInput { models, pcm } =
+        read_stage_input(running, job, &VOCALS.cached(&running.context.models_path)).await?;
     let mixture = Arc::new(normalize_peak(
         &planar_from_interleaved(&deinterleave(&pcm)),
         MAX_PEAK,
     ));
     let samples = u64::try_from(mixture.len() / CHANNELS).unwrap_or(0);
-    (report)(StepPhase::Loading);
     let computation = computation_id(&[
         DSP_VERSION,
         &digest_samples(&mixture),

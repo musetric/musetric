@@ -3,22 +3,21 @@ use std::{
     sync::Arc,
 };
 
-use musetric_db::{MasterType, NewStems, PendingJob, blob_path};
+use musetric_db::{MasterType, NewStems, PendingJob};
 use musetric_jobs::{StepAnswer, StepPhase, StepReport};
-use musetric_media::{
-    SampleRates, analyze_lead_visual_loudness, analyze_loudness, collect_interleaved_pcm,
-};
+use musetric_media::{SampleRates, analyze_lead_visual_loudness, analyze_loudness};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{Failure, count_frames, decode_reporter, ensure_files},
+        browser::Failure,
         gains::{lead_loudness, plain_loudness},
         models::{LEAD_BACKING, LEAD_BACKING_MODEL, VOCALS, lead_backing_graph},
         stage_attempt::{
-            StageAttempt, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model, run_step,
+            StageAttempt, StageInput, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model,
+            read_stage_input, run_step,
         },
         stage_units::StageRegistration,
         stem_files::{StemFiles, read_at},
@@ -91,20 +90,14 @@ async fn split_voices(
     job: &PendingJob,
     stems: &Voices,
 ) -> Result<(), Failure> {
-    let context = running.context;
-    let report = running.report;
-    let models = ensure_files(context, report, &LEAD_BACKING.cached(&context.models_path)).await?;
-    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
-    let pcm = collect_interleaved_pcm(
-        context.storage.pcm.as_ref(),
-        read_at(&source, VOCALS.sample_rate),
-        &mut decoded,
+    let StageInput { models, pcm } = read_stage_input(
+        running,
+        job,
+        &LEAD_BACKING.cached(&running.context.models_path),
     )
     .await?;
     let vocals = planar_from_interleaved(&deinterleave(&pcm));
     let samples = u64::try_from(vocals.len() / CHANNELS).unwrap_or(0);
-    (report)(StepPhase::Loading);
     let peak = peak_of(&vocals);
     if peak == 0.0 {
         return Err(Failure::Refused(SILENT_VOCALS.to_owned()));

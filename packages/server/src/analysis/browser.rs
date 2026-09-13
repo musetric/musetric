@@ -137,6 +137,7 @@ async fn analyze(
     analysis: &BrowserAnalysis,
 ) -> Result<(), Failure> {
     let files = ensure_files(context, report, &analysis.files).await?;
+    require_executor(context)?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
     let request = PcmRequest {
         from: &source,
@@ -150,7 +151,6 @@ async fn analyze(
         decoded: &mut decoded,
     })
     .await?;
-    report(StepPhase::Loading);
     let result = drive(DriveJob {
         context,
         job,
@@ -199,6 +199,7 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
     });
     session.wait_ready().await?;
+    (job.report)(StepPhase::Loading);
     let bound = write_database(&job.context.storage, {
         let project_id = job.job.project_id;
         let step = job.job.step;
@@ -283,6 +284,14 @@ pub(crate) fn decode_reporter(report: &StepReport, total: u64) -> impl FnMut(u64
         }
         announced = decoded;
         report(StepPhase::Decoding { decoded, total });
+    }
+}
+
+pub(crate) fn require_executor(context: &AnalysisContext) -> Result<(), Failure> {
+    if context.host.has_executor() {
+        Ok(())
+    } else {
+        Err(Failure::ExecutorAbsent)
     }
 }
 

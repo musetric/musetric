@@ -410,6 +410,38 @@ async fn serves_a_second_session_over_the_same_connection() {
 }
 
 #[tokio::test]
+async fn tells_whether_an_executor_is_ready_and_when_one_arrives() {
+    let workspace = Workspace::new();
+    let host = ExecutorHost::start(Bundle::Directory(workspace.bundle_path()))
+        .await
+        .expect("the host should start");
+    let mut arrivals = host.arrivals();
+    let before = host.has_executor();
+
+    let mut executor = connect_socket(&host.socket_url()).await;
+    let connected_only = host.has_executor();
+    announce(&mut executor, true, false).await;
+    let arrived = timeout(ANSWER, arrivals.next())
+        .await
+        .expect("the arrival should be announced");
+    let after_ready = host.has_executor();
+    executor.close(None).await.expect("the socket should close");
+    let gone = timeout(ANSWER, async {
+        while host.has_executor() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+
+    assert!(!before);
+    assert!(!connected_only);
+    assert!(arrived);
+    assert!(after_ready);
+    assert!(gone.is_ok());
+    host.close().await;
+}
+
+#[tokio::test]
 async fn drops_an_executor_that_stops_answering_the_host() {
     let workspace = Workspace::new();
     let reported = Reported::create();
