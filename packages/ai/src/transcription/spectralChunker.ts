@@ -326,6 +326,7 @@ export const computeChunks = (
   };
 
   const round3 = (value: number): number => Math.round(value * 1000) / 1000;
+  const lastEnd = Math.floor(voicedEnd * 1000) / 1000;
 
   const chunks: Span[] = [];
   let start = nextAnchor(0);
@@ -333,7 +334,7 @@ export const computeChunks = (
     const low = start + minChunk;
     const high = Math.min(start + chunkSize, voicedEnd);
     const cut = chooseCut(pauses, flatness, { start, low, high });
-    chunks.push([round3(start), round3(cut)]);
+    chunks.push([round3(start), Math.min(round3(cut), lastEnd)]);
     start = Math.max(nextAnchor(secondsToFrame(cut)), cut + 0.1);
   }
   return chunks;

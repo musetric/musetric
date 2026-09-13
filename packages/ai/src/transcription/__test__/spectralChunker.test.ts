@@ -57,6 +57,17 @@ describe('computeChunks', () => {
     const overlapsVoiced = chunks.some((span) => span[1] > 2 && span[0] < 4);
     expect(overlapsVoiced).toBe(true);
   });
+
+  it('never ends a span past the audio when the voice reaches the last sample', () => {
+    const audio = new Float32Array(158636);
+    makeTone(audio, sampleRate, audio.length);
+    const duration = audio.length / sampleRate;
+    const chunks = computeChunks(audio, 30);
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const [, end] of chunks) {
+      expect(end).toBeLessThanOrEqual(duration);
+    }
+  });
 });
 
 describe('buildCompaction + mapTime', () => {
