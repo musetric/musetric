@@ -5,7 +5,8 @@ import { endpoints } from './api/index.js';
 import { queryClient } from './api/queryClient.js';
 import { App } from './app/index.js';
 import { engine } from './engine/engine.js';
-import { mountExecutorFrame } from './executor/executorFrame.js';
+import { startExecutorSurface } from './executor/executorSurface.js';
+import { holdScreenWhileWorking } from './executor/screenWakeLock.js';
 import { initI18next } from './translations/index.js';
 
 const runApp = async () => {
@@ -21,8 +22,9 @@ const runApp = async () => {
   await engine.boot();
   await queryClient.prefetchQuery(endpoints.project.list());
   void queryClient.fetchQuery(endpoints.executor.get()).then((executor) => {
-    if (executor.surface === 'page') {
-      mountExecutorFrame(executor.url);
+    startExecutorSurface(executor);
+    if (executor.surface === 'foregroundPage') {
+      holdScreenWhileWorking(queryClient);
     }
   });
 

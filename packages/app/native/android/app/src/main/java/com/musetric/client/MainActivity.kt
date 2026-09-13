@@ -1,7 +1,5 @@
 package com.musetric.client
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -9,7 +7,6 @@ import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
-import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -25,7 +22,6 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onWebViewCreate(webView: WebView) {
-    webView.addJavascriptInterface(ForegroundBridge(this), "MusetricForeground")
     webView.addJavascriptInterface(ThermalBridge(this), "MusetricThermal")
     super.onWebViewCreate(webView)
     applyWebViewInsets(webView)
@@ -43,37 +39,6 @@ class MainActivity : TauriActivity() {
       WindowInsetsCompat.CONSUMED
     }
     ViewCompat.requestApplyInsets(webView)
-  }
-
-  fun setProcessingActive(active: Boolean) {
-    if (active) {
-      if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-          ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-          ) != PackageManager.PERMISSION_GRANTED
-      ) {
-        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
-      }
-      ProcessingService.start(this)
-      return
-    }
-    ProcessingService.stop(this)
-  }
-
-  override fun onDestroy() {
-    ProcessingService.stop(this)
-    super.onDestroy()
-  }
-}
-
-private class ForegroundBridge(private val activity: MainActivity) {
-  @JavascriptInterface
-  fun setActive(active: Boolean) {
-    activity.runOnUiThread {
-      activity.setProcessingActive(active)
-    }
   }
 }
 

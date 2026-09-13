@@ -1,4 +1,3 @@
-import { type ForegroundBridge } from './androidForeground.js';
 import { readGpuSupport } from './browserGpuSupport.js';
 import { type BrowserJobApis } from './browserJob.js';
 import { createUnitServer } from './browserUnitServing.js';
@@ -29,7 +28,6 @@ const readSocketUrl = (jobUrl: string): string | undefined => {
 export type JobExecutorOptions = {
   jobUrl: string;
   apis: BrowserJobApis;
-  foreground: ForegroundBridge | undefined;
   onClosed?: () => void;
 };
 
@@ -47,13 +45,7 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
       send(socket, { type: 'unitDone', jobId, attemptId, unit });
     },
   });
-  let runningJobs = 0;
-
   const runJob = async (command: JobCommand): Promise<void> => {
-    runningJobs += 1;
-    if (runningJobs === 1) {
-      options.foreground?.setActive(true);
-    }
     try {
       const api = options.apis[command.api];
       if (!api) {
@@ -73,11 +65,6 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
         jobId: command.jobId,
         error: describeError(error),
       });
-    } finally {
-      runningJobs -= 1;
-      if (runningJobs === 0) {
-        options.foreground?.setActive(false);
-      }
     }
   };
 

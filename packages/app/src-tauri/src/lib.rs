@@ -30,7 +30,7 @@ const EXECUTOR_TITLE: &str = "Musetric executor";
 #[cfg(desktop)]
 const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::Shell;
 #[cfg(mobile)]
-const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::Page;
+const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::ForegroundPage;
 const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
 #[cfg(desktop)]
