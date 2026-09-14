@@ -270,20 +270,19 @@ const repairWindow = async (
   const runway = sliceSeconds(compacted, runwayStart, runwayAnchor);
   const seam = runwayAnchor - runwayStart + runwayPadSeconds;
 
-  const halves = await Promise.all([
-    rebuildHalf(options, {
-      payloadStart: start,
-      payloadEnd: middle,
-      runway,
-      seam,
-    }),
-    rebuildHalf(options, {
-      payloadStart: middle,
-      payloadEnd: end,
-      runway,
-      seam,
-    }),
-  ]);
+  const firstHalf = await rebuildHalf(options, {
+    payloadStart: start,
+    payloadEnd: middle,
+    runway,
+    seam,
+  });
+  const secondHalf = await rebuildHalf(options, {
+    payloadStart: middle,
+    payloadEnd: end,
+    runway,
+    seam,
+  });
+  const halves = [firstHalf, secondHalf];
   const kept = halves.filter((half): half is RebuiltHalf => half !== undefined);
   const origWords = wordCount(wordsText(result[index]));
   const totalWords = kept.reduce((sum, half) => sum + half.count, 0);

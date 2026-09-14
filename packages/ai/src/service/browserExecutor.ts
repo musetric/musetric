@@ -9,9 +9,7 @@ import {
   readUnitEvent,
 } from './jobProtocol.js';
 
-const send = (socket: WebSocket, message: ExecutorMessage): void => {
-  socket.send(JSON.stringify(message));
-};
+export const executorLockName = 'musetric-executor';
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -26,42 +24,59 @@ const readSocketUrl = (jobUrl: string): string | undefined => {
   return loopbackHosts.includes(url.hostname) ? url.toString() : undefined;
 };
 
-export type JobExecutorOptions = {
-  jobUrl: string;
-  apis: BrowserJobApis;
-  onClosed?: () => void;
+const pause = async (delayMs: number, signal: AbortSignal): Promise<void> => {
+  const paused = Promise.withResolvers<void>();
+  const timer = setTimeout(paused.resolve, delayMs);
+  const cancel = (): void => {
+    clearTimeout(timer);
+    paused.resolve();
+  };
+  signal.addEventListener('abort', cancel, { once: true });
+  await paused.promise;
+  signal.removeEventListener('abort', cancel);
 };
 
-export const startJobExecutor = (options: JobExecutorOptions): void => {
-  const socketUrl = readSocketUrl(options.jobUrl);
-  if (socketUrl === undefined) {
-    throw new Error('The job executor accepts a local socket url only');
-  }
+type RunningJob = {
+  job: Promise<void> | undefined;
+};
+
+const serveConnection = async (
+  socketUrl: string,
+  apis: BrowserJobApis,
+  signal: AbortSignal,
+): Promise<void> => {
   const socket = new WebSocket(socketUrl);
+  const send = (message: ExecutorMessage): void => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message));
+    }
+  };
   const unitServer = createUnitServer({
     unitOpened: (jobId, attemptId) => {
-      send(socket, { type: 'unitOpened', jobId, attemptId });
+      send({ type: 'unitOpened', jobId, attemptId });
     },
     unitDone: (jobId, attemptId, unit) => {
-      send(socket, { type: 'unitDone', jobId, attemptId, unit });
+      send({ type: 'unitDone', jobId, attemptId, unit });
     },
   });
+  const running: RunningJob = { job: undefined };
+
   const runJob = async (command: JobCommand): Promise<void> => {
     try {
-      const api = options.apis[command.api];
+      const api = apis[command.api];
       if (!api) {
         throw new Error(`Browser API ${command.api} is not initialized`);
       }
       const result = await api(command.request, {
         reportLoading: () => {
-          send(socket, { type: 'loading', jobId: command.jobId });
+          send({ type: 'loading', jobId: command.jobId });
         },
         serveUnits: async (serving) =>
           await unitServer.serve(command.jobId, serving),
       });
-      send(socket, { type: 'result', jobId: command.jobId, result });
+      send({ type: 'result', jobId: command.jobId, result });
     } catch (error) {
-      send(socket, {
+      send({
         type: 'failed',
         jobId: command.jobId,
         error: describeError(error),
@@ -69,26 +84,34 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
     }
   };
 
-  let closed = false;
-  const reportClosed = (): void => {
-    if (closed) {
+  const acceptJob = (command: JobCommand): void => {
+    if (running.job !== undefined) {
+      send({
+        type: 'failed',
+        jobId: command.jobId,
+        error: 'The executor is already running a job',
+      });
       return;
     }
-    closed = true;
-    options.onClosed?.();
+    running.job = runJob(command).finally(() => {
+      running.job = undefined;
+    });
   };
 
+  const closed = Promise.withResolvers<void>();
+  const close = (): void => {
+    socket.close();
+  };
+  signal.addEventListener('abort', close, { once: true });
   socket.addEventListener('close', () => {
-    unitServer.abandon('the executor lost its connection to the host');
-    reportClosed();
+    closed.resolve();
   });
   socket.addEventListener('error', () => {
-    unitServer.abandon('the executor connection to the host failed');
-    reportClosed();
+    closed.resolve();
   });
   socket.addEventListener('open', () => {
     void readGpuSupport().then((support) => {
-      send(socket, { type: 'ready', ...support });
+      send({ type: 'ready', ...support });
     });
   });
   socket.addEventListener('message', (event: MessageEvent<unknown>) => {
@@ -96,7 +119,7 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
       return;
     }
     if (isPingCommand(event.data)) {
-      send(socket, { type: 'pong' });
+      send({ type: 'pong' });
       return;
     }
     const unitEvent = readUnitEvent(event.data);
@@ -106,7 +129,50 @@ export const startJobExecutor = (options: JobExecutorOptions): void => {
     }
     const command = readJobCommand(event.data);
     if (command) {
-      void runJob(command);
+      acceptJob(command);
     }
   });
+
+  await closed.promise;
+  signal.removeEventListener('abort', close);
+  close();
+  await unitServer.abandon('the executor lost its connection to the host');
+  await running.job;
+};
+
+export type JobExecutorOptions = {
+  jobUrl: string;
+  apis: BrowserJobApis;
+  reconnectDelayMs: number;
+};
+
+export type JobExecutor = {
+  stop: () => Promise<void>;
+};
+
+export const startJobExecutor = (options: JobExecutorOptions): JobExecutor => {
+  const socketUrl = readSocketUrl(options.jobUrl);
+  if (socketUrl === undefined) {
+    throw new Error('The job executor accepts a local socket url only');
+  }
+  const controller = new AbortController();
+  const { signal } = controller;
+  const stopped = navigator.locks
+    .request(executorLockName, { signal }, async () => {
+      while (!signal.aborted) {
+        await serveConnection(socketUrl, options.apis, signal);
+        await pause(options.reconnectDelayMs, signal);
+      }
+    })
+    .catch((error: unknown) => {
+      if (!signal.aborted) {
+        throw error;
+      }
+    });
+  return {
+    stop: async () => {
+      controller.abort();
+      await stopped;
+    },
+  };
 };
