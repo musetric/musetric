@@ -2,6 +2,6 @@
   "extends": "../../tsconfigs/tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2024", "WebWorker"],
-    "types": ["@webgpu/types"]
+    "types": ["@webgpu/types", "vite/client"]
   }
 }
