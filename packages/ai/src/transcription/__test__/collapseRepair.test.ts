@@ -81,6 +81,52 @@ describe('repairCollapsedWindows', () => {
     }
   });
 
+  it('decodes the halves of a window one at a time', async () => {
+    const audio = new Float32Array(sampleRate * 40);
+    fillBursts(audio, 20, 40);
+    const chunks: Chunk[] = [
+      { start: 0, end: 20, segments: [[0, 20]] },
+      { start: 20, end: 40, segments: [[20, 40]] },
+    ];
+    const packed: Span[][] = [[[0, 20]], [[20, 40]]];
+    const mapping: Mapping[] = [
+      [0, 20, 0],
+      [20, 40, 20],
+    ];
+    const cleanWords: TranscriptionWord[] = [];
+    for (let t = 0; t < 20; t++) {
+      cleanWords.push({ text: `clean${t}`, start: t, end: t + 0.8 });
+    }
+    const collapsedWords: TranscriptionWord[] = [
+      { text: 'lonely', start: 20, end: 20.5 },
+    ];
+
+    let decoding = 0;
+    let mostDecoding = 0;
+    let decodes = 0;
+    const transcribeSlice = async (): Promise<TranscriptionWord[]> => {
+      decoding += 1;
+      decodes += 1;
+      mostDecoding = Math.max(mostDecoding, decoding);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+      decoding -= 1;
+      return [];
+    };
+
+    await repairCollapsedWindows({
+      compacted: audio,
+      chunks,
+      packed,
+      wordsPerChunk: [cleanWords, collapsedWords],
+      mapping,
+      transcribeSlice,
+    });
+    expect(decodes).toBe(2);
+    expect(mostDecoding).toBe(1);
+  });
+
   it('does not rebuild when the re-decode is a low-diversity loop', async () => {
     const audio = new Float32Array(sampleRate * 40);
     fillBursts(audio, 20, 40);

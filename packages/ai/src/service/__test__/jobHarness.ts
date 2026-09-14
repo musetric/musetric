@@ -45,6 +45,9 @@ export type FakeHost = {
   baseUrl: string;
   socketUrl: string;
   ready: Promise<ExecutorReady>;
+  readies: ExecutorReady[];
+  connections: () => number;
+  drop: () => void;
   phases: ExecutorJobMessage[];
   unitDone: UnitDoneEvent[];
   windows: Map<string, Buffer>;
@@ -70,6 +73,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
   const pending: string[] = [];
   const connected = Promise.withResolvers<WebSocket>();
   const ready = Promise.withResolvers<ExecutorReady>();
+  const readies: ExecutorReady[] = [];
 
   const sendAll = (text: string): void => {
     if (sockets.length === 0) {
@@ -126,6 +130,9 @@ export const startFakeHost = async (): Promise<FakeHost> => {
   socketServer.on('connection', (socket) => {
     sockets.push(socket);
     connected.resolve(socket);
+    socket.on('close', () => {
+      sockets.splice(sockets.indexOf(socket), 1);
+    });
     for (const text of pending.splice(0)) {
       socket.send(text);
     }
@@ -135,6 +142,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         return;
       }
       if (message.type === 'ready') {
+        readies.push(message);
         ready.resolve(message);
         return;
       }
@@ -166,12 +174,20 @@ export const startFakeHost = async (): Promise<FakeHost> => {
   const baseUrl = await listenLocally(server);
   const socketUrl = `${baseUrl.replace('http://', 'ws://')}${jobSocketPath}`;
 
-  const active = async (): Promise<WebSocket> => await connected.promise;
+  const active = async (): Promise<WebSocket> =>
+    sockets.at(-1) ?? (await connected.promise);
 
   return {
     baseUrl,
     socketUrl,
     ready: ready.promise,
+    readies,
+    connections: () => sockets.length,
+    drop: () => {
+      for (const socket of [...sockets]) {
+        socket.terminate();
+      }
+    },
     phases,
     unitDone,
     windows,

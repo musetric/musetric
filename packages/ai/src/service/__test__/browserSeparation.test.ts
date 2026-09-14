@@ -43,11 +43,12 @@ test('the unit serving fetches every window, uploads the output and confirms the
   host.windows.set(`${attempt}/1`, floatBytes([1, -1, 2, -2]));
   serving.attemptUrl = `${host.baseUrl}/attempt/${attempt}`;
 
+  const executor = startJobExecutor({
+    jobUrl: host.socketUrl,
+    apis: servingApis(serving),
+    reconnectDelayMs: 10,
+  });
   try {
-    startJobExecutor({
-      jobUrl: host.socketUrl,
-      apis: servingApis(serving),
-    });
     await host.ready;
     const answered = host.run(servingApiName, {});
     host.sendUnit(attempt, 0, 2);
@@ -67,6 +68,7 @@ test('the unit serving fetches every window, uploads the output and confirms the
       { attemptId: attempt, unit: 1 },
     ]);
   } finally {
+    await executor.stop();
     await host.close();
   }
 });
@@ -103,27 +105,33 @@ test('the unit serving gives up when the host connection drops', async () => {
     ),
   };
 
-  startJobExecutor({
+  const executor = startJobExecutor({
     jobUrl: host.socketUrl,
     apis,
+    reconnectDelayMs: 10,
   });
-  await host.ready;
-  void host.run(servingApiName, {}).catch(() => undefined);
-  host.sendUnit(dropped, 0, 2);
-  await waitFor(() => host.unitDone.length > 0);
+  try {
+    await host.ready;
+    void host.run(servingApiName, {}).catch(() => undefined);
+    host.sendUnit(dropped, 0, 2);
+    await waitFor(() => host.unitDone.length > 0);
 
-  await host.close();
+    host.drop();
 
-  const settled = await Promise.race([
-    released.promise.then(() => 'released' as const),
-    new Promise<'stuck'>((resolve) => {
-      setTimeout(() => {
-        resolve('stuck');
-      }, 3000);
-    }),
-  ]);
+    const settled = await Promise.race([
+      released.promise.then(() => 'released' as const),
+      new Promise<'stuck'>((resolve) => {
+        setTimeout(() => {
+          resolve('stuck');
+        }, 3000);
+      }),
+    ]);
 
-  expect(settled).toBe('released');
+    expect(settled).toBe('released');
+  } finally {
+    await executor.stop();
+    await host.close();
+  }
 });
 
 test('the unit serving fails the job when the host refuses an output', async () => {
@@ -135,11 +143,12 @@ test('the unit serving fails the job when the host refuses an output', async () 
   );
   serving.attemptUrl = `${host.baseUrl}/attempt/${attempt}`;
 
+  const executor = startJobExecutor({
+    jobUrl: host.socketUrl,
+    apis: servingApis(serving),
+    reconnectDelayMs: 10,
+  });
   try {
-    startJobExecutor({
-      jobUrl: host.socketUrl,
-      apis: servingApis(serving),
-    });
     await host.ready;
     const answered = host.run(servingApiName, {});
     host.sendUnit(attempt, 0, 1);
@@ -149,6 +158,7 @@ test('the unit serving fails the job when the host refuses an output', async () 
     );
     expect(host.unitDone).toEqual([]);
   } finally {
+    await executor.stop();
     await host.close();
   }
 });

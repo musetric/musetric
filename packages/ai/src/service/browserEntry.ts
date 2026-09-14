@@ -20,22 +20,14 @@ const apis: BrowserJobApis = {
   [analyzeKeyApiName]: analyzeKey,
 };
 
-const reconnectDelayMs = 3000;
-
 const readJobUrl = (): string => {
   const url = new URL(jobSocketPath, location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.href;
 };
 
-const connect = (): void => {
-  startJobExecutor({
-    jobUrl: readJobUrl(),
-    apis,
-    onClosed: () => {
-      setTimeout(connect, reconnectDelayMs);
-    },
-  });
-};
-
-connect();
+startJobExecutor({
+  jobUrl: readJobUrl(),
+  apis,
+  reconnectDelayMs: 3000,
+});

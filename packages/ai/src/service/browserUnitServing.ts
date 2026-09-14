@@ -45,26 +45,23 @@ export type UnitHost = {
 export type UnitServer = {
   serve: (jobId: string, serving: UnitServing) => Promise<void>;
   dispatch: (event: UnitEvent) => void;
-  abandon: (reason: string) => void;
+  abandon: (reason: string) => Promise<void>;
 };
 
 export const createUnitServer = (host: UnitHost): UnitServer => {
   const events: UnitEvent[] = [];
   let receiver: UnitReceiver | undefined = undefined;
-  let pumping = false;
+  let pumping: Promise<void> | undefined = undefined;
   let rejectServing: ((reason: Error) => void) | undefined = undefined;
+  let abandoned: Error | undefined = undefined;
 
-  const pump = async (): Promise<void> => {
-    if (pumping) {
-      return;
-    }
-    pumping = true;
+  const drain = async (): Promise<void> => {
     try {
-      while (receiver && events.length > 0) {
-        const event = events.shift();
-        if (event === undefined) {
-          break;
-        }
+      for (
+        let event = events.shift();
+        receiver && event !== undefined;
+        event = events.shift()
+      ) {
         await receiver(event);
       }
     } catch (error) {
@@ -73,10 +70,13 @@ export const createUnitServer = (host: UnitHost): UnitServer => {
         error instanceof Error ? error : new Error(String(error)),
       );
     } finally {
-      pumping = false;
-      if (receiver && events.length > 0) {
-        void pump();
-      }
+      pumping = undefined;
+    }
+  };
+
+  const pump = (): void => {
+    if (pumping === undefined && receiver && events.length > 0) {
+      pumping = drain();
     }
   };
 
@@ -86,11 +86,14 @@ export const createUnitServer = (host: UnitHost): UnitServer => {
       events.length = 0;
       return;
     }
-    void pump();
+    pump();
   };
 
   return {
     serve: async (jobId, serving) => {
+      if (abandoned) {
+        throw abandoned;
+      }
       const closed = Promise.withResolvers<void>();
       setReceiver(async (event) => {
         if (event.attemptId !== serving.attemptId) {
@@ -120,10 +123,13 @@ export const createUnitServer = (host: UnitHost): UnitServer => {
     },
     dispatch: (event) => {
       events.push(event);
-      void pump();
+      pump();
     },
-    abandon: (reason) => {
-      rejectServing?.(new Error(reason));
+    abandon: async (reason) => {
+      abandoned = new Error(reason);
+      events.length = 0;
+      await pumping;
+      rejectServing?.(abandoned);
     },
   };
 };
