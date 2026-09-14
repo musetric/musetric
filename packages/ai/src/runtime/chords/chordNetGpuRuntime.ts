@@ -30,11 +30,16 @@ const smoothingKernel = 9;
 type ChordNetGpuState = {
   sampleCount: number;
   frameCount: number;
-  windowCount: number;
+  runCount: number;
+  paddedWindowCount: number;
   input: GPUBuffer;
   cqtOutput: GPUBuffer;
   modelInput: GPUBuffer;
   logits: GPUBuffer;
+  runInput: GPUBuffer;
+  runLogits: GPUBuffer;
+  runInputTensor: ort.Tensor;
+  runLogitsTensor: ort.Tensor;
   indices: GPUBuffer;
   readback: GPUBuffer;
   cqt: Cqt;
@@ -56,11 +61,13 @@ const createState = (options: CreateStateOptions): ChordNetGpuState => {
   const { graph, device, cqtCell, plan, sampleCount } = options;
   const frameCount = getCqtFrameCount(sampleCount, plan);
   const windowCount = Math.ceil(frameCount / graph.sequenceLength);
+  const runCount = Math.ceil(windowCount / graph.windowsPerRun);
+  const paddedWindowCount = runCount * graph.windowsPerRun;
   const cqtFloatCount = frameCount * graph.inputBins;
   const modelInputFloatCount =
-    windowCount * graph.sequenceLength * graph.inputBins;
+    paddedWindowCount * graph.sequenceLength * graph.inputBins;
   const logitsFloatCount =
-    windowCount * graph.sequenceLength * graph.chordCount;
+    paddedWindowCount * graph.sequenceLength * graph.chordCount;
   const input = createStorageBuffer(
     device,
     sampleCount * Float32Array.BYTES_PER_ELEMENT,
@@ -77,6 +84,22 @@ const createState = (options: CreateStateOptions): ChordNetGpuState => {
     device,
     logitsFloatCount * Float32Array.BYTES_PER_ELEMENT,
   );
+  const runInput = createStorageBuffer(
+    device,
+    (modelInputFloatCount / runCount) * Float32Array.BYTES_PER_ELEMENT,
+  );
+  const runLogits = createStorageBuffer(
+    device,
+    (logitsFloatCount / runCount) * Float32Array.BYTES_PER_ELEMENT,
+  );
+  const runInputTensor = ort.Tensor.fromGpuBuffer(runInput, {
+    dataType: 'float32',
+    dims: [graph.windowsPerRun, graph.sequenceLength, graph.inputBins],
+  });
+  const runLogitsTensor = ort.Tensor.fromGpuBuffer(runLogits, {
+    dataType: 'float32',
+    dims: [graph.windowsPerRun, graph.sequenceLength, graph.chordCount],
+  });
   const indices = createStorageBuffer(
     device,
     frameCount * Uint32Array.BYTES_PER_ELEMENT,
@@ -131,11 +154,16 @@ const createState = (options: CreateStateOptions): ChordNetGpuState => {
   return {
     sampleCount,
     frameCount,
-    windowCount,
+    runCount,
+    paddedWindowCount,
     input,
     cqtOutput,
     modelInput,
     logits,
+    runInput,
+    runLogits,
+    runInputTensor,
+    runLogitsTensor,
     indices,
     readback,
     cqt,
@@ -152,6 +180,8 @@ const destroyState = (state: ChordNetGpuState): void => {
     state.cqtOutput,
     state.modelInput,
     state.logits,
+    state.runInput,
+    state.runLogits,
     state.indices,
     state.readback,
   ]) {
@@ -214,29 +244,43 @@ export const createChordNetGpuRuntime = async (
       padPass,
       current.padPipeline,
       current.padBindGroup,
-      current.windowCount * graph.sequenceLength * graph.inputBins,
+      current.paddedWindowCount * graph.sequenceLength * graph.inputBins,
     );
     padPass.end();
     device.queue.submit([cqtEncoder.finish()]);
 
-    const input = ort.Tensor.fromGpuBuffer(current.modelInput, {
-      dataType: 'float32',
-      dims: [current.windowCount, graph.sequenceLength, graph.inputBins],
-    });
-    const output = ort.Tensor.fromGpuBuffer(current.logits, {
-      dataType: 'float32',
-      dims: [current.windowCount, graph.sequenceLength, graph.chordCount],
-    });
-    const result = await session.run(
-      { [graph.inputName]: input },
-      { [graph.outputName]: output },
-    );
-    const logits = result[graph.outputName];
-    if (logits.gpuBuffer !== current.logits) {
-      logits.dispose();
-      throw new Error(
-        'ChordNet output did not reuse the preallocated GPU buffer',
+    const runInputBytes = current.runInput.size;
+    const runLogitsBytes = current.runLogits.size;
+    for (let run = 0; run < current.runCount; run++) {
+      const inputEncoder = device.createCommandEncoder();
+      inputEncoder.copyBufferToBuffer(
+        current.modelInput,
+        run * runInputBytes,
+        current.runInput,
+        0,
+        runInputBytes,
       );
+      device.queue.submit([inputEncoder.finish()]);
+      const result = await session.run(
+        { [graph.inputName]: current.runInputTensor },
+        { [graph.outputName]: current.runLogitsTensor },
+      );
+      const logits = result[graph.outputName];
+      if (logits.gpuBuffer !== current.runLogits) {
+        logits.dispose();
+        throw new Error(
+          'ChordNet output did not reuse the preallocated GPU buffer',
+        );
+      }
+      const outputEncoder = device.createCommandEncoder();
+      outputEncoder.copyBufferToBuffer(
+        current.runLogits,
+        0,
+        current.logits,
+        run * runLogitsBytes,
+        runLogitsBytes,
+      );
+      device.queue.submit([outputEncoder.finish()]);
     }
 
     const postEncoder = device.createCommandEncoder();

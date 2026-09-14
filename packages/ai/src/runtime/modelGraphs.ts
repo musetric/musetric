@@ -38,6 +38,7 @@ export type ChordNetGraph = {
   sequenceLength: number;
   inputBins: number;
   chordCount: number;
+  windowsPerRun: number;
 };
 
 export type SkeyGraph = {

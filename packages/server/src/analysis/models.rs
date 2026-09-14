@@ -129,6 +129,7 @@ pub(crate) fn chord_net_graph() -> Value {
         "sequenceLength": 108,
         "inputBins": 144,
         "chordCount": 170,
+        "windowsPerRun": 1,
     })
 }
 
