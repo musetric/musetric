@@ -1,3 +1,4 @@
+import { serveOrtWasmFromBundle } from '../runtime/ortWasm.js';
 import { analyzeChords } from './browserChords.js';
 import { startJobExecutor } from './browserExecutor.js';
 import { type BrowserJobApis } from './browserJob.js';
@@ -25,6 +26,8 @@ const readJobUrl = (): string => {
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.href;
 };
+
+serveOrtWasmFromBundle();
 
 startJobExecutor({
   jobUrl: readJobUrl(),
