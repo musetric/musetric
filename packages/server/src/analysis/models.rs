@@ -309,19 +309,19 @@ pub(crate) fn vocals_graph() -> Value {
     )
 }
 
-pub(crate) const LEAD_BACKING_MODEL: &str = "UVR_MDXNET_KARA_2.onnx";
+pub(crate) const LEAD_BACKING_MODEL: &str = "kara2.onnx";
 
 pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
     label: "Lead/backing separation model",
-    model_id: "AI4future/RVC",
-    revision: "main",
-    directory: "uvr_mdxnet_kara_2",
+    model_id: "musetric/uvr-mdxnet-kara2-onnx",
+    revision: "7d49dab35fa3b19831c09f55622a82d1de332b8e",
+    directory: "uvr-mdxnet-kara2-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
     layout: CacheLayout::Flat,
     files: &[(
         LEAD_BACKING_MODEL,
-        "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+        "f314179eccd2c689f702e63b22281b54d1fb39df516377d7409175be1dd772aa",
     )],
 };
 
