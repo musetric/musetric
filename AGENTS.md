@@ -13,11 +13,14 @@
 
 Applies to everything published from this repository: code, tests, comments, commits, PRs, issues, documentation and model cards.
 
-- Never mention copyrighted or private audio: no titles, artists, albums, lyrics, quoted transcriptions, file names, and no hashed or otherwise encoded forms of them.
+- Prefer material anyone can obtain: synthetic signals, public domain audio, and tracks under an open license such as CC0, CC BY or CC BY-SA, including tracks from public datasets.
+- Name an openly licensed track by artist, title, source link and license, and give the attribution its license requires. Its lyrics, excerpt positions, durations and results may be quoted.
+- A track under a non-commercial or no-derivatives license (NC, ND) may be used for measurements and named with its license, but do not publish its audio, stems, excerpts or lyrics.
+- Never mention any other audio: no titles, artists, albums, lyrics, quoted transcriptions, file names, and no hashed or otherwise encoded forms of them.
 - Do not describe material that cannot be shared. No duration, tempo, key, excerpt position or similar detail of an unnamed track: a claim nobody can check is not evidence.
-- Name a property of the input only when it is the subject of the problem, and state it abstractly: "fails on tracks shorter than one chord window", "runs out of GPU memory on tracks longer than about 4 minutes".
+- Name a property of such input only when it is the subject of the problem, and state it abstractly: "fails on tracks shorter than one chord window", "runs out of GPU memory on tracks longer than about 4 minutes".
 - Otherwise report the observation without the input: "the step fails on Android; the cause is under investigation".
-- Checkable evidence uses synthetic signals or inputs committed with the change. A run on private material may be reported only as its outcome, such as "matches desktop" or "still differs".
+- Checkable evidence uses synthetic signals, openly licensed tracks or inputs committed with the change. A run on any other material may be reported only as its outcome, such as "matches desktop" or "still differs".
 
 ## Repository Map
 
