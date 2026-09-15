@@ -13,6 +13,7 @@ import {
   type DecodeResult,
   type WhisperPipelineInternals,
 } from './whisperDecoder.js';
+import { createWhisperGpu } from './whisperGpu.js';
 import {
   countWords,
   extractWords,
@@ -64,6 +65,7 @@ export const createWhisperRuntime = async (
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
 
   const loadStart = performance.now();
+  const gpu = await createWhisperGpu();
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',
     options.modelId,
@@ -74,19 +76,26 @@ export const createWhisperRuntime = async (
       dtype: { ...options.graph.dtype },
 
       session_options: {
-        executionProviders: ['webgpu'],
+        executionProviders: [gpu.provider],
       },
       progress_callback: () => {
         options.onLoading();
       },
     },
-  );
+  ).catch(async (error: unknown) => {
+    await gpu.release();
+    throw error;
+  });
   console.log(
     `whisper load: ${((performance.now() - loadStart) / 1000).toFixed(1)}s`,
   );
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
+  const encoder = internals.model.sessions.model;
+  const runEncoder = encoder.run.bind(encoder);
+  encoder.run = async (...args) =>
+    gpu.runEncoder(async () => runEncoder(...args));
   const { decodeTimestamped, decodeAligned } = createWhisperDecoder(internals);
   const generationConfig = internals.model.generation_config;
   const langToId = generationConfig.lang_to_id ?? {};
@@ -258,7 +267,11 @@ export const createWhisperRuntime = async (
   };
 
   const release = async (): Promise<void> => {
-    await transcriber.dispose();
+    try {
+      await transcriber.dispose();
+    } finally {
+      await gpu.release();
+    }
   };
 
   return { detectLanguage, transcribeBatch, transcribeAligned, release };

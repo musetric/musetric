@@ -6180,6 +6180,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"onnxruntime-web@patch:onnxruntime-web@npm%3A1.29.0#~/.yarn/patches/onnxruntime-web-npm-1.29.0-a7538a29db.patch":
+  version: 1.29.0
+  resolution: "onnxruntime-web@patch:onnxruntime-web@npm%3A1.29.0#~/.yarn/patches/onnxruntime-web-npm-1.29.0-a7538a29db.patch::version=1.29.0&hash=c41f47"
+  dependencies:
+    flatbuffers: "npm:^25.1.24"
+    guid-typescript: "npm:^1.0.9"
+    long: "npm:^5.2.3"
+    onnxruntime-common: "npm:1.29.0"
+    platform: "npm:^1.3.6"
+    protobufjs: "npm:^7.2.4"
+  checksum: 10c0/cffddf93da110795ad71e47d7db0ba66383020954e814961cd2c9db55f83447e9496faf8ebcd410b36e9eb58cee2e7184cca3457c4c0c1c7be8fcf594add2c02
+  languageName: node
+  linkType: hard
+
 "optionator@npm:^0.9.3":
   version: 0.9.4
   resolution: "optionator@npm:0.9.4"

@@ -26,6 +26,9 @@ type GenerateOutput = {
 };
 
 export type WhisperModelInternals = {
+  sessions: {
+    model: { run: (...args: unknown[]) => Promise<Record<string, unknown>> };
+  };
   generation_config: {
     lang_to_id?: Record<string, number>;
     decoder_start_token_id?: number;
