@@ -314,7 +314,7 @@ pub(crate) const LEAD_BACKING_MODEL: &str = "kara2.onnx";
 pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
     label: "Lead/backing separation model",
     model_id: "musetric/uvr-mdxnet-kara2-onnx",
-    revision: "7d49dab35fa3b19831c09f55622a82d1de332b8e",
+    revision: "86010c52ddae7d89f462a6332c82eb5af4450dc9",
     directory: "uvr-mdxnet-kara2-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
