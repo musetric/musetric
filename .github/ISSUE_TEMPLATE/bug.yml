@@ -1,0 +1,55 @@
+name: Bug
+description: Something does not work as expected
+type: Bug
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happens and what should happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: >-
+        Steps, code or input that show the problem. Any audio or lyrics must be
+        synthetic or openly licensed (CC0, CC BY, CC BY-SA) with a link and
+        license.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything relevant, such as OS version, browser or WebView, device, GPU.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Error messages, stack traces, console or command output.
+      render: text
