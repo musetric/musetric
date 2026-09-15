@@ -9,6 +9,16 @@
 
 - All commit and PR titles must comply with `.github/prTitle.config.yml`.
 
+## Test Material
+
+Applies to everything published from this repository: code, tests, comments, commits, PRs, issues, documentation and model cards.
+
+- Never mention copyrighted or private audio: no titles, artists, albums, lyrics, quoted transcriptions, file names, and no hashed or otherwise encoded forms of them.
+- Do not describe material that cannot be shared. No duration, tempo, key, excerpt position or similar detail of an unnamed track: a claim nobody can check is not evidence.
+- Name a property of the input only when it is the subject of the problem, and state it abstractly: "fails on tracks shorter than one chord window", "runs out of GPU memory on tracks longer than about 4 minutes".
+- Otherwise report the observation without the input: "the step fails on Android; the cause is under investigation".
+- Checkable evidence uses synthetic signals or inputs committed with the change. A run on private material may be reported only as its outcome, such as "matches desktop" or "still differs".
+
 ## Repository Map
 
 - Musetric is split into a web app, a Rust host, audio-processing modules, and shared infrastructure packages.
