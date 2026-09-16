@@ -44,7 +44,7 @@
     "adm-zip": "0.6.0",
     "browserslist": "4.28.8",
     "filelist": "2.0.2",
-    "onnxruntime-web": "1.29.0",
+    "onnxruntime-web": "patch:onnxruntime-web@npm%3A1.29.0#~/.yarn/patches/onnxruntime-web-npm-1.29.0-a7538a29db.patch",
     "sharp": "0.35.3",
     "tar": "7.5.21"
   }
