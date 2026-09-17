@@ -8,7 +8,7 @@ import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
   getMusetricWebGpuDevice,
-  prepareMusetricWebGpu,
+  musetricWebGpuProvider,
 } from '../webgpuDevice.js';
 import {
   type BeatThisGpuState,
@@ -93,9 +93,10 @@ export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
   const { graph } = options;
-  await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(options.modelUrl, {
-    executionProviders: [{ name: 'webgpu', storageBufferCacheMode: 'simple' }],
+    executionProviders: [
+      await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
+    ],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: {
       [graph.beatOutputName]: 'gpu-buffer',

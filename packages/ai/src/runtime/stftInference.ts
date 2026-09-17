@@ -19,7 +19,7 @@ import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
   getMusetricWebGpuDevice,
-  prepareMusetricWebGpu,
+  musetricWebGpuProvider,
 } from './webgpuDevice.js';
 
 ort.env.logLevel = 'error';
@@ -87,19 +87,6 @@ export const createStftInferenceRuntime = async (
   const chunkBytes = chunkFloats * Float32Array.BYTES_PER_ELEMENT;
   const spectrumBytes =
     windowCount * (nFft + 2) * Float32Array.BYTES_PER_ELEMENT;
-  await prepareMusetricWebGpu();
-
-  const session = await ort.InferenceSession.create(options.modelUrl, {
-    executionProviders: [
-      {
-        name: 'webgpu',
-        storageBufferCacheMode: 'simple',
-      },
-    ],
-    graphOptimizationLevel: 'all',
-    preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
-    ...(options.externalData ? { externalData: options.externalData } : {}),
-  });
   const webgpu = await getMusetricWebGpuDevice();
   assertStorageBufferLimit({
     actual: webgpu.maxStorageBuffersPerShaderStage,
@@ -109,6 +96,14 @@ export const createStftInferenceRuntime = async (
   });
   const { device } = webgpu;
 
+  const session = await ort.InferenceSession.create(options.modelUrl, {
+    executionProviders: [
+      await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
+    ],
+    graphOptimizationLevel: 'all',
+    preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
+    ...(options.externalData ? { externalData: options.externalData } : {}),
+  });
   const frameLayout = createBindGroupLayout(device, [
     'read-only-storage',
     'storage',
