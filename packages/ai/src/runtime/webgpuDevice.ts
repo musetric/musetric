@@ -1,7 +1,6 @@
 import { type InferenceSession } from 'onnxruntime-web/webgpu';
 
 export const defaultStorageBufferLimit = 8;
-const maximumStorageBufferLimit = 10;
 
 export type StorageBufferLimitOptions = {
   actual: number;
@@ -19,6 +18,19 @@ export const assertStorageBufferLimit = (
     );
   }
 };
+
+const deviceLimits = [
+  'maxBufferSize',
+  'maxComputeInvocationsPerWorkgroup',
+  'maxComputeWorkgroupSizeX',
+  'maxComputeWorkgroupSizeY',
+  'maxComputeWorkgroupSizeZ',
+  'maxComputeWorkgroupStorageSize',
+  'maxComputeWorkgroupsPerDimension',
+  'maxStorageBufferBindingSize',
+  'maxStorageBuffersPerShaderStage',
+  'maxUniformBufferBindingSize',
+] as const;
 
 const ortFeatures: GPUFeatureName[] = [
   'float32-blendable',
@@ -40,10 +52,10 @@ const createMusetricWebGpuDevice = async (): Promise<MusetricWebGpuDevice> => {
   if (!adapter) {
     throw new Error('WebGPU adapter is unavailable');
   }
-  const limit = Math.min(
-    adapter.limits.maxStorageBuffersPerShaderStage,
-    maximumStorageBufferLimit,
-  );
+  const requiredLimits: Record<string, number> = {};
+  for (const limit of deviceLimits) {
+    requiredLimits[limit] = adapter.limits[limit];
+  }
   const features: GPUFeatureName[] = [];
   for (const feature of ortFeatures) {
     if (adapter.features.has(feature)) {
@@ -52,7 +64,7 @@ const createMusetricWebGpuDevice = async (): Promise<MusetricWebGpuDevice> => {
   }
   const device = await adapter.requestDevice({
     requiredFeatures: features,
-    requiredLimits: { maxStorageBuffersPerShaderStage: limit },
+    requiredLimits,
   });
   return {
     device,
