@@ -64,11 +64,9 @@ fn readSpectrumBin(k: u32) -> vec2<f32> {
 }
 
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {
-  if (k == 0u) {
-    let dc = readSpectrumFloat(0u);
-    let nyquist = readSpectrumFloat(2u * packedWindowSize);
-    return vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
-  }
+  let dc = readSpectrumFloat(0u);
+  let nyquist = readSpectrumFloat(2u * packedWindowSize);
+  let dcBin = vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
 
   let mirrorK = packedWindowSize - k;
   let a = readSpectrumBin(k);
@@ -78,7 +76,7 @@ fn loadPackedSpectrum(k: u32) -> vec2<f32> {
   let diff = 0.5 * (a - b);
   let invTwiddle = vec2<f32>(r2cTrigTable[2u * k], r2cTrigTable[2u * k + 1u]);
   let odd = mul(diff, invTwiddle);
-  return even + vec2<f32>(-odd.y, odd.x);
+  return select(even + vec2<f32>(-odd.y, odd.x), dcBin, k == 0u);
 }
 
 fn readStage(windowIndex: u32, index: u32) -> vec2<f32> {
