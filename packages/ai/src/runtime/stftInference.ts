@@ -4,6 +4,7 @@ import {
 } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
 import { yieldGpuToCompositor } from './gpuCooldown.js';
+import { createGpuPacer } from './gpuPacer.js';
 import {
   createBindGroup,
   createBindGroupLayout,
@@ -104,6 +105,7 @@ export const createStftInferenceRuntime = async (
     preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
     ...(options.externalData ? { externalData: options.externalData } : {}),
   });
+  const pacer = createGpuPacer(device);
   const frameLayout = createBindGroupLayout(device, [
     'read-only-storage',
     'storage',
@@ -168,7 +170,7 @@ export const createStftInferenceRuntime = async (
     dims: [...options.outputShape],
   });
 
-  const processChunk = async (
+  const runChunk = async (
     input: Float32Array<ArrayBuffer>,
     output?: Float32Array<ArrayBuffer>,
   ): Promise<Float32Array<ArrayBuffer>> => {
@@ -221,7 +223,14 @@ export const createStftInferenceRuntime = async (
     return audio;
   };
 
+  const processChunk = async (
+    input: Float32Array<ArrayBuffer>,
+    output?: Float32Array<ArrayBuffer>,
+  ): Promise<Float32Array<ArrayBuffer>> =>
+    pacer.pace(async () => runChunk(input, output));
+
   const release = async (): Promise<void> => {
+    await pacer.release();
     await device.queue.onSubmittedWorkDone();
     await session.release();
     core.release();
