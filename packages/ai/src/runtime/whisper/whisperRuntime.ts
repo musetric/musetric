@@ -7,6 +7,7 @@ import {
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
 import { type WhisperGraph } from '../modelGraphs.js';
+import { musetricWebGpuProvider } from '../webgpuDevice.js';
 import {
   createWhisperDecoder,
   type DecodeGuard,
@@ -74,7 +75,7 @@ export const createWhisperRuntime = async (
       dtype: { ...options.graph.dtype },
 
       session_options: {
-        executionProviders: ['webgpu'],
+        executionProviders: [await musetricWebGpuProvider()],
       },
       progress_callback: () => {
         options.onLoading();

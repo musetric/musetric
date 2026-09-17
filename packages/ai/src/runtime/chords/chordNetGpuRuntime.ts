@@ -18,7 +18,7 @@ import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
   getMusetricWebGpuDevice,
-  prepareMusetricWebGpu,
+  musetricWebGpuProvider,
 } from '../webgpuDevice.js';
 import { chordPadFeaturesShader } from './padFeatures.wgsl.js';
 import { chordSmoothArgmaxShader } from './smoothArgmax.wgsl.js';
@@ -204,9 +204,8 @@ export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
   const { graph, modelUrl, plan } = options;
-  await prepareMusetricWebGpu();
   const session = await ort.InferenceSession.create(modelUrl, {
-    executionProviders: ['webgpu'],
+    executionProviders: [await musetricWebGpuProvider()],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [graph.outputName]: 'gpu-buffer' },
   });
