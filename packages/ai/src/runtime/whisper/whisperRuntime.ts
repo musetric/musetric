@@ -75,7 +75,9 @@ export const createWhisperRuntime = async (
       dtype: { ...options.graph.dtype },
 
       session_options: {
-        executionProviders: [await musetricWebGpuProvider()],
+        executionProviders: [
+          await musetricWebGpuProvider({ subgroups: false }),
+        ],
       },
       progress_callback: () => {
         options.onLoading();

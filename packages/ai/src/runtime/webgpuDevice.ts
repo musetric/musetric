@@ -45,7 +45,13 @@ export type MusetricWebGpuDevice = {
   maxStorageBuffersPerShaderStage: number;
 };
 
-const createMusetricWebGpuDevice = async (): Promise<MusetricWebGpuDevice> => {
+export type MusetricWebGpuDeviceOptions = {
+  subgroups: boolean;
+};
+
+const createMusetricWebGpuDevice = async (
+  options: MusetricWebGpuDeviceOptions,
+): Promise<MusetricWebGpuDevice> => {
   const adapter = await navigator.gpu.requestAdapter({
     powerPreference: 'high-performance',
   });
@@ -58,6 +64,9 @@ const createMusetricWebGpuDevice = async (): Promise<MusetricWebGpuDevice> => {
   }
   const features: GPUFeatureName[] = [];
   for (const feature of ortFeatures) {
+    if (feature === 'subgroups' && !options.subgroups) {
+      continue;
+    }
     if (adapter.features.has(feature)) {
       features.push(feature);
     }
@@ -73,24 +82,31 @@ const createMusetricWebGpuDevice = async (): Promise<MusetricWebGpuDevice> => {
   };
 };
 
-// eslint-disable-next-line musetric/no-top-level-let
-let musetricWebGpuDevice: Promise<MusetricWebGpuDevice> | undefined = undefined;
+const musetricWebGpuDevices = new Map<boolean, Promise<MusetricWebGpuDevice>>();
 
-export const getMusetricWebGpuDevice =
-  async (): Promise<MusetricWebGpuDevice> => {
-    musetricWebGpuDevice ??= createMusetricWebGpuDevice();
-    return musetricWebGpuDevice;
-  };
+export const getMusetricWebGpuDevice = async (
+  options: MusetricWebGpuDeviceOptions = { subgroups: true },
+): Promise<MusetricWebGpuDevice> => {
+  const existing = musetricWebGpuDevices.get(options.subgroups);
+  if (existing) {
+    return existing;
+  }
+  const created = createMusetricWebGpuDevice(options);
+  musetricWebGpuDevices.set(options.subgroups, created);
+  return created;
+};
 
 export type MusetricWebGpuProviderOptions = {
   storageBufferCacheMode?: NonNullable<
     InferenceSession.WebGpuExecutionProviderOption['storageBufferCacheMode']
   >;
+  subgroups?: boolean;
 };
 
 export const musetricWebGpuProvider = async (
   options: MusetricWebGpuProviderOptions = {},
 ): Promise<InferenceSession.WebGpuExecutionProviderOption> => {
-  const { device } = await getMusetricWebGpuDevice();
-  return { name: 'webgpu', device, ...options };
+  const { subgroups = true, ...provider } = options;
+  const { device } = await getMusetricWebGpuDevice({ subgroups });
+  return { name: 'webgpu', device, ...provider };
 };
