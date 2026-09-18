@@ -6,8 +6,12 @@ import {
 } from '@huggingface/transformers';
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
+import { createGpuPacer } from '../gpuPacer.js';
 import { type WhisperGraph } from '../modelGraphs.js';
-import { musetricWebGpuProvider } from '../webgpuDevice.js';
+import {
+  getMusetricWebGpuDevice,
+  musetricWebGpuProvider,
+} from '../webgpuDevice.js';
 import {
   createWhisperDecoder,
   type DecodeGuard,
@@ -90,6 +94,12 @@ export const createWhisperRuntime = async (
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
+
+  const { device } = await getMusetricWebGpuDevice({ subgroups: false });
+  const pacer = createGpuPacer(device);
+  const encoder = internals.model.sessions.model;
+  const runEncoder = encoder.run.bind(encoder);
+  encoder.run = async (...args) => pacer.pace(async () => runEncoder(...args));
   const { decodeTimestamped, decodeAligned } = createWhisperDecoder(internals);
   const generationConfig = internals.model.generation_config;
   const langToId = generationConfig.lang_to_id ?? {};
@@ -261,6 +271,7 @@ export const createWhisperRuntime = async (
   };
 
   const release = async (): Promise<void> => {
+    await pacer.release();
     await transcriber.dispose();
   };
 
