@@ -25,7 +25,10 @@ type GenerateOutput = {
   past_key_values?: { dispose: () => Promise<void> };
 };
 
+type SessionRun = (...args: never[]) => Promise<unknown>;
+
 export type WhisperModelInternals = {
+  sessions: { model: { run: SessionRun } };
   generation_config: {
     lang_to_id?: Record<string, number>;
     decoder_start_token_id?: number;
