@@ -53,6 +53,16 @@ impl Workspace {
         create_dir_all(directory.join("bundle")).expect("the workspace should be created");
         write(directory.join("bundle").join("index.js"), BUNDLE_ASSET)
             .expect("the bundle asset should be written");
+        create_dir_all(directory.join("bundle").join("assets"))
+            .expect("the hashed asset folder should be created");
+        write(
+            directory
+                .join("bundle")
+                .join("assets")
+                .join("runtime-Cx9aB2.wasm"),
+            BUNDLE_ASSET,
+        )
+        .expect("the hashed asset should be written");
         Self { directory }
     }
 
@@ -346,6 +356,9 @@ async fn serves_the_page_the_bundle_and_the_registered_files() {
     let (file_status, file) = get(&file_url).await;
     let (asset_status, asset) = get(&format!("{}/index.js", host.base_url())).await;
     let (missing_status, _) = get(&format!("{}/nothing.js", host.base_url())).await;
+    let entry_cache = read_cache_control(&format!("{}/index.js", host.base_url())).await;
+    let hashed_cache =
+        read_cache_control(&format!("{}/assets/runtime-Cx9aB2.wasm", host.base_url())).await;
 
     assert_eq!(page_status, StatusCode::OK);
     assert!(String::from_utf8_lossy(&page).contains("/index.js"));
@@ -356,6 +369,8 @@ async fn serves_the_page_the_bundle_and_the_registered_files() {
     assert_eq!(asset_status, StatusCode::OK);
     assert_eq!(String::from_utf8_lossy(&asset), BUNDLE_ASSET);
     assert_eq!(missing_status, StatusCode::NOT_FOUND);
+    assert_eq!(entry_cache, "no-store");
+    assert_eq!(hashed_cache, "public, max-age=31536000, immutable");
     host.close().await;
 }
 

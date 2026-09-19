@@ -20,6 +20,8 @@ pub(crate) const LOADER_HTML: &str = concat!(
     "</body></html>"
 );
 pub(crate) const NO_STORE: &str = "no-store";
+const IMMUTABLE: &str = "public, max-age=31536000, immutable";
+const HASHED_ASSETS: &str = "assets/";
 pub(crate) const OCTET_STREAM: &str = "application/octet-stream";
 
 pub struct Asset {
@@ -54,14 +56,23 @@ pub enum Bundle {
 
 impl Bundle {
     pub(crate) async fn send(&self, pathname: &str) -> Option<Response<Body>> {
-        match self {
+        let relative = read_relative(pathname)?;
+        let mut response = match self {
             Self::Directory(root) => {
-                let path = resolve_asset(root, pathname)?;
-                let content_type = read_content_type(&path);
-                send_file(&path, content_type).await
+                let path = root.join(relative);
+                send_file(&path, read_content_type(&path)).await?
             }
-            Self::Assets(assets) => assets.get(read_relative(pathname)?).map(send_asset),
-        }
+            Self::Assets(assets) => send_asset(assets.get(relative)?),
+        };
+        let cache_control = if relative.starts_with(HASHED_ASSETS) {
+            IMMUTABLE
+        } else {
+            NO_STORE
+        };
+        response
+            .headers_mut()
+            .insert(CACHE_CONTROL, HeaderValue::from_static(cache_control));
+        Some(response)
     }
 }
 
