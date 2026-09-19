@@ -71,11 +71,20 @@ impl Workspace {
     }
 
     fn create_queue_with_idle(&self, runner: Arc<dyn StepRunner>, idle: Duration) -> Arc<Queue> {
+        self.create_queue_with_timing(runner, Duration::from_mins(1), idle)
+    }
+
+    fn create_queue_with_timing(
+        &self,
+        runner: Arc<dyn StepRunner>,
+        interval: Duration,
+        idle: Duration,
+    ) -> Arc<Queue> {
         Queue::create(QueueOptions {
             reader: Arc::new(Reader::open(&self.database_path()).expect("the reader should open")),
             writer: Arc::new(Writer::open(&self.database_path()).expect("the writer should open")),
             runner,
-            interval: Duration::from_mins(1),
+            interval,
             idle_limit: idle,
         })
     }
@@ -536,4 +545,48 @@ async fn keeps_the_first_cancel_when_another_project_is_cancelled() {
         processing.step(ProcessingStep::Separation).status,
         StepStatus::Pending
     );
+}
+
+#[tokio::test]
+async fn holds_a_finished_step_until_its_status_is_written() {
+    let workspace = Workspace::new();
+    workspace.execute(
+        "CREATE TRIGGER refuse_done BEFORE UPDATE OF status ON ProcessingStep
+         WHEN NEW.status = 'done'
+         BEGIN SELECT RAISE(ABORT, 'the disk refused the write'); END;",
+    );
+    let runner = FakeRunner::create(&workspace, Answer::Complete);
+    let queue = workspace.create_queue_with_timing(
+        runner.clone(),
+        Duration::from_millis(10),
+        Duration::from_mins(1),
+    );
+    let worker = tokio::spawn({
+        let draining = Arc::clone(&queue);
+        async move { draining.drain().await }
+    });
+    runner.wait_seen(1).await;
+    sleep(Duration::from_millis(100)).await;
+
+    assert_eq!(runner.seen(), vec!["separation"]);
+    let refused = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    assert_eq!(
+        refused.step(ProcessingStep::Separation).status,
+        StepStatus::Processing
+    );
+
+    workspace.execute("DROP TRIGGER refuse_done;");
+    worker
+        .await
+        .expect("the drain should finish once writes succeed");
+
+    assert_eq!(runner.seen().len(), 6);
+    let processing = queue
+        .processing(1)
+        .await
+        .expect("the summary should be built");
+    assert!(processing.done);
 }

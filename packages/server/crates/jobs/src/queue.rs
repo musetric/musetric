@@ -299,16 +299,15 @@ impl Queue {
 
     async fn settle(&self, project_id: i64, step: ProcessingStep, answer: &StepAnswer) {
         let (status, error) = self.resolve(project_id, step, answer);
-        let _ = self
-            .write_status(StepUpdate {
-                project_id,
-                step,
-                status,
-                error,
-                required: StepStatus::Processing,
-                attempt_id: None,
-            })
-            .await;
+        self.persist(StepUpdate {
+            project_id,
+            step,
+            status,
+            error,
+            required: StepStatus::Processing,
+            attempt_id: None,
+        })
+        .await;
         if let Ok(mut cancelled) = self.cancelled.lock() {
             cancelled.remove(&project_id);
         }
@@ -374,6 +373,15 @@ impl Queue {
             return false;
         }
         let Ok(states) = self.read_states(job.project_id).await else {
+            self.persist(StepUpdate {
+                project_id: job.project_id,
+                step: job.step,
+                status: StepStatus::Pending,
+                error: None,
+                required: StepStatus::Processing,
+                attempt_id: None,
+            })
+            .await;
             return false;
         };
         let Ok(mut running) = self.running.lock() else {
@@ -408,6 +416,12 @@ impl Queue {
             project_id: running.step.project_id,
             processing,
         });
+    }
+
+    async fn persist(&self, update: StepUpdate) {
+        while self.write_status(update.clone()).await.is_err() {
+            sleep(self.interval).await;
+        }
     }
 
     async fn write_status(&self, update: StepUpdate) -> Result<bool, BoxedError> {
