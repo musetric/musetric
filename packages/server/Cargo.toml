@@ -28,11 +28,11 @@ sha2 = "=0.11.0"
 time = { version = "=0.3.55", features = ["formatting", "macros"] }
 tokio = { version = "=1.53.1", features = [
   "fs",
-  "io-std",
   "io-util",
   "macros",
   "net",
   "rt-multi-thread",
+  "signal",
   "sync",
   "time",
 ] }
