@@ -101,6 +101,7 @@ pub struct PendingJob {
     pub blob_id: String,
 }
 
+#[derive(Clone)]
 pub struct StepUpdate {
     pub project_id: i64,
     pub step: ProcessingStep,
