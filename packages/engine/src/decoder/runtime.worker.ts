@@ -141,10 +141,24 @@ export const createDecoderWorkerRuntime = (
   const audioDecode = createAudioDecode({ playerPort, spectrogramPort });
 
   let recordingStream: RecordingStream | undefined = undefined;
+  let recordingSessionId: string | undefined = undefined;
   let recordingReady = false;
   let backendRevision = 0;
 
   let recordingController: RecordingController | undefined = undefined;
+
+  const applyRecordingState = (
+    started: boolean,
+    connection: ProjectRealtime,
+  ): void => {
+    recordingReady = started;
+    if (!started) {
+      recordingStream?.notifyFinished();
+      return;
+    }
+    recordingStream?.notifyStarted();
+    connection.flush();
+  };
 
   const realtime = createProjectRealtime({
     isRecordingReady: () => recordingReady,
@@ -159,15 +173,13 @@ export const createDecoderWorkerRuntime = (
         });
         return;
       }
-      if (event.type === 'recording.finished') {
-        recordingStream?.notifyFinished();
-        recordingReady = false;
-        return;
-      }
-      if (event.type === 'recording.started') {
-        recordingReady = true;
-        recordingStream?.notifyStarted();
-        realtime.flush();
+      if (
+        event.type === 'recording.started' ||
+        event.type === 'recording.finished'
+      ) {
+        if (event.sessionId === recordingSessionId) {
+          applyRecordingState(event.type === 'recording.started', realtime);
+        }
         return;
       }
       if (event.type === 'player.play') {
@@ -285,8 +297,10 @@ export const createDecoderWorkerRuntime = (
           );
         },
       });
+      recordingSessionId = crypto.randomUUID();
       realtime.sendJson({
         type: 'recording.start',
+        sessionId: recordingSessionId,
         sampleRate: message.sampleRate,
         frameCount: message.frameCount,
         latencyFrameCount: message.latencyFrameCount,

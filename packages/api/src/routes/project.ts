@@ -168,13 +168,13 @@ export namespace realtime {
   export type Response = z.infer<typeof base.responseSchema>;
 
   export type Event =
-    | { type: 'recording.started' }
+    | { type: 'recording.started'; sessionId: string }
     | {
         type: 'recording.peaksChanged';
         startPeakIndex: number;
         peaks: number[];
       }
-    | { type: 'recording.finished' }
+    | { type: 'recording.finished'; sessionId: string }
     | { type: 'error'; error: string }
     | { type: 'player.play' }
     | { type: 'player.record' }

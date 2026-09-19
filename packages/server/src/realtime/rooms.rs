@@ -16,6 +16,13 @@ const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 
 pub(crate) type MemberId = u64;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Begin {
+    Started,
+    Saving,
+    Busy,
+}
+
 pub(crate) struct FrameIndexUpdate {
     pub(crate) frame_index: f64,
     pub(crate) frozen: bool,
@@ -59,6 +66,7 @@ struct Room {
     members: HashMap<MemberId, UnboundedSender<Message>>,
     player: Option<Player>,
     session_owner: Option<MemberId>,
+    saving: bool,
 }
 
 impl Room {
@@ -67,6 +75,7 @@ impl Room {
             members: HashMap::new(),
             player: None,
             session_owner: None,
+            saving: false,
         }
     }
 
@@ -224,15 +233,24 @@ impl Rooms {
         });
     }
 
-    pub(crate) fn begin_session(&self, project_id: i64, member: MemberId) -> bool {
-        let started = self.with_room(project_id, |room| {
-            if room.session_owner.is_some() {
-                return false;
+    pub(crate) fn begin_session(&self, project_id: i64, member: MemberId) -> Begin {
+        let started = self.with_room(project_id, |room| match room.session_owner {
+            Some(_) if room.saving => Begin::Saving,
+            Some(_) => Begin::Busy,
+            None => {
+                room.session_owner = Some(member);
+                Begin::Started
             }
-            room.session_owner = Some(member);
-            true
         });
-        started.unwrap_or(false)
+        started.unwrap_or(Begin::Busy)
+    }
+
+    pub(crate) fn save_session(&self, project_id: i64, member: MemberId) {
+        self.in_room(project_id, |room| {
+            if room.session_owner == Some(member) {
+                room.saving = true;
+            }
+        });
     }
 
     pub(crate) fn end_session(&self, project_id: i64, member: MemberId) {
@@ -242,6 +260,7 @@ impl Rooms {
         };
         if room.session_owner == Some(member) {
             room.session_owner = None;
+            room.saving = false;
         }
         forget_idle_room(&mut projects, project_id);
     }
@@ -301,7 +320,7 @@ fn frame_index_event(player: &Player, from_user: bool) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{Rooms, events};
+    use super::{Begin, Rooms, events};
 
     #[test]
     fn forgets_a_room_once_the_last_member_leaves() {
@@ -310,13 +329,13 @@ mod tests {
         rooms.claim_master(1, member, false);
         rooms.leave(1, member);
 
-        rooms.broadcast_event(1, &events::recording_finished(), None);
-        rooms.send_to(1, member, &events::recording_finished());
+        rooms.broadcast_event(1, &events::recording_finished("take"), None);
+        rooms.send_to(1, member, &events::recording_finished("take"));
         rooms.stop_player(1);
         rooms.request_sync(1, member);
         rooms.end_session(1, member);
         assert!(!rooms.claim_master(1, member, false));
-        assert!(!rooms.begin_session(1, member));
+        assert_eq!(rooms.begin_session(1, member), Begin::Busy);
 
         assert_eq!(rooms.room_count(), 0);
     }
@@ -325,14 +344,28 @@ mod tests {
     fn holds_the_recording_until_its_session_ends() {
         let rooms = Rooms::create();
         let (owner, _owner_outgoing) = rooms.join(1);
-        assert!(rooms.begin_session(1, owner));
+        assert_eq!(rooms.begin_session(1, owner), Begin::Started);
         rooms.leave(1, owner);
         let (next, _next_outgoing) = rooms.join(1);
 
-        assert!(!rooms.begin_session(1, next));
+        assert_eq!(rooms.begin_session(1, next), Begin::Busy);
+        rooms.save_session(1, owner);
+        assert_eq!(rooms.begin_session(1, next), Begin::Saving);
         rooms.end_session(1, owner);
 
-        assert!(rooms.begin_session(1, next));
+        assert_eq!(rooms.begin_session(1, next), Begin::Started);
+    }
+
+    #[test]
+    fn marks_only_its_own_session_as_saving() {
+        let rooms = Rooms::create();
+        let (owner, _owner_outgoing) = rooms.join(1);
+        let (other, _other_outgoing) = rooms.join(1);
+        rooms.begin_session(1, owner);
+
+        rooms.save_session(1, other);
+
+        assert_eq!(rooms.begin_session(1, other), Begin::Busy);
     }
 
     #[test]
