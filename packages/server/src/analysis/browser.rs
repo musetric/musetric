@@ -18,7 +18,7 @@ use tokio::{fs::write, sync::mpsc};
 use uuid::Uuid;
 
 use crate::{
-    analysis::{AnalysisContext, json_units::JsonUnits},
+    analysis::{AnalysisContext, json_units::JsonUnits, result_check::check_result},
     blobs::{StagedBlob, close_area, ensure_area, stage_blob, step_area},
     publish::publish,
     storage::write_database,
@@ -151,6 +151,7 @@ async fn analyze(
         decoded: &mut decoded,
     })
     .await?;
+    let duration = sample_duration(pcm.len() / 4, analysis.sample_rate);
     let result = drive(DriveJob {
         context,
         job,
@@ -160,9 +161,18 @@ async fn analyze(
         files,
     })
     .await?;
+    check_result(analysis.stored, &result, duration)?;
     report(StepPhase::Saving);
     store(context, job, analysis.stored, &result).await?;
     Ok(())
+}
+
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a track holds far fewer samples than f64 represents exactly"
+)]
+pub(crate) fn sample_duration(samples: usize, sample_rate: u32) -> f64 {
+    samples as f64 / f64::from(sample_rate)
 }
 
 struct DriveJob<'drive> {

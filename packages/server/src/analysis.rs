@@ -3,6 +3,7 @@ mod checkpoint_persist;
 mod gains;
 mod json_units;
 pub(crate) mod models;
+mod result_check;
 mod separation;
 mod stage_attempt;
 mod stage_units;
