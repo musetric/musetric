@@ -14,8 +14,8 @@ const asString = (value: unknown): string | undefined =>
 const asNumber = (value: unknown): number | undefined =>
   typeof value === 'number' ? value : undefined;
 
-const asBoolean = (value: unknown): boolean =>
-  typeof value === 'boolean' && value;
+const asBoolean = (value: unknown): boolean | undefined =>
+  typeof value === 'boolean' ? value : undefined;
 
 const parse = (text: string): Record<string, unknown> | undefined => {
   try {
@@ -31,11 +31,16 @@ export type ExecutorReady = {
   shaderF16: boolean;
 };
 
-const readReady = (message: Record<string, unknown>): ExecutorReady => ({
-  type: 'ready',
-  adapter: asBoolean(message['adapter']),
-  shaderF16: asBoolean(message['shaderF16']),
-});
+const readReady = (
+  message: Record<string, unknown>,
+): ExecutorReady | undefined => {
+  const adapter = asBoolean(message['adapter']);
+  const shaderF16 = asBoolean(message['shaderF16']);
+  if (adapter === undefined || shaderF16 === undefined) {
+    return undefined;
+  }
+  return { type: 'ready', adapter, shaderF16 };
+};
 
 export type ExecutorRunning = {
   type: 'running';
