@@ -3,7 +3,7 @@ use axum::{
     http::{HeaderValue, header::CONTENT_TYPE},
     response::Response,
 };
-use musetric_db::ProjectItem;
+use musetric_db::{ProjectItem, StemLoudness};
 use musetric_jobs::{Processing, STEP_ORDER, StepPhase, StepView, StepWait};
 use serde_json::{Map, Value, json};
 
@@ -39,19 +39,31 @@ pub(crate) async fn respond_with_item(state: &RouteState, project_id: i64) -> Re
 pub(crate) async fn read_item(state: &RouteState, project_id: i64) -> Result<Value, Failure> {
     let found = read(&state.storage, move |reader| reader.project(project_id)).await?;
     let project = found.ok_or_else(|| Failure::NotFound(missing_message(project_id)))?;
-    build_item(state, &project).await
+    load_item(state, &project).await
 }
 
 pub(crate) async fn read_items(state: &RouteState) -> Result<Value, Failure> {
-    let projects = read(&state.storage, musetric_db::Reader::projects).await?;
-    let mut items = Vec::with_capacity(projects.len());
-    for project in &projects {
-        items.push(build_item(state, project).await?);
+    let overview = read(&state.storage, musetric_db::Reader::project_overview).await?;
+    let mut items = Vec::with_capacity(overview.projects.len());
+    for project in &overview.projects {
+        let measured = overview
+            .loudness
+            .get(&project.id)
+            .map_or(&[][..], Vec::as_slice);
+        let states = overview
+            .states
+            .get(&project.id)
+            .map_or(&[][..], Vec::as_slice);
+        let processing = state
+            .queue
+            .summarize(project.id, states)
+            .map_err(Failure::failed)?;
+        items.push(build_item(project, measured, &processing));
     }
     Ok(Value::Array(items))
 }
 
-async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, Failure> {
+async fn load_item(state: &RouteState, project: &ProjectItem) -> Result<Value, Failure> {
     let project_id = project.id;
     let measured = read(&state.storage, move |reader| {
         reader.stem_loudness(project_id)
@@ -62,6 +74,10 @@ async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, 
         .processing(project_id)
         .await
         .map_err(Failure::failed)?;
+    Ok(build_item(project, &measured, &processing))
+}
+
+fn build_item(project: &ProjectItem, measured: &[StemLoudness], processing: &Processing) -> Value {
     let mut item = Map::new();
     item.insert("id".to_owned(), json!(project.id));
     item.insert("name".to_owned(), json!(project.name));
@@ -73,11 +89,11 @@ async fn build_item(state: &RouteState, project: &ProjectItem) -> Result<Value, 
             json!(format!("/api/preview/{preview_id}")),
         );
     }
-    if let Some(gains) = read_gains(&measured) {
+    if let Some(gains) = read_gains(measured) {
         item.insert("audioAnalysis".to_owned(), build_analysis(&gains));
     }
-    item.insert("processing".to_owned(), build_processing(&processing));
-    Ok(Value::Object(item))
+    item.insert("processing".to_owned(), build_processing(processing));
+    Value::Object(item)
 }
 
 fn build_analysis(gains: &Gains) -> Value {

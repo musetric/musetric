@@ -1,4 +1,6 @@
-use rusqlite::{Connection, OptionalExtension, Result, Transaction};
+use std::collections::HashMap;
+
+use rusqlite::{Connection, OptionalExtension, Params, Result, Transaction};
 
 use crate::audio::MasterType;
 
@@ -48,25 +50,50 @@ pub(crate) fn read_stem_loudness(
     connection: &Connection,
     project_id: i64,
 ) -> Result<Vec<StemLoudness>> {
-    let mut statement = connection.prepare(
-        "SELECT stemType, integratedLufs, truePeakDb, p95RmsDb
-         FROM StemLoudness
-         WHERE projectId = ?1",
-    )?;
-    let rows = statement.query_map([project_id], |row| {
-        let name: String = row.get(0)?;
-        Ok((name, row.get(1)?, row.get(2)?, row.get(3)?))
+    Ok(
+        query_stem_loudness(connection, "WHERE projectId = ?1", [project_id])?
+            .into_iter()
+            .map(|(_, measured)| measured)
+            .collect(),
+    )
+}
+
+pub(crate) fn read_all_stem_loudness(
+    connection: &Connection,
+) -> Result<HashMap<i64, Vec<StemLoudness>>> {
+    let mut grouped: HashMap<i64, Vec<StemLoudness>> = HashMap::new();
+    for (project_id, measured) in query_stem_loudness(connection, "", [])? {
+        grouped.entry(project_id).or_default().push(measured);
+    }
+    Ok(grouped)
+}
+
+fn query_stem_loudness(
+    connection: &Connection,
+    filter: &str,
+    params: impl Params,
+) -> Result<Vec<(i64, StemLoudness)>> {
+    let mut statement = connection.prepare(&format!(
+        "SELECT projectId, stemType, integratedLufs, truePeakDb, p95RmsDb
+         FROM StemLoudness {filter}"
+    ))?;
+    let rows = statement.query_map(params, |row| {
+        let name: String = row.get(1)?;
+        Ok((row.get(0)?, name, row.get(2)?, row.get(3)?, row.get(4)?))
     })?;
     let mut measured = Vec::new();
     for row in rows {
-        let (name, integrated_lufs, true_peak_db, p95_rms_db) = row?;
+        let (project_id, name, integrated_lufs, true_peak_db, p95_rms_db) = row?;
         if let Some(stem) = MasterType::parse(&name) {
-            measured.push(StemLoudness {
-                stem,
-                integrated_lufs,
-                true_peak_db,
-                p95_rms_db,
-            });
+            measured.push((
+                project_id,
+                StemLoudness {
+                    stem,
+                    integrated_lufs,
+                    true_peak_db,
+                    p95_rms_db,
+                },
+            ));
         }
     }
     Ok(measured)

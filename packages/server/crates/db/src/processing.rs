@@ -1,4 +1,6 @@
-use rusqlite::{Connection, OptionalExtension, Result, Transaction};
+use std::collections::HashMap;
+
+use rusqlite::{Connection, OptionalExtension, Params, Result, Transaction};
 
 use crate::audio::MasterType;
 
@@ -177,25 +179,50 @@ pub(crate) fn read_pending(
 }
 
 pub(crate) fn read_states(connection: &Connection, project_id: i64) -> Result<Vec<StepState>> {
-    let mut statement = connection
-        .prepare("SELECT step, status, error FROM ProcessingStep WHERE projectId = ?1")?;
-    let rows = statement.query_map([project_id], |row| {
-        let name: String = row.get(0)?;
-        let recorded: String = row.get(1)?;
-        let error: Option<String> = row.get(2)?;
-        Ok((name, recorded, error))
+    Ok(
+        query_states(connection, "WHERE projectId = ?1", [project_id])?
+            .into_iter()
+            .map(|(_, state)| state)
+            .collect(),
+    )
+}
+
+pub(crate) fn read_all_states(connection: &Connection) -> Result<HashMap<i64, Vec<StepState>>> {
+    let mut grouped: HashMap<i64, Vec<StepState>> = HashMap::new();
+    for (project_id, state) in query_states(connection, "", [])? {
+        grouped.entry(project_id).or_default().push(state);
+    }
+    Ok(grouped)
+}
+
+fn query_states(
+    connection: &Connection,
+    filter: &str,
+    params: impl Params,
+) -> Result<Vec<(i64, StepState)>> {
+    let mut statement = connection.prepare(&format!(
+        "SELECT projectId, step, status, error FROM ProcessingStep {filter}"
+    ))?;
+    let rows = statement.query_map(params, |row| {
+        let name: String = row.get(1)?;
+        let recorded: String = row.get(2)?;
+        let error: Option<String> = row.get(3)?;
+        Ok((row.get(0)?, name, recorded, error))
     })?;
     let mut found = Vec::new();
     for row in rows {
-        let (name, recorded, error) = row?;
+        let (project_id, name, recorded, error) = row?;
         if let Some(step) = ProcessingStep::parse(&name)
             && let Some(status) = StepStatus::parse(&recorded)
         {
-            found.push(StepState {
-                step,
-                status,
-                error,
-            });
+            found.push((
+                project_id,
+                StepState {
+                    step,
+                    status,
+                    error,
+                },
+            ));
         }
     }
     Ok(found)

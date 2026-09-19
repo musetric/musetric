@@ -124,6 +124,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lists_each_project_as_its_own_item_reads_it() {
+        let workspace = Workspace::new();
+        workspace.seed(
+            "INSERT INTO Project (id, name, sampleRate, frameCount)
+             VALUES (1, 'First', 44100, 441000), (2, 'Second', 44100, 882000),
+                    (3, 'Third', 48000, 480000);
+             INSERT INTO ProcessingStep (projectId, step, status, error)
+             VALUES (1, 'separation', 'done', NULL), (1, 'voices', 'failed', 'the voices failed'),
+                    (2, 'separation', 'done', NULL), (2, 'voices', 'done', NULL),
+                    (2, 'transcription', 'pending', NULL), (3, 'separation', 'pending', NULL);
+             INSERT INTO StemLoudness (projectId, stemType, integratedLufs, truePeakDb, p95RmsDb)
+             VALUES (2, 'source', -9.0, -0.5, -12.0), (2, 'instrumental', -11.0, -1.0, -14.0),
+                    (2, 'lead', -15.0, -2.0, -18.0), (2, 'backing', -21.0, -4.0, -25.0),
+                    (3, 'source', -8.0, -0.2, NULL);",
+        );
+        let router = create_test_router(&workspace).await;
+
+        let listed: serde_json::Value = serde_json::from_str(
+            &read_body(request(router.clone(), "/api/project/list").await).await,
+        )
+        .expect("the list should be json");
+        let items = listed.as_array().expect("the list should be an array");
+        assert_eq!(items.len(), 3);
+        for item in items {
+            let id = item["id"].as_i64().expect("the item should carry its id");
+            let alone: serde_json::Value = serde_json::from_str(
+                &read_body(request(router.clone(), &format!("/api/project/{id}")).await).await,
+            )
+            .expect("the item should be json");
+            assert_eq!(item, &alone);
+        }
+    }
+
+    #[tokio::test]
     async fn announces_the_executor_document_on_the_loopback() {
         let workspace = Workspace::new();
 
