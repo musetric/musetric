@@ -32,6 +32,7 @@
     "eslint": "catalog:",
     "onnxruntime-web": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "zod": "catalog:"
   }
 }

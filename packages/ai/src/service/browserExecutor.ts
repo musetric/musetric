@@ -4,10 +4,9 @@ import { createUnitServer } from './browserUnitServing.js';
 import {
   type ExecutorLogLevel,
   type ExecutorMessage,
-  isPingCommand,
+  type HostCommand,
   type JobCommand,
-  readJobCommand,
-  readUnitEvent,
+  readHostCommand,
 } from './jobProtocol.js';
 
 export const executorLockName = 'musetric-executor';
@@ -135,22 +134,34 @@ const serveConnection = async (
       send({ type: 'ready', ...support });
     });
   });
-  socket.addEventListener('message', (event: MessageEvent<unknown>) => {
-    if (typeof event.data !== 'string') {
-      return;
-    }
-    if (isPingCommand(event.data)) {
+  const obey = (command: HostCommand): void => {
+    if (command.type === 'ping') {
       send({ type: 'pong' });
       return;
     }
-    const unitEvent = readUnitEvent(event.data);
-    if (unitEvent) {
-      unitServer.dispatch(unitEvent);
+    if (command.type === 'job') {
+      acceptJob(command);
       return;
     }
-    const command = readJobCommand(event.data);
+    unitServer.dispatch(command);
+  };
+  const read = (text: string): HostCommand | undefined => {
+    try {
+      return readHostCommand(text);
+    } catch (error) {
+      send({
+        type: 'log',
+        level: 'error',
+        message: `The executor cannot read a host message: ${describeLogged(error)}`,
+      });
+      close();
+      return undefined;
+    }
+  };
+  socket.addEventListener('message', (event: MessageEvent<string>) => {
+    const command = read(event.data);
     if (command) {
-      acceptJob(command);
+      obey(command);
     }
   });
 

@@ -145,9 +145,6 @@ export const startFakeHost = async (): Promise<FakeHost> => {
     }
     socket.on('message', (data) => {
       const message = readExecutorMessage(String(data));
-      if (!message) {
-        return;
-      }
       if (message.type === 'ready') {
         readies.push(message);
         ready.resolve(message);

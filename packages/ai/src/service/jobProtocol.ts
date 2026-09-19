@@ -1,278 +1,122 @@
+import { z } from 'zod/mini';
+
 export const jobSocketPath = '/jobs';
 
-const asObject = (value: unknown): Record<string, unknown> | undefined => {
-  if (typeof value !== 'object' || !value) {
-    return undefined;
-  }
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return value as Record<string, unknown>;
-};
+const jobId = z.string();
+const attemptId = z.string();
 
-const asString = (value: unknown): string | undefined =>
-  typeof value === 'string' ? value : undefined;
+const pingCommandSchema = z.object({ type: z.literal('ping') });
 
-const asNumber = (value: unknown): number | undefined =>
-  typeof value === 'number' ? value : undefined;
+const jobCommandSchema = z.object({
+  type: z.literal('job'),
+  jobId,
+  api: z.string(),
+  request: z.unknown(),
+});
 
-const asBoolean = (value: unknown): boolean | undefined =>
-  typeof value === 'boolean' ? value : undefined;
+const unitCommandSchema = z.object({
+  type: z.literal('unit'),
+  jobId,
+  attemptId,
+  unit: z.number(),
+  unitCount: z.number(),
+});
 
-const parse = (text: string): Record<string, unknown> | undefined => {
-  try {
-    return asObject(JSON.parse(text));
-  } catch {
-    return undefined;
-  }
-};
+const unitCloseCommandSchema = z.object({
+  type: z.literal('unitClose'),
+  jobId,
+  attemptId,
+});
 
-export type ExecutorReady = {
-  type: 'ready';
-  adapter: boolean;
-  shaderF16: boolean;
-};
+const hostCommandSchema = z.discriminatedUnion('type', [
+  pingCommandSchema,
+  jobCommandSchema,
+  unitCommandSchema,
+  unitCloseCommandSchema,
+]);
 
-const readReady = (
-  message: Record<string, unknown>,
-): ExecutorReady | undefined => {
-  const adapter = asBoolean(message['adapter']);
-  const shaderF16 = asBoolean(message['shaderF16']);
-  if (adapter === undefined || shaderF16 === undefined) {
-    return undefined;
-  }
-  return { type: 'ready', adapter, shaderF16 };
-};
-
-export type ExecutorRunning = {
-  type: 'running';
-  jobId: string;
-  pass: 'decode' | 'repair';
-  unit: number;
-  unitCount: number;
-};
-
-const readPass = (value: unknown): ExecutorRunning['pass'] | undefined => {
-  const pass = asString(value);
-  return pass === 'decode' || pass === 'repair' ? pass : undefined;
-};
-
-const readRunning = (
-  message: Record<string, unknown>,
-  jobId: string,
-): ExecutorRunning | undefined => {
-  const pass = readPass(message['pass']);
-  const unit = asNumber(message['unit']);
-  const unitCount = asNumber(message['unitCount']);
-  if (pass === undefined || unit === undefined || unitCount === undefined) {
-    return undefined;
-  }
-  return { type: 'running', jobId, pass, unit, unitCount };
-};
-
-export type ExecutorFailure = {
-  type: 'failed';
-  jobId: string;
-  error: string;
-};
-
-const readFailure = (
-  message: Record<string, unknown>,
-  jobId: string,
-): ExecutorFailure | undefined => {
-  const error = asString(message['error']);
-  return error === undefined ? undefined : { type: 'failed', jobId, error };
-};
-
-const readAttemptId = (message: Record<string, unknown>): string | undefined =>
-  asString(message['attemptId']);
-
-export type ExecutorUnitOpened = {
-  type: 'unitOpened';
-  jobId: string;
-  attemptId: string;
-};
-
-const readUnitOpened = (
-  message: Record<string, unknown>,
-  jobId: string,
-): ExecutorUnitOpened | undefined => {
-  const attemptId = readAttemptId(message);
-  return attemptId === undefined
-    ? undefined
-    : { type: 'unitOpened', jobId, attemptId };
-};
-
-export type ExecutorUnitDone = {
-  type: 'unitDone';
-  jobId: string;
-  attemptId: string;
-  unit: number;
-};
-
-const readUnitDone = (
-  message: Record<string, unknown>,
-  jobId: string,
-): ExecutorUnitDone | undefined => {
-  const attemptId = readAttemptId(message);
-  const unit = asNumber(message['unit']);
-  if (attemptId === undefined || unit === undefined) {
-    return undefined;
-  }
-  return { type: 'unitDone', jobId, attemptId, unit };
-};
-
-export const isPingCommand = (text: string): boolean =>
-  asString(parse(text)?.['type']) === 'ping';
-
-export type ExecutorLogLevel = 'error' | 'warn';
-
-export type ExecutorLog = {
-  type: 'log';
-  level: ExecutorLogLevel;
-  message: string;
-};
-
-const readLog = (message: Record<string, unknown>): ExecutorLog | undefined => {
-  const { level } = message;
-  const text = asString(message['message']);
-  if ((level !== 'error' && level !== 'warn') || text === undefined) {
-    return undefined;
-  }
-  return { type: 'log', level, message: text };
-};
-
-export type ExecutorResult = {
-  type: 'result';
-  jobId: string;
-  result: unknown;
-};
-
-export type ExecutorLoading = {
-  type: 'loading';
-  jobId: string;
-};
-
-export type ExecutorJobMessage =
-  | ExecutorLoading
-  | ExecutorRunning
-  | ExecutorResult
-  | ExecutorFailure
-  | ExecutorUnitOpened
-  | ExecutorUnitDone;
-
-export type ExecutorAlive = {
-  type: 'pong';
-};
-
-export type ExecutorMessage =
-  | ExecutorReady
-  | ExecutorAlive
-  | ExecutorLog
-  | ExecutorJobMessage;
-
-export const readExecutorMessage = (
-  text: string,
-): ExecutorMessage | undefined => {
-  const message = parse(text);
-  if (!message) {
-    return undefined;
-  }
-  const kind = asString(message['type']);
-  if (kind === 'pong') {
-    return { type: 'pong' };
-  }
-  if (kind === 'ready') {
-    return readReady(message);
-  }
-  if (kind === 'log') {
-    return readLog(message);
-  }
-  const jobId = asString(message['jobId']);
-  if (jobId === undefined) {
-    return undefined;
-  }
-  if (kind === 'loading') {
-    return { type: 'loading', jobId };
-  }
-  if (kind === 'running') {
-    return readRunning(message, jobId);
-  }
-  if (kind === 'result') {
-    return { type: 'result', jobId, result: message['result'] };
-  }
-  if (kind === 'failed') {
-    return readFailure(message, jobId);
-  }
-  if (kind === 'unitOpened') {
-    return readUnitOpened(message, jobId);
-  }
-  if (kind === 'unitDone') {
-    return readUnitDone(message, jobId);
-  }
-  return undefined;
-};
-
-export type JobCommand = {
-  type: 'job';
-  jobId: string;
-  api: string;
-  request: unknown;
-};
-
-export const readJobCommand = (text: string): JobCommand | undefined => {
-  const message = parse(text);
-  if (!message || asString(message['type']) !== 'job') {
-    return undefined;
-  }
-  const jobId = asString(message['jobId']);
-  const api = asString(message['api']);
-  if (jobId === undefined || api === undefined) {
-    return undefined;
-  }
-  return {
-    type: 'job',
-    jobId,
-    api,
-    request: message['request'],
-  };
-};
-
-export type UnitCommand = {
-  type: 'unit';
-  jobId: string;
-  attemptId: string;
-  unit: number;
-  unitCount: number;
-};
-
-export type UnitCloseCommand = {
-  type: 'unitClose';
-  jobId: string;
-  attemptId: string;
-};
-
+export type JobCommand = z.infer<typeof jobCommandSchema>;
+export type UnitCommand = z.infer<typeof unitCommandSchema>;
+export type UnitCloseCommand = z.infer<typeof unitCloseCommandSchema>;
 export type UnitEvent = UnitCommand | UnitCloseCommand;
+export type HostCommand = z.infer<typeof hostCommandSchema>;
 
-export const readUnitEvent = (text: string): UnitEvent | undefined => {
-  const message = parse(text);
-  if (!message) {
-    return undefined;
-  }
-  const kind = asString(message['type']);
-  const jobId = asString(message['jobId']);
-  const attemptId = readAttemptId(message);
-  if (jobId === undefined || attemptId === undefined) {
-    return undefined;
-  }
-  if (kind === 'unitClose') {
-    return { type: 'unitClose', jobId, attemptId };
-  }
-  if (kind !== 'unit') {
-    return undefined;
-  }
-  const unit = asNumber(message['unit']);
-  const unitCount = asNumber(message['unitCount']);
-  if (unit === undefined || unitCount === undefined) {
-    return undefined;
-  }
-  return { type: 'unit', jobId, attemptId, unit, unitCount };
-};
+export const readHostCommand = (text: string): HostCommand =>
+  hostCommandSchema.parse(JSON.parse(text));
+
+const readySchema = z.object({
+  type: z.literal('ready'),
+  adapter: z.boolean(),
+  shaderF16: z.boolean(),
+});
+
+const aliveSchema = z.object({ type: z.literal('pong') });
+
+const logLevelSchema = z.enum(['error', 'warn']);
+
+const logSchema = z.object({
+  type: z.literal('log'),
+  level: logLevelSchema,
+  message: z.string(),
+});
+
+const loadingSchema = z.object({ type: z.literal('loading'), jobId });
+
+const runningSchema = z.object({
+  type: z.literal('running'),
+  jobId,
+  pass: z.enum(['decode', 'repair']),
+  unit: z.number(),
+  unitCount: z.number(),
+});
+
+const resultSchema = z.object({
+  type: z.literal('result'),
+  jobId,
+  result: z.optional(z.unknown()),
+});
+
+const failureSchema = z.object({
+  type: z.literal('failed'),
+  jobId,
+  error: z.string(),
+});
+
+const unitOpenedSchema = z.object({
+  type: z.literal('unitOpened'),
+  jobId,
+  attemptId,
+});
+
+const unitDoneSchema = z.object({
+  type: z.literal('unitDone'),
+  jobId,
+  attemptId,
+  unit: z.number(),
+});
+
+const executorMessageSchema = z.discriminatedUnion('type', [
+  readySchema,
+  aliveSchema,
+  logSchema,
+  loadingSchema,
+  runningSchema,
+  resultSchema,
+  failureSchema,
+  unitOpenedSchema,
+  unitDoneSchema,
+]);
+
+export type ExecutorReady = z.infer<typeof readySchema>;
+export type ExecutorLogLevel = z.infer<typeof logLevelSchema>;
+export type ExecutorJobMessage =
+  | z.infer<typeof loadingSchema>
+  | z.infer<typeof runningSchema>
+  | z.infer<typeof resultSchema>
+  | z.infer<typeof failureSchema>
+  | z.infer<typeof unitOpenedSchema>
+  | z.infer<typeof unitDoneSchema>;
+export type ExecutorMessage = z.infer<typeof executorMessageSchema>;
+
+export const readExecutorMessage = (text: string): ExecutorMessage =>
+  executorMessageSchema.parse(JSON.parse(text));
