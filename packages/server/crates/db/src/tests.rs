@@ -1,6 +1,7 @@
 use std::{
     fs::{copy, create_dir_all, read_dir, remove_dir_all, write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
@@ -33,6 +34,8 @@ const FAILING_THIRD_STEP: Migration = &[
 const DANGLING_STEP: Migration =
     &["INSERT INTO AudioMaster (projectId, type, blobId) VALUES (404, 'lead', 'orphan')"];
 
+static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 struct Workspace {
     directory: PathBuf,
 }
@@ -40,12 +43,13 @@ struct Workspace {
 impl Workspace {
     fn new() -> Self {
         let directory = std::env::temp_dir().join(format!(
-            "musetric-db-{}-{:?}",
+            "musetric-db-{}-{:?}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            WORKSPACE_COUNT.fetch_add(1, Ordering::Relaxed)
         ));
         create_dir_all(&directory).unwrap();
         Self { directory }
