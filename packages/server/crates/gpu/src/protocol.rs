@@ -62,8 +62,8 @@ pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
     }
     if kind == "ready" {
         return Some(ExecutorMessage::Ready {
-            adapter: read_flag(&message, "adapter"),
-            shader_f16: read_flag(&message, "shaderF16"),
+            adapter: message.get("adapter")?.as_bool()?,
+            shader_f16: message.get("shaderF16")?.as_bool()?,
         });
     }
     let job_id = message.get("jobId")?.as_str()?.to_owned();
@@ -140,8 +140,4 @@ pub(crate) fn write_unit_close(job_id: &str, attempt_id: &str) -> String {
         "attemptId": attempt_id,
     })
     .to_string()
-}
-
-fn read_flag(message: &Value, name: &str) -> bool {
-    message.get(name).and_then(Value::as_bool).unwrap_or(false)
 }
