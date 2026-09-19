@@ -189,12 +189,7 @@ async fn start_recording(
     start: RecordingStart,
 ) -> bool {
     if !rooms.claim_master(connection.project_id, connection.member, true) {
-        connection.ignoring_recording_stream = true;
-        rooms.send_to(
-            connection.project_id,
-            connection.member,
-            &events::recording_finished(),
-        );
+        refuse_recording(rooms, connection);
         return true;
     }
     if finish_session(rooms, connection).await.is_err() {
@@ -202,8 +197,9 @@ async fn start_recording(
         return false;
     }
     if !rooms.begin_session(connection.project_id, connection.member) {
-        channel.fail("Failed to start recording session").await;
-        return false;
+        rooms.stop_player(connection.project_id);
+        refuse_recording(rooms, connection);
+        return true;
     }
     let created = session::Session::create(
         &connection.storage,
@@ -220,6 +216,15 @@ async fn start_recording(
     connection.session = Some(session);
     rooms.broadcast_event(connection.project_id, &events::recording_started(), None);
     true
+}
+
+fn refuse_recording(rooms: &Rooms, connection: &mut Connection) {
+    connection.ignoring_recording_stream = true;
+    rooms.send_to(
+        connection.project_id,
+        connection.member,
+        &events::recording_finished(),
+    );
 }
 
 async fn finish_recording(
@@ -305,10 +310,11 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
         return Ok(());
     };
     let finished = session.finish(&connection.storage).await;
+    if finished.is_ok() {
+        rooms.broadcast_event(connection.project_id, &events::recording_finished(), None);
+    }
     rooms.end_session(connection.project_id, connection.member);
-    finished?;
-    rooms.broadcast_event(connection.project_id, &events::recording_finished(), None);
-    Ok(())
+    finished
 }
 
 struct RecordingStart {
@@ -677,6 +683,48 @@ mod tests {
             receive_json(&mut owner).await,
             json!({ "type": "recording.finished" })
         );
+    }
+
+    #[tokio::test]
+    async fn refuses_a_recorder_while_another_session_holds_the_recording() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
+        let (mut owner, mut listener) = start_recording_room(&base).await;
+        send_json(&mut listener, json!({ "type": "player.stop" })).await;
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "player.stop" })
+        );
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "player.stop" })
+        );
+
+        send_json(&mut listener, start_message(FRAME_COUNT)).await;
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "player.stop" })
+        );
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.finished" })
+        );
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "player.record" })
+        );
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "player.stop" })
+        );
+
+        send_packet(&mut listener, chunk(0, &[0.5_f32])).await;
+        expect_silence(&mut owner).await;
+
+        let expected_packet = chunk(0, &[0.25_f32]);
+        send_packet(&mut owner, expected_packet.clone()).await;
+        assert_eq!(receive_binary(&mut listener).await, expected_packet);
     }
 
     #[tokio::test]
