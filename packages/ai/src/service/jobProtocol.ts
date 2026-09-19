@@ -123,6 +123,23 @@ const readUnitDone = (
 export const isPingCommand = (text: string): boolean =>
   asString(parse(text)?.['type']) === 'ping';
 
+export type ExecutorLogLevel = 'error' | 'warn';
+
+export type ExecutorLog = {
+  type: 'log';
+  level: ExecutorLogLevel;
+  message: string;
+};
+
+const readLog = (message: Record<string, unknown>): ExecutorLog | undefined => {
+  const { level } = message;
+  const text = asString(message['message']);
+  if ((level !== 'error' && level !== 'warn') || text === undefined) {
+    return undefined;
+  }
+  return { type: 'log', level, message: text };
+};
+
 export type ExecutorResult = {
   type: 'result';
   jobId: string;
@@ -149,6 +166,7 @@ export type ExecutorAlive = {
 export type ExecutorMessage =
   | ExecutorReady
   | ExecutorAlive
+  | ExecutorLog
   | ExecutorJobMessage;
 
 export const readExecutorMessage = (
@@ -164,6 +182,9 @@ export const readExecutorMessage = (
   }
   if (kind === 'ready') {
     return readReady(message);
+  }
+  if (kind === 'log') {
+    return readLog(message);
   }
   const jobId = asString(message['jobId']);
   if (jobId === undefined) {

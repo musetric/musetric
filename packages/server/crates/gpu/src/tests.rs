@@ -24,8 +24,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 use crate::{
     files::{Asset, Assets, Bundle},
     host::{
-        BoxedError, ExecutorFailure, ExecutorHost, ExecutorSession, ExecutorSessionOptions,
-        JobTicket, Liveness, PhaseSink,
+        BoxedError, EXECUTOR_LOG, ExecutorFailure, ExecutorHost, ExecutorSession,
+        ExecutorSessionOptions, JobTicket, Liveness, PhaseSink,
     },
     protocol::{ExecutorPass, ExecutorPhase},
     units::{UnitCompleted, UnitReject, UnitSession, UnitTarget},
@@ -818,4 +818,73 @@ async fn fails_the_job_when_a_done_event_points_outside_the_plan() {
         "the done event points outside the plan"
     );
     host.close().await;
+}
+
+struct CapturedLog;
+
+static CAPTURED: Mutex<Vec<(log::Level, String)>> = Mutex::new(Vec::new());
+static CAPTURE: CapturedLog = CapturedLog;
+
+impl log::Log for CapturedLog {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.target() == EXECUTOR_LOG
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata())
+            && let Ok(mut lines) = CAPTURED.lock()
+        {
+            lines.push((record.level(), record.args().to_string()));
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+fn captured() -> Vec<(log::Level, String)> {
+    CAPTURED
+        .lock()
+        .map(|lines| lines.clone())
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn writes_executor_log_lines_to_the_host_log() {
+    let _ = log::set_logger(&CAPTURE);
+    log::set_max_level(log::LevelFilter::Warn);
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = start_host(&workspace, false, &reported).await;
+    let mut executor = connect_executor(&host).await;
+
+    reply(
+        &mut executor,
+        &json!({ "type": "log", "level": "error", "message": "the runtime threw 31203688" }),
+    )
+    .await;
+    reply(
+        &mut executor,
+        &json!({ "type": "log", "level": "info", "message": "not a level the executor sends" }),
+    )
+    .await;
+    reply(
+        &mut executor,
+        &json!({ "type": "log", "level": "warn", "message": "the adapter lost its device" }),
+    )
+    .await;
+    for _ in 0..200 {
+        if captured().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    host.close().await;
+
+    assert_eq!(
+        captured(),
+        vec![
+            (log::Level::Error, "the runtime threw 31203688".to_owned()),
+            (log::Level::Warn, "the adapter lost its device".to_owned()),
+        ]
+    );
 }

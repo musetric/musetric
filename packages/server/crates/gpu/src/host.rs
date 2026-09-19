@@ -45,6 +45,7 @@ pub(crate) struct Liveness {
     pub(crate) silence: Duration,
 }
 
+pub(crate) const EXECUTOR_LOG: &str = "executor";
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_LIVENESS: Liveness = Liveness {
     ping: Duration::from_secs(15),
@@ -264,11 +265,21 @@ impl HostState {
         if matches!(read, ExecutorMessage::Alive) {
             return;
         }
+        if let ExecutorMessage::Log {
+            level,
+            message: line,
+        } = read
+        {
+            log::log!(target: EXECUTOR_LOG, level, "{line}");
+            return;
+        }
         let Some(session) = self.session() else {
             return;
         };
         match read {
-            ExecutorMessage::Ready { .. } | ExecutorMessage::Alive => {}
+            ExecutorMessage::Ready { .. }
+            | ExecutorMessage::Alive
+            | ExecutorMessage::Log { .. } => {}
             ExecutorMessage::Phase(phase) => (session.on_phase)(phase),
             ExecutorMessage::Answer { job_id, result } => session.answer(&job_id, Ok(result)),
             ExecutorMessage::Failure { job_id, error } => {

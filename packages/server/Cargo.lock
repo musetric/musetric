@@ -2836,6 +2836,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "log",
  "reqwest",
  "serde_json",
  "sha2 0.11.0",

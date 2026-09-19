@@ -1,6 +1,6 @@
 import { serveOrtWasmFromBundle } from '../runtime/ortWasm.js';
 import { analyzeChords } from './browserChords.js';
-import { startJobExecutor } from './browserExecutor.js';
+import { describeLogged, startJobExecutor } from './browserExecutor.js';
 import { type BrowserJobApis } from './browserJob.js';
 import { analyzeKey } from './browserKey.js';
 import { analyzeRhythm } from './browserRhythm.js';
@@ -31,11 +31,31 @@ const readJobUrl = (): string => {
 
 serveOrtWasmFromBundle();
 
-startJobExecutor({
+const executor = startJobExecutor({
   jobUrl: readJobUrl(),
   apis,
   reconnectDelayMs: 3000,
   restart: () => {
     window.location.reload();
   },
+});
+
+const forwardConsole = (level: 'error' | 'warn'): void => {
+  const original = console[level];
+  console[level] = (...values: unknown[]) => {
+    original(...values);
+    executor.log(level, values.map(describeLogged).join(' '));
+  };
+};
+
+forwardConsole('error');
+forwardConsole('warn');
+addEventListener('error', (event) => {
+  executor.log(
+    'error',
+    `${describeLogged(event.error ?? event.message)} at ${event.filename}:${event.lineno}`,
+  );
+});
+addEventListener('unhandledrejection', (event) => {
+  executor.log('error', `Unhandled rejection: ${describeLogged(event.reason)}`);
 });
