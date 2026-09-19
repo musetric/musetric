@@ -12,12 +12,12 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started() -> Value {
-    json!({ "type": "recording.started" })
+pub(crate) fn recording_started(session_id: &str) -> Value {
+    json!({ "type": "recording.started", "sessionId": session_id })
 }
 
-pub(crate) fn recording_finished() -> Value {
-    json!({ "type": "recording.finished" })
+pub(crate) fn recording_finished(session_id: &str) -> Value {
+    json!({ "type": "recording.finished", "sessionId": session_id })
 }
 
 pub(crate) fn peaks_changed(start_peak_index: usize, peaks: &[f32]) -> Value {

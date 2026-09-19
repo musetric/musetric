@@ -4,7 +4,11 @@ mod packet;
 mod rooms;
 mod session;
 
-use std::{num::ParseIntError, sync::Arc};
+use std::{
+    num::ParseIntError,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use axum::{
     Router,
@@ -22,6 +26,9 @@ use crate::{
 };
 
 pub(crate) use rooms::Rooms;
+
+const SAVE_WAIT: Duration = Duration::from_secs(30);
+const SAVE_POLL: Duration = Duration::from_millis(50);
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new().route("/api/project/{projectId}/realtime", get(upgrade))
@@ -95,8 +102,13 @@ struct Connection {
     project_id: i64,
     member: rooms::MemberId,
     storage: Arc<Storage>,
-    session: Option<session::Session>,
-    ignoring_recording_stream: bool,
+    take: Option<Take>,
+    refused: Option<String>,
+}
+
+struct Take {
+    session: session::Session,
+    id: String,
 }
 
 impl Connection {
@@ -105,8 +117,8 @@ impl Connection {
             project_id,
             member,
             storage,
-            session: None,
-            ignoring_recording_stream: false,
+            take: None,
+            refused: None,
         }
     }
 }
@@ -189,16 +201,16 @@ async fn start_recording(
     start: RecordingStart,
 ) -> bool {
     if !rooms.claim_master(connection.project_id, connection.member, true) {
-        refuse_recording(rooms, connection);
+        refuse_recording(rooms, connection, start.session_id);
         return true;
     }
     if finish_session(rooms, connection).await.is_err() {
         channel.fail("Failed to start recording session").await;
         return false;
     }
-    if !rooms.begin_session(connection.project_id, connection.member) {
+    if !begin_after_save(rooms, connection).await {
         rooms.stop_player(connection.project_id);
-        refuse_recording(rooms, connection);
+        refuse_recording(rooms, connection, start.session_id);
         return true;
     }
     let created = session::Session::create(
@@ -218,18 +230,38 @@ async fn start_recording(
             return false;
         }
     };
-    connection.session = Some(session);
-    rooms.broadcast_event(connection.project_id, &events::recording_started(), None);
+    rooms.broadcast_event(
+        connection.project_id,
+        &events::recording_started(&start.session_id),
+        None,
+    );
+    connection.take = Some(Take {
+        session,
+        id: start.session_id,
+    });
     true
 }
 
-fn refuse_recording(rooms: &Rooms, connection: &mut Connection) {
-    connection.ignoring_recording_stream = true;
+async fn begin_after_save(rooms: &Rooms, connection: &Connection) -> bool {
+    let deadline = Instant::now() + SAVE_WAIT;
+    loop {
+        match rooms.begin_session(connection.project_id, connection.member) {
+            rooms::Begin::Started => return true,
+            rooms::Begin::Saving if Instant::now() < deadline => {
+                tokio::time::sleep(SAVE_POLL).await;
+            }
+            rooms::Begin::Saving | rooms::Begin::Busy => return false,
+        }
+    }
+}
+
+fn refuse_recording(rooms: &Rooms, connection: &mut Connection, session_id: String) {
     rooms.send_to(
         connection.project_id,
         connection.member,
-        &events::recording_finished(),
+        &events::recording_finished(&session_id),
     );
+    connection.refused = Some(session_id);
 }
 
 async fn finish_recording(
@@ -237,12 +269,11 @@ async fn finish_recording(
     rooms: &Rooms,
     connection: &mut Connection,
 ) -> bool {
-    if connection.ignoring_recording_stream {
-        connection.ignoring_recording_stream = false;
+    if let Some(refused) = connection.refused.take() {
         rooms.send_to(
             connection.project_id,
             connection.member,
-            &events::recording_finished(),
+            &events::recording_finished(&refused),
         );
         return true;
     }
@@ -259,10 +290,10 @@ async fn handle_packet(
     connection: &mut Connection,
     raw_packet: &[u8],
 ) -> bool {
-    if connection.ignoring_recording_stream {
+    if connection.refused.is_some() {
         return true;
     }
-    let Some(session) = connection.session.as_mut() else {
+    let Some(Take { session, .. }) = connection.take.as_mut() else {
         channel
             .close(
                 CLOSE_UNSUPPORTED,
@@ -311,12 +342,17 @@ async fn write_packet(
 }
 
 async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<(), BoxedError> {
-    let Some(session) = connection.session.take() else {
+    let Some(Take { session, id }) = connection.take.take() else {
         return Ok(());
     };
+    rooms.save_session(connection.project_id, connection.member);
     let finished = session.finish(&connection.storage).await;
     if finished.is_ok() {
-        rooms.broadcast_event(connection.project_id, &events::recording_finished(), None);
+        rooms.broadcast_event(
+            connection.project_id,
+            &events::recording_finished(&id),
+            None,
+        );
     }
     rooms.end_session(connection.project_id, connection.member);
     finished
@@ -325,18 +361,21 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
 struct RecordingStart {
     sample_rate: i64,
     frame_count: i64,
+    session_id: String,
 }
 
 fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<RecordingStart> {
     let sample_rate = read_integer(event.get("sampleRate")?)?;
     let frame_count = read_integer(event.get("frameCount")?)?;
     let latency_frame_count = read_integer(event.get("latencyFrameCount")?)?;
+    let session_id = event.get("sessionId")?.as_str()?.to_owned();
     if sample_rate == 0 || frame_count < 0 || latency_frame_count < 0 {
         return None;
     }
     Some(RecordingStart {
         sample_rate,
         frame_count,
+        session_id,
     })
 }
 
@@ -397,6 +436,10 @@ mod tests {
       VALUES (1, 'Fixture project', 48000, 480000);
     ";
     const FRAME_COUNT: usize = 4;
+    const LONG_TAKE: usize = 48_000 * 300;
+    const OWNER_TAKE: &str = "owner-take";
+    const LISTENER_TAKE: &str = "listener-take";
+    const SECOND_TAKE: &str = "second-take";
     const SILENCE: Duration = Duration::from_millis(300);
 
     type ClientSocket = tokio_tungstenite::WebSocketStream<
@@ -497,12 +540,13 @@ mod tests {
             .expect("the audio packet should send");
     }
 
-    fn start_message(frame_count: usize) -> Value {
+    fn start_message(session_id: &str, frame_count: usize) -> Value {
         json!({
             "type": "recording.start",
             "sampleRate": 48000,
             "frameCount": frame_count,
             "latencyFrameCount": 0,
+            "sessionId": session_id,
         })
     }
 
@@ -515,11 +559,11 @@ mod tests {
         send_json(owner, json!({ "type": "recording.finish" })).await;
         assert_eq!(
             receive_json(owner).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
         );
         assert_eq!(
             receive_json(listener).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
         );
     }
 
@@ -532,12 +576,19 @@ mod tests {
     }
 
     async fn start_recording_room(base: &str) -> (ClientSocket, ClientSocket) {
+        start_recording_room_for(base, FRAME_COUNT).await
+    }
+
+    async fn start_recording_room_for(
+        base: &str,
+        frame_count: usize,
+    ) -> (ClientSocket, ClientSocket) {
         let mut owner = connect(base).await;
         let mut listener = connect(base).await;
-        send_json(&mut owner, start_message(FRAME_COUNT)).await;
+        send_json(&mut owner, start_message(OWNER_TAKE, frame_count)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started" })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE })
         );
         assert_eq!(
             receive_json(&mut listener).await,
@@ -545,7 +596,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started" })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE })
         );
         (owner, listener)
     }
@@ -640,7 +691,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
         );
 
         send_json(&mut listener, json!({ "type": "player.play" })).await;
@@ -665,7 +716,7 @@ mod tests {
         let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
-        send_json(&mut listener, start_message(FRAME_COUNT)).await;
+        send_json(&mut listener, start_message(LISTENER_TAKE, FRAME_COUNT)).await;
         assert_eq!(
             receive_json(&mut listener).await,
             json!({
@@ -679,7 +730,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": LISTENER_TAKE })
         );
 
         send_packet(&mut listener, chunk(0, &[0.5_f32])).await;
@@ -688,13 +739,13 @@ mod tests {
         send_json(&mut listener, json!({ "type": "recording.finish" })).await;
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": LISTENER_TAKE })
         );
 
         send_json(&mut owner, json!({ "type": "recording.finish" })).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
         );
     }
 
@@ -714,14 +765,14 @@ mod tests {
             json!({ "type": "player.stop" })
         );
 
-        send_json(&mut listener, start_message(FRAME_COUNT)).await;
+        send_json(&mut listener, start_message(LISTENER_TAKE, FRAME_COUNT)).await;
         assert_eq!(
             receive_json(&mut listener).await,
             json!({ "type": "player.stop" })
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
+            json!({ "type": "recording.finished", "sessionId": LISTENER_TAKE })
         );
         assert_eq!(
             receive_json(&mut owner).await,
@@ -738,6 +789,30 @@ mod tests {
         let expected_packet = chunk(0, &[0.25_f32]);
         send_packet(&mut owner, expected_packet.clone()).await;
         assert_eq!(receive_binary(&mut listener).await, expected_packet);
+    }
+
+    #[tokio::test]
+    async fn starts_a_new_take_once_the_previous_one_is_saved() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
+        let (owner, mut listener) = start_recording_room_for(&base, LONG_TAKE).await;
+
+        drop(owner);
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "player.stop" })
+        );
+        send_json(&mut listener, start_message(LISTENER_TAKE, FRAME_COUNT)).await;
+
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+        );
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE })
+        );
     }
 
     #[tokio::test]
@@ -818,14 +893,14 @@ mod tests {
         finish_take(&mut owner, &mut listener).await;
         let reserved = stored_recording(&storage);
 
-        send_json(&mut owner, start_message(FRAME_COUNT * 2)).await;
+        send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT * 2)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started" })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE })
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started" })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE })
         );
 
         let samples = [0.25_f32; FRAME_COUNT * 2];
@@ -856,7 +931,7 @@ mod tests {
         let audio = musetric_db::blob_path(&storage.blobs_path, &recording.blob_id);
         std::fs::remove_file(&audio).expect("the recording wav should be removed");
 
-        send_json(&mut owner, start_message(FRAME_COUNT)).await;
+        send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT)).await;
 
         assert_eq!(
             receive_json(&mut owner).await,
