@@ -22,6 +22,13 @@ pub(crate) struct StageResume {
     pub(crate) next_unit: u32,
 }
 
+pub(crate) struct FoldSnapshot {
+    pub(crate) prefix: Vec<u8>,
+    pub(crate) settled: u64,
+    pub(crate) tail: Vec<u8>,
+    pub(crate) record_bytes: usize,
+}
+
 pub(crate) struct StageRegistration {
     pub(crate) attempt: String,
     pub(crate) plan: UnitPlan,
@@ -141,13 +148,29 @@ impl StageUnits {
             .map_err(|_| Failure::Refused("the unit fold was dropped".to_owned()))
     }
 
-    pub(crate) fn snapshot(&self, attempt: &str) -> Result<Vec<u8>, Failure> {
+    pub(crate) fn snapshot(
+        &self,
+        attempt: &str,
+        next_unit: u32,
+        committed: u64,
+    ) -> Result<FoldSnapshot, Failure> {
         let stage = self.stage(attempt)?;
         let fold = stage
             .fold
             .lock()
             .map_err(|_| Failure::Refused("the stage fold is poisoned".to_owned()))?;
-        Ok(fold.to_bytes())
+        let frames = fold.frames();
+        let settled = stage.plan.settled_frames(next_unit as usize, frames);
+        let reached = stage
+            .plan
+            .reached_frames(next_unit as usize, frames)
+            .max(settled);
+        Ok(FoldSnapshot {
+            prefix: fold.records(committed, settled),
+            settled,
+            tail: fold.records(settled, reached),
+            record_bytes: fold.record_bytes(),
+        })
     }
 
     pub(crate) fn next_unit(&self, attempt: &str) -> Result<u32, Failure> {

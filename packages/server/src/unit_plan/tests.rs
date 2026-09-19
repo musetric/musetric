@@ -200,3 +200,23 @@ fn weighs_the_lead_backing_window_symmetrically() {
     assert!(f64::from(plan.weight(last, 0)).abs() < 1e-7);
     let _ = layout;
 }
+
+#[test]
+fn settles_the_frames_no_remaining_window_can_touch() {
+    let plan = UnitPlan::create(
+        PlanRules::LeadBackingV1,
+        2,
+        5,
+        [0, 3, 6, 9, 7]
+            .into_iter()
+            .map(|start| PlanUnit { start, length: 5 })
+            .collect(),
+    );
+    assert_eq!(plan.settled_frames(0, 12), 0);
+    assert_eq!(plan.settled_frames(2, 12), 6);
+    assert_eq!(plan.settled_frames(3, 12), 7);
+    assert_eq!(plan.settled_frames(5, 12), 12);
+    assert_eq!(plan.reached_frames(0, 12), 0);
+    assert_eq!(plan.reached_frames(2, 12), 8);
+    assert_eq!(plan.reached_frames(4, 12), 12);
+}

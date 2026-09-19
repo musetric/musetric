@@ -1,6 +1,9 @@
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use musetric_db::{PendingJob, ProcessingStep, blob_path};
@@ -20,20 +23,21 @@ use crate::{
             Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
             require_executor,
         },
-        checkpoint_persist::{CheckpointCursor, persist_tail},
+        checkpoint_persist::{CheckpointCursor, PrefixAppend, persist_tail},
         models::VOCALS,
         stage_units::{StageRegistration, StageResume, StageUnits},
         stem_files::read_at,
     },
     blobs::{StagedBlob, close_area, ensure_area, step_area},
-    checkpoint::{CheckpointDir, area_root, restore_refused},
+    checkpoint::{CheckpointDir, area_root, computation_id, restore_refused},
     storage::{read_database, write_database},
-    unit_fold::FoldAccumulator,
+    unit_fold::{FoldAccumulator, record_bytes},
 };
 
 pub(crate) const UNIT_OUTPUT: &str = "separated";
 const API_NAME: &str = "musetricAiSeparateUnits";
 const CHECKPOINT_EVERY: u32 = 2;
+const FOLD_FORMAT: &str = "fold-prefix-v1";
 const NOT_ACTIVE: &str = "the attempt is not active";
 
 pub(crate) struct StageRun<'run> {
@@ -101,6 +105,7 @@ pub(crate) struct StageAttempt<'run> {
     pass: &'static str,
     computation: String,
     store: CheckpointDir,
+    committed_prefix: AtomicU64,
 }
 
 impl<'run> StageAttempt<'run> {
@@ -108,11 +113,12 @@ impl<'run> StageAttempt<'run> {
         running: &'run StageRun<'run>,
         start: StageStart<'_>,
     ) -> Result<Self, Failure> {
+        let computation = computation_id(&[FOLD_FORMAT, &start.computation]);
         let store = CheckpointDir::create(area_root(
             &running.context.storage.work_path,
             running.project_id,
             running.step.name(),
-            &start.computation,
+            &computation,
         ));
         store
             .write_input(start.input)
@@ -135,8 +141,9 @@ impl<'run> StageAttempt<'run> {
             units,
             reported,
             pass: start.pass,
-            computation: start.computation,
+            computation,
             store,
+            committed_prefix: AtomicU64::new(0),
         })
     }
 
@@ -188,8 +195,15 @@ impl<'run> StageAttempt<'run> {
                 "the tail hash does not match",
             )));
         }
-        let fold = FoldAccumulator::from_bytes(&tail.bytes, frames, channels)
+        let settled = u64::from(cursor.prefix_frames);
+        let prefix = self
+            .store
+            .read_prefix(settled * record_bytes(channels) as u64)
+            .await
+            .map_err(|_| Failure::Refused(restore_refused("the prefix file is short")))?;
+        let fold = FoldAccumulator::restore(frames, channels, &prefix, &tail.bytes)
             .ok_or_else(|| Failure::Refused(restore_refused("the tail is not a fold")))?;
+        self.committed_prefix.store(settled, Ordering::Relaxed);
         Ok(Some(StageResume {
             fold,
             next_unit: cursor.next_unit,
@@ -277,11 +291,18 @@ impl<'run> StageAttempt<'run> {
         if next_unit != count && !next_unit.is_multiple_of(CHECKPOINT_EVERY) {
             return Ok(());
         }
-        let bytes = self.units.snapshot(attempt)?;
+        let committed = self.committed_prefix.load(Ordering::Relaxed);
+        let snapshot = self.units.snapshot(attempt, next_unit, committed)?;
+        let prefix = PrefixAppend {
+            committed_bytes: committed * snapshot.record_bytes as u64,
+            bytes: snapshot.prefix,
+            frames: u32::try_from(snapshot.settled)
+                .map_err(|_| Failure::Refused("the track is too long to checkpoint".to_owned()))?,
+        };
         persist_tail(
             &self.running.context.storage,
             &self.store,
-            bytes,
+            snapshot.tail,
             CheckpointCursor {
                 project_id: self.running.project_id,
                 step: self.running.step,
@@ -290,9 +311,13 @@ impl<'run> StageAttempt<'run> {
                 pass: self.pass,
                 next_unit,
                 unit_count: count,
+                prefix: Some(prefix),
             },
         )
-        .await
+        .await?;
+        self.committed_prefix
+            .store(snapshot.settled, Ordering::Relaxed);
+        Ok(())
     }
 }
 

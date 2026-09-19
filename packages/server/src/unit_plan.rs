@@ -163,6 +163,24 @@ impl UnitPlan {
         u32::try_from(self.units.len()).unwrap_or(0)
     }
 
+    pub(crate) fn settled_frames(&self, next_unit: usize, frames: u64) -> u64 {
+        self.units[next_unit..]
+            .iter()
+            .map(|unit| unit.start)
+            .min()
+            .unwrap_or(frames)
+            .min(frames)
+    }
+
+    pub(crate) fn reached_frames(&self, next_unit: usize, frames: u64) -> u64 {
+        self.units[..next_unit]
+            .iter()
+            .map(|unit| unit.start + u64::from(unit.length))
+            .max()
+            .unwrap_or(0)
+            .min(frames)
+    }
+
     #[must_use]
     pub(crate) fn weight(&self, index: usize, position: u32) -> f32 {
         let length = self.units[index].length;
