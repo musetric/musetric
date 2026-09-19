@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use musetric_server::{Bundle, EmbeddedServerOptions, ExecutorSurface, Frontend, start_embedded};
+use musetric_server::{Bundle, EmbeddedServerOptions, Frontend, start_embedded};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(desktop)]
@@ -15,6 +15,8 @@ use tauri_plugin_window_state::StateFlags;
 use crate::assets::TauriAssets;
 
 mod assets;
+#[cfg(target_os = "android")]
+mod executor_view;
 #[cfg(desktop)]
 mod lifecycle;
 #[cfg(desktop)]
@@ -27,10 +29,6 @@ const MAIN_WINDOW: &str = "main";
 const EXECUTOR_WINDOW: &str = "executor";
 #[cfg(desktop)]
 const EXECUTOR_TITLE: &str = "Musetric executor";
-#[cfg(desktop)]
-const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::Shell;
-#[cfg(mobile)]
-const EXECUTOR_SURFACE: ExecutorSurface = ExecutorSurface::ForegroundPage;
 const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
 #[cfg(desktop)]
@@ -53,7 +51,10 @@ pub fn run() {
 }
 
 fn run_app() -> tauri::Result<()> {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(executor_view::init());
+    let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(desktop)]
             let root = setup_desktop_lifecycle(app)?;
@@ -76,7 +77,6 @@ fn run_app() -> tauri::Result<()> {
                         APP_PREFIX,
                     ))),
                     processing: true,
-                    executor_surface: EXECUTOR_SURFACE,
                 }));
             #[cfg(desktop)]
             let server = match server_result {
@@ -89,11 +89,13 @@ fn run_app() -> tauri::Result<()> {
             #[cfg(mobile)]
             let server = server_result.map_err(|error| io::Error::other(error.to_string()))?;
             let url = WebviewUrl::External(server.url().parse()?);
-            #[cfg(desktop)]
-            let executor_url = WebviewUrl::External(server.executor_url().parse()?);
+            #[cfg(any(desktop, target_os = "android"))]
+            let executor_url = server.executor_url().to_owned();
             app.manage(server);
             #[cfg(desktop)]
-            create_executor_window(app.handle(), executor_url)?;
+            create_executor_window(app.handle(), WebviewUrl::External(executor_url.parse()?))?;
+            #[cfg(target_os = "android")]
+            executor_view::open(app.handle(), &executor_url)?;
             create_main_window(app.handle(), url)?;
             Ok(())
         })

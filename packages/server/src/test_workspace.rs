@@ -19,7 +19,6 @@ use musetric_gpu::{
     Bundle, ExecutorHost, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
 };
 
-use crate::serve::ExecutorSurface;
 use musetric_jobs::{
     Queue, QueueOptions, StepAnswer, StepOutcome, StepReport, StepRunner, StepWaiting,
 };
@@ -189,15 +188,10 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         interval: QUEUE_INTERVAL,
         idle_limit: QUEUE_INTERVAL,
     });
-    let executor = ExecutorHost::start(Bundle::Directory(workspace.unit_bundle_path()))
-        .await
-        .expect("the executor host should start");
     RouteState {
         rooms: Arc::new(Rooms::create()),
         storage,
         queue,
-        executor,
-        executor_surface: ExecutorSurface::Page,
         models_path: workspace.models_path(),
     }
 }

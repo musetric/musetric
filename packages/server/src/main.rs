@@ -65,6 +65,12 @@ struct Arguments {
         help = "PEM private key for the public HTTPS listener."
     )]
     private_key: Option<PathBuf>,
+
+    #[arg(
+        long,
+        help = "Chrome, Edge or Chromium that runs the gpu executor headless; found in the usual places when omitted."
+    )]
+    browser: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -88,6 +94,7 @@ async fn main() -> Result<(), BoxedError> {
         processing: arguments.processing,
         tls_self_signed: arguments.tls_self_signed,
         tls,
+        browser: arguments.browser,
     })
     .await
 }

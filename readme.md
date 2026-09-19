@@ -9,6 +9,8 @@ yarn
 yarn dev
 ```
 
+The server runs the models in a headless Chrome, Edge or Chromium that it starts itself, so one of them must be installed; `--browser` points it at a specific one.
+
 ## License
 
 Musetric's source code is [MIT licensed](https://github.com/musetric/musetric/blob/main/license.md).
