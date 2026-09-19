@@ -38,7 +38,7 @@ const OVERFLOWED: &str = "The flac header value does not fit its field";
 struct FramePosition {
     first_sample: u64,
     offset: u64,
-    bytes: u16,
+    samples: u16,
 }
 
 pub(crate) struct FlacWriter {
@@ -122,11 +122,10 @@ impl FlacWriter {
         let encoded = sink.as_slice();
         self.smallest_frame = self.smallest_frame.min(encoded.len());
         self.largest_frame = self.largest_frame.max(encoded.len());
-        let frame_bytes = u64::try_from(BLOCK_FRAMES)?;
         self.frame_positions.push(FramePosition {
-            first_sample: u64::try_from(number)? * frame_bytes,
-            offset: self.header_byte_length as u64 + self.written_bytes,
-            bytes: u16::try_from(encoded.len()).unwrap_or(0),
+            first_sample: u64::try_from(number)? * u64::try_from(BLOCK_FRAMES)?,
+            offset: self.written_bytes,
+            samples: u16::try_from(self.pending.len() / CHANNELS)?,
         });
         self.written_bytes += encoded.len() as u64;
         self.file.write_all(encoded)?;
@@ -235,10 +234,10 @@ fn seek_table(
             point[..size_of::<u64>()].fill(0xff);
             continue;
         };
-        point[..size_of::<u64>()].copy_from_slice(&sample.to_be_bytes());
+        point[..size_of::<u64>()].copy_from_slice(&position.first_sample.to_be_bytes());
         point[size_of::<u64>()..size_of::<u64>() * 2]
             .copy_from_slice(&position.offset.to_be_bytes());
-        point[size_of::<u64>() * 2..].copy_from_slice(&position.bytes.to_be_bytes());
+        point[size_of::<u64>() * 2..].copy_from_slice(&position.samples.to_be_bytes());
     }
     Ok(table)
 }
@@ -269,6 +268,15 @@ fn quantize(value: f32) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, path::Path};
+
+    use symphonia::core::{
+        formats::{FormatOptions, SeekMode, SeekTo, TrackType, probe::Hint},
+        io::{MediaSourceStream, MediaSourceStreamOptions},
+        meta::MetadataOptions,
+        units::Timestamp,
+    };
+
     use super::{
         BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
         containing_frame, raw_byte_length, seek_spacing, seek_table,
@@ -288,8 +296,12 @@ mod tests {
             u64::from_be_bytes(self.0[8..16].try_into().expect("the offset is 8 bytes"))
         }
 
-        fn bytes(&self) -> u16 {
-            u16::from_be_bytes(self.0[16..18].try_into().expect("the size is 2 bytes"))
+        fn samples(&self) -> u16 {
+            u16::from_be_bytes(
+                self.0[16..18]
+                    .try_into()
+                    .expect("the sample count is 2 bytes"),
+            )
         }
 
         fn is_placeholder(&self) -> bool {
@@ -301,7 +313,7 @@ mod tests {
         super::FramePosition {
             first_sample,
             offset: first_sample * 7,
-            bytes: 4096,
+            samples: 4096,
         }
     }
 
@@ -335,6 +347,65 @@ mod tests {
         );
     }
 
+    fn first_sample_after_seek(path: &Path, target: i64) -> i64 {
+        let file = File::open(path).expect("the stream should open");
+        let source = MediaSourceStream::new(Box::new(file), MediaSourceStreamOptions::default());
+        let mut reader = symphonia::default::get_probe()
+            .probe(
+                &Hint::new(),
+                source,
+                FormatOptions::default(),
+                MetadataOptions::default(),
+            )
+            .expect("the stream should be probed");
+        let track_id = reader
+            .default_track(TrackType::Audio)
+            .expect("the stream should carry audio")
+            .id;
+        let seek = SeekTo::Timestamp {
+            ts: Timestamp::new(target),
+            track_id,
+        };
+        reader
+            .seek(SeekMode::Accurate, seek)
+            .expect("the stream should seek");
+        reader
+            .next_packet()
+            .expect("the stream should read after the seek")
+            .expect("a frame should follow the seek")
+            .pts
+            .get()
+    }
+
+    #[test]
+    fn lets_a_decoder_seek_to_the_frame_that_holds_a_sample() {
+        let blocks = 160;
+        let path =
+            std::env::temp_dir().join(format!("musetric-flac-seek-{}.flac", std::process::id()));
+        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let mut state = 1;
+        for _ in 0..BLOCK_FRAMES * blocks {
+            let sample = noise(&mut state) / 8.0;
+            writer.push(sample, sample);
+        }
+        writer.finish().expect("the stream should be finished");
+
+        let targets = [96_000, 200_000, 400_000, 600_000];
+        let landed: Vec<_> = targets
+            .iter()
+            .map(|&target| (target, first_sample_after_seek(&path, target)))
+            .collect();
+        std::fs::remove_file(&path).expect("the stream should be removed");
+
+        let frame = i64::try_from(BLOCK_FRAMES).expect("the block fits");
+        for (target, first) in landed {
+            assert!(
+                first <= target && target < first + frame,
+                "a seek to {target} landed on the frame starting at {first}"
+            );
+        }
+    }
+
     #[test]
     fn fills_a_placeholder_table_when_nothing_was_encoded() {
         let table = seek_table(&[], u64::MAX, RATE).expect("the table should be built");
@@ -363,10 +434,10 @@ mod tests {
         assert_eq!(spacing, 96_000);
         assert_eq!(points.len(), 10);
         assert_eq!(points[0].sample(), 0);
-        assert_eq!(points[1].sample(), 96_000);
         let holding_frame = position(23 * 4096);
+        assert_eq!(points[1].sample(), holding_frame.first_sample);
         assert_eq!(points[1].offset(), holding_frame.offset);
-        assert_eq!(points[1].bytes(), 4096);
+        assert_eq!(points[1].samples(), 4096);
     }
 
     #[test]
