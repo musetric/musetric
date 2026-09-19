@@ -4,9 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { endpoints } from './api/index.js';
 import { queryClient } from './api/queryClient.js';
 import { App } from './app/index.js';
+import { holdScreenWhileWorking } from './app/screenWakeLock.js';
 import { engine } from './engine/engine.js';
-import { startExecutorSurface } from './executor/executorSurface.js';
-import { holdScreenWhileWorking } from './executor/screenWakeLock.js';
 import { initI18next } from './translations/index.js';
 
 const runApp = async () => {
@@ -21,12 +20,7 @@ const runApp = async () => {
   await initI18next();
   await engine.boot();
   await queryClient.prefetchQuery(endpoints.project.list());
-  void queryClient.fetchQuery(endpoints.executor.get()).then((executor) => {
-    startExecutorSurface(executor);
-    if (executor.surface === 'foregroundPage') {
-      holdScreenWhileWorking(queryClient);
-    }
-  });
+  holdScreenWhileWorking(queryClient);
 
   createRoot(rootElement).render(
     <StrictMode>

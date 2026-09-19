@@ -1,6 +1,5 @@
 mod analysis;
 mod audio;
-mod executor;
 mod item;
 mod models;
 mod preview;
@@ -13,24 +12,19 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use musetric_gpu::ExecutorHost;
-
-use crate::{realtime, realtime::Rooms, serve::ExecutorSurface, storage::Storage};
+use crate::{realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
-    pub(crate) executor: Arc<ExecutorHost>,
-    pub(crate) executor_surface: ExecutorSurface,
     pub(crate) models_path: PathBuf,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
-        .merge(executor::create_router())
         .merge(models::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
@@ -177,23 +171,6 @@ mod tests {
             "the full set should weigh over a gigabyte"
         );
         assert_eq!(size["missingBytes"].as_u64(), Some(total));
-    }
-
-    #[tokio::test]
-    async fn announces_the_executor_document_on_the_loopback() {
-        let workspace = Workspace::new();
-
-        let response = request(create_test_router(&workspace).await, "/api/executor").await;
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let announced: serde_json::Value =
-            serde_json::from_str(&read_body(response).await).expect("the body should be json");
-        assert_eq!(announced["surface"], "page");
-        assert!(
-            announced["url"]
-                .as_str()
-                .is_some_and(|url| url.starts_with("http://127.0.0.1:"))
-        );
     }
 
     #[tokio::test]

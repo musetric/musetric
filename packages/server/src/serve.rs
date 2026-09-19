@@ -20,6 +20,7 @@ use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
+    executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
     garbage::spawn_collector,
     publish::Publication,
@@ -30,6 +31,8 @@ use crate::{
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
+const NO_BROWSER: &str =
+    "No Chrome, Edge or Chromium was found to run the gpu executor; pass --browser";
 
 pub struct ServerOptions {
     pub listen: String,
@@ -42,24 +45,7 @@ pub struct ServerOptions {
     pub processing: bool,
     pub tls_self_signed: bool,
     pub tls: Option<TlsOptions>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExecutorSurface {
-    Shell,
-    Page,
-    ForegroundPage,
-}
-
-impl ExecutorSurface {
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Shell => "shell",
-            Self::Page => "page",
-            Self::ForegroundPage => "foregroundPage",
-        }
-    }
+    pub browser: Option<PathBuf>,
 }
 
 pub struct TlsOptions {
@@ -76,7 +62,6 @@ pub struct EmbeddedServerOptions {
     pub browser_bundle: Bundle,
     pub frontend: Frontend,
     pub processing: bool,
-    pub executor_surface: ExecutorSurface,
 }
 
 pub struct EmbeddedServer {
@@ -119,17 +104,33 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
             return Err(failure.into());
         }
     }
+    let browser = match (options.processing, options.browser) {
+        (false, _) => None,
+        (true, Some(path)) => Some(path),
+        (true, None) => Some(find_browser().ok_or(NO_BROWSER)?),
+    };
+    let work = options.work.clone();
     let storage = create_storage(&options.database, options.blobs, options.work)?;
-    let app = create_app(AppOptions {
+    let CreatedApp {
+        router: app,
+        executor_url,
+    } = create_app(AppOptions {
         storage,
         models: options.models,
         browser_bundle: Bundle::Directory(options.browser_bundle),
         frontend: Frontend::from_directory(options.public),
         processing: options.processing,
-        executor_surface: ExecutorSurface::Page,
     })
-    .await?
-    .router;
+    .await?;
+    let _browser = browser
+        .map(|executable| {
+            ExecutorBrowser::start(ExecutorBrowserOptions {
+                executable,
+                work,
+                url: executor_url,
+            })
+        })
+        .transpose()?;
     let socket = bind(&options.listen)?;
     let address = socket.local_addr()?;
     let tls = match options.tls {
@@ -166,7 +167,6 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         browser_bundle: options.browser_bundle,
         frontend: options.frontend,
         processing: options.processing,
-        executor_surface: options.executor_surface,
     })
     .await?;
     let socket = bind(&options.listen)?;
@@ -197,7 +197,6 @@ struct AppOptions {
     browser_bundle: Bundle,
     frontend: Frontend,
     processing: bool,
-    executor_surface: ExecutorSurface,
 }
 
 struct CreatedApp {
@@ -230,8 +229,6 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         frontend: options.frontend,
         storage,
         queue,
-        executor: host,
-        executor_surface: options.executor_surface,
         models_path: options.models,
     });
     Ok(CreatedApp {
@@ -371,7 +368,7 @@ mod tests {
 
     use musetric_db::{OpenOptions, init_database, lock_storage, open_database};
 
-    use super::{EmbeddedServerOptions, ExecutorSurface, ServerOptions, serve, start_embedded};
+    use super::{EmbeddedServerOptions, ServerOptions, serve, start_embedded};
     use crate::{Asset, Assets, Bundle, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -415,7 +412,6 @@ mod tests {
                 work: self.root.join("storage/work"),
                 models: self.root.join("models"),
                 browser_bundle: Bundle::Directory(self.root.join("browser")),
-                executor_surface: ExecutorSurface::Page,
                 frontend: Frontend::from_assets(Arc::new(AppAssets)),
                 processing: false,
             }
@@ -490,6 +486,7 @@ mod tests {
             processing: false,
             tls_self_signed: false,
             tls: None,
+            browser: None,
         })
         .await;
         let status: String = open_database(&database, &options)

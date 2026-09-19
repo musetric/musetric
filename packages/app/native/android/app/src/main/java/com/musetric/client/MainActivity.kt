@@ -1,10 +1,7 @@
 package com.musetric.client
 
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -22,7 +19,6 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onWebViewCreate(webView: WebView) {
-    webView.addJavascriptInterface(ThermalBridge(this), "MusetricThermal")
     super.onWebViewCreate(webView)
     applyWebViewInsets(webView)
   }
@@ -39,15 +35,5 @@ class MainActivity : TauriActivity() {
       WindowInsetsCompat.CONSUMED
     }
     ViewCompat.requestApplyInsets(webView)
-  }
-}
-
-private class ThermalBridge(private val activity: MainActivity) {
-  @JavascriptInterface
-  fun status(): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-      return 0
-    }
-    return activity.getSystemService(PowerManager::class.java).currentThermalStatus
   }
 }

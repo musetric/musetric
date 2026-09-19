@@ -31,6 +31,7 @@ tokio = { version = "=1.53.1", features = [
   "io-util",
   "macros",
   "net",
+  "process",
   "rt-multi-thread",
   "signal",
   "sync",
@@ -38,6 +39,9 @@ tokio = { version = "=1.53.1", features = [
 ] }
 tokio-util = { version = "=0.7.19", features = ["io"] }
 uuid = { version = "=1.26.0", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+win32job = "=2.0.3"
 
 [dev-dependencies]
 tokio-tungstenite = "=0.29.0"
