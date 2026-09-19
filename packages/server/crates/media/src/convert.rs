@@ -15,7 +15,10 @@ use crate::{
     flac::FlacWriter,
     fmp4::Fmp4Writer,
     frames::read_flac_info,
-    pcm::{BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH},
+    pcm::{
+        BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH,
+        SourceFailure,
+    },
     resample::{Conversion, SampleRates},
 };
 
@@ -53,7 +56,10 @@ async fn encode_source(
     writer: &mut FlacWriter,
 ) -> Result<(), BoxedError> {
     let mut sink = |chunk: &[f32]| write_frames(writer, chunk);
-    source.read_pcm(request, &mut sink).await
+    source
+        .read_pcm(request, &mut sink)
+        .await
+        .map_err(|failure| SourceFailure(failure).into())
 }
 
 pub async fn convert_to_fmp4(
@@ -128,4 +134,38 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
         create_dir_all(directory).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{create_dir_all, remove_dir_all, write};
+
+    use super::convert_to_flac;
+    use crate::{PcmRequest, SourceFailure, SymphoniaPcm};
+
+    #[tokio::test]
+    async fn tells_an_unreadable_source_from_a_failed_write() {
+        let directory =
+            std::env::temp_dir().join(format!("musetric-convert-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let garbage = directory.join("song.mp3");
+        write(&garbage, b"not audio at all").expect("the input should be written");
+        let blocked = directory.join("blocked");
+        create_dir_all(&blocked).expect("the blocking directory should be created");
+        let request = PcmRequest {
+            from: &garbage,
+            sample_rate: 48_000,
+        };
+
+        let unreadable = convert_to_flac(&SymphoniaPcm, request, &directory.join("out.flac"))
+            .await
+            .expect_err("garbage should not convert");
+        let refused = convert_to_flac(&SymphoniaPcm, request, &blocked)
+            .await
+            .expect_err("a directory should not take the master");
+        remove_dir_all(&directory).expect("the workspace should be removed");
+
+        assert!(unreadable.is::<SourceFailure>());
+        assert!(!refused.is::<SourceFailure>());
+    }
 }

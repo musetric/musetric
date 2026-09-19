@@ -1,4 +1,10 @@
-use std::{future::Future, path::Path, pin::Pin};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    future::Future,
+    path::Path,
+    pin::Pin,
+};
 
 use crate::BoxedError;
 
@@ -26,6 +32,21 @@ pub trait PcmSource: Send + Sync {
         request: PcmRequest<'source>,
         sink: PcmSink<'source>,
     ) -> ReadingPcm<'source>;
+}
+
+#[derive(Debug)]
+pub struct SourceFailure(pub BoxedError);
+
+impl Display for SourceFailure {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl Error for SourceFailure {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.0.as_ref())
+    }
 }
 
 #[derive(Default)]
