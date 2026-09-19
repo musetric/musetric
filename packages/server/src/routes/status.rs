@@ -48,16 +48,13 @@ async fn handle_status(State(state): State<RouteState>) -> Response<Body> {
 async fn read_update(
     mut events: Receiver<StatusEvent>,
 ) -> Option<(Result<String, Infallible>, Receiver<StatusEvent>)> {
-    loop {
-        let update = tokio::select! {
-            received = events.recv() => received,
-            () = sleep(HEARTBEAT) => return Some((Ok(PING.to_owned()), events)),
-        };
-        match update {
-            Ok(event) => return Some((Ok(encode(&event)), events)),
-            Err(RecvError::Lagged(_)) => {}
-            Err(RecvError::Closed) => return None,
-        }
+    let update = tokio::select! {
+        received = events.recv() => received,
+        () = sleep(HEARTBEAT) => return Some((Ok(PING.to_owned()), events)),
+    };
+    match update {
+        Ok(event) => Some((Ok(encode(&event)), events)),
+        Err(RecvError::Lagged(_) | RecvError::Closed) => None,
     }
 }
 
@@ -75,7 +72,9 @@ mod tests {
         Processing, StatusEvent, StepPass, StepPhase, StepStatus, StepView, StepWait, StepWaiting,
     };
 
-    use super::encode;
+    use tokio::sync::broadcast;
+
+    use super::{encode, read_update};
 
     const EXPECTED: &str = "data: {\"processing\":{\"done\":false,\"steps\":{\
 \"chords\":{\"status\":\"pending\",\"waiting\":{\"attempt\":2,\"limit\":5,\"reason\":\"lost\"}},\
@@ -102,6 +101,25 @@ mod tests {
             error: None,
             wait: Some(wait),
         }
+    }
+
+    fn pending_update(project_id: i64) -> StatusEvent {
+        StatusEvent {
+            project_id,
+            processing: Processing {
+                done: false,
+                steps: [(); 6].map(|()| create_step(StepStatus::Pending, None)),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn ends_the_stream_of_a_client_that_fell_behind() {
+        let (sender, subscribed) = broadcast::channel(1);
+        let _ = sender.send(pending_update(1));
+        let _ = sender.send(pending_update(2));
+
+        assert!(read_update(subscribed).await.is_none());
     }
 
     #[test]

@@ -7,8 +7,13 @@ export const subscribeEventSource = <
 >(
   apiEvent: ApiEvent<Path, EventSchema>,
   callback: (event: z.infer<EventSchema>) => void,
+  resync: () => void,
 ): UnsubscribeApiEvent => {
   const source = new EventSource(apiEvent.path);
+
+  source.onopen = () => {
+    resync();
+  };
 
   source.onmessage = (event) => {
     const parsedEvent = JSON.parse(event.data);

@@ -19,38 +19,56 @@ export const get = (projectId: number) =>
       }),
   });
 
-export const subscribeToStatus = (queryClient: QueryClient) =>
-  subscribeEventSource(api.project.status.event, (event) => {
-    const applyEvent = (projectItem: api.project.Item): api.project.Item => ({
-      ...projectItem,
-      processing: event.processing,
-    });
-
-    queryClient.setQueryData(list().queryKey, (projects) => {
-      if (!projects) {
-        return projects;
-      }
-      return projects.map((projectItem) =>
-        projectItem.id === event.projectId
-          ? applyEvent(projectItem)
-          : projectItem,
-      );
-    });
-
-    queryClient.setQueryData(get(event.projectId).queryKey, (projectItem) => {
-      if (!projectItem) {
-        return projectItem;
-      }
-      return applyEvent(projectItem);
-    });
-
-    if (event.processing.done) {
-      void queryClient.invalidateQueries({
-        queryKey: get(event.projectId).queryKey,
-      });
-      void queryClient.invalidateQueries({ queryKey: list().queryKey });
+export const subscribeToStatus = (queryClient: QueryClient) => {
+  const resync = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['project'] });
+  };
+  const resyncWhenVisible = (): void => {
+    if (document.visibilityState === 'visible') {
+      resync();
     }
-  });
+  };
+  document.addEventListener('visibilitychange', resyncWhenVisible);
+  const unsubscribe = subscribeEventSource(
+    api.project.status.event,
+    (event) => {
+      const applyEvent = (projectItem: api.project.Item): api.project.Item => ({
+        ...projectItem,
+        processing: event.processing,
+      });
+
+      queryClient.setQueryData(list().queryKey, (projects) => {
+        if (!projects) {
+          return projects;
+        }
+        return projects.map((projectItem) =>
+          projectItem.id === event.projectId
+            ? applyEvent(projectItem)
+            : projectItem,
+        );
+      });
+
+      queryClient.setQueryData(get(event.projectId).queryKey, (projectItem) => {
+        if (!projectItem) {
+          return projectItem;
+        }
+        return applyEvent(projectItem);
+      });
+
+      if (event.processing.done) {
+        void queryClient.invalidateQueries({
+          queryKey: get(event.projectId).queryKey,
+        });
+        void queryClient.invalidateQueries({ queryKey: list().queryKey });
+      }
+    },
+    resync,
+  );
+  return () => {
+    document.removeEventListener('visibilitychange', resyncWhenVisible);
+    unsubscribe();
+  };
+};
 
 export const create = (queryClient: QueryClient) =>
   mutationOptions({
