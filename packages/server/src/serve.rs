@@ -14,8 +14,7 @@ use musetric_gpu::{Bundle, ExecutorHost, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use rcgen::generate_simple_self_signed;
-use serde_json::{Map, Value, json};
-use tokio::{io::stdin, net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
@@ -26,9 +25,6 @@ use crate::{
     storage::Storage,
 };
 
-const READY_PREFIX: &str = "MUSETRIC_PROXY_URL=";
-const MIGRATION_PREFIX: &str = "MUSETRIC_MIGRATION=";
-const MIGRATION_FAILED_PREFIX: &str = "MUSETRIC_MIGRATION_FAILED=";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
@@ -107,11 +103,10 @@ impl EmbeddedServer {
 }
 
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
-    let closing = watch_parent();
     match init_database(&options.database) {
         Ok(report) => announce_migration(&report),
         Err(failure) => {
-            announce_migration_failure(&failure);
+            report_migration_failure(&failure);
             return Err(failure.into());
         }
     }
@@ -137,7 +132,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     };
     if let Some(config) = tls {
         let handle = Handle::<SocketAddr>::new();
-        tokio::spawn(shutdown_on_closed_parent(handle.clone(), closing));
+        tokio::spawn(shutdown_on_signal(handle.clone()));
         announce_ready("https", address);
         axum_server::from_tcp_rustls(socket, config)?
             .handle(handle)
@@ -148,9 +143,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let listener = TcpListener::from_std(socket)?;
     announce_ready("http", address);
     axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            let _ = closing.await;
-        })
+        .with_graceful_shutdown(stop_requested())
         .await?;
     Ok(())
 }
@@ -247,13 +240,22 @@ fn wake_on_arrival(host: &ExecutorHost, queue: &Arc<Queue>) {
     });
 }
 
-fn watch_parent() -> oneshot::Receiver<()> {
-    let (closed, closing) = oneshot::channel();
-    tokio::spawn(async move {
-        let _ = tokio::io::copy(&mut stdin(), &mut tokio::io::sink()).await;
-        let _ = closed.send(());
-    });
-    closing
+#[cfg(unix)]
+async fn stop_requested() {
+    use tokio::signal::unix::{SignalKind, signal};
+    let Ok(mut terminate) = signal(SignalKind::terminate()) else {
+        let _ = tokio::signal::ctrl_c().await;
+        return;
+    };
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = terminate.recv() => {}
+    }
+}
+
+#[cfg(not(unix))]
+async fn stop_requested() {
+    let _ = tokio::signal::ctrl_c().await;
 }
 
 fn announce(line: &str) {
@@ -305,38 +307,42 @@ async fn self_signed_config() -> Result<RustlsConfig, BoxedError> {
 }
 
 fn announce_ready(protocol: &str, address: SocketAddr) {
-    announce(&format!("{READY_PREFIX}{protocol}://{address}"));
+    announce(&format!("Musetric is listening on {protocol}://{address}"));
 }
 
 fn announce_migration(report: &MigrationReport) {
-    let mut described = Map::new();
-    described.insert("fromVersion".to_owned(), json!(report.from_version));
-    described.insert("toVersion".to_owned(), json!(report.to_version));
-    insert_backup(&mut described, report.backup_path.as_deref());
-    announce(&format!("{MIGRATION_PREFIX}{}", Value::Object(described)));
+    if report.from_version == report.to_version {
+        return;
+    }
+    let moved = format!(
+        "The database moved from version {} to {}",
+        report.from_version, report.to_version
+    );
+    match &report.backup_path {
+        Some(path) => announce(&format!(
+            "{moved}; the previous copy is in {}",
+            path.display()
+        )),
+        None => announce(&moved),
+    }
 }
 
-fn announce_migration_failure(failure: &MigrationFailure) {
-    let mut described = Map::new();
-    described.insert("message".to_owned(), json!(failure.to_string()));
+fn report_migration_failure(failure: &MigrationFailure) {
+    let mut lines = vec![failure.to_string()];
     if let Some(version) = failure.committed_version() {
-        described.insert("committedVersion".to_owned(), json!(version));
+        lines.push(format!("The database stays at version {version}."));
     }
-    insert_backup(&mut described, failure.backup_path());
-    announce(&format!(
-        "{MIGRATION_FAILED_PREFIX}{}",
-        Value::Object(described)
-    ));
+    if let Some(path) = failure.backup_path() {
+        lines.push(format!(
+            "A copy from before the update is in {}.",
+            path.display()
+        ));
+    }
+    let _ = writeln!(io::stderr().lock(), "{}", lines.join("\n"));
 }
 
-fn insert_backup(described: &mut Map<String, Value>, backup_path: Option<&std::path::Path>) {
-    if let Some(path) = backup_path {
-        described.insert("backupPath".to_owned(), json!(path));
-    }
-}
-
-async fn shutdown_on_closed_parent(handle: Handle<SocketAddr>, closing: oneshot::Receiver<()>) {
-    let _ = closing.await;
+async fn shutdown_on_signal(handle: Handle<SocketAddr>) {
+    stop_requested().await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 }
 
