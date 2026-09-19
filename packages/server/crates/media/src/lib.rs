@@ -18,7 +18,10 @@ pub use decode::SymphoniaPcm;
 pub use frames::{read_flac_sample_rate, read_frame_count};
 pub use loudness::{LeadVisualLoudness, Loudness, analyze_lead_visual_loudness, analyze_loudness};
 pub use mono::{Downmix, MonoRequest, decode_mono_pcm};
-pub use pcm::{DecodedFrames, PcmRequest, PcmSink, PcmSource, ReadingPcm, collect_interleaved_pcm};
+pub use pcm::{
+    DecodedFrames, PcmRequest, PcmSink, PcmSource, ReadingPcm, SourceFailure,
+    collect_interleaved_pcm,
+};
 pub use peaks::{WAVE_PEAK_COUNT, WavePeaks, generate_wave_peaks};
 pub use resample::SampleRates;
 

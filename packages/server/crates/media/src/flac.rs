@@ -90,6 +90,9 @@ impl FlacWriter {
     }
 
     pub(crate) fn push(&mut self, left: f32, right: f32) {
+        if self.failure.is_some() {
+            return;
+        }
         self.pending.push(quantize(left));
         self.pending.push(quantize(right));
         if self.pending.len() >= BLOCK_FRAMES * CHANNELS {
@@ -404,6 +407,26 @@ mod tests {
                 "a seek to {target} landed on the frame starting at {first}"
             );
         }
+    }
+
+    #[test]
+    fn stops_taking_samples_once_a_write_fails() {
+        let path =
+            std::env::temp_dir().join(format!("musetric-flac-fail-{}.flac", std::process::id()));
+        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let read_only = File::open(&path).expect("the stream should reopen");
+        writer.file = std::io::BufWriter::with_capacity(0, read_only);
+        let mut state = 1;
+        for _ in 0..BLOCK_FRAMES * 64 {
+            let sample = noise(&mut state) / 8.0;
+            writer.push(sample, sample);
+        }
+        let pending = writer.pending.len();
+        let finished = writer.finish();
+        std::fs::remove_file(&path).expect("the stream should be removed");
+
+        assert!(finished.is_err(), "the failed write should be reported");
+        assert_eq!(pending, 0, "no samples should pile up after the failure");
     }
 
     #[test]

@@ -11,7 +11,7 @@ use axum::{
 use musetric_db::{
     NewPreview, NewProject, PROCESSING_STEPS, ProcessingStep, ProjectEdit, StepStatus, StepUpdate,
 };
-use musetric_media::{PcmRequest, convert_to_flac, read_frame_count};
+use musetric_media::{PcmRequest, SourceFailure, convert_to_flac, read_frame_count};
 use serde_json::Value;
 
 use crate::{
@@ -367,9 +367,12 @@ async fn normalize_song(
     let area = upload_area(&storage.work_path);
     let normalized = stage_blob(&area, &storage.blobs_path);
     let measured = convert_and_measure(storage, uploaded.staged.path(), normalized.path()).await;
-    let Some(frame_count) = measured else {
-        normalized.discard().await;
-        return Err(Failure::Invalid(INVALID_AUDIO.to_owned()));
+    let frame_count = match measured {
+        Ok(frame_count) => frame_count,
+        Err(failure) => {
+            normalized.discard().await;
+            return Err(failure);
+        }
     };
     uploaded.staged.discard().await;
     Ok(NormalizedSong {
@@ -382,14 +385,20 @@ async fn convert_and_measure(
     storage: &Arc<Storage>,
     from: &FilePath,
     to: &FilePath,
-) -> Option<i64> {
+) -> Result<i64, Failure> {
     let request = PcmRequest {
         from,
         sample_rate: SAMPLE_RATE,
     };
     convert_to_flac(storage.pcm.as_ref(), request, to)
         .await
-        .ok()?;
-    let frames = read_frame_count(to).await.ok()?;
-    i64::try_from(frames).ok()
+        .map_err(|failure| {
+            if failure.is::<SourceFailure>() {
+                Failure::Invalid(format!("{INVALID_AUDIO}: {failure}"))
+            } else {
+                Failure::failed(failure)
+            }
+        })?;
+    let frames = read_frame_count(to).await.map_err(Failure::failed)?;
+    i64::try_from(frames).map_err(Failure::failed)
 }
