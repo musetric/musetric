@@ -1,14 +1,19 @@
 use std::{
     fmt::Write,
+    io::SeekFrom,
     path::{Path, PathBuf},
 };
 
 use sha2::{Digest, Sha256};
-use tokio::fs::{self, create_dir_all};
+use tokio::{
+    fs::{self, File, OpenOptions, create_dir_all},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+};
 
 use musetric_db::BoxedError;
 
 const TAIL_NAME: &str = "separated.tail";
+const PREFIX_NAME: &str = "separated.prefix";
 const INPUT_NAME: &str = "input.f32";
 const CHECKPOINTS: &str = "checkpoints";
 const INCOMING: &str = "incoming";
@@ -80,6 +85,36 @@ impl CheckpointDir {
             digest: digest_of(bytes),
             bytes: bytes.to_vec(),
         })
+    }
+
+    pub(crate) async fn append_prefix(
+        &self,
+        committed_bytes: u64,
+        bytes: &[u8],
+    ) -> Result<(), BoxedError> {
+        create_dir_all(&self.root).await?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(false)
+            .open(self.root.join(PREFIX_NAME))
+            .await?;
+        file.set_len(committed_bytes).await?;
+        file.seek(SeekFrom::Start(committed_bytes)).await?;
+        file.write_all(bytes).await?;
+        file.flush().await?;
+        Ok(())
+    }
+
+    pub(crate) async fn read_prefix(&self, committed_bytes: u64) -> Result<Vec<u8>, BoxedError> {
+        let mut prefix = vec![0_u8; usize::try_from(committed_bytes)?];
+        if committed_bytes > 0 {
+            File::open(self.root.join(PREFIX_NAME))
+                .await?
+                .read_exact(&mut prefix)
+                .await?;
+        }
+        Ok(prefix)
     }
 
     pub(crate) async fn read_tail(&self, generation: u32) -> Result<StoredTail, BoxedError> {

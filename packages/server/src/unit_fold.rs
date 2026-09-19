@@ -1,8 +1,7 @@
-use bytemuck::cast_slice;
-
 use crate::unit_plan::UnitPlan;
 
 const COUNTER_FLOOR: f64 = 1e-10;
+const VALUE_BYTES: usize = 4;
 
 pub(crate) struct FoldAccumulator {
     target: Vec<f32>,
@@ -26,6 +25,14 @@ impl FoldAccumulator {
         }
     }
 
+    pub(crate) fn frames(&self) -> u64 {
+        self.frames as u64
+    }
+
+    pub(crate) fn record_bytes(&self) -> usize {
+        record_bytes(self.channels)
+    }
+
     #[expect(
         clippy::cast_possible_truncation,
         reason = "the accumulation reproduces the browser float32 arithmetic"
@@ -47,36 +54,59 @@ impl FoldAccumulator {
         }
     }
 
-    pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity((self.target.len() + self.counter.len()) * 4);
-        bytes.extend_from_slice(cast_slice::<f32, u8>(&self.target));
-        bytes.extend_from_slice(cast_slice::<f32, u8>(&self.counter));
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "frame ranges index buffers that fit the address space"
+    )]
+    pub(crate) fn records(&self, from: u64, to: u64) -> Vec<u8> {
+        let channels = self.channels as usize;
+        let mut bytes = Vec::with_capacity((to - from) as usize * self.record_bytes());
+        for frame in from as usize..to as usize {
+            for channel in 0..channels {
+                let value = self.target[channel * self.frames + frame];
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            for channel in 0..channels {
+                let value = self.counter[channel * self.frames + frame];
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
         bytes
     }
 
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "signal sizes stay far below the address space"
+        reason = "frame ranges index buffers that fit the address space"
     )]
-    pub(crate) fn from_bytes(bytes: &[u8], frames: u64, channels: u32) -> Option<Self> {
-        let length = frames as usize * channels as usize;
-        if bytes.len() != length * 8 {
+    pub(crate) fn restore(frames: u64, channels: u32, prefix: &[u8], tail: &[u8]) -> Option<Self> {
+        let record = record_bytes(channels);
+        if !prefix.len().is_multiple_of(record)
+            || !tail.len().is_multiple_of(record)
+            || (prefix.len() + tail.len()) / record > frames as usize
+        {
             return None;
         }
-        let mut target = Vec::with_capacity(length);
-        let mut counter = Vec::with_capacity(length);
-        for raw in bytes[..length * 4].chunks_exact(4) {
-            target.push(f32::from_le_bytes(raw.try_into().ok()?));
+        let mut fold = Self::create(frames, channels);
+        fold.load(0, prefix)?;
+        fold.load(prefix.len() / record, tail)?;
+        Some(fold)
+    }
+
+    fn load(&mut self, start: usize, bytes: &[u8]) -> Option<()> {
+        let channels = self.channels as usize;
+        for (offset, record) in bytes.chunks_exact(self.record_bytes()).enumerate() {
+            let frame = start + offset;
+            let mut values = record
+                .chunks_exact(VALUE_BYTES)
+                .map(|raw| raw.try_into().ok().map(f32::from_le_bytes));
+            for channel in 0..channels {
+                self.target[channel * self.frames + frame] = values.next()??;
+            }
+            for channel in 0..channels {
+                self.counter[channel * self.frames + frame] = values.next()??;
+            }
         }
-        for raw in bytes[length * 4..].chunks_exact(4) {
-            counter.push(f32::from_le_bytes(raw.try_into().ok()?));
-        }
-        Some(Self {
-            target,
-            counter,
-            channels,
-            frames: frames as usize,
-        })
+        Some(())
     }
 
     #[expect(
@@ -92,6 +122,10 @@ impl FoldAccumulator {
             })
             .collect()
     }
+}
+
+pub(crate) fn record_bytes(channels: u32) -> usize {
+    channels as usize * 2 * VALUE_BYTES
 }
 
 #[cfg(test)]
