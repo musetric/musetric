@@ -127,12 +127,7 @@ impl Rooms {
         if was_master {
             stop_player(room);
         }
-        if room.session_owner == Some(member) {
-            room.session_owner = None;
-        }
-        if room.members.is_empty() {
-            projects.remove(&project_id);
-        }
+        forget_idle_room(&mut projects, project_id);
     }
 
     pub(crate) fn send_to(&self, project_id: i64, member: MemberId, event: &Value) {
@@ -241,11 +236,14 @@ impl Rooms {
     }
 
     pub(crate) fn end_session(&self, project_id: i64, member: MemberId) {
-        self.in_room(project_id, |room| {
-            if room.session_owner == Some(member) {
-                room.session_owner = None;
-            }
-        });
+        let mut projects = self.lock();
+        let Some(room) = projects.get_mut(&project_id) else {
+            return;
+        };
+        if room.session_owner == Some(member) {
+            room.session_owner = None;
+        }
+        forget_idle_room(&mut projects, project_id);
     }
 
     fn with_room<Value>(
@@ -271,6 +269,15 @@ impl Rooms {
         self.projects
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+fn forget_idle_room(projects: &mut HashMap<i64, Room>, project_id: i64) {
+    let idle = projects
+        .get(&project_id)
+        .is_some_and(|room| room.members.is_empty() && room.session_owner.is_none());
+    if idle {
+        projects.remove(&project_id);
     }
 }
 
@@ -310,6 +317,33 @@ mod tests {
         rooms.end_session(1, member);
         assert!(!rooms.claim_master(1, member, false));
         assert!(!rooms.begin_session(1, member));
+
+        assert_eq!(rooms.room_count(), 0);
+    }
+
+    #[test]
+    fn holds_the_recording_until_its_session_ends() {
+        let rooms = Rooms::create();
+        let (owner, _owner_outgoing) = rooms.join(1);
+        assert!(rooms.begin_session(1, owner));
+        rooms.leave(1, owner);
+        let (next, _next_outgoing) = rooms.join(1);
+
+        assert!(!rooms.begin_session(1, next));
+        rooms.end_session(1, owner);
+
+        assert!(rooms.begin_session(1, next));
+    }
+
+    #[test]
+    fn forgets_a_room_once_its_last_session_ends() {
+        let rooms = Rooms::create();
+        let (owner, _outgoing) = rooms.join(1);
+        rooms.begin_session(1, owner);
+        rooms.leave(1, owner);
+        assert_eq!(rooms.room_count(), 1);
+
+        rooms.end_session(1, owner);
 
         assert_eq!(rooms.room_count(), 0);
     }
