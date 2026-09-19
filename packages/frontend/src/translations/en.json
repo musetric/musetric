@@ -97,6 +97,7 @@
   "pages.projects.dialogs.create.cancel": "Cancel",
   "pages.projects.dialogs.create.create": "Create",
   "pages.projects.dialogs.create.dragDrop": "or drag song file here",
+  "pages.projects.dialogs.create.models": "Before its first results, Musetric downloads {{size}} GB of models.",
   "pages.projects.dialogs.create.select": "Browse",
   "pages.projects.dialogs.create.title": "Create new project",
   "pages.projects.dialogs.delete.cancel": "Cancel",

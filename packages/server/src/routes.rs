@@ -2,11 +2,12 @@ mod analysis;
 mod audio;
 mod executor;
 mod item;
+mod models;
 mod preview;
 mod project;
 mod status;
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use axum::Router;
 
@@ -23,12 +24,14 @@ pub(crate) struct RouteState {
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) executor_surface: ExecutorSurface,
+    pub(crate) models_path: PathBuf,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
         .merge(executor::create_router())
+        .merge(models::create_router())
         .merge(preview::create_router())
         .merge(project::create_router())
         .merge(status::create_router())
@@ -155,6 +158,25 @@ mod tests {
             .expect("the item should be json");
             assert_eq!(item, &alone);
         }
+    }
+
+    #[tokio::test]
+    async fn counts_every_model_byte_as_missing_before_a_download() {
+        let workspace = Workspace::new();
+        let router = create_test_router(&workspace).await;
+
+        let size: serde_json::Value =
+            serde_json::from_str(&read_body(request(router, "/api/models/download").await).await)
+                .expect("the size should be json");
+
+        let total = size["totalBytes"]
+            .as_u64()
+            .expect("the total should be a number");
+        assert!(
+            total > 1_000_000_000,
+            "the full set should weigh over a gigabyte"
+        );
+        assert_eq!(size["missingBytes"].as_u64(), Some(total));
     }
 
     #[tokio::test]

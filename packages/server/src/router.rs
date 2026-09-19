@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use axum::Router;
 use musetric_gpu::ExecutorHost;
@@ -16,6 +16,7 @@ pub(crate) struct RouterOptions {
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) executor_surface: ExecutorSurface,
+    pub(crate) models_path: PathBuf,
 }
 
 pub(crate) fn create_router(options: RouterOptions) -> Router {
@@ -25,6 +26,7 @@ pub(crate) fn create_router(options: RouterOptions) -> Router {
         queue: options.queue,
         executor: options.executor,
         executor_surface: options.executor_surface,
+        models_path: options.models_path,
     };
     routes::create_router(state).merge(frontend::create_router(options.frontend))
 }

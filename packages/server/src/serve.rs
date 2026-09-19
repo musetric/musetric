@@ -211,7 +211,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         client: create_client()?,
-        models_path: options.models,
+        models_path: options.models.clone(),
         host: Arc::clone(&host),
     });
     let queue = Queue::create(QueueOptions {
@@ -232,6 +232,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         queue,
         executor: host,
         executor_surface: options.executor_surface,
+        models_path: options.models,
     });
     Ok(CreatedApp {
         router,

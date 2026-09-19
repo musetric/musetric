@@ -262,6 +262,16 @@ fn progress(model: &ModelFile, downloaded: u64, total: Option<u64>) -> Download<
     }
 }
 
+pub async fn has_verified_copy(model: &ModelFile) -> bool {
+    let Ok(manifest) = create_manifest(&model.path, &model.sha256).await else {
+        return false;
+    };
+    let manifest_path = with_suffix(&model.path, MANIFEST_SUFFIX);
+    read_to_string(&manifest_path)
+        .await
+        .is_ok_and(|stored| stored == manifest)
+}
+
 async fn read_cached_size(model: &ModelFile) -> Option<u64> {
     let stat = metadata(&model.path).await.ok()?;
     if !stat.is_file() {
@@ -349,7 +359,7 @@ mod tests {
     use reqwest::Client;
     use tokio::{net::TcpListener, sync::oneshot};
 
-    use super::{Download, DownloadStatus, ModelFile, ensure_model_file};
+    use super::{Download, DownloadStatus, ModelFile, ensure_model_file, has_verified_copy};
 
     const CONTENT: &[u8] = b"the fixture model bytes";
     const SHA256: &str = "015edf815f1917be874183c54bb97d63665f3942dcc22a0ac7e164804ea50e5d";
@@ -522,9 +532,12 @@ mod tests {
         let reported = Reported::create();
         let model = create_model(&workspace, address, SHA256);
 
+        let before = has_verified_copy(&model).await;
         let path = ensure_model_file(&Client::new(), &model, reported.sink().as_ref())
             .await
             .expect("the model should download");
+        assert!(!before, "nothing should be cached before the download");
+        assert!(has_verified_copy(&model).await);
 
         assert_eq!(read(&path).expect("the model should be stored"), CONTENT);
         assert!(
