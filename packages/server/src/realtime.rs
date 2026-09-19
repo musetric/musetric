@@ -208,10 +208,15 @@ async fn start_recording(
         start.frame_count,
     )
     .await;
-    let Ok(session) = created else {
-        rooms.end_session(connection.project_id, connection.member);
-        channel.fail("Failed to start recording session").await;
-        return false;
+    let session = match created {
+        Ok(session) => session,
+        Err(error) => {
+            rooms.end_session(connection.project_id, connection.member);
+            channel
+                .fail(&format!("Failed to start recording session: {error}"))
+                .await;
+            return false;
+        }
     };
     connection.session = Some(session);
     rooms.broadcast_event(connection.project_id, &events::recording_started(), None);
@@ -506,6 +511,26 @@ mod tests {
             .expect("the fixture packet should fit the realtime protocol")
     }
 
+    async fn finish_take(owner: &mut ClientSocket, listener: &mut ClientSocket) {
+        send_json(owner, json!({ "type": "recording.finish" })).await;
+        assert_eq!(
+            receive_json(owner).await,
+            json!({ "type": "recording.finished" })
+        );
+        assert_eq!(
+            receive_json(listener).await,
+            json!({ "type": "recording.finished" })
+        );
+    }
+
+    fn stored_recording(storage: &Storage) -> musetric_db::Recording {
+        storage
+            .database
+            .recording(1)
+            .expect("the recording should be readable")
+            .expect("the recording should be stored")
+    }
+
     async fn start_recording_room(base: &str) -> (ClientSocket, ClientSocket) {
         let mut owner = connect(base).await;
         let mut listener = connect(base).await;
@@ -588,20 +613,8 @@ mod tests {
         assert_eq!(peaks[5], 32767.0 / 32768.0);
         assert_eq!(receive_json(&mut listener).await, patch);
 
-        send_json(&mut owner, json!({ "type": "recording.finish" })).await;
-        assert_eq!(
-            receive_json(&mut owner).await,
-            json!({ "type": "recording.finished" })
-        );
-        assert_eq!(
-            receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
-        );
-        let recording = storage
-            .database
-            .recording(1)
-            .expect("the recording should be readable")
-            .expect("the recording should be stored");
+        finish_take(&mut owner, &mut listener).await;
+        let recording = stored_recording(&storage);
         let audio = std::fs::read(musetric_db::blob_path(
             &storage.blobs_path,
             &recording.blob_id,
@@ -802,20 +815,8 @@ mod tests {
         let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
-        send_json(&mut owner, json!({ "type": "recording.finish" })).await;
-        assert_eq!(
-            receive_json(&mut owner).await,
-            json!({ "type": "recording.finished" })
-        );
-        assert_eq!(
-            receive_json(&mut listener).await,
-            json!({ "type": "recording.finished" })
-        );
-        let reserved = storage
-            .database
-            .recording(1)
-            .expect("the recording should be readable")
-            .expect("the recording should be stored");
+        finish_take(&mut owner, &mut listener).await;
+        let reserved = stored_recording(&storage);
 
         send_json(&mut owner, start_message(FRAME_COUNT * 2)).await;
         assert_eq!(
@@ -834,17 +835,37 @@ mod tests {
             chunk(0, &samples[..FRAME_COUNT])
         );
 
-        let reused = storage
-            .database
-            .recording(1)
-            .expect("the recording should be readable")
-            .expect("the recording should be stored");
+        let reused = stored_recording(&storage);
         assert_eq!(reused.blob_id, reserved.blob_id);
         assert_eq!(reused.wave_blob_id, reserved.wave_blob_id);
         assert_eq!(
             usize::try_from(reused.frame_count).expect("the frame count should be positive"),
             FRAME_COUNT
         );
+    }
+
+    #[tokio::test]
+    async fn refuses_to_record_over_audio_that_went_missing() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room(&base).await;
+        finish_take(&mut owner, &mut listener).await;
+        let recording = stored_recording(&storage);
+        let audio = musetric_db::blob_path(&storage.blobs_path, &recording.blob_id);
+        std::fs::remove_file(&audio).expect("the recording wav should be removed");
+
+        send_json(&mut owner, start_message(FRAME_COUNT)).await;
+
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({
+                "type": "error",
+                "error": "Failed to start recording session: The recorded audio of this project is missing",
+            })
+        );
+        assert!(!audio.exists(), "the missing wav should not be recreated");
     }
 
     #[tokio::test]

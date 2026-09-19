@@ -21,6 +21,7 @@ use crate::{
 const PEAK_BYTE_LENGTH: usize = WAVE_PEAK_COUNT * 2 * 4;
 const FULL_SCALE: f64 = 32768.0;
 const POSITIVE_SCALE: f64 = 32767.0;
+const MISSING_AUDIO: &str = "The recorded audio of this project is missing";
 
 pub(crate) struct PeakPatch {
     pub(crate) start_peak_index: usize,
@@ -241,10 +242,10 @@ async fn reuse_blobs(
 ) -> Result<ReservedBlobs, BoxedError> {
     let audio_path = blob_path(&storage.blobs_path, &recording.blob_id);
     let wave_path = blob_path(&storage.blobs_path, &recording.wave_blob_id);
-    if !try_exists(&audio_path).await.unwrap_or(false) {
-        create_reserved_wav(&audio_path, recording.sample_rate, recording.frame_count).await?;
+    if !try_exists(&audio_path).await? {
+        return Err(MISSING_AUDIO.into());
     }
-    if !try_exists(&wave_path).await.unwrap_or(false) {
+    if !try_exists(&wave_path).await? {
         write_empty_peaks(&wave_path).await?;
     }
     Ok(ReservedBlobs {
