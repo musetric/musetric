@@ -252,6 +252,37 @@ test('the browser client keeps its runtime after a job that succeeds', async () 
   });
 });
 
+test('the browser client sends the stack of a failing job to the host log', async () => {
+  announceAdapter(true);
+  const apis: BrowserJobApis = {
+    [apiName]: createBrowserJobApi<unknown>(() => {
+      throw new Error('the runtime ran out of memory');
+    }),
+  };
+
+  await withExecutor(apis, async (host) => {
+    await expect(host.run(apiName, {})).rejects.toThrow();
+    expect(host.logs).toHaveLength(1);
+    expect(host.logs[0]?.level).toBe('error');
+    expect(host.logs[0]?.message).toContain(
+      `The ${apiName} job failed: Error: the runtime ran out of memory`,
+    );
+    expect(host.logs[0]?.message).toContain('browserExecutor.test.ts');
+  });
+});
+
+test('the browser client forwards a log line while it is connected', async () => {
+  announceAdapter(true);
+
+  await withExecutor({}, async (host, executor) => {
+    await host.ready;
+    executor.log('warn', 'the adapter lost its device');
+    await expect
+      .poll(() => host.logs)
+      .toEqual([{ level: 'warn', message: 'the adapter lost its device' }]);
+  });
+});
+
 test('the browser client rejects a job for an api it does not have', async () => {
   announceAdapter(true);
 

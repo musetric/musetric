@@ -41,6 +41,11 @@ export type UnitDoneEvent = {
   unit: number;
 };
 
+export type LoggedLine = {
+  level: string;
+  message: string;
+};
+
 export type FakeHost = {
   baseUrl: string;
   socketUrl: string;
@@ -58,12 +63,14 @@ export type FakeHost = {
   sendUnitClose: (attemptId: string) => void;
   ping: () => void;
   alive: string[];
+  logs: LoggedLine[];
   close: () => Promise<void>;
 };
 
 export const startFakeHost = async (): Promise<FakeHost> => {
   const phases: ExecutorJobMessage[] = [];
   const alive: string[] = [];
+  const logs: LoggedLine[] = [];
   const unitDone: UnitDoneEvent[] = [];
   const windows = new Map<string, Buffer>();
   const outputs = new Map<string, Buffer>();
@@ -150,6 +157,10 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         phases.push(message);
         return;
       }
+      if (message.type === 'log') {
+        logs.push({ level: message.level, message: message.message });
+        return;
+      }
       if (message.type === 'unitOpened' || message.type === 'pong') {
         alive.push(message.type);
         return;
@@ -224,6 +235,7 @@ export const startFakeHost = async (): Promise<FakeHost> => {
       sendAll(JSON.stringify({ type: 'ping' }));
     },
     alive,
+    logs,
     sendUnitClose: (attemptId) => {
       sendAll(
         JSON.stringify({

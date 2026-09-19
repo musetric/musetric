@@ -30,6 +30,10 @@ pub enum ExecutorPhase {
 
 pub(crate) enum ExecutorMessage {
     Alive,
+    Log {
+        level: log::Level,
+        message: String,
+    },
     Ready {
         adapter: bool,
         shader_f16: bool,
@@ -64,6 +68,17 @@ pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
         return Some(ExecutorMessage::Ready {
             adapter: message.get("adapter")?.as_bool()?,
             shader_f16: message.get("shaderF16")?.as_bool()?,
+        });
+    }
+    if kind == "log" {
+        let level = match message.get("level")?.as_str()? {
+            "error" => log::Level::Error,
+            "warn" => log::Level::Warn,
+            _ => return None,
+        };
+        return Some(ExecutorMessage::Log {
+            level,
+            message: message.get("message")?.as_str()?.to_owned(),
         });
     }
     let job_id = message.get("jobId")?.as_str()?.to_owned();
