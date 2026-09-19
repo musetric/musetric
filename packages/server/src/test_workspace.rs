@@ -75,6 +75,10 @@ impl Workspace {
         self.directory.join("blobs")
     }
 
+    pub(crate) fn models_path(&self) -> PathBuf {
+        self.directory.join("models")
+    }
+
     pub(crate) fn work_path(&self) -> PathBuf {
         self.directory.join("work")
     }
@@ -194,6 +198,7 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         queue,
         executor,
         executor_surface: ExecutorSurface::Page,
+        models_path: workspace.models_path(),
     }
 }
 

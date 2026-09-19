@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use musetric_gpu::ModelFile;
+use musetric_gpu::{ModelFile, has_verified_copy};
 use musetric_media::Downmix;
 use serde_json::{Value, json};
 
@@ -18,7 +18,7 @@ pub(crate) struct ModelBundle {
     pub(crate) sample_rate: u32,
     pub(crate) downmix: Downmix,
     pub(crate) layout: CacheLayout,
-    pub(crate) files: &'static [(&'static str, &'static str)],
+    pub(crate) files: &'static [(&'static str, &'static str, u64)],
 }
 
 impl ModelBundle {
@@ -37,7 +37,7 @@ impl ModelBundle {
         };
         self.files
             .iter()
-            .map(|(file, sha256)| ModelFile {
+            .map(|(file, sha256, _)| ModelFile {
                 label: self.label.to_owned(),
                 file: (*file).to_owned(),
                 url: format!(
@@ -105,18 +105,22 @@ pub(crate) const CHORD_NET: ModelBundle = ModelBundle {
         (
             "config.json",
             "1f26c11ebea51ec08f12e813eb213a729fa0ecc407ac7632dfdc7bad67e65aa4",
+            3009,
         ),
         (
             CHORD_NET_MODEL,
             "6907d39254c4e0fd1a85e11efeb80b7da49f948c493d4f6fccdd9384921564d9",
+            16_956_724,
         ),
         (
             CHORD_NET_PLAN,
             "c31f0a6fd2d582d753be6628b5daecdee58acba53cba93b2bc2b5c75dee2ba48",
+            23896,
         ),
         (
             CHORD_NET_PLAN_MANIFEST,
             "522b178e4f6e8ae5b6bf63b8e2f1a615fe2398592e27f7d9e3e219810081019f",
+            1721,
         ),
     ],
 };
@@ -148,14 +152,17 @@ pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
         (
             "config.json",
             "46e93c11d7afb78e3eba72cac26e1aced47b9b6558379f928c19b0cf95c9af1d",
+            1008,
         ),
         (
             BEAT_THIS_MODEL,
             "d6b41a44dbf555e90593f60dc86aea3689e1f5db427956e4c9036c8dfde970e8",
+            120_259_561,
         ),
         (
             BEAT_THIS_FILTERBANK,
             "1ee975d96f44ccf2c3bfe37825c1c1f0b089f5703c7a12a84b1f0a3bce004533",
+            262_656,
         ),
     ],
 };
@@ -189,10 +196,12 @@ pub(crate) const SKEY: ModelBundle = ModelBundle {
         (
             "config.json",
             "20be1e139e1b05dea4bae2e2dde717d593c10c30bb38b300aeedc6693be88a52",
+            712,
         ),
         (
             SKEY_MODEL,
             "5113c1378c1007c8559fcb767593366ba9794397b060535eb80a113db50530fc",
+            338_482,
         ),
     ],
 };
@@ -216,50 +225,62 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         (
             "config.json",
             "3895aac9c18e541502ded9bf0f4c31cbe25a3387ef88ffdc85214e43acc0ca57",
+            1223,
         ),
         (
             "generation_config.json",
             "0392ccf797bca2bff1600477ed6fb71d367b428f3da626c6d3c8dbd82c58ae44",
+            3797,
         ),
         (
             "preprocessor_config.json",
             "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+            340,
         ),
         (
             "tokenizer.json",
             "b3c8202bbf06d8ee4232c5984baa563784ac4737e2e7fdc42fa180200d3cfcdb",
+            2_480_645,
         ),
         (
             "tokenizer_config.json",
             "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+            282_843,
         ),
         (
             "special_tokens_map.json",
             "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+            2186,
         ),
         (
             "added_tokens.json",
             "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+            34648,
         ),
         (
             "vocab.json",
             "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387",
+            1_036_558,
         ),
         (
             "merges.txt",
             "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+            493_869,
         ),
         (
             "normalizer.json",
             "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+            52666,
         ),
         (
             "encoder_model_q4.onnx",
             "d27943f0f3ee4fdfc33241a64d68fffd40ce0f2344ee21f73d37abac9ebd1a43",
+            432_766_809,
         ),
         (
             "decoder_model_merged_fp16.onnx",
             "0f64a6ee464ae44c24b41e312e6c206d29df5d9e9f46162cd3d6e14bd1e770cd",
+            344_323_830,
         ),
     ],
 };
@@ -288,10 +309,12 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
         (
             VOCALS_MODEL,
             "88b51e87dd2fa02acecf95d880a3833c307bf780b101dd39021de7b821faec22",
+            8_446_324,
         ),
         (
             VOCALS_MODEL_DATA,
             "648db04fce69e556bc1fb08486ffd7f7ac50d370b1c6026e42ffea9cd621a7ed",
+            741_190_540,
         ),
     ],
 };
@@ -322,6 +345,7 @@ pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
     files: &[(
         LEAD_BACKING_MODEL,
         "c59e3b9d2288cf8ad1099fe2b99e6de008d825aee2720f401c02bf63c596c127",
+        53_249_592,
     )],
 };
 
@@ -336,4 +360,34 @@ pub(crate) fn lead_backing_graph() -> Value {
             "dimF": 2048,
         }),
     )
+}
+
+const BUNDLES: [&ModelBundle; 6] = [
+    &VOCALS,
+    &LEAD_BACKING,
+    &WHISPER,
+    &BEAT_THIS,
+    &CHORD_NET,
+    &SKEY,
+];
+
+pub(crate) struct DownloadSize {
+    pub(crate) total_bytes: u64,
+    pub(crate) missing_bytes: u64,
+}
+
+pub(crate) async fn download_size(models_path: &Path) -> DownloadSize {
+    let mut size = DownloadSize {
+        total_bytes: 0,
+        missing_bytes: 0,
+    };
+    for bundle in BUNDLES {
+        for (model, (_, _, bytes)) in bundle.cached(models_path).iter().zip(bundle.files) {
+            size.total_bytes += bytes;
+            if !has_verified_copy(model).await {
+                size.missing_bytes += bytes;
+            }
+        }
+    }
+    size
 }

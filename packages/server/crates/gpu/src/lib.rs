@@ -9,6 +9,7 @@ mod tests;
 
 pub use cache::{
     Download, DownloadReport, DownloadStatus, ModelFile, create_client, ensure_model_file,
+    has_verified_copy,
 };
 pub use files::{Asset, Assets, Bundle, read_relative};
 pub use host::{

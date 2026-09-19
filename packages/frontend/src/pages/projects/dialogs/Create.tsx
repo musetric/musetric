@@ -8,7 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
@@ -45,6 +45,8 @@ export const CreateDialog: FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const create = useMutation(endpoints.project.create(queryClient));
+  const models = useQuery(endpoints.models.download());
+  const missingBytes = models.data?.missingBytes ?? 0;
 
   const {
     setValue,
@@ -118,6 +120,13 @@ export const CreateDialog: FC = () => {
                 }}
               />
               <SongPlayer url={song.url} />
+              {missingBytes > 0 && (
+                <Typography variant='body2' color='text.secondary'>
+                  {t('pages.projects.dialogs.create.models', {
+                    size: (missingBytes / 1e9).toFixed(1),
+                  })}
+                </Typography>
+              )}
             </>
           )}
           {!song && (
