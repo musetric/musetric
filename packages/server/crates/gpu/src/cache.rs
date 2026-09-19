@@ -1,5 +1,6 @@
 use std::{
-    fmt::Write,
+    error::Error,
+    fmt::{Display, Formatter, Write},
     path::{Path, PathBuf},
     time::{Duration, Instant, UNIX_EPOCH},
 };
@@ -31,6 +32,8 @@ const DOWNLOAD_ATTEMPTS: u32 = 3;
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 const REPORT_INTERVAL: Duration = Duration::from_millis(200);
 const READ_BUFFER_BYTE_LENGTH: usize = 64 * 1024;
+const SPACE_RESERVE: u64 = 256 * 1024 * 1024;
+const MEGABYTE: u64 = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DownloadStatus {
@@ -119,7 +122,9 @@ async fn download_with_retries(
         let outcome = run_download(client, model, partial_path, report).await;
         match outcome {
             Ok(()) => return Ok(()),
-            Err(error) if attempt == DOWNLOAD_ATTEMPTS => return Err(error),
+            Err(error) if attempt == DOWNLOAD_ATTEMPTS || error.is::<NoRoom>() => {
+                return Err(error);
+            }
             Err(_) => sleep(RETRY_DELAY * attempt).await,
         }
         attempt += 1;
@@ -134,6 +139,9 @@ async fn run_download(
 ) -> Result<(), BoxedError> {
     let partial_size = metadata(partial_path).await.map_or(0, |stat| stat.len());
     let started = start_download(client, model, partial_size).await?;
+    if let Some(total) = started.total {
+        ensure_room(model, partial_path, total - started.resume_from)?;
+    }
     let mut hasher = Sha256::new();
     if started.resume_from > 0 {
         update_from_file(partial_path, &mut hasher).await?;
@@ -203,6 +211,34 @@ async fn start_download(
         total,
     })
 }
+
+fn ensure_room(model: &ModelFile, partial_path: &Path, needed: u64) -> Result<(), BoxedError> {
+    let directory = partial_path
+        .parent()
+        .ok_or("The model path has no directory")?;
+    let available = fs4::available_space(directory)?;
+    if needed.saturating_add(SPACE_RESERVE) <= available {
+        return Ok(());
+    }
+    Err(NoRoom(format!(
+        "Not enough free space to download {}: it needs {} MB more, and {} MB are free",
+        model.label,
+        needed.div_ceil(MEGABYTE),
+        available / MEGABYTE
+    ))
+    .into())
+}
+
+#[derive(Debug)]
+struct NoRoom(String);
+
+impl Display for NoRoom {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl Error for NoRoom {}
 
 async fn open_partial(partial_path: &Path, resume_from: u64) -> Result<File, BoxedError> {
     if resume_from > 0 {
@@ -303,7 +339,10 @@ mod tests {
         Router,
         body::Body,
         extract::State,
-        http::{HeaderMap, StatusCode, header::RANGE},
+        http::{
+            HeaderMap, HeaderValue, StatusCode,
+            header::{CONTENT_LENGTH, RANGE},
+        },
         response::{IntoResponse, Response},
         routing::get,
     };
@@ -377,6 +416,15 @@ mod tests {
         (StatusCode::OK, Body::from(CONTENT.to_vec())).into_response()
     }
 
+    async fn serve_huge() -> Response {
+        let endless = futures_util::stream::pending::<Result<Vec<u8>, std::io::Error>>();
+        let mut response = Body::from_stream(endless).into_response();
+        response
+            .headers_mut()
+            .insert(CONTENT_LENGTH, HeaderValue::from_static("1000000000000000"));
+        response
+    }
+
     async fn start_source() -> (SocketAddr, Served, oneshot::Sender<()>) {
         let state = Served {
             requests: Arc::new(AtomicUsize::new(0)),
@@ -384,6 +432,7 @@ mod tests {
         };
         let application = Router::new()
             .route("/model", get(serve_content))
+            .route("/huge", get(serve_huge))
             .with_state(state.clone());
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -440,6 +489,30 @@ mod tests {
             sha256: sha256.to_owned(),
             path: workspace.model_path(),
         }
+    }
+
+    #[tokio::test]
+    async fn refuses_a_download_the_disk_cannot_hold() {
+        let workspace = Workspace::new();
+        let (address, _served, shutdown) = start_source().await;
+        let reported = Reported::create();
+        let mut model = create_model(&workspace, address, SHA256);
+        model.url = format!("http://{address}/huge");
+
+        let refused = ensure_model_file(&Client::new(), &model, reported.sink().as_ref())
+            .await
+            .expect_err("a petabyte should not fit");
+        let partial = format!("{}.part", model.path.display());
+        let _ = shutdown.send(());
+
+        assert!(
+            refused
+                .to_string()
+                .starts_with("Not enough free space to download Chord recognition model"),
+            "{refused}"
+        );
+        assert!(!model.path.exists());
+        assert!(!std::path::Path::new(&partial).exists());
     }
 
     #[tokio::test]
