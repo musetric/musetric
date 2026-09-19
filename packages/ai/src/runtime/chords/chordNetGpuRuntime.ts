@@ -309,12 +309,13 @@ export const createChordNetGpuRuntime = async (
   };
 
   const release = async (): Promise<void> => {
+    await device.queue.onSubmittedWorkDone();
+    await session.release();
     cqtCell.dispose();
     if (state !== undefined) {
       destroyState(state);
       state = undefined;
     }
-    await session.release();
   };
 
   return { analyze, release };

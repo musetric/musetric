@@ -224,13 +224,14 @@ export const createBeatThisGpuRuntime = async (
   };
 
   const release = async (): Promise<void> => {
+    await device.queue.onSubmittedWorkDone();
+    await session.release();
     fftCell.dispose();
     filterbank.destroy();
     if (state !== undefined) {
       destroyBeatThisGpuState(state);
       state = undefined;
     }
-    await session.release();
   };
 
   return { analyze, release };
