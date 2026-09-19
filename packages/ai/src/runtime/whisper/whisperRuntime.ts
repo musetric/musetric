@@ -68,7 +68,6 @@ export const createWhisperRuntime = async (
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
 
-  const loadStart = performance.now();
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',
     options.modelId,
@@ -87,9 +86,6 @@ export const createWhisperRuntime = async (
         options.onLoading();
       },
     },
-  );
-  console.log(
-    `whisper load: ${((performance.now() - loadStart) / 1000).toFixed(1)}s`,
   );
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -136,7 +132,6 @@ export const createWhisperRuntime = async (
     const results: DecodeResult[] = [];
     for (const audio of audios) {
       if (audio.length === 0) {
-        console.log('whisper decode: empty chunk skipped');
         results.push({});
         continue;
       }
@@ -152,8 +147,6 @@ export const createWhisperRuntime = async (
     if (audios.length === 0) {
       return [];
     }
-    const decodeStart = performance.now();
-    const maxDuration = Math.max(...audios.map((a) => a.length / sampleRate));
 
     const outputs = await decodePass(audios, language, undefined);
 
@@ -176,10 +169,6 @@ export const createWhisperRuntime = async (
         alignedWords / duration >= alignedWordsPerSecond &&
         !isHallucination(aligned.text ?? '') &&
         !(await isLooped(aligned.text ?? ''));
-      console.log(
-        `whisper aligned decode: ${words}w -> ${alignedWords}w, ` +
-          `${better ? 'taken' : 'kept timestamped'}`,
-      );
       return better ? aligned : result;
     };
 
@@ -193,11 +182,6 @@ export const createWhisperRuntime = async (
       );
       if (clean.length === segments.length) {
         return result;
-      }
-      for (const segment of segments) {
-        if (!clean.includes(segment)) {
-          console.log(`whisper caption dropped: ${spanText(segment)}`);
-        }
       }
       const chunks = clean.flat();
       return { text: spanText(chunks), chunks, segments: clean };
@@ -235,9 +219,6 @@ export const createWhisperRuntime = async (
             outputs[index] = retried[retryIndex];
           }
         }
-        console.log(
-          `whisper ladder ${JSON.stringify(guard)}: rescued ${bad.length - stillBad.length}/${bad.length} chunk(s)`,
-        );
         bad = stillBad;
       }
     };
@@ -256,9 +237,6 @@ export const createWhisperRuntime = async (
       );
     }
 
-    console.log(
-      `whisper batch x${audios.length} (${maxDuration.toFixed(1)}s max) in ${((performance.now() - decodeStart) / 1000).toFixed(1)}s`,
-    );
     return outputs.map((result) => extractWords(result.chunks ?? []));
   };
 
