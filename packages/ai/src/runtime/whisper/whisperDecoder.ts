@@ -123,7 +123,7 @@ export const createWhisperDecoder = (
       try {
         await cache.dispose();
       } catch (error) {
-        console.log(`whisper decode: cache dispose failed: ${String(error)}`);
+        console.warn(`whisper decode: cache dispose failed: ${String(error)}`);
       }
     }
 
@@ -177,7 +177,7 @@ export const createWhisperDecoder = (
       try {
         await cache.dispose();
       } catch (error) {
-        console.log(`whisper decode: cache dispose failed: ${String(error)}`);
+        console.warn(`whisper decode: cache dispose failed: ${String(error)}`);
       }
     }
 
