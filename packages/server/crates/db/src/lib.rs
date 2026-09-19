@@ -4,6 +4,7 @@ mod backup;
 mod blob;
 mod database;
 mod failure;
+mod lock;
 mod preview;
 mod processing;
 mod project;
@@ -21,6 +22,7 @@ pub use backup::create_backup_name;
 pub use blob::blob_path;
 pub use database::{OpenOptions, open_database, open_readonly, read_schema_version};
 pub use failure::{BoxedError, MigrationFailure};
+pub use lock::{StorageLock, lock_storage};
 pub use preview::Preview;
 pub use processing::{
     CheckpointWrite, PROCESSING_STEPS, PendingJob, ProcessingStep, StepCheckpoint, StepState,
