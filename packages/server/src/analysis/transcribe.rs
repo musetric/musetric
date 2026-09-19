@@ -16,10 +16,11 @@ use crate::{
         AnalysisContext,
         browser::{
             Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
-            require_executor, store,
+            require_executor, sample_duration, store,
         },
         checkpoint_persist::{CheckpointCursor, persist_tail},
         models::{WHISPER, whisper_graph},
+        result_check::check_result,
         transcribe_units::{
             CHUNK_SIZE_SECONDS, Plan, REPAIR_UNITS, Restored, SEAM_SECONDS, StartPass,
             TranscribeState, TranscribeUnits, restore_state,
@@ -69,7 +70,9 @@ async fn transcribe(
     })
     .await?;
     let samples = decode_samples(&pcm);
+    let duration = sample_duration(samples.len(), WHISPER.sample_rate);
     let result = drive(context, job, report, samples).await?;
+    check_result(Analysis::Subtitle, &result, duration)?;
     (report)(StepPhase::Saving);
     store(context, job, Analysis::Subtitle, &result).await
 }
