@@ -1,25 +1,15 @@
 use std::{
-    fs::create_dir_all,
     io,
     path::{Path, PathBuf},
-    sync::Mutex,
-    time::Duration,
 };
 
-use musetric_server::MigrationFailure;
-use rusqlite::{Connection, ErrorCode};
+use musetric_server::{MigrationFailure, StorageLock, lock_storage};
 use tauri::{Manager, Runtime};
 
 const APPLICATION_NAME: &str = "Musetric";
 const DEVELOPMENT_APPLICATION_NAME: &str = "Musetric Dev";
 const LOG_FILE_NAME: &str = "musetric.log";
 const LOGS_DIRECTORY: &str = "logs";
-const STORAGE_LOCK_NAME: &str = "backend.lock";
-
-pub(crate) struct StorageLock {
-    _connection: Mutex<Connection>,
-}
-
 pub(crate) fn application_data_dir<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<PathBuf> {
     let name = if cfg!(debug_assertions) {
         DEVELOPMENT_APPLICATION_NAME
@@ -37,20 +27,12 @@ pub(crate) fn log_path(root: &Path) -> PathBuf {
     logs_dir(root).join(LOG_FILE_NAME)
 }
 
+pub(crate) fn database_path(root: &Path) -> PathBuf {
+    root.join("storage").join("db").join("app.db")
+}
+
 pub(crate) fn acquire_storage_lock(root: &Path) -> io::Result<Option<StorageLock>> {
-    let storage = root.join("storage");
-    create_dir_all(&storage)?;
-    let connection = Connection::open(storage.join(STORAGE_LOCK_NAME)).map_err(io::Error::other)?;
-    connection
-        .busy_timeout(Duration::ZERO)
-        .map_err(io::Error::other)?;
-    match connection.execute_batch("BEGIN EXCLUSIVE") {
-        Ok(()) => Ok(Some(StorageLock {
-            _connection: Mutex::new(connection),
-        })),
-        Err(error) if is_lock_busy(&error) => Ok(None),
-        Err(error) => Err(io::Error::other(error)),
-    }
+    lock_storage(&database_path(root)).map_err(io::Error::other)
 }
 
 pub(crate) fn storage_busy_message() -> (&'static str, String) {
@@ -85,14 +67,6 @@ pub(crate) fn startup_failure_message(
     }
     lines.push(format!("The details are in {}", logs.display()));
     ("Musetric could not update its database", lines.join("\n\n"))
-}
-
-fn is_lock_busy(error: &rusqlite::Error) -> bool {
-    matches!(
-        error,
-        rusqlite::Error::SqliteFailure(failure, _)
-            if failure.code == ErrorCode::DatabaseBusy
-    )
 }
 
 #[cfg(test)]

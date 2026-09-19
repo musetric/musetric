@@ -9,7 +9,9 @@ use std::{
 
 use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
-use musetric_db::{BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database};
+use musetric_db::{
+    BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database, lock_storage,
+};
 use musetric_gpu::{Bundle, ExecutorHost, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
@@ -103,6 +105,13 @@ impl EmbeddedServer {
 }
 
 pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
+    let Some(_storage_lock) = lock_storage(&options.database)? else {
+        return Err(format!(
+            "Another Musetric server is using the database {}",
+            options.database.display()
+        )
+        .into());
+    };
     match init_database(&options.database) {
         Ok(report) => announce_migration(&report),
         Err(failure) => {
@@ -359,7 +368,9 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::{EmbeddedServerOptions, ExecutorSurface, start_embedded};
+    use musetric_db::{OpenOptions, init_database, lock_storage, open_database};
+
+    use super::{EmbeddedServerOptions, ExecutorSurface, ServerOptions, serve, start_embedded};
     use crate::{Asset, Assets, Bundle, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -439,5 +450,58 @@ mod tests {
         assert_eq!(shell, "<!doctype html><title>Musetric</title>");
         assert_eq!(projects, "[]");
         server.close();
+    }
+
+    #[tokio::test]
+    async fn leaves_the_storage_of_a_running_server_untouched() {
+        let workspace = Workspace::new();
+        let database = workspace.root.join("storage/db/app.db");
+        init_database(&database).expect("the database should be created");
+        let options = OpenOptions {
+            foreign_keys: false,
+        };
+        open_database(&database, &options)
+            .expect("the database should open")
+            .execute_batch(
+                "INSERT INTO Project (id, name, sampleRate, frameCount)
+                 VALUES (1, 'Fixture project', 48000, 480000);
+                 INSERT INTO ProcessingStep (projectId, step, status)
+                 VALUES (1, 'separation', 'processing');",
+            )
+            .expect("the running step should be seeded");
+        let first = lock_storage(&database)
+            .expect("the lock should open")
+            .expect("the first server should hold the storage");
+        let port = std::net::TcpListener::bind("127.0.0.1:0").expect("the port should bind");
+        let listen = port
+            .local_addr()
+            .expect("the port should have an address")
+            .to_string();
+
+        let refused = serve(ServerOptions {
+            listen,
+            database: database.clone(),
+            blobs: workspace.root.join("storage/blobs"),
+            work: workspace.root.join("storage/work"),
+            models: workspace.root.join("models"),
+            browser_bundle: workspace.root.join("browser"),
+            public: workspace.root.join("public"),
+            processing: false,
+            tls_self_signed: false,
+            tls: None,
+        })
+        .await;
+        let status: String = open_database(&database, &options)
+            .expect("the database should open")
+            .query_row(
+                "SELECT status FROM ProcessingStep WHERE projectId = 1 AND step = 'separation'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("the step should be readable");
+        drop(first);
+
+        assert!(refused.is_err());
+        assert_eq!(status, "processing");
     }
 }
