@@ -22,18 +22,28 @@ const settle = async (delayMs: number): Promise<void> => {
   });
 };
 
+type Restarts = { count: number };
+
 const withExecutor = async (
   apis: BrowserJobApis,
-  check: (host: FakeHost, executor: JobExecutor) => Promise<void>,
+  check: (
+    host: FakeHost,
+    executor: JobExecutor,
+    restarts: Restarts,
+  ) => Promise<void>,
 ): Promise<void> => {
   const host = await startFakeHost();
+  const restarts: Restarts = { count: 0 };
   const executor = startJobExecutor({
     jobUrl: host.socketUrl,
     apis,
     reconnectDelayMs,
+    restart: () => {
+      restarts.count += 1;
+    },
   });
   try {
-    await check(host, executor);
+    await check(host, executor, restarts);
   } finally {
     await executor.stop();
     await host.close();
@@ -184,6 +194,7 @@ test('a second browser client waits until the first one stops', async () => {
       jobUrl: host.socketUrl,
       apis: {},
       reconnectDelayMs,
+      restart: () => undefined,
     });
     try {
       await settle(reconnectDelayMs * 20);
@@ -218,10 +229,26 @@ test('the browser client reports a failing job back to the host', async () => {
     }),
   };
 
-  await withExecutor(apis, async (host) => {
+  await withExecutor(apis, async (host, _executor, restarts) => {
     await expect(host.run(apiName, {})).rejects.toThrow(
       'the runtime ran out of memory',
     );
+    await expect.poll(() => restarts.count).toBe(1);
+    await settle(reconnectDelayMs * 20);
+    expect(host.readies).toHaveLength(1);
+  });
+});
+
+test('the browser client keeps its runtime after a job that succeeds', async () => {
+  announceAdapter(true);
+  const apis: BrowserJobApis = {
+    [apiName]: createBrowserJobApi<unknown>(async () => Promise.resolve(1)),
+  };
+
+  await withExecutor(apis, async (host, _executor, restarts) => {
+    expect(await host.run(apiName, {})).toBe(1);
+    expect(await host.run(apiName, {})).toBe(1);
+    expect(restarts.count).toBe(0);
   });
 });
 
@@ -239,6 +266,7 @@ test('the browser client refuses a socket url outside the machine', () => {
       jobUrl: 'ws://example.com/jobs',
       apis: {},
       reconnectDelayMs,
+      restart: () => undefined,
     });
   }).toThrow('accepts a local socket url only');
   expect(() => {
@@ -246,6 +274,7 @@ test('the browser client refuses a socket url outside the machine', () => {
       jobUrl: 'http://127.0.0.1/jobs',
       apis: {},
       reconnectDelayMs,
+      restart: () => undefined,
     });
   }).toThrow('accepts a local socket url only');
 });

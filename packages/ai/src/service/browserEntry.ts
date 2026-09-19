@@ -13,6 +13,8 @@ import { analyzeRhythmApiName } from './rhythmApi.js';
 import { separateUnitsApiName } from './separationApi.js';
 import { transcribeAudioApiName } from './transcribeApi.js';
 
+declare const window: { location: { reload: () => void } };
+
 const apis: BrowserJobApis = {
   [separateUnitsApiName]: separateUnits,
   [transcribeAudioApiName]: transcribeAudio,
@@ -33,4 +35,7 @@ startJobExecutor({
   jobUrl: readJobUrl(),
   apis,
   reconnectDelayMs: 3000,
+  restart: () => {
+    window.location.reload();
+  },
 });

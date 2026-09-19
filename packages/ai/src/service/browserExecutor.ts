@@ -38,13 +38,14 @@ const pause = async (delayMs: number, signal: AbortSignal): Promise<void> => {
 
 type RunningJob = {
   job: Promise<void> | undefined;
+  failed: boolean;
 };
 
 const serveConnection = async (
   socketUrl: string,
   apis: BrowserJobApis,
   signal: AbortSignal,
-): Promise<void> => {
+): Promise<boolean> => {
   const socket = new WebSocket(socketUrl);
   const send = (message: ExecutorMessage): void => {
     if (socket.readyState === WebSocket.OPEN) {
@@ -59,7 +60,10 @@ const serveConnection = async (
       send({ type: 'unitDone', jobId, attemptId, unit });
     },
   });
-  const running: RunningJob = { job: undefined };
+  const running: RunningJob = { job: undefined, failed: false };
+  const close = (): void => {
+    socket.close();
+  };
 
   const runJob = async (command: JobCommand): Promise<void> => {
     try {
@@ -76,11 +80,16 @@ const serveConnection = async (
       });
       send({ type: 'result', jobId: command.jobId, result });
     } catch (error) {
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
       send({
         type: 'failed',
         jobId: command.jobId,
         error: describeError(error),
       });
+      running.failed = true;
+      close();
     }
   };
 
@@ -99,9 +108,6 @@ const serveConnection = async (
   };
 
   const closed = Promise.withResolvers<void>();
-  const close = (): void => {
-    socket.close();
-  };
   signal.addEventListener('abort', close, { once: true });
   socket.addEventListener('close', () => {
     closed.resolve();
@@ -138,12 +144,14 @@ const serveConnection = async (
   close();
   await unitServer.abandon('the executor lost its connection to the host');
   await running.job;
+  return running.failed;
 };
 
 export type JobExecutorOptions = {
   jobUrl: string;
   apis: BrowserJobApis;
   reconnectDelayMs: number;
+  restart: () => void;
 };
 
 export type JobExecutor = {
@@ -160,8 +168,16 @@ export const startJobExecutor = (options: JobExecutorOptions): JobExecutor => {
   const stopped = navigator.locks
     .request(executorLockName, { signal }, async () => {
       while (!signal.aborted) {
-        await serveConnection(socketUrl, options.apis, signal);
+        if (await serveConnection(socketUrl, options.apis, signal)) {
+          return true;
+        }
         await pause(options.reconnectDelayMs, signal);
+      }
+      return false;
+    })
+    .then((failed) => {
+      if (failed) {
+        options.restart();
       }
     })
     .catch((error: unknown) => {
