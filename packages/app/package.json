@@ -42,6 +42,7 @@
     "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "onnxruntime-web": "catalog:"
+    "onnxruntime-web": "catalog:",
+    "zod": "catalog:"
   }
 }

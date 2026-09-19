@@ -25,7 +25,8 @@
     "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "onnxruntime-web": "1.30.0"
+    "onnxruntime-web": "1.30.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@musetric/cqt": "workspace:*",
@@ -41,6 +42,7 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "ws": "catalog:"
+    "ws": "catalog:",
+    "zod": "catalog:"
   }
 }
