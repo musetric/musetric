@@ -47,6 +47,7 @@ test('the unit serving fetches every window, uploads the output and confirms the
     jobUrl: host.socketUrl,
     apis: servingApis(serving),
     reconnectDelayMs: 10,
+    restart: () => undefined,
   });
   try {
     await host.ready;
@@ -109,6 +110,7 @@ test('the unit serving gives up when the host connection drops', async () => {
     jobUrl: host.socketUrl,
     apis,
     reconnectDelayMs: 10,
+    restart: () => undefined,
   });
   try {
     await host.ready;
@@ -147,6 +149,7 @@ test('the unit serving fails the job when the host refuses an output', async () 
     jobUrl: host.socketUrl,
     apis: servingApis(serving),
     reconnectDelayMs: 10,
+    restart: () => undefined,
   });
   try {
     await host.ready;
