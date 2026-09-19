@@ -29,7 +29,7 @@ pub use processing::{
     StepStatus, StepUpdate,
 };
 pub use project::ProjectItem;
-pub use reader::Reader;
+pub use reader::{ProjectOverview, Reader};
 pub use runner::{MigrationReport, init_database, run_migrations};
 pub use schema::{MIGRATIONS, Migration};
 pub use writer::{

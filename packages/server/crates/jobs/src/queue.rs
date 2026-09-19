@@ -168,13 +168,21 @@ impl Queue {
 
     pub async fn processing(&self, project_id: i64) -> Result<Processing, BoxedError> {
         let states = self.read_states(project_id).await?;
+        self.summarize(project_id, &states)
+    }
+
+    pub fn summarize(
+        &self,
+        project_id: i64,
+        states: &[StepState],
+    ) -> Result<Processing, BoxedError> {
         let guard = self.running.lock().map_err(|_| "the queue is poisoned")?;
         let active = guard
             .as_ref()
             .map(|running| &running.step)
             .filter(|step| step.project_id == project_id);
         let parked = self.parked_step(project_id);
-        Ok(build_processing(&states, active, parked.as_ref()))
+        Ok(build_processing(states, active, parked.as_ref()))
     }
 
     pub fn spawn(self: &Arc<Self>) {

@@ -1,9 +1,11 @@
-use std::{path::Path, sync::Mutex};
+use std::{collections::HashMap, path::Path, sync::Mutex};
 
 use rusqlite::Connection;
 
 use crate::{
-    analysis::{Analysis, StemLoudness, read_analysis_blob, read_stem_loudness},
+    analysis::{
+        Analysis, StemLoudness, read_all_stem_loudness, read_analysis_blob, read_stem_loudness,
+    },
     audio::{
         AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
         read_recording,
@@ -13,14 +15,20 @@ use crate::{
     failure::BoxedError,
     preview::{Preview, read_preview},
     processing::{
-        PendingJob, ProcessingStep, StepCheckpoint, StepState, read_checkpoint, read_pending,
-        read_states,
+        PendingJob, ProcessingStep, StepCheckpoint, StepState, read_all_states, read_checkpoint,
+        read_pending, read_states,
     },
     project::{ProjectItem, read_project, read_project_name, read_projects},
 };
 
 pub struct Reader {
     connection: Mutex<Connection>,
+}
+
+pub struct ProjectOverview {
+    pub projects: Vec<ProjectItem>,
+    pub loudness: HashMap<i64, Vec<StemLoudness>>,
+    pub states: HashMap<i64, Vec<StepState>>,
 }
 
 impl Reader {
@@ -50,6 +58,16 @@ impl Reader {
 
     pub fn project(&self, project_id: i64) -> Result<Option<ProjectItem>, BoxedError> {
         self.read(|connection| read_project(connection, project_id))
+    }
+
+    pub fn project_overview(&self) -> Result<ProjectOverview, BoxedError> {
+        self.read(|connection| {
+            Ok(ProjectOverview {
+                projects: read_projects(connection)?,
+                loudness: read_all_stem_loudness(connection)?,
+                states: read_all_states(connection)?,
+            })
+        })
     }
 
     pub fn projects(&self) -> Result<Vec<ProjectItem>, BoxedError> {
