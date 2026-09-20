@@ -101,6 +101,7 @@ pub struct PendingJob {
     pub step: ProcessingStep,
     pub project_id: i64,
     pub blob_id: String,
+    pub position: i64,
 }
 
 #[derive(Clone)]
@@ -155,12 +156,13 @@ pub(crate) fn read_pending(
 ) -> Result<Option<PendingJob>> {
     connection
         .query_row(
-            "SELECT Step.projectId, Master.blobId
+            "SELECT Step.projectId, Master.blobId, Project.position
              FROM ProcessingStep AS Step
+             JOIN Project ON Project.id = Step.projectId
              JOIN AudioMaster AS Master
                ON Master.projectId = Step.projectId AND Master.type = ?2
-             WHERE Step.step = ?1 AND Step.status = ?3
-             ORDER BY Step.projectId
+             WHERE Step.step = ?1 AND Step.status = ?3 AND Project.paused = 0
+             ORDER BY Project.position, Step.projectId
              LIMIT 1",
             (
                 step.name(),
@@ -172,6 +174,7 @@ pub(crate) fn read_pending(
                     step,
                     project_id: row.get(0)?,
                     blob_id: row.get(1)?,
+                    position: row.get(2)?,
                 })
             },
         )

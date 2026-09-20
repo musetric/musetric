@@ -5,7 +5,9 @@ const CREATE_PROJECT: &str = "
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     sampleRate INTEGER NOT NULL,
-    frameCount INTEGER NOT NULL
+    frameCount INTEGER NOT NULL,
+    paused INTEGER NOT NULL DEFAULT 0,
+    position INTEGER NOT NULL DEFAULT 0
   );
 ";
 
@@ -142,6 +144,15 @@ const CREATE_RECORDING: &str = "
   );
 ";
 
+const CREATE_PROCESSING: &str = "
+  CREATE TABLE Processing (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    paused INTEGER NOT NULL DEFAULT 0
+  );
+";
+
+const INSERT_PROCESSING: &str = "INSERT INTO Processing (id, paused) VALUES (1, 0);";
+
 const V001_INITIAL: Migration = &[
     CREATE_PROJECT,
     CREATE_PROCESSING_STEP,
@@ -157,6 +168,8 @@ const V001_INITIAL: Migration = &[
     CREATE_KEY,
     CREATE_CHORDS,
     CREATE_RECORDING,
+    CREATE_PROCESSING,
+    INSERT_PROCESSING,
 ];
 
 pub const MIGRATIONS: &[Migration] = &[V001_INITIAL];

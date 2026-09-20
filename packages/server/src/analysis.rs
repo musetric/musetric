@@ -44,6 +44,10 @@ impl AnalysisRunner {
 }
 
 impl StepRunner for AnalysisRunner {
+    fn rest(&self) {
+        self.context.host.reload_executor();
+    }
+
     fn run<'a>(&'a self, job: &'a PendingJob, report: &'a StepReport) -> StepOutcome<'a> {
         match job.step {
             ProcessingStep::Transcription => Box::pin(transcribe::run(&self.context, job, report)),

@@ -122,6 +122,10 @@ pub(crate) fn write_ping_command() -> String {
     json!({ "type": "ping" }).to_string()
 }
 
+pub(crate) fn write_reload_command() -> String {
+    json!({ "type": "reload" }).to_string()
+}
+
 pub(crate) fn write_job_command(job_id: &str, api: &str, request: &Value) -> String {
     json!({
         "type": "job",

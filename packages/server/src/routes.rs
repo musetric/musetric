@@ -3,10 +3,13 @@ mod audio;
 mod item;
 mod models;
 mod preview;
+mod processing;
 mod project;
 mod status;
 
 use std::{path::PathBuf, sync::Arc};
+
+use musetric_gpu::ExecutorHost;
 
 use axum::Router;
 
@@ -19,6 +22,7 @@ pub(crate) struct RouteState {
     pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
+    pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) models_path: PathBuf,
 }
 
@@ -27,6 +31,7 @@ pub(crate) fn create_router(state: RouteState) -> Router {
         .merge(audio::create_router())
         .merge(models::create_router())
         .merge(preview::create_router())
+        .merge(processing::create_router())
         .merge(project::create_router())
         .merge(status::create_router())
         .merge(realtime::create_router())

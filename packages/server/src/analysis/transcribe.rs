@@ -204,8 +204,8 @@ async fn restore(
     let next_unit = cursor.next_unit;
     let pass = match cursor.pass.as_deref() {
         Some(PASS_DECODE) => {
-            let chunks = state.plan.as_ref().map_or(0, Plan::chunk_count);
-            let valid = (next_unit == 0 || state.plan.is_some()) && next_unit <= chunks;
+            let units = 1 + state.plan.as_ref().map_or(0, Plan::chunk_count);
+            let valid = (next_unit == 0 || state.plan.is_some()) && next_unit <= units;
             if !valid {
                 return Err(Failure::Refused(restore_refused(
                     "the cursor is outside the plan",

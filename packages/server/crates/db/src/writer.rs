@@ -11,6 +11,7 @@ use crate::{
         CheckpointWrite, ProcessingStep, StepUpdate, abandon_running, bind_attempt, create_steps,
         write_checkpoint, write_status,
     },
+    project::{write_processing_paused, write_project_order, write_project_paused},
 };
 
 pub struct NewPreview {
@@ -74,7 +75,8 @@ impl Writer {
     pub fn create_project(&self, project: &NewProject) -> Result<i64, BoxedError> {
         self.write(|transaction| {
             transaction.execute(
-                "INSERT INTO Project (name, sampleRate, frameCount) VALUES (?1, ?2, ?3)",
+                "INSERT INTO Project (name, sampleRate, frameCount, position)
+                 VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(position), 0) + 1 FROM Project))",
                 (&project.name, project.sample_rate, project.frame_count),
             )?;
             let project_id = transaction.last_insert_rowid();
@@ -88,6 +90,18 @@ impl Writer {
             }
             Ok(project_id)
         })
+    }
+
+    pub fn set_processing_paused(&self, paused: bool) -> Result<(), BoxedError> {
+        self.write(|transaction| write_processing_paused(transaction, paused))
+    }
+
+    pub fn set_project_paused(&self, project_id: i64, paused: bool) -> Result<bool, BoxedError> {
+        self.write(|transaction| write_project_paused(transaction, project_id, paused))
+    }
+
+    pub fn set_project_order(&self, project_ids: &[i64]) -> Result<(), BoxedError> {
+        self.write(|transaction| write_project_order(transaction, project_ids))
     }
 
     pub fn edit_project(&self, edit: &ProjectEdit) -> Result<bool, BoxedError> {
