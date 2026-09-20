@@ -300,7 +300,7 @@ pub(crate) const VOCALS_MODEL_DATA: &str = "syhft_core_t1100.onnx.data";
 pub(crate) const VOCALS: ModelBundle = ModelBundle {
     label: "Vocals separation model",
     model_id: "musetric/vocal-separation-roformer-onnx",
-    revision: "06f07ae6dc13ba34b6fe905593407b0c85a5e908",
+    revision: "4720922b290b256f80228dbf5b48b592620e70f7",
     directory: "vocal-separation-roformer-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
@@ -308,7 +308,7 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
     files: &[
         (
             VOCALS_MODEL,
-            "88b51e87dd2fa02acecf95d880a3833c307bf780b101dd39021de7b821faec22",
+            "e6da40047d63ce9129c53d9c9f50b019ffae83de414e05b2800ab67fce13e374",
             8_446_324,
         ),
         (
