@@ -1,8 +1,8 @@
-export type StorageBufferType = 'read-only-storage' | 'storage';
+export type BufferType = 'read-only-storage' | 'storage' | 'uniform';
 
 export const createBindGroupLayout = (
   device: GPUDevice,
-  bufferTypes: readonly StorageBufferType[],
+  bufferTypes: readonly BufferType[],
 ): GPUBindGroupLayout =>
   device.createBindGroupLayout({
     entries: bufferTypes.map((type, binding) => ({
@@ -57,13 +57,13 @@ export const createReadbackBuffer = (
 export const createBindGroup = (
   device: GPUDevice,
   layout: GPUBindGroupLayout,
-  buffers: readonly GPUBuffer[],
+  buffers: readonly (GPUBuffer | GPUBufferBinding)[],
 ): GPUBindGroup =>
   device.createBindGroup({
     layout,
     entries: buffers.map((buffer, binding) => ({
       binding,
-      resource: { buffer },
+      resource: 'buffer' in buffer ? buffer : { buffer },
     })),
   });
 

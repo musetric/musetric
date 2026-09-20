@@ -7,8 +7,13 @@ override samples: i32;
 
 const pi: f32 = 3.141592653589793;
 
+struct Params {
+  frameOffset: u32,
+};
+
 @group(0) @binding(0) var<storage, read> rawAudio: array<f32>;
 @group(0) @binding(1) var<storage, read_write> wave: array<f32>;
+@group(0) @binding(2) var<uniform> params: Params;
 
 fn reflectIndex(index: i32) -> i32 {
   if (index < 0i) {
@@ -23,7 +28,7 @@ fn reflectIndex(index: i32) -> i32 {
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let n = id.x;
-  let frame = id.y;
+  let frame = id.y + params.frameOffset;
   if (n >= nFft || frame >= frames) {
     return;
   }

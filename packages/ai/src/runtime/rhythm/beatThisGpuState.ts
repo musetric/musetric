@@ -38,6 +38,23 @@ export const getWindowStarts = (
 export const getWindowFrames = (graph: BeatThisGraph): number =>
   graph.chunkSize;
 
+const frameBatchFrames = 1024;
+const melBatchFrames = 512;
+const uniformSlotBytes = 256;
+
+export type CreateBeatThisGpuStateOptions = {
+  graph: BeatThisGraph;
+  device: GPUDevice;
+  fftCell: ReturnType<typeof createFftPackedStockhamR2c>;
+  filterbank: GPUBuffer;
+  sampleCount: number;
+};
+
+export type FrameBatch = {
+  bindGroup: GPUBindGroup;
+  frames: number;
+};
+
 export type BeatThisGpuState = {
   graph: BeatThisGraph;
   sampleCount: number;
@@ -57,19 +74,12 @@ export type BeatThisGpuState = {
   readback: GPUBuffer;
   fft: ReturnType<ReturnType<typeof createFftPackedStockhamR2c>['get']>;
   framePipeline: GPUComputePipeline;
-  frameBindGroup: GPUBindGroup;
+  frameBatches: FrameBatch[];
   melPipeline: GPUComputePipeline;
-  melBindGroup: GPUBindGroup;
+  melBatches: FrameBatch[];
+  batchOffsets: GPUBuffer;
   windowsPipeline: GPUComputePipeline;
   windowsBindGroup: GPUBindGroup;
-};
-
-export type CreateBeatThisGpuStateOptions = {
-  graph: BeatThisGraph;
-  device: GPUDevice;
-  fftCell: ReturnType<typeof createFftPackedStockhamR2c>;
-  filterbank: GPUBuffer;
-  sampleCount: number;
 };
 
 export const createBeatThisGpuState = (
@@ -131,9 +141,37 @@ export const createBeatThisGpuState = (
 
   device.queue.writeBuffer(startsBuffer, 0, Int32Array.from(starts));
 
+  const batchStarts = (size: number): number[] => {
+    const offsets: number[] = [];
+    for (let offset = 0; offset < frames; offset += size) {
+      offsets.push(offset);
+    }
+    return offsets;
+  };
+  const frameStarts = batchStarts(frameBatchFrames);
+  const melStarts = batchStarts(melBatchFrames);
+  const offsets = new Uint32Array(
+    ((frameStarts.length + melStarts.length) * uniformSlotBytes) /
+      Uint32Array.BYTES_PER_ELEMENT,
+  );
+  [...frameStarts, ...melStarts].forEach((start, slot) => {
+    offsets[(slot * uniformSlotBytes) / Uint32Array.BYTES_PER_ELEMENT] = start;
+  });
+  const batchOffsets = device.createBuffer({
+    size: offsets.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(batchOffsets, 0, offsets);
+  const slotResource = (slot: number): GPUBufferBinding => ({
+    buffer: batchOffsets,
+    offset: slot * uniformSlotBytes,
+    size: Uint32Array.BYTES_PER_ELEMENT,
+  });
+
   const frameLayout = createBindGroupLayout(device, [
     'read-only-storage',
     'storage',
+    'uniform',
   ]);
   const framePipeline = createComputePipeline({
     device,
@@ -147,12 +185,20 @@ export const createBeatThisGpuState = (
       samples: sampleCount,
     },
   });
-  const frameBindGroup = createBindGroup(device, frameLayout, [rawAudio, wave]);
+  const frameBatches: FrameBatch[] = frameStarts.map((start, index) => ({
+    frames: Math.min(frameBatchFrames, frames - start),
+    bindGroup: createBindGroup(device, frameLayout, [
+      rawAudio,
+      wave,
+      slotResource(index),
+    ]),
+  }));
 
   const melLayout = createBindGroupLayout(device, [
     'read-only-storage',
     'read-only-storage',
     'storage',
+    'uniform',
   ]);
   const melPipeline = createComputePipeline({
     device,
@@ -167,11 +213,15 @@ export const createBeatThisGpuState = (
       logMultiplier: graph.logMultiplier,
     },
   });
-  const melBindGroup = createBindGroup(device, melLayout, [
-    wave,
-    filterbank,
-    spect,
-  ]);
+  const melBatches: FrameBatch[] = melStarts.map((start, index) => ({
+    frames: Math.min(melBatchFrames, frames - start),
+    bindGroup: createBindGroup(device, melLayout, [
+      wave,
+      filterbank,
+      spect,
+      slotResource(frameStarts.length + index),
+    ]),
+  }));
 
   const windowsLayout = createBindGroupLayout(device, [
     'read-only-storage',
@@ -220,9 +270,10 @@ export const createBeatThisGpuState = (
     readback,
     fft,
     framePipeline,
-    frameBindGroup,
+    frameBatches,
     melPipeline,
-    melBindGroup,
+    melBatches,
+    batchOffsets,
     windowsPipeline,
     windowsBindGroup,
   };
@@ -241,6 +292,7 @@ export const destroyBeatThisGpuState = (state: BeatThisGpuState): void => {
     state.beat,
     state.downbeat,
     state.readback,
+    state.batchOffsets,
   ]) {
     buffer.destroy();
   }
