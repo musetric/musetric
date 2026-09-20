@@ -3,7 +3,10 @@ use std::{
     future::Future,
     panic::AssertUnwindSafe,
     pin::Pin,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -45,6 +48,8 @@ pub type StepOutcome<'a> = Pin<Box<dyn Future<Output = StepAnswer> + Send + 'a>>
 
 pub trait StepRunner: Send + Sync {
     fn run<'a>(&'a self, job: &'a PendingJob, report: &'a StepReport) -> StepOutcome<'a>;
+
+    fn rest(&self) {}
 }
 
 #[derive(Clone, Debug)]
@@ -80,16 +85,26 @@ pub struct Queue {
     wake: Notify,
     cancel: Notify,
     cancelled: Mutex<HashSet<i64>>,
+    worked: AtomicBool,
 }
 
 fn read_pending(reader: &Reader) -> Result<Option<PendingJob>, BoxedError> {
-    for step in QUEUE_ORDER {
-        let pending = reader.pending_job(step)?;
-        if pending.is_some() {
-            return Ok(pending);
+    if reader.processing_paused()? {
+        return Ok(None);
+    }
+    let mut chosen: Option<(usize, PendingJob)> = None;
+    for (rank, step) in QUEUE_ORDER.into_iter().enumerate() {
+        let Some(pending) = reader.pending_job(step)? else {
+            continue;
+        };
+        let better = chosen
+            .as_ref()
+            .is_none_or(|(kept_rank, kept)| (pending.position, rank) < (kept.position, *kept_rank));
+        if better {
+            chosen = Some((rank, pending));
         }
     }
-    Ok(None)
+    Ok(chosen.map(|(_, pending)| pending))
 }
 
 fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
@@ -147,6 +162,7 @@ impl Queue {
             wake: Notify::new(),
             cancel: Notify::new(),
             cancelled: Mutex::new(HashSet::new()),
+            worked: AtomicBool::new(false),
         })
     }
 
@@ -156,6 +172,11 @@ impl Queue {
     }
 
     pub fn wake(&self) {
+        self.wake.notify_one();
+    }
+
+    pub fn pause_changed(&self) {
+        self.cancel.notify_one();
         self.wake.notify_one();
     }
 
@@ -204,9 +225,21 @@ impl Queue {
         }
     }
 
+    async fn rest_when_idle(self: &Arc<Self>) {
+        if !self.worked.swap(false, Ordering::Relaxed) {
+            return;
+        }
+        if self.next_job().await.is_none() {
+            self.runner.rest();
+            return;
+        }
+        self.worked.store(true, Ordering::Relaxed);
+    }
+
     async fn work(self: Arc<Self>) {
         loop {
             self.drain().await;
+            self.rest_when_idle().await;
             tokio::select! {
                 () = self.wake.notified() => {}
                 () = sleep(self.interval) => {}
@@ -223,6 +256,7 @@ impl Queue {
     }
 
     async fn run_job(self: &Arc<Self>, job: PendingJob) -> bool {
+        self.worked.store(true, Ordering::Relaxed);
         let project_id = job.project_id;
         let step = job.step;
         if !self.start(&job).await {
@@ -334,6 +368,11 @@ impl Queue {
                     if self.project_cancelled(job.project_id) {
                         return StepAnswer::Cancelled;
                     }
+                    match self.paused(job.project_id).await {
+                        Ok(true) => return StepAnswer::Cancelled,
+                        Ok(false) => {}
+                        Err(error) => return StepAnswer::Failed(error.to_string()),
+                    }
                 }
                 () = sleep(self.idle_limit) => {
                     if self.idle_for().is_none_or(|elapsed| elapsed >= self.idle_limit) {
@@ -342,6 +381,14 @@ impl Queue {
                 }
             }
         }
+    }
+
+    async fn paused(&self, project_id: i64) -> Result<bool, BoxedError> {
+        let reader = Arc::clone(&self.reader);
+        spawn_blocking(
+            move || Ok(reader.processing_paused()? || reader.project_paused(project_id)?),
+        )
+        .await?
     }
 
     fn project_cancelled(&self, project_id: i64) -> bool {

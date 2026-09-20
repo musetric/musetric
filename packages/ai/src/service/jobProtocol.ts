@@ -7,6 +7,8 @@ const attemptId = z.string();
 
 const pingCommandSchema = z.object({ type: z.literal('ping') });
 
+const reloadCommandSchema = z.object({ type: z.literal('reload') });
+
 const jobCommandSchema = z.object({
   type: z.literal('job'),
   jobId,
@@ -30,6 +32,7 @@ const unitCloseCommandSchema = z.object({
 
 const hostCommandSchema = z.discriminatedUnion('type', [
   pingCommandSchema,
+  reloadCommandSchema,
   jobCommandSchema,
   unitCommandSchema,
   unitCloseCommandSchema,

@@ -188,10 +188,14 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         interval: QUEUE_INTERVAL,
         idle_limit: QUEUE_INTERVAL,
     });
+    let executor = ExecutorHost::start(Bundle::Directory(workspace.unit_bundle_path()))
+        .await
+        .expect("the executor host should start");
     RouteState {
         rooms: Arc::new(Rooms::create()),
         storage,
         queue,
+        executor,
         models_path: workspace.models_path(),
     }
 }

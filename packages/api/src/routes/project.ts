@@ -98,6 +98,8 @@ export const itemSchema = z.object({
   sampleRate: z.number().int().positive(),
   frameCount: z.number().int().positive(),
   previewUrl: z.string().optional(),
+  paused: z.boolean(),
+  position: z.number().int(),
   audioAnalysis: audioAnalysisSchema.optional(),
   processing: processingSchema,
 });
@@ -242,6 +244,19 @@ export namespace retry {
     paramsSchema: z.object({ projectId: z.number() }),
     requestSchema: z.object({ step: processingStepNameSchema }),
     responseSchema: itemSchema,
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
+export namespace pause {
+  export const base = createApiRoute({
+    method: 'post',
+    path: '/api/project/:projectId/pause',
+    paramsSchema: z.object({ projectId: z.number() }),
+    requestSchema: z.object({ paused: z.boolean() }),
+    responseSchema: z.void(),
   });
   export type Params = z.infer<typeof base.paramsSchema>;
   export type Request = z.infer<typeof base.requestSchema>;

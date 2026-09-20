@@ -48,12 +48,18 @@ type LogSink = {
   send: ((message: ExecutorMessage) => void) | undefined;
 };
 
+type ConnectionOptions = {
+  socketUrl: string;
+  apis: BrowserJobApis;
+  signal: AbortSignal;
+  logs: LogSink;
+  reload: () => void;
+};
+
 const serveConnection = async (
-  socketUrl: string,
-  apis: BrowserJobApis,
-  signal: AbortSignal,
-  logs: LogSink,
+  connection: ConnectionOptions,
 ): Promise<boolean> => {
+  const { socketUrl, apis, signal, logs } = connection;
   const socket = new WebSocket(socketUrl);
   const send = (message: ExecutorMessage): void => {
     if (socket.readyState === WebSocket.OPEN) {
@@ -139,6 +145,10 @@ const serveConnection = async (
       send({ type: 'pong' });
       return;
     }
+    if (command.type === 'reload') {
+      connection.reload();
+      return;
+    }
     if (command.type === 'job') {
       acceptJob(command);
       return;
@@ -197,7 +207,14 @@ export const startJobExecutor = (options: JobExecutorOptions): JobExecutor => {
   const stopped = navigator.locks
     .request(executorLockName, { signal }, async () => {
       while (!signal.aborted) {
-        if (await serveConnection(socketUrl, options.apis, signal, logs)) {
+        const failed = await serveConnection({
+          socketUrl,
+          apis: options.apis,
+          signal,
+          logs,
+          reload: options.restart,
+        });
+        if (failed) {
           return true;
         }
         await pause(options.reconnectDelayMs, signal);

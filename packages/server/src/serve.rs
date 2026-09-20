@@ -229,6 +229,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         frontend: options.frontend,
         storage,
         queue,
+        executor: host,
         models_path: options.models,
     });
     Ok(CreatedApp {

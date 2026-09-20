@@ -33,6 +33,9 @@ export const routes = {
       parseNativeParams: projectIdSchema.parse,
     },
   }),
+  processing: createSpaRoute({
+    path: { pattern: '/processing' },
+  }),
   project: createSpaRoute({
     path: {
       pattern: '/project/:projectId',

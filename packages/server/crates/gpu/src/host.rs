@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -32,7 +35,7 @@ use crate::{
     },
     protocol::{
         ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, read_executor_message, write_job_command,
-        write_ping_command, write_unit_close, write_unit_command,
+        write_ping_command, write_reload_command, write_unit_close, write_unit_command,
     },
     units::{UnitOutput, UnitSession, receive_output, receive_window},
 };
@@ -208,10 +211,14 @@ impl SessionState {
                 let _ = sender.send(Err(ExecutorFailure::Lost));
             }
         }
-        if let Ok(mut active) = self.active.lock() {
-            *active = None;
-        }
+        let running = self
+            .active
+            .lock()
+            .is_ok_and(|mut active| active.take().is_some());
         if let Ok(mut held) = self.executor.lock() {
+            if let (true, Some(outgoing)) = (running, held.as_ref()) {
+                let _ = outgoing.send(Message::Close(None));
+            }
             *held = None;
         }
     }
@@ -241,6 +248,7 @@ struct Leader {
 }
 
 pub(crate) struct HostState {
+    reload_wanted: AtomicBool,
     bundle: Bundle,
     liveness: Liveness,
     connections: Mutex<Vec<Connection>>,
@@ -308,6 +316,23 @@ impl HostState {
             });
         }
         self.publish_leader();
+        self.reload_executor_now();
+    }
+
+    fn reload_executor_now(&self) {
+        if !self.reload_wanted.load(Ordering::Relaxed) {
+            return;
+        }
+        let Some(leader) = self.leader.borrow().clone() else {
+            return;
+        };
+        if leader
+            .outgoing
+            .send(Message::Text(write_reload_command().into()))
+            .is_ok()
+        {
+            self.reload_wanted.store(false, Ordering::Relaxed);
+        }
     }
 
     fn publish_leader(&self) {
@@ -400,6 +425,7 @@ impl ExecutorHost {
     ) -> Result<Arc<Self>, BoxedError> {
         let (leader, _) = watch::channel(None);
         let state = Arc::new(HostState {
+            reload_wanted: AtomicBool::new(false),
             bundle,
             liveness,
             connections: Mutex::new(Vec::new()),
@@ -436,6 +462,11 @@ impl ExecutorHost {
             host: Arc::clone(self),
             state: session,
         }
+    }
+
+    pub fn reload_executor(&self) {
+        self.state.reload_wanted.store(true, Ordering::Relaxed);
+        self.state.reload_executor_now();
     }
 
     #[must_use]

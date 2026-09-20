@@ -83,6 +83,8 @@ fn build_item(project: &ProjectItem, measured: &[StemLoudness], processing: &Pro
     item.insert("name".to_owned(), json!(project.name));
     item.insert("sampleRate".to_owned(), json!(project.sample_rate));
     item.insert("frameCount".to_owned(), json!(project.frame_count));
+    item.insert("paused".to_owned(), json!(project.paused));
+    item.insert("position".to_owned(), json!(project.position));
     if let Some(preview_id) = project.preview_id {
         item.insert(
             "previewUrl".to_owned(),

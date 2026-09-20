@@ -18,7 +18,10 @@ use crate::{
         PendingJob, ProcessingStep, StepCheckpoint, StepState, read_all_states, read_checkpoint,
         read_pending, read_states,
     },
-    project::{ProjectItem, read_project, read_project_name, read_projects},
+    project::{
+        ProjectItem, read_processing_paused, read_project, read_project_name, read_project_paused,
+        read_projects,
+    },
 };
 
 pub struct Reader {
@@ -84,6 +87,14 @@ impl Reader {
 
     pub fn pending_job(&self, step: ProcessingStep) -> Result<Option<PendingJob>, BoxedError> {
         self.read(|connection| read_pending(connection, step))
+    }
+
+    pub fn processing_paused(&self) -> Result<bool, BoxedError> {
+        self.read(read_processing_paused)
+    }
+
+    pub fn project_paused(&self, project_id: i64) -> Result<bool, BoxedError> {
+        self.read(|connection| read_project_paused(connection, project_id))
     }
 
     pub fn step_checkpoint(

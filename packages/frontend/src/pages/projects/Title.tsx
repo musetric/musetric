@@ -4,6 +4,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../app/router/routes.js';
 import favicon from '../../favicon.svg';
+import { ProcessingIndicator } from '../processing/ProcessingIndicator.js';
 
 export const ProjectsTitle: FC = () => {
   const { t } = useTranslation();
@@ -21,13 +22,16 @@ export const ProjectsTitle: FC = () => {
         />
         <Typography variant='h4'>{t('pages.projects.title')}</Typography>
       </Stack>
-      <Button
-        component={routes.projectsCreate.Link}
-        variant='outlined'
-        startIcon={<AddIcon fontSize='inherit' />}
-      >
-        {t('pages.projects.create')}
-      </Button>
+      <Stack direction='row' gap={2} alignItems='center'>
+        <ProcessingIndicator />
+        <Button
+          component={routes.projectsCreate.Link}
+          variant='outlined'
+          startIcon={<AddIcon fontSize='inherit' />}
+        >
+          {t('pages.projects.create')}
+        </Button>
+      </Stack>
     </Stack>
   );
 };
