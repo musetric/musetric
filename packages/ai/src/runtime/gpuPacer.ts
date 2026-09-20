@@ -3,12 +3,20 @@ export type GpuPacer = {
   release: () => Promise<void>;
 };
 
+export type GpuPacerOptions = {
+  budgetMs?: number;
+};
+
 type QueueWork = {
   submit: boolean;
   execute: () => void;
 };
 
-export const createGpuPacer = (device: GPUDevice): GpuPacer => {
+export const createGpuPacer = (
+  device: GPUDevice,
+  options: GpuPacerOptions = {},
+): GpuPacer => {
+  const { budgetMs } = options;
   const { queue } = device;
   const submit = queue.submit.bind(queue);
   const writeBuffer = queue.writeBuffer.bind(queue);
@@ -63,16 +71,34 @@ export const createGpuPacer = (device: GPUDevice): GpuPacer => {
     }
   };
 
+  let perSubmission = 4;
+  let sinceWait = 0;
+  let spendingFrom = 0;
+
   const flush = async (): Promise<void> => {
     while (pending.length > 0) {
       const work = pending.shift();
       if (!work) {
         continue;
       }
-      work.execute();
-      if (work.submit) {
-        await complete();
+      if (work.submit && sinceWait === 0) {
+        spendingFrom = performance.now();
       }
+      work.execute();
+      if (!work.submit) {
+        continue;
+      }
+      sinceWait += 1;
+      if (
+        budgetMs !== undefined &&
+        (sinceWait + 1) * perSubmission <= budgetMs
+      ) {
+        continue;
+      }
+      await complete();
+      perSubmission =
+        (perSubmission + (performance.now() - spendingFrom) / sinceWait) / 2;
+      sinceWait = 0;
     }
   };
 

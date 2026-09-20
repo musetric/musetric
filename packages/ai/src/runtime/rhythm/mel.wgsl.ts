@@ -6,9 +6,14 @@ override frames: u32;
 override fftScale: f32;
 override logMultiplier: f32;
 
+struct Params {
+  frameOffset: u32,
+};
+
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read> filterbank: array<f32>;
 @group(0) @binding(2) var<storage, read_write> spect: array<f32>;
+@group(0) @binding(3) var<uniform> params: Params;
 
 fn log1p(x: f32) -> f32 {
   let shifted = 1.0 + x;
@@ -21,7 +26,7 @@ fn log1p(x: f32) -> f32 {
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let mel = id.x;
-  let frame = id.y;
+  let frame = id.y + params.frameOffset;
   if (mel >= melBins || frame >= frames) {
     return;
   }

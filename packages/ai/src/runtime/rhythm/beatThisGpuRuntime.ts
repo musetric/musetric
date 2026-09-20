@@ -1,6 +1,7 @@
 import { createFftPackedStockhamR2c } from '@musetric/fft/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
 import { yieldGpuToCompositor } from '../gpuCooldown.js';
+import { createGpuPacer } from '../gpuPacer.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
 import { type BeatThisGraph } from '../modelGraphs.js';
 import { type ReportUnit } from '../unitProgress.js';
@@ -37,37 +38,63 @@ const readBuffer = async (
   return values;
 };
 
+const fftFramesPerSubmission = 128;
+const uploadSamples = 1 << 20;
+const rhythmQueueBudgetMs = 32;
+
 const encodeFeatures = (device: GPUDevice, state: BeatThisGpuState): void => {
-  const encoder = device.createCommandEncoder();
-  const framePass = encoder.beginComputePass({ label: 'rhythm-frame' });
-  dispatch2d({
-    pass: framePass,
-    pipeline: state.framePipeline,
-    bindGroup: state.frameBindGroup,
-    x: state.graph.nFft,
-    y: state.frames,
+  const submitPass = (
+    label: string,
+    encode: (pass: GPUComputePassEncoder) => void,
+  ): void => {
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginComputePass({ label });
+    encode(pass);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  };
+
+  for (const batch of state.frameBatches) {
+    submitPass('rhythm-frame', (pass) => {
+      dispatch2d({
+        pass,
+        pipeline: state.framePipeline,
+        bindGroup: batch.bindGroup,
+        x: state.graph.nFft,
+        y: batch.frames,
+      });
+    });
+  }
+  for (
+    let offset = 0;
+    offset < state.frames;
+    offset += fftFramesPerSubmission
+  ) {
+    const count = Math.min(fftFramesPerSubmission, state.frames - offset);
+    submitPass('rhythm-fft', (pass) => {
+      state.fft.dispatch(pass, { batchOffset: offset, batchCount: count });
+    });
+  }
+  for (const batch of state.melBatches) {
+    submitPass('rhythm-mel', (pass) => {
+      dispatch2d({
+        pass,
+        pipeline: state.melPipeline,
+        bindGroup: batch.bindGroup,
+        x: state.graph.melBins,
+        y: batch.frames,
+      });
+    });
+  }
+  submitPass('rhythm-windows', (pass) => {
+    dispatch2d({
+      pass,
+      pipeline: state.windowsPipeline,
+      bindGroup: state.windowsBindGroup,
+      x: state.graph.melBins,
+      y: state.windowFrames * state.starts.length,
+    });
   });
-  framePass.end();
-  state.fft.run(encoder);
-  const melPass = encoder.beginComputePass({ label: 'rhythm-mel' });
-  dispatch2d({
-    pass: melPass,
-    pipeline: state.melPipeline,
-    bindGroup: state.melBindGroup,
-    x: state.graph.melBins,
-    y: state.frames,
-  });
-  melPass.end();
-  const windowsPass = encoder.beginComputePass({ label: 'rhythm-windows' });
-  dispatch2d({
-    pass: windowsPass,
-    pipeline: state.windowsPipeline,
-    bindGroup: state.windowsBindGroup,
-    x: state.graph.melBins,
-    y: state.windowFrames * state.starts.length,
-  });
-  windowsPass.end();
-  device.queue.submit([encoder.finish()]);
 };
 
 export type BeatThisLogits = {
@@ -110,6 +137,9 @@ export const createBeatThisGpuRuntime = async (
     label: 'Beat This',
   });
   const { device } = webgpu;
+  const pacer = createGpuPacer(device, {
+    budgetMs: rhythmQueueBudgetMs,
+  });
   const fftCell = createFftPackedStockhamR2c(device);
   const filterbank = createStorageBuffer(
     device,
@@ -206,16 +236,27 @@ export const createBeatThisGpuRuntime = async (
   ): Promise<BeatThisLogits> => {
     const current = ensureState(audio.length);
     const empty = new Float32Array(current.frames).fill(emptyLogit);
-    device.queue.writeBuffer(current.rawAudio, 0, audio);
-    device.queue.writeBuffer(current.beat, 0, empty);
-    device.queue.writeBuffer(current.downbeat, 0, empty);
-    encodeFeatures(device, current);
+    await pacer.pace(async () => {
+      for (let offset = 0; offset < audio.length; offset += uploadSamples) {
+        const count = Math.min(uploadSamples, audio.length - offset);
+        device.queue.writeBuffer(
+          current.rawAudio,
+          offset * Float32Array.BYTES_PER_ELEMENT,
+          audio,
+          offset,
+          count,
+        );
+      }
+      device.queue.writeBuffer(current.beat, 0, empty);
+      device.queue.writeBuffer(current.downbeat, 0, empty);
+      encodeFeatures(device, current);
 
-    const unitCount = current.starts.length;
-    for (let index = unitCount - 1; index >= 0; index -= 1) {
-      await onUnit?.({ unit: unitCount - 1 - index, unitCount });
-      await runWindow(current, index);
-    }
+      const unitCount = current.starts.length;
+      for (let index = unitCount - 1; index >= 0; index -= 1) {
+        await onUnit?.({ unit: unitCount - 1 - index, unitCount });
+        await runWindow(current, index);
+      }
+    });
 
     return {
       beat: await readBuffer(device, current, current.beat),
@@ -224,6 +265,7 @@ export const createBeatThisGpuRuntime = async (
   };
 
   const release = async (): Promise<void> => {
+    await pacer.release();
     await device.queue.onSubmittedWorkDone();
     await session.release();
     fftCell.dispose();
