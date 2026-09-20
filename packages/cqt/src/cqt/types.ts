@@ -17,5 +17,7 @@ export type CqtArg = {
 
 export type Cqt = {
   frameCount: number;
+  octaveCount: number;
   run: (encoder: GPUCommandEncoder) => void;
+  runOctave: (encoder: GPUCommandEncoder, octave: number) => void;
 };

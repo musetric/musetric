@@ -5,6 +5,7 @@ import {
   getCqtFrameCount,
 } from '@musetric/cqt/gpu';
 import * as ort from 'onnxruntime-web/webgpu';
+import { createGpuPacer } from '../gpuPacer.js';
 import {
   createBindGroup,
   createBindGroupLayout,
@@ -26,6 +27,8 @@ import { chordSmoothArgmaxShader } from './smoothArgmax.wgsl.js';
 ort.env.logLevel = 'error';
 
 const smoothingKernel = 9;
+const chordQueueBudgetMs = 32;
+const uploadSamples = 1 << 20;
 
 type ChordNetGpuState = {
   sampleCount: number;
@@ -216,6 +219,7 @@ export const createChordNetGpuRuntime = async (
     label: 'ChordNet',
   });
   const { device } = webgpu;
+  const pacer = createGpuPacer(device, { budgetMs: chordQueueBudgetMs });
   const cqtCell = createCqt(device);
   let state: ChordNetGpuState | undefined = undefined;
 
@@ -231,12 +235,14 @@ export const createChordNetGpuRuntime = async (
     return state;
   };
 
-  const analyze = async (audio: Float32Array): Promise<Int32Array> => {
-    const current = ensureState(audio.length);
-    device.queue.writeBuffer(current.input, 0, audio);
-    const cqtEncoder = device.createCommandEncoder();
-    current.cqt.run(cqtEncoder);
-    const padPass = cqtEncoder.beginComputePass({
+  const encodeFeatures = (current: ChordNetGpuState): void => {
+    for (let octave = 0; octave < current.cqt.octaveCount; octave += 1) {
+      const octaveEncoder = device.createCommandEncoder();
+      current.cqt.runOctave(octaveEncoder, octave);
+      device.queue.submit([octaveEncoder.finish()]);
+    }
+    const padEncoder = device.createCommandEncoder();
+    const padPass = padEncoder.beginComputePass({
       label: 'chordnet-pad-features',
     });
     dispatch1d(
@@ -246,8 +252,10 @@ export const createChordNetGpuRuntime = async (
       current.paddedWindowCount * graph.sequenceLength * graph.inputBins,
     );
     padPass.end();
-    device.queue.submit([cqtEncoder.finish()]);
+    device.queue.submit([padEncoder.finish()]);
+  };
 
+  const runModel = async (current: ChordNetGpuState): Promise<void> => {
     const runInputBytes = current.runInput.size;
     const runLogitsBytes = current.runLogits.size;
     for (let run = 0; run < current.runCount; run++) {
@@ -281,6 +289,24 @@ export const createChordNetGpuRuntime = async (
       );
       device.queue.submit([outputEncoder.finish()]);
     }
+  };
+
+  const analyze = async (audio: Float32Array): Promise<Int32Array> => {
+    const current = ensureState(audio.length);
+    await pacer.pace(async () => {
+      for (let offset = 0; offset < audio.length; offset += uploadSamples) {
+        const count = Math.min(uploadSamples, audio.length - offset);
+        device.queue.writeBuffer(
+          current.input,
+          offset * Float32Array.BYTES_PER_ELEMENT,
+          audio,
+          offset,
+          count,
+        );
+      }
+      encodeFeatures(current);
+      await runModel(current);
+    });
 
     const postEncoder = device.createCommandEncoder();
     const smoothPass = postEncoder.beginComputePass({
