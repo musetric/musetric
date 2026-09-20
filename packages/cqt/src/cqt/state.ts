@@ -233,41 +233,47 @@ const createState = (
     config: { windowSize: cqtFrameFftSize, windowCount: frameCount },
   });
 
+  const runOctave = (encoder: GPUCommandEncoder, octaveIndex: number): void => {
+    if (octaveIndex === 0) {
+      runStage(
+        encoder,
+        'cqt-early-downsample',
+        downsampleStages[0],
+        markers?.downsample,
+      );
+    } else {
+      runStage(
+        encoder,
+        `cqt-downsample-${octaveIndex}`,
+        downsampleStages[octaveIndex],
+      );
+    }
+    runStage(
+      encoder,
+      `cqt-frame-${octaveIndex}`,
+      frameStages[octaveIndex],
+      octaveIndex === 0 ? markers?.frame : undefined,
+    );
+    fft.run(encoder);
+    runStage(
+      encoder,
+      `cqt-project-${octaveIndex}`,
+      projectStages[octaveIndex],
+      octaveIndex === 0 ? markers?.projection : undefined,
+    );
+  };
+
   const cqt: Cqt = {
     frameCount,
+    octaveCount: plan.octaves.length,
+    runOctave,
     run: (encoder) => {
       for (
         let octaveIndex = 0;
         octaveIndex < plan.octaves.length;
         octaveIndex++
       ) {
-        if (octaveIndex === 0) {
-          runStage(
-            encoder,
-            'cqt-early-downsample',
-            downsampleStages[0],
-            markers?.downsample,
-          );
-        } else {
-          runStage(
-            encoder,
-            `cqt-downsample-${octaveIndex}`,
-            downsampleStages[octaveIndex],
-          );
-        }
-        runStage(
-          encoder,
-          `cqt-frame-${octaveIndex}`,
-          frameStages[octaveIndex],
-          octaveIndex === 0 ? markers?.frame : undefined,
-        );
-        fft.run(encoder);
-        runStage(
-          encoder,
-          `cqt-project-${octaveIndex}`,
-          projectStages[octaveIndex],
-          octaveIndex === 0 ? markers?.projection : undefined,
-        );
+        runOctave(encoder, octaveIndex);
       }
     },
   };
