@@ -75,6 +75,7 @@ const resolveLanguage = async (
 ): Promise<string> => {
   const sampleCount = Math.min(3, chunks.length);
   const votes = new Map<string, number>();
+  let leader = '';
   for (let i = 0; i < sampleCount; i++) {
     const chunk = chunks[Math.floor((i * chunks.length) / sampleCount)];
     const slice = compacted.subarray(
@@ -83,6 +84,13 @@ const resolveLanguage = async (
     );
     const language = await detectLanguage(slice);
     votes.set(language, (votes.get(language) ?? 0) + 1);
+    if ((votes.get(language) ?? 0) > sampleCount / 2) {
+      leader = language;
+      break;
+    }
+  }
+  if (leader) {
+    return leader;
   }
   let best = 'en';
   let bestVotes = 0;
@@ -136,18 +144,20 @@ export type TranscribeBatch = (
   language: string,
 ) => Promise<TranscriptionWord[][]>;
 
-export const decodeChunkPass = async (
-  slice: Float32Array,
+export const decodeChunksPass = async (
+  slices: Float32Array[],
   language: string,
   transcribeBatch: TranscribeBatch,
-): Promise<TranscriptionWord[]> => {
+): Promise<TranscriptionWord[][]> => {
   await yieldGpuToCompositor();
-  const [words] = await transcribeBatch([slice], language);
-  return words.map((word) => ({
-    text: word.text,
-    start: word.start,
-    end: word.end,
-  }));
+  const decoded = await transcribeBatch(slices, language);
+  return decoded.map((words) =>
+    words.map((word) => ({
+      text: word.text,
+      start: word.start,
+      end: word.end,
+    })),
+  );
 };
 
 export type TranscribeAligned = (

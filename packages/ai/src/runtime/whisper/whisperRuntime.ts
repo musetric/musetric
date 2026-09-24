@@ -4,6 +4,8 @@ import {
   pipeline,
   Tensor,
 } from '@huggingface/transformers';
+import * as ort from 'onnxruntime-web/webgpu';
+import { fetchOk } from '../../service/browserShared.js';
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
 import { createGpuPacer } from '../gpuPacer.js';
@@ -11,6 +13,7 @@ import { type WhisperGraph } from '../modelGraphs.js';
 import {
   getMusetricWebGpuDevice,
   musetricWebGpuProvider,
+  readAdapterArchitecture,
 } from '../webgpuDevice.js';
 import {
   createWhisperDecoder,
@@ -24,6 +27,12 @@ import {
   isLooped,
   spanText,
 } from './whisperSegments.js';
+import {
+  isFirstStep,
+  isFlatStep,
+  routeFirstStep,
+  type StepSession,
+} from './whisperStep.js';
 
 const sampleRate = 16000;
 
@@ -35,6 +44,8 @@ const guardLadder: DecodeGuard[] = [
 const collapsedWordsPerSecond = 0.25;
 const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
+const windowsPerBatch = 4;
+const subgroupArchitectures = new Set(['adreno-6xx']);
 
 export type WhisperRuntimeOptions = {
   graph: WhisperGraph;
@@ -68,6 +79,7 @@ export const createWhisperRuntime = async (
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
 
+  const subgroups = subgroupArchitectures.has(await readAdapterArchitecture());
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',
     options.modelId,
@@ -78,9 +90,7 @@ export const createWhisperRuntime = async (
       dtype: { ...options.graph.dtype },
 
       session_options: {
-        executionProviders: [
-          await musetricWebGpuProvider({ subgroups: false }),
-        ],
+        executionProviders: [await musetricWebGpuProvider({ subgroups })],
       },
       progress_callback: () => {
         options.onLoading();
@@ -91,12 +101,39 @@ export const createWhisperRuntime = async (
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
 
-  const { device } = await getMusetricWebGpuDevice({ subgroups: false });
+  const step: StepSession = internals.model.sessions.decoder_model_merged;
+  const cross = isFlatStep(step)
+    ? await ort.InferenceSession.create(
+        new Uint8Array(
+          await (
+            await fetchOk(
+              `${options.modelHost}/${options.modelId}/resolve/${options.revision}/cross_kv_${options.graph.dtype.decoder_model_merged}.onnx`,
+              'the whisper cross projection',
+            )
+          ).arrayBuffer(),
+        ),
+        {
+          executionProviders: [await musetricWebGpuProvider({ subgroups })],
+          preferredOutputLocation: 'gpu-buffer',
+        },
+      )
+    : undefined;
+
+  const { device } = await getMusetricWebGpuDevice({ subgroups });
   const pacer = createGpuPacer(device);
   const encoder = internals.model.sessions.model;
   const runEncoder = encoder.run.bind(encoder);
   encoder.run = async (...args) => pacer.pace(async () => runEncoder(...args));
-  const { decodeTimestamped, decodeAligned } = createWhisperDecoder(internals);
+  const { decodeAligned, decodeTimestampedBatch } =
+    createWhisperDecoder(internals);
+  if (cross) {
+    routeFirstStep(step, cross);
+  }
+  const runStep = step.run.bind(step);
+  step.run = async (feeds, ...rest) =>
+    isFirstStep(feeds)
+      ? pacer.pace(async () => runStep(feeds, ...rest))
+      : runStep(feeds, ...rest);
   const generationConfig = internals.model.generation_config;
   const langToId = generationConfig.lang_to_id ?? {};
   const startToken = generationConfig.decoder_start_token_id ?? 50258;
@@ -129,13 +166,20 @@ export const createWhisperRuntime = async (
     language: string,
     guard: DecodeGuard | undefined,
   ): Promise<DecodeResult[]> => {
-    const results: DecodeResult[] = [];
-    for (const audio of audios) {
-      if (audio.length === 0) {
-        results.push({});
-        continue;
+    const results: DecodeResult[] = audios.map(() => ({}));
+    const pending = audios.flatMap((audio, index) =>
+      audio.length === 0 ? [] : [index],
+    );
+    for (let from = 0; from < pending.length; from += windowsPerBatch) {
+      const group = pending.slice(from, from + windowsPerBatch);
+      const decoded = await decodeTimestampedBatch(
+        group.map((index) => audios[index]),
+        language,
+        guard,
+      );
+      for (const [position, index] of group.entries()) {
+        results[index] = decoded[position];
       }
-      results.push(await decodeTimestamped(audio, language, guard));
     }
     return results;
   };
@@ -250,6 +294,7 @@ export const createWhisperRuntime = async (
 
   const release = async (): Promise<void> => {
     await pacer.release();
+    await cross?.release();
     await transcriber.dispose();
   };
 
