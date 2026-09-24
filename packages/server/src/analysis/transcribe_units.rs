@@ -26,6 +26,7 @@ pub(crate) const MAX_RESULT: u64 = 16 * 1024 * 1024;
 pub(crate) const SEAM_SECONDS: f64 = 2.0;
 pub(crate) const CHUNK_SIZE_SECONDS: f64 = 30.0;
 pub(crate) const REPAIR_UNITS: u32 = 2;
+pub(crate) const DECODE_WINDOWS: usize = 4;
 
 #[cfg(test)]
 mod tests;
@@ -63,6 +64,15 @@ pub(crate) struct Plan {
 impl Plan {
     pub(crate) fn chunk_count(&self) -> u32 {
         u32::try_from(self.chunks.len()).unwrap_or(0)
+    }
+
+    pub(crate) fn decode_units(&self) -> u32 {
+        u32::try_from(self.chunks.len().div_ceil(DECODE_WINDOWS)).unwrap_or(0)
+    }
+
+    fn decode_group(&self, unit: u32) -> Option<std::ops::Range<usize>> {
+        let first = usize::try_from(unit.checked_sub(1)?).ok()? * DECODE_WINDOWS;
+        (first < self.chunks.len()).then(|| first..(first + DECODE_WINDOWS).min(self.chunks.len()))
     }
 }
 
@@ -149,7 +159,7 @@ impl TranscribeUnits {
     pub(crate) fn pass_count(&self, pass: StartPass) -> Result<u32, Failure> {
         let progress = Self::lock(&self.progress)?;
         Ok(match pass {
-            StartPass::Decode => 1 + progress.state.plan.as_ref().map_or(0, Plan::chunk_count),
+            StartPass::Decode => 1 + progress.state.plan.as_ref().map_or(0, Plan::decode_units),
             StartPass::Repair => REPAIR_UNITS,
         })
     }
@@ -205,17 +215,18 @@ impl TranscribeUnits {
     }
 
     fn inside(progress: &Progress, unit: u32) -> bool {
-        match progress.pass {
+        Self::inside_pass(progress, progress.pass, unit)
+    }
+
+    fn inside_pass(progress: &Progress, pass: StartPass, unit: u32) -> bool {
+        match pass {
             StartPass::Decode => {
-                if unit == 0 {
-                    return true;
-                }
-                let index = usize::try_from(unit - 1).unwrap_or(usize::MAX);
-                progress
-                    .state
-                    .plan
-                    .as_ref()
-                    .is_some_and(|plan| index < plan.chunks.len())
+                unit == 0
+                    || progress
+                        .state
+                        .plan
+                        .as_ref()
+                        .is_some_and(|plan| plan.decode_group(unit).is_some())
             }
             StartPass::Repair => unit < REPAIR_UNITS,
         }
@@ -243,12 +254,19 @@ impl TranscribeUnits {
                 progress.state.plan = Some(plan);
             }
             StartPass::Decode => {
-                let count = progress.state.plan.as_ref().map_or(0, Plan::chunk_count);
-                let index = usize::try_from(unit - 1).map_err(|_| OUTSIDE_PLAN.to_owned())?;
-                if index >= count as usize {
-                    return Err(OUTSIDE_PLAN.to_owned());
+                let group = progress
+                    .state
+                    .plan
+                    .as_ref()
+                    .and_then(|plan| plan.decode_group(unit))
+                    .ok_or_else(|| OUTSIDE_PLAN.to_owned())?;
+                let lists = value["words"]
+                    .as_array()
+                    .filter(|lists| lists.len() == group.len())
+                    .ok_or_else(|| "the unit words do not match its windows".to_owned())?;
+                for (index, list) in group.zip(lists) {
+                    progress.state.words[index] = parse_words(list)?;
                 }
-                progress.state.words[index] = parse_words(&value["words"])?;
             }
             StartPass::Repair if unit == 0 => {
                 let chunks = progress.state.plan.as_ref().map_or(0, Plan::chunk_count);
@@ -536,11 +554,18 @@ impl UnitSession for TranscribeUnits {
                     .plan
                     .as_ref()
                     .ok_or_else(|| UnitReject::Bad(PLAN_NOT_READY.to_owned()))?;
-                let index = usize::try_from(unit - 1)
-                    .map_err(|_| UnitReject::Bad(OUTSIDE_PLAN.to_owned()))?;
-                let chunk = &plan.chunks[index];
-                let payload = sample_bytes(&plan.compacted[chunk.from..chunk.to]);
-                let meta = json!({ "kind": "chunk", "language": plan.language });
+                let group = plan
+                    .decode_group(unit)
+                    .ok_or_else(|| UnitReject::Bad(OUTSIDE_PLAN.to_owned()))?;
+                let chunks = &plan.chunks[group];
+                let mut payload = Vec::new();
+                for chunk in chunks {
+                    payload.extend_from_slice(&sample_bytes(&plan.compacted[chunk.from..chunk.to]));
+                }
+                let lengths: Vec<usize> =
+                    chunks.iter().map(|chunk| chunk.to - chunk.from).collect();
+                let meta =
+                    json!({ "kind": "chunks", "language": plan.language, "lengths": lengths });
                 container(&meta, &payload)
             }
             StartPass::Repair if unit == 0 => {
@@ -623,11 +648,17 @@ impl UnitSession for TranscribeUnits {
     }
 
     fn done(&self, attempt: &str, unit: u32) -> Result<(), String> {
-        self.guard(attempt, unit)
-            .map(|_| ())
-            .map_err(|reject| match reject {
-                UnitReject::Stale => STAGE_LOST.to_owned(),
-                UnitReject::Bad(reason) => reason,
-            })
+        let progress = Self::lock(&self.progress).map_err(|_| POISONED_UNITS.to_owned())?;
+        if progress.attempt != attempt {
+            return Err(STAGE_LOST.to_owned());
+        }
+        let known = [StartPass::Decode, StartPass::Repair]
+            .into_iter()
+            .any(|pass| Self::inside_pass(&progress, pass, unit));
+        if known {
+            Ok(())
+        } else {
+            Err(OUTSIDE_PLAN.to_owned())
+        }
     }
 }

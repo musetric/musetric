@@ -5,7 +5,7 @@ import {
 import { buildLayout } from '../transcription/audioCompaction.js';
 import { type Span } from '../transcription/spectralChunker.js';
 import {
-  decodeChunkPass,
+  decodeChunksPass,
   finalizePass,
   planPass,
   repairPass,
@@ -18,7 +18,7 @@ import { type BrowserTranscribeRequest } from './transcribeApi.js';
 
 type UnitMeta =
   | { kind: 'plan' }
-  | { kind: 'chunk'; language: string }
+  | { kind: 'chunks'; language: string; lengths: number[] }
   | {
       kind: 'repair';
       language: string;
@@ -87,11 +87,17 @@ export const runTranscribeUnit = async (
       detectLanguage: runtime?.detectLanguage,
     });
   }
-  if (meta.kind === 'chunk') {
+  if (meta.kind === 'chunks') {
     const runtime = await loadRuntime();
+    const slices: Float32Array[] = [];
+    let offset = 0;
+    for (const length of meta.lengths) {
+      slices.push(audio.subarray(offset, offset + length));
+      offset += length;
+    }
     return {
-      words: await decodeChunkPass(
-        audio,
+      words: await decodeChunksPass(
+        slices,
         meta.language,
         runtime.transcribeBatch,
       ),

@@ -216,7 +216,7 @@ pub(crate) fn skey_graph() -> Value {
 pub(crate) const WHISPER: ModelBundle = ModelBundle {
     label: "Whisper transcription model",
     model_id: "musetric/whisper-large-v3-turbo-onnx",
-    revision: "84ab6b4473ab12b4df1c3e588a3e6af94338d26d",
+    revision: "81da5251e8cebcf5d72f778f3b5028deeed2bc2b",
     directory: "whisper-onnx-hf-cache",
     sample_rate: 16000,
     downmix: Downmix::Power,
@@ -279,8 +279,8 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         ),
         (
             "decoder_model_merged_fp16.onnx",
-            "0f64a6ee464ae44c24b41e312e6c206d29df5d9e9f46162cd3d6e14bd1e770cd",
-            344_323_830,
+            "4862f66f9140ccd78ad76e8b5f5365fc49b8b3d0312e5431cf058a7b978029eb",
+            344_283_544,
         ),
     ],
 };

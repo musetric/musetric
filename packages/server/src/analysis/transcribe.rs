@@ -34,7 +34,7 @@ use crate::{
 const LABEL: &str = "Headless transcription";
 const API_NAME: &str = "musetricAiTranscribeAudio";
 const OUTPUT: &str = "result";
-const DSP_VERSION: &str = "transcription-dsp-v1";
+const DSP_VERSION: &str = "transcription-dsp-v2";
 const PASS_DECODE: &str = "decode";
 const PASS_REPAIR: &str = "repair";
 const ANSWERED_EARLY: &str = "the analysis job answered before the close";
@@ -204,7 +204,7 @@ async fn restore(
     let next_unit = cursor.next_unit;
     let pass = match cursor.pass.as_deref() {
         Some(PASS_DECODE) => {
-            let units = 1 + state.plan.as_ref().map_or(0, Plan::chunk_count);
+            let units = 1 + state.plan.as_ref().map_or(0, Plan::decode_units);
             let valid = (next_unit == 0 || state.plan.is_some()) && next_unit <= units;
             if !valid {
                 return Err(Failure::Refused(restore_refused(

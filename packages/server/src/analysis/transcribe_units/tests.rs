@@ -85,6 +85,18 @@ async fn fold_plan(base: &str, units: &TranscribeUnits) {
         .expect("the plan should fold");
 }
 
+async fn first_chunk_window(base: &str) -> Vec<f32> {
+    let (status, body) = get_unit_window(base, ATTEMPT, 1).await;
+    assert_eq!(status, StatusCode::OK);
+    let (meta, payload) = container_parts(&body);
+    assert_eq!(
+        meta,
+        json!({ "kind": "chunks", "language": "en", "lengths": [112_000] })
+    );
+    assert_eq!(payload.len(), 112_000);
+    payload
+}
+
 #[tokio::test]
 async fn serves_the_whole_audio_as_the_plan_window() {
     let workspace = Workspace::new();
@@ -121,15 +133,103 @@ async fn folds_a_plan_and_serves_the_chunk_window() {
         .expect("the fold should not hang")
         .expect("the plan should fold");
 
-    let (status, body) = get_unit_window(&base, ATTEMPT, 1).await;
-    assert_eq!(status, StatusCode::OK);
-    let (meta, payload) = container_parts(&body);
-    assert_eq!(meta, json!({ "kind": "chunk", "language": "en" }));
-    assert_eq!(payload.len(), 112_000);
+    let payload = first_chunk_window(&base).await;
     assert_eq!(payload[0], 2.0);
     assert_eq!(payload[47_999], 4.999_937_5);
     assert_eq!(payload[48_000], 0.0);
     assert_eq!(payload[80_000], 6.0);
+    host.close().await;
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the input vectors hold seconds markers within float range"
+)]
+fn long_input() -> Vec<f32> {
+    (0..2_400_000)
+        .map(|sample| f64::from(sample) / RATE)
+        .map(|value| value as f32)
+        .collect()
+}
+
+#[tokio::test]
+async fn groups_the_decode_windows_four_to_a_unit() {
+    let workspace = Workspace::new();
+    let units = Arc::new(TranscribeUnits::create(
+        workspace.unit_incoming_path(),
+        Arc::new(long_input()),
+        16_000,
+        TranscribeState::default(),
+    ));
+    units
+        .register(ATTEMPT)
+        .expect("the attempt should register");
+    let host = start_host(&workspace, Arc::clone(&units)).await;
+    let base = host.base_url().to_owned();
+    let packed = json!([
+        [[0.0, 29.0]],
+        [[29.5, 58.5]],
+        [[59.0, 88.0]],
+        [[88.5, 117.5]],
+        [[118.0, 147.0]]
+    ]);
+    let planned = put_output(&base, ATTEMPT, 0, plan_value("en", &packed)).await;
+    assert_eq!(planned, StatusCode::NO_CONTENT);
+    timeout(ANSWER, units.folded(0))
+        .await
+        .expect("the fold should not hang")
+        .expect("the plan should fold");
+    assert_eq!(
+        units
+            .pass_count(StartPass::Decode)
+            .expect("the count should read"),
+        3
+    );
+
+    let (full_status, full_body) = get_unit_window(&base, ATTEMPT, 1).await;
+    assert_eq!(full_status, StatusCode::OK);
+    let (full_meta, full_payload) = container_parts(&full_body);
+    assert_eq!(
+        full_meta["lengths"],
+        json!([464_000, 464_000, 464_000, 464_000])
+    );
+    assert_eq!(full_payload.len(), 1_856_000);
+    assert_eq!(full_payload[464_000], 29.5);
+
+    let (rest_status, rest_body) = get_unit_window(&base, ATTEMPT, 2).await;
+    assert_eq!(rest_status, StatusCode::OK);
+    let (rest_meta, rest_payload) = container_parts(&rest_body);
+    assert_eq!(rest_meta["lengths"], json!([464_000]));
+    assert_eq!(rest_payload[0], 118.0);
+
+    let short = json!({ "words": [[]] });
+    assert_ne!(
+        put_output(&base, ATTEMPT, 1, short).await,
+        StatusCode::NO_CONTENT
+    );
+    let words = json!({ "words": [[], [], [{ "text": "three", "start": 60.0, "end": 60.4 }], []] });
+    assert_eq!(
+        put_output(&base, ATTEMPT, 1, words).await,
+        StatusCode::NO_CONTENT
+    );
+    let last = json!({ "words": [[{ "text": "five", "start": 120.0, "end": 120.3 }]] });
+    assert_eq!(
+        put_output(&base, ATTEMPT, 2, last).await,
+        StatusCode::NO_CONTENT
+    );
+    let (beyond_status, _) = get_unit_window(&base, ATTEMPT, 3).await;
+    assert_ne!(beyond_status, StatusCode::OK);
+
+    units
+        .set_pass(StartPass::Repair)
+        .expect("the pass should switch");
+    assert_eq!(units.done(ATTEMPT, 2), Ok(()));
+    assert!(units.done(ATTEMPT, 3).is_err());
+
+    let tail = units.tail().expect("the tail should serialize");
+    let restored = restore_state(&tail, &long_input(), 16_000).expect("the tail should restore");
+    assert_eq!(restored.words[2][0].text, "three");
+    assert_eq!(restored.words[4][0].text, "five");
     host.close().await;
 }
 
@@ -168,7 +268,7 @@ async fn accepts_words_replacements_and_the_final_result() {
 
     fold_plan(&base, &units).await;
 
-    let chunk_words = json!({ "words": [{ "text": "hi", "start": 0.1, "end": 0.4 }] });
+    let chunk_words = json!({ "words": [[{ "text": "hi", "start": 0.1, "end": 0.4 }]] });
     let chunk_status = put_output(&base, ATTEMPT, 1, chunk_words).await;
     assert_eq!(chunk_status, StatusCode::NO_CONTENT);
     timeout(ANSWER, units.folded(1))
@@ -311,10 +411,6 @@ async fn resumes_from_a_restored_state() {
         "the plan unit should be skipped on resume"
     );
 
-    let (status, body) = get_unit_window(&base, ATTEMPT, 1).await;
-    assert_eq!(status, StatusCode::OK);
-    let (meta, payload) = container_parts(&body);
-    assert_eq!(meta, json!({ "kind": "chunk", "language": "en" }));
-    assert_eq!(payload.len(), 112_000);
+    first_chunk_window(&base).await;
     host.close().await;
 }

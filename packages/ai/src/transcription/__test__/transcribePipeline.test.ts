@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCompaction, buildLayout } from '../audioCompaction.js';
 import { sampleRate, type Span } from '../spectralChunker.js';
 import {
-  decodeChunkPass,
+  decodeChunksPass,
   finalizePass,
   groupWordsIntoSegments,
   planPass,
@@ -66,7 +66,7 @@ describe('the unit passes', () => {
         Math.round(chunk.start * sampleRate),
         Math.round(chunk.end * sampleRate),
       );
-      const decoded = await decodeChunkPass(slice, 'en', transcribeBatch);
+      const [decoded] = await decodeChunksPass([slice], 'en', transcribeBatch);
       expect(decoded.map((word) => word.text)).toEqual(['Hello', 'world']);
       wordsPerChunk[index] = decoded;
     }

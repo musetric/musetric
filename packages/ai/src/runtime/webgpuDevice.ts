@@ -96,6 +96,13 @@ export const getMusetricWebGpuDevice = async (
   return created;
 };
 
+export const readAdapterArchitecture = async (): Promise<string> => {
+  const adapter = await navigator.gpu.requestAdapter({
+    powerPreference: 'high-performance',
+  });
+  return adapter?.info.architecture ?? '';
+};
+
 export type MusetricWebGpuProviderOptions = {
   storageBufferCacheMode?: NonNullable<
     InferenceSession.WebGpuExecutionProviderOption['storageBufferCacheMode']
