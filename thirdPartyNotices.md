@@ -43,13 +43,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Musetric Vocal Separation RoFormer ONNX
+## Mel-Band RoFormer Duality ONNX
 
-- Source: https://huggingface.co/musetric/vocal-separation-roformer-onnx
-- Usage: WebGPU-ready ONNX vocal separation model and external data file.
+- Source: https://huggingface.co/musetric/aname-mel-band-roformer-duality-onnx
+- Usage: WebGPU-ready ONNX vocal separation model and external data file, converted from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT).
 - Local files: `packages/ai/src/models/vocalsModel.ts`, `packages/ai/src/service/browserEntry.ts`, `packages/ai/src/service/browserSeparation.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`.
-- License: MIT.
+- License: Apache-2.0.
 - License source: Hugging Face model card metadata.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+these files except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
 
 ## ChordMini
 
