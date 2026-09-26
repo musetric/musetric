@@ -24,11 +24,8 @@ body:
   - type: textarea
     id: check
     attributes:
-      label: How the gain is checked
-      description: >-
-        What shows that it got better and that nothing else got worse. Any
-        audio, lyrics or track names it uses must be synthetic or openly
-        licensed (CC0, CC BY, CC BY-SA) with a link and license.
+      label: How it is checked
+      description: What shows that it got better and that nothing else got worse.
     validations:
       required: true
   - type: input
@@ -58,7 +55,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Anything the check depends on, such as device, browser or WebView, data or settings.
+      description: Anything the check depends on, such as OS, device, browser or WebView, tool versions, data or settings.
   - type: textarea
     id: baseline
     attributes:
