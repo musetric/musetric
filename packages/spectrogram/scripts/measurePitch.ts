@@ -12,6 +12,7 @@ type PitchExtractRequest = {
   hopMs: number;
   windowSize: number;
   zeroPaddingFactor: 1 | 2 | 4;
+  columns: number;
 };
 
 type PitchCompareRequest = {
@@ -26,19 +27,21 @@ declare module 'vitest' {
   interface ProvidedContext {
     pitchExtract?: PitchExtractRequest;
     pitchCompare?: PitchCompareRequest;
+    pitchPerf?: PitchExtractRequest;
   }
 }
 
-type PitchExtractOutput = {
-  csv: string;
-  frames: number;
+type PitchPerfOutput = {
+  result: Record<string, unknown>;
+  markdown: string;
 };
 
 declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
-    pitchExtract?: PitchExtractOutput;
+    pitchExtract?: { csv: string; frames: number };
     pitchCompare?: Record<string, number>;
+    pitchPerf?: PitchPerfOutput;
   }
 }
 
@@ -48,7 +51,8 @@ stages
   reference   run the neural reference (musetric-pitch) and write reference.csv
   extract     run the spectrogram tracker and write <tag>.csv
   compare     score <tag>.csv against reference.csv and write <tag>.compare.json
-  all         the three stages in order
+  perf        time the pitch kernels per batch and a render of the window, write <tag>.perf.json
+  all         reference, extract and compare in order
 
 options
   --from <seconds>            start of the analysed range (default: 0)
@@ -56,6 +60,7 @@ options
   --hop-ms <ms>               frame step of both tracks (default: 5)
   --window-size <samples>     tracker analysis window (default: 4096)
   --zero-padding <1|2|4>      tracker zero padding factor (default: 2)
+  --columns <count>           columns of the tracker window (default: 4096, perf 1920)
   --tag <name>                name of the tracker output (default: ours)
   --out <dir>                 output root (default: tmp/pitch)
   --reference-command <cmd>   neural reference command (default: musetric-pitch)`;
@@ -64,14 +69,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sampleRate = 48000;
 const contextSeconds = 1;
 
-type PitchStage = 'reference' | 'extract' | 'compare' | 'all';
-
-const stages: readonly PitchStage[] = [
-  'reference',
-  'extract',
-  'compare',
-  'all',
-];
+const stages = ['reference', 'extract', 'compare', 'perf', 'all'] as const;
 
 const readNumber = (
   options: Map<string, string>,
@@ -90,6 +88,8 @@ const readZeroPadding = (options: Map<string, string>): 1 | 2 | 4 => {
   throw new Error('--zero-padding must be 1, 2 or 4');
 };
 
+type PitchStage = (typeof stages)[number];
+
 type PitchArgs = {
   stage: PitchStage;
   audioPath: string;
@@ -98,6 +98,7 @@ type PitchArgs = {
   hopMs: number;
   windowSize: number;
   zeroPaddingFactor: 1 | 2 | 4;
+  columns: number;
   tag: string;
   outDir: string;
   referenceCommand: string;
@@ -123,6 +124,7 @@ const parseArgs = (argv: readonly string[]): PitchArgs => {
     hopMs: readNumber(options, '--hop-ms', 5),
     windowSize: readNumber(options, '--window-size', 4096),
     zeroPaddingFactor: readZeroPadding(options),
+    columns: readNumber(options, '--columns', stage === 'perf' ? 1920 : 4096),
     tag: options.get('--tag') ?? 'ours',
     outDir: resolve(options.get('--out') ?? resolve(packageRoot, 'tmp/pitch')),
     referenceCommand: options.get('--reference-command') ?? 'musetric-pitch',
@@ -134,6 +136,7 @@ type PitchPaths = {
   reference: string;
   ours: string;
   compare: string;
+  perf: string;
 };
 
 const buildPaths = (args: PitchArgs): PitchPaths => {
@@ -149,6 +152,7 @@ const buildPaths = (args: PitchArgs): PitchPaths => {
     reference: resolve(dir, 'reference.csv'),
     ours: resolve(dir, `${args.tag}.csv`),
     compare: resolve(dir, `${args.tag}.compare.json`),
+    perf: resolve(dir, `${args.tag}.perf.json`),
   };
 };
 
@@ -170,10 +174,8 @@ const runReference = (args: PitchArgs, paths: PitchPaths): void => {
     `--result-path "${paths.reference}"`,
     `--hop-ms ${args.hopMs}`,
     `--from-seconds ${args.fromSeconds}`,
+    ...(args.toSeconds === undefined ? [] : [`--to-seconds ${args.toSeconds}`]),
   ];
-  if (args.toSeconds !== undefined) {
-    parts.push(`--to-seconds ${args.toSeconds}`);
-  }
   const result = spawnSync(parts.join(' '), { shell: true, stdio: 'inherit' });
   if (result.status !== 0) {
     throw new Error(`reference command exited with ${result.status}`);
@@ -239,15 +241,8 @@ const pitchReporter = {
   },
 };
 
-type PitchProvide = {
-  pitchExtract?: PitchExtractRequest;
-  pitchCompare?: PitchCompareRequest;
-};
-
-type PitchMeta = {
-  pitchExtract?: PitchExtractOutput;
-  pitchCompare?: Record<string, number>;
-};
+type PitchProvide = NonNullable<Parameters<typeof startVitest>[2]>['provide'];
+type PitchMeta = ReturnType<typeof experimental_getRunnerTask>['meta'];
 
 const runPitchTest = async (provide: PitchProvide): Promise<PitchMeta> => {
   const vitest = await startVitest(
@@ -280,21 +275,29 @@ const runPitchTest = async (provide: PitchProvide): Promise<PitchMeta> => {
   return meta;
 };
 
+const buildExtractRequest = (
+  args: PitchArgs,
+  paths: PitchPaths,
+): PitchExtractRequest => {
+  const pcm = decodePcm(args, paths);
+  return {
+    pcmUrl: pcm.url,
+    pcmStartSeconds: pcm.startSeconds,
+    fromSeconds: args.fromSeconds,
+    toSeconds: Math.min(args.toSeconds ?? Infinity, pcm.endSeconds),
+    hopMs: args.hopMs,
+    windowSize: args.windowSize,
+    zeroPaddingFactor: args.zeroPaddingFactor,
+    columns: args.columns,
+  };
+};
+
 const runExtract = async (
   args: PitchArgs,
   paths: PitchPaths,
 ): Promise<void> => {
-  const pcm = decodePcm(args, paths);
   const meta = await runPitchTest({
-    pitchExtract: {
-      pcmUrl: pcm.url,
-      pcmStartSeconds: pcm.startSeconds,
-      fromSeconds: args.fromSeconds,
-      toSeconds: Math.min(args.toSeconds ?? Infinity, pcm.endSeconds),
-      hopMs: args.hopMs,
-      windowSize: args.windowSize,
-      zeroPaddingFactor: args.zeroPaddingFactor,
-    },
+    pitchExtract: buildExtractRequest(args, paths),
   });
   if (!meta.pitchExtract) {
     throw new Error('extraction produced no result');
@@ -330,6 +333,25 @@ const runCompare = async (
   console.log(`wrote ${paths.compare}`);
 };
 
+const runPerf = async (args: PitchArgs, paths: PitchPaths): Promise<void> => {
+  const { pitchPerf } = await runPitchTest({
+    pitchPerf: buildExtractRequest(args, paths),
+  });
+  if (!pitchPerf) {
+    throw new Error('the measurement produced no result');
+  }
+  const report = {
+    audio: basename(args.audioPath),
+    from: args.fromSeconds,
+    to: args.toSeconds,
+    tag: args.tag,
+    ...pitchPerf.result,
+  };
+  writeFileSync(paths.perf, JSON.stringify(report, undefined, 2) + '\n');
+  console.log(pitchPerf.markdown);
+  console.log(`wrote ${paths.perf}`);
+};
+
 const main = async (): Promise<void> => {
   const args = parseArgs(process.argv.slice(2));
   const paths = buildPaths(args);
@@ -341,6 +363,9 @@ const main = async (): Promise<void> => {
   }
   if (args.stage === 'compare' || args.stage === 'all') {
     await runCompare(args, paths);
+  }
+  if (args.stage === 'perf') {
+    await runPerf(args, paths);
   }
 };
 

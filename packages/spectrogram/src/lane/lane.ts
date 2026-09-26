@@ -9,7 +9,10 @@ import {
   type SpectrogramSpectralBand,
   type TrackKey,
 } from '../config.cross.js';
-import { createSpectrogramFundamentalFrequencyCell } from '../fundamentalFrequency/index.js';
+import {
+  createSpectrogramFundamentalFrequencyCell,
+  type FundamentalFrequencyStage,
+} from '../fundamentalFrequency/index.js';
 import {
   type BandPipelineCells,
   createBandPipelineCells,
@@ -91,18 +94,7 @@ export type SpectrogramLane = {
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
   dispatchDecibelify: SpectrogramLaneDispatch;
-  dispatchFundamentalObserve: (
-    pass: GPUComputePassEncoder,
-    range: SpectrogramColumnRange,
-  ) => void;
-  dispatchFundamentalAutocorr: (
-    pass: GPUComputePassEncoder,
-    range: SpectrogramColumnRange,
-  ) => void;
-  dispatchFundamentalTrack: (
-    pass: GPUComputePassEncoder,
-    range: SpectrogramColumnRange,
-  ) => void;
+  fundamentalStages: readonly FundamentalFrequencyStage[];
   clear: (encoder: GPUCommandEncoder) => void;
 };
 
@@ -229,9 +221,7 @@ const buildSpectrogramLane = (
         baseBandPipeline.dispatchDecibelRun(pass, range);
       }
     },
-    dispatchFundamentalAutocorr: fundamentalFrequency.dispatchAutocorr,
-    dispatchFundamentalObserve: fundamentalFrequency.dispatchObserve,
-    dispatchFundamentalTrack: fundamentalFrequency.dispatchTrack,
+    fundamentalStages: fundamentalFrequency.stages,
     clear: (encoder) => {
       baseBandPipeline.clear(encoder);
       for (const pipeline of externalPipelines) {

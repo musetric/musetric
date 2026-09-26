@@ -6,6 +6,7 @@ export type PitchExtractRequest = {
   hopMs: number;
   windowSize: number;
   zeroPaddingFactor: 1 | 2 | 4;
+  columns: number;
 };
 
 export type PitchFrame = {

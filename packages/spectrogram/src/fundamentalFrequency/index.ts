@@ -5,24 +5,19 @@ import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 64;
 
+export type FundamentalFrequencyStage = {
+  label: string;
+  radius: number;
+  dispatch: (
+    pass: GPUComputePassEncoder,
+    range?: SpectrogramColumnRange,
+  ) => void;
+};
+
 export type SpectrogramFundamentalFrequency = {
   lineBuffer: GPUBuffer;
+  stages: readonly FundamentalFrequencyStage[];
   run: (encoder: GPUCommandEncoder) => void;
-
-  dispatchAutocorr: (
-    pass: GPUComputePassEncoder,
-    range?: SpectrogramColumnRange,
-  ) => void;
-
-  dispatchObserve: (
-    pass: GPUComputePassEncoder,
-    range?: SpectrogramColumnRange,
-  ) => void;
-
-  dispatchTrack: (
-    pass: GPUComputePassEncoder,
-    range?: SpectrogramColumnRange,
-  ) => void;
 };
 
 export const createSpectrogramFundamentalFrequencyCell = (
@@ -44,7 +39,6 @@ export const createSpectrogramFundamentalFrequencyCell = (
         if (columnCount <= 0 || state.params.value.lagCount <= 0) {
           return;
         }
-
         pass.setPipeline(state.pipelines.autocorr);
         pass.setBindGroup(0, state.bindGroups.autocorr, [byteOffset]);
         pass.dispatchWorkgroups(state.params.value.lagCount, columnCount);
@@ -58,7 +52,6 @@ export const createSpectrogramFundamentalFrequencyCell = (
         if (columnCount <= 0) {
           return;
         }
-
         pass.setPipeline(state.pipelines.observe);
         pass.setBindGroup(0, state.bindGroups.observe, [byteOffset]);
         pass.dispatchWorkgroups(columnCount);
@@ -76,27 +69,34 @@ export const createSpectrogramFundamentalFrequencyCell = (
           1,
           Math.ceil(columnCount / workgroupSize),
         );
-
         pass.setPipeline(state.pipelines.track);
         pass.setBindGroup(0, state.bindGroups.track, [byteOffset]);
         pass.dispatchWorkgroups(windowGroups);
       };
 
+      const stages: FundamentalFrequencyStage[] = [
+        { label: 'autocorr', radius: 0, dispatch: dispatchAutocorr },
+        { label: 'observe', radius: 0, dispatch: dispatchObserve },
+        {
+          label: 'track',
+          radius: state.params.value.trackWindow,
+          dispatch: dispatchTrack,
+        },
+      ];
+
       return {
         lineBuffer: state.output.line,
+        stages,
         run: (encoder) => {
           const pass = encoder.beginComputePass({
             label: 'fundamental-frequency-pass',
             timestampWrites: marker,
           });
-          dispatchAutocorr(pass);
-          dispatchObserve(pass);
-          dispatchTrack(pass);
+          for (const stage of stages) {
+            stage.dispatch(pass);
+          }
           pass.end();
         },
-        dispatchAutocorr,
-        dispatchObserve,
-        dispatchTrack,
       };
     },
     dispose: () => {
