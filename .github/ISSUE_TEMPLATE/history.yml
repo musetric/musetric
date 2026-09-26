@@ -1,0 +1,61 @@
+name: History
+description: A timeline of events for one problem
+type: History
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong now and what should become different.
+    validations:
+      required: true
+  - type: textarea
+    id: snapshot
+    attributes:
+      label: How a snapshot is taken
+      description: >-
+        What a snapshot shows and how to take it again the same way, so that
+        every later one can be compared with the start: which screens, which
+        schema or state diagram, which command. Any audio, lyrics or track
+        names it shows must be synthetic or openly licensed (CC0, CC BY,
+        CC BY-SA) with a link and license.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit the start snapshot is taken at.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything the snapshots depend on, such as device, browser or WebView, data or settings.
+  - type: textarea
+    id: start
+    attributes:
+      label: Start
+      description: >-
+        How it looks now, at the version above: the snapshot every later one
+        is compared with. Each later change adds a comment with a snapshot
+        taken the same way.
+    validations:
+      required: true
