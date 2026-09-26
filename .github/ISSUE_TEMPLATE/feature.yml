@@ -1,0 +1,63 @@
+name: Feature
+description: A new capability that does not exist yet
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        One new capability. A change to something that already exists is an
+        Improvement; a goal that needs several issues is an Epic.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What cannot be done now and why it is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What the new capability does and how it is used.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: How it is worked around now and what else was considered.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit the proposal is made against.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything it depends on, such as OS, device, browser or WebView, tool versions, data or settings.
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What must work for the feature to be done, as short checkable points.
+    validations:
+      required: true
