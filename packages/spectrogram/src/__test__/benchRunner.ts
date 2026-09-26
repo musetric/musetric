@@ -11,7 +11,12 @@ import {
   type SpectrogramBenchMetric,
   type SpectrogramBenchSummary,
 } from './bench.es.js';
-import { createDriver, renderDriverSamples, warmup } from './benchDriver.js';
+import {
+  type BenchDriver,
+  createDriver,
+  renderDriverSamples,
+  warmup,
+} from './benchDriver.js';
 import {
   addDerivedMetrics,
   aggregateMetrics,
@@ -22,15 +27,28 @@ import {
 const profiledContext = await createGpuContext(true);
 const wallContext = await createGpuContext();
 
+export const warmDriver = async (driver: BenchDriver): Promise<void> => {
+  for (const context of [wallContext, profiledContext]) {
+    const processor = createSpectrogramProcessor({
+      device: context.device,
+      config: driver.config,
+    });
+    try {
+      await warmup(driver, processor);
+    } finally {
+      processor.dispose();
+    }
+  }
+};
+
 type ProfiledMeasurement = {
   metrics: SpectrogramBenchMetric[];
   sampleCount: number;
 };
 
-const measureProfiled = async (
-  benchCase: SpectrogramBenchCase,
+export const measureProfiledDriver = async (
+  driver: BenchDriver,
 ): Promise<ProfiledMeasurement> => {
-  const driver = createDriver(benchCase);
   const metricsArray: SpectrogramProcessorMetrics[] = [];
   const sampleMetrics: SpectrogramProcessorMetrics[] = [];
   const processor: SpectrogramProcessor = createSpectrogramProcessor({
@@ -83,10 +101,9 @@ const measureProfiled = async (
   }
 };
 
-const measureWall = async (
-  benchCase: SpectrogramBenchCase,
+export const measureWallDriver = async (
+  driver: BenchDriver,
 ): Promise<SpectrogramBenchMetric> => {
-  const driver = createDriver(benchCase);
   const pilotDurations: number[] = [];
   const sampleDurations: number[] = [];
   const processor = createSpectrogramProcessor({
@@ -144,8 +161,8 @@ export const measureCase = async (
   benchCase: SpectrogramBenchCase,
   timestamp: string,
 ): Promise<SpectrogramBenchSummary> => {
-  const wallMetric = await measureWall(benchCase);
-  const profiled = await measureProfiled(benchCase);
+  const wallMetric = await measureWallDriver(createDriver(benchCase));
+  const profiled = await measureProfiledDriver(createDriver(benchCase));
   const metrics = [wallMetric, ...profiled.metrics];
   const totalMetric = metrics.find((metric) => metric.label === 'total');
   const caseLabel = `${benchCase.label}/${benchCase.scenario.label}`;

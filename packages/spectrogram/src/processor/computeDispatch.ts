@@ -13,7 +13,6 @@ import {
   type TrackKey,
 } from '../config.cross.js';
 import { type SpectrogramRuntime } from '../configurator.js';
-import { fundamentalTrackWindow } from '../fundamentalFrequency/params.js';
 import { type SpectrogramLane } from '../lane/index.js';
 import { type TrackRenderPlan } from './renderPlan.js';
 
@@ -130,34 +129,26 @@ const dispatchFundamental = (
   ctx: DispatchContext,
 ): void => {
   const { plans, runtime } = ctx;
-  for (const key of allTrackKeys) {
-    if (!hasFundamentalWork(ctx, key)) {
-      continue;
-    }
-    for (const range of plans[key].ranges) {
-      runtime.tracks[key].lane.dispatchFundamentalAutocorr(pass, range);
-    }
-  }
-  for (const key of allTrackKeys) {
-    if (!hasFundamentalWork(ctx, key)) {
-      continue;
-    }
-    for (const range of plans[key].ranges) {
-      runtime.tracks[key].lane.dispatchFundamentalObserve(pass, range);
-    }
-  }
-  for (const key of allTrackKeys) {
-    if (!hasFundamentalWork(ctx, key)) {
-      continue;
-    }
-    const expanded = expandColumnRanges(
-      runtime.config,
-      plans[key].baseColumn,
-      plans[key].ranges,
-      fundamentalTrackWindow,
-    );
-    for (const range of expanded) {
-      runtime.tracks[key].lane.dispatchFundamentalTrack(pass, range);
+  const stageCount =
+    runtime.tracks[allTrackKeys[0]].lane.fundamentalStages.length;
+  for (let index = 0; index < stageCount; index += 1) {
+    for (const key of allTrackKeys) {
+      if (!hasFundamentalWork(ctx, key)) {
+        continue;
+      }
+      const stage = runtime.tracks[key].lane.fundamentalStages[index];
+      const ranges =
+        stage.radius > 0
+          ? expandColumnRanges(
+              runtime.config,
+              plans[key].baseColumn,
+              plans[key].ranges,
+              stage.radius,
+            )
+          : plans[key].ranges;
+      for (const range of ranges) {
+        stage.dispatch(pass, range);
+      }
     }
   }
   dispatchColor(pass, ctx);
