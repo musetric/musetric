@@ -1,0 +1,71 @@
+name: Epic
+description: A goal that groups the issues needed to reach it
+type: Epic
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        The work goes into sub-issues of the epic: bugs, histories, hypotheses
+        and improvements. An epic that another one replaces is closed with a
+        comment that says where the work continues.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong now and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: How the work is kept
+      description: >-
+        Which issues go under the epic and how they are written, such as one
+        history per model or one issue of hypotheses per problem, and the
+        rules they share. Any audio, lyrics or track names they use must be
+        synthetic or openly licensed (CC0, CC BY, CC BY-SA) with a link and
+        license.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit the epic starts from.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything the work depends on, such as devices, browser or WebView, data or settings.
+  - type: textarea
+    id: must-not-break
+    attributes:
+      label: Must not break
+      description: What no change under the epic may break on the way to the goal.
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: >-
+        What must hold for the epic to close, as short checkable points. Every
+        issue under the epic works toward them.
+    validations:
+      required: true
