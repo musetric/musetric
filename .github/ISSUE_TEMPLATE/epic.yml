@@ -5,9 +5,9 @@ body:
   - type: markdown
     attributes:
       value: >-
-        The work goes into sub-issues of the epic: bugs, histories, hypotheses
-        and improvements. An epic that another one replaces is closed with a
-        comment that says where the work continues.
+        The work goes into sub-issues of the epic, of any type. An epic that
+        another one replaces is closed with a comment that says where the work
+        continues.
   - type: textarea
     id: problem
     attributes:
@@ -21,10 +21,8 @@ body:
       label: How the work is kept
       description: >-
         Which issues go under the epic and how they are written, such as one
-        history per model or one issue of hypotheses per problem, and the
-        rules they share. Any audio, lyrics or track names they use must be
-        synthetic or openly licensed (CC0, CC BY, CC BY-SA) with a link and
-        license.
+        history per component or one issue of hypotheses per problem, and the
+        rules they share.
     validations:
       required: true
   - type: input
@@ -54,7 +52,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Anything the work depends on, such as devices, browser or WebView, data or settings.
+      description: Anything the work depends on, such as OS, device, browser or WebView, tool versions, data or settings.
   - type: textarea
     id: must-not-break
     attributes:
