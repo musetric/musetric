@@ -8,10 +8,14 @@ const config: KnipConfig = {
     'packages/api/src/routes/audio.ts': ['exports'],
     'packages/api/src/routes/preview.ts': ['exports'],
   },
-  ignoreBinaries: ['xcodegen'],
+  ignoreBinaries: ['xcodegen', 'ffmpeg'],
   ignoreUnresolved: ['vite/client', '^tsx$'],
   ignoreDependencies: ['@vitest/browser'],
-  ignoreFiles: ['**/i18next.config.ts', '**/vitest.bench.config.ts'],
+  ignoreFiles: [
+    '**/i18next.config.ts',
+    '**/vitest.bench.config.ts',
+    '**/vitest.pitch.config.ts',
+  ],
   workspaces: {
     'packages/fft': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
@@ -26,7 +30,7 @@ const config: KnipConfig = {
       entry: ['src/**/*.ts'],
     },
     'packages/spectrogram': {
-      entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
+      entry: ['scripts/**/*.ts', 'src/**/*.bench.ts', 'src/**/*.pitch.ts'],
     },
   },
 };
