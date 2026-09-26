@@ -44,6 +44,8 @@ type EncoderFeeds = { input_features?: unknown };
 
 type SessionRun = (feeds: EncoderFeeds, ...rest: never[]) => Promise<unknown>;
 
+type ForwardTensor = { dispose: () => void };
+
 export type WhisperModelInternals = {
   sessions: {
     model: { run: SessionRun };
@@ -57,9 +59,11 @@ export type WhisperModelInternals = {
   };
   generate: (args: Record<string, unknown>) => Promise<GenerateOutput>;
 } & BatchedGeneration &
-  ((args: Record<string, unknown>) => Promise<{
-    logits: { data: Float32Array };
-  }>);
+  ((args: Record<string, unknown>) => Promise<
+    Record<string, ForwardTensor> & {
+      logits: ForwardTensor & { data: Float32Array };
+    }
+  >);
 
 type AsrChunk = {
   tokens: TokenId[];

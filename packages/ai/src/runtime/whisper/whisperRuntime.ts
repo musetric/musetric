@@ -157,6 +157,9 @@ export const createWhisperRuntime = async (
         best = token;
       }
     }
+    for (const tensor of Object.values(output)) {
+      tensor.dispose();
+    }
 
     return best.slice(2, -2);
   };
