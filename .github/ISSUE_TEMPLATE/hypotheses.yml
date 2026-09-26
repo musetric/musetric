@@ -1,0 +1,67 @@
+name: Hypotheses
+description: Hypotheses for one problem and their verdicts
+type: Hypotheses
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Each hypothesis is one comment, numbered H1 onward within the issue and
+        referred to from elsewhere as #N H3. It starts with **H1. Name** and
+        one status: proposed, checking, needs decision, confirmed, merged
+        (#PR), rejected, blocked or deferred. Then come Idea, Check, Found and
+        Merge. The comment is edited as the hypothesis moves on.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong now and what should become different.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: How a hypothesis is checked
+      description: >-
+        What decides whether a hypothesis works, the same for every hypothesis
+        here, and what none of them may make worse. Any audio, lyrics or track
+        names it uses must be synthetic or openly licensed (CC0, CC BY,
+        CC BY-SA) with a link and license.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit the baseline is taken at.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything the checks depend on, such as device, browser or WebView, data or settings.
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Baseline
+      description: >-
+        How it is now, at the version above: what every hypothesis is compared
+        with. A link to the start or a snapshot of a History issue is enough.
+    validations:
+      required: true
