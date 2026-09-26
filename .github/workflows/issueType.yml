@@ -1,0 +1,40 @@
+name: Issue Type
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - typed
+      - untyped
+
+permissions:
+  issues: write
+
+concurrency:
+  group: issueType-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  require-issue-type:
+    runs-on: ubuntu-latest
+    steps:
+      # The event can be stale by the time a queued run starts, so the live type decides.
+      - name: Ask for a type while the issue has none
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          marker='<!-- issue-type-check -->'
+          type=$(gh api "repos/$REPO/issues/$NUMBER" --jq '.type.name // ""')
+          comments=$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id")
+          if [ -n "$type" ]; then
+            for id in $comments; do
+              gh api -X DELETE "repos/$REPO/issues/comments/$id"
+            done
+          elif [ -z "$comments" ]; then
+            body=$(printf '%s\n%s' "$marker" 'This issue has no type; set one of Bug, Feature, Improvement, Epic, History, Hypotheses.')
+            gh api "repos/$REPO/issues/$NUMBER/comments" -f body="$body" > /dev/null
+          fi
