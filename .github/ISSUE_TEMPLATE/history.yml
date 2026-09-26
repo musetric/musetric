@@ -15,10 +15,8 @@ body:
       label: How a snapshot is taken
       description: >-
         What a snapshot shows and how to take it again the same way, so that
-        every later one can be compared with the start: which screens, which
-        schema or state diagram, which command. Any audio, lyrics or track
-        names it shows must be synthetic or openly licensed (CC0, CC BY,
-        CC BY-SA) with a link and license.
+        every later one can be compared with the start, such as which screens,
+        diagram, command or measurement.
     validations:
       required: true
   - type: input
@@ -48,7 +46,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Anything the snapshots depend on, such as device, browser or WebView, data or settings.
+      description: Anything the snapshots depend on, such as OS, device, browser or WebView, tool versions, data or settings.
   - type: textarea
     id: start
     attributes:

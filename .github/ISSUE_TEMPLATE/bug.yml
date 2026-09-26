@@ -13,10 +13,7 @@ body:
     id: reproduction
     attributes:
       label: Reproduction
-      description: >-
-        Steps, code or input that show the problem. Any audio or lyrics must be
-        synthetic or openly licensed (CC0, CC BY, CC BY-SA) with a link and
-        license.
+      description: Steps, code or input that show the problem.
     validations:
       required: true
   - type: input
@@ -46,7 +43,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Anything relevant, such as OS version, browser or WebView, device, GPU.
+      description: Anything relevant, such as OS, device, browser or WebView, tool versions, data or settings.
   - type: textarea
     id: logs
     attributes:
