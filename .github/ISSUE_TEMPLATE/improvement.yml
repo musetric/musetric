@@ -1,0 +1,67 @@
+name: Improvement
+description: A change that makes something that already works better
+type: Improvement
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        One chosen change. When a problem has several candidate changes, they
+        go as hypotheses into a Hypotheses issue instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What works now but not well enough, and what should become better.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change, what it touches and what it leaves as it is.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: How it is checked
+      description: What shows that it got better and that nothing else got worse.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App version or commit the baseline is taken at.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+        - Browser
+        - Development (scripts, build, CI)
+        - Not platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Anything the check depends on, such as OS, device, browser or WebView, tool versions, data or settings.
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Baseline
+      description: >-
+        How it works now, at the version above: what the change is compared
+        with.
+    validations:
+      required: true
