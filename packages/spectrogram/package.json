@@ -25,7 +25,8 @@
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
     "test": "vitest run",
-    "bench": "node --import tsx ./scripts/bench.ts"
+    "bench": "node --import tsx ./scripts/bench.ts",
+    "measure:pitch": "node ./scripts/measurePitch.ts"
   },
   "peerDependencies": {
     "@musetric/fft": "workspace:*",

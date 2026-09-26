@@ -33,7 +33,10 @@ const createLineBufferCell = (device: GPUDevice) =>
       device.createBuffer({
         label: 'fundamental-frequency-line-buffer',
         size: Math.max(1, windowCount) * Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        usage:
+          GPUBufferUsage.STORAGE |
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.COPY_SRC,
       }),
     dispose: (buffer) => {
       buffer.destroy();

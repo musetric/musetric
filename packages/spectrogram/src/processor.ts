@@ -1,4 +1,5 @@
 import { createCallLatest } from '@musetric/utils';
+import { createGpuBufferReader } from '@musetric/utils/gpu';
 import {
   createSpectrogramProcessorTimer,
   type SpectrogramMarkers,
@@ -85,11 +86,21 @@ const noConfigInvalidations: ReadonlySet<TrackKey> = new Set();
 
 export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
 
+export type SpectrogramFundamentalLine = {
+  baseColumn: number;
+  columnStep: number;
+  values: Float32Array;
+};
+
 export type SpectrogramProcessor = {
   render: (
     samples: SpectrogramSamples,
     trackProgress: number,
   ) => Promise<boolean>;
+
+  readFundamentalLine: (
+    trackKey: TrackKey,
+  ) => Promise<SpectrogramFundamentalLine | undefined>;
 
   invalidateSamples: (
     invalidations: readonly SpectrogramSampleInvalidation[],
@@ -132,6 +143,8 @@ export const createSpectrogramProcessor = (
   let reusableColumns: boolean[] = [];
   let lastConfig: SpectrogramRuntime['config'] | undefined = undefined;
   let lastBaseSlots: Record<TrackKey, number> | undefined = undefined;
+  let lastRuntime: SpectrogramRuntime | undefined = undefined;
+  let lastPlans: Record<TrackKey, TrackRenderPlan> | undefined = undefined;
   let pendingInvalidations: SpectrogramSampleInvalidation[] = [];
 
   const ensureColumns = (windowCount: number): boolean[] => {
@@ -181,6 +194,8 @@ export const createSpectrogramProcessor = (
       commitResidentPlans(residents, samples, plans, work);
       lastConfig = runtime.config;
       lastBaseSlots = mapTrackKeys((key) => plans[key].baseSlot);
+      lastRuntime = runtime;
+      lastPlans = plans;
       return { ok: true };
     },
   );
@@ -198,6 +213,32 @@ export const createSpectrogramProcessor = (
 
   return {
     render: renderLatest,
+    readFundamentalLine: async (trackKey) => {
+      if (!lastRuntime || !lastPlans) {
+        return undefined;
+      }
+      const { windowCount, columnStep } = lastRuntime.config;
+      const { baseColumn, baseSlot } = lastPlans[trackKey];
+      const reader = createGpuBufferReader({
+        device,
+        typeSize: Float32Array.BYTES_PER_ELEMENT,
+        size: windowCount,
+      });
+      try {
+        const ring = new Float32Array(
+          await reader.read(
+            lastRuntime.tracks[trackKey].lane.fundamentalLineBuffer,
+          ),
+        );
+        const values = new Float32Array(windowCount);
+        for (let index = 0; index < windowCount; index += 1) {
+          values[index] = ring[(baseSlot + index) % windowCount];
+        }
+        return { baseColumn, columnStep, values };
+      } finally {
+        reader.destroy();
+      }
+    },
     invalidateSamples: (invalidations) => {
       for (const invalidation of invalidations) {
         pendingInvalidations = mergeSampleInvalidation(
