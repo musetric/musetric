@@ -1,10 +1,18 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export const sha256Of = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex');
+
+const readIfPresent = (path: string): Uint8Array | undefined => {
+  try {
+    return readFileSync(path);
+  } catch {
+    return undefined;
+  }
+};
 
 export type PinnedDownload = {
   url: string;
@@ -15,10 +23,8 @@ export type PinnedDownload = {
 export const ensureDownload = async (
   download: PinnedDownload,
 ): Promise<void> => {
-  if (
-    existsSync(download.target) &&
-    sha256Of(readFileSync(download.target)) === download.sha256
-  ) {
+  const present = readIfPresent(download.target);
+  if (present && sha256Of(present) === download.sha256) {
     return;
   }
   console.log(`download ${download.url}`);
@@ -36,7 +42,9 @@ export const ensureDownload = async (
     );
   }
   mkdirSync(dirname(download.target), { recursive: true });
-  writeFileSync(download.target, bytes);
+  const partial = `${download.target}.part`;
+  writeFileSync(partial, bytes);
+  renameSync(partial, download.target);
 };
 
 export type DecodeRequest = {
