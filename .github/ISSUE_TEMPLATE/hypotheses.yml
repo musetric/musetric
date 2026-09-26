@@ -23,9 +23,7 @@ body:
       label: How a hypothesis is checked
       description: >-
         What decides whether a hypothesis works, the same for every hypothesis
-        here, and what none of them may make worse. Any audio, lyrics or track
-        names it uses must be synthetic or openly licensed (CC0, CC BY,
-        CC BY-SA) with a link and license.
+        here, and what none of them may make worse.
     validations:
       required: true
   - type: input
@@ -55,7 +53,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Anything the checks depend on, such as device, browser or WebView, data or settings.
+      description: Anything the checks depend on, such as OS, device, browser or WebView, tool versions, data or settings.
   - type: textarea
     id: baseline
     attributes:
