@@ -1,0 +1,92 @@
+{
+  "sources": {
+    "rxbyn-bad-side": {
+      "url": "https://raw.githubusercontent.com/f90/jamendolyrics/master/mp3/Rxbyn_-_Bad_Side.mp3",
+      "sha256": "24090af9ca4886bb0551f7c1896c249af3311cce1c585092054ed5c428834d44",
+      "credit": "Rxbyn, \"Bad Side\", https://www.jamendo.com/track/1556580/bad-side, CC BY 3.0, from the JamendoLyrics dataset"
+    }
+  },
+  "cases": [
+    {
+      "name": "vocals-bad-side-60",
+      "step": "vocals",
+      "source": "rxbyn-bad-side",
+      "from": 60,
+      "to": 80
+    },
+    {
+      "name": "vocals-bad-side-60-quiet",
+      "step": "vocals",
+      "source": "rxbyn-bad-side",
+      "from": 60,
+      "to": 80,
+      "gain": 0.5
+    },
+    {
+      "name": "vocals-bad-side-short",
+      "step": "vocals",
+      "source": "rxbyn-bad-side",
+      "from": 20,
+      "to": 26
+    },
+    {
+      "name": "vocals-bad-side-full",
+      "step": "vocals",
+      "source": "rxbyn-bad-side"
+    },
+    {
+      "name": "voices-bad-side-60",
+      "step": "voices",
+      "input": { "case": "vocals-bad-side-60", "stem": "step.vocals" }
+    },
+    {
+      "name": "rhythm-bad-side",
+      "step": "rhythm",
+      "input": { "case": "vocals-bad-side-full", "stem": "step.instrumental" }
+    },
+    {
+      "name": "rhythm-bad-side-short",
+      "step": "rhythm",
+      "input": { "case": "vocals-bad-side-short", "stem": "step.instrumental" }
+    },
+    {
+      "name": "rhythm-silence",
+      "step": "rhythm",
+      "source": "rxbyn-bad-side",
+      "from": 0,
+      "to": 30,
+      "gain": 0
+    },
+    {
+      "name": "key-bad-side",
+      "step": "key",
+      "input": { "case": "vocals-bad-side-full", "stem": "step.instrumental" }
+    },
+    {
+      "name": "key-silence",
+      "step": "key",
+      "source": "rxbyn-bad-side",
+      "from": 0,
+      "to": 30,
+      "gain": 0
+    },
+    {
+      "name": "chords-bad-side",
+      "step": "chords",
+      "input": { "case": "vocals-bad-side-full", "stem": "step.instrumental" }
+    },
+    {
+      "name": "chords-bad-side-short",
+      "step": "chords",
+      "input": { "case": "vocals-bad-side-short", "stem": "step.instrumental" }
+    },
+    {
+      "name": "chords-silence",
+      "step": "chords",
+      "source": "rxbyn-bad-side",
+      "from": 0,
+      "to": 30,
+      "gain": 0
+    }
+  ]
+}

@@ -27,7 +27,7 @@ const fetchPlanManifest = async (
   return manifest;
 };
 
-const fetchCqtPlan = async (
+export const fetchCqtPlan = async (
   planUrl: string,
   planManifestUrl: string | undefined,
 ): Promise<CqtPlan> => {

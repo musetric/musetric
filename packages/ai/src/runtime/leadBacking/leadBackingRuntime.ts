@@ -9,6 +9,7 @@ import {
   createStftInferenceRuntime,
   type StftInferenceCore,
   type StftInferenceRuntime,
+  type StftInferenceTap,
 } from '../stftInference.js';
 import { leadBackingFrameShader } from './frame.wgsl.js';
 import { leadBackingOverlapAddShader } from './overlapAdd.wgsl.js';
@@ -25,6 +26,7 @@ export type LeadBackingGpuRuntime = {
 export type LeadBackingGpuRuntimeOptions = {
   graph: LeadBackingGraph;
   modelUrl: string;
+  inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
 
 export const createLeadBackingGpuRuntime = async (
@@ -47,6 +49,7 @@ export const createLeadBackingGpuRuntime = async (
     modelUrl: options.modelUrl,
     frameShader: leadBackingFrameShader,
     overlapAddShader: leadBackingOverlapAddShader,
+    inspect: options.inspect,
     createCore: (buffers): StftInferenceCore => {
       const { device, wave, spectrum } = buffers;
       const modelInput = createStorageBuffer(device, modelBytes);

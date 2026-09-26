@@ -6,6 +6,7 @@ const entry = fileURLToPath(import.meta.resolve('./service/browserEntry.ts'));
 export type BrowserBundleOptions = {
   root: string;
   outDir: string;
+  entry?: string;
 };
 
 export const createBrowserBundleConfig = (
@@ -23,7 +24,7 @@ export const createBrowserBundleConfig = (
       modulePreload: false,
       chunkSizeWarningLimit: 8192,
       rollupOptions: {
-        input: { index: entry },
+        input: { index: options.entry ?? entry },
         output: {
           format: 'es',
           entryFileNames: '[name].js',
