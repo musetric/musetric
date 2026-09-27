@@ -1,4 +1,3 @@
-import { expandColumnRanges } from '../common/columnRanges.js';
 import {
   fullColumnRange,
   type SpectrogramColumnRange,
@@ -26,15 +25,8 @@ const hasSpectrumWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.plans[key].ranges.length > 0 &&
   (ctx.work[key].spectrogram || ctx.work[key].fundamental);
 
-const hasFundamentalWork = (ctx: DispatchContext, key: TrackKey): boolean => {
-  const lane = ctx.runtime.config.lanes[key];
-  return (
-    ctx.plans[key].ranges.length > 0 &&
-    (lane.showFundamental ||
-      lane.showNotes ||
-      hasSpectrogramComparison(ctx.runtime.config))
-  );
-};
+const hasFundamentalWork = (ctx: DispatchContext, key: TrackKey): boolean =>
+  ctx.plans[key].present && ctx.work[key].fundamental;
 
 const hasRemapWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.runtime.config.lanes[key].showSpectrogram &&
@@ -74,37 +66,6 @@ const colorLaneShown = (ctx: DispatchContext, key: TrackKey): boolean => {
   );
 };
 
-const unionColorRanges = (
-  ctx: DispatchContext,
-  keys: readonly TrackKey[],
-  radius: number,
-): SpectrogramColumnRange[] => {
-  const { windowCount } = ctx.runtime.config;
-  const intervals: [number, number][] = [];
-  for (const key of keys) {
-    for (const range of ctx.plans[key].ranges) {
-      intervals.push([
-        Math.max(0, range.screenBase - radius),
-        Math.min(windowCount, range.screenBase + range.columnCount + radius),
-      ]);
-    }
-  }
-  intervals.sort((first, second) => first[0] - second[0]);
-
-  const merged: SpectrogramColumnRange[] = [];
-  for (const [start, end] of intervals) {
-    const previous = merged.at(-1);
-    if (previous && start <= previous.screenBase + previous.columnCount) {
-      previous.columnCount =
-        Math.max(previous.screenBase + previous.columnCount, end) -
-        previous.screenBase;
-      continue;
-    }
-    merged.push({ screenBase: start, columnCount: end - start, slotOffset: 0 });
-  }
-  return merged;
-};
-
 const dispatchColor = (
   pass: GPUComputePassEncoder,
   ctx: DispatchContext,
@@ -116,39 +77,25 @@ const dispatchColor = (
     return;
   }
 
-  const ranges = unionColorRanges(ctx, [reference, target], color.colorRadius);
-  const referenceBaseSlot = ctx.plans[reference].baseSlot;
-  const targetBaseSlot = ctx.plans[target].baseSlot;
-  for (const range of ranges) {
-    color.dispatch(pass, { referenceBaseSlot, targetBaseSlot, range });
-  }
+  const range: SpectrogramColumnRange = {
+    screenBase: 0,
+    columnCount: runtime.config.windowCount,
+    slotOffset: 0,
+  };
+  color.dispatch(pass, {
+    referenceBaseSlot: ctx.plans[reference].baseSlot,
+    targetBaseSlot: ctx.plans[target].baseSlot,
+    range,
+  });
 };
 
 const dispatchFundamental = (
   pass: GPUComputePassEncoder,
   ctx: DispatchContext,
 ): void => {
-  const { plans, runtime } = ctx;
-  const stageCount =
-    runtime.tracks[allTrackKeys[0]].lane.fundamentalStages.length;
-  for (let index = 0; index < stageCount; index += 1) {
-    for (const key of allTrackKeys) {
-      if (!hasFundamentalWork(ctx, key)) {
-        continue;
-      }
-      const stage = runtime.tracks[key].lane.fundamentalStages[index];
-      const ranges =
-        stage.radius > 0
-          ? expandColumnRanges(
-              runtime.config,
-              plans[key].baseColumn,
-              plans[key].ranges,
-              stage.radius,
-            )
-          : plans[key].ranges;
-      for (const range of ranges) {
-        stage.dispatch(pass, range);
-      }
+  for (const key of allTrackKeys) {
+    if (hasFundamentalWork(ctx, key)) {
+      ctx.runtime.tracks[key].lane.dispatchPitch(pass);
     }
   }
   dispatchColor(pass, ctx);

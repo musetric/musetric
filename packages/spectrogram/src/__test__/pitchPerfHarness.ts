@@ -1,24 +1,17 @@
-import { createFourierCell } from '@musetric/fft/gpu';
 import {
   type BenchStats,
   computeBenchStats,
   defaultBenchStatsConfig,
   selectBenchRunsPerSample,
 } from '@musetric/utils';
-import { expandColumnRanges } from '../common/columnRanges.js';
-import {
-  computeColumnStep,
-  type ExtSpectrogramConfig,
-  type SpectrogramColumnRange,
-} from '../common/extConfig.js';
 import { createGpuTimer } from '../common/timer/gpu.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
+import { createSpectrogramFundamentalFrequencyCell } from '../fundamentalFrequency/index.js';
 import {
-  createSpectrogramFundamentalFrequencyCell,
-  type FundamentalFrequencyStage,
-} from '../fundamentalFrequency/index.js';
+  createPitchSettings,
+  type PitchSettings,
+} from '../fundamentalFrequency/settings.es.js';
 import { playback60Fps } from './bench.es.js';
-import { buildConfig, extendConfig } from './common.js';
 import {
   type PitchPerfMetric,
   type PitchPerfRow,
@@ -84,127 +77,57 @@ export const measureDispatch = async (
   return computeBenchStats(values, kernelBenchConfig);
 };
 
-const createSpectrumData = (
+const synthesizeVoice = (
   length: number,
-  offset: number,
-  scale: number,
+  sampleRate: number,
 ): Float32Array<ArrayBuffer> =>
-  Float32Array.from(
-    { length },
-    (_, index) => offset + scale * Math.sin(index / 16),
-  );
+  Float32Array.from({ length }, (_, index) => {
+    const phase = (2 * Math.PI * 220 * index) / sampleRate;
+    let value = 0;
+    for (let harmonic = 1; harmonic <= 10; harmonic += 1) {
+      value += Math.sin(harmonic * phase) / harmonic;
+    }
+    return 0.1 * value;
+  });
 
-export type PitchKernelSpectrum = {
-  windowSize: number;
-  zeroPaddingFactor: 1 | 2 | 4;
-};
-
-export type PitchKernelCase = {
-  spectrum: PitchKernelSpectrum;
-  columns: number;
-};
-
-const buildKernelConfig = (kernelCase: PitchKernelCase): ExtSpectrogramConfig =>
-  extendConfig(
-    buildConfig({
-      windowSize: kernelCase.spectrum.windowSize,
-      zeroPaddingFactor: kernelCase.spectrum.zeroPaddingFactor,
-      viewSize: { width: kernelCase.columns, height: 1 },
-    }),
-  );
-
-export const frameColumnsOf = (columns: number): number =>
+const playbackFrames = (settings: PitchSettings): number =>
   Math.ceil(
-    playback60Fps.framesPerRender /
-      computeColumnStep({
-        visibleTime: defaultSpectrogramConfig.visibleTime,
-        sampleRate: defaultSpectrogramConfig.sampleRate,
-        windowCount: columns,
-      }),
+    (playback60Fps.framesPerRender * settings.sampleRate) /
+      defaultSpectrogramConfig.sampleRate /
+      settings.hop,
   );
-
-const frameRange = (config: ExtSpectrogramConfig): SpectrogramColumnRange => {
-  const columnCount = frameColumnsOf(config.windowCount);
-  return {
-    screenBase: config.windowCount - columnCount,
-    slotOffset: 0,
-    columnCount,
-  };
-};
-
-const quarterRange = (
-  config: ExtSpectrogramConfig,
-): SpectrogramColumnRange => ({
-  screenBase: Math.floor((config.windowCount * 3) / 8),
-  slotOffset: 0,
-  columnCount: Math.floor(config.windowCount / 4),
-});
-
-const stageRanges = (
-  config: ExtSpectrogramConfig,
-  stage: FundamentalFrequencyStage,
-  range: SpectrogramColumnRange | undefined,
-): (SpectrogramColumnRange | undefined)[] => {
-  if (!range) {
-    return [undefined];
-  }
-  if (stage.radius > 0) {
-    return expandColumnRanges(config, 0, [range], stage.radius);
-  }
-  return [range];
-};
-
-type KernelSetup = {
-  config: ExtSpectrogramConfig;
-  signal: GPUBuffer;
-  magnitude: GPUBuffer;
-};
-
-const createKernelSetup = (
-  device: GPUDevice,
-  kernelCase: PitchKernelCase,
-): KernelSetup => {
-  const config = buildKernelConfig(kernelCase);
-  const fftSize = config.windowSize * config.zeroPaddingFactor;
-  const signalLength = (fftSize + 2) * config.windowCount;
-  const magnitudeLength = (fftSize / 2) * config.windowCount;
-  const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
-  const signal = device.createBuffer({
-    size: signalLength * Float32Array.BYTES_PER_ELEMENT,
-    usage,
-  });
-  const magnitude = device.createBuffer({
-    size: magnitudeLength * Float32Array.BYTES_PER_ELEMENT,
-    usage,
-  });
-  device.queue.writeBuffer(
-    signal,
-    0,
-    createSpectrumData(signalLength, -30, 20),
-  );
-  device.queue.writeBuffer(
-    magnitude,
-    0,
-    createSpectrumData(magnitudeLength, 0.5, 0.5),
-  );
-  return { config, signal, magnitude };
-};
 
 export const measureKernelRow = async (
   device: GPUDevice,
-  kernelCase: PitchKernelCase,
+  frames: number,
 ): Promise<PitchPerfRow> => {
-  const setup = createKernelSetup(device, kernelCase);
-  const { config } = setup;
-  const fourierCell = createFourierCell(device);
-  const fundamentalCell = createSpectrogramFundamentalFrequencyCell(device);
+  const { sampleRate, fourierMode } = defaultSpectrogramConfig;
+  const settings = createPitchSettings(sampleRate);
+  const windowCount =
+    frames - settings.historyFrames - settings.lookaheadFrames - 3;
+  const baseColumn = settings.historyFrames + 2;
+  const cell = createSpectrogramFundamentalFrequencyCell(device);
   try {
-    const fourier = fourierCell.get({ signal: setup.signal, config });
-    const fundamental = fundamentalCell.get({
-      signal: setup.signal,
-      magnitude: setup.magnitude,
-      config,
+    const pitch = cell.get({
+      sampleRate,
+      fourierMode,
+      columnStep: settings.hop,
+      windowCount,
     });
+    const samples = synthesizeVoice(
+      (baseColumn + windowCount + 400) * settings.hop,
+      sampleRate,
+    );
+    const prepare = (shift: number): void => {
+      pitch.prepare({
+        samples,
+        projection: { baseColumn: baseColumn + shift, baseSlot: shift },
+        trackProgress: 0,
+        truncated: false,
+        invalidations: [],
+      });
+    };
+    prepare(0);
     const metrics: PitchPerfMetric[] = [];
     const measure = async (
       label: string,
@@ -214,65 +137,34 @@ export const measureKernelRow = async (
       const stats = await measureDispatch(device, dispatchOnce);
       metrics.push({ label, ...stats, reference });
     };
-    const dispatchPitch =
-      (range?: SpectrogramColumnRange): Dispatch =>
-      (pass) => {
-        for (const stage of fundamental.stages) {
-          for (const stageRange of stageRanges(config, stage, range)) {
-            stage.dispatch(pass, stageRange);
-          }
-        }
-      };
-    const frame = frameRange(config);
-    await measure('fft', (pass) => {
-      fourier.dispatch(pass);
-    });
-    await measure(
-      'fft frame',
-      (pass) => {
-        fourier.dispatch(pass, {
-          batchOffset: frame.screenBase,
-          batchCount: frame.columnCount,
-        });
-      },
-      'fft',
-    );
-    for (const stage of fundamental.stages) {
-      await measure(
-        stage.label,
-        (pass) => {
-          stage.dispatch(pass);
-        },
-        'fft',
-      );
+    const fft = pitch.stages.find((stage) => stage.label === 'fft');
+    if (fft) {
+      await measure('fft', fft.dispatch);
     }
-    await measure('pitch', dispatchPitch(), 'fft');
-    await measure(
-      'pitch quarter',
-      dispatchPitch(quarterRange(config)),
-      'pitch',
-    );
-    await measure('pitch frame', dispatchPitch(frame), 'pitch');
+    for (const stage of pitch.stages) {
+      if (stage.label !== 'fft') {
+        await measure(stage.label, stage.dispatch, 'fft');
+      }
+    }
+    await measure('pitch', pitch.dispatch, 'fft');
+    prepare(playbackFrames(settings));
+    await measure('pitch frame', pitch.dispatch, 'pitch');
     return {
-      spectrum: `${config.windowSize}·${config.zeroPaddingFactor}`,
+      spectrum: `${settings.windowSize}·${settings.fftSize / settings.windowSize}`,
       metrics,
     };
   } finally {
-    fundamentalCell.dispose();
-    fourierCell.dispose();
-    setup.signal.destroy();
-    setup.magnitude.destroy();
+    cell.dispose();
   }
 };
 
 export const measureKernelTable = async (
   device: GPUDevice,
-  columns: number,
-  spectra: readonly PitchKernelSpectrum[],
-): Promise<PitchPerfTable> => {
-  const rows: PitchPerfRow[] = [];
-  for (const spectrum of spectra) {
-    rows.push(await measureKernelRow(device, { spectrum, columns }));
-  }
-  return { columns, frameColumns: frameColumnsOf(columns), rows };
-};
+  frames: number,
+): Promise<PitchPerfTable> => ({
+  columns: frames,
+  frameColumns: playbackFrames(
+    createPitchSettings(defaultSpectrogramConfig.sampleRate),
+  ),
+  rows: [await measureKernelRow(device, frames)],
+});

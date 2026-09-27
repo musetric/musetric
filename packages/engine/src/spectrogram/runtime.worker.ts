@@ -101,6 +101,20 @@ export const createSpectrogramRuntime = async (
   };
 
   const renderLoop = createAnimationFrameLoop(renderFromPlayhead);
+  const fillLoop = createAnimationFrameLoop(async () => {
+    if (playing) {
+      return false;
+    }
+    await renderFromPlayhead();
+    return processor.hasPendingWork();
+  });
+
+  const renderPaused = async () => {
+    await renderFromPlayhead();
+    if (!playing && processor.hasPendingWork()) {
+      fillLoop.start();
+    }
+  };
 
   dataPort.bindHandlers({
     mount: async (message) => {
@@ -125,7 +139,7 @@ export const createSpectrogramRuntime = async (
         },
       ]);
       if (!playing) {
-        void renderFromPlayhead();
+        void renderPaused();
       }
     },
   });
@@ -140,6 +154,8 @@ export const createSpectrogramRuntime = async (
         await render();
         if (playing) {
           renderLoop.start();
+        } else if (processor.hasPendingWork()) {
+          fillLoop.start();
         }
       } catch (error) {
         console.error('Failed to render spectrogram', error);
@@ -148,6 +164,7 @@ export const createSpectrogramRuntime = async (
     },
     unmount: () => {
       renderLoop.stop();
+      fillLoop.stop();
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
@@ -162,7 +179,7 @@ export const createSpectrogramRuntime = async (
         );
       }
       if (!playing) {
-        void renderFromPlayhead();
+        void renderPaused();
       }
     },
     setFrameCount: (message) => {
@@ -175,12 +192,12 @@ export const createSpectrogramRuntime = async (
         return;
       }
       renderLoop.stop();
-      void renderFromPlayhead();
+      void renderPaused();
     },
     updateConfig: (message) => {
       processor.updateConfig(message.patch);
       if (!playing) {
-        void renderFromPlayhead();
+        void renderPaused();
       }
     },
   });

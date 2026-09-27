@@ -38,6 +38,7 @@ export type PitchExtractResult = {
   hopSeconds: number;
   startSeconds: number;
   values: number[];
+  confidence: number[];
 };
 
 export type PitchCompareRequest = {
@@ -52,9 +53,10 @@ export type PitchCompareRequest = {
 export const formatPitchCsv = (result: PitchExtractResult): string => {
   const rows = result.values.map((value, index) => {
     const time = result.startSeconds + index * result.hopSeconds;
-    return `${time.toFixed(4)},${value.toFixed(3)}`;
+    const confidence = result.confidence[index].toFixed(4);
+    return `${time.toFixed(4)},${value.toFixed(3)},${confidence}`;
   });
-  return ['time_s,f0_hz', ...rows].join('\n') + '\n';
+  return ['time_s,f0_hz,confidence', ...rows].join('\n') + '\n';
 };
 
 const toleranceCents = 50;
