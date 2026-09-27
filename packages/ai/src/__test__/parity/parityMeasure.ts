@@ -1,3 +1,5 @@
+import { alignedTimeOffset, tokenErrorRate } from './parityTokens.js';
+
 const elementCount = (shape: number[]): number =>
   shape.reduce((product, size) => product * size, 1);
 
@@ -55,8 +57,14 @@ export const checkEvents = (
   if (candidate.dtype !== reference.dtype) {
     return `dtype ${candidate.dtype} instead of ${reference.dtype}`;
   }
-  if (reference.shape.length !== 1 || candidate.shape.length !== 1) {
-    return `shapes ${reference.shape.join('x')} and ${candidate.shape.join('x')} are not event lists`;
+  const [, ...referenceRow] = reference.shape;
+  const [, ...candidateRow] = candidate.shape;
+  if (
+    reference.shape.length === 0 ||
+    candidate.shape.length !== reference.shape.length ||
+    candidateRow.join('x') !== referenceRow.join('x')
+  ) {
+    return `shapes ${reference.shape.join('x')} and ${candidate.shape.join('x')} are not lists of the same rows`;
   }
   return checkValues(reference, candidate);
 };
@@ -190,7 +198,9 @@ export type ParityMeasure =
   | 'differing'
   | 'argmaxDiffering'
   | 'agreement'
-  | 'fMeasure';
+  | 'fMeasure'
+  | 'tokenErrorRate'
+  | 'timeOffset';
 
 export type ParityMeasureInput = {
   measure: ParityMeasure;
@@ -230,17 +240,34 @@ const measures: Record<ParityMeasure, (input: ParityMeasureInput) => number> = {
       input.candidate.values,
       input.tolerance ?? 0,
     ),
+  tokenErrorRate: (input) =>
+    tokenErrorRate({
+      reference: input.reference.values,
+      candidate: input.candidate.values,
+      width: input.reference.shape[1] ?? 1,
+    }),
+  timeOffset: (input) =>
+    alignedTimeOffset({
+      reference: input.reference.values,
+      candidate: input.candidate.values,
+      width: input.reference.shape[1] ?? 1,
+    }),
 };
+
+const eventMeasures = new Set<ParityMeasure>([
+  'fMeasure',
+  'tokenErrorRate',
+  'timeOffset',
+]);
 
 export type ParityValue =
   | { kind: 'invalid'; reason: string }
   | { kind: 'value'; value: number };
 
 export const measureTensors = (input: ParityMeasureInput): ParityValue => {
-  const reason =
-    input.measure === 'fMeasure'
-      ? checkEvents(input.reference, input.candidate)
-      : checkTensors(input.reference, input.candidate);
+  const reason = eventMeasures.has(input.measure)
+    ? checkEvents(input.reference, input.candidate)
+    : checkTensors(input.reference, input.candidate);
   if (reason !== undefined) {
     return { kind: 'invalid', reason };
   }

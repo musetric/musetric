@@ -396,6 +396,112 @@
         "measure": "agreement",
         "atLeast": 0.99
       }
+    ],
+    "transcribe": [
+      {
+        "row": 1,
+        "boundary": "result.tokens",
+        "reference": "reference",
+        "candidate": "author",
+        "measure": "tokenErrorRate",
+        "atMost": 0.1
+      },
+      {
+        "row": 1,
+        "boundary": "result.tokens",
+        "reference": "reference",
+        "candidate": "author",
+        "measure": "timeOffset",
+        "atMost": 0.5
+      },
+      {
+        "row": 3,
+        "boundary": "encoder.output",
+        "reference": "original",
+        "candidate": "onnx-cpu",
+        "measure": "snr",
+        "atLeast": 20
+      },
+      {
+        "row": 3,
+        "boundary": "decoder.logits",
+        "reference": "original",
+        "candidate": "onnx-cpu",
+        "measure": "argmaxDiffering",
+        "atMost": 2
+      },
+      {
+        "row": 4,
+        "boundary": "encoder.output",
+        "reference": "onnx-cpu",
+        "candidate": "wasm",
+        "measure": "snr",
+        "atLeast": 60
+      },
+      {
+        "row": 4,
+        "boundary": "decoder.logits",
+        "reference": "onnx-cpu",
+        "candidate": "wasm",
+        "measure": "maxAbs",
+        "atMost": 0.1
+      },
+      {
+        "row": 5,
+        "boundary": "encoder.output",
+        "reference": "onnx-cpu",
+        "candidate": "webgpu",
+        "measure": "snr",
+        "atLeast": 40
+      },
+      {
+        "row": 5,
+        "boundary": "decoder.logits",
+        "reference": "onnx-cpu",
+        "candidate": "webgpu",
+        "measure": "maxAbs",
+        "atMost": 1
+      },
+      {
+        "row": 5,
+        "boundary": "decoder.logits",
+        "reference": "onnx-cpu",
+        "candidate": "webgpu",
+        "measure": "argmaxDiffering",
+        "atMost": 0
+      },
+      {
+        "row": 6,
+        "boundary": "model.input",
+        "reference": "reference",
+        "candidate": "product",
+        "measure": "snr",
+        "atLeast": 60
+      },
+      {
+        "row": 6,
+        "boundary": "encoder.output",
+        "reference": "onnx-cpu",
+        "candidate": "product",
+        "measure": "snr",
+        "atLeast": 30
+      },
+      {
+        "row": 6,
+        "boundary": "result.tokens",
+        "reference": "reference",
+        "candidate": "product",
+        "measure": "tokenErrorRate",
+        "atMost": 0.05
+      },
+      {
+        "row": 6,
+        "boundary": "result.tokens",
+        "reference": "reference",
+        "candidate": "product",
+        "measure": "timeOffset",
+        "atMost": 0.1
+      }
     ]
   }
 }

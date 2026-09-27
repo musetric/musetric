@@ -222,3 +222,64 @@ describe('beat F-measure', () => {
     expect(beatFMeasure(events(beats, [2, 4])).kind).toBe('invalid');
   });
 });
+
+const timed = (rows: [number, number][]): ParityTensor => ({
+  dtype: 'float32',
+  shape: [rows.length, 2],
+  values: Float32Array.from(rows.flat()),
+});
+
+const words: [number, number][] = [
+  [50365, 0],
+  [400, 0.4],
+  [401, 0.8],
+  [402, 1.2],
+  [403, 1.6],
+];
+
+const compareTokens = (
+  measure: 'tokenErrorRate' | 'timeOffset',
+  candidate: ParityTensor,
+): ParityValue =>
+  measureTensors({ measure, reference: timed(words), candidate });
+
+describe('token measures', () => {
+  it('scores equal tokens with the time error of their pairs', () => {
+    const late = timed(words.map((row) => [row[0], row[1] + 0.04]));
+    expect(compareTokens('tokenErrorRate', late)).toEqual({
+      kind: 'value',
+      value: 0,
+    });
+    const offset = compareTokens('timeOffset', late);
+    expect(offset.kind === 'value' && offset.value).toBeCloseTo(0.04, 6);
+  });
+
+  it('counts a changed and a missing token, and times only the pairs', () => {
+    const edited = timed([
+      [50365, 0],
+      [999, 0.4],
+      [401, 0.8],
+      [403, 1.6],
+    ]);
+    expect(compareTokens('tokenErrorRate', edited)).toEqual({
+      kind: 'value',
+      value: 2 / 5,
+    });
+    expect(compareTokens('timeOffset', edited)).toEqual({
+      kind: 'value',
+      value: 0,
+    });
+  });
+
+  it('rejects rows of another width and a NaN time', () => {
+    const wide: ParityTensor = {
+      dtype: 'float32',
+      shape: [5, 3],
+      values: new Float32Array(15),
+    };
+    expect(compareTokens('tokenErrorRate', wide).kind).toBe('invalid');
+    expect(
+      compareTokens('timeOffset', timed([...words.slice(1), [404, NaN]])),
+    ).toEqual({ kind: 'invalid', reason: 'value 9 is not finite' });
+  });
+});

@@ -67,6 +67,9 @@ it('runs the parity page on one device', async (context) => {
     outDir: request.outDir,
     device: request.device.name,
     job,
+    hub: new Map(
+      models.bundles.map((bundle) => [bundle.modelId, bundle.directory]),
+    ),
   });
   const close = openDevice({
     device: request.device,

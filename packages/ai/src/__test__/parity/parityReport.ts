@@ -233,6 +233,8 @@ const formats: Record<ParityMeasure, (value: number) => string> = {
   argmaxDiffering: String,
   agreement: (value) => value.toFixed(3),
   fMeasure: (value) => value.toFixed(3),
+  tokenErrorRate: (value) => value.toFixed(3),
+  timeOffset: (value) => `${value.toFixed(2)} s`,
 };
 
 const formatValue = (cell: ParityCell, check: ParityCheck): string =>

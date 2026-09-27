@@ -4,6 +4,7 @@ import {
   type LeadBackingGraph,
   type SkeyGraph,
   type VocalsGraph,
+  type WhisperGraph,
 } from '../../runtime/modelGraphs.js';
 import { type ParityDtype } from './parityMeasure.js';
 
@@ -83,13 +84,39 @@ export type ParityChordsTask = {
   unitInput: ParityTensorRef;
 };
 
+export type ParityWhisperModelTask = {
+  kind: 'whisperModel';
+  caseName: string;
+  provider: 'wasm' | 'webgpu';
+  encoderUrl: string;
+  decoderUrl: string;
+  features: ParityTensorRef;
+  encoderStates: ParityTensorRef;
+  tokens: ParityTensorRef;
+  promptLength: number;
+};
+
+export type ParityWhisperTask = {
+  kind: 'whisper';
+  caseName: string;
+  graph: WhisperGraph;
+  modelPath: string;
+  modelId: string;
+  revision: string;
+  language: string;
+  timestampBegin: number;
+  unitInput: ParityTensorRef;
+};
+
 export type ParityTask =
   | ParityModelTask
   | ParityVocalsTask
   | ParityVoicesTask
   | ParityRhythmTask
   | ParityKeyTask
-  | ParityChordsTask;
+  | ParityChordsTask
+  | ParityWhisperModelTask
+  | ParityWhisperTask;
 
 export type ParityJob = {
   tasks: ParityTask[];

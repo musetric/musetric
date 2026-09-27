@@ -1,4 +1,10 @@
-export type ParityStep = 'vocals' | 'voices' | 'rhythm' | 'key' | 'chords';
+export type ParityStep =
+  | 'vocals'
+  | 'voices'
+  | 'rhythm'
+  | 'key'
+  | 'chords'
+  | 'transcribe';
 
 export type ParitySource = {
   url: string;
@@ -21,6 +27,7 @@ export type ParityCase = {
   gain?: number;
   sampleRate?: number;
   channels?: number;
+  language?: string;
 };
 
 export type ParityCaseFile = {
@@ -85,6 +92,14 @@ export const parityStepModels: Record<ParityStep, ParityStepModel> = {
     webgpu: true,
     simpleBufferCache: false,
     outputs: { outputName: 'model.output' },
+  },
+  transcribe: {
+    bundle: 'WHISPER',
+    graph: 'whisper',
+    wasm: 'desktop',
+    webgpu: true,
+    simpleBufferCache: false,
+    outputs: {},
   },
 };
 

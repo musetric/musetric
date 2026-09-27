@@ -104,12 +104,23 @@ const saveOutput = (
   );
 };
 
+const hubFile = /^\/hf\/([^/]+\/[^/]+)\/resolve\/[^/]+\/(\w[\w.-]*)$/;
+
 export type ParityServerOptions = {
   port: number;
   pageDir: string;
   outDir: string;
   device: string;
   job: ParityJob;
+  hub: Map<string, string>;
+};
+
+const hubPath = (options: ParityServerOptions, pathname: string): string => {
+  const match = hubFile.exec(decodeURIComponent(pathname));
+  const directory = match ? options.hub.get(match[1]) : undefined;
+  return match && directory !== undefined
+    ? join(options.outDir, 'models', directory, match[2])
+    : '';
 };
 
 export type ParityServer = {
@@ -175,6 +186,10 @@ export const startParityServer = (
           'content-type': contentTypes['.json'],
         })
         .end(first ? JSON.stringify(options.job) : '{}');
+      return;
+    }
+    if (url.pathname.startsWith('/hf/')) {
+      sendFile(response, hubPath(options, url.pathname));
       return;
     }
     const relative = normalize(decodeURIComponent(url.pathname)).replace(
