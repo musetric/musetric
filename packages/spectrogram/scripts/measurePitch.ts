@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -15,44 +21,40 @@ type PitchExtractRequest = {
   columns: number;
 };
 
-type PitchCompareRequest = {
-  referencePath: string;
-  oursPath: string;
-  fromSeconds: number;
-  toSeconds: number | undefined;
-};
-
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface ProvidedContext {
     pitchExtract?: PitchExtractRequest;
-    pitchCompare?: PitchCompareRequest;
+    pitchCompare?: {
+      name: string;
+      referencePath: string;
+      oursPath: string;
+      fromSeconds: number;
+      toSeconds: number | undefined;
+      worstCount: number;
+    }[];
     pitchPerf?: PitchExtractRequest;
   }
 }
-
-type PitchPerfOutput = {
-  result: Record<string, unknown>;
-  markdown: string;
-};
 
 declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     pitchExtract?: { csv: string; frames: number };
-    pitchCompare?: Record<string, number>;
-    pitchPerf?: PitchPerfOutput;
+    pitchCompare?: { reports: unknown[]; markdown: string };
+    pitchPerf?: { result: Record<string, unknown>; markdown: string };
   }
 }
 
-const usage = `usage: yarn workspace @musetric/spectrogram measure:pitch <stage> --audio <file> [options]
+const usage = `usage: yarn workspace @musetric/spectrogram measure:pitch <stage> --audio <file|dir> [options]
 
 stages
   reference   run the neural reference (musetric-pitch) and write reference.csv
   extract     run the spectrogram tracker and write <tag>.csv
-  compare     score <tag>.csv against reference.csv and write <tag>.compare.json
+  compare     score <tag>.csv against reference.csv, write <tag>.compare.md and .json,
+              for a directory <out>/<tag>.corpus.md and .json
   perf        time the pitch kernels per batch and a render of the window, write <tag>.perf.json
-  all         reference, extract and compare in order
+  all         reference, extract and compare in order; with --audio <dir>, on each track
 
 options
   --from <seconds>            start of the analysed range (default: 0)
@@ -63,11 +65,13 @@ options
   --columns <count>           columns of the tracker window (default: 4096, perf 1920)
   --tag <name>                name of the tracker output (default: ours)
   --out <dir>                 output root (default: tmp/pitch)
+  --worst <count>             worst 5 s windows to list (default: 10)
   --reference-command <cmd>   neural reference command (default: musetric-pitch)`;
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sampleRate = 48000;
 const contextSeconds = 1;
+const audioExtensions = new Set(['.flac', '.wav', '.mp3', '.ogg', '.m4a']);
 
 const stages = ['reference', 'extract', 'compare', 'perf', 'all'] as const;
 
@@ -88,11 +92,20 @@ const readZeroPadding = (options: Map<string, string>): 1 | 2 | 4 => {
   throw new Error('--zero-padding must be 1, 2 or 4');
 };
 
-type PitchStage = (typeof stages)[number];
+const listAudio = (path: string): string[] => {
+  const resolved = resolve(path);
+  if (!statSync(resolved).isDirectory()) {
+    return [resolved];
+  }
+  return readdirSync(resolved)
+    .filter((name) => audioExtensions.has(extname(name).toLowerCase()))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => resolve(resolved, name));
+};
 
 type PitchArgs = {
-  stage: PitchStage;
-  audioPath: string;
+  stage: (typeof stages)[number];
+  audioPaths: string[];
   fromSeconds: number;
   toSeconds: number | undefined;
   hopMs: number;
@@ -101,6 +114,7 @@ type PitchArgs = {
   columns: number;
   tag: string;
   outDir: string;
+  worstCount: number;
   referenceCommand: string;
 };
 
@@ -118,7 +132,7 @@ const parseArgs = (argv: readonly string[]): PitchArgs => {
   const to = options.get('--to');
   return {
     stage,
-    audioPath: resolve(audio),
+    audioPaths: listAudio(audio),
     fromSeconds: readNumber(options, '--from', 0),
     toSeconds: to === undefined ? undefined : Number(to),
     hopMs: readNumber(options, '--hop-ms', 5),
@@ -127,11 +141,13 @@ const parseArgs = (argv: readonly string[]): PitchArgs => {
     columns: readNumber(options, '--columns', stage === 'perf' ? 1920 : 4096),
     tag: options.get('--tag') ?? 'ours',
     outDir: resolve(options.get('--out') ?? resolve(packageRoot, 'tmp/pitch')),
+    worstCount: readNumber(options, '--worst', 10),
     referenceCommand: options.get('--reference-command') ?? 'musetric-pitch',
   };
 };
 
-type PitchPaths = {
+type PitchTrack = {
+  audioPath: string;
   stem: string;
   reference: string;
   ours: string;
@@ -139,39 +155,40 @@ type PitchPaths = {
   perf: string;
 };
 
-const buildPaths = (args: PitchArgs): PitchPaths => {
+const buildTrack = (args: PitchArgs, audioPath: string): PitchTrack => {
   const range =
     args.toSeconds === undefined
       ? ''
       : `_${args.fromSeconds}-${args.toSeconds}`;
-  const stem = basename(args.audioPath, extname(args.audioPath));
+  const stem = basename(audioPath, extname(audioPath));
   const dir = resolve(args.outDir, `${stem}${range}`);
   mkdirSync(dir, { recursive: true });
   return {
+    audioPath,
     stem,
     reference: resolve(dir, 'reference.csv'),
     ours: resolve(dir, `${args.tag}.csv`),
-    compare: resolve(dir, `${args.tag}.compare.json`),
+    compare: resolve(dir, `${args.tag}.compare`),
     perf: resolve(dir, `${args.tag}.perf.json`),
   };
 };
 
 const wholeTrackInput = (
   args: PitchArgs,
-  paths: PitchPaths,
+  track: PitchTrack,
   rangedPath: string,
 ): string => {
-  const wholePath = resolve(args.outDir, paths.stem, basename(rangedPath));
+  const wholePath = resolve(args.outDir, track.stem, basename(rangedPath));
   return existsSync(rangedPath) || !existsSync(wholePath)
     ? rangedPath
     : wholePath;
 };
 
-const runReference = (args: PitchArgs, paths: PitchPaths): void => {
+const runReference = (args: PitchArgs, track: PitchTrack): void => {
   const parts = [
     args.referenceCommand,
-    `--audio-path "${args.audioPath}"`,
-    `--result-path "${paths.reference}"`,
+    `--audio-path "${track.audioPath}"`,
+    `--result-path "${track.reference}"`,
     `--hop-ms ${args.hopMs}`,
     `--from-seconds ${args.fromSeconds}`,
     ...(args.toSeconds === undefined ? [] : [`--to-seconds ${args.toSeconds}`]),
@@ -180,16 +197,13 @@ const runReference = (args: PitchArgs, paths: PitchPaths): void => {
   if (result.status !== 0) {
     throw new Error(`reference command exited with ${result.status}`);
   }
-  console.log(`wrote ${paths.reference}`);
+  console.log(`wrote ${track.reference}`);
 };
 
-type DecodedPcm = {
-  url: string;
-  startSeconds: number;
-  endSeconds: number;
-};
-
-const decodePcm = (args: PitchArgs, paths: PitchPaths): DecodedPcm => {
+const buildExtractRequest = (
+  args: PitchArgs,
+  track: PitchTrack,
+): PitchExtractRequest => {
   const startSeconds = Math.max(0, args.fromSeconds - contextSeconds);
   const ffmpegArgs = [
     '-v',
@@ -197,7 +211,7 @@ const decodePcm = (args: PitchArgs, paths: PitchPaths): DecodedPcm => {
     '-ss',
     String(startSeconds),
     '-i',
-    args.audioPath,
+    track.audioPath,
   ];
   if (args.toSeconds !== undefined) {
     ffmpegArgs.push(
@@ -210,16 +224,22 @@ const decodePcm = (args: PitchArgs, paths: PitchPaths): DecodedPcm => {
   if (result.status !== 0 || result.stdout.length === 0) {
     throw new Error(`ffmpeg failed: ${result.stderr.toString()}`);
   }
-  const relative = `tmp/pitch/pcm/${paths.stem}_${startSeconds}.f32`;
+  const relative = `tmp/pitch/pcm/${track.stem}_${startSeconds}.f32`;
   const target = resolve(packageRoot, relative);
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, result.stdout);
+  const endSeconds =
+    startSeconds +
+    result.stdout.length / Float32Array.BYTES_PER_ELEMENT / sampleRate;
   return {
-    url: `/${relative}`,
-    startSeconds,
-    endSeconds:
-      startSeconds +
-      result.stdout.length / Float32Array.BYTES_PER_ELEMENT / sampleRate,
+    pcmUrl: `/${relative}`,
+    pcmStartSeconds: startSeconds,
+    fromSeconds: args.fromSeconds,
+    toSeconds: Math.min(args.toSeconds ?? Infinity, endSeconds),
+    hopMs: args.hopMs,
+    windowSize: args.windowSize,
+    zeroPaddingFactor: args.zeroPaddingFactor,
+    columns: args.columns,
   };
 };
 
@@ -244,7 +264,10 @@ const pitchReporter = {
 type PitchProvide = NonNullable<Parameters<typeof startVitest>[2]>['provide'];
 type PitchMeta = ReturnType<typeof experimental_getRunnerTask>['meta'];
 
-const runPitchTest = async (provide: PitchProvide): Promise<PitchMeta> => {
+const runPitchTest = async (
+  provide: PitchProvide,
+  outDir: string,
+): Promise<PitchMeta> => {
   const vitest = await startVitest(
     'test',
     [],
@@ -254,7 +277,7 @@ const runPitchTest = async (provide: PitchProvide): Promise<PitchMeta> => {
       reporters: [pitchReporter],
       provide,
     },
-    undefined,
+    { server: { fs: { allow: [resolve(packageRoot, '../..'), outDir] } } },
     { stdout: devNull, stderr: devNull },
   );
   const meta: PitchMeta = {};
@@ -275,97 +298,94 @@ const runPitchTest = async (provide: PitchProvide): Promise<PitchMeta> => {
   return meta;
 };
 
-const buildExtractRequest = (
-  args: PitchArgs,
-  paths: PitchPaths,
-): PitchExtractRequest => {
-  const pcm = decodePcm(args, paths);
-  return {
-    pcmUrl: pcm.url,
-    pcmStartSeconds: pcm.startSeconds,
-    fromSeconds: args.fromSeconds,
-    toSeconds: Math.min(args.toSeconds ?? Infinity, pcm.endSeconds),
-    hopMs: args.hopMs,
-    windowSize: args.windowSize,
-    zeroPaddingFactor: args.zeroPaddingFactor,
-    columns: args.columns,
-  };
-};
-
 const runExtract = async (
   args: PitchArgs,
-  paths: PitchPaths,
+  track: PitchTrack,
 ): Promise<void> => {
-  const meta = await runPitchTest({
-    pitchExtract: buildExtractRequest(args, paths),
-  });
+  const meta = await runPitchTest(
+    { pitchExtract: buildExtractRequest(args, track) },
+    args.outDir,
+  );
   if (!meta.pitchExtract) {
     throw new Error('extraction produced no result');
   }
-  writeFileSync(paths.ours, meta.pitchExtract.csv);
-  console.log(`wrote ${paths.ours} (${meta.pitchExtract.frames} frames)`);
+  writeFileSync(track.ours, meta.pitchExtract.csv);
+  console.log(`wrote ${track.ours} (${meta.pitchExtract.frames} frames)`);
+};
+
+const writeJson = (path: string, value: unknown): void => {
+  writeFileSync(path, JSON.stringify(value, undefined, 2) + '\n');
 };
 
 const runCompare = async (
   args: PitchArgs,
-  paths: PitchPaths,
+  tracks: PitchTrack[],
 ): Promise<void> => {
-  const meta = await runPitchTest({
-    pitchCompare: {
-      referencePath: wholeTrackInput(args, paths, paths.reference),
-      oursPath: wholeTrackInput(args, paths, paths.ours),
-      fromSeconds: args.fromSeconds,
-      toSeconds: args.toSeconds,
-    },
-  });
-  if (!meta.pitchCompare) {
+  const pitchCompare = tracks.map((track) => ({
+    name: track.stem,
+    referencePath: wholeTrackInput(args, track, track.reference),
+    oursPath: wholeTrackInput(args, track, track.ours),
+    fromSeconds: args.fromSeconds,
+    toSeconds: args.toSeconds,
+    worstCount: args.worstCount,
+  }));
+  const meta = await runPitchTest({ pitchCompare }, args.outDir);
+  const output = meta.pitchCompare;
+  if (output?.reports.length !== tracks.length) {
     throw new Error('comparison produced no result');
   }
-  const report = {
-    audio: basename(args.audioPath),
-    from: args.fromSeconds,
-    to: args.toSeconds,
-    tag: args.tag,
-    ...meta.pitchCompare,
-  };
-  writeFileSync(paths.compare, JSON.stringify(report, undefined, 2) + '\n');
-  console.table(meta.pitchCompare);
-  console.log(`wrote ${paths.compare}`);
+  const target =
+    tracks.length === 1
+      ? tracks[0].compare
+      : resolve(args.outDir, `${args.tag}.corpus`);
+  writeFileSync(`${target}.md`, output.markdown + '\n');
+  writeJson(`${target}.json`, output.reports);
+  console.log(output.markdown);
+  console.log(`wrote ${target}.md and ${target}.json`);
 };
 
-const runPerf = async (args: PitchArgs, paths: PitchPaths): Promise<void> => {
-  const { pitchPerf } = await runPitchTest({
-    pitchPerf: buildExtractRequest(args, paths),
-  });
+const runPerf = async (args: PitchArgs, track: PitchTrack): Promise<void> => {
+  const { pitchPerf } = await runPitchTest(
+    { pitchPerf: buildExtractRequest(args, track) },
+    args.outDir,
+  );
   if (!pitchPerf) {
     throw new Error('the measurement produced no result');
   }
   const report = {
-    audio: basename(args.audioPath),
+    audio: basename(track.audioPath),
     from: args.fromSeconds,
     to: args.toSeconds,
     tag: args.tag,
     ...pitchPerf.result,
   };
-  writeFileSync(paths.perf, JSON.stringify(report, undefined, 2) + '\n');
+  writeJson(track.perf, report);
   console.log(pitchPerf.markdown);
-  console.log(`wrote ${paths.perf}`);
+  console.log(`wrote ${track.perf}`);
 };
 
 const main = async (): Promise<void> => {
   const args = parseArgs(process.argv.slice(2));
-  const paths = buildPaths(args);
-  if (args.stage === 'reference' || args.stage === 'all') {
-    runReference(args, paths);
+  const tracks = args.audioPaths.map((audioPath) =>
+    buildTrack(args, audioPath),
+  );
+  if (args.stage === 'perf') {
+    if (tracks.length !== 1) {
+      throw new Error('perf takes one audio file');
+    }
+    await runPerf(args, tracks[0]);
+    return;
   }
-  if (args.stage === 'extract' || args.stage === 'all') {
-    await runExtract(args, paths);
+  for (const track of tracks) {
+    if (args.stage === 'reference' || args.stage === 'all') {
+      runReference(args, track);
+    }
+    if (args.stage === 'extract' || args.stage === 'all') {
+      await runExtract(args, track);
+    }
   }
   if (args.stage === 'compare' || args.stage === 'all') {
-    await runCompare(args, paths);
-  }
-  if (args.stage === 'perf') {
-    await runPerf(args, paths);
+    await runCompare(args, tracks);
   }
 };
 

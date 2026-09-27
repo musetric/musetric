@@ -16,12 +16,14 @@ import {
   type PitchExtractRequest,
   type PitchExtractResult,
 } from './pitchAccuracy.es.js';
+import { comparePitchLine } from './pitchLine.es.js';
+import { formatPitchReport, type PitchTrackReport } from './pitchReport.es.js';
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface ProvidedContext {
     pitchExtract?: PitchExtractRequest;
-    pitchCompare?: PitchCompareRequest;
+    pitchCompare?: PitchCompareRequest[];
   }
 }
 
@@ -162,22 +164,35 @@ it('extracts the fundamental line of a track', async (context) => {
   });
 });
 
-it('compares a pitch track with its reference', async (context) => {
-  const request = inject('pitchCompare');
-  if (!request) {
+it('compares pitch tracks with their references', async (context) => {
+  const requests = inject('pitchCompare');
+  if (!requests) {
     context.skip();
     return;
   }
-  const reference = parsePitchCsv(
-    await commands.readFile(request.referencePath, 'utf8'),
-  );
-  const ours = parsePitchCsv(await commands.readFile(request.oursPath, 'utf8'));
+  const reports: PitchTrackReport[] = [];
+  for (const request of requests) {
+    const reference = parsePitchCsv(
+      await commands.readFile(request.referencePath, 'utf8'),
+    );
+    const ours = parsePitchCsv(
+      await commands.readFile(request.oursPath, 'utf8'),
+    );
+    const toSeconds = request.toSeconds ?? Infinity;
+    const line = comparePitchLine(reference, ours, {
+      fromSeconds: request.fromSeconds,
+      toSeconds,
+      worstCount: request.worstCount,
+    });
+    reports.push({
+      name: request.name,
+      accuracy: comparePitch(reference, ours, request.fromSeconds, toSeconds),
+      line: line.overview,
+      worst: line.worst,
+    });
+  }
+  const worstCount = requests[0]?.worstCount ?? 0;
   Object.assign(context.task.meta, {
-    pitchCompare: comparePitch(
-      reference,
-      ours,
-      request.fromSeconds,
-      request.toSeconds ?? Infinity,
-    ),
+    pitchCompare: { reports, markdown: formatPitchReport(reports, worstCount) },
   });
 });
