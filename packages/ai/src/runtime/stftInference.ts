@@ -61,6 +61,12 @@ export type StftInferenceCore = {
   release: () => void;
 };
 
+export type StftInferenceTap = {
+  device: GPUDevice;
+  modelInput: GPUBuffer;
+  modelOutput: GPUBuffer;
+};
+
 export type StftInferenceOptions = {
   label: string;
   model: StftInferenceModel;
@@ -74,6 +80,7 @@ export type StftInferenceOptions = {
   frameShader: string;
   overlapAddShader: string;
   createCore: (buffers: StftInferenceBuffers) => StftInferenceCore;
+  inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
 
 export const createStftInferenceRuntime = async (
@@ -200,6 +207,11 @@ export const createStftInferenceRuntime = async (
         `${label} model output did not reuse the preallocated GPU buffer`,
       );
     }
+    await options.inspect?.({
+      device,
+      modelInput: core.modelInput,
+      modelOutput: core.modelOutput,
+    });
 
     const istftEncoder = device.createCommandEncoder();
     runStage(istftEncoder, core.synthesis);

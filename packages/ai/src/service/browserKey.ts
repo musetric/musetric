@@ -5,7 +5,7 @@ import { createBrowserJobApi } from './browserJob.js';
 import { floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserAnalyzeKeyRequest } from './keyApi.js';
 
-const peakNormalize = (audio: Float32Array): void => {
+export const peakNormalize = (audio: Float32Array): void => {
   let peak = 0;
   for (const sample of audio) {
     const magnitude = Math.abs(sample);
@@ -20,7 +20,7 @@ const peakNormalize = (audio: Float32Array): void => {
   }
 };
 
-const argmax = (values: Float32Array): number => {
+export const argmax = (values: Float32Array): number => {
   let best = 0;
   for (let i = 1; i < values.length; i += 1) {
     if (values[i] > values[best]) {

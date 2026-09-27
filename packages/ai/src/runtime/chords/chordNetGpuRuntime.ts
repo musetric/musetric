@@ -197,10 +197,18 @@ export type ChordNetGpuRuntime = {
   release: () => Promise<void>;
 };
 
+export type ChordNetGpuTap = {
+  device: GPUDevice;
+  features: GPUBuffer;
+  modelInput: GPUBuffer;
+  logits: GPUBuffer;
+};
+
 export type ChordNetGpuRuntimeOptions = {
   graph: ChordNetGraph;
   modelUrl: string;
   plan: CqtPlan;
+  inspect?: (tap: ChordNetGpuTap) => Promise<void>;
 };
 
 export const createChordNetGpuRuntime = async (
@@ -306,6 +314,12 @@ export const createChordNetGpuRuntime = async (
       }
       encodeFeatures(current);
       await runModel(current);
+      await options.inspect?.({
+        device,
+        features: current.cqtOutput,
+        modelInput: current.modelInput,
+        logits: current.logits,
+      });
     });
 
     const postEncoder = device.createCommandEncoder();

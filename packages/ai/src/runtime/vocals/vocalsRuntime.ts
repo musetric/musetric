@@ -9,6 +9,7 @@ import {
   createStftInferenceRuntime,
   type StftInferenceCore,
   type StftInferenceRuntime,
+  type StftInferenceTap,
 } from '../stftInference.js';
 import { vocalsApplyMasksShader } from './applyMasks.wgsl.js';
 import { vocalsFrameShader } from './frame.wgsl.js';
@@ -30,6 +31,7 @@ export type VocalsGpuRuntimeOptions = {
   modelUrl: string;
   modelDataUrl: string;
   modelDataPath: string;
+  inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
 
 export const createVocalsGpuRuntime = async (
@@ -51,6 +53,7 @@ export const createVocalsGpuRuntime = async (
     externalData: [{ path: options.modelDataPath, data: options.modelDataUrl }],
     frameShader: vocalsFrameShader,
     overlapAddShader: vocalsOverlapAddShader,
+    inspect: options.inspect,
     createCore: (buffers): StftInferenceCore => {
       const { device, wave, spectrum } = buffers;
       const stft = createStorageBuffer(device, modelBytes);

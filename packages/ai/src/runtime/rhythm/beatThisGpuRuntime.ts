@@ -110,10 +110,16 @@ export type BeatThisGpuRuntime = {
   release: () => Promise<void>;
 };
 
+export type BeatThisGpuTap = {
+  device: GPUDevice;
+  windows: GPUBuffer;
+};
+
 export type BeatThisGpuRuntimeOptions = {
   graph: BeatThisGraph;
   modelUrl: string;
   filterbank: Float32Array;
+  inspect?: (tap: BeatThisGpuTap) => Promise<void>;
 };
 
 export const createBeatThisGpuRuntime = async (
@@ -256,6 +262,7 @@ export const createBeatThisGpuRuntime = async (
         await onUnit?.({ unit: unitCount - 1 - index, unitCount });
         await runWindow(current, index);
       }
+      await options.inspect?.({ device, windows: current.windows });
     });
 
     return {

@@ -20,3 +20,20 @@ Both model families are fetched from the core's model cache (downloaded and
 sha256-verified by the rust side from Hugging Face, `musetric/*-onnx`). The
 package intentionally does not expose a node API: the core is rust, and the
 executor runs in the browser.
+
+## Parity run
+
+`yarn workspace @musetric/ai measure:parity <prepare|run|compare|all>` follows
+each step from the model author's torch code to the executor on a device, run
+by hand when a model, its pin or `onnxruntime-web` changes, never in CI.
+
+- `prepare` downloads the pinned models and the cases of
+  `scripts/parityCases.json`, and writes each case's reference with
+  `musetric-parity` from musetric-toolkit.
+- `run --devices pc,<name>=<adb serial>` opens a page on the desktop Chrome and
+  on each phone over `adb reverse`; it runs the models on wasm and WebGPU and
+  the executor's own runtime, and saves every stage boundary.
+- `compare` scores each boundary against `scripts/parityChecks.json` and writes
+  `report.md`; a phone must stay within `marginDb` of the desktop.
+
+Outputs go to `packages/ai/tmp/parity` (`--out`).

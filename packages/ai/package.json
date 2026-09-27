@@ -16,7 +16,8 @@
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "test": "vitest run"
+    "test": "vitest run",
+    "measure:parity": "node ./scripts/measureParity.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "catalog:"
