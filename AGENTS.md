@@ -57,6 +57,7 @@ Applies to everything published from this repository: code, tests, comments, com
 - Re-export only when an `index` file is needed as a module entrypoint; use `export * from ...` for flat entrypoints or `export * as namespace from ...` for intentional conceptual isolation, and do not re-export from any other files.
 - Import entities without renaming them; rename an import only when there is a real local name conflict and it cannot be avoided by another reasonable import approach.
 - When importing from a folder that has an `index` entrypoint, prefer the folder entrypoint over importing an internal file through the folder boundary.
+- Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`; a script that `node` runs directly therefore stays in one file.
 
 **Types**
 

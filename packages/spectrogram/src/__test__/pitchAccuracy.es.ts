@@ -41,10 +41,12 @@ export type PitchExtractResult = {
 };
 
 export type PitchCompareRequest = {
+  name: string;
   referencePath: string;
   oursPath: string;
   fromSeconds: number;
   toSeconds: number | undefined;
+  worstCount: number;
 };
 
 export const formatPitchCsv = (result: PitchExtractResult): string => {
@@ -58,7 +60,8 @@ export const formatPitchCsv = (result: PitchExtractResult): string => {
 const toleranceCents = 50;
 const flipCents = 550;
 
-const centsBetween = (a: number, b: number): number => 1200 * Math.log2(a / b);
+export const centsBetween = (a: number, b: number): number =>
+  1200 * Math.log2(a / b);
 
 const chromaDistance = (cents: number): number => {
   const folded = Math.abs(cents) % 1200;
@@ -76,7 +79,7 @@ const quantile = (sorted: number[], position: number): number => {
   return sorted[index];
 };
 
-const alignToReference = (
+export const alignToReference = (
   reference: PitchFrame[],
   ours: PitchFrame[],
 ): Float64Array => {
