@@ -115,7 +115,12 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
     label: 'fold',
     code: foldShader,
     entryPoint: 'foldPitch',
-    kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ],
   }),
   smooth: createPipeline(device, {
     label: 'smooth',

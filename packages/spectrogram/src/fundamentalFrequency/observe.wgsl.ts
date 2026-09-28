@@ -320,6 +320,7 @@ fn observe(
     params.voicingLevel * level;
   observation.voicing = 1.0 / (1.0 + exp(-z));
   observation.frame = slot.frame;
+  observation.level = level;
   observations[u32(slot.frame) % params.ringFrames] = observation;
 }
 `;

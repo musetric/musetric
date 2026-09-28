@@ -198,7 +198,7 @@ describe('pitch frames', () => {
             Math.floor((head - settings.support) / settings.hop) -
             settings.lookaheadFrames -
             settings.smoothAheadFrames -
-            settings.repairReachFrames;
+            settings.repairAheadFrames;
           if (limit < 0) {
             continue;
           }

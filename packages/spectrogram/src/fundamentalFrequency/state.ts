@@ -5,7 +5,7 @@ import { type PitchPipelines } from './pipeline.js';
 import { type PitchSettings } from './settings.es.js';
 
 export const pitchSlotBytes = 16;
-export const pitchObservationBytes = 48;
+export const pitchObservationBytes = 56;
 export const pitchDecodedBytes = 16;
 
 export type PitchBuffers = {
@@ -207,6 +207,7 @@ const createBindGroups = (
     ]),
     fold: create(pipelines.fold, 'fold', [
       { buffer: buffers.decoded },
+      { buffer: buffers.observations },
       { buffer: buffers.folded },
       uniform,
     ]),

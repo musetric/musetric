@@ -55,6 +55,14 @@ const fillGapFrames = 12;
 const fillBaseCents = 50;
 const fillSlopeCents = 50;
 const fillCapCents = 250;
+const echoMaxFrames = 40;
+const echoGapFrames = 10;
+const echoWindowFrames = 150;
+const echoHeldFrames = 40;
+const echoToleranceCents = 50;
+const echoSplitCents = 200;
+const echoDropDb = 15;
+const echoOffsetDb = 3;
 
 const ringFrames = 16384;
 const batchSlots = 1024;
@@ -122,7 +130,16 @@ export type PitchSettings = {
   fillBaseCents: number;
   fillSlopeCents: number;
   fillCapCents: number;
-  repairReachFrames: number;
+  echoMaxFrames: number;
+  echoGapFrames: number;
+  echoWindowFrames: number;
+  echoHeldFrames: number;
+  echoToleranceCents: number;
+  echoSplitCents: number;
+  echoDropDb: number;
+  echoOffsetDb: number;
+  repairBackFrames: number;
+  repairAheadFrames: number;
   ringFrames: number;
   batchSlots: number;
   maxRuns: number;
@@ -141,6 +158,7 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
   const periodicityWindow = Math.round(periodicityWindowSeconds * sampleRate);
   const periodicitySpan = periodicityWindow + maximumLag + 1;
   const windowOffset = Math.floor(hop / 2);
+  const foldReach = foldMaxFrames + foldGapFrames + foldAnchorFrames;
   const support = Math.max(
     windowSize / 2 + windowOffset,
     Math.ceil(periodicitySpan / 2),
@@ -215,8 +233,18 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     fillBaseCents,
     fillSlopeCents,
     fillCapCents,
-    repairReachFrames:
-      foldMaxFrames + foldGapFrames + foldAnchorFrames + fillGapFrames + 1,
+    echoMaxFrames,
+    echoGapFrames,
+    echoWindowFrames,
+    echoHeldFrames,
+    echoToleranceCents,
+    echoSplitCents,
+    echoDropDb,
+    echoOffsetDb,
+    repairBackFrames:
+      Math.max(foldReach, echoMaxFrames + echoWindowFrames) + fillGapFrames + 1,
+    repairAheadFrames:
+      Math.max(foldReach, echoMaxFrames + echoGapFrames) + fillGapFrames + 1,
     ringFrames,
     batchSlots,
     maxRuns,

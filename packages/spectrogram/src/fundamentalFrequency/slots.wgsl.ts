@@ -9,6 +9,7 @@ export const pitchObservationStruct = `struct PitchObservation {
   candidates: array<vec2<f32>, 5>,
   voicing: f32,
   frame: i32,
+  level: f32,
 };`;
 
 export const pitchDecodedStruct = `struct PitchDecoded {

@@ -58,7 +58,7 @@ fn smoothPitch(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
   let raw = filledRaw(frame);
   if (raw <= 0.0) {
-    decoded[slot].frequency = decoded[slot].raw;
+    decoded[slot].frequency = 0.0;
     return;
   }
   let center = log2(raw);
