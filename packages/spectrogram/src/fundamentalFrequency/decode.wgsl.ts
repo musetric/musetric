@@ -185,7 +185,7 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
   result.frequency = frequency;
   result.confidence = 1.0 - exp(-min(margin, 1.0e6) / max(params.confidenceScale, 1.0e-6));
   result.frame = frame;
-  result.padding = 0u;
+  result.raw = frequency;
   decoded[u32(frame) % params.ringFrames] = result;
 }
 `;

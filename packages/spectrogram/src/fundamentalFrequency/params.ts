@@ -7,6 +7,8 @@ export type PitchDispatchValues = {
   trackFrames: number;
   decodeFirst: number;
   decodeCount: number;
+  smoothFirst: number;
+  smoothCount: number;
   baseColumn: number;
   columnStep: number;
   windowCount: number;
@@ -33,6 +35,7 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['spectrumBins', 'u32'],
   ['phaseBins', 'u32'],
   ['support', 'u32'],
+  ['windowOffset', 'u32'],
   ['levelOffsetDb', 'f32'],
   ['minimumFrequency', 'f32'],
   ['candidateCount', 'u32'],
@@ -73,12 +76,17 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['memoryDecayFrames', 'f32'],
   ['voicingScale', 'f32'],
   ['confidenceScale', 'f32'],
+  ['smoothBackFrames', 'u32'],
+  ['smoothAheadFrames', 'u32'],
+  ['smoothLimitCents', 'f32'],
   ['ringFrames', 'u32'],
   ['latticeCount', 'u32'],
   ['slotCount', 'u32'],
   ['trackFrames', 'i32'],
   ['decodeFirst', 'i32'],
   ['decodeCount', 'u32'],
+  ['smoothFirst', 'i32'],
+  ['smoothCount', 'u32'],
   ['baseColumn', 'i32'],
   ['columnStep', 'f32'],
   ['windowCount', 'u32'],

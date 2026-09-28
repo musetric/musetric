@@ -5,6 +5,7 @@ import { observeShader } from '../observe.wgsl.js';
 import { periodicityShader } from '../periodicity.wgsl.js';
 import { projectShader } from '../project.wgsl.js';
 import { sliceShader } from '../slice.wgsl.js';
+import { smoothShader } from '../smooth.wgsl.js';
 import { spectrumShader } from '../spectrum.wgsl.js';
 
 const shaders = {
@@ -13,6 +14,7 @@ const shaders = {
   periodicity: periodicityShader,
   observe: observeShader,
   decode: decodeShader,
+  smooth: smoothShader,
   project: projectShader,
 };
 

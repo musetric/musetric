@@ -21,7 +21,7 @@ fn slice(@builtin(global_invocation_id) gid: vec3<u32>) {
   var value = 0.0;
   if (sampleIndex < params.windowSize) {
     let spanIndex = slots[slotIndex].spanOffset + params.support -
-      params.windowSize / 2u + sampleIndex;
+      params.windowSize / 2u + params.windowOffset + sampleIndex;
     value = span[spanIndex] * weights[sampleIndex];
   }
   signal[slotIndex * (params.fftSize + 2u) + sampleIndex] = value;

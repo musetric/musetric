@@ -134,6 +134,7 @@ export type PitchBindGroups = {
   periodicity: GPUBindGroup;
   observe: GPUBindGroup;
   decode: GPUBindGroup;
+  smooth: GPUBindGroup;
   project: GPUBindGroup;
 };
 
@@ -194,6 +195,10 @@ const createBindGroups = (
     ]),
     decode: create(pipelines.decode, 'decode', [
       { buffer: buffers.observations },
+      { buffer: buffers.decoded },
+      uniform,
+    ]),
+    smooth: create(pipelines.smooth, 'smooth', [
       { buffer: buffers.decoded },
       uniform,
     ]),

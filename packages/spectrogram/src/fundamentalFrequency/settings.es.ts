@@ -46,6 +46,9 @@ const memoryCapCents = 1200;
 const memoryDecayFrames = 200;
 const voicingScale = 0.5;
 const confidenceScale = 4;
+const smoothBackFrames = 3;
+const smoothAheadFrames = 2;
+const smoothLimitCents = 150;
 
 const ringFrames = 16384;
 const batchSlots = 1024;
@@ -63,6 +66,7 @@ export type PitchSettings = {
   spectrumBins: number;
   phaseBins: number;
   support: number;
+  windowOffset: number;
   levelOffsetDb: number;
   minimumFrequency: number;
   candidateCount: number;
@@ -103,6 +107,9 @@ export type PitchSettings = {
   memoryDecayFrames: number;
   voicingScale: number;
   confidenceScale: number;
+  smoothBackFrames: number;
+  smoothAheadFrames: number;
+  smoothLimitCents: number;
   ringFrames: number;
   batchSlots: number;
   maxRuns: number;
@@ -120,7 +127,11 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
   const maximumLag = Math.floor(sampleRate / minimumFrequency);
   const periodicityWindow = Math.round(periodicityWindowSeconds * sampleRate);
   const periodicitySpan = periodicityWindow + maximumLag + 1;
-  const support = Math.max(windowSize / 2, Math.ceil(periodicitySpan / 2));
+  const windowOffset = Math.floor(hop / 2);
+  const support = Math.max(
+    windowSize / 2 + windowOffset,
+    Math.ceil(periodicitySpan / 2),
+  );
   const windowEnergy = windowFunctions[windowName](windowSize).reduce(
     (sum, value) => sum + value * value,
     0,
@@ -138,6 +149,7 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     ),
     phaseBins: Math.min(halfSize, Math.ceil(phaseMaxFrequency / binFrequency)),
     support,
+    windowOffset,
     levelOffsetDb: 10 * Math.log10(halfSize * windowEnergy),
     minimumFrequency,
     candidateCount:
@@ -181,6 +193,9 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     memoryDecayFrames,
     voicingScale,
     confidenceScale,
+    smoothBackFrames,
+    smoothAheadFrames,
+    smoothLimitCents,
     ringFrames,
     batchSlots,
     maxRuns,

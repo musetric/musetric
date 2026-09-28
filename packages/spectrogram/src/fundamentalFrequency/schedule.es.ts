@@ -84,6 +84,7 @@ export type PitchPlan = {
   slots: PitchSlot[];
   spans: PitchSpan[];
   decodes: PitchFrameRange[];
+  smooth: PitchFrameRange;
   complete: boolean;
 };
 
@@ -148,14 +149,18 @@ const observationRange = (
   input: PitchScheduleInput,
 ): PitchFrameRange => {
   const { historyFrames, lookaheadFrames, hop, support } = settings;
-  const first = Math.max(0, input.visibleFirst - historyFrames);
+  const { smoothBackFrames, smoothAheadFrames } = settings;
+  const first = Math.max(
+    0,
+    input.visibleFirst - smoothBackFrames - historyFrames,
+  );
   const recorded = input.truncated
     ? Math.floor((input.availableSamples + support - 1) / hop)
     : input.trackFrames - 1;
   const last = Math.min(
     input.trackFrames - 1,
     recorded,
-    input.visibleLast + lookaheadFrames,
+    input.visibleLast + smoothAheadFrames + lookaheadFrames,
   );
   return { first, count: last - first + 1 };
 };
@@ -249,8 +254,11 @@ const planDecodes = (
   runs: readonly PitchFrameRange[],
 ): DecodePlan => {
   const { ringFrames, historyFrames, lookaheadFrames } = settings;
-  const first = Math.max(0, input.visibleFirst);
-  const last = Math.min(input.trackFrames - 1, input.visibleLast);
+  const first = Math.max(0, input.visibleFirst - settings.smoothBackFrames);
+  const last = Math.min(
+    input.trackFrames - 1,
+    input.visibleLast + settings.smoothAheadFrames,
+  );
   if (last < first) {
     return { decodes: [], complete: true };
   }
@@ -295,6 +303,12 @@ const planDecodes = (
   return { decodes, complete };
 };
 
+const smoothRange = (input: PitchScheduleInput): PitchFrameRange => {
+  const first = Math.max(0, input.visibleFirst);
+  const last = Math.min(input.trackFrames - 1, input.visibleLast);
+  return { first, count: Math.max(0, last - first + 1) };
+};
+
 export type PitchSchedule = {
   plan: (input: PitchScheduleInput) => PitchPlan;
 };
@@ -313,6 +327,7 @@ export const createPitchSchedule = (settings: PitchSettings): PitchSchedule => {
         slots: [],
         spans: [],
         decodes: [],
+        smooth: smoothRange(input),
         complete: true,
       };
       const observations = planObservations(state, settings, input, plan);

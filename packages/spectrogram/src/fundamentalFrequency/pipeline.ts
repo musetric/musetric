@@ -7,6 +7,7 @@ import { observeShader } from './observe.wgsl.js';
 import { periodicityShader } from './periodicity.wgsl.js';
 import { projectShader } from './project.wgsl.js';
 import { sliceShader } from './slice.wgsl.js';
+import { smoothShader } from './smooth.wgsl.js';
 import { spectrumShader } from './spectrum.wgsl.js';
 
 type PipelineSpec = {
@@ -46,6 +47,7 @@ export type PitchPipelines = {
   periodicity: GPUComputePipeline;
   observe: GPUComputePipeline;
   decode: GPUComputePipeline;
+  smooth: GPUComputePipeline;
   project: GPUComputePipeline;
 };
 
@@ -106,6 +108,12 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
     code: decodeShader,
     entryPoint: 'decode',
     kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+  }),
+  smooth: createPipeline(device, {
+    label: 'smooth',
+    code: smoothShader,
+    entryPoint: 'smoothPitch',
+    kinds: ['storage', 'dynamic-uniform'],
   }),
   project: createPipeline(device, {
     label: 'project',

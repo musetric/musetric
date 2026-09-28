@@ -166,6 +166,8 @@ export const createSpectrogramFundamentalFrequencyCell = (
         trackFrames: state.trackFrames,
         decodeFirst: decode ? decode.first : 0,
         decodeCount: decode ? decode.count : 0,
+        smoothFirst: state.plan.smooth.first,
+        smoothCount: state.plan.smooth.count,
         baseColumn: state.projection.baseColumn,
         columnStep: arg.columnStep,
         windowCount: arg.windowCount,
@@ -241,6 +243,22 @@ export const createSpectrogramFundamentalFrequencyCell = (
               ]);
               pass.dispatchWorkgroups(Math.ceil(decode.count / workgroupSize));
             }
+          },
+        },
+        {
+          label: 'smooth',
+          dispatch: (pass) => {
+            const state = pending;
+            if (!state || state.plan.smooth.count === 0) {
+              return;
+            }
+            pass.setPipeline(pipelines.smooth);
+            pass.setBindGroup(0, bindGroups.smooth, [
+              params.write(dispatchValues(state, undefined)),
+            ]);
+            pass.dispatchWorkgroups(
+              Math.ceil(state.plan.smooth.count / workgroupSize),
+            );
           },
         },
         {

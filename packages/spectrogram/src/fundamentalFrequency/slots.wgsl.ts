@@ -15,5 +15,5 @@ export const pitchDecodedStruct = `struct PitchDecoded {
   frequency: f32,
   confidence: f32,
   frame: i32,
-  padding: u32,
+  raw: f32,
 };`;

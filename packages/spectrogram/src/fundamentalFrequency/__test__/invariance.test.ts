@@ -196,7 +196,8 @@ describe('pitch frames', () => {
           await processor.render({ recording }, head / recording.length);
           const limit =
             Math.floor((head - settings.support) / settings.hop) -
-            settings.lookaheadFrames;
+            settings.lookaheadFrames -
+            settings.smoothAheadFrames;
           if (limit < 0) {
             continue;
           }
