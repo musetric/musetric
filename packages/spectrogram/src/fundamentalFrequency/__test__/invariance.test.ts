@@ -182,7 +182,7 @@ describe('pitch frames', () => {
       const recording = new Float32Array(lead.length);
       const committed = new Map<number, number>();
       const chunk = Math.round(sampleRate * 0.05);
-      const end = Math.round(sampleRate * 9.2);
+      const end = Math.round(sampleRate * 9.6);
       await withProcessor({ device, config }, async (processor) => {
         for (let head = chunk; head <= end; head += chunk) {
           recording.set(lead.subarray(head - chunk, head), head - chunk);
@@ -197,7 +197,8 @@ describe('pitch frames', () => {
           const limit =
             Math.floor((head - settings.support) / settings.hop) -
             settings.lookaheadFrames -
-            settings.smoothAheadFrames;
+            settings.smoothAheadFrames -
+            settings.foldReachFrames;
           if (limit < 0) {
             continue;
           }

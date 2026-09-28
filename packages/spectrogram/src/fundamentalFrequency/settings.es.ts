@@ -46,6 +46,11 @@ const confidenceScale = 4;
 const smoothBackFrames = 3;
 const smoothAheadFrames = 2;
 const smoothLimitCents = 150;
+const foldMaxFrames = 20;
+const foldGapFrames = 5;
+const foldAnchorFrames = 10;
+const foldToleranceCents = 150;
+const foldSplitCents = 600;
 
 const ringFrames = 16384;
 const batchSlots = 1024;
@@ -104,6 +109,12 @@ export type PitchSettings = {
   smoothBackFrames: number;
   smoothAheadFrames: number;
   smoothLimitCents: number;
+  foldMaxFrames: number;
+  foldGapFrames: number;
+  foldAnchorFrames: number;
+  foldToleranceCents: number;
+  foldSplitCents: number;
+  foldReachFrames: number;
   ringFrames: number;
   batchSlots: number;
   maxRuns: number;
@@ -187,6 +198,12 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     smoothBackFrames,
     smoothAheadFrames,
     smoothLimitCents,
+    foldMaxFrames,
+    foldGapFrames,
+    foldAnchorFrames,
+    foldToleranceCents,
+    foldSplitCents,
+    foldReachFrames: foldMaxFrames + foldGapFrames + foldAnchorFrames,
     ringFrames,
     batchSlots,
     maxRuns,
