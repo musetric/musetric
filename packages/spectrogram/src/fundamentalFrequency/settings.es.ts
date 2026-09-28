@@ -38,12 +38,9 @@ const voicingLevel = 0.1008;
 const historyFrames = 72;
 const lookaheadFrames = 8;
 const jumpCostCents = 0.006;
-const jumpCapCents = 500;
+const jumpCapCents = 1200;
 const unvoicedCost = 0.75;
 const voicedTransitionCost = 1.8;
-const memoryWeight = 0.01;
-const memoryCapCents = 1200;
-const memoryDecayFrames = 200;
 const voicingScale = 0.5;
 const confidenceScale = 4;
 const smoothBackFrames = 3;
@@ -102,9 +99,6 @@ export type PitchSettings = {
   jumpCapCents: number;
   unvoicedCost: number;
   voicedTransitionCost: number;
-  memoryWeight: number;
-  memoryCapCents: number;
-  memoryDecayFrames: number;
   voicingScale: number;
   confidenceScale: number;
   smoothBackFrames: number;
@@ -188,9 +182,6 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     jumpCapCents,
     unvoicedCost,
     voicedTransitionCost,
-    memoryWeight,
-    memoryCapCents,
-    memoryDecayFrames,
     voicingScale,
     confidenceScale,
     smoothBackFrames,

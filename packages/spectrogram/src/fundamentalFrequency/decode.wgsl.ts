@@ -55,15 +55,6 @@ fn jumpCost(freqA: f32, freqB: f32) -> f32 {
     min(centsDistance(freqA, freqB), params.jumpCapCents);
 }
 
-fn memoryCost(remembered: f32, frequency: f32, gap: f32) -> f32 {
-  if (remembered <= 0.0 || frequency <= 0.0 || params.memoryWeight <= 0.0) {
-    return 0.0;
-  }
-  let decay = exp(-gap / max(params.memoryDecayFrames, 1.0));
-  return params.memoryWeight *
-    min(centsDistance(remembered, frequency), params.memoryCapCents) * decay;
-}
-
 @compute @workgroup_size(64)
 fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= params.decodeCount) {
@@ -76,64 +67,40 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
   var column = loadColumn(frame - history);
   var alpha = column.emits;
   var previousFreqs = column.freqs;
-  var memoryFreq = 0.0;
-  var memoryGap = 0.0;
   var scratch = array<f32, 6>();
   for (var step = 1; step <= history; step += 1) {
     column = loadColumn(frame - history + step);
-    var nextMemoryFreq = memoryFreq;
-    var nextMemoryGap = memoryGap + 1.0;
     for (var b = 0u; b < stateCount; b += 1u) {
       var best = infinity;
       if (b == unvoiced) {
         best = alpha[unvoiced];
         for (var a = 0u; a < unvoiced; a += 1u) {
-          let cost = alpha[a] + params.voicedTransitionCost;
-          if (cost < best) {
-            best = cost;
-            nextMemoryFreq = previousFreqs[a];
-            nextMemoryGap = 1.0;
-          }
+          best = min(best, alpha[a] + params.voicedTransitionCost);
         }
       } else {
         for (var a = 0u; a < unvoiced; a += 1u) {
           best = min(best, alpha[a] + jumpCost(previousFreqs[a], column.freqs[b]));
         }
-        best = min(
-          best,
-          alpha[unvoiced] + params.voicedTransitionCost +
-            memoryCost(memoryFreq, column.freqs[b], memoryGap),
-        );
+        best = min(best, alpha[unvoiced] + params.voicedTransitionCost);
       }
       scratch[b] = column.emits[b] + best;
     }
     alpha = scratch;
     previousFreqs = column.freqs;
-    memoryFreq = nextMemoryFreq;
-    memoryGap = nextMemoryGap;
   }
   let centerFreqs = column.freqs;
   let alphaCenter = alpha;
 
   var right = loadColumn(frame + lookahead);
   var beta = array<f32, 6>();
-  var nextFreq = 0.0;
-  var nextGap = 0.0;
   for (var step = 1; step <= lookahead; step += 1) {
     let current = loadColumn(frame + lookahead - step);
-    var newNextFreq = nextFreq;
-    var newNextGap = nextGap + 1.0;
     for (var a = 0u; a < stateCount; a += 1u) {
       var best = infinity;
       if (a == unvoiced) {
         best = right.emits[unvoiced] + beta[unvoiced];
         for (var b = 0u; b < unvoiced; b += 1u) {
-          let cost = params.voicedTransitionCost + right.emits[b] + beta[b];
-          if (cost < best) {
-            best = cost;
-            newNextFreq = right.freqs[b];
-            newNextGap = 1.0;
-          }
+          best = min(best, params.voicedTransitionCost + right.emits[b] + beta[b]);
         }
       } else {
         for (var b = 0u; b < unvoiced; b += 1u) {
@@ -141,17 +108,13 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
         best = min(
           best,
-          params.voicedTransitionCost +
-            memoryCost(current.freqs[a], nextFreq, nextGap) +
-            right.emits[unvoiced] + beta[unvoiced],
+          params.voicedTransitionCost + right.emits[unvoiced] + beta[unvoiced],
         );
       }
       scratch[a] = best;
     }
     beta = scratch;
     right = current;
-    nextFreq = newNextFreq;
-    nextGap = newNextGap;
   }
 
   var bestState = unvoiced;
@@ -159,22 +122,21 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
   var bestVoiced = infinity;
   var secondVoiced = infinity;
   for (var state = 0u; state < stateCount; state += 1u) {
-    var cost = alphaCenter[state] + beta[state];
-    if (state == unvoiced) {
-      cost += memoryCost(memoryFreq, nextFreq, memoryGap + nextGap);
-    } else if (cost < bestVoiced) {
-      secondVoiced = bestVoiced;
-      bestVoiced = cost;
-    } else if (cost < secondVoiced) {
-      secondVoiced = cost;
+    let cost = alphaCenter[state] + beta[state];
+    if (state < unvoiced) {
+      if (cost < bestVoiced) {
+        secondVoiced = bestVoiced;
+        bestVoiced = cost;
+      } else if (cost < secondVoiced) {
+        secondVoiced = cost;
+      }
     }
     if (cost < bestCost) {
       bestCost = cost;
       bestState = state;
     }
   }
-  let unvoicedTotal = alphaCenter[unvoiced] + beta[unvoiced] +
-    memoryCost(memoryFreq, nextFreq, memoryGap + nextGap);
+  let unvoicedTotal = alphaCenter[unvoiced] + beta[unvoiced];
   var margin = abs(unvoicedTotal - bestVoiced);
   var frequency = 0.0;
   if (bestState < unvoiced) {
