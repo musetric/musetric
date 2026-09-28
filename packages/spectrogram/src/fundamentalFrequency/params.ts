@@ -9,6 +9,8 @@ export type PitchDispatchValues = {
   decodeCount: number;
   smoothFirst: number;
   smoothCount: number;
+  foldFirst: number;
+  foldCount: number;
   baseColumn: number;
   columnStep: number;
   windowCount: number;
@@ -93,6 +95,8 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['decodeCount', 'u32'],
   ['smoothFirst', 'i32'],
   ['smoothCount', 'u32'],
+  ['foldFirst', 'i32'],
+  ['foldCount', 'u32'],
   ['baseColumn', 'i32'],
   ['columnStep', 'f32'],
   ['windowCount', 'u32'],

@@ -19,6 +19,7 @@ export type PitchBuffers = {
   periodicity: GPUBuffer;
   observations: GPUBuffer;
   decoded: GPUBuffer;
+  folded: GPUBuffer;
 };
 
 const createPitchBuffers = (
@@ -95,6 +96,11 @@ const createPitchBuffers = (
         GPUBufferUsage.COPY_DST |
         GPUBufferUsage.COPY_SRC,
     ),
+    folded: create(
+      'folded',
+      settings.ringFrames * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
   };
 };
 
@@ -134,6 +140,7 @@ export type PitchBindGroups = {
   periodicity: GPUBindGroup;
   observe: GPUBindGroup;
   decode: GPUBindGroup;
+  fold: GPUBindGroup;
   smooth: GPUBindGroup;
   project: GPUBindGroup;
 };
@@ -198,8 +205,14 @@ const createBindGroups = (
       { buffer: buffers.decoded },
       uniform,
     ]),
+    fold: create(pipelines.fold, 'fold', [
+      { buffer: buffers.decoded },
+      { buffer: buffers.folded },
+      uniform,
+    ]),
     smooth: create(pipelines.smooth, 'smooth', [
       { buffer: buffers.decoded },
+      { buffer: buffers.folded },
       uniform,
     ]),
     project: create(pipelines.project, 'project', [

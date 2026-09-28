@@ -85,6 +85,7 @@ export type PitchPlan = {
   spans: PitchSpan[];
   decodes: PitchFrameRange[];
   smooth: PitchFrameRange;
+  fold: PitchFrameRange;
   complete: boolean;
 };
 
@@ -313,6 +314,22 @@ const smoothRange = (input: PitchScheduleInput): PitchFrameRange => {
   return { first, count: Math.max(0, last - first + 1) };
 };
 
+const foldRange = (
+  settings: PitchSettings,
+  input: PitchScheduleInput,
+): PitchFrameRange => {
+  const { smoothBackFrames, smoothAheadFrames, fillGapFrames } = settings;
+  const first = Math.max(
+    0,
+    input.visibleFirst - smoothBackFrames - fillGapFrames - 1,
+  );
+  const last = Math.min(
+    input.trackFrames - 1,
+    input.visibleLast + smoothAheadFrames + fillGapFrames + 1,
+  );
+  return { first, count: Math.max(0, last - first + 1) };
+};
+
 export type PitchSchedule = {
   plan: (input: PitchScheduleInput) => PitchPlan;
 };
@@ -332,6 +349,7 @@ export const createPitchSchedule = (settings: PitchSettings): PitchSchedule => {
         spans: [],
         decodes: [],
         smooth: smoothRange(input),
+        fold: foldRange(settings, input),
         complete: true,
       };
       const observations = planObservations(state, settings, input, plan);

@@ -3,6 +3,7 @@ import {
   type ComputeBufferKind,
 } from '../common/computeBufferEntries.js';
 import { decodeShader } from './decode.wgsl.js';
+import { foldShader } from './fold.wgsl.js';
 import { observeShader } from './observe.wgsl.js';
 import { periodicityShader } from './periodicity.wgsl.js';
 import { projectShader } from './project.wgsl.js';
@@ -47,6 +48,7 @@ export type PitchPipelines = {
   periodicity: GPUComputePipeline;
   observe: GPUComputePipeline;
   decode: GPUComputePipeline;
+  fold: GPUComputePipeline;
   smooth: GPUComputePipeline;
   project: GPUComputePipeline;
 };
@@ -109,11 +111,17 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
     entryPoint: 'decode',
     kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
   }),
+  fold: createPipeline(device, {
+    label: 'fold',
+    code: foldShader,
+    entryPoint: 'foldPitch',
+    kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+  }),
   smooth: createPipeline(device, {
     label: 'smooth',
     code: smoothShader,
     entryPoint: 'smoothPitch',
-    kinds: ['storage', 'dynamic-uniform'],
+    kinds: ['storage', 'read-only-storage', 'dynamic-uniform'],
   }),
   project: createPipeline(device, {
     label: 'project',

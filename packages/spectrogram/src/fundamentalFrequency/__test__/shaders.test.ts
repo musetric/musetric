@@ -1,6 +1,7 @@
 import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
 import { decodeShader } from '../decode.wgsl.js';
+import { foldShader } from '../fold.wgsl.js';
 import { observeShader } from '../observe.wgsl.js';
 import { periodicityShader } from '../periodicity.wgsl.js';
 import { projectShader } from '../project.wgsl.js';
@@ -14,6 +15,7 @@ const shaders = {
   periodicity: periodicityShader,
   observe: observeShader,
   decode: decodeShader,
+  fold: foldShader,
   smooth: smoothShader,
   project: projectShader,
 };

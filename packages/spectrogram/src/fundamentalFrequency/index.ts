@@ -168,6 +168,8 @@ export const createSpectrogramFundamentalFrequencyCell = (
         decodeCount: decode ? decode.count : 0,
         smoothFirst: state.plan.smooth.first,
         smoothCount: state.plan.smooth.count,
+        foldFirst: state.plan.fold.first,
+        foldCount: state.plan.fold.count,
         baseColumn: state.projection.baseColumn,
         columnStep: arg.columnStep,
         windowCount: arg.windowCount,
@@ -243,6 +245,22 @@ export const createSpectrogramFundamentalFrequencyCell = (
               ]);
               pass.dispatchWorkgroups(Math.ceil(decode.count / workgroupSize));
             }
+          },
+        },
+        {
+          label: 'fold',
+          dispatch: (pass) => {
+            const state = pending;
+            if (!state || state.plan.fold.count === 0) {
+              return;
+            }
+            pass.setPipeline(pipelines.fold);
+            pass.setBindGroup(0, bindGroups.fold, [
+              params.write(dispatchValues(state, undefined)),
+            ]);
+            pass.dispatchWorkgroups(
+              Math.ceil(state.plan.fold.count / workgroupSize),
+            );
           },
         },
         {
