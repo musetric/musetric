@@ -63,6 +63,9 @@ const echoToleranceCents = 50;
 const echoSplitCents = 200;
 const echoDropDb = 15;
 const echoOffsetDb = 3;
+const spikeLimitCents = 80;
+const spikeAloneFrames = 1;
+const spikeMajorityFrames = 4;
 
 const ringFrames = 16384;
 const batchSlots = 1024;
@@ -138,6 +141,9 @@ export type PitchSettings = {
   echoSplitCents: number;
   echoDropDb: number;
   echoOffsetDb: number;
+  spikeLimitCents: number;
+  spikeAloneFrames: number;
+  spikeMajorityFrames: number;
   repairBackFrames: number;
   repairAheadFrames: number;
   ringFrames: number;
@@ -241,6 +247,9 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     echoSplitCents,
     echoDropDb,
     echoOffsetDb,
+    spikeLimitCents,
+    spikeAloneFrames,
+    spikeMajorityFrames,
     repairBackFrames:
       Math.max(foldReach, echoMaxFrames + echoWindowFrames) + fillGapFrames + 1,
     repairAheadFrames:

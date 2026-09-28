@@ -9,6 +9,8 @@ ${pitchDecodedStruct}
 @group(0) @binding(1) var<storage, read> folded: array<f32>;
 @group(0) @binding(2) var<uniform> params: PitchParams;
 
+const maxSide = 7;
+
 fn foldedAt(frame: i32) -> f32 {
   if (frame < 0 || frame >= params.trackFrames) {
     return 0.0;
@@ -61,25 +63,68 @@ fn smoothPitch(@builtin(global_invocation_id) gid: vec3<u32>) {
     decoded[slot].frequency = 0.0;
     return;
   }
-  let center = log2(raw);
-  let limit = params.smoothLimitCents / 1200.0;
-  var sum = 0.0;
-  var count = 0.0;
+  let own = log2(raw);
+  let spike = params.spikeLimitCents / 1200.0;
+  var others = array<f32, 14>();
+  var count = 0u;
+  var close = 0u;
   for (
-    var neighbor = frame - i32(params.smoothBackFrames);
-    neighbor <= frame + i32(params.smoothAheadFrames);
+    var neighbor = frame - min(i32(params.smoothBackFrames), maxSide);
+    neighbor <= frame + min(i32(params.smoothAheadFrames), maxSide);
     neighbor += 1
   ) {
+    if (neighbor == frame) {
+      continue;
+    }
     let value = filledRaw(neighbor);
     if (value <= 0.0) {
       continue;
     }
-    let octaves = log2(value);
-    if (abs(octaves - center) <= limit) {
-      sum += octaves;
-      count += 1.0;
+    others[count] = log2(value);
+    if (abs(others[count] - own) <= spike) {
+      close += 1u;
+    }
+    count += 1u;
+  }
+  var center = own;
+  if (count >= params.spikeMajorityFrames && close <= params.spikeAloneFrames) {
+    for (var index = 1u; index < count; index += 1u) {
+      let value = others[index];
+      var position = index;
+      while (position > 0u && others[position - 1u] > value) {
+        others[position] = others[position - 1u];
+        position -= 1u;
+      }
+      others[position] = value;
+    }
+    let middle = count / 2u;
+    var median = others[middle];
+    if (count % 2u == 0u) {
+      median = 0.5 * (others[middle - 1u] + median);
+    }
+    var agree = 0u;
+    for (var index = 0u; index < count; index += 1u) {
+      if (abs(others[index] - median) <= spike) {
+        agree += 1u;
+      }
+    }
+    if (agree >= params.spikeMajorityFrames) {
+      center = median;
     }
   }
-  decoded[slot].frequency = exp2(sum / count);
+  let limit = params.smoothLimitCents / 1200.0;
+  var sum = 0.0;
+  var total = 0.0;
+  if (abs(own - center) <= limit) {
+    sum = own;
+    total = 1.0;
+  }
+  for (var index = 0u; index < count; index += 1u) {
+    if (abs(others[index] - center) <= limit) {
+      sum += others[index];
+      total += 1.0;
+    }
+  }
+  decoded[slot].frequency = exp2(sum / total);
 }
 `;
