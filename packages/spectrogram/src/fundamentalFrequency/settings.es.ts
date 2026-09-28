@@ -51,6 +51,10 @@ const foldGapFrames = 5;
 const foldAnchorFrames = 10;
 const foldToleranceCents = 150;
 const foldSplitCents = 600;
+const fillGapFrames = 12;
+const fillBaseCents = 50;
+const fillSlopeCents = 50;
+const fillCapCents = 250;
 
 const ringFrames = 16384;
 const batchSlots = 1024;
@@ -114,7 +118,11 @@ export type PitchSettings = {
   foldAnchorFrames: number;
   foldToleranceCents: number;
   foldSplitCents: number;
-  foldReachFrames: number;
+  fillGapFrames: number;
+  fillBaseCents: number;
+  fillSlopeCents: number;
+  fillCapCents: number;
+  repairReachFrames: number;
   ringFrames: number;
   batchSlots: number;
   maxRuns: number;
@@ -203,7 +211,12 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     foldAnchorFrames,
     foldToleranceCents,
     foldSplitCents,
-    foldReachFrames: foldMaxFrames + foldGapFrames + foldAnchorFrames,
+    fillGapFrames,
+    fillBaseCents,
+    fillSlopeCents,
+    fillCapCents,
+    repairReachFrames:
+      foldMaxFrames + foldGapFrames + foldAnchorFrames + fillGapFrames + 1,
     ringFrames,
     batchSlots,
     maxRuns,

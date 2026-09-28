@@ -76,6 +76,36 @@ fn foldedRaw(frame: i32) -> f32 {
   return raw;
 }
 
+fn filledRaw(frame: i32) -> f32 {
+  let value = foldedRaw(frame);
+  if (value > 0.0 || params.fillGapFrames == 0u) {
+    return value;
+  }
+  let gap = i32(params.fillGapFrames);
+  var before = frame - 1;
+  while (frame - before <= gap && rawAt(before) <= 0.0) {
+    before -= 1;
+  }
+  var after = frame + 1;
+  while (after - frame <= gap && rawAt(after) <= 0.0) {
+    after += 1;
+  }
+  let steps = after - before;
+  if (steps - 1 > gap || rawAt(before) <= 0.0 || rawAt(after) <= 0.0) {
+    return 0.0;
+  }
+  let first = log2(foldedRaw(before));
+  let last = log2(foldedRaw(after));
+  let limit = min(
+    params.fillBaseCents + params.fillSlopeCents * f32(steps),
+    params.fillCapCents,
+  );
+  if (abs(first - last) * 1200.0 > limit) {
+    return 0.0;
+  }
+  return exp2(mix(first, last, f32(frame - before) / f32(steps)));
+}
+
 @compute @workgroup_size(64)
 fn smoothPitch(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= params.smoothCount) {
@@ -86,7 +116,7 @@ fn smoothPitch(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (decoded[slot].frame != frame) {
     return;
   }
-  let raw = foldedRaw(frame);
+  let raw = filledRaw(frame);
   if (raw <= 0.0) {
     decoded[slot].frequency = decoded[slot].raw;
     return;
@@ -100,7 +130,7 @@ fn smoothPitch(@builtin(global_invocation_id) gid: vec3<u32>) {
     neighbor <= frame + i32(params.smoothAheadFrames);
     neighbor += 1
   ) {
-    let value = foldedRaw(neighbor);
+    let value = filledRaw(neighbor);
     if (value <= 0.0) {
       continue;
     }

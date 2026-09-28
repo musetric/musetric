@@ -149,10 +149,10 @@ const observationRange = (
   input: PitchScheduleInput,
 ): PitchFrameRange => {
   const { historyFrames, lookaheadFrames, hop, support } = settings;
-  const { smoothBackFrames, smoothAheadFrames, foldReachFrames } = settings;
+  const { smoothBackFrames, smoothAheadFrames, repairReachFrames } = settings;
   const first = Math.max(
     0,
-    input.visibleFirst - smoothBackFrames - foldReachFrames - historyFrames,
+    input.visibleFirst - smoothBackFrames - repairReachFrames - historyFrames,
   );
   const recorded = input.truncated
     ? Math.floor((input.availableSamples + support - 1) / hop)
@@ -160,7 +160,7 @@ const observationRange = (
   const last = Math.min(
     input.trackFrames - 1,
     recorded,
-    input.visibleLast + smoothAheadFrames + foldReachFrames + lookaheadFrames,
+    input.visibleLast + smoothAheadFrames + repairReachFrames + lookaheadFrames,
   );
   return { first, count: last - first + 1 };
 };
@@ -254,14 +254,14 @@ const planDecodes = (
   runs: readonly PitchFrameRange[],
 ): DecodePlan => {
   const { ringFrames, historyFrames, lookaheadFrames } = settings;
-  const { smoothBackFrames, smoothAheadFrames, foldReachFrames } = settings;
+  const { smoothBackFrames, smoothAheadFrames, repairReachFrames } = settings;
   const first = Math.max(
     0,
-    input.visibleFirst - smoothBackFrames - foldReachFrames,
+    input.visibleFirst - smoothBackFrames - repairReachFrames,
   );
   const last = Math.min(
     input.trackFrames - 1,
-    input.visibleLast + smoothAheadFrames + foldReachFrames,
+    input.visibleLast + smoothAheadFrames + repairReachFrames,
   );
   if (last < first) {
     return { decodes: [], complete: true };
