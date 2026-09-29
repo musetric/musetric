@@ -96,7 +96,7 @@ pub(crate) const CHORD_NET_PLAN_MANIFEST: &str = "cqt-plan.manifest.json";
 pub(crate) const CHORD_NET: ModelBundle = ModelBundle {
     label: "Chord recognition model",
     model_id: "musetric/chordmini-onnx",
-    revision: "086162411b8c4772774392be195e5c6f065d67ad",
+    revision: "8ab85fc0f61439900cd07ac21257a43eac57075c",
     directory: "chordmini-onnx",
     sample_rate: 22050,
     layout: CacheLayout::Flat,
@@ -109,8 +109,8 @@ pub(crate) const CHORD_NET: ModelBundle = ModelBundle {
         ),
         (
             CHORD_NET_MODEL,
-            "cfe7703434ebd1c28ba2ded6601581ab41d8f7d1b40f285110445460e1b11154",
-            17_080_918,
+            "1faee8e1cf168300afe0f47517e76836ac200c3841b0fb430fad7dfea5ad6394",
+            17_080_550,
         ),
         (
             CHORD_NET_PLAN,
