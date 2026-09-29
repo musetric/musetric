@@ -19,6 +19,7 @@ import {
   createWhisperDecoder,
   type DecodeGuard,
   type DecodeResult,
+  type WhisperDecodeInspect,
   type WhisperPipelineInternals,
 } from './whisperDecoder.js';
 import {
@@ -47,6 +48,9 @@ const alignedWordsPerSecond = 0.8;
 const windowsPerBatch = 4;
 const subgroupArchitectures = new Set(['adreno-6xx']);
 
+export const readWhisperSubgroups = async (): Promise<boolean> =>
+  subgroupArchitectures.has(await readAdapterArchitecture());
+
 export type WhisperRuntimeOptions = {
   graph: WhisperGraph;
   modelHost: string;
@@ -54,6 +58,7 @@ export type WhisperRuntimeOptions = {
   revision: string;
 
   onLoading: () => void;
+  inspect?: WhisperDecodeInspect;
 };
 
 export type WhisperRuntime = {
@@ -79,7 +84,7 @@ export const createWhisperRuntime = async (
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
 
-  const subgroups = subgroupArchitectures.has(await readAdapterArchitecture());
+  const subgroups = await readWhisperSubgroups();
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',
     options.modelId,
@@ -124,8 +129,10 @@ export const createWhisperRuntime = async (
   const encoder = internals.model.sessions.model;
   const runEncoder = encoder.run.bind(encoder);
   encoder.run = async (...args) => pacer.pace(async () => runEncoder(...args));
-  const { decodeAligned, decodeTimestampedBatch } =
-    createWhisperDecoder(internals);
+  const { decodeAligned, decodeTimestampedBatch } = createWhisperDecoder(
+    internals,
+    options.inspect,
+  );
   if (cross) {
     routeFirstStep(step, cross);
   }

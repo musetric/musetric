@@ -40,6 +40,34 @@
       "input": { "case": "vocals-bad-side-60", "stem": "step.vocals" }
     },
     {
+      "name": "voices-bad-side-full",
+      "step": "voices",
+      "input": { "case": "vocals-bad-side-full", "stem": "step.vocals" }
+    },
+    {
+      "name": "transcribe-bad-side-60",
+      "step": "transcribe",
+      "input": { "case": "voices-bad-side-60", "stem": "step.lead" },
+      "language": "en"
+    },
+    {
+      "name": "transcribe-bad-side-90",
+      "step": "transcribe",
+      "input": { "case": "voices-bad-side-full", "stem": "step.lead" },
+      "from": 90,
+      "to": 120,
+      "language": "en"
+    },
+    {
+      "name": "transcribe-silence",
+      "step": "transcribe",
+      "source": "rxbyn-bad-side",
+      "from": 0,
+      "to": 30,
+      "gain": 0,
+      "language": "en"
+    },
+    {
       "name": "rhythm-bad-side",
       "step": "rhythm",
       "input": { "case": "vocals-bad-side-full", "stem": "step.instrumental" }

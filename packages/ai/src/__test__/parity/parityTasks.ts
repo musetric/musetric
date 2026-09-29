@@ -15,21 +15,27 @@ import {
   skeyGraph,
   stringField,
   vocalsGraph,
+  whisperGraph,
 } from './parityGraphs.js';
 import {
   type ParityExternalData,
   type ParityModelTask,
   type ParityTask,
   type ParityTensorRef,
+  type ParityWhisperModelTask,
 } from './parityJob.js';
 import { findBundle, findFile, type ParityModels } from './parityModels.js';
 
 type CaseModel = {
   caseName: string;
   graph: ParityGraphFields;
+  modelId: string;
+  revision: string;
   modelUrl: string;
   externalData: ParityExternalData[];
   fileUrl: (constant: string) => string;
+  fileStarting: (prefix: string) => string;
+  meta: Record<string, unknown>;
   tensor: (key: string) => ParityTensorRef;
 };
 
@@ -46,11 +52,16 @@ const caseModel = (
   return {
     caseName: testCase.name,
     graph: models.graphs[step.graph],
+    modelId: bundle.modelId,
+    revision: bundle.revision,
     modelUrl: `${root}/${model?.name ?? ''}`,
     externalData: data
       ? [{ path: data.name, data: `${root}/${data.name}` }]
       : [],
     fileUrl: (constant) => `${root}/${findFile(models, constant)}`,
+    fileStarting: (prefix) =>
+      `${root}/${bundle.files.find((file) => file.name.startsWith(prefix))?.name ?? prefix}`,
+    meta: manifest.meta,
     tensor: (key) => {
       const tensor = manifest.tensors[key];
       return {
@@ -85,7 +96,49 @@ const modelTask = (
   })),
 });
 
+const metaValue = (model: CaseModel, key: string): unknown => {
+  const value = model.meta[key];
+  if (value === undefined) {
+    throw new Error(`${model.caseName} records no ${key}`);
+  }
+  return value;
+};
+
+const whisperModelTask = (
+  model: CaseModel,
+  provider: ParityWhisperModelTask['provider'],
+): ParityWhisperModelTask => ({
+  kind: 'whisperModel',
+  caseName: model.caseName,
+  provider,
+  encoderUrl: model.fileStarting('encoder_model'),
+  decoderUrl: model.fileStarting('decoder_model_merged'),
+  features: model.tensor('model.input@reference'),
+  encoderStates: model.tensor('encoder.output@onnx-cpu'),
+  tokens: model.tensor('decoder.tokens@reference'),
+  promptLength: Number(metaValue(model, 'promptLength')),
+});
+
+const providerTask = (
+  testCase: ParityCase,
+  model: CaseModel,
+  provider: ParityModelTask['provider'],
+): ParityTask =>
+  testCase.step === 'transcribe'
+    ? whisperModelTask(model, provider)
+    : modelTask(model, parityStepModels[testCase.step], provider);
+
 const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
+  transcribe: (model) => ({
+    kind: 'whisper',
+    caseName: model.caseName,
+    graph: whisperGraph(model.graph),
+    modelPath: '/hf',
+    modelId: model.modelId,
+    revision: model.revision,
+    language: String(metaValue(model, 'language')),
+    unitInput: model.tensor('unit.input@reference'),
+  }),
   vocals: (model) => ({
     kind: 'vocals',
     caseName: model.caseName,
@@ -140,12 +193,13 @@ export const caseTasks = (request: ParityCaseTasks): ParityTask[] => {
     resolve(request.outDir, 'cases', testCase.name, 'manifest.json'),
   );
   const model = caseModel(request.models, testCase, manifest);
-  const step = parityStepModels[testCase.step];
   return [
     ...(wasmRuns(testCase.step, request.desktop)
-      ? [modelTask(model, step, 'wasm')]
+      ? [providerTask(testCase, model, 'wasm')]
       : []),
-    ...(step.webgpu ? [modelTask(model, step, 'webgpu')] : []),
+    ...(parityStepModels[testCase.step].webgpu
+      ? [providerTask(testCase, model, 'webgpu')]
+      : []),
     productTasks[testCase.step](model),
   ];
 };

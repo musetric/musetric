@@ -54,12 +54,16 @@ const ensureBundle = async (
   }
 };
 
-const writeStemInput = (
-  outDir: string,
-  input: ParityStem,
-  target: string,
-): void => {
-  const inputDir = resolve(outDir, 'cases', input.case);
+type StemInput = {
+  outDir: string;
+  input: ParityStem;
+  testCase: ParityCase;
+  target: string;
+};
+
+const writeStemInput = (stem: StemInput): void => {
+  const { input, testCase } = stem;
+  const inputDir = resolve(stem.outDir, 'cases', input.case);
   const manifest = readManifest(resolve(inputDir, 'manifest.json'));
   const tensor = manifest.tensors[`${input.stem}@reference`];
   const { sampleRate } = manifest.meta;
@@ -68,12 +72,15 @@ const writeStemInput = (
   }
   const values = readTensorValues(resolve(inputDir, tensor.file), tensor);
   const [channels, frames] = tensor.shape;
+  const from = Math.round((testCase.from ?? 0) * sampleRate);
+  const to =
+    testCase.to === undefined ? frames : Math.round(testCase.to * sampleRate);
   writeWav({
-    path: target,
+    path: stem.target,
     sampleRate,
     channels: Array.from({ length: channels }, (_, channel) =>
       Float32Array.from(
-        values.subarray(channel * frames, (channel + 1) * frames),
+        values.subarray(channel * frames + from, channel * frames + to),
       ),
     ),
   });
@@ -139,7 +146,12 @@ it('prepares the parity cases', async (context) => {
     if (testCase.input === undefined) {
       await writeSourceInput(request, testCase, audio);
     } else {
-      writeStemInput(request.outDir, testCase.input, audio);
+      writeStemInput({
+        outDir: request.outDir,
+        input: testCase.input,
+        testCase,
+        target: audio,
+      });
     }
     const bundle = findBundle(models, parityStepModels[testCase.step].bundle);
     await ensureBundle(request.outDir, bundle);
@@ -149,6 +161,9 @@ it('prepares the parity cases', async (context) => {
       `--audio-path "${audio}"`,
       `--onnx "${resolve(request.outDir, 'models', bundle.directory, onnx?.name ?? '')}"`,
       `--case-path "${caseDir}"`,
+      ...(testCase.language === undefined
+        ? []
+        : [`--language ${testCase.language}`]),
     ]);
     prepared.push(testCase.name);
   }

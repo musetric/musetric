@@ -88,6 +88,15 @@ export type WhisperPipelineInternals = {
   processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
 };
 
+export type WhisperDecodeTap = {
+  features: unknown;
+  encoderOutput: unknown;
+  tokens: TokenId[];
+  times: number[];
+};
+
+export type WhisperDecodeInspect = (tap: WhisperDecodeTap) => Promise<void>;
+
 export type DecodeGuard = Record<string, number>;
 
 export type DecodeResult = {
@@ -117,6 +126,7 @@ export type WhisperDecoder = {
 
 export const createWhisperDecoder = (
   internals: WhisperPipelineInternals,
+  inspect?: WhisperDecodeInspect,
 ): WhisperDecoder => {
   const { model } = internals;
   fetchStepOutputs(model);
@@ -125,6 +135,7 @@ export const createWhisperDecoder = (
 
   const features = new WeakMap<Float32Array, unknown>();
   const encoded = new WeakMap<object, unknown>();
+  const lastEncoded: { output: unknown } = { output: undefined };
   const encoder = model.sessions.model;
   const runEncoder = encoder.run.bind(encoder);
   encoder.run = async (feeds: EncoderFeeds, ...rest: never[]) => {
@@ -134,10 +145,12 @@ export const createWhisperDecoder = (
     }
     const hit = encoded.get(input);
     if (hit) {
+      lastEncoded.output = hit;
       return hit;
     }
     const output = await runEncoder(feeds, ...rest);
     encoded.set(input, output);
+    lastEncoded.output = output;
     return output;
   };
 
@@ -237,6 +250,12 @@ export const createWhisperDecoder = (
     await disposeCache(output);
     const [rawTokens] = output.sequences.tolist();
     const [rawTimes] = output.token_timestamps.tolist();
+    await inspect?.({
+      features: inputs.input_features,
+      encoderOutput: lastEncoded.output,
+      tokens: rawTokens,
+      times: rawTimes,
+    });
     return timestampedResult(audio, rawTokens, rawTimes);
   };
 
