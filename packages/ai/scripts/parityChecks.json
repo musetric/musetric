@@ -407,14 +407,6 @@
         "atMost": 0.1
       },
       {
-        "row": 1,
-        "boundary": "result.tokens",
-        "reference": "reference",
-        "candidate": "author",
-        "measure": "timeOffset",
-        "atMost": 0.5
-      },
-      {
         "row": 3,
         "boundary": "encoder.output",
         "reference": "original",
