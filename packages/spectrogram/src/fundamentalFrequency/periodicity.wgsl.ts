@@ -15,7 +15,7 @@ fn correlate(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (lagIndex >= params.lagCount || slotIndex >= params.slotCount) {
     return;
   }
-  let base = slotIndex * params.fftSize;
+  let base = slotIndex * (params.fftSize + 2u);
   let energy = autocorrelation[base];
   let lag = params.minimumLag + lagIndex;
   let windowShare = windowCorrelation[lagIndex];

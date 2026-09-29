@@ -12,8 +12,8 @@ export const createPitchInverseCell = (device: GPUDevice): PitchInverseCell => {
   return {
     get: (buffers, settings) =>
       cell.get({
-        wave: buffers.autocorrelation,
-        spectrum: buffers.power,
+        wave: buffers.signal,
+        spectrum: buffers.signal,
         config: {
           windowSize: settings.fftSize,
           windowCount: settings.batchSlots,
