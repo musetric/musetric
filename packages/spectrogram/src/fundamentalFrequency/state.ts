@@ -12,10 +12,13 @@ export type PitchBuffers = {
   span: GPUBuffer;
   slots: GPUBuffer;
   weights: GPUBuffer;
+  windowCorrelation: GPUBuffer;
   signal: GPUBuffer;
   whitened: GPUBuffer;
   frequencies: GPUBuffer;
   levels: GPUBuffer;
+  power: GPUBuffer;
+  autocorrelation: GPUBuffer;
   periodicity: GPUBuffer;
   observations: GPUBuffer;
   decoded: GPUBuffer;
@@ -38,10 +41,28 @@ const createPitchBuffers = (
     settings.windowSize * Float32Array.BYTES_PER_ELEMENT,
     GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   );
+  const window = windowFunctions[settings.windowName](settings.windowSize);
+  device.queue.writeBuffer(weights, 0, window);
+  const windowCorrelation = create(
+    'window-correlation',
+    settings.lagCount * Float32Array.BYTES_PER_ELEMENT,
+    GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  );
+  const correlationAt = (lag: number): number => {
+    let sum = 0;
+    for (let index = 0; index + lag < window.length; index += 1) {
+      sum += window[index] * window[index + lag];
+    }
+    return sum;
+  };
+  const windowEnergy = correlationAt(0);
   device.queue.writeBuffer(
-    weights,
+    windowCorrelation,
     0,
-    windowFunctions[settings.windowName](settings.windowSize),
+    Float32Array.from(
+      { length: settings.lagCount },
+      (_, index) => correlationAt(settings.minimumLag + index) / windowEnergy,
+    ),
   );
   return {
     span: create(
@@ -55,6 +76,7 @@ const createPitchBuffers = (
       GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     ),
     weights,
+    windowCorrelation,
     signal: create(
       'signal',
       slots * (settings.fftSize + 2) * Float32Array.BYTES_PER_ELEMENT,
@@ -75,6 +97,16 @@ const createPitchBuffers = (
     levels: create(
       'levels',
       slots * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    power: create(
+      'power',
+      slots * (settings.fftSize + 2) * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    autocorrelation: create(
+      'autocorrelation',
+      slots * settings.fftSize * Float32Array.BYTES_PER_ELEMENT,
       GPUBufferUsage.STORAGE,
     ),
     periodicity: create(
@@ -182,11 +214,12 @@ const createBindGroups = (
       { buffer: buffers.whitened },
       { buffer: buffers.frequencies },
       { buffer: buffers.levels },
+      { buffer: buffers.power },
       uniform,
     ]),
     periodicity: create(pipelines.periodicity, 'periodicity', [
-      { buffer: buffers.span },
-      { buffer: buffers.slots },
+      { buffer: buffers.autocorrelation },
+      { buffer: buffers.windowCorrelation },
       { buffer: buffers.periodicity },
       uniform,
     ]),

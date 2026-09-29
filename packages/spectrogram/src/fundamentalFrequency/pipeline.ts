@@ -76,6 +76,7 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
       'storage',
       'storage',
       'storage',
+      'storage',
       'dynamic-uniform',
     ],
   }),
