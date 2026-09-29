@@ -201,6 +201,20 @@ describe('ifftPackedStockhamC2r batch range', () => {
       },
     );
 
+    it('keeps every window at the spectrum stride in place', async () => {
+      const stride = windowSize + 2;
+      const outOfPlace = await inverseTransform(windowSize);
+      const inPlace = await transform(createIfftPackedStockhamC2r, windowSize);
+      for (let w = 0; w < windowCount; w += 1) {
+        for (let i = 0; i < windowSize; i += 1) {
+          expect(inPlace[w * stride + i], `window ${w} index ${i}`).toBeCloseTo(
+            outOfPlace[w * windowSize + i],
+            3,
+          );
+        }
+      }
+    });
+
     it('transforms every disjoint range issued in one submit', async () => {
       const multiRanges: FourierBatchRange[] = [
         { batchOffset: 1, batchCount: 2 },
