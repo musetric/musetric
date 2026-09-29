@@ -137,7 +137,6 @@ const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
     modelId: model.modelId,
     revision: model.revision,
     language: String(metaValue(model, 'language')),
-    timestampBegin: Number(metaValue(model, 'timestampBegin')),
     unitInput: model.tensor('unit.input@reference'),
   }),
   vocals: (model) => ({

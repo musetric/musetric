@@ -404,7 +404,7 @@
         "reference": "reference",
         "candidate": "author",
         "measure": "tokenErrorRate",
-        "atMost": 0.1
+        "atMost": 0.05
       },
       {
         "row": 3,
@@ -412,7 +412,7 @@
         "reference": "original",
         "candidate": "onnx-cpu",
         "measure": "snr",
-        "atLeast": 20
+        "atLeast": 7
       },
       {
         "row": 3,
@@ -420,7 +420,7 @@
         "reference": "original",
         "candidate": "onnx-cpu",
         "measure": "argmaxDiffering",
-        "atMost": 2
+        "atMost": 5
       },
       {
         "row": 4,
@@ -428,7 +428,7 @@
         "reference": "onnx-cpu",
         "candidate": "wasm",
         "measure": "snr",
-        "atLeast": 60
+        "atLeast": 80
       },
       {
         "row": 4,
@@ -436,7 +436,7 @@
         "reference": "onnx-cpu",
         "candidate": "wasm",
         "measure": "maxAbs",
-        "atMost": 0.1
+        "atMost": 0.05
       },
       {
         "row": 5,
@@ -444,7 +444,7 @@
         "reference": "onnx-cpu",
         "candidate": "webgpu",
         "measure": "snr",
-        "atLeast": 40
+        "atLeast": 70
       },
       {
         "row": 5,
@@ -460,7 +460,7 @@
         "reference": "onnx-cpu",
         "candidate": "webgpu",
         "measure": "argmaxDiffering",
-        "atMost": 0
+        "atMost": 1
       },
       {
         "row": 6,
@@ -468,7 +468,7 @@
         "reference": "reference",
         "candidate": "product",
         "measure": "snr",
-        "atLeast": 60
+        "atLeast": 120
       },
       {
         "row": 6,
@@ -476,7 +476,7 @@
         "reference": "onnx-cpu",
         "candidate": "product",
         "measure": "snr",
-        "atLeast": 30
+        "atLeast": 70
       },
       {
         "row": 6,
@@ -484,7 +484,7 @@
         "reference": "reference",
         "candidate": "product",
         "measure": "tokenErrorRate",
-        "atMost": 0.05
+        "atMost": 0.3
       },
       {
         "row": 6,

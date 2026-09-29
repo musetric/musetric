@@ -104,7 +104,6 @@ export type ParityWhisperTask = {
   modelId: string;
   revision: string;
   language: string;
-  timestampBegin: number;
   unitInput: ParityTensorRef;
 };
 

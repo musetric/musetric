@@ -197,36 +197,32 @@ export const runWhisperModelTask = async (
   await runTeacherForced(task),
 ];
 
-const timedTokens = (
-  tap: WhisperDecodeTap,
-  timestampBegin: number,
-): Float32Array => {
-  const tokens = tap.tokens.map(Number);
-  const found = tokens.findIndex((token) => token >= timestampBegin);
-  const start = found === -1 ? tokens.length : found;
-  const end =
-    tokens.length > start && tokens.at(-1) === endOfText
-      ? tokens.length - 1
-      : tokens.length;
+const timedTokens = (tap: WhisperDecodeTap): Float32Array => {
   const rows: number[] = [];
-  for (let index = start; index < end; index += 1) {
-    rows.push(tokens[index], Math.round((tap.times[index] ?? 0) * 100) / 100);
+  for (const [index, token] of tap.tokens.entries()) {
+    if (Number(token) < endOfText) {
+      rows.push(Number(token), Math.round((tap.times[index] ?? 0) * 100) / 100);
+    }
   }
   return Float32Array.from(rows);
 };
 
+const ortTensorOf = (value: unknown): unknown =>
+  typeof value === 'object' && !!value && 'ort_tensor' in value
+    ? value.ort_tensor
+    : value;
+
 const encoderStatesOf = (value: unknown): Downloadable => {
-  if (
-    typeof value === 'object' &&
-    !!value &&
-    'last_hidden_state' in value &&
-    isDownloadable(value.last_hidden_state)
-  ) {
-    return value.last_hidden_state;
+  const states =
+    typeof value === 'object' && !!value && 'last_hidden_state' in value
+      ? ortTensorOf(value.last_hidden_state)
+      : undefined;
+  if (!isDownloadable(states)) {
+    throw new Error(
+      'whisper parity: the encoder output has no last_hidden_state',
+    );
   }
-  throw new Error(
-    'whisper parity: the encoder output has no last_hidden_state',
-  );
+  return states;
 };
 
 type Features = {
@@ -251,10 +247,17 @@ const featuresOf = (value: unknown): Features => {
   throw new Error('whisper parity: the features are not a float32 tensor');
 };
 
+type WhisperCapture = {
+  features: Features;
+  states: Float32Array;
+  statesDims: number[];
+  rows: Float32Array;
+};
+
 export const runWhisperTask = async (
   task: ParityWhisperTask,
 ): Promise<ParityOutput[]> => {
-  const taps: WhisperDecodeTap[] = [];
+  const captures: WhisperCapture[] = [];
   const runtime = await createWhisperRuntime({
     graph: task.graph,
     modelHost: `${location.origin}${task.modelPath}`,
@@ -262,8 +265,16 @@ export const runWhisperTask = async (
     revision: task.revision,
     onLoading: () => undefined,
     inspect: async (tap) => {
-      taps.push(tap);
-      await Promise.resolve();
+      if (captures.length > 0) {
+        return;
+      }
+      const states = encoderStatesOf(tap.encoderOutput);
+      captures.push({
+        features: featuresOf(tap.features),
+        states: await download(states),
+        statesDims: [...states.dims],
+        rows: timedTokens(tap),
+      });
     },
   });
   try {
@@ -271,20 +282,18 @@ export const runWhisperTask = async (
       [Float32Array.from(await fetchTensor(task.unitInput))],
       task.language,
     );
-    const tap = taps.at(0);
-    if (!tap) {
+    const capture = captures.at(0);
+    if (!capture) {
       throw new Error('whisper parity: the runtime decoded nothing');
     }
-    const features = featuresOf(tap.features);
-    const states = encoderStatesOf(tap.encoderOutput);
-    const rows = timedTokens(tap, task.timestampBegin);
+    const { features, rows } = capture;
     return [
       float32Output('model.input', 'product', features.dims, features.data),
       float32Output(
         'encoder.output',
         'product',
-        [...states.dims],
-        await download(states),
+        capture.statesDims,
+        capture.states,
       ),
       float32Output('result.tokens', 'product', [rows.length / 2, 2], rows),
     ];
