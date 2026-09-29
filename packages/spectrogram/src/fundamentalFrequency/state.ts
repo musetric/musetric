@@ -17,8 +17,6 @@ export type PitchBuffers = {
   whitened: GPUBuffer;
   frequencies: GPUBuffer;
   levels: GPUBuffer;
-  power: GPUBuffer;
-  autocorrelation: GPUBuffer;
   periodicity: GPUBuffer;
   observations: GPUBuffer;
   decoded: GPUBuffer;
@@ -99,16 +97,6 @@ const createPitchBuffers = (
       slots * Float32Array.BYTES_PER_ELEMENT,
       GPUBufferUsage.STORAGE,
     ),
-    power: create(
-      'power',
-      slots * (settings.fftSize + 2) * Float32Array.BYTES_PER_ELEMENT,
-      GPUBufferUsage.STORAGE,
-    ),
-    autocorrelation: create(
-      'autocorrelation',
-      slots * settings.fftSize * Float32Array.BYTES_PER_ELEMENT,
-      GPUBufferUsage.STORAGE,
-    ),
     periodicity: create(
       'periodicity',
       slots * settings.lagCount * Float32Array.BYTES_PER_ELEMENT,
@@ -169,6 +157,7 @@ export const createPitchLineCell = (device: GPUDevice) =>
 export type PitchBindGroups = {
   slice: GPUBindGroup;
   spectrum: GPUBindGroup;
+  power: GPUBindGroup;
   periodicity: GPUBindGroup;
   observe: GPUBindGroup;
   decode: GPUBindGroup;
@@ -214,11 +203,14 @@ const createBindGroups = (
       { buffer: buffers.whitened },
       { buffer: buffers.frequencies },
       { buffer: buffers.levels },
-      { buffer: buffers.power },
+      uniform,
+    ]),
+    power: create(pipelines.power, 'power', [
+      { buffer: buffers.signal },
       uniform,
     ]),
     periodicity: create(pipelines.periodicity, 'periodicity', [
-      { buffer: buffers.autocorrelation },
+      { buffer: buffers.signal },
       { buffer: buffers.windowCorrelation },
       { buffer: buffers.periodicity },
       uniform,
@@ -230,7 +222,6 @@ const createBindGroups = (
       { buffer: buffers.levels },
       { buffer: buffers.periodicity },
       { buffer: buffers.observations },
-      { buffer: buffers.signal },
       uniform,
     ]),
     decode: create(pipelines.decode, 'decode', [

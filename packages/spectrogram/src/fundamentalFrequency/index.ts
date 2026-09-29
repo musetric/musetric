@@ -15,62 +15,13 @@ import {
   createPitchBindGroupsCell,
   createPitchBuffersCell,
   createPitchLineCell,
-  pitchSlotBytes,
 } from './state.js';
+import { uploadSlots, uploadSpans } from './upload.js';
 
 const workgroupSize = 64;
 
 const frameCountOf = (settings: PitchSettings, length: number): number =>
   length > 0 ? Math.floor((length - 1) / settings.hop) + 1 : 0;
-
-type SpanUpload = {
-  plan: PitchPlan;
-  samples: Float32Array;
-  availableSamples: number;
-};
-
-const uploadSpans = (
-  device: GPUDevice,
-  target: GPUBuffer,
-  upload: SpanUpload,
-): void => {
-  const { plan, samples, availableSamples } = upload;
-  const last = plan.spans.at(-1);
-  if (!last) {
-    return;
-  }
-  const staging = new Float32Array(last.spanOffset + last.length);
-  const end = Math.min(samples.length, availableSamples);
-  for (const span of plan.spans) {
-    const from = Math.max(0, span.sampleStart);
-    const to = Math.min(end, span.sampleStart + span.length);
-    if (to > from) {
-      staging.set(
-        samples.subarray(from, to),
-        span.spanOffset + from - span.sampleStart,
-      );
-    }
-  }
-  device.queue.writeBuffer(target, 0, staging);
-};
-
-const uploadSlots = (
-  device: GPUDevice,
-  target: GPUBuffer,
-  plan: PitchPlan,
-): void => {
-  if (plan.slots.length === 0) {
-    return;
-  }
-  const table = new Int32Array((plan.slots.length * pitchSlotBytes) / 4);
-  plan.slots.forEach((slot, index) => {
-    table[index * 4] = slot.frame;
-    table[index * 4 + 1] = slot.spanOffset;
-    table[index * 4 + 2] = slot.predecessor;
-    table[index * 4 + 3] = slot.observe ? 1 : 0;
-  });
-  device.queue.writeBuffer(target, 0, table);
-};
 
 export type PitchProjection = {
   baseColumn: number;
@@ -220,6 +171,13 @@ export const createSpectrogramFundamentalFrequencyCell = (
         analysisStage('spectrum', (pass, state) => {
           bindAnalysis(pass, state, pipelines.spectrum, bindGroups.spectrum);
           pass.dispatchWorkgroups(state.plan.slots.length);
+        }),
+        analysisStage('power', (pass, state) => {
+          bindAnalysis(pass, state, pipelines.power, bindGroups.power);
+          pass.dispatchWorkgroups(
+            Math.ceil((settings.halfSize + 1) / workgroupSize),
+            state.plan.slots.length,
+          );
         }),
         analysisStage('autocorrelation', (pass, state) => {
           inverse.dispatch(pass, {

@@ -93,6 +93,13 @@ fn complexStride() -> u32 {
   return params.windowSize + 2u;
 }
 
+fn getOutputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return complexStride() * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
 fn readSpectrumFloat(spectrumOffset: u32, index: u32) -> f32 {
   if (inPlace == 1u) {
     return signal[spectrumOffset + index];
@@ -138,7 +145,7 @@ fn main(
 
   let t = localId.x;
   let spectrumOffset = complexStride() * windowIndex;
-  let signalOffset = params.windowSize * windowIndex;
+  let signalOffset = getOutputWindowOffset(windowIndex);
 
   if (t == 0u) {
     store(0u, loadPackedSpectrum(spectrumOffset, 0u));

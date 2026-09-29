@@ -31,6 +31,13 @@ var<private> windowScratchOffset: u32;
 var<private> windowSpectrumOffset: u32;
 var<private> windowSignalOffset: u32;
 ${stockhamCombines}
+fn getOutputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return (params.windowSize + 2u) * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
 fn readSpectrumFloat(index: u32) -> f32 {
   if (inPlace == 1u) {
     return signal[windowSpectrumOffset + index];
@@ -108,7 +115,7 @@ fn main(
   let scratchOffset = packedWindowSize * windowIndex;
   windowScratchOffset = scratchOffset;
   windowSpectrumOffset = (params.windowSize + 2u) * windowIndex;
-  windowSignalOffset = params.windowSize * windowIndex;
+  windowSignalOffset = getOutputWindowOffset(windowIndex);
 
   if (factor == 8u) {
     let base = block * stageStride + k;

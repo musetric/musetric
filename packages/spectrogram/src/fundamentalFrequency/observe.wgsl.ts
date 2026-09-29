@@ -12,8 +12,7 @@ ${pitchObservationStruct}
 @group(0) @binding(3) var<storage, read> levels: array<f32>;
 @group(0) @binding(4) var<storage, read> periodicity: array<f32>;
 @group(0) @binding(5) var<storage, read_write> observations: array<PitchObservation>;
-@group(0) @binding(6) var<storage, read> signal: array<f32>;
-@group(0) @binding(7) var<uniform> params: PitchParams;
+@group(0) @binding(6) var<uniform> params: PitchParams;
 
 const workgroupWidth = 64u;
 const latticeSize = 5u;
@@ -120,12 +119,6 @@ fn candidateSalience(slotIndex: u32, frequency: f32, gate: f32) -> f32 {
   return spectral * factor * gate;
 }
 
-fn powerAt(slotIndex: u32, bin: u32) -> f32 {
-  let offset = slotIndex * (params.fftSize + 2u) + 2u * bin;
-  let value = vec2<f32>(signal[offset], signal[offset + 1u]);
-  return dot(value, value);
-}
-
 fn refineWith(
   slotIndex: u32,
   frequency: f32,
@@ -136,10 +129,6 @@ fn refineWith(
   let maxFrequency = f32(params.phaseBins - 1u) * binWidth;
   let spectrumBase = slotIndex * params.spectrumBins;
   let frequencyBase = slotIndex * params.phaseBins;
-  let minimumPower = exp2(
-    (levels[slotIndex] + params.levelOffsetDb - params.refineRangeDb) /
-      3.01029996,
-  );
   var weighted = 0.0;
   var total = 0.0;
   for (var harmonic = 1u; harmonic <= harmonics; harmonic += 1u) {
@@ -159,9 +148,6 @@ fn refineWith(
         bestValue = value;
         bestBin = bin;
       }
-    }
-    if (powerAt(slotIndex, bestBin) < minimumPower) {
-      continue;
     }
     let measured = frequencies[frequencyBase + bestBin];
     if (measured <= 0.0 || abs(measured - expected) > tolerance * expected) {

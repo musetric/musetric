@@ -51,6 +51,13 @@ fn getInvTwiddle(index: u32) -> vec2<f32> {
   return vec2<f32>(fftTrigTable[2u * index], fftTrigTable[2u * index + 1u]);
 }
 
+fn getOutputWindowOffset(windowIndex: u32) -> u32 {
+  if (inPlace == 1u) {
+    return (params.windowSize + 2u) * windowIndex;
+  }
+  return params.windowSize * windowIndex;
+}
+
 fn readSpectrumFloat(index: u32) -> f32 {
   if (inPlace == 1u) {
     return signal[windowSpectrumOffset + index];
@@ -204,7 +211,7 @@ fn main(
   let shBase = groupLocal * groupSize;
   windowSpectrumOffset = (params.windowSize + 2u) * windowIndex;
   windowScratchOffset = scratchOffset;
-  windowSignalOffset = params.windowSize * windowIndex;
+  windowSignalOffset = getOutputWindowOffset(windowIndex);
 
   if (groupInRange && role < factor2) {
     let blockA = blockB + role * twiddleScaleB;
