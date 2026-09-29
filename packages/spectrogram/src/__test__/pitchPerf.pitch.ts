@@ -18,10 +18,7 @@ import {
   type PitchPerfResult,
   type PitchPerfTable,
 } from './pitchPerf.es.js';
-import {
-  measureKernelTable,
-  type PitchKernelSpectrum,
-} from './pitchPerfHarness.js';
+import { measureKernelTable } from './pitchPerfHarness.js';
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
@@ -30,12 +27,7 @@ declare module 'vitest' {
   }
 }
 
-const kernelColumns = [512, 1920];
-const kernelSpectra: PitchKernelSpectrum[] = [
-  { windowSize: 2048, zeroPaddingFactor: 2 },
-  { windowSize: 4096, zeroPaddingFactor: 2 },
-  { windowSize: 8192, zeroPaddingFactor: 2 },
-];
+const kernelFrames = [512, 1024];
 const foreignIdleMs = 2000;
 const foreignSettleMs = 300;
 const renderProgressStart = 0.2;
@@ -184,8 +176,8 @@ it('measures the pitch kernels and a render of the window', async (context) => {
   }
   const { device } = await createGpuContext(true);
   const kernels: PitchPerfTable[] = [];
-  for (const columns of kernelColumns) {
-    kernels.push(await measureKernelTable(device, columns, kernelSpectra));
+  for (const frames of kernelFrames) {
+    kernels.push(await measureKernelTable(device, frames));
   }
   const samples = await fetchSamples(request.pcmUrl);
   const result: PitchPerfResult = {

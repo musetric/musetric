@@ -32,6 +32,7 @@ import {
   createTrackResidents,
   createTrackWork,
   drainPendingInvalidations,
+  hasPendingPitch,
   isRenderNoop,
   type RenderResult,
   type TrackRenderPlan,
@@ -92,6 +93,13 @@ export type SpectrogramFundamentalLine = {
   values: Float32Array;
 };
 
+export type SpectrogramFundamentalFrames = {
+  hopSeconds: number;
+  firstFrame: number;
+  values: Float32Array;
+  confidence: Float32Array;
+};
+
 export type SpectrogramProcessor = {
   render: (
     samples: SpectrogramSamples,
@@ -101,6 +109,14 @@ export type SpectrogramProcessor = {
   readFundamentalLine: (
     trackKey: TrackKey,
   ) => Promise<SpectrogramFundamentalLine | undefined>;
+
+  readFundamentalFrames: (
+    trackKey: TrackKey,
+    firstFrame: number,
+    frameCount: number,
+  ) => Promise<SpectrogramFundamentalFrames | undefined>;
+
+  hasPendingWork: () => boolean;
 
   invalidateSamples: (
     invalidations: readonly SpectrogramSampleInvalidation[],
@@ -145,6 +161,7 @@ export const createSpectrogramProcessor = (
   let lastBaseSlots: Record<TrackKey, number> | undefined = undefined;
   let lastRuntime: SpectrogramRuntime | undefined = undefined;
   let lastPlans: Record<TrackKey, TrackRenderPlan> | undefined = undefined;
+  let lastWork: Record<TrackKey, SpectrogramLaneWork> | undefined = undefined;
   let pendingInvalidations: SpectrogramSampleInvalidation[] = [];
 
   const ensureColumns = (windowCount: number): boolean[] => {
@@ -185,10 +202,15 @@ export const createSpectrogramProcessor = (
         trackProgress,
         work,
       });
-      if (!onMetrics && !configChanged && isRenderNoop(plans, lastBaseSlots)) {
+      if (
+        !onMetrics &&
+        !configChanged &&
+        isRenderNoop(plans, lastBaseSlots) &&
+        !hasPendingPitch(runtime, work)
+      ) {
         return { ok: true };
       }
-      writeBuffers(runtime, samples, plans, work);
+      writeBuffers({ runtime, samples, plans, work, trackProgress });
       const command = createCommand(runtime, plans, work);
       await submitCommand(command);
       commitResidentPlans(residents, samples, plans, work);
@@ -196,6 +218,7 @@ export const createSpectrogramProcessor = (
       lastBaseSlots = mapTrackKeys((key) => plans[key].baseSlot);
       lastRuntime = runtime;
       lastPlans = plans;
+      lastWork = work;
       return { ok: true };
     },
   );
@@ -239,6 +262,40 @@ export const createSpectrogramProcessor = (
         reader.destroy();
       }
     },
+    readFundamentalFrames: async (trackKey, firstFrame, frameCount) => {
+      if (!lastRuntime) {
+        return undefined;
+      }
+      const { lane } = lastRuntime.tracks[trackKey];
+      const { ringFrames, hop, sampleRate } = lane.pitchSettings;
+      const reader = createGpuBufferReader({
+        device,
+        typeSize: Int32Array.BYTES_PER_ELEMENT,
+        size: ringFrames * 4,
+      });
+      try {
+        const bytes = await reader.read(lane.fundamentalDecodedBuffer);
+        const floats = new Float32Array(bytes);
+        const ints = new Int32Array(bytes);
+        const values = new Float32Array(frameCount);
+        const confidence = new Float32Array(frameCount);
+        for (let index = 0; index < frameCount; index += 1) {
+          const frame = firstFrame + index;
+          const slot = ((frame % ringFrames) + ringFrames) % ringFrames;
+          if (ints[slot * 4 + 2] === frame) {
+            values[index] = floats[slot * 4];
+            confidence[index] = floats[slot * 4 + 1];
+          }
+        }
+        return { hopSeconds: hop / sampleRate, firstFrame, values, confidence };
+      } finally {
+        reader.destroy();
+      }
+    },
+    hasPendingWork: () =>
+      lastRuntime !== undefined &&
+      lastWork !== undefined &&
+      hasPendingPitch(lastRuntime, lastWork),
     invalidateSamples: (invalidations) => {
       for (const invalidation of invalidations) {
         pendingInvalidations = mergeSampleInvalidation(

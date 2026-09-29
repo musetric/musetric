@@ -11,8 +11,9 @@ import {
 } from '../config.cross.js';
 import {
   createSpectrogramFundamentalFrequencyCell,
-  type FundamentalFrequencyStage,
+  type PitchPrepareInput,
 } from '../fundamentalFrequency/index.js';
+import { type PitchSettings } from '../fundamentalFrequency/settings.es.js';
 import {
   type BandPipelineCells,
   createBandPipelineCells,
@@ -32,19 +33,13 @@ export type SpectrogramLaneWork = {
 const forEachWorkPipeline = (
   work: SpectrogramLaneWork,
   spectrogramBandPipelines: readonly BandSpectrumPipeline[],
-  baseBandPipeline: BandSpectrumPipeline,
   fn: (pipeline: BandSpectrumPipeline) => void,
 ): void => {
-  if (work.spectrogram) {
-    for (const pipeline of spectrogramBandPipelines) {
-      fn(pipeline);
-    }
+  if (!work.spectrogram) {
+    return;
   }
-  if (
-    work.fundamental &&
-    (!work.spectrogram || !spectrogramBandPipelines.includes(baseBandPipeline))
-  ) {
-    fn(baseBandPipeline);
+  for (const pipeline of spectrogramBandPipelines) {
+    fn(pipeline);
   }
 };
 
@@ -83,6 +78,11 @@ export type SpectrogramLane = {
   signal: GPUBuffer;
   bandSpectra: SpectrogramBandSpectrum[];
   fundamentalLineBuffer: GPUBuffer;
+  fundamentalDecodedBuffer: GPUBuffer;
+  pitchSettings: PitchSettings;
+  preparePitch: (input: PitchPrepareInput) => void;
+  dispatchPitch: (pass: GPUComputePassEncoder) => void;
+  pitchPending: () => boolean;
   writeSamples: (options: {
     samples: Float32Array;
     baseColumn: number;
@@ -94,7 +94,6 @@ export type SpectrogramLane = {
   dispatchFourierTransform: SpectrogramLaneDispatch;
   dispatchMagnitudify: SpectrogramLaneDispatch;
   dispatchDecibelify: SpectrogramLaneDispatch;
-  fundamentalStages: readonly FundamentalFrequencyStage[];
   clear: (encoder: GPUCommandEncoder) => void;
 };
 
@@ -115,9 +114,10 @@ const buildSpectrogramLane = (
     options.label,
   );
   const fundamentalFrequency = fundamentalFrequencyCell.get({
-    signal: baseBandPipeline.signal,
-    magnitude: baseBandPipeline.rawMagnitudeBuffer,
-    config,
+    sampleRate: config.sampleRate,
+    fourierMode: config.fourierMode,
+    columnStep: config.columnStep,
+    windowCount: config.windowCount,
   });
 
   const externalSpectralBands = laneConfig.showSpectrogram
@@ -161,73 +161,49 @@ const buildSpectrogramLane = (
     signal: baseBandPipeline.signal,
     bandSpectra,
     fundamentalLineBuffer: fundamentalFrequency.lineBuffer,
+    fundamentalDecodedBuffer: fundamentalFrequency.decodedBuffer,
+    pitchSettings: fundamentalFrequency.settings,
+    preparePitch: fundamentalFrequency.prepare,
+    dispatchPitch: fundamentalFrequency.dispatch,
+    pitchPending: fundamentalFrequency.pending,
     writeSamples: (writeSamplesOptions) => {
       const { samples, baseColumn, work, forceFullUpload, invalidations } =
         writeSamplesOptions;
-      forEachWorkPipeline(
-        work,
-        spectrogramBandPipelines,
-        baseBandPipeline,
-        (pipeline) => {
-          pipeline.writeSamples(
-            samples,
-            baseColumn,
-            forceFullUpload,
-            invalidations,
-          );
-        },
-      );
+      forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
+        pipeline.writeSamples(
+          samples,
+          baseColumn,
+          forceFullUpload,
+          invalidations,
+        );
+      });
     },
     dispatchSliceSamples: (pass, work, range) => {
-      forEachWorkPipeline(
-        work,
-        spectrogramBandPipelines,
-        baseBandPipeline,
-        (pipeline) => {
-          pipeline.dispatchSliceSamples(pass, range);
-        },
-      );
+      forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
+        pipeline.dispatchSliceSamples(pass, range);
+      });
     },
     dispatchFourierTransform: (pass, work, range) => {
-      forEachWorkPipeline(
-        work,
-        spectrogramBandPipelines,
-        baseBandPipeline,
-        (pipeline) => {
-          pipeline.dispatchFourier(pass, range);
-        },
-      );
+      forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
+        pipeline.dispatchFourier(pass, range);
+      });
     },
     dispatchMagnitudify: (pass, work, range) => {
-      forEachWorkPipeline(
-        work,
-        spectrogramBandPipelines,
-        baseBandPipeline,
-        (pipeline) => {
-          pipeline.dispatchMagnitudify(pass, range);
-        },
-      );
+      forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
+        pipeline.dispatchMagnitudify(pass, range);
+      });
     },
     dispatchDecibelify: (pass, work, range) => {
-      forEachWorkPipeline(
-        work,
-        spectrogramBandPipelines,
-        baseBandPipeline,
-        (pipeline) => {
-          pipeline.dispatchDecibelEnergy(pass, range);
-        },
-      );
-      if (work.fundamental) {
-        baseBandPipeline.dispatchDecibelRun(pass, range);
-      }
+      forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
+        pipeline.dispatchDecibelEnergy(pass, range);
+      });
     },
-    fundamentalStages: fundamentalFrequency.stages,
     clear: (encoder) => {
       baseBandPipeline.clear(encoder);
       for (const pipeline of externalPipelines) {
         pipeline.clear(encoder);
       }
-      encoder.clearBuffer(fundamentalFrequency.lineBuffer);
+      fundamentalFrequency.clear(encoder);
     },
   };
 };

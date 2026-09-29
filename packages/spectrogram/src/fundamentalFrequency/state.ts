@@ -1,37 +1,127 @@
-import { createResourceCell, type ResourceCell } from '@musetric/utils';
-import { type ExtSpectrogramConfig } from '../common/extConfig.js';
-import { createParamsCell, type StateParams } from './params.js';
-import { type FundamentalFrequencyPipelines } from './pipeline.js';
+import { windowFunctions } from '@musetric/fft';
+import { createResourceCell } from '@musetric/utils';
+import { type PitchParams } from './params.js';
+import { type PitchPipelines } from './pipeline.js';
+import { type PitchSettings } from './settings.es.js';
 
-type LatticeBufferArg = {
-  windowCount: number;
-  latticeCount: number;
+export const pitchSlotBytes = 16;
+export const pitchObservationBytes = 56;
+export const pitchDecodedBytes = 16;
+
+export type PitchBuffers = {
+  span: GPUBuffer;
+  slots: GPUBuffer;
+  weights: GPUBuffer;
+  signal: GPUBuffer;
+  whitened: GPUBuffer;
+  frequencies: GPUBuffer;
+  levels: GPUBuffer;
+  periodicity: GPUBuffer;
+  observations: GPUBuffer;
+  decoded: GPUBuffer;
+  folded: GPUBuffer;
 };
 
-const createLatticeBufferCell = (device: GPUDevice) =>
+const createPitchBuffers = (
+  device: GPUDevice,
+  settings: PitchSettings,
+): PitchBuffers => {
+  const create = (label: string, size: number, usage: number): GPUBuffer =>
+    device.createBuffer({
+      label: `pitch-${label}-buffer`,
+      size: Math.max(16, size),
+      usage,
+    });
+  const slots = settings.batchSlots;
+  const weights = create(
+    'weights',
+    settings.windowSize * Float32Array.BYTES_PER_ELEMENT,
+    GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  );
+  device.queue.writeBuffer(
+    weights,
+    0,
+    windowFunctions[settings.windowName](settings.windowSize),
+  );
+  return {
+    span: create(
+      'span',
+      settings.spanCapacity * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    ),
+    slots: create(
+      'slots',
+      slots * pitchSlotBytes,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    ),
+    weights,
+    signal: create(
+      'signal',
+      slots * (settings.fftSize + 2) * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    ),
+    whitened: create(
+      'whitened',
+      slots * settings.spectrumBins * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    frequencies: create(
+      'frequencies',
+      slots * settings.phaseBins * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    levels: create(
+      'levels',
+      slots * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    periodicity: create(
+      'periodicity',
+      slots * settings.lagCount * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+    observations: create(
+      'observations',
+      settings.ringFrames * pitchObservationBytes,
+      GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    ),
+    decoded: create(
+      'decoded',
+      settings.ringFrames * pitchDecodedBytes,
+      GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    ),
+    folded: create(
+      'folded',
+      settings.ringFrames * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
+  };
+};
+
+const destroyPitchBuffers = (buffers: PitchBuffers): void => {
+  for (const buffer of Object.values(buffers)) {
+    buffer.destroy();
+  }
+};
+
+export const createPitchBuffersCell = (device: GPUDevice) =>
   createResourceCell({
-    create: (arg: LatticeBufferArg): GPUBuffer =>
-      device.createBuffer({
-        label: 'fundamental-frequency-lattice-buffer',
-        size:
-          Math.max(1, arg.windowCount * arg.latticeCount) *
-          2 *
-          Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-    dispose: (buffer) => {
-      buffer.destroy();
-    },
-    equals: (current, next) =>
-      current.windowCount === next.windowCount &&
-      current.latticeCount === next.latticeCount,
+    create: (settings: PitchSettings) => createPitchBuffers(device, settings),
+    dispose: destroyPitchBuffers,
+    equals: (current, next) => current === next,
   });
 
-const createLineBufferCell = (device: GPUDevice) =>
+export const createPitchLineCell = (device: GPUDevice) =>
   createResourceCell({
     create: (windowCount: number): GPUBuffer =>
       device.createBuffer({
-        label: 'fundamental-frequency-line-buffer',
+        label: 'pitch-line-buffer',
         size: Math.max(1, windowCount) * Float32Array.BYTES_PER_ELEMENT,
         usage:
           GPUBufferUsage.STORAGE |
@@ -44,199 +134,105 @@ const createLineBufferCell = (device: GPUDevice) =>
     equals: (current, next) => current === next,
   });
 
-type PeriodicityBufferArg = {
-  windowCount: number;
-  lagCount: number;
+export type PitchBindGroups = {
+  slice: GPUBindGroup;
+  spectrum: GPUBindGroup;
+  periodicity: GPUBindGroup;
+  observe: GPUBindGroup;
+  decode: GPUBindGroup;
+  fold: GPUBindGroup;
+  smooth: GPUBindGroup;
+  project: GPUBindGroup;
 };
 
-const createPeriodicityBufferCell = (device: GPUDevice) =>
-  createResourceCell({
-    create: (arg: PeriodicityBufferArg): GPUBuffer =>
-      device.createBuffer({
-        label: 'fundamental-frequency-periodicity-buffer',
-        size:
-          Math.max(1, arg.windowCount * arg.lagCount) *
-          Float32Array.BYTES_PER_ELEMENT,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-    dispose: (buffer) => {
-      buffer.destroy();
-    },
-    equals: (current, next) =>
-      current.windowCount === next.windowCount &&
-      current.lagCount === next.lagCount,
-  });
-
-export type StateArg = {
-  signal: GPUBuffer;
-  magnitude: GPUBuffer;
-  config: ExtSpectrogramConfig;
+type BindGroupsArg = {
+  buffers: PitchBuffers;
+  line: GPUBuffer;
+  params: PitchParams;
 };
 
-export type FundamentalFrequencyState = {
-  pipelines: FundamentalFrequencyPipelines;
-  params: StateParams;
-  output: {
-    periodicity: GPUBuffer;
-    lattice: GPUBuffer;
-    line: GPUBuffer;
-  };
-  bindGroups: {
-    autocorr: GPUBindGroup;
-    observe: GPUBindGroup;
-    track: GPUBindGroup;
-  };
-};
-
-export const createStateCell = (
+const createBindGroups = (
   device: GPUDevice,
-  pipelines: FundamentalFrequencyPipelines,
-): ResourceCell<StateArg, FundamentalFrequencyState> => {
-  const paramsCell = createParamsCell(device);
-  const latticeCell = createLatticeBufferCell(device);
-  const lineCell = createLineBufferCell(device);
-  const periodicityCell = createPeriodicityBufferCell(device);
+  pipelines: PitchPipelines,
+  arg: BindGroupsArg,
+): PitchBindGroups => {
+  const { buffers, line, params } = arg;
+  const uniform = { buffer: params.buffer, size: params.byteLength };
+  const create = (
+    pipeline: GPUComputePipeline,
+    label: string,
+    resources: GPUBufferBinding[],
+  ): GPUBindGroup =>
+    device.createBindGroup({
+      label: `pitch-${label}-bind-group`,
+      layout: pipeline.getBindGroupLayout(0),
+      entries: resources.map((resource, binding) => ({ binding, resource })),
+    });
+  return {
+    slice: create(pipelines.slice, 'slice', [
+      { buffer: buffers.span },
+      { buffer: buffers.slots },
+      { buffer: buffers.weights },
+      { buffer: buffers.signal },
+      uniform,
+    ]),
+    spectrum: create(pipelines.spectrum, 'spectrum', [
+      { buffer: buffers.signal },
+      { buffer: buffers.slots },
+      { buffer: buffers.whitened },
+      { buffer: buffers.frequencies },
+      { buffer: buffers.levels },
+      uniform,
+    ]),
+    periodicity: create(pipelines.periodicity, 'periodicity', [
+      { buffer: buffers.span },
+      { buffer: buffers.slots },
+      { buffer: buffers.periodicity },
+      uniform,
+    ]),
+    observe: create(pipelines.observe, 'observe', [
+      { buffer: buffers.slots },
+      { buffer: buffers.whitened },
+      { buffer: buffers.frequencies },
+      { buffer: buffers.levels },
+      { buffer: buffers.periodicity },
+      { buffer: buffers.observations },
+      { buffer: buffers.signal },
+      uniform,
+    ]),
+    decode: create(pipelines.decode, 'decode', [
+      { buffer: buffers.observations },
+      { buffer: buffers.decoded },
+      uniform,
+    ]),
+    fold: create(pipelines.fold, 'fold', [
+      { buffer: buffers.decoded },
+      { buffer: buffers.observations },
+      { buffer: buffers.folded },
+      uniform,
+    ]),
+    smooth: create(pipelines.smooth, 'smooth', [
+      { buffer: buffers.decoded },
+      { buffer: buffers.folded },
+      uniform,
+    ]),
+    project: create(pipelines.project, 'project', [
+      { buffer: buffers.decoded },
+      { buffer: line },
+      uniform,
+    ]),
+  };
+};
 
-  type AutocorrBindGroupArg = {
-    magnitude: GPUBuffer;
-    periodicity: GPUBuffer;
-    params: StateParams;
-  };
-  const autocorrBindGroupCell = createResourceCell({
-    create: (arg: AutocorrBindGroupArg): GPUBindGroup =>
-      device.createBindGroup({
-        label: 'fundamental-frequency-autocorr-bind-group',
-        layout: pipelines.autocorr.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: arg.magnitude } },
-          { binding: 1, resource: { buffer: arg.periodicity } },
-          {
-            binding: 2,
-            resource: {
-              buffer: arg.params.buffer,
-              size: arg.params.byteLength,
-            },
-          },
-        ],
-      }),
+export const createPitchBindGroupsCell = (
+  device: GPUDevice,
+  pipelines: PitchPipelines,
+) =>
+  createResourceCell({
+    create: (arg: BindGroupsArg) => createBindGroups(device, pipelines, arg),
     dispose: () => undefined,
     equals: (current, next) =>
-      current.magnitude === next.magnitude &&
-      current.periodicity === next.periodicity &&
-      current.params === next.params,
-  });
-  type ObserveBindGroupArg = {
-    signal: GPUBuffer;
-    periodicity: GPUBuffer;
-    lattice: GPUBuffer;
-    params: StateParams;
-  };
-  const observeBindGroupCell = createResourceCell({
-    create: (arg: ObserveBindGroupArg): GPUBindGroup =>
-      device.createBindGroup({
-        label: 'fundamental-frequency-observe-bind-group',
-        layout: pipelines.observe.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: arg.signal } },
-          { binding: 1, resource: { buffer: arg.periodicity } },
-          { binding: 2, resource: { buffer: arg.lattice } },
-          {
-            binding: 3,
-            resource: {
-              buffer: arg.params.buffer,
-              size: arg.params.byteLength,
-            },
-          },
-        ],
-      }),
-    dispose: () => undefined,
-    equals: (current, next) =>
-      current.signal === next.signal &&
-      current.periodicity === next.periodicity &&
-      current.lattice === next.lattice &&
-      current.params === next.params,
-  });
-  type TrackBindGroupArg = {
-    lattice: GPUBuffer;
-    line: GPUBuffer;
-    params: StateParams;
-  };
-  const trackBindGroupCell = createResourceCell({
-    create: (arg: TrackBindGroupArg): GPUBindGroup =>
-      device.createBindGroup({
-        label: 'fundamental-frequency-track-bind-group',
-        layout: pipelines.track.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: arg.lattice } },
-          { binding: 1, resource: { buffer: arg.line } },
-          {
-            binding: 2,
-            resource: {
-              buffer: arg.params.buffer,
-              size: arg.params.byteLength,
-            },
-          },
-        ],
-      }),
-    dispose: () => undefined,
-    equals: (current, next) =>
-      current.lattice === next.lattice &&
+      current.buffers === next.buffers &&
       current.line === next.line &&
       current.params === next.params,
   });
-
-  return {
-    get: (arg) => {
-      const params = paramsCell.get(arg.config);
-      const lattice = latticeCell.get({
-        windowCount: params.value.windowCount,
-        latticeCount: params.value.latticeCount,
-      });
-      const line = lineCell.get(params.value.windowCount);
-      const periodicity = periodicityCell.get({
-        windowCount: params.value.windowCount,
-        lagCount: params.value.lagCount,
-      });
-      const autocorrBindGroup = autocorrBindGroupCell.get({
-        magnitude: arg.magnitude,
-        periodicity,
-        params,
-      });
-      const observeBindGroup = observeBindGroupCell.get({
-        signal: arg.signal,
-        periodicity,
-        lattice,
-        params,
-      });
-      const trackBindGroup = trackBindGroupCell.get({
-        lattice,
-        line,
-        params,
-      });
-
-      return {
-        pipelines,
-        params,
-        output: {
-          periodicity,
-          lattice,
-          line,
-        },
-        bindGroups: {
-          autocorr: autocorrBindGroup,
-          observe: observeBindGroup,
-          track: trackBindGroup,
-        },
-      };
-    },
-    dispose: () => {
-      trackBindGroupCell.dispose();
-      observeBindGroupCell.dispose();
-      autocorrBindGroupCell.dispose();
-      periodicityCell.dispose();
-      lineCell.dispose();
-      latticeCell.dispose();
-      paramsCell.dispose();
-    },
-  };
-};

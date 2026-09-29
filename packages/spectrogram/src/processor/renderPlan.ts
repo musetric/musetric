@@ -234,18 +234,26 @@ export const createRenderPlans = (
   });
 };
 
-export const writeTrackSamples = (
-  runtime: SpectrogramRuntime,
-  samples: SpectrogramSamples,
-  plans: Record<TrackKey, TrackRenderPlan>,
-  work: Record<TrackKey, SpectrogramLaneWork>,
-): void => {
+export type WriteTrackSamplesOptions = {
+  runtime: SpectrogramRuntime;
+  samples: SpectrogramSamples;
+  plans: Record<TrackKey, TrackRenderPlan>;
+  work: Record<TrackKey, SpectrogramLaneWork>;
+  trackProgress: number;
+};
+
+export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
+  const { runtime, samples, plans, work, trackProgress } = options;
   for (const key of allTrackKeys) {
     const trackSamples = samples[key];
     const trackWork = work[key];
     const plan = plans[key];
-    if (trackSamples && plan.ranges.length > 0 && hasVisibleWork(trackWork)) {
-      runtime.tracks[key].lane.writeSamples({
+    if (!trackSamples) {
+      continue;
+    }
+    const { lane } = runtime.tracks[key];
+    if (plan.ranges.length > 0 && trackWork.spectrogram) {
+      lane.writeSamples({
         samples: trackSamples,
         baseColumn: plan.baseColumn,
         work: trackWork,
@@ -253,8 +261,25 @@ export const writeTrackSamples = (
         invalidations: plan.invalidations,
       });
     }
+    if (trackWork.fundamental) {
+      lane.preparePitch({
+        samples: trackSamples,
+        projection: { baseColumn: plan.baseColumn, baseSlot: plan.baseSlot },
+        trackProgress,
+        truncated: runtime.config.lanes[key].truncateAfterPlayhead,
+        invalidations: plan.invalidations,
+      });
+    }
   }
 };
+
+export const hasPendingPitch = (
+  runtime: SpectrogramRuntime,
+  work: Record<TrackKey, SpectrogramLaneWork>,
+): boolean =>
+  allTrackKeys.some(
+    (key) => work[key].fundamental && runtime.tracks[key].lane.pitchPending(),
+  );
 
 export const drainPendingInvalidations = (
   pending: readonly SpectrogramSampleInvalidation[],

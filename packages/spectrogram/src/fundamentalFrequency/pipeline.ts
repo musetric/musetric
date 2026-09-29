@@ -1,91 +1,137 @@
-import { computeBufferEntries } from '../common/computeBufferEntries.js';
-import { autocorrelationShader } from './autocorrelation.wgsl.js';
-import { shader } from './fundamentalFrequency.wgsl.js';
-import { trackShader } from './track.wgsl.js';
+import {
+  computeBufferEntries,
+  type ComputeBufferKind,
+} from '../common/computeBufferEntries.js';
+import { decodeShader } from './decode.wgsl.js';
+import { foldShader } from './fold.wgsl.js';
+import { observeShader } from './observe.wgsl.js';
+import { periodicityShader } from './periodicity.wgsl.js';
+import { projectShader } from './project.wgsl.js';
+import { sliceShader } from './slice.wgsl.js';
+import { smoothShader } from './smooth.wgsl.js';
+import { spectrumShader } from './spectrum.wgsl.js';
 
-export type FundamentalFrequencyPipelines = {
-  autocorr: GPUComputePipeline;
-  observe: GPUComputePipeline;
-  track: GPUComputePipeline;
+type PipelineSpec = {
+  label: string;
+  code: string;
+  entryPoint: string;
+  kinds: ComputeBufferKind[];
 };
 
-export const createPipelines = (
+const createPipeline = (
   device: GPUDevice,
-): FundamentalFrequencyPipelines => {
-  const autocorrLayout = device.createBindGroupLayout({
-    label: 'fundamental-frequency-autocorr-bind-group-layout',
-    entries: computeBufferEntries([
-      'read-only-storage',
-      'storage',
-      'dynamic-uniform',
-    ]),
+  spec: PipelineSpec,
+): GPUComputePipeline => {
+  const layout = device.createBindGroupLayout({
+    label: `pitch-${spec.label}-bind-group-layout`,
+    entries: computeBufferEntries(spec.kinds),
   });
-  const observeLayout = device.createBindGroupLayout({
-    label: 'fundamental-frequency-observe-bind-group-layout',
-    entries: computeBufferEntries([
-      'read-only-storage',
-      'read-only-storage',
-      'storage',
-      'dynamic-uniform',
-    ]),
-  });
-  const trackLayout = device.createBindGroupLayout({
-    label: 'fundamental-frequency-track-bind-group-layout',
-    entries: computeBufferEntries([
-      'read-only-storage',
-      'storage',
-      'dynamic-uniform',
-    ]),
-  });
-  const autocorrPipelineLayout = device.createPipelineLayout({
-    label: 'fundamental-frequency-autocorr-pipeline-layout',
-    bindGroupLayouts: [autocorrLayout],
-  });
-  const observePipelineLayout = device.createPipelineLayout({
-    label: 'fundamental-frequency-observe-pipeline-layout',
-    bindGroupLayouts: [observeLayout],
-  });
-  const trackPipelineLayout = device.createPipelineLayout({
-    label: 'fundamental-frequency-track-pipeline-layout',
-    bindGroupLayouts: [trackLayout],
-  });
-  const observeModule = device.createShaderModule({
-    label: 'fundamental-frequency-observe-shader',
-    code: shader,
-  });
-  const autocorrModule = device.createShaderModule({
-    label: 'fundamental-frequency-autocorr-shader',
-    code: autocorrelationShader,
-  });
-  const trackModule = device.createShaderModule({
-    label: 'fundamental-frequency-track-shader',
-    code: trackShader,
-  });
-
-  return {
-    autocorr: device.createComputePipeline({
-      label: 'fundamental-frequency-autocorr-pipeline',
-      layout: autocorrPipelineLayout,
-      compute: {
-        module: autocorrModule,
-        entryPoint: 'autocorr',
-      },
+  return device.createComputePipeline({
+    label: `pitch-${spec.label}-pipeline`,
+    layout: device.createPipelineLayout({
+      label: `pitch-${spec.label}-pipeline-layout`,
+      bindGroupLayouts: [layout],
     }),
-    observe: device.createComputePipeline({
-      label: 'fundamental-frequency-observe-pipeline',
-      layout: observePipelineLayout,
-      compute: {
-        module: observeModule,
-        entryPoint: 'observe',
-      },
-    }),
-    track: device.createComputePipeline({
-      label: 'fundamental-frequency-track-pipeline',
-      layout: trackPipelineLayout,
-      compute: {
-        module: trackModule,
-        entryPoint: 'track',
-      },
-    }),
-  };
+    compute: {
+      module: device.createShaderModule({
+        label: `pitch-${spec.label}-shader`,
+        code: spec.code,
+      }),
+      entryPoint: spec.entryPoint,
+    },
+  });
 };
+
+export type PitchPipelines = {
+  slice: GPUComputePipeline;
+  spectrum: GPUComputePipeline;
+  periodicity: GPUComputePipeline;
+  observe: GPUComputePipeline;
+  decode: GPUComputePipeline;
+  fold: GPUComputePipeline;
+  smooth: GPUComputePipeline;
+  project: GPUComputePipeline;
+};
+
+export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
+  slice: createPipeline(device, {
+    label: 'slice',
+    code: sliceShader,
+    entryPoint: 'slice',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ],
+  }),
+  spectrum: createPipeline(device, {
+    label: 'spectrum',
+    code: spectrumShader,
+    entryPoint: 'spectrum',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'storage',
+      'storage',
+      'dynamic-uniform',
+    ],
+  }),
+  periodicity: createPipeline(device, {
+    label: 'periodicity',
+    code: periodicityShader,
+    entryPoint: 'correlate',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ],
+  }),
+  observe: createPipeline(device, {
+    label: 'observe',
+    code: observeShader,
+    entryPoint: 'observe',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'read-only-storage',
+      'dynamic-uniform',
+    ],
+  }),
+  decode: createPipeline(device, {
+    label: 'decode',
+    code: decodeShader,
+    entryPoint: 'decode',
+    kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+  }),
+  fold: createPipeline(device, {
+    label: 'fold',
+    code: foldShader,
+    entryPoint: 'foldPitch',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ],
+  }),
+  smooth: createPipeline(device, {
+    label: 'smooth',
+    code: smoothShader,
+    entryPoint: 'smoothPitch',
+    kinds: ['storage', 'read-only-storage', 'dynamic-uniform'],
+  }),
+  project: createPipeline(device, {
+    label: 'project',
+    code: projectShader,
+    entryPoint: 'project',
+    kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+  }),
+});

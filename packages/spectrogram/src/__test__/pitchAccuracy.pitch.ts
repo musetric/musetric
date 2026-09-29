@@ -3,7 +3,7 @@ import { commands } from '@vitest/browser/context';
 import { inject, it } from 'vitest';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
-import { fundamentalTrackWindow } from '../fundamentalFrequency/params.js';
+import { createPitchSettings } from '../fundamentalFrequency/settings.es.js';
 import {
   createSpectrogramProcessor,
   type SpectrogramProcessor,
@@ -29,11 +29,7 @@ declare module 'vitest' {
 
 const { sampleRate } = defaultSpectrogramConfig;
 
-const hopSamplesOf = (request: PitchExtractRequest): number =>
-  (sampleRate * request.hopMs) / 1000;
-
-const stepColumnsOf = (request: PitchExtractRequest): number =>
-  request.columns - 2 * fundamentalTrackWindow;
+const { hop } = createPitchSettings(sampleRate);
 
 type ColumnRange = {
   first: number;
@@ -44,13 +40,12 @@ const columnRangeOf = (
   samples: Float32Array,
   request: PitchExtractRequest,
 ): ColumnRange => {
-  const hopSamples = hopSamplesOf(request);
   const toColumn = (seconds: number): number =>
-    ((seconds - request.pcmStartSeconds) * sampleRate) / hopSamples;
+    ((seconds - request.pcmStartSeconds) * sampleRate) / hop;
   return {
     first: Math.max(0, Math.floor(toColumn(request.fromSeconds))),
     last: Math.min(
-      Math.floor(samples.length / hopSamples),
+      Math.floor(samples.length / hop),
       Math.ceil(toColumn(request.toSeconds)),
     ),
   };
@@ -60,7 +55,7 @@ const buildConfig = (request: PitchExtractRequest): SpectrogramConfig => ({
   ...defaultSpectrogramConfig,
   canvas: new OffscreenCanvas(request.columns, 8),
   viewSize: { width: request.columns, height: 8 },
-  visibleTime: (hopSamplesOf(request) * (request.columns - 1)) / sampleRate,
+  visibleTime: (hop * (request.columns - 1)) / sampleRate,
   playheadRatio: 0,
   windowSize: request.windowSize,
   zeroPaddingFactor: request.zeroPaddingFactor,
@@ -80,28 +75,14 @@ const buildConfig = (request: PitchExtractRequest): SpectrogramConfig => ({
   },
 });
 
-type ChunkRun = {
-  processor: SpectrogramProcessor;
-  samples: Float32Array;
-  request: PitchExtractRequest;
-  range: ColumnRange;
-};
-
-const renderChunks = async (
-  run: ChunkRun,
-  onRendered: () => Promise<void>,
+const renderUntilComplete = async (
+  processor: SpectrogramProcessor,
+  samples: Float32Array,
+  progress: number,
 ): Promise<void> => {
-  const { processor, samples, request, range } = run;
-  const hopSamples = hopSamplesOf(request);
-  for (
-    let baseColumn = range.first - fundamentalTrackWindow;
-    baseColumn + fundamentalTrackWindow < range.last;
-    baseColumn += stepColumnsOf(request)
-  ) {
-    const progress =
-      (baseColumn * hopSamples + request.windowSize / 2) / samples.length;
+  await processor.render({ lead: samples }, progress);
+  while (processor.hasPendingWork()) {
     await processor.render({ lead: samples }, progress);
-    await onRendered();
   }
 };
 
@@ -110,38 +91,45 @@ const extractFundamental = async (
   samples: Float32Array,
   request: PitchExtractRequest,
 ): Promise<PitchExtractResult> => {
-  const hopSamples = hopSamplesOf(request);
   const range = columnRangeOf(samples, request);
   const values = new Float32Array(Math.max(0, range.last - range.first));
+  const confidence = new Float32Array(values.length);
   const processor = createSpectrogramProcessor({
     device,
     config: buildConfig(request),
   });
   try {
-    await renderChunks({ processor, samples, request, range }, async () => {
-      const line = await processor.readFundamentalLine('lead');
-      if (!line) {
-        throw new Error('the fundamental line was not rendered');
+    for (
+      let baseColumn = range.first;
+      baseColumn < range.last;
+      baseColumn += request.columns
+    ) {
+      const progress =
+        (baseColumn * hop + request.windowSize / 2) / samples.length;
+      await renderUntilComplete(processor, samples, progress);
+      const frames = await processor.readFundamentalFrames(
+        'lead',
+        baseColumn,
+        request.columns,
+      );
+      if (!frames) {
+        throw new Error('the fundamental frames were not rendered');
       }
-      for (
-        let index = fundamentalTrackWindow;
-        index < request.columns - fundamentalTrackWindow;
-        index += 1
-      ) {
-        const column = line.baseColumn + index;
-        if (column >= range.first && column < range.last) {
-          values[column - range.first] = line.values[index];
-        }
-      }
-    });
+      const count = Math.min(request.columns, range.last - baseColumn);
+      values.set(frames.values.subarray(0, count), baseColumn - range.first);
+      confidence.set(
+        frames.confidence.subarray(0, count),
+        baseColumn - range.first,
+      );
+    }
   } finally {
     processor.dispose();
   }
   return {
-    hopSeconds: hopSamples / sampleRate,
-    startSeconds:
-      request.pcmStartSeconds + (range.first * hopSamples) / sampleRate,
+    hopSeconds: hop / sampleRate,
+    startSeconds: request.pcmStartSeconds + (range.first * hop) / sampleRate,
     values: Array.from(values),
+    confidence: Array.from(confidence),
   };
 };
 
