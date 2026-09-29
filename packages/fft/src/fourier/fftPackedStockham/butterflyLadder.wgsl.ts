@@ -26,26 +26,22 @@ fn getFactor(stage: u32) -> u32 {
   return 5u;
 }
 
+// The even and odd stage buffers are the two halves of one array: the AMD
+// GCN-5 driver miscompiles the code DXC builds for two separate arrays.
+fn stageOffset(even: bool) -> u32 {
+  return select(packedWindowSize, 0u, even);
+}
+
 fn readStage(index: u32, readEven: bool) -> vec2<f32> {
-  if (readEven) {
-    return sm0[index];
-  }
-  return sm1[index];
+  return sm[stageOffset(readEven) + index];
 }
 
 fn writeStage(index: u32, readEven: bool, value: vec2<f32>) {
-  if (readEven) {
-    sm1[index] = value;
-  } else {
-    sm0[index] = value;
-  }
+  sm[stageOffset(!readEven) + index] = value;
 }
 
 fn getResult(index: u32) -> vec2<f32> {
-  if ((getFactorCount() & 1u) == 0u) {
-    return sm0[index];
-  }
-  return sm1[index];
+  return sm[stageOffset((getFactorCount() & 1u) == 0u) + index];
 }
 `;
 

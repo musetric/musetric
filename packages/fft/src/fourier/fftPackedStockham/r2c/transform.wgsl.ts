@@ -21,8 +21,7 @@ struct Params {
   batchOffset: u32,
 };
 
-var<workgroup> sm0: array<vec2<f32>, packedWindowSize>;
-var<workgroup> sm1: array<vec2<f32>, packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, 2u * packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
@@ -106,15 +105,15 @@ fn main(
       let a6 = loadPacked(inputOffset, j + 6u * butterflyCount);
       let a7 = loadPacked(inputOffset, j + 7u * butterflyCount);
       let y = combineRadix8(a0, a1, a2, a3, a4, a5, a6, a7);
-      let o0 = j * 8u;
-      sm1[o0] = y[0];
-      sm1[o0 + 1u] = y[1];
-      sm1[o0 + 2u] = y[2];
-      sm1[o0 + 3u] = y[3];
-      sm1[o0 + 4u] = y[4];
-      sm1[o0 + 5u] = y[5];
-      sm1[o0 + 6u] = y[6];
-      sm1[o0 + 7u] = y[7];
+      let o0 = stageOffset(false) + j * 8u;
+      sm[o0] = y[0];
+      sm[o0 + 1u] = y[1];
+      sm[o0 + 2u] = y[2];
+      sm[o0 + 3u] = y[3];
+      sm[o0 + 4u] = y[4];
+      sm[o0 + 5u] = y[5];
+      sm[o0 + 6u] = y[6];
+      sm[o0 + 7u] = y[7];
     }
     workgroupBarrier();
     stageStride = 8u;
@@ -122,7 +121,7 @@ fn main(
   } else {
     for (var i = t; i < packedWindowSize; i += threadCount) {
       let sampleIndex = i * 2u;
-      sm0[i] = vec2<f32>(
+      sm[i] = vec2<f32>(
         readInput(inputOffset, sampleIndex),
         readInput(inputOffset, sampleIndex + 1u),
       );

@@ -21,8 +21,7 @@ struct Params {
   batchOffset: u32,
 };
 
-var<workgroup> sm0: array<vec2<f32>, packedWindowSize>;
-var<workgroup> sm1: array<vec2<f32>, packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, 2u * packedWindowSize>;
 
 @group(0) @binding(0) var<storage, read> sourceSpectrum: array<f32>;
 @group(0) @binding(1) var<storage, read_write> signal: array<f32>;
@@ -89,10 +88,10 @@ fn main(
   let signalOffset = getOutputWindowOffset(windowIndex);
 
   if (t == 0u) {
-    sm0[0u] = loadPackedSpectrum(spectrumOffset, 0u);
+    sm[0u] = loadPackedSpectrum(spectrumOffset, 0u);
     if (packedWindowSize % 2u == 0u) {
       let half = packedWindowSize / 2u;
-      sm0[half] = loadPackedSpectrum(spectrumOffset, half);
+      sm[half] = loadPackedSpectrum(spectrumOffset, half);
     }
   }
   for (var k = t + 1u; 2u * k < packedWindowSize; k += threadCount) {
@@ -107,8 +106,8 @@ fn main(
       r2cTrigTable[2u * k + 1u],
     );
     let odd = mul(diff, invTwiddle);
-    sm0[k] = vec2<f32>(even.x - odd.y, even.y + odd.x);
-    sm0[mirrorK] = vec2<f32>(even.x + odd.y, odd.x - even.y);
+    sm[k] = vec2<f32>(even.x - odd.y, even.y + odd.x);
+    sm[mirrorK] = vec2<f32>(even.x + odd.y, odd.x - even.y);
   }
   workgroupBarrier();
 
