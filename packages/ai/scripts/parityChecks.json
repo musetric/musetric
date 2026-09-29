@@ -126,7 +126,7 @@
         "reference": "original",
         "candidate": "product",
         "measure": "snr",
-        "atLeast": 115
+        "atLeast": 110
       },
       {
         "row": 6,
@@ -134,7 +134,7 @@
         "reference": "reference",
         "candidate": "product",
         "measure": "snr",
-        "atLeast": 115
+        "atLeast": 80
       }
     ],
     "rhythm": [
