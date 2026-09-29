@@ -23,7 +23,6 @@ export const pitchParamsStruct = `struct PitchParams {
   levelRangeDb: f32,
   minimumLag: u32,
   lagCount: u32,
-  periodicityWindow: u32,
   periodicityFloor: f32,
   agreementBoostCap: f32,
   refineHarmonics: u32,

@@ -10,7 +10,8 @@ ${pitchSlotStruct}
 @group(0) @binding(2) var<storage, read_write> whitened: array<f32>;
 @group(0) @binding(3) var<storage, read_write> frequencies: array<f32>;
 @group(0) @binding(4) var<storage, read_write> levels: array<f32>;
-@group(0) @binding(5) var<uniform> params: PitchParams;
+@group(0) @binding(5) var<storage, read_write> powerSpectrum: array<f32>;
+@group(0) @binding(6) var<uniform> params: PitchParams;
 
 const workgroupWidth = 256u;
 const maxSpectrumBins = 2048u;
@@ -92,6 +93,13 @@ fn spectrum(
       value = magnitudeAt(slotIndex, bin) / mean;
     }
     whitened[whitenedBase + bin] = value;
+  }
+
+  let powerBase = slotIndex * (params.fftSize + 2u);
+  for (var bin = threadIndex; bin <= params.halfSize; bin += workgroupWidth) {
+    let value = vec2<f32>(signal[powerBase + 2u * bin], signal[powerBase + 2u * bin + 1u]);
+    powerSpectrum[powerBase + 2u * bin] = dot(value, value);
+    powerSpectrum[powerBase + 2u * bin + 1u] = 0.0;
   }
 
   let frequencyBase = slotIndex * params.phaseBins;

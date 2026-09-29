@@ -1,6 +1,7 @@
 import { type FourierMode } from '@musetric/fft';
 import { createFourierCell } from '@musetric/fft/gpu';
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
+import { createPitchInverseCell } from './inverse.js';
 import { createPitchParamsCell } from './params.js';
 import { createPitchPipelines } from './pipeline.js';
 import {
@@ -137,6 +138,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
   const lineCell = createPitchLineCell(device);
   const bindGroupsCell = createPitchBindGroupsCell(device, pipelines);
   const fourierCell = createFourierCell(device);
+  const inverseCell = createPitchInverseCell(device);
   let pending: Pending | undefined = undefined;
   const identity: SampleIdentity = { samples: undefined, length: 0 };
 
@@ -157,6 +159,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
           windowCount: settings.batchSlots,
         },
       });
+      const inverse = inverseCell.get(buffers, settings);
 
       const dispatchValues = (
         state: Pending,
@@ -218,6 +221,12 @@ export const createSpectrogramFundamentalFrequencyCell = (
           bindAnalysis(pass, state, pipelines.spectrum, bindGroups.spectrum);
           pass.dispatchWorkgroups(state.plan.slots.length);
         }),
+        analysisStage('autocorrelation', (pass, state) => {
+          inverse.dispatch(pass, {
+            batchOffset: 0,
+            batchCount: state.plan.slots.length,
+          });
+        }),
         analysisStage('periodicity', (pass, state) => {
           bindAnalysis(
             pass,
@@ -225,7 +234,10 @@ export const createSpectrogramFundamentalFrequencyCell = (
             pipelines.periodicity,
             bindGroups.periodicity,
           );
-          pass.dispatchWorkgroups(state.plan.slots.length);
+          pass.dispatchWorkgroups(
+            Math.ceil(settings.lagCount / workgroupSize),
+            state.plan.slots.length,
+          );
         }),
         analysisStage('observe', (pass, state) => {
           bindAnalysis(pass, state, pipelines.observe, bindGroups.observe);
@@ -347,6 +359,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
       paramsCell.dispose();
       buffersCell.dispose();
       fourierCell.dispose();
+      inverseCell.dispose();
       scheduleCell.dispose();
       settingsCell.dispose();
     },

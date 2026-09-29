@@ -6,7 +6,6 @@ const zeroPaddingFactor = 2;
 const windowName: WindowFunctionName = 'hann';
 const spectrumMaxFrequency = 12000;
 const phaseMaxFrequency = 8000;
-const periodicityWindowSeconds = 0.01;
 
 const minimumFrequency = 55;
 const maximumFrequency = 1100;
@@ -29,7 +28,7 @@ const refineRangeDb = 70;
 const coarseRefineHarmonics = 3;
 const coarseRefineTolerance = 0.06;
 
-const voicingBias = -1.1883;
+const voicingBias = -1.05;
 const voicingPeriodicity = 5.2802;
 const voicingSalience = 0.465;
 const voicingShare = 4.6998;
@@ -99,7 +98,6 @@ export type PitchSettings = {
   levelRangeDb: number;
   minimumLag: number;
   lagCount: number;
-  periodicityWindow: number;
   periodicityFloor: number;
   agreementBoostCap: number;
   refineHarmonics: number;
@@ -161,14 +159,9 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
   const top = Math.min(maximumFrequency, sampleRate / 2);
   const minimumLag = Math.ceil(sampleRate / top);
   const maximumLag = Math.floor(sampleRate / minimumFrequency);
-  const periodicityWindow = Math.round(periodicityWindowSeconds * sampleRate);
-  const periodicitySpan = periodicityWindow + maximumLag + 1;
   const windowOffset = Math.floor(hop / 2);
   const foldReach = foldMaxFrames + foldGapFrames + foldAnchorFrames;
-  const support = Math.max(
-    windowSize / 2 + windowOffset,
-    Math.ceil(periodicitySpan / 2),
-  );
+  const support = windowSize / 2 + windowOffset;
   const windowEnergy = windowFunctions[windowName](windowSize).reduce(
     (sum, value) => sum + value * value,
     0,
@@ -205,7 +198,6 @@ export const createPitchSettings = (sampleRate: number): PitchSettings => {
     levelRangeDb,
     minimumLag,
     lagCount: maximumLag - minimumLag + 1,
-    periodicityWindow,
     periodicityFloor,
     agreementBoostCap,
     refineHarmonics,
