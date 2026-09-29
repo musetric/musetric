@@ -1,6 +1,102 @@
 import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
 import { pitchParamsStruct } from './paramsStruct.wgsl.js';
+import { pitchLatticeCount } from './settings.es.js';
 import { pitchDecodedStruct, pitchObservationStruct } from './slots.wgsl.js';
+
+const voiced = Array.from({ length: pitchLatticeCount }, (_, state) => state);
+const states = [...voiced, pitchLatticeCount];
+
+const joinLines = (items: string[]): string => items.join('\n');
+
+const forwardFrom = (to: number, from: number): string =>
+  `  best${to} = min(best${to}, alpha${from} + jumpCost(previous${from}, column.frequency${to}));`;
+
+const forwardVoiced = (to: number): string =>
+  joinLines([
+    `  var best${to} = infinity;`,
+    ...voiced.map((from) => forwardFrom(to, from)),
+    `  best${to} = min(best${to}, alpha${pitchLatticeCount} + params.voicedTransitionCost);`,
+    `  let next${to} = column.emit${to} + best${to};`,
+  ]);
+
+const forwardUnvoiced = (): string =>
+  joinLines([
+    `  var best${pitchLatticeCount} = alpha${pitchLatticeCount};`,
+    ...voiced.map(
+      (from) =>
+        `  best${pitchLatticeCount} = min(best${pitchLatticeCount}, alpha${from} + params.voicedTransitionCost);`,
+    ),
+    `  let next${pitchLatticeCount} = column.emit${pitchLatticeCount} + best${pitchLatticeCount};`,
+  ]);
+
+const forwardStep = joinLines([
+  ...voiced.map(forwardVoiced),
+  forwardUnvoiced(),
+  ...states.map((state) => `  alpha${state} = next${state};`),
+  ...voiced.map((state) => `  previous${state} = column.frequency${state};`),
+]);
+
+const backwardTo = (from: number, to: number): string =>
+  `  best${from} = min(best${from}, jumpCost(current.frequency${from}, right.frequency${to}) + right.emit${to} + beta${to});`;
+
+const backwardVoiced = (from: number): string =>
+  joinLines([
+    `  var best${from} = infinity;`,
+    ...voiced.map((to) => backwardTo(from, to)),
+    `  best${from} = min(best${from}, params.voicedTransitionCost + right.emit${pitchLatticeCount} + beta${pitchLatticeCount});`,
+  ]);
+
+const backwardUnvoiced = (): string =>
+  joinLines([
+    `  var best${pitchLatticeCount} = right.emit${pitchLatticeCount} + beta${pitchLatticeCount};`,
+    ...voiced.map(
+      (to) =>
+        `  best${pitchLatticeCount} = min(best${pitchLatticeCount}, params.voicedTransitionCost + right.emit${to} + beta${to});`,
+    ),
+  ]);
+
+const backwardStep = joinLines([
+  ...voiced.map(backwardVoiced),
+  backwardUnvoiced(),
+  ...states.map((state) => `  beta${state} = best${state};`),
+]);
+
+const readCandidate = (state: number): string =>
+  joinLines([
+    `  if (observation.candidates[${state}].y > 0.0) {`,
+    `    column.frequency${state} = observation.candidates[${state}].x;`,
+    `    column.emit${state} = -observation.candidates[${state}].y;`,
+    '  }',
+  ]);
+
+const columnFields = joinLines([
+  ...voiced.map((state) => `  frequency${state}: f32,`),
+  ...states.map((state) => `  emit${state}: f32,`),
+]);
+
+const columnDefaults = joinLines(
+  voiced.map(
+    (state) =>
+      `  column.frequency${state} = 0.0;\n  column.emit${state} = infinity;`,
+  ),
+);
+
+const alphaStart = joinLines([
+  ...states.map((state) => `  var alpha${state} = column.emit${state};`),
+  ...voiced.map(
+    (state) => `  var previous${state} = column.frequency${state};`,
+  ),
+]);
+
+const betaStart = joinLines(states.map((state) => `  var beta${state} = 0.0;`));
+
+const totalCosts = states
+  .map((state) => `alpha${state} + beta${state}`)
+  .join(', ');
+
+const centerFrequencies = voiced
+  .map((state) => `center.frequency${state}`)
+  .join(', ');
 
 export const decodeShader = `
 ${pitchParamsStruct}
@@ -11,26 +107,20 @@ ${pitchDecodedStruct}
 @group(0) @binding(1) var<storage, read_write> decoded: array<PitchDecoded>;
 @group(0) @binding(2) var<uniform> params: PitchParams;
 
-const stateCount = 6u;
-const unvoiced = 5u;
+const unvoiced = ${pitchLatticeCount}u;
 const infinity = 1.0e30;
 const maxHistory = 128;
 
 ${centsDistanceWgsl}
 
 struct Column {
-  freqs: array<f32, 6>,
-  emits: array<f32, 6>,
+${columnFields}
 };
 
 fn loadColumn(frame: i32) -> Column {
   var column: Column;
-  for (var state = 0u; state < unvoiced; state += 1u) {
-    column.freqs[state] = 0.0;
-    column.emits[state] = infinity;
-  }
-  column.freqs[unvoiced] = -1.0;
-  column.emits[unvoiced] = -params.unvoicedCost;
+${columnDefaults}
+  column.emit${pitchLatticeCount} = -params.unvoicedCost;
   if (frame < 0 || frame >= params.trackFrames) {
     return column;
   }
@@ -38,14 +128,8 @@ fn loadColumn(frame: i32) -> Column {
   if (observation.frame != frame) {
     return column;
   }
-  for (var state = 0u; state < unvoiced; state += 1u) {
-    let candidate = observation.candidates[state];
-    if (candidate.y > 0.0) {
-      column.freqs[state] = candidate.x;
-      column.emits[state] = -candidate.y;
-    }
-  }
-  column.emits[unvoiced] = -params.unvoicedCost +
+${joinLines(voiced.map(readCandidate))}
+  column.emit${pitchLatticeCount} = -params.unvoicedCost +
     params.voicingScale * (2.0 * observation.voicing - 1.0);
   return column;
 }
@@ -65,64 +149,29 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
   let lookahead = min(i32(params.lookaheadFrames), history);
 
   var column = loadColumn(frame - history);
-  var alpha = column.emits;
-  var previousFreqs = column.freqs;
-  var scratch = array<f32, 6>();
+${alphaStart}
   for (var step = 1; step <= history; step += 1) {
     column = loadColumn(frame - history + step);
-    for (var b = 0u; b < stateCount; b += 1u) {
-      var best = infinity;
-      if (b == unvoiced) {
-        best = alpha[unvoiced];
-        for (var a = 0u; a < unvoiced; a += 1u) {
-          best = min(best, alpha[a] + params.voicedTransitionCost);
-        }
-      } else {
-        for (var a = 0u; a < unvoiced; a += 1u) {
-          best = min(best, alpha[a] + jumpCost(previousFreqs[a], column.freqs[b]));
-        }
-        best = min(best, alpha[unvoiced] + params.voicedTransitionCost);
-      }
-      scratch[b] = column.emits[b] + best;
-    }
-    alpha = scratch;
-    previousFreqs = column.freqs;
+${forwardStep}
   }
-  let centerFreqs = column.freqs;
-  let alphaCenter = alpha;
+  let center = column;
 
   var right = loadColumn(frame + lookahead);
-  var beta = array<f32, 6>();
+${betaStart}
   for (var step = 1; step <= lookahead; step += 1) {
     let current = loadColumn(frame + lookahead - step);
-    for (var a = 0u; a < stateCount; a += 1u) {
-      var best = infinity;
-      if (a == unvoiced) {
-        best = right.emits[unvoiced] + beta[unvoiced];
-        for (var b = 0u; b < unvoiced; b += 1u) {
-          best = min(best, params.voicedTransitionCost + right.emits[b] + beta[b]);
-        }
-      } else {
-        for (var b = 0u; b < unvoiced; b += 1u) {
-          best = min(best, jumpCost(current.freqs[a], right.freqs[b]) + right.emits[b] + beta[b]);
-        }
-        best = min(
-          best,
-          params.voicedTransitionCost + right.emits[unvoiced] + beta[unvoiced],
-        );
-      }
-      scratch[a] = best;
-    }
-    beta = scratch;
+${backwardStep}
     right = current;
   }
 
+  let costs = array<f32, ${states.length}>(${totalCosts});
+  let frequencies = array<f32, ${voiced.length}>(${centerFrequencies});
   var bestState = unvoiced;
   var bestCost = infinity;
   var bestVoiced = infinity;
   var secondVoiced = infinity;
-  for (var state = 0u; state < stateCount; state += 1u) {
-    let cost = alphaCenter[state] + beta[state];
+  for (var state = 0u; state <= unvoiced; state += 1u) {
+    let cost = costs[state];
     if (state < unvoiced) {
       if (cost < bestVoiced) {
         secondVoiced = bestVoiced;
@@ -136,11 +185,10 @@ fn decode(@builtin(global_invocation_id) gid: vec3<u32>) {
       bestState = state;
     }
   }
-  let unvoicedTotal = alphaCenter[unvoiced] + beta[unvoiced];
-  var margin = abs(unvoicedTotal - bestVoiced);
+  var margin = abs(costs[unvoiced] - bestVoiced);
   var frequency = 0.0;
   if (bestState < unvoiced) {
-    frequency = centerFreqs[bestState];
+    frequency = frequencies[bestState];
     margin = secondVoiced - bestVoiced;
   }
   var result: PitchDecoded;
