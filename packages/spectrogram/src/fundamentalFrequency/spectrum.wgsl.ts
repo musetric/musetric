@@ -16,7 +16,7 @@ const workgroupWidth = 256u;
 const maxSpectrumBins = 2048u;
 const tau = 6.28318530717958647692;
 
-var<workgroup> cumulative: array<f32, 2049>;
+var<workgroup> cumulative: array<f32, 2176>;
 var<workgroup> chunkTotals: array<f32, 256>;
 var<workgroup> powerTotals: array<f32, 256>;
 

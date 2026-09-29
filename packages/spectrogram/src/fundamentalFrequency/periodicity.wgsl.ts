@@ -14,7 +14,7 @@ const workgroupWidth = 256u;
 const maxSegment = 1536u;
 
 var<workgroup> segment: array<f32, 1536>;
-var<workgroup> energy: array<f32, 1537>;
+var<workgroup> energy: array<f32, 1664>;
 var<workgroup> chunkTotals: array<f32, 256>;
 
 @compute @workgroup_size(256)
