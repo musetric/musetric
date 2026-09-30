@@ -134,7 +134,7 @@ export const createWhisperRuntime = async (
     options.inspect,
   );
   if (cross) {
-    routeFirstStep(step, cross);
+    routeFirstStep(step, { cross, device });
   }
   const runStep = step.run.bind(step);
   step.run = async (feeds, ...rest) =>

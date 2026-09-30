@@ -113,6 +113,7 @@ const whisperModelTask = (
   provider,
   encoderUrl: model.fileStarting('encoder_model'),
   decoderUrl: model.fileStarting('decoder_model_merged'),
+  crossUrl: model.fileStarting('cross_kv'),
   features: model.tensor('model.input@reference'),
   encoderStates: model.tensor('encoder.output@onnx-cpu'),
   tokens: model.tensor('decoder.tokens@reference'),

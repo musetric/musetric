@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web/webgpu';
+import { type CrossProjection, projectCrossByWindow } from './whisperCross.js';
 
 const branchSelector = 'use_cache_branch';
 const encoderStates = 'encoder_hidden_states';
@@ -72,16 +73,17 @@ const release = (
 
 export const routeFirstStep = (
   step: StepSession,
-  cross: ort.InferenceSession,
+  projection: CrossProjection,
 ): void => {
   const run = step.run.bind(step);
   step.run = async (feeds, ...rest) => {
     if (!isFirstStep(feeds)) {
       return run(feeds, ...rest);
     }
-    const crossValues = await cross.run({
-      [encoderStates]: feeds[encoderStates],
-    });
+    const crossValues = await projectCrossByWindow(
+      projection,
+      feeds[encoderStates],
+    );
     const ids = feeds.input_ids;
     const [, tokens] = ids.dims;
     let past: StepFeeds = Object.fromEntries(

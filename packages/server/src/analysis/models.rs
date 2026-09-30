@@ -216,7 +216,7 @@ pub(crate) fn skey_graph() -> Value {
 pub(crate) const WHISPER: ModelBundle = ModelBundle {
     label: "Whisper transcription model",
     model_id: "musetric/whisper-large-v3-turbo-onnx",
-    revision: "81da5251e8cebcf5d72f778f3b5028deeed2bc2b",
+    revision: "4d1b258947772984ec0b07a913cb42ca23619266",
     directory: "whisper-onnx-hf-cache",
     sample_rate: 16000,
     downmix: Downmix::Power,
@@ -229,8 +229,8 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         ),
         (
             "generation_config.json",
-            "0392ccf797bca2bff1600477ed6fb71d367b428f3da626c6d3c8dbd82c58ae44",
-            3797,
+            "db262b08585e6c86efb23ac22c1ea49d577f66d82649063b0761a1513c01f5a2",
+            3794,
         ),
         (
             "preprocessor_config.json",
@@ -279,8 +279,13 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         ),
         (
             "decoder_model_merged_fp16.onnx",
-            "4862f66f9140ccd78ad76e8b5f5365fc49b8b3d0312e5431cf058a7b978029eb",
-            344_283_544,
+            "e01b8138736055fecf80bb736a709336d5eb2e8b990e7819baa0b01b49a6a7f8",
+            317_766_408,
+        ),
+        (
+            "cross_kv_fp16.onnx",
+            "45b5271bd4f69e16a6e59a624698de9db2c065d38fd55ce67f69271414d9ef84",
+            26_228_595,
         ),
     ],
 };
