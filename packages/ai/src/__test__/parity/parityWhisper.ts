@@ -105,6 +105,40 @@ const emptyPast = (
 const presentOf = (past: string): string =>
   past.replace(pastPrefix, 'present.');
 
+const branchSelector = 'use_cache_branch';
+
+const projectCross = async (
+  task: ParityWhisperModelTask,
+  states: ort.Tensor,
+): Promise<Record<string, ort.Tensor>> => {
+  const cross = await ort.InferenceSession.create(
+    task.crossUrl,
+    await sessionOptions(task.provider),
+  );
+  try {
+    const outputs = await cross.run({ encoder_hidden_states: states });
+    return Object.fromEntries(
+      Object.entries(outputs).map((entry) => [
+        entry[0].replace('present.', pastPrefix),
+        entry[1],
+      ]),
+    );
+  } finally {
+    await cross.release();
+  }
+};
+
+const keepDecoderPast = (
+  past: Record<string, ort.Tensor>,
+  outputs: ort.InferenceSession.ReturnType,
+): void => {
+  for (const name of Object.keys(past)) {
+    if (name.includes('.decoder.')) {
+      past[name] = outputs[presentOf(name)];
+    }
+  }
+};
+
 type DecoderStep = {
   ids: number[];
   useCache: boolean;
@@ -126,49 +160,55 @@ const runTeacherForced = async (
     );
     let past = emptyPast(session);
     const pastNames = Object.keys(past);
+    const merged = session.inputNames.includes(branchSelector);
     const fetches = ['logits', ...pastNames.map(presentOf)];
     const logits: Float32Array[] = [];
     const step = async (
       decoderStep: DecoderStep,
     ): Promise<ort.InferenceSession.ReturnType> => {
-      const outputs = await session.run(
-        {
-          ...past,
-          input_ids: new ort.Tensor(
-            'int64',
-            BigInt64Array.from(decoderStep.ids, BigInt),
-            [1, decoderStep.ids.length],
-          ),
-          encoder_hidden_states: states,
-          use_cache_branch: new ort.Tensor(
-            'bool',
-            Uint8Array.of(decoderStep.useCache ? 1 : 0),
-            [1],
-          ),
-        },
-        fetches,
-      );
+      const feeds: Record<string, ort.Tensor> = {
+        ...past,
+        input_ids: new ort.Tensor(
+          'int64',
+          BigInt64Array.from(decoderStep.ids, BigInt),
+          [1, decoderStep.ids.length],
+        ),
+        encoder_hidden_states: states,
+      };
+      if (merged) {
+        feeds[branchSelector] = new ort.Tensor(
+          'bool',
+          Uint8Array.of(decoderStep.useCache ? 1 : 0),
+          [1],
+        );
+      }
+      const outputs = await session.run(feeds, fetches);
       logits.push(await download(outputs.logits));
       return outputs;
     };
-    const first = await step({
-      ids: tokens.slice(0, task.promptLength),
-      useCache: false,
-    });
-    past = Object.fromEntries(
-      pastNames.map((name) => [name, first[presentOf(name)]]),
-    );
+    if (merged) {
+      const first = await step({
+        ids: tokens.slice(0, task.promptLength),
+        useCache: false,
+      });
+      past = Object.fromEntries(
+        pastNames.map((name) => [name, first[presentOf(name)]]),
+      );
+    } else {
+      past = { ...past, ...(await projectCross(task, states)) };
+      for (const id of tokens.slice(0, task.promptLength)) {
+        keepDecoderPast(past, await step({ ids: [id], useCache: true }));
+      }
+    }
     for (
       let position = task.promptLength;
       position < tokens.length - 1;
       position += 1
     ) {
-      const outputs = await step({ ids: [tokens[position]], useCache: true });
-      for (const name of pastNames.filter((entry) =>
-        entry.includes('.decoder.'),
-      )) {
-        past[name] = outputs[presentOf(name)];
-      }
+      keepDecoderPast(
+        past,
+        await step({ ids: [tokens[position]], useCache: true }),
+      );
     }
     const values = new Float32Array(
       logits.reduce((total, part) => total + part.length, 0),

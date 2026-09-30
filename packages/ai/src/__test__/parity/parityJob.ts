@@ -90,6 +90,7 @@ export type ParityWhisperModelTask = {
   provider: 'wasm' | 'webgpu';
   encoderUrl: string;
   decoderUrl: string;
+  crossUrl: string;
   features: ParityTensorRef;
   encoderStates: ParityTensorRef;
   tokens: ParityTensorRef;
