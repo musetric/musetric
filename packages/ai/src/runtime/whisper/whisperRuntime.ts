@@ -13,7 +13,6 @@ import { type WhisperGraph } from '../modelGraphs.js';
 import {
   getMusetricWebGpuDevice,
   musetricWebGpuProvider,
-  readAdapterArchitecture,
 } from '../webgpuDevice.js';
 import {
   createWhisperDecoder,
@@ -46,10 +45,7 @@ const collapsedWordsPerSecond = 0.25;
 const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
 const windowsPerBatch = 4;
-const subgroupArchitectures = new Set(['adreno-6xx']);
-
-export const readWhisperSubgroups = async (): Promise<boolean> =>
-  subgroupArchitectures.has(await readAdapterArchitecture());
+export const whisperDeviceOptions = { subgroups: false };
 
 export type WhisperRuntimeOptions = {
   graph: WhisperGraph;
@@ -84,7 +80,6 @@ export const createWhisperRuntime = async (
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
 
-  const subgroups = await readWhisperSubgroups();
   const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
     'automatic-speech-recognition',
     options.modelId,
@@ -95,7 +90,9 @@ export const createWhisperRuntime = async (
       dtype: { ...options.graph.dtype },
 
       session_options: {
-        executionProviders: [await musetricWebGpuProvider({ subgroups })],
+        executionProviders: [
+          await musetricWebGpuProvider(whisperDeviceOptions),
+        ],
       },
       progress_callback: () => {
         options.onLoading();
@@ -118,13 +115,15 @@ export const createWhisperRuntime = async (
           ).arrayBuffer(),
         ),
         {
-          executionProviders: [await musetricWebGpuProvider({ subgroups })],
+          executionProviders: [
+            await musetricWebGpuProvider(whisperDeviceOptions),
+          ],
           preferredOutputLocation: 'gpu-buffer',
         },
       )
     : undefined;
 
-  const { device } = await getMusetricWebGpuDevice({ subgroups });
+  const { device } = await getMusetricWebGpuDevice(whisperDeviceOptions);
   const pacer = createGpuPacer(device);
   const encoder = internals.model.sessions.model;
   const runEncoder = encoder.run.bind(encoder);
