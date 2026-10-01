@@ -3,7 +3,7 @@ import { musetricWebGpuProvider } from '../../runtime/webgpuDevice.js';
 import { type WhisperDecodeTap } from '../../runtime/whisper/whisperDecoder.js';
 import {
   createWhisperRuntime,
-  readWhisperSubgroups,
+  whisperDeviceOptions,
 } from '../../runtime/whisper/whisperRuntime.js';
 import {
   fetchTensor,
@@ -48,11 +48,7 @@ const sessionOptions = async (
   executionProviders:
     provider === 'wasm'
       ? ['wasm']
-      : [
-          await musetricWebGpuProvider({
-            subgroups: await readWhisperSubgroups(),
-          }),
-        ],
+      : [await musetricWebGpuProvider(whisperDeviceOptions)],
   graphOptimizationLevel: 'all',
 });
 
