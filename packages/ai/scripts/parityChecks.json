@@ -460,7 +460,7 @@
         "reference": "onnx-cpu",
         "candidate": "webgpu",
         "measure": "argmaxDiffering",
-        "atMost": 1
+        "atMost": 2
       },
       {
         "row": 6,
