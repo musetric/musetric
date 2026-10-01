@@ -42,6 +42,7 @@ const createStockhamConstants = (
   packedWindowSize: variant.packedWindowSize,
   inPlace: inPlace ? 1 : 0,
   threadCount: selectStockhamThreadCount(variant.packedWindowSize),
+  smSize: 2 * variant.packedWindowSize,
   radix8StageCount: 0,
   ...variant.radixStageCounts,
   ...(isPowerOfTwo(variant.packedWindowSize)

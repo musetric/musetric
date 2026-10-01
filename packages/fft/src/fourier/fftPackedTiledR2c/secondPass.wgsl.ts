@@ -14,6 +14,7 @@ const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
 override smPad: u32 = 8u;
+override smSize: u32 = 288u;
 
 struct Params {
   windowSize: u32,
@@ -21,14 +22,14 @@ struct Params {
   batchOffset: u32,
 };
 
-var<workgroup> rowAReal0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowAImag0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowAReal1: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowAImag1: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowBReal0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowBImag0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowBReal1: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> rowBImag1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> rowAReal0: array<f32, smSize>;
+var<workgroup> rowAImag0: array<f32, smSize>;
+var<workgroup> rowAReal1: array<f32, smSize>;
+var<workgroup> rowAImag1: array<f32, smSize>;
+var<workgroup> rowBReal0: array<f32, smSize>;
+var<workgroup> rowBImag0: array<f32, smSize>;
+var<workgroup> rowBReal1: array<f32, smSize>;
+var<workgroup> rowBImag1: array<f32, smSize>;
 
 @group(0) @binding(0) var<storage, read> scratch: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
