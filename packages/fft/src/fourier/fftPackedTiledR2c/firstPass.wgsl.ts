@@ -12,6 +12,7 @@ const threadCount: u32 = 64u;
 const batchSize: u32 = 4u;
 const sqrt1_2: f32 = 0.70710678118654752440;
 override smPad: u32 = 8u;
+override smSize: u32 = 288u;
 
 struct Params {
   windowSize: u32,
@@ -19,10 +20,10 @@ struct Params {
   batchOffset: u32,
 };
 
-var<workgroup> smReal0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> smImag0: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> smReal1: array<f32, batchSize * (tileSize + smPad)>;
-var<workgroup> smImag1: array<f32, batchSize * (tileSize + smPad)>;
+var<workgroup> smReal0: array<f32, smSize>;
+var<workgroup> smImag0: array<f32, smSize>;
+var<workgroup> smReal1: array<f32, smSize>;
+var<workgroup> smImag1: array<f32, smSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read> spectrum: array<f32>;

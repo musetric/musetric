@@ -13,6 +13,7 @@ override radix3StageCount: u32 = 0u;
 override radix5StageCount: u32 = 0u;
 override inPlace: u32 = 1u;
 override threadCount: u32 = 256u;
+override smSize: u32 = 4096u;
 override twiddleSign: f32 = -1.0;
 
 struct Params {
@@ -21,7 +22,7 @@ struct Params {
   batchOffset: u32,
 };
 
-var<workgroup> sm: array<vec2<f32>, 2u * packedWindowSize>;
+var<workgroup> sm: array<vec2<f32>, smSize>;
 
 @group(0) @binding(0) var<storage, read> wave: array<f32>;
 @group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;

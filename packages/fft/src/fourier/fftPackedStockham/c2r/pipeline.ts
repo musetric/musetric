@@ -69,6 +69,9 @@ const createTransformConstants = (
     inPlace: inPlace ? 1 : 0,
     threadCount: selectTransformThreadCount(variant, counts),
     ...counts,
+    ...(variant.kind === 'singlePass'
+      ? { smSize: 2 * variant.packedWindowSize }
+      : {}),
   };
 };
 

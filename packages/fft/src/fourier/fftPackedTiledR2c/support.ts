@@ -6,7 +6,7 @@ import {
 } from '../factorization.es.js';
 import { selectBalancedTileShape } from '../tileShape.js';
 
-const batchSize = 4;
+export const batchSize = 4;
 const maxTileSize = 256;
 const maxWindowSize = 65536;
 const minPackedWindowSize = 4;

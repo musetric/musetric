@@ -3,7 +3,7 @@ import { firstPassShader } from './firstPass.wgsl.js';
 import { firstPassMixedShader } from './firstPassMixed.wgsl.js';
 import { secondPassShader } from './secondPass.wgsl.js';
 import { secondPassMixedShader } from './secondPassMixed.wgsl.js';
-import { type PackedTiledR2cVariant } from './support.js';
+import { batchSize, type PackedTiledR2cVariant } from './support.js';
 
 const minRadix8Log2TileSize = 7;
 
@@ -31,6 +31,8 @@ const createFirstPassConstants = (
   variant: PackedTiledR2cVariant,
   inPlace: boolean,
 ): Record<string, number> => {
+  const smPad = 8;
+  const smSize = batchSize * (variant.tileSize + smPad);
   if (variant.kind === 'tiledMixed') {
     return {
       packedWindowSize: variant.packedWindowSize,
@@ -38,7 +40,8 @@ const createFirstPassConstants = (
       tileSize: variant.tileSize,
       rowSize: variant.rowSize,
       columnSize: variant.columnSize,
-      smPad: 8,
+      smPad,
+      smSize,
       ...createPrefixedRadixStageConstants(variant.rowStageCounts, 'row'),
     };
   }
@@ -49,7 +52,8 @@ const createFirstPassConstants = (
     tileSize: variant.tileSize,
     rowSize: variant.rowSize,
     columnSize: variant.columnSize,
-    smPad: 8,
+    smPad,
+    smSize,
     ...createRadix8StageCounts(variant.log2RowSize, 'row'),
   };
 };
@@ -57,6 +61,8 @@ const createFirstPassConstants = (
 const createSecondPassConstants = (
   variant: PackedTiledR2cVariant,
 ): Record<string, number> => {
+  const smPad = variant.tileSize <= 248 ? 8 : 0;
+  const smSize = batchSize * (variant.tileSize + smPad);
   if (variant.kind === 'tiledMixed') {
     return {
       packedWindowSize: variant.packedWindowSize,
@@ -65,7 +71,8 @@ const createSecondPassConstants = (
       rowSize: variant.rowSize,
       rowPairCount: variant.rowPairCount,
       columnSize: variant.columnSize,
-      smPad: variant.tileSize <= 248 ? 8 : 0,
+      smPad,
+      smSize,
       ...createPrefixedRadixStageConstants(variant.columnStageCounts, 'column'),
     };
   }
@@ -78,7 +85,8 @@ const createSecondPassConstants = (
     rowHalfSize: variant.rowHalfSize,
     rowPairCount: variant.rowPairCount,
     columnSize: variant.columnSize,
-    smPad: variant.tileSize <= 248 ? 8 : 0,
+    smPad,
+    smSize,
     ...createRadix8StageCounts(variant.log2ColumnSize, 'column'),
   };
 };
