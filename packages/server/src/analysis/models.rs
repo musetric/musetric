@@ -305,7 +305,7 @@ pub(crate) const VOCALS_MODEL_DATA: &str = "duality_core_t1100.onnx.data";
 pub(crate) const VOCALS: ModelBundle = ModelBundle {
     label: "Vocals separation model",
     model_id: "musetric/aname-mel-band-roformer-duality-onnx",
-    revision: "bcb0c0b4d8290ad79525bd13559b8167b33a5ee2",
+    revision: "4aacb7a71b4bfaa305c8e02bd00e3f3b3924f47b",
     directory: "aname-mel-band-roformer-duality-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
@@ -313,8 +313,8 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
     files: &[
         (
             VOCALS_MODEL,
-            "0d33bf5e075e656233e9bf434101c561cae18bbe68f33ac0aa12c9566b7e5b43",
-            10_352_478,
+            "4a320d23b6361c1c7920f7e95184fe4195447c2dee18cab17ca5c2579cc1bdf7",
+            10_823_613,
         ),
         (
             VOCALS_MODEL_DATA,
