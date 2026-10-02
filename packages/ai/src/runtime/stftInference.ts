@@ -79,6 +79,7 @@ export type StftInferenceOptions = {
   >;
   frameShader: string;
   overlapAddShader: string;
+  graphCapture?: boolean;
   createCore: (buffers: StftInferenceBuffers) => StftInferenceCore;
   inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
@@ -110,6 +111,7 @@ export const createStftInferenceRuntime = async (
     ],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [model.outputName]: 'gpu-buffer' },
+    ...(options.graphCapture ? { enableGraphCapture: true } : {}),
     ...(options.externalData ? { externalData: options.externalData } : {}),
   });
   const pacer = createGpuPacer(device);
@@ -177,6 +179,35 @@ export const createStftInferenceRuntime = async (
     dims: [...options.outputShape],
   });
 
+  const runModel = async (): Promise<void> => {
+    if (!options.graphCapture) {
+      const result = await session.run(
+        { [model.inputName]: inputTensor },
+        { [model.outputName]: outputTensor },
+      );
+      const modelResult = result[model.outputName];
+      if (modelResult.gpuBuffer !== core.modelOutput) {
+        modelResult.dispose();
+        throw new Error(
+          `${label} model output did not reuse the preallocated GPU buffer`,
+        );
+      }
+      return;
+    }
+    const result = await session.run({ [model.inputName]: inputTensor });
+    const modelResult = result[model.outputName];
+    const encoder = device.createCommandEncoder();
+    encoder.copyBufferToBuffer(
+      modelResult.gpuBuffer,
+      0,
+      core.modelOutput,
+      0,
+      core.modelOutput.size,
+    );
+    device.queue.submit([encoder.finish()]);
+    modelResult.dispose();
+  };
+
   const runChunk = async (
     input: Float32Array<ArrayBuffer>,
     output?: Float32Array<ArrayBuffer>,
@@ -196,17 +227,7 @@ export const createStftInferenceRuntime = async (
     runStage(stftEncoder, core.analysis);
     device.queue.submit([stftEncoder.finish()]);
 
-    const result = await session.run(
-      { [model.inputName]: inputTensor },
-      { [model.outputName]: outputTensor },
-    );
-    const modelResult = result[model.outputName];
-    if (modelResult.gpuBuffer !== core.modelOutput) {
-      modelResult.dispose();
-      throw new Error(
-        `${label} model output did not reuse the preallocated GPU buffer`,
-      );
-    }
+    await runModel();
     await options.inspect?.({
       device,
       modelInput: core.modelInput,
