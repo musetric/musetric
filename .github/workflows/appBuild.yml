@@ -91,7 +91,7 @@ jobs:
       - run: corepack prepare yarn@4.17.1 --activate
       - uses: actions/cache@v5
         with:
-          path: ~/.yarn/berry/cache
+          path: ${{ runner.os == 'Windows' && '~/AppData/Local/Yarn/Berry/cache' || '~/.yarn/berry/cache' }}
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
           restore-keys: yarn-${{ runner.os }}-
       - run: yarn --immutable
@@ -108,7 +108,7 @@ jobs:
           toolchain: 1.97.1
           targets: ${{ matrix.rustTarget }}
       - if: matrix.platform != 'Linux'
-        run: rustup show
+        run: rustup toolchain install --no-self-update
         working-directory: packages/app
       - if: matrix.platform != 'Linux'
         run: rustup target add ${{ matrix.rustTarget }}
@@ -239,7 +239,7 @@ jobs:
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           ONNXRUNTIME_NODE_INSTALL: skip
-      - run: rustup show
+      - run: rustup toolchain install --no-self-update
         working-directory: packages/app
       - uses: actions/cache@v5
         with:
