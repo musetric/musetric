@@ -8,6 +8,16 @@ import {
   type BrowserVocalsUnitsRequest,
 } from './separationApi.js';
 
+const silentUnitRms = 1e-3;
+
+const isSilent = (input: Float32Array): boolean => {
+  let energy = 0;
+  for (const sample of input) {
+    energy += sample * sample;
+  }
+  return Math.sqrt(energy / Math.max(input.length, 1)) < silentUnitRms;
+};
+
 type Stage = {
   run: (input: Float32Array<ArrayBuffer>) => Promise<Float32Array<ArrayBuffer>>;
   release: () => Promise<void>;
@@ -40,7 +50,10 @@ const createLeadBackingStage = async (
     modelUrl: request.leadBackingModelUrl,
   });
   return {
-    run: async (input) => await runtime.processChunk(input),
+    run: async (input) =>
+      isSilent(input)
+        ? new Float32Array(input.length)
+        : await runtime.processChunk(input),
     release: runtime.release,
   };
 };
