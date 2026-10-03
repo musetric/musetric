@@ -41,7 +41,8 @@ from scratch.
 renders it and lets `tauri icon` produce every platform raster asset. Tauri's
 `android` and `ios` development and build commands run that step
 automatically; the same script also refreshes the Android splash screen
-images under `gen/android`.
+images under `gen/android`. The Vite build renders the page's favicons and
+web manifest from the same file.
 
 ## Toolchain
 

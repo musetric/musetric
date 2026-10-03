@@ -1641,6 +1641,7 @@ __metadata:
     "@musetric/cqt": "workspace:*"
     "@musetric/eslint-config": "workspace:*"
     "@musetric/fft": "workspace:*"
+    "@musetric/script": "workspace:*"
     "@musetric/utils": "workspace:*"
     "@resvg/resvg-js": "catalog:"
     "@tauri-apps/cli": "catalog:"
