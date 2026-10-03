@@ -32,10 +32,10 @@ runs:
       with:
         workspaces: packages/server
         shared-key: rust-quality
-    - uses: awalsh128/cache-apt-pkgs-action@v1.6.3
-      with:
-        packages: libgtk-3-dev libwebkit2gtk-4.1-dev
-        version: 1.0
+    - run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      shell: bash
     - run: yarn workspace @musetric/app build:ui
       shell: bash
     - run: yarn workspace @musetric/server check:rust:ast
