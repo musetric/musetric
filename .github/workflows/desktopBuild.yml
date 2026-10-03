@@ -99,10 +99,9 @@ jobs:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           ONNXRUNTIME_NODE_INSTALL: skip
       - if: matrix.platform == 'Linux'
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.3
-        with:
-          packages: libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev patchelf
-          version: 1.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev patchelf
       - if: matrix.platform == 'Linux'
         uses: dtolnay/rust-toolchain@v1
         with:
