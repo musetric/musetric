@@ -41,11 +41,9 @@
     "prettier": "catalog:"
   },
   "resolutions": {
-    "adm-zip": "0.6.0",
     "browserslist": "4.28.8",
     "filelist": "2.0.2",
     "onnxruntime-web": "1.30.0",
-    "sharp": "0.35.3",
     "tar": "7.5.21"
   }
 }
