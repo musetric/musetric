@@ -1,5 +1,4 @@
 use std::{
-    env,
     io::{self, Write},
     path::{self, Path, PathBuf},
     process::{ExitStatus, Stdio},
@@ -110,7 +109,7 @@ pub(crate) fn find_browser() -> Option<PathBuf> {
 fn browser_candidates() -> Vec<PathBuf> {
     let roots = ["ProgramFiles", "ProgramFiles(x86)", "LocalAppData"]
         .into_iter()
-        .filter_map(env::var_os)
+        .filter_map(std::env::var_os)
         .map(PathBuf::from);
     roots
         .flat_map(|root| {
@@ -143,9 +142,9 @@ fn browser_candidates() -> Vec<PathBuf> {
         "chromium-browser",
         "microsoft-edge",
     ];
-    env::var_os("PATH")
+    std::env::var_os("PATH")
         .map(|paths| {
-            env::split_paths(&paths)
+            std::env::split_paths(&paths)
                 .flat_map(|directory| names.map(|name| directory.join(name)))
                 .collect()
         })
