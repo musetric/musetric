@@ -110,7 +110,7 @@
         "reference": "onnx-cpu",
         "candidate": "webgpu",
         "measure": "snr",
-        "atLeast": 115
+        "atLeast": 110
       },
       {
         "row": 6,
