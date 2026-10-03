@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
+    "@musetric/script": "workspace:*",
     "@resvg/resvg-js": "catalog:",
     "@tauri-apps/cli": "catalog:",
     "@types/node": "catalog:",
