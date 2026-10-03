@@ -14,10 +14,33 @@ const readIfPresent = (path: string): Uint8Array | undefined => {
   }
 };
 
+const downloadAttempts = 3;
+
 export type PinnedDownload = {
   url: string;
   sha256: string;
   target: string;
+};
+
+const fetchPinned = async (download: PinnedDownload): Promise<Uint8Array> => {
+  let failure = '';
+  for (let attempt = 1; attempt <= downloadAttempts; attempt += 1) {
+    console.log(`download ${download.url}`);
+    const response = await fetch(download.url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download ${download.url}: HTTP ${response.status}`,
+      );
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const actual = sha256Of(bytes);
+    if (actual === download.sha256) {
+      return bytes;
+    }
+    failure = `${download.url} has sha256 ${actual} over ${bytes.length} bytes (content-length ${response.headers.get('content-length') ?? 'absent'}), expected ${download.sha256}`;
+    console.log(failure);
+  }
+  throw new Error(failure);
 };
 
 export const ensureDownload = async (
@@ -27,20 +50,7 @@ export const ensureDownload = async (
   if (present && sha256Of(present) === download.sha256) {
     return;
   }
-  console.log(`download ${download.url}`);
-  const response = await fetch(download.url);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download ${download.url}: HTTP ${response.status}`,
-    );
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const actual = sha256Of(bytes);
-  if (actual !== download.sha256) {
-    throw new Error(
-      `${download.url} has sha256 ${actual}, expected ${download.sha256}`,
-    );
-  }
+  const bytes = await fetchPinned(download);
   mkdirSync(dirname(download.target), { recursive: true });
   const partial = `${download.target}.part`;
   writeFileSync(partial, bytes);
