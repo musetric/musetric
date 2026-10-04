@@ -17,6 +17,7 @@ export type SpectrogramSliceSamples = {
   write: (options: {
     samples: Float32Array;
     baseColumn: number;
+    playheadRatio: number;
     truncateAfterPlayhead: boolean;
     forceFullUpload: boolean;
     invalidations: readonly SpectrogramSampleRange[];
@@ -63,6 +64,7 @@ export const createSpectrogramSliceSamplesCell = (
           const {
             samples,
             baseColumn,
+            playheadRatio,
             truncateAfterPlayhead,
             forceFullUpload,
             invalidations,
@@ -71,6 +73,7 @@ export const createSpectrogramSliceSamplesCell = (
             samples,
             baseColumn,
             config: state.config,
+            playheadRatio,
             truncateAfterPlayhead,
             forceFullUpload,
             invalidations,

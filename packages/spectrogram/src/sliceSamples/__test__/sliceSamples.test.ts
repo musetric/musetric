@@ -132,6 +132,7 @@ const runSlice = async (
   slice.write({
     samples,
     baseColumn,
+    playheadRatio: 0,
     truncateAfterPlayhead: false,
     forceFullUpload: false,
     invalidations: [],
@@ -267,6 +268,7 @@ describe('sliceSamples', () => {
         incremental.write({
           samples: incrementalSamples,
           baseColumn: firstBase,
+          playheadRatio: 0,
           truncateAfterPlayhead: false,
           forceFullUpload: true,
           invalidations: [],
@@ -284,6 +286,7 @@ describe('sliceSamples', () => {
         incremental.write({
           samples: incrementalSamples,
           baseColumn: secondBase,
+          playheadRatio: 0,
           truncateAfterPlayhead: false,
           forceFullUpload: false,
           invalidations: [chunk],
@@ -293,6 +296,7 @@ describe('sliceSamples', () => {
         full.write({
           samples: Float32Array.from(incrementalSamples),
           baseColumn: secondBase,
+          playheadRatio: 0,
           truncateAfterPlayhead: false,
           forceFullUpload: true,
           invalidations: [],
@@ -332,6 +336,7 @@ describe('sliceSamples', () => {
       slice.write({
         samples: sampleData,
         baseColumn: firstBase,
+        playheadRatio: 0,
         truncateAfterPlayhead: false,
         forceFullUpload: true,
         invalidations: [],
@@ -339,6 +344,7 @@ describe('sliceSamples', () => {
       slice.write({
         samples: sampleData,
         baseColumn: secondBase,
+        playheadRatio: 0,
         truncateAfterPlayhead: false,
         forceFullUpload: false,
         invalidations: [],

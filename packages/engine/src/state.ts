@@ -20,6 +20,7 @@ export type EngineSeekOrigin =
   | 'playbackEnd'
   | 'player'
   | 'playerProgress'
+  | 'playhead'
   | 'remote'
   | 'spectrogramVisualization'
   | 'subtitle'

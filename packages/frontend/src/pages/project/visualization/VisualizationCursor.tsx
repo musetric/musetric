@@ -3,6 +3,7 @@ import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
 import { useProjectStore } from '../store.js';
+import { subscribePlayheadDrag } from './subscribePlayheadDrag.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
@@ -10,11 +11,13 @@ import {
 
 export const VisualizationCursor: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const element = ref.current;
+    const handle = handleRef.current;
 
-    if (!element) {
+    if (!element || !handle) {
       return;
     }
 
@@ -39,6 +42,7 @@ export const VisualizationCursor: FC = () => {
       );
 
       element.style.transform = `translateX(${cursorX}px)`;
+      handle.style.display = visualizationMode === 'tracks' ? 'none' : '';
     };
 
     const resize = () => {
@@ -48,7 +52,8 @@ export const VisualizationCursor: FC = () => {
 
     render();
 
-    return subscribeVisualizationRender({
+    const unsubscribeDrag = subscribePlayheadDrag(handle, parentElement);
+    const unsubscribeRender = subscribeVisualizationRender({
       resizeTarget: parentElement,
       onResize: resize,
       render,
@@ -56,6 +61,11 @@ export const VisualizationCursor: FC = () => {
       projectKeys: ['visualizationMode'],
       settingsKeys: ['playheadRatio'],
     });
+
+    return () => {
+      unsubscribeDrag();
+      unsubscribeRender();
+    };
   }, []);
 
   return (
@@ -72,6 +82,21 @@ export const VisualizationCursor: FC = () => {
         willChange: 'transform',
         zIndex: 0,
       }}
-    />
+    >
+      <Box
+        ref={handleRef}
+        position='absolute'
+        top={0}
+        bottom={0}
+        left='50%'
+        width={{ xs: '32px', md: '16px' }}
+        sx={{
+          cursor: 'ew-resize',
+          pointerEvents: 'auto',
+          touchAction: 'none',
+          transform: 'translateX(-50%)',
+        }}
+      />
+    </Box>
   );
 };

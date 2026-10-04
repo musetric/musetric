@@ -30,7 +30,6 @@ const computeInvalidatingConfigKeys: readonly (keyof SpectrogramConfig)[] = [
   'windowSize',
   'sampleRate',
   'visibleTime',
-  'playheadRatio',
   'zeroPaddingFactor',
   'spectralBands',
   'windowName',
@@ -141,9 +140,14 @@ export const createConfigInvalidationScope = (
     return 'all';
   }
 
+  const playheadMoved = current.playheadRatio !== next.playheadRatio;
   const changedTracks = new Set<TrackKey>();
   for (const key of allTrackKeys) {
-    if (!isLaneComputeConfigEqual(current.lanes[key], next.lanes[key])) {
+    const lane = next.lanes[key];
+    if (
+      !isLaneComputeConfigEqual(current.lanes[key], lane) ||
+      (playheadMoved && lane.truncateAfterPlayhead)
+    ) {
       changedTracks.add(key);
     }
   }
@@ -252,6 +256,7 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
       lane.writeSamples({
         samples: trackSamples,
         baseColumn: plan.baseColumn,
+        playheadRatio: runtime.config.playheadRatio,
         work: trackWork,
         forceFullUpload: plan.forceFullUpload,
         invalidations: plan.invalidations,
