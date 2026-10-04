@@ -232,4 +232,45 @@ describe('pitch frames', () => {
       await expectLineFromFrames(processor);
     });
   });
+
+  it('hides an earlier take after the playhead while recording', async () => {
+    const recording = pitchConfig('recording', 700, 2.5);
+    const listening: SpectrogramConfig = {
+      ...recording,
+      lanes: {
+        ...recording.lanes,
+        recording: {
+          ...recording.lanes.recording,
+          truncateAfterPlayhead: false,
+        },
+      },
+    };
+    const progress = 4.2 / durationSeconds;
+    const playhead = progress * lead.length;
+    const line = await withProcessor(
+      { device, config: listening },
+      async (processor) => {
+        await renderComplete(processor, { recording: lead }, progress);
+        processor.updateConfig({ lanes: recording.lanes });
+        await renderComplete(processor, { recording: lead }, progress);
+        return processor.readFundamentalLine('recording');
+      },
+    );
+    if (!line) {
+      throw new Error('the pitch line was not drawn');
+    }
+    const timeAt = (index: number): number =>
+      (line.baseColumn + index) * line.columnStep;
+    const before = line.values.filter(
+      (_, index) => timeAt(index) < playhead - settings.support,
+    );
+    const after = line.values.filter(
+      (_, index) => timeAt(index) >= playhead + settings.hop / 2,
+    );
+    expect(before.filter((value) => value > 0).length).toBeGreaterThan(
+      before.length / 2,
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect(Array.from(after.filter((value) => value > 0))).toEqual([]);
+  });
 });

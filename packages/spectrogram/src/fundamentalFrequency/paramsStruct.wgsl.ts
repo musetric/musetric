@@ -81,4 +81,5 @@ export const pitchParamsStruct = `struct PitchParams {
   columnStep: f32,
   windowCount: u32,
   baseSlot: u32,
+  shownFrames: i32,
 };`;

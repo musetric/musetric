@@ -18,7 +18,7 @@ fn project(@builtin(global_invocation_id) gid: vec3<u32>) {
   let column = params.baseColumn + i32(screen);
   let frame = i32(round(f32(column) * params.columnStep / f32(params.hop)));
   var value = 0.0;
-  if (frame >= 0 && frame < params.trackFrames) {
+  if (frame >= 0 && frame < params.shownFrames) {
     let entry = decoded[u32(frame) % params.ringFrames];
     if (entry.frame == frame) {
       value = entry.frequency;

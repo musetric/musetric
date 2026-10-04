@@ -62,6 +62,7 @@ export type PitchArg = {
 type Pending = {
   plan: PitchPlan;
   trackFrames: number;
+  shownFrames: number;
   projection: PitchProjection;
 };
 
@@ -128,6 +129,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
         columnStep: arg.columnStep,
         windowCount: arg.windowCount,
         baseSlot: state.projection.baseSlot,
+        shownFrames: state.shownFrames,
       });
 
       const analysisStage = (
@@ -297,7 +299,13 @@ export const createSpectrogramFundamentalFrequencyCell = (
             availableSamples,
           });
           uploadSlots(device, buffers.slots, plan);
-          pending = { plan, trackFrames, projection };
+          const shownFrames = input.truncated
+            ? Math.min(
+                trackFrames,
+                Math.floor(availableSamples / settings.hop) + 1,
+              )
+            : trackFrames;
+          pending = { plan, trackFrames, shownFrames, projection };
         },
         stages,
         dispatch: (pass) => {
