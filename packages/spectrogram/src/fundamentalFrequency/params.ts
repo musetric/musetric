@@ -15,6 +15,7 @@ export type PitchDispatchValues = {
   columnStep: number;
   windowCount: number;
   baseSlot: number;
+  shownFrames: number;
 };
 
 type PitchParamValues = PitchSettings &
@@ -111,6 +112,7 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['columnStep', 'f32'],
   ['windowCount', 'u32'],
   ['baseSlot', 'u32'],
+  ['shownFrames', 'i32'],
 ];
 
 const paramsByteLength = pitchParamFields.length * 4;
