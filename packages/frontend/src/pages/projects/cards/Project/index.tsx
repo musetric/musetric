@@ -23,6 +23,7 @@ export const ProjectCard: FC<ProjectCardProps> = (props) => {
       animate={{ opacity: 1, scale: 1, transition: { duration: 0.35 } }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.25 } }}
       sx={{
+        minWidth: 0,
         borderRadius: 2,
         padding: 2,
         backgroundColor: 'action.hover',
