@@ -2,18 +2,25 @@ use std::{
     f32::consts::FRAC_1_SQRT_2,
     ffi::OsStr,
     fs::File,
+    ops::Range,
     path::{Path, PathBuf},
 };
 
 use symphonia::core::{
     audio::{Channels, GenericAudioBufferRef, Position},
-    codecs::audio::{AudioDecoder, AudioDecoderOptions},
+    codecs::{
+        audio::{
+            AudioCodecParameters, AudioDecoder, AudioDecoderOptions, well_known::CODEC_ID_OPUS,
+        },
+        registry::CodecRegistry,
+    },
     errors::Error,
     formats::{FormatOptions, FormatReader, TrackType, probe::Hint},
     io::{MediaSourceStream, MediaSourceStreamOptions},
     meta::MetadataOptions,
     packet::Packet,
 };
+use symphonia_adapter_libopus::OpusDecoder;
 use tokio::{sync::mpsc, task::spawn_blocking};
 
 use crate::{
@@ -28,6 +35,11 @@ const NO_TRACK: &str = "The file carries no audio track";
 const NO_PARAMETERS: &str = "The audio track declares no codec parameters";
 const NO_SAMPLE_RATE: &str = "The audio track declares no sample rate";
 const NO_CHANNELS: &str = "The audio track declares no channels";
+const OPUS_HEAD_LENGTH: usize = 19;
+const OPUS_HEAD_VERSION_OFFSET: usize = 8;
+const MP4_OPUS_HEAD_VERSION: u8 = 0;
+const OGG_OPUS_HEAD_VERSION: u8 = 1;
+const MP4_BIG_ENDIAN_OPUS_HEAD_FIELDS: [Range<usize>; 3] = [10..12, 12..16, 16..18];
 
 pub struct SymphoniaPcm;
 
@@ -105,8 +117,10 @@ fn open(from: &Path) -> Result<Track, BoxedError> {
         .clone()
         .filter(|found| found.count() > 0)
         .ok_or(BoxedError::from(NO_CHANNELS))?;
-    let decoder = symphonia::default::get_codecs()
-        .make_audio_decoder(parameters, &AudioDecoderOptions::default())?;
+    let decoder = codecs().make_audio_decoder(
+        &ogg_opus_head_from_mp4(parameters.clone()),
+        &AudioDecoderOptions::default(),
+    )?;
     Ok(Track {
         reader,
         decoder,
@@ -114,6 +128,30 @@ fn open(from: &Path) -> Result<Track, BoxedError> {
         fold: Fold::create(&channels),
         sample_rate,
     })
+}
+
+fn codecs() -> CodecRegistry {
+    let mut codecs = CodecRegistry::new();
+    symphonia::default::register_enabled_codecs(&mut codecs);
+    codecs.register_audio_decoder::<OpusDecoder>();
+    codecs
+}
+
+fn ogg_opus_head_from_mp4(mut parameters: AudioCodecParameters) -> AudioCodecParameters {
+    if parameters.codec != CODEC_ID_OPUS {
+        return parameters;
+    }
+    let Some(head) = parameters.extra_data.as_mut() else {
+        return parameters;
+    };
+    if head.len() < OPUS_HEAD_LENGTH || head[OPUS_HEAD_VERSION_OFFSET] != MP4_OPUS_HEAD_VERSION {
+        return parameters;
+    }
+    head[OPUS_HEAD_VERSION_OFFSET] = OGG_OPUS_HEAD_VERSION;
+    for field in MP4_BIG_ENDIAN_OPUS_HEAD_FIELDS {
+        head[field].reverse();
+    }
+    parameters
 }
 
 fn probe(from: &Path) -> Result<Box<dyn FormatReader>, BoxedError> {
