@@ -7,6 +7,7 @@ export type VisualizationMode = 'notes' | 'spectrum' | 'tracks';
 export type ProjectState = {
   visualizationMode: VisualizationMode;
   subtitlesOpen: boolean;
+  chordsOpen: boolean;
   audioSettingsOpen: boolean;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
@@ -15,12 +16,14 @@ export type ProjectState = {
 const initialState: ProjectState = {
   visualizationMode: 'spectrum',
   subtitlesOpen: true,
+  chordsOpen: true,
   audioSettingsOpen: false,
 };
 
 export type ProjectActions = {
   setVisualizationMode: (value: VisualizationMode) => void;
   setSubtitlesOpen: (value: boolean) => void;
+  setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
@@ -40,6 +43,7 @@ export const useProjectStore = create<State>()(
       }
     },
     setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
+    setChordsOpen: (chordsOpen) => set({ chordsOpen }),
     setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
     setTransposeAnchorEl: (transposeAnchorEl) =>
       set({

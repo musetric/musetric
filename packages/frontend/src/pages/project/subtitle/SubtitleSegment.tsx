@@ -30,23 +30,6 @@ const getTimedSubtitleElements = (element: HTMLElement) => {
     if (textElement) {
       timedElements.push({ element: textElement, start, end });
     }
-
-    const chordElement = wordElement.querySelector<HTMLElement>(
-      '[data-subtitle-chord-start]',
-    );
-
-    if (!chordElement) {
-      continue;
-    }
-
-    const chordStart = Number(chordElement.dataset.subtitleChordStart);
-    const chordEnd = Number(chordElement.dataset.subtitleChordEnd);
-
-    timedElements.push({
-      element: chordElement,
-      start: chordStart,
-      end: chordEnd,
-    });
   }
 
   return timedElements;
@@ -86,11 +69,10 @@ const setElementColor = (element: HTMLElement, color: string) => {
 
 type ActiveSubtitleSegmentProps = {
   segment: api.subtitle.Segment;
-  chordSegments: api.chords.ChordSegment[];
 };
 
 const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
-  const { segment, chordSegments } = props;
+  const { segment } = props;
   const ref = useRef<HTMLDivElement>(null);
   const theme = useTheme();
 
@@ -130,15 +112,11 @@ const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
     update();
 
     return engine.store.subscribe(getSubtitlePlaybackTimeFromState, update);
-  }, [chordSegments, segment, theme]);
+  }, [segment, theme]);
 
   return (
     <Box ref={ref}>
-      <SubtitleSegmentText
-        segment={segment}
-        status='active'
-        chordSegments={chordSegments}
-      />
+      <SubtitleSegmentText segment={segment} status='active' />
     </Box>
   );
 };
@@ -147,26 +125,18 @@ export type SubtitleSegmentProps = {
   index: number;
   segment: api.subtitle.Segment;
   subtitleCursor: SubtitleCursor;
-  chordSegments: api.chords.ChordSegment[];
 };
 
 export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
-  const { index, segment, subtitleCursor, chordSegments } = props;
+  const { index, segment, subtitleCursor } = props;
   const status = useSubtitleSegmentStatus(index, subtitleCursor);
 
   return (
     <Box data-subtitle-segment-index={index} py={1}>
       {status === 'active' ? (
-        <ActiveSubtitleSegment
-          segment={segment}
-          chordSegments={chordSegments}
-        />
+        <ActiveSubtitleSegment segment={segment} />
       ) : (
-        <SubtitleSegmentText
-          segment={segment}
-          status={status}
-          chordSegments={chordSegments}
-        />
+        <SubtitleSegmentText segment={segment} status={status} />
       )}
     </Box>
   );
