@@ -1,9 +1,9 @@
 import { alpha, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { getFrequencyRange } from '@musetric/engine';
 import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
-import { useSettingsStore } from '../../settings/store.js';
-import { useProjectStore } from '../../store.js';
+import { engine } from '../../../../engine/engine.js';
 import { getNoteMarkers, isNaturalMidi, isOctaveMidi } from './noteMarker.js';
 
 const alignPixel = (value: number, pixelRatio: number) =>
@@ -65,9 +65,9 @@ export const SpectrogramNoteScale: FC = () => {
     };
 
     const render = () => {
-      const { minFrequency, maxFrequency } = useSettingsStore.getState();
-      const notesMode =
-        useProjectStore.getState().visualizationMode === 'notes';
+      const state = engine.store.get();
+      const { minFrequency, maxFrequency } = getFrequencyRange(state);
+      const notesMode = state.spectrogramView === 'notes';
       const markers = getNoteMarkers(minFrequency, maxFrequency);
 
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -114,19 +114,14 @@ export const SpectrogramNoteScale: FC = () => {
     resizeAndRender();
 
     const unsubscribeResize = subscribeResizeObserver(canvas, resizeAndRender);
-    const unsubscribeSettings = useSettingsStore.subscribe(
-      (state) => `${state.minFrequency}:${state.maxFrequency}`,
-      render,
-    );
-    const unsubscribeMode = useProjectStore.subscribe(
-      (state) => state.visualizationMode,
-      render,
-    );
+    const unsubscribeView = engine.store.subscribe((state) => {
+      const range = getFrequencyRange(state);
+      return `${state.spectrogramView}:${range.minFrequency}:${range.maxFrequency}`;
+    }, render);
 
     return () => {
       unsubscribeResize();
-      unsubscribeSettings();
-      unsubscribeMode();
+      unsubscribeView();
     };
   }, [theme]);
 

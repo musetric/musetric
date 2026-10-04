@@ -10,6 +10,7 @@ import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
 import {
   type EngineState,
+  getFrequencyRange,
   getTrackProgress,
   type SpectrogramViewMode,
 } from '../state.js';
@@ -131,12 +132,14 @@ export const createEngineSpectrogram = (
           },
         };
       };
-      const buildStateLanes = (state: EngineState) =>
-        buildLanes(
+      const buildStateView = (state: EngineState) => ({
+        ...getFrequencyRange(state),
+        lanes: buildLanes(
           state.spectrogramView,
           state.recording,
           state.leadSpectrogramGainDb,
-        );
+        ),
+      });
 
       port.methods.setFrameCount({ frameCount: engineState.frameCount ?? 0 });
       port.methods.mount({
@@ -147,7 +150,7 @@ export const createEngineSpectrogram = (
           viewSize,
           colors: engineState.colors,
           sampleRate,
-          lanes: buildStateLanes(engineState),
+          ...buildStateView(engineState),
         },
         trackProgress: getTrackProgress(engineState),
       });
@@ -159,18 +162,20 @@ export const createEngineSpectrogram = (
         });
       });
 
-      const unsubscribeLanes = store.subscribe(
-        (state) =>
-          `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}`,
+      const unsubscribeView = store.subscribe(
+        (state) => {
+          const range = getFrequencyRange(state);
+          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${range.minFrequency}:${range.maxFrequency}`;
+        },
         () => {
           port.methods.updateConfig({
-            patch: { lanes: buildStateLanes(store.get()) },
+            patch: buildStateView(store.get()),
           });
         },
       );
 
       return () => {
-        unsubscribeLanes();
+        unsubscribeView();
         unsubscribeResizeObserver();
         port.methods.unmount();
         store.update((state) => {

@@ -35,11 +35,17 @@ export type RecordingLatencySource = 'estimated' | 'manual' | 'calibrated';
 
 export type SpectrogramViewMode = 'notes' | 'spectrum';
 
+export type FrequencyRange = {
+  minFrequency: number;
+  maxFrequency: number;
+};
+
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
   colors: SpectrogramColors;
   spectrogramView: SpectrogramViewMode;
+  frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
   duration: number;
   playing: boolean;
   frozen: boolean;
@@ -74,6 +80,10 @@ export type EngineState = {
   metronomeBeats: number[];
   metronomeDownbeats: number[];
 };
+
+export const getFrequencyRange = (
+  state: Pick<EngineState, 'frequencyRanges' | 'spectrogramView'>,
+): FrequencyRange => state.frequencyRanges[state.spectrogramView];
 
 export const getTrackProgress = (
   state: Pick<EngineState, 'frameCount' | 'frameIndex'>,

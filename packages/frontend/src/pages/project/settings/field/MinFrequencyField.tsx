@@ -1,13 +1,16 @@
 import { TextField } from '@mui/material';
+import { getFrequencyRange } from '@musetric/engine';
 import { normalizeSpectrogramMinFrequency } from '@musetric/spectrogram';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSettingsStore } from '../store.js';
+import { engine } from '../../../../engine/engine.js';
+import { useEngineStore } from '../../../../engine/useEngineStore.js';
 
 export const MinFrequencyField: FC = () => {
   const { t } = useTranslation();
-  const minFrequency = useSettingsStore((s) => s.minFrequency);
-  const setMinFrequency = useSettingsStore((s) => s.setMinFrequency);
+  const minFrequency = useEngineStore(
+    (state) => getFrequencyRange(state).minFrequency,
+  );
 
   return (
     <TextField
@@ -20,12 +23,15 @@ export const MinFrequencyField: FC = () => {
         const rawValue = Number(event.target.value);
         if (Number.isNaN(rawValue)) return;
 
-        const { maxFrequency } = useSettingsStore.getState();
+        const { maxFrequency } = getFrequencyRange(engine.store.get());
         const nextMinFrequency = normalizeSpectrogramMinFrequency(
           rawValue,
           maxFrequency,
         );
-        setMinFrequency(nextMinFrequency);
+        engine.store.update((state) => {
+          state.frequencyRanges[state.spectrogramView].minFrequency =
+            nextMinFrequency;
+        });
       }}
       slotProps={{
         input: {

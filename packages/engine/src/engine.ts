@@ -18,6 +18,8 @@ import {
 import { type EngineState } from './state.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
+const notesMaxFrequency = 1100;
+
 const initialState: EngineState = {
   statuses: {
     decoder: 'pending',
@@ -32,6 +34,16 @@ const initialState: EngineState = {
   },
   colors: defaultSpectrogramConfig.colors,
   spectrogramView: 'spectrum',
+  frequencyRanges: {
+    notes: {
+      minFrequency: defaultSpectrogramConfig.minFrequency,
+      maxFrequency: notesMaxFrequency,
+    },
+    spectrum: {
+      minFrequency: defaultSpectrogramConfig.minFrequency,
+      maxFrequency: defaultSpectrogramConfig.maxFrequency,
+    },
+  },
   duration: 0,
   playing: false,
   frozen: false,

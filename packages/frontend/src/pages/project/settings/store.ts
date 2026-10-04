@@ -20,8 +20,6 @@ export type SettingsState = Pick<
   | 'windowName'
   | 'minDecibel'
   | 'visual'
-  | 'minFrequency'
-  | 'maxFrequency'
 > & {
   open: boolean;
 };
@@ -36,8 +34,6 @@ const initialState: SettingsState = {
   windowName: defaultSpectrogramConfig.windowName,
   minDecibel: defaultSpectrogramConfig.minDecibel,
   visual: defaultSpectrogramConfig.visual,
-  minFrequency: defaultSpectrogramConfig.minFrequency,
-  maxFrequency: defaultSpectrogramConfig.maxFrequency,
   open: false,
 };
 
@@ -45,9 +41,6 @@ export type SettingsActions = {
   setFourierMode: (value: FourierMode) => void;
   setWindowName: (value: WindowFunctionName) => void;
   setWindowSize: (value: number) => void;
-  setMinFrequency: (value: number) => void;
-  setMaxFrequency: (value: number) => void;
-  setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   setMinDecibel: (value: number) => void;
   setVisibleTime: (value: number) => void;
   setPlayheadRatio: (value: number) => void;
@@ -62,10 +55,6 @@ export const useSettingsStore = create<State>()(
     setFourierMode: (fourierMode) => set({ fourierMode }),
     setWindowName: (windowName) => set({ windowName }),
     setWindowSize: (windowSize) => set({ windowSize }),
-    setMinFrequency: (minFrequency) => set({ minFrequency }),
-    setMaxFrequency: (maxFrequency) => set({ maxFrequency }),
-    setFrequencyRange: (minFrequency, maxFrequency) =>
-      set({ minFrequency, maxFrequency }),
     setMinDecibel: (minDecibel) => set({ minDecibel }),
     setVisibleTime: (visibleTime) => set({ visibleTime }),
     setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
