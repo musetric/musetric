@@ -45,6 +45,7 @@
   "pages.project.audioSettings.outputSystemControlled": "Output controlled by system",
   "pages.project.audioSettings.previewError": "Failed to open audio preview",
   "pages.project.audioSettings.title": "Audio settings",
+  "pages.project.chords.title": "Chords",
   "pages.project.detailsMode.metronome": "Metronome",
   "pages.project.detailsMode.subtitles": "Subtitles",
   "pages.project.menu.audioSettings": "Audio settings",
