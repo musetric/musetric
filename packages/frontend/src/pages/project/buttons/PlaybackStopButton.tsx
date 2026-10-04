@@ -8,7 +8,6 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 export const PlaybackStopButton: FC = () => {
   const { t } = useTranslation();
   const frameCount = useEngineStore((state) => state.frameCount);
-  const recording = useEngineStore((state) => state.recording);
   const playerCommandPending = useEngineStore(
     (state) => state.playerCommandPending,
   );
@@ -19,21 +18,20 @@ export const PlaybackStopButton: FC = () => {
 
   return (
     <IconButton
-      color={recording ? 'error' : undefined}
+      color='inherit'
       disabled={disabled}
       onClick={() => {
         void engine.player.stop();
       }}
-      size='small'
       sx={{
         alignSelf: 'stretch',
         borderRadius: 999,
         flex: 1,
-        mx: -0.5,
+        mx: -1,
       }}
       title={t('pages.project.player.controls.stop')}
     >
-      <StopRoundedIcon />
+      <StopRoundedIcon fontSize='large' />
     </IconButton>
   );
 };

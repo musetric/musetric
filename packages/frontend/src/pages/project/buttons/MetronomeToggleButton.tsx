@@ -8,33 +8,25 @@ import { MetronomeIcon } from '../../../icons/MetronomeIcon.js';
 export const MetronomeToggleButton: FC = () => {
   const { t } = useTranslation();
   const metronomeEnabled = useEngineStore((state) => state.metronomeEnabled);
+  const label = t('pages.project.detailsMode.metronome');
 
   return (
-    <Tooltip title={t('pages.project.detailsMode.metronome')}>
+    <Tooltip title={label}>
       <IconButton
         size='small'
         color={metronomeEnabled ? 'primary' : 'inherit'}
-        aria-label={t('pages.project.detailsMode.metronome')}
-        sx={{
-          borderRadius: 1,
-          px: 1,
-          py: 0,
-        }}
+        aria-label={label}
+        sx={{ borderRadius: 2, px: 2, py: 1 }}
         onClick={() => {
           engine.store.update((state) => {
             state.metronomeEnabled = !state.metronomeEnabled;
           });
         }}
       >
-        <Stack alignItems='center'>
+        <Stack alignItems='center' gap={0.5}>
           <MetronomeIcon fontSize='small' />
-          <Typography
-            component='span'
-            variant='caption'
-            fontSize={10}
-            lineHeight={1}
-          >
-            {t('pages.project.detailsMode.metronome')}
+          <Typography variant='caption' lineHeight={1} noWrap>
+            {t('pages.project.detailsMode.metronomeCaption')}
           </Typography>
         </Stack>
       </IconButton>

@@ -20,11 +20,11 @@ export const TransposePicker: FC = () => {
         }}
         anchorOrigin={{
           horizontal: 'center',
-          vertical: 'bottom',
+          vertical: 'top',
         }}
         transformOrigin={{
           horizontal: 'center',
-          vertical: 'top',
+          vertical: 'bottom',
         }}
       >
         <Box width={340} p={2}>

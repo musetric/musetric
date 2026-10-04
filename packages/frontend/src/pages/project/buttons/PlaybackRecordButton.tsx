@@ -1,16 +1,13 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
-import { IconButton } from '@mui/material';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
-export type PlaybackRecordButtonProps = {
-  projectId: number;
-};
-
-export const PlaybackRecordButton: FC<PlaybackRecordButtonProps> = (props) => {
-  const { projectId } = props;
+export const PlaybackRecordButton: FC = () => {
+  const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
   const frameCount = useEngineStore((state) => state.frameCount);
   const isSlave = useEngineStore((state) => state.isSlave);
@@ -25,31 +22,31 @@ export const PlaybackRecordButton: FC<PlaybackRecordButtonProps> = (props) => {
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
+  const altered = tempoBpm !== sourceTempoBpm || transposeSemitones !== 0;
   const disabled =
-    !frameCount ||
-    realtimeFailed ||
-    tempoBpm !== sourceTempoBpm ||
-    transposeSemitones !== 0 ||
-    isSlave ||
-    playerCommandPending;
+    !frameCount || realtimeFailed || altered || isSlave || playerCommandPending;
 
   return (
-    <IconButton
-      color='error'
-      disabled={disabled}
-      onClick={() => {
-        void engine.player.record(projectId);
-      }}
-      size='small'
-      sx={{
-        alignSelf: 'stretch',
-        borderBottomRightRadius: 0,
-        borderTopRightRadius: 0,
-        flex: 1,
-      }}
-      title={t('pages.project.player.controls.record')}
+    <Tooltip
+      enterTouchDelay={0}
+      title={
+        altered
+          ? t('pages.project.player.controls.recordAltered')
+          : t('pages.project.player.controls.record')
+      }
     >
-      <MicRoundedIcon />
-    </IconButton>
+      <Box component='span' flex={1} alignSelf='stretch' display='flex' ml={-1}>
+        <IconButton
+          color='error'
+          disabled={disabled}
+          onClick={() => {
+            void engine.player.record(projectId);
+          }}
+          sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}
+        >
+          <MicRoundedIcon />
+        </IconButton>
+      </Box>
+    </Tooltip>
   );
 };

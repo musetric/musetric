@@ -1,32 +1,55 @@
 import { Box, Stack } from '@mui/material';
 import { type FC } from 'react';
+import { MetronomeToggleButton } from '../buttons/MetronomeToggleButton.js';
 import { PlaybackControlsButton } from '../buttons/PlaybackControlsButton.js';
+import { SubtitlesToggleButton } from '../buttons/SubtitlesToggleButton.js';
+import { TempoButton } from '../buttons/TempoButton.js';
+import { TransposeButton } from '../buttons/TransposeButton.js';
 import { VisualizationModeToggle } from '../buttons/visualizationModeToggle/index.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
-export type PlaybackPanelProps = {
-  projectId: number;
+const dockAreas = {
+  xs: '"view view view" "practice transport song"',
+  sm: '"controls transport view"',
 };
 
-export const PlaybackPanel: FC<PlaybackPanelProps> = (props) => {
-  const { projectId } = props;
+const dockColumns = {
+  xs: 'auto 1fr auto',
+  sm: '1fr auto 1fr',
+};
 
-  return (
-    <Stack width='100%'>
-      <PlayerProgress />
+export const PlaybackPanel: FC = () => (
+  <Stack width='100%'>
+    <PlayerProgress />
+    <Box
+      display='grid'
+      alignItems='center'
+      columnGap={2}
+      rowGap={2}
+      gridTemplateAreas={dockAreas}
+      gridTemplateColumns={dockColumns}
+    >
       <Box
-        width='100%'
-        display='grid'
-        gridTemplateColumns='minmax(0, 1fr) auto minmax(0, 1fr)'
+        gridArea='controls'
+        display={{ xs: 'contents', sm: 'flex' }}
         alignItems='center'
+        gap={1}
       >
-        <Box gridColumn={2}>
-          <PlaybackControlsButton projectId={projectId} />
-        </Box>
-        <Stack gridColumn={3} direction='row' justifyContent='flex-end'>
-          <VisualizationModeToggle />
+        <Stack gridArea='practice' direction='row' alignItems='center' gap={1}>
+          <SubtitlesToggleButton />
+          <MetronomeToggleButton />
+        </Stack>
+        <Stack gridArea='song' direction='row' alignItems='center' gap={1}>
+          <TransposeButton />
+          <TempoButton />
         </Stack>
       </Box>
-    </Stack>
-  );
-};
+      <Box gridArea='transport' justifySelf='center'>
+        <PlaybackControlsButton />
+      </Box>
+      <Box gridArea='view' justifySelf={{ xs: 'stretch', sm: 'end' }}>
+        <VisualizationModeToggle />
+      </Box>
+    </Box>
+  </Stack>
+);

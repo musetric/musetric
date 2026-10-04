@@ -1,4 +1,4 @@
-import { IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -12,35 +12,29 @@ export const SubtitlesToggleButton: FC = () => {
   );
   const subtitlesOpen = useProjectStore((state) => state.subtitlesOpen);
   const setSubtitlesOpen = useProjectStore((state) => state.setSubtitlesOpen);
+  const label = t('pages.project.detailsMode.subtitles');
 
   return (
-    <Tooltip title={t('pages.project.detailsMode.subtitles')}>
-      <IconButton
-        size='small'
-        disabled={realtimeFailed}
-        color={subtitlesOpen ? 'primary' : 'inherit'}
-        aria-label={t('pages.project.detailsMode.subtitles')}
-        sx={{
-          borderRadius: 1,
-          px: 1,
-          py: 0,
-        }}
-        onClick={() => {
-          setSubtitlesOpen(!subtitlesOpen);
-        }}
-      >
-        <Stack alignItems='center'>
-          <LyricsTextIcon fontSize='small' />
-          <Typography
-            component='span'
-            variant='caption'
-            fontSize={10}
-            lineHeight={1}
-          >
-            {t('pages.project.detailsMode.subtitles')}
-          </Typography>
-        </Stack>
-      </IconButton>
+    <Tooltip title={label}>
+      <Box>
+        <IconButton
+          size='small'
+          disabled={realtimeFailed}
+          color={subtitlesOpen ? 'primary' : 'inherit'}
+          aria-label={label}
+          sx={{ borderRadius: 2, px: 2, py: 1 }}
+          onClick={() => {
+            setSubtitlesOpen(!subtitlesOpen);
+          }}
+        >
+          <Stack alignItems='center' gap={0.5}>
+            <LyricsTextIcon fontSize='small' />
+            <Typography variant='caption' lineHeight={1} noWrap>
+              {label}
+            </Typography>
+          </Stack>
+        </IconButton>
+      </Box>
     </Tooltip>
   );
 };
