@@ -27,6 +27,7 @@ export const useSubtitleFollowScroll = (
         engine.player.seek(frameIndex, 'subtitle');
       },
       isIgnoredSeekOrigin: (origin) =>
+        origin === 'playhead' ||
         origin === 'spectrogramVisualization' ||
         origin === 'tracksVisualization',
     });

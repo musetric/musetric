@@ -29,17 +29,20 @@ type BandDispatchRange = (
   range: SpectrogramColumnRange,
 ) => void;
 
+export type BandSampleWrite = {
+  samples: Float32Array;
+  baseColumn: number;
+  playheadRatio: number;
+  forceFullUpload: boolean;
+  invalidations: readonly SpectrogramSampleRange[];
+};
+
 export type BandSpectrumPipeline = {
   signal: GPUBuffer;
   rawMagnitudeBuffer: GPUBuffer;
   columnEnergyBuffer: GPUBuffer;
   windowSize: number;
-  writeSamples: (
-    samples: Float32Array,
-    baseColumn: number,
-    forceFullUpload: boolean,
-    invalidations: readonly SpectrogramSampleRange[],
-  ) => void;
+  writeSamples: (write: BandSampleWrite) => void;
   dispatchSliceSamples: BandDispatchRange;
   dispatchFourier: BandDispatchRange;
   dispatchMagnitudify: BandDispatchRange;
@@ -74,13 +77,10 @@ export const buildBandSpectrumPipeline = (
     rawMagnitudeBuffer: magnitudify.magnitude,
     columnEnergyBuffer: decibelify.columnEnergy,
     windowSize: paddedWindowSize,
-    writeSamples: (samples, baseColumn, forceFullUpload, invalidations) => {
+    writeSamples: (write) => {
       sliceSamples.write({
-        samples,
-        baseColumn,
+        ...write,
         truncateAfterPlayhead: laneConfig.truncateAfterPlayhead,
-        forceFullUpload,
-        invalidations,
       });
     },
     dispatchSliceSamples: sliceSamples.dispatch,
@@ -124,7 +124,6 @@ export const createBandSpectrumCell = (
       current.config.windowName === next.config.windowName &&
       current.config.sampleRate === next.config.sampleRate &&
       current.config.visibleTime === next.config.visibleTime &&
-      current.config.playheadRatio === next.config.playheadRatio &&
       current.config.minDecibel === next.config.minDecibel &&
       current.config.maxFrequency === next.config.maxFrequency &&
       current.config.windowCount === next.config.windowCount &&

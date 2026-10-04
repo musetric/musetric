@@ -86,6 +86,7 @@ export type SpectrogramLane = {
   writeSamples: (options: {
     samples: Float32Array;
     baseColumn: number;
+    playheadRatio: number;
     work: SpectrogramLaneWork;
     forceFullUpload: boolean;
     invalidations: readonly SpectrogramSampleRange[];
@@ -167,15 +168,9 @@ const buildSpectrogramLane = (
     dispatchPitch: fundamentalFrequency.dispatch,
     pitchPending: fundamentalFrequency.pending,
     writeSamples: (writeSamplesOptions) => {
-      const { samples, baseColumn, work, forceFullUpload, invalidations } =
-        writeSamplesOptions;
+      const { work, ...write } = writeSamplesOptions;
       forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
-        pipeline.writeSamples(
-          samples,
-          baseColumn,
-          forceFullUpload,
-          invalidations,
-        );
+        pipeline.writeSamples(write);
       });
     },
     dispatchSliceSamples: (pass, work, range) => {
@@ -254,7 +249,6 @@ export const createSpectrogramLaneCell = (
         current.windowName === next.windowName &&
         current.sampleRate === next.sampleRate &&
         current.visibleTime === next.visibleTime &&
-        current.playheadRatio === next.playheadRatio &&
         current.minDecibel === next.minDecibel &&
         current.maxFrequency === next.maxFrequency &&
         current.windowCount === next.windowCount &&

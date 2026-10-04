@@ -101,19 +101,19 @@ export const createSpectrogramRuntime = async (
   };
 
   const renderLoop = createAnimationFrameLoop(renderFromPlayhead);
+  let renderRequest = 0;
   const fillLoop = createAnimationFrameLoop(async () => {
     if (playing) {
       return false;
     }
+    const request = renderRequest;
     await renderFromPlayhead();
-    return processor.hasPendingWork();
+    return request !== renderRequest || processor.hasPendingWork();
   });
 
-  const renderPaused = async () => {
-    await renderFromPlayhead();
-    if (!playing && processor.hasPendingWork()) {
-      fillLoop.start();
-    }
+  const renderPaused = () => {
+    renderRequest += 1;
+    fillLoop.start();
   };
 
   dataPort.bindHandlers({
@@ -139,7 +139,7 @@ export const createSpectrogramRuntime = async (
         },
       ]);
       if (!playing) {
-        void renderPaused();
+        renderPaused();
       }
     },
   });
@@ -179,7 +179,7 @@ export const createSpectrogramRuntime = async (
         );
       }
       if (!playing) {
-        void renderPaused();
+        renderPaused();
       }
     },
     setFrameCount: (message) => {
@@ -192,12 +192,12 @@ export const createSpectrogramRuntime = async (
         return;
       }
       renderLoop.stop();
-      void renderPaused();
+      renderPaused();
     },
     updateConfig: (message) => {
       processor.updateConfig(message.patch);
       if (!playing) {
-        void renderPaused();
+        renderPaused();
       }
     },
   });

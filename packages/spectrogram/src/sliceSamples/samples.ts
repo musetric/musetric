@@ -19,6 +19,7 @@ export type StateSamples = {
     samples: Float32Array;
     baseColumn: number;
     config: ExtSpectrogramConfig;
+    playheadRatio: number;
     truncateAfterPlayhead: boolean;
     forceFullUpload: boolean;
     invalidations: readonly SpectrogramSampleRange[];
@@ -60,11 +61,12 @@ export const createStateSamplesCell = (device: GPUDevice) =>
             samples,
             baseColumn,
             config,
+            playheadRatio,
             truncateAfterPlayhead,
             forceFullUpload,
             invalidations,
           } = options;
-          const { windowSize, playheadRatio, sampleRate, visibleTime } = config;
+          const { windowSize, sampleRate, visibleTime } = config;
           const beforeSamples =
             visibleTime * playheadRatio * sampleRate + windowSize;
           const windowStart = windowStartForColumn(

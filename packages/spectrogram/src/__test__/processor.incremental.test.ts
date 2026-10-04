@@ -91,6 +91,16 @@ const writeRecordingChunks = (
   return invalidated;
 };
 
+const progressForPlayheadMove = (
+  config: SpectrogramConfig,
+  sampleLength: number,
+  playheadRatio: number,
+): number =>
+  (config.visibleTime *
+    config.sampleRate *
+    (playheadRatio - config.playheadRatio)) /
+  sampleLength;
+
 describe('spectrogram processor incremental render', () => {
   it('matches a full render when slide and recording dirty disjoint columns', async () => {
     const incrementalConfig = singleBandConfig();
@@ -251,6 +261,74 @@ describe('spectrogram processor incremental render', () => {
         await incremental.render({ lead }, 0.5);
         incremental.updateConfig({ lanes: gainedLanes });
         await incremental.render({ lead }, 0.5);
+      },
+    });
+  });
+
+  it('matches a full render when the playhead moves over a still picture', async () => {
+    const incrementalConfig = singleBandConfig();
+    const playheadRatio = 0.7;
+    const fullConfig = singleBandConfig({ playheadRatio });
+    const length = incrementalConfig.sampleRate * 5;
+    const lead = createSilence(length);
+    writeCentreTone(lead, incrementalConfig.sampleRate);
+    const start = 0.5;
+    const shift = progressForPlayheadMove(
+      incrementalConfig,
+      length,
+      playheadRatio,
+    );
+    await assertIncrementalMatchesFull({
+      incrementalConfig,
+      fullConfig,
+      samples: { lead },
+      progress: start + shift,
+      assertFullBright: true,
+      driveIncremental: async (incremental) => {
+        await incremental.render({ lead }, start);
+        incremental.updateConfig({ playheadRatio });
+        await incremental.render({ lead }, start + shift);
+      },
+    });
+  });
+
+  it('matches a full render when the playhead moves over a truncated take', async () => {
+    const base = singleBandConfig();
+    const lanes = {
+      ...base.lanes,
+      recording: {
+        ...base.lanes.recording,
+        showSpectrogram: true,
+        truncateAfterPlayhead: true,
+      },
+    };
+    const incrementalConfig = singleBandConfig({ lanes });
+    const playheadRatio = 0.7;
+    const fullConfig = singleBandConfig({ lanes, playheadRatio });
+    const length = incrementalConfig.sampleRate * 5;
+    const lead = createSilence(length);
+    const recording = createTone(
+      length,
+      toneFrequency,
+      incrementalConfig.sampleRate,
+      0.7,
+    );
+    const start = 0.5;
+    const shift = progressForPlayheadMove(
+      incrementalConfig,
+      length,
+      playheadRatio,
+    );
+    await assertIncrementalMatchesFull({
+      incrementalConfig,
+      fullConfig,
+      samples: { lead, recording },
+      progress: start + shift,
+      assertFullBright: true,
+      driveIncremental: async (incremental) => {
+        await incremental.render({ lead, recording }, start);
+        incremental.updateConfig({ playheadRatio });
+        await incremental.render({ lead, recording }, start + shift);
       },
     });
   });
