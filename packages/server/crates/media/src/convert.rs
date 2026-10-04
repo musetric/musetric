@@ -10,7 +10,7 @@ use tokio::{
 };
 
 use crate::{
-    AacEncoder, BoxedError,
+    AacEncoder, BoxedError, SampleDepth,
     aac::FRAME_SAMPLES,
     flac::FlacWriter,
     fmp4::Fmp4Writer,
@@ -39,7 +39,7 @@ pub async fn convert_to_flac(
         }
         return Ok(());
     }
-    let mut writer = FlacWriter::create(to, request.sample_rate)?;
+    let mut writer = FlacWriter::create(to, request.sample_rate, SampleDepth::TwentyFour)?;
     encode_source(source, request, &mut writer).await?;
     writer.finish()
 }
@@ -104,7 +104,7 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedErr
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
     let mut conversion = Conversion::create(rates)?;
-    let mut writer = FlacWriter::create(to, rates.output)?;
+    let mut writer = FlacWriter::create(to, rates.output, SampleDepth::TwentyFour)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
@@ -140,8 +140,26 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
 mod tests {
     use std::fs::{create_dir_all, remove_dir_all, write};
 
-    use super::convert_to_flac;
-    use crate::{PcmRequest, SourceFailure, SymphoniaPcm};
+    use super::{convert_to_flac, convert_to_fmp4};
+    use crate::{
+        ENCODER_DELAY, PcmRequest, PcmSource, SampleDepth, SourceFailure, SymphoniaPcm,
+        wav::WavWriter,
+    };
+
+    const RATE: u32 = 48_000;
+    const CLICK_FRAME: usize = 20_001;
+    const CLICK_FRAMES: usize = 64;
+    const SEARCH_FRAMES: usize = 4096;
+
+    fn click(frame: usize) -> f32 {
+        frame
+            .checked_sub(CLICK_FRAME)
+            .filter(|offset| *offset < CLICK_FRAMES)
+            .map_or(0.0, |offset| {
+                let phase = f32::from(u16::try_from(offset).expect("the offset is small"));
+                0.5 * (std::f32::consts::TAU * phase / 16.0).sin()
+            })
+    }
 
     #[tokio::test]
     async fn tells_an_unreadable_source_from_a_failed_write() {
@@ -167,5 +185,53 @@ mod tests {
 
         assert!(unreadable.is::<SourceFailure>());
         assert!(!refused.is::<SourceFailure>());
+    }
+
+    #[tokio::test]
+    async fn delays_the_delivery_by_the_encoder_delay() {
+        let directory =
+            std::env::temp_dir().join(format!("musetric-delivery-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let source = directory.join("click.wav");
+        let delivery = directory.join("click.mp4");
+        let frames = 48_000;
+        let mut writer = WavWriter::create(&source, RATE, SampleDepth::TwentyFour, frames)
+            .expect("the source should be created");
+        for frame in 0..frames {
+            writer
+                .push(click(frame), click(frame))
+                .expect("the source should take the frame");
+        }
+        writer.finish().expect("the source should be finished");
+        let request = PcmRequest {
+            from: &source,
+            sample_rate: RATE,
+        };
+        convert_to_fmp4(&SymphoniaPcm, request, &delivery)
+            .await
+            .expect("the delivery should be encoded");
+
+        let mut decoded = Vec::new();
+        let mut sink = |chunk: &[f32]| decoded.extend(chunk.iter().step_by(2));
+        let heard = PcmRequest {
+            from: &delivery,
+            sample_rate: RATE,
+        };
+        SymphoniaPcm
+            .read_pcm(heard, &mut sink)
+            .await
+            .expect("the delivery should be decoded");
+        remove_dir_all(&directory).expect("the workspace should be removed");
+
+        let score = |lag: &usize| -> f32 {
+            (CLICK_FRAME..CLICK_FRAME + CLICK_FRAMES)
+                .map(|frame| click(frame) * decoded.get(frame + lag).copied().unwrap_or(0.0))
+                .sum()
+        };
+        let lag = (0..SEARCH_FRAMES).max_by(|first, second| score(first).total_cmp(&score(second)));
+        assert_eq!(
+            lag,
+            Some(usize::try_from(ENCODER_DELAY).expect("the delay fits"))
+        );
     }
 }

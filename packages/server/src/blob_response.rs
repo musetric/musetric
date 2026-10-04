@@ -1,4 +1,7 @@
-use std::{io::Cursor, path::Path};
+use std::{
+    io::Cursor,
+    path::{Path, PathBuf},
+};
 
 use axum::{
     body::Body,
@@ -71,6 +74,32 @@ pub(crate) async fn send_cached(
                 .map_err(Failure::failed)
         }
     }
+}
+
+pub(crate) struct NamedFile {
+    pub(crate) path: PathBuf,
+    pub(crate) filename: String,
+    pub(crate) content_type: &'static str,
+    pub(crate) missing_message: String,
+}
+
+pub(crate) async fn send_named(file: NamedFile) -> Result<Response<Body>, Failure> {
+    let stat = metadata(&file.path)
+        .await
+        .map_err(|_| Failure::NotFound(file.missing_message.clone()))?;
+    let modified = stat
+        .modified()
+        .map_err(|_| Failure::NotFound(file.missing_message))?;
+    let size = stat.len();
+    let headers = CachedHeaders::create(&CachedFile {
+        filename: Some(file.filename),
+        content_type: file.content_type.to_owned(),
+        cache_control: NO_STORE,
+        size,
+        modified,
+    })
+    .map_err(Failure::failed)?;
+    Ok(headers.respond(size, open_stream(&file.path).await?))
 }
 
 pub(crate) async fn send_stored(

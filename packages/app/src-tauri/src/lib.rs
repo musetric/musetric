@@ -15,6 +15,8 @@ use tauri_plugin_window_state::StateFlags;
 use crate::assets::TauriAssets;
 
 mod assets;
+#[cfg(desktop)]
+mod download;
 #[cfg(target_os = "android")]
 mod executor_view;
 #[cfg(desktop)]
@@ -140,6 +142,7 @@ fn finish_main_window<R: tauri::Runtime, M: Manager<R>>(
     builder: WebviewWindowBuilder<'_, R, M>,
 ) -> tauri::Result<()> {
     builder
+        .on_download(|webview, event| download::handle(&webview, event))
         .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .background_color(tauri::webview::Color(18, 18, 18, 255))
         .visible(false)
@@ -182,6 +185,7 @@ fn setup_desktop_lifecycle(
             .build(),
     )?;
     app.handle().plugin(tauri_plugin_dialog::init())?;
+    app.manage(download::Downloads::default());
     app.handle().plugin(
         tauri_plugin_window_state::Builder::default()
             .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)

@@ -8,6 +8,7 @@ mod failure;
 mod form;
 mod frontend;
 mod garbage;
+mod mixdown;
 mod publish;
 mod range;
 mod realtime;

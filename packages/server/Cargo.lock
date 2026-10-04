@@ -2866,6 +2866,7 @@ dependencies = [
  "flacenc",
  "rubato",
  "rusty_aac",
+ "rusty_mp3",
  "serde_json",
  "symphonia",
  "symphonia-adapter-libopus",
@@ -4068,6 +4069,12 @@ name = "rusty_aac"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7ab980ffb66a559565d09dd6727ff2da7d2a39d2e8b6149e48af6908caa99b5"
+
+[[package]]
+name = "rusty_mp3"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5df133351b8d2bc947955fdd201cb952854ed881586f1a69d5a5677a02132f6c"
 
 [[package]]
 name = "ryu"

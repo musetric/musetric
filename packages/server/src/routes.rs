@@ -1,6 +1,7 @@
 mod analysis;
 mod audio;
 mod item;
+mod mixdown;
 mod models;
 mod preview;
 mod processing;
@@ -15,7 +16,7 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use crate::{realtime, realtime::Rooms, storage::Storage};
+use crate::{mixdown::Mixdowns, realtime, realtime::Rooms, storage::Storage};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
@@ -24,11 +25,13 @@ pub(crate) struct RouteState {
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) models_path: PathBuf,
+    pub(crate) mixdowns: Arc<Mixdowns>,
 }
 
 pub(crate) fn create_router(state: RouteState) -> Router {
     analysis::create_router()
         .merge(audio::create_router())
+        .merge(mixdown::create_router())
         .merge(models::create_router())
         .merge(preview::create_router())
         .merge(processing::create_router())
