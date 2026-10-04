@@ -1,3 +1,4 @@
+import { getFrequencyRange } from '@musetric/engine';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
@@ -26,8 +27,8 @@ export const useSpectrogramGesture = (
       getFrameIndex: () => engine.store.get().frameIndex,
       getVisibleTime: () => useSettingsStore.getState().visibleTime,
       getPlayheadRatio: () => useSettingsStore.getState().playheadRatio,
-      getMinFrequency: () => useSettingsStore.getState().minFrequency,
-      getMaxFrequency: () => useSettingsStore.getState().maxFrequency,
+      getMinFrequency: () => getFrequencyRange(engine.store.get()).minFrequency,
+      getMaxFrequency: () => getFrequencyRange(engine.store.get()).maxFrequency,
     };
 
     const controls: SpectrogramGestureControls = {
@@ -38,9 +39,12 @@ export const useSpectrogramGesture = (
         }
       },
       setFrequencyRange: (minFrequency, maxFrequency) => {
-        useSettingsStore
-          .getState()
-          .setFrequencyRange(minFrequency, maxFrequency);
+        engine.store.update((state) => {
+          state.frequencyRanges[state.spectrogramView] = {
+            minFrequency,
+            maxFrequency,
+          };
+        });
       },
       seek: (frameIndex) => {
         const roundedFrameIndex = Math.round(frameIndex);
