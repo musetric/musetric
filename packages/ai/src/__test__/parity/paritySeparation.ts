@@ -1,6 +1,7 @@
 import { createLeadBackingGpuRuntime } from '../../runtime/leadBacking/leadBackingRuntime.js';
 import { type StftInferenceTap } from '../../runtime/stftInference.js';
 import { createVocalsGpuRuntime } from '../../runtime/vocals/vocalsRuntime.js';
+import { fetchBytes } from '../../service/browserShared.js';
 import { readGpuBuffer } from './parityGpu.js';
 import {
   fetchTensor,
@@ -75,8 +76,8 @@ export const runVocalsTask = async (
   const reader = createTapReader();
   const runtime = await createVocalsGpuRuntime({
     graph: task.graph,
-    modelUrl: task.modelUrl,
-    modelDataUrl: task.modelData.data,
+    modelFile: await fetchBytes(task.modelUrl, 'the model'),
+    modelDataFile: await fetchBytes(task.modelData.data, 'the model data'),
     modelDataPath: task.modelData.path,
     inspect: reader.inspect,
   });
@@ -101,7 +102,7 @@ export const runVoicesTask = async (
   const reader = createTapReader();
   const runtime = await createLeadBackingGpuRuntime({
     graph: task.graph,
-    modelUrl: task.modelUrl,
+    modelFile: await fetchBytes(task.modelUrl, 'the model'),
     inspect: reader.inspect,
   });
   try {

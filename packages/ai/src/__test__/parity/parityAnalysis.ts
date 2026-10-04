@@ -8,7 +8,7 @@ import { createSkeyRuntime } from '../../runtime/key/skeyRuntime.js';
 import { createBeatThisGpuRuntime } from '../../runtime/rhythm/beatThisGpuRuntime.js';
 import { fetchCqtPlan } from '../../service/browserChords.js';
 import { argmax, peakNormalize } from '../../service/browserKey.js';
-import { fetchFloat32 } from '../../service/browserShared.js';
+import { fetchBytes, fetchFloat32 } from '../../service/browserShared.js';
 import { readGpuBuffer } from './parityGpu.js';
 import {
   fetchTensor,
@@ -48,7 +48,7 @@ export const runRhythmTask = async (
   const read: Float32Array[] = [];
   const runtime = await createBeatThisGpuRuntime({
     graph,
-    modelUrl: task.modelUrl,
+    modelFile: await fetchBytes(task.modelUrl, 'the model'),
     filterbank,
     inspect: async (tap) => {
       read.push(await readGpuBuffer(tap.device, tap.windows));
@@ -100,7 +100,7 @@ export const runKeyTask = async (
 ): Promise<ParityOutput[]> => {
   const runtime = await createSkeyRuntime({
     graph: task.graph,
-    modelUrl: task.modelUrl,
+    modelFile: await fetchBytes(task.modelUrl, 'the model'),
   });
   try {
     const audio = await fetchAudio(task.unitInput);
@@ -125,7 +125,7 @@ export const runChordsTask = async (
   const read: Float32Array[] = [];
   const runtime = await createChordNetGpuRuntime({
     graph,
-    modelUrl: task.modelUrl,
+    modelFile: await fetchBytes(task.modelUrl, 'the model'),
     plan,
     inspect: async (tap) => {
       read.push(

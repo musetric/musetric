@@ -10,14 +10,14 @@ export type SkeyRuntime = {
 
 export type SkeyRuntimeOptions = {
   graph: SkeyGraph;
-  modelUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
 };
 
 export const createSkeyRuntime = async (
   options: SkeyRuntimeOptions,
 ): Promise<SkeyRuntime> => {
   const { inputName, outputName } = options.graph;
-  const session = await ort.InferenceSession.create(options.modelUrl, {
+  const session = await ort.InferenceSession.create(options.modelFile, {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
   });

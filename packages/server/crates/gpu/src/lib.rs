@@ -16,5 +16,5 @@ pub use host::{
     BoxedError, ExecutorArrivals, ExecutorFailure, ExecutorHost, ExecutorSession,
     ExecutorSessionOptions, JobTicket, PhaseSink,
 };
-pub use protocol::{ExecutorPass, ExecutorPhase};
+pub use protocol::{ExecutorPass, ExecutorPhase, ExecutorProgress};
 pub use units::{UnitCompleted, UnitPayload, UnitReject, UnitSession, UnitTarget, UnitWrite};

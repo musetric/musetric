@@ -25,7 +25,7 @@ export type LeadBackingGpuRuntime = {
 
 export type LeadBackingGpuRuntimeOptions = {
   graph: LeadBackingGraph;
-  modelUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
   inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
 
@@ -46,7 +46,7 @@ export const createLeadBackingGpuRuntime = async (
     geometry: graph,
     inputShape: shape,
     outputShape: shape,
-    modelUrl: options.modelUrl,
+    modelFile: options.modelFile,
     frameShader: leadBackingFrameShader,
     overlapAddShader: leadBackingOverlapAddShader,
     inspect: options.inspect,

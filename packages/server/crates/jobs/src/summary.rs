@@ -19,6 +19,12 @@ impl StepPass {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ByteProgress {
+    pub done: u64,
+    pub total: u64,
+}
+
 #[derive(Clone, Debug)]
 pub enum StepPhase {
     Preparing {
@@ -28,7 +34,10 @@ pub enum StepPhase {
         decoded: u64,
         total: u64,
     },
-    Loading,
+    Loading {
+        progress: Option<ByteProgress>,
+    },
+    Building,
     Running {
         pass: StepPass,
         unit: u32,
@@ -43,7 +52,8 @@ impl StepPhase {
         match self {
             Self::Preparing { .. } => "preparing",
             Self::Decoding { .. } => "decoding",
-            Self::Loading => "loading",
+            Self::Loading { .. } => "loading",
+            Self::Building => "building",
             Self::Running { .. } => "running",
             Self::Saving => "saving",
         }

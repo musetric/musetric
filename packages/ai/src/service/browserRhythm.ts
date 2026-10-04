@@ -6,20 +6,23 @@ import {
 import { type RhythmResult } from '../rhythm/types.js';
 import { createBeatThisGpuRuntime } from '../runtime/rhythm/beatThisGpuRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
+import { fetchModelFiles, loadModel } from './browserModelLoad.js';
 import { fetchFloat32, floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserAnalyzeRhythmRequest } from './rhythmApi.js';
 
 export const analyzeRhythm = createBrowserJobApi<BrowserAnalyzeRhythmRequest>(
   async (request, context) => {
-    context.reportLoading();
     const filterbank = await fetchFloat32(
       request.filterbankUrl,
       'rhythm mel filterbank',
     );
-    const runtime = await createBeatThisGpuRuntime({
-      graph: request.graph,
-      modelUrl: request.modelUrl,
-      filterbank,
+    const runtime = await loadModel(context, async (report) => {
+      const [modelFile] = await fetchModelFiles([request.modelUrl], report);
+      return createBeatThisGpuRuntime({
+        graph: request.graph,
+        modelFile,
+        filterbank,
+      });
     });
     try {
       await context.serveUnits({

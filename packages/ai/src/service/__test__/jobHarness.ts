@@ -150,7 +150,12 @@ export const startFakeHost = async (): Promise<FakeHost> => {
         ready.resolve(message);
         return;
       }
-      if (message.type === 'loading' || message.type === 'running') {
+      if (
+        message.type === 'loading' ||
+        message.type === 'building' ||
+        message.type === 'loaded' ||
+        message.type === 'running'
+      ) {
         phases.push(message);
         return;
       }

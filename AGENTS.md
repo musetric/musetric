@@ -70,8 +70,15 @@ Applies to everything published from this repository: code, tests, comments, com
 - Write callback implementations inline in API objects with callback fields or handlers, and inline in React JSX props.
 - Do not extract callbacks for trivial direct logic, even when the same small code is repeated; extract a callback only when it hides non-trivial complexity or defines a reusable domain entity.
 
+**Components**
+
+- Do not add component layers: a new component must own real state, logic, or a domain entity, not just forward props to another component.
+- Keep a component in the folder of the feature that renders it; do not lift it into shared folders such as `components/` or build a generic abstraction for one concrete use.
+
 **MUI**
 
+- Build markup from Material UI components. Do not write raw DOM elements such as `div`, `span`, or `p` in JSX; use a plain React DOM element only in extreme necessity, when no Material UI component can do the job.
+- Use Material UI components directly where they are rendered. Do not wrap them in project components or shared `sx` and prop presets, such as a custom button or a captioned icon button.
 - Do not introduce unnecessary Material UI customization. Prefer the built-in variants, spacing, and visual design by default, but preserve existing behavior and established UI output when custom styling is already serving a real purpose.
 - When a Material UI component already exposes a dedicated prop for a layout or visual option, prefer that prop over `sx` only if the result stays behaviorally and visually equivalent; use `sx` whenever it is needed to preserve the current result or to express styling that the component props do not cover.
 

@@ -18,9 +18,17 @@ impl ExecutorPass {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExecutorProgress {
+    pub done: u64,
+    pub total: u64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ExecutorPhase {
-    Loading,
+    Loading(Option<ExecutorProgress>),
+    Building,
+    Loaded,
     Running {
         pass: ExecutorPass,
         unit: u32,
@@ -83,7 +91,11 @@ pub(crate) fn read_executor_message(text: &str) -> Option<ExecutorMessage> {
     }
     let job_id = message.get("jobId")?.as_str()?.to_owned();
     match kind {
-        "loading" => Some(ExecutorMessage::Phase(ExecutorPhase::Loading)),
+        "loading" => Some(ExecutorMessage::Phase(ExecutorPhase::Loading(
+            read_progress(&message),
+        ))),
+        "building" => Some(ExecutorMessage::Phase(ExecutorPhase::Building)),
+        "loaded" => Some(ExecutorMessage::Phase(ExecutorPhase::Loaded)),
         "running" => read_running(&message).map(ExecutorMessage::Phase),
         "result" => Some(ExecutorMessage::Answer {
             job_id,
@@ -111,6 +123,13 @@ fn read_running(message: &Value) -> Option<ExecutorPhase> {
         pass: ExecutorPass::parse(message.get("pass")?.as_str()?)?,
         unit: read_count(message, "unit")?,
         unit_count: read_count(message, "unitCount")?,
+    })
+}
+
+fn read_progress(message: &Value) -> Option<ExecutorProgress> {
+    Some(ExecutorProgress {
+        done: message.get("loaded")?.as_u64()?,
+        total: message.get("total")?.as_u64()?,
     })
 }
 

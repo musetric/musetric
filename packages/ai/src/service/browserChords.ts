@@ -2,6 +2,7 @@ import { type CqtPlan, verifyCqtPlanArtifact } from '@musetric/cqt';
 import { buildChordSegments } from '../chords/chordSegments.js';
 import { createChordNetGpuRuntime } from '../runtime/chords/chordNetGpuRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
+import { fetchModelFiles, loadModel } from './browserModelLoad.js';
 import { fetchOk, floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserAnalyzeChordsRequest } from './chordsApi.js';
 
@@ -46,12 +47,14 @@ export const fetchCqtPlan = async (
 
 export const analyzeChords = createBrowserJobApi<BrowserAnalyzeChordsRequest>(
   async (request, context) => {
-    context.reportLoading();
     const plan = await fetchCqtPlan(request.planUrl, request.planManifestUrl);
-    const runtime = await createChordNetGpuRuntime({
-      graph: request.graph,
-      modelUrl: request.modelUrl,
-      plan,
+    const runtime = await loadModel(context, async (report) => {
+      const [modelFile] = await fetchModelFiles([request.modelUrl], report);
+      return createChordNetGpuRuntime({
+        graph: request.graph,
+        modelFile,
+        plan,
+      });
     });
     try {
       await context.serveUnits({

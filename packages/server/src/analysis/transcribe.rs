@@ -15,8 +15,8 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{
-            Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
-            require_executor, sample_duration, store,
+            Failure, answer, count_frames, decode_reporter, ensure_files, require_executor,
+            sample_duration, show_phase, store,
         },
         checkpoint_persist::{CheckpointCursor, persist_tail},
         models::{WHISPER, whisper_graph},
@@ -142,7 +142,7 @@ async fn drive(
     let opened = open_attempt(context, job, &session, &attempt_id).await;
     let outcome = match opened {
         Ok(ticket) => {
-            (report)(StepPhase::Loading);
+            (report)(StepPhase::Loading { progress: None });
             attempt(
                 Run {
                     context,
@@ -266,24 +266,44 @@ struct Run<'run> {
 }
 
 impl Run<'_> {
+    async fn open(&mut self, answered: &mut Answered) -> Result<(), Failure> {
+        let opened = self.units.wait_opened();
+        tokio::pin!(opened);
+        loop {
+            tokio::select! {
+                finished = &mut *answered => {
+                    finished.map_err(Failure::from)?;
+                    return Err(Failure::Refused(ANSWERED_EARLY.to_owned()));
+                }
+                outcome = &mut opened => return outcome,
+                Some(phase) = self.reported.recv() => show_phase(self.report, phase, None),
+            }
+        }
+    }
+
     async fn run_unit(&mut self, answered: &mut Answered, step: UnitStep) -> Result<(), Failure> {
-        (self.report)(StepPhase::Running {
+        let running = StepPhase::Running {
             pass: step_pass(step.pass),
             unit: step.unit,
             unit_count: step.count,
-        });
+        };
+        (self.report)(running.clone());
         self.session
             .send_unit(self.attempt_id, step.unit, step.count)
             .map_err(Failure::from)?;
-        while let Ok(phase) = self.reported.try_recv() {
-            (self.report)(read_phase(phase));
-        }
-        tokio::select! {
-            finished = &mut *answered => {
-                finished.map_err(Failure::from)?;
-                Err(Failure::Refused(ANSWERED_EARLY.to_owned()))
+        let folded = self.units.folded(step.unit);
+        tokio::pin!(folded);
+        loop {
+            tokio::select! {
+                finished = &mut *answered => {
+                    finished.map_err(Failure::from)?;
+                    return Err(Failure::Refused(ANSWERED_EARLY.to_owned()));
+                }
+                outcome = &mut folded => return outcome,
+                Some(phase) = self.reported.recv() => {
+                    show_phase(self.report, phase, Some(&running));
+                }
             }
-            outcome = self.units.folded(step.unit) => outcome,
         }
     }
 
@@ -317,11 +337,7 @@ impl Run<'_> {
                     finished.map_err(Failure::from)?;
                     return Ok(());
                 }
-                received = self.reported.recv() => {
-                    if let Some(phase) = received {
-                        (self.report)(read_phase(phase));
-                    }
-                }
+                Some(phase) = self.reported.recv() => show_phase(self.report, phase, None),
             }
         }
     }
@@ -333,13 +349,7 @@ async fn attempt(
     restored: Option<Restored>,
 ) -> Result<(), Failure> {
     let mut answered: Answered = Box::pin(async move { ticket.wait().await });
-    tokio::select! {
-        finished = &mut answered => {
-            finished.map_err(Failure::from)?;
-            return Err(Failure::Refused(ANSWERED_EARLY.to_owned()));
-        }
-        outcome = run.units.wait_opened() => outcome?,
-    }
+    run.open(&mut answered).await?;
     let (pass, mut next) = restored.map_or((StartPass::Decode, 0), |found| {
         (found.pass, found.next_unit)
     });

@@ -1,6 +1,11 @@
 import { createLeadBackingGpuRuntime } from '../runtime/leadBacking/leadBackingRuntime.js';
 import { createVocalsGpuRuntime } from '../runtime/vocals/vocalsRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
+import {
+  fetchModelFiles,
+  loadModel,
+  type ReportLoading,
+} from './browserModelLoad.js';
 import { floatsFromBytes } from './browserShared.js';
 import {
   type BrowserLeadBackingUnitsRequest,
@@ -25,11 +30,16 @@ type Stage = {
 
 const createVocalsStage = async (
   request: BrowserVocalsUnitsRequest,
+  report: ReportLoading,
 ): Promise<Stage> => {
+  const [modelFile, modelDataFile] = await fetchModelFiles(
+    [request.vocalsModelUrl, request.vocalsModelDataUrl],
+    report,
+  );
   const runtime = await createVocalsGpuRuntime({
     graph: request.graph,
-    modelUrl: request.vocalsModelUrl,
-    modelDataUrl: request.vocalsModelDataUrl,
+    modelFile,
+    modelDataFile,
     modelDataPath: request.vocalsModelDataPath,
   });
   return {
@@ -44,10 +54,15 @@ const createVocalsStage = async (
 
 const createLeadBackingStage = async (
   request: BrowserLeadBackingUnitsRequest,
+  report: ReportLoading,
 ): Promise<Stage> => {
+  const [modelFile] = await fetchModelFiles(
+    [request.leadBackingModelUrl],
+    report,
+  );
   const runtime = await createLeadBackingGpuRuntime({
     graph: request.graph,
-    modelUrl: request.leadBackingModelUrl,
+    modelFile,
   });
   return {
     run: async (input) =>
@@ -60,15 +75,17 @@ const createLeadBackingStage = async (
 
 const createStage = async (
   request: BrowserSeparateUnitsRequest,
+  report: ReportLoading,
 ): Promise<Stage> =>
   request.stage === 'vocals'
-    ? await createVocalsStage(request)
-    : await createLeadBackingStage(request);
+    ? await createVocalsStage(request, report)
+    : await createLeadBackingStage(request, report);
 
 export const separateUnits = createBrowserJobApi<BrowserSeparateUnitsRequest>(
   async (request, context) => {
-    context.reportLoading();
-    const stage = await createStage(request);
+    const stage = await loadModel(context, async (report) =>
+      createStage(request, report),
+    );
     try {
       await context.serveUnits({
         attemptId: request.attemptId,
