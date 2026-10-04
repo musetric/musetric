@@ -27,6 +27,10 @@ export const ProcessingIndicator: FC = () => {
     return t('pages.processing.indicator.idle', { count: waiting.length });
   };
 
+  if (!paused && waiting.length === 0) {
+    return undefined;
+  }
+
   return (
     <Button
       component={routes.processing.Link}

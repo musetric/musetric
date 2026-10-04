@@ -1,4 +1,5 @@
-import { Button, Stack, Typography } from '@mui/material';
+import AudioFileOutlinedIcon from '@mui/icons-material/AudioFileOutlined';
+import { Box, Button, Stack, Typography } from '@mui/material';
 import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type SongValue } from './schema.js';
@@ -41,6 +42,7 @@ export const SongField: FC<SongFieldProps> = (props) => {
   return (
     <Stack
       onDrop={(event) => {
+        event.preventDefault();
         setIsDragging(false);
         const file = event.dataTransfer.files.item(0);
         if (!file) return;
@@ -49,23 +51,25 @@ export const SongField: FC<SongFieldProps> = (props) => {
           url: URL.createObjectURL(file),
         });
       }}
-      onDragOver={() => {
+      onDragOver={(event) => {
+        event.preventDefault();
         setIsDragging(true);
       }}
       onDragLeave={() => {
         setIsDragging(false);
       }}
-      height='180px'
+      height={180}
+      gap={3}
       justifyContent='center'
       alignItems='center'
       sx={{
-        border: '2px dashed',
-        borderColor: isDragging ? 'primary.main' : 'divider',
         borderRadius: 2,
-        transition: 'border-color 0.2s',
+        backgroundColor: isDragging ? 'action.hover' : 'background.default',
+        transition: 'background-color 160ms linear',
       }}
     >
-      <input
+      <Box
+        component='input'
         type='file'
         accept={audioAccept}
         ref={inputRef}
@@ -80,19 +84,26 @@ export const SongField: FC<SongFieldProps> = (props) => {
           });
         }}
       />
-      <Button
-        variant='contained'
-        color='primary'
-        onClick={() => {
-          inputRef.current?.click();
-        }}
-        disabled={disabled}
-      >
-        {t('pages.projects.dialogs.create.select')}
-      </Button>
-      <Typography variant='body1' gutterBottom>
-        {t('pages.projects.dialogs.create.dragDrop')}
-      </Typography>
+      <AudioFileOutlinedIcon sx={{ fontSize: 36, color: 'text.disabled' }} />
+      <Stack alignItems='center' gap={2}>
+        <Typography
+          variant='body2'
+          color='text.secondary'
+          sx={{ '@media (hover: none)': { display: 'none' } }}
+        >
+          {t('pages.projects.dialogs.create.dragDrop')}
+        </Typography>
+        <Button
+          variant='contained'
+          color='primary'
+          onClick={() => {
+            inputRef.current?.click();
+          }}
+          disabled={disabled}
+        >
+          {t('pages.projects.dialogs.create.select')}
+        </Button>
+      </Stack>
     </Stack>
   );
 };
