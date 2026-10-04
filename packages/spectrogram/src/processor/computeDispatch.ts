@@ -6,11 +6,7 @@ import {
   type SpectrumStage,
   spectrumStages,
 } from '../common/processorTimer.js';
-import {
-  allTrackKeys,
-  hasSpectrogramComparison,
-  type TrackKey,
-} from '../config.cross.js';
+import { allTrackKeys, type TrackKey } from '../config.cross.js';
 import { type SpectrogramRuntime } from '../configurator.js';
 import { type SpectrogramLane } from '../lane/index.js';
 import { type TrackRenderPlan } from './renderPlan.js';
@@ -59,11 +55,7 @@ const dispatchSpectrumStage = (
 
 const colorLaneShown = (ctx: DispatchContext, key: TrackKey): boolean => {
   const lane = ctx.runtime.config.lanes[key];
-  return (
-    lane.showFundamental ||
-    lane.showNotes ||
-    hasSpectrogramComparison(ctx.runtime.config)
-  );
+  return lane.showFundamental || lane.showNotes;
 };
 
 const dispatchColor = (

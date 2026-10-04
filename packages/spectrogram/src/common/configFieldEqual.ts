@@ -18,7 +18,6 @@ const isSpectrogramColorsEqual = (
   first.background === second.background &&
   first.foreground === second.foreground &&
   first.primary === second.primary &&
-  first.recordingForeground === second.recordingForeground &&
   first.recordingMatch === second.recordingMatch &&
   first.recordingClose === second.recordingClose &&
   first.recordingMiss === second.recordingMiss &&

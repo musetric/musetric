@@ -62,7 +62,6 @@ export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
     background: '#000000',
     foreground: '#888888',
     primary: '#1976d2',
-    recordingForeground: '#ba68c8',
     recordingMatch: '#4caf50',
     recordingClose: '#ffeb3b',
     recordingMiss: '#f44336',

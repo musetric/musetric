@@ -14,7 +14,6 @@ const toVec4 = (hex: string): [number, number, number, number] => {
 export const drawRingSlotsByteOffset = 224;
 
 const noteGridStripeAmount = 0.12;
-const recordingTintScale = 1.15;
 const fundamentalLineMaskBoost = 1.18;
 const maxSegmentSpanCents = 720;
 
@@ -46,7 +45,6 @@ const areConfigsEqual = (
     current.colors.foreground !== next.colors.foreground ||
     current.colors.background !== next.colors.background ||
     current.colors.primary !== next.colors.primary ||
-    current.colors.recordingForeground !== next.colors.recordingForeground ||
     current.colors.recordingMatch !== next.colors.recordingMatch ||
     current.colors.recordingClose !== next.colors.recordingClose ||
     current.colors.recordingMiss !== next.colors.recordingMiss ||
@@ -57,7 +55,8 @@ const areConfigsEqual = (
   if (
     current.minFrequency !== next.minFrequency ||
     current.maxFrequency !== next.maxFrequency ||
-    current.visibleTime !== next.visibleTime
+    current.visibleTime !== next.visibleTime ||
+    current.playheadRatio !== next.playheadRatio
   ) {
     return false;
   }
@@ -100,11 +99,12 @@ export const createColorsCell = (device: GPUDevice) =>
         0,
         0,
       ] as const;
+      const playhead = [config.playheadRatio, 0, 0, 0] as const;
       const overlayTuning = [
         noteGridStripeAmount,
-        recordingTintScale,
         fundamentalLineMaskBoost,
         maxSegmentSpanCents,
+        0,
       ] as const;
       f32.set([
         ...toVec4(colors.foreground),
@@ -115,7 +115,7 @@ export const createColorsCell = (device: GPUDevice) =>
         ...toVec4(colors.recordingClose),
         ...toVec4(colors.recordingMiss),
         ...toVec4(colors.recordingTimingMiss),
-        ...toVec4(colors.recordingForeground),
+        ...playhead,
         ...comparisonThresholds,
         ...lineWidths,
         ...overlayTuning,
