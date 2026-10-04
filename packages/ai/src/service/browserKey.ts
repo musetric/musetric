@@ -2,6 +2,7 @@ import { keyMap } from '../key/keyMap.js';
 import { type KeyResult } from '../key/types.js';
 import { createSkeyRuntime } from '../runtime/key/skeyRuntime.js';
 import { createBrowserJobApi } from './browserJob.js';
+import { fetchModelFiles, loadModel } from './browserModelLoad.js';
 import { floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserAnalyzeKeyRequest } from './keyApi.js';
 
@@ -32,10 +33,9 @@ export const argmax = (values: Float32Array): number => {
 
 export const analyzeKey = createBrowserJobApi<BrowserAnalyzeKeyRequest>(
   async (request, context) => {
-    context.reportLoading();
-    const runtime = await createSkeyRuntime({
-      graph: request.graph,
-      modelUrl: request.modelUrl,
+    const runtime = await loadModel(context, async (report) => {
+      const [modelFile] = await fetchModelFiles([request.modelUrl], report);
+      return createSkeyRuntime({ graph: request.graph, modelFile });
     });
     try {
       await context.serveUnits({

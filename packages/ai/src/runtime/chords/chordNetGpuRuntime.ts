@@ -206,7 +206,7 @@ export type ChordNetGpuTap = {
 
 export type ChordNetGpuRuntimeOptions = {
   graph: ChordNetGraph;
-  modelUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
   plan: CqtPlan;
   inspect?: (tap: ChordNetGpuTap) => Promise<void>;
 };
@@ -214,8 +214,8 @@ export type ChordNetGpuRuntimeOptions = {
 export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
-  const { graph, modelUrl, plan } = options;
-  const session = await ort.InferenceSession.create(modelUrl, {
+  const { graph, modelFile, plan } = options;
+  const session = await ort.InferenceSession.create(modelFile, {
     executionProviders: [await musetricWebGpuProvider()],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [graph.outputName]: 'gpu-buffer' },

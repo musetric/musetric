@@ -20,8 +20,8 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::{
-            Failure, answer, count_frames, decode_reporter, ensure_files, read_phase,
-            require_executor,
+            Failure, answer, count_frames, decode_reporter, ensure_files, require_executor,
+            show_phase,
         },
         checkpoint_persist::{CheckpointCursor, PrefixAppend, persist_tail},
         models::VOCALS,
@@ -149,7 +149,7 @@ impl<'run> StageAttempt<'run> {
 
     pub(crate) async fn open(&self) -> Result<(), Failure> {
         self.session.wait_ready().await?;
-        (self.running.report)(StepPhase::Loading);
+        (self.running.report)(StepPhase::Loading { progress: None });
         Ok(())
     }
 
@@ -232,21 +232,41 @@ impl<'run> StageAttempt<'run> {
         let start = self.units.next_unit(&attempt_id)?;
         let ticket = self.session.send_job(API_NAME, &request)?;
         let mut answered = Box::pin(async move { ticket.wait().await });
-        tokio::select! {
-            finished = &mut answered => return early_job(finished),
-            outcome = self.units.wait_opened(&attempt_id) => outcome?,
+        let opened = self.units.wait_opened(&attempt_id);
+        tokio::pin!(opened);
+        loop {
+            tokio::select! {
+                finished = &mut answered => return early_job(finished),
+                outcome = &mut opened => {
+                    outcome?;
+                    break;
+                }
+                Some(phase) = self.reported.recv() => {
+                    show_phase(self.running.report, phase, None);
+                }
+            }
         }
         for index in start..count {
-            (self.running.report)(StepPhase::Running {
+            let running = StepPhase::Running {
                 pass: StepPass::Decode,
                 unit: index,
                 unit_count: count,
-            });
+            };
+            (self.running.report)(running.clone());
             self.session.send_unit(&attempt_id, index, count)?;
-            self.drain_phases();
-            tokio::select! {
-                finished = &mut answered => return early_job(finished),
-                outcome = self.units.folded(&attempt_id, index) => outcome?,
+            let folded = self.units.folded(&attempt_id, index);
+            tokio::pin!(folded);
+            loop {
+                tokio::select! {
+                    finished = &mut answered => return early_job(finished),
+                    outcome = &mut folded => {
+                        outcome?;
+                        break;
+                    }
+                    Some(phase) = self.reported.recv() => {
+                        show_phase(self.running.report, phase, Some(&running));
+                    }
+                }
             }
             self.persist(&attempt_id, index + 1, count).await?;
         }
@@ -257,18 +277,10 @@ impl<'run> StageAttempt<'run> {
                     finished.map_err(Failure::from)?;
                     return Ok(());
                 }
-                received = self.reported.recv() => {
-                    if let Some(phase) = received {
-                        (self.running.report)(read_phase(phase));
-                    }
+                Some(phase) = self.reported.recv() => {
+                    show_phase(self.running.report, phase, None);
                 }
             }
-        }
-    }
-
-    fn drain_phases(&mut self) {
-        while let Ok(phase) = self.reported.try_recv() {
-            (self.running.report)(read_phase(phase));
         }
     }
 

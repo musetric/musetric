@@ -27,7 +27,7 @@ use crate::{
         BoxedError, EXECUTOR_LOG, ExecutorFailure, ExecutorHost, ExecutorSession,
         ExecutorSessionOptions, JobTicket, Liveness, PhaseSink,
     },
-    protocol::{ExecutorPass, ExecutorPhase},
+    protocol::{ExecutorPass, ExecutorPhase, ExecutorProgress},
     units::{UnitCompleted, UnitReject, UnitSession, UnitTarget},
 };
 
@@ -576,6 +576,21 @@ async fn runs_a_job_and_reports_its_phases() {
     .await;
     reply(
         &mut job.executor,
+        &json!({ "type": "loading", "jobId": job_id, "loaded": 10, "total": 40 }),
+    )
+    .await;
+    reply(
+        &mut job.executor,
+        &json!({ "type": "building", "jobId": job_id }),
+    )
+    .await;
+    reply(
+        &mut job.executor,
+        &json!({ "type": "loaded", "jobId": job_id }),
+    )
+    .await;
+    reply(
+        &mut job.executor,
         &json!({
             "type": "running",
             "jobId": job_id,
@@ -603,7 +618,13 @@ async fn runs_a_job_and_reports_its_phases() {
     assert_eq!(
         reported.seen(),
         vec![
-            ExecutorPhase::Loading,
+            ExecutorPhase::Loading(None),
+            ExecutorPhase::Loading(Some(ExecutorProgress {
+                done: 10,
+                total: 40,
+            })),
+            ExecutorPhase::Building,
+            ExecutorPhase::Loaded,
             ExecutorPhase::Running {
                 pass: ExecutorPass::Decode,
                 unit: 1,

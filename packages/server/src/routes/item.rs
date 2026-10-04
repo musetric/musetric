@@ -164,6 +164,12 @@ fn describe_phase(phase: &StepPhase, view: &mut Map<String, Value>) {
             view.insert("unit".to_owned(), json!(unit));
             view.insert("unitCount".to_owned(), json!(unit_count));
         }
-        StepPhase::Loading | StepPhase::Saving => {}
+        StepPhase::Loading { progress } => {
+            if let Some(found) = progress {
+                view.insert("loaded".to_owned(), json!(found.done));
+                view.insert("total".to_owned(), json!(found.total));
+            }
+        }
+        StepPhase::Building | StepPhase::Saving => {}
     }
 }

@@ -9,6 +9,14 @@ export const fetchOk = async (
   return response;
 };
 
+export const fetchBytes = async (
+  url: string,
+  label: string,
+): Promise<Uint8Array<ArrayBuffer>> => {
+  const response = await fetchOk(url, label);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
 export const fetchFloat32 = async (
   url: string,
   label: string,

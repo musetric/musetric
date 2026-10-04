@@ -53,7 +53,7 @@ export type WhisperRuntimeOptions = {
   modelId: string;
   revision: string;
 
-  onLoading: () => void;
+  onLoading: (loaded: number, total: number) => void;
   inspect?: WhisperDecodeInspect;
 };
 
@@ -94,8 +94,10 @@ export const createWhisperRuntime = async (
           await musetricWebGpuProvider(whisperDeviceOptions),
         ],
       },
-      progress_callback: () => {
-        options.onLoading();
+      progress_callback: (info) => {
+        if (info.status === 'progress_total') {
+          options.onLoading(info.loaded, info.total);
+        }
       },
     },
   );

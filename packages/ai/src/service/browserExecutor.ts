@@ -86,8 +86,14 @@ const serveConnection = async (
         throw new Error(`Browser API ${command.api} is not initialized`);
       }
       const result = await api(command.request, {
-        reportLoading: () => {
-          send({ type: 'loading', jobId: command.jobId });
+        reportLoading: (progress) => {
+          send({ type: 'loading', jobId: command.jobId, ...progress });
+        },
+        reportBuilding: () => {
+          send({ type: 'building', jobId: command.jobId });
+        },
+        reportLoaded: () => {
+          send({ type: 'loaded', jobId: command.jobId });
         },
         serveUnits: async (serving) =>
           await unitServer.serve(command.jobId, serving),

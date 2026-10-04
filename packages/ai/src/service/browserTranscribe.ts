@@ -13,6 +13,7 @@ import {
 } from '../transcription/transcribePipeline.js';
 import { type TranscriptionWord } from '../transcription/types.js';
 import { createBrowserJobApi } from './browserJob.js';
+import { loadModel } from './browserModelLoad.js';
 import { floatsFromBytes, jsonBytes } from './browserShared.js';
 import { type BrowserTranscribeRequest } from './transcribeApi.js';
 
@@ -130,7 +131,6 @@ export const runTranscribeUnit = async (
 
 export const transcribeAudio = createBrowserJobApi<BrowserTranscribeRequest>(
   async (request, context) => {
-    context.reportLoading();
     const holder: { runtime: Promise<WhisperRuntime> | undefined } = {
       runtime: undefined,
     };
@@ -139,13 +139,15 @@ export const transcribeAudio = createBrowserJobApi<BrowserTranscribeRequest>(
       if (cached !== undefined) {
         return cached;
       }
-      const created = createWhisperRuntime({
-        graph: request.graph,
-        modelHost: request.modelHost,
-        modelId: request.modelId,
-        revision: request.revision,
-        onLoading: context.reportLoading,
-      });
+      const created = loadModel(context, async (report) =>
+        createWhisperRuntime({
+          graph: request.graph,
+          modelHost: request.modelHost,
+          modelId: request.modelId,
+          revision: request.revision,
+          onLoading: report,
+        }),
+      );
       holder.runtime = created;
       return created;
     };

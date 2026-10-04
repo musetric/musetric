@@ -1,4 +1,4 @@
-import { Chip, Stack, type Theme, Typography, useTheme } from '@mui/material';
+import { Stack, type Theme, Typography, useTheme } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type TFunction } from 'i18next';
 import { type FC } from 'react';
@@ -20,10 +20,7 @@ const getDownloadColor = (
   download: api.project.Download,
   theme: Theme,
 ): string => {
-  if (download.status === 'cached') {
-    return theme.palette.success.main;
-  }
-  if (download.status === 'done') {
+  if (download.status === 'cached' || download.status === 'done') {
     return theme.palette.success.main;
   }
   return theme.palette.primary.main;
@@ -65,24 +62,23 @@ export const FlowStepDownload: FC<FlowStepDownloadProps> = (props) => {
   const color = getDownloadColor(download, theme);
 
   return (
-    <Stack direction='row' alignItems='center' gap={2}>
-      <Typography variant='subtitle2' color='text.secondary'>
+    <Stack direction='row' alignItems='center' gap={2} flexWrap='wrap'>
+      <Typography variant='caption' color='text.secondary'>
         {t('pages.project.progress.download.label', {
           name: getDownloadName(download),
         })}
       </Typography>
-      <Chip
-        size='small'
-        variant='outlined'
+      <Typography
+        variant='caption'
         sx={{
           color,
-          '& .MuiChip-label':
-            download.status === 'processing'
-              ? getShimmerTextSx(color)
-              : undefined,
+          ...(download.status === 'processing'
+            ? getShimmerTextSx(color)
+            : undefined),
         }}
-        label={getDownloadStatusLabel(download, t)}
-      />
+      >
+        {getDownloadStatusLabel(download, t)}
+      </Typography>
     </Stack>
   );
 };

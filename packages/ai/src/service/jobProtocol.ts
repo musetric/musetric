@@ -63,7 +63,16 @@ const logSchema = z.object({
   message: z.string(),
 });
 
-const loadingSchema = z.object({ type: z.literal('loading'), jobId });
+const loadingSchema = z.object({
+  type: z.literal('loading'),
+  jobId,
+  loaded: z.number(),
+  total: z.number(),
+});
+
+const buildingSchema = z.object({ type: z.literal('building'), jobId });
+
+const loadedSchema = z.object({ type: z.literal('loaded'), jobId });
 
 const runningSchema = z.object({
   type: z.literal('running'),
@@ -103,6 +112,8 @@ const executorMessageSchema = z.discriminatedUnion('type', [
   aliveSchema,
   logSchema,
   loadingSchema,
+  buildingSchema,
+  loadedSchema,
   runningSchema,
   resultSchema,
   failureSchema,
@@ -114,6 +125,8 @@ export type ExecutorReady = z.infer<typeof readySchema>;
 export type ExecutorLogLevel = z.infer<typeof logLevelSchema>;
 export type ExecutorJobMessage =
   | z.infer<typeof loadingSchema>
+  | z.infer<typeof buildingSchema>
+  | z.infer<typeof loadedSchema>
   | z.infer<typeof runningSchema>
   | z.infer<typeof resultSchema>
   | z.infer<typeof failureSchema>

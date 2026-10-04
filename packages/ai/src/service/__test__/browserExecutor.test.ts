@@ -55,7 +55,9 @@ test('the browser client runs a job and reports its phases', async () => {
   const apis: BrowserJobApis = {
     [apiName]: createBrowserJobApi<{ gain: number }>(
       async (request, context) => {
-        context.reportLoading();
+        context.reportLoading({ loaded: 1, total: 4 });
+        context.reportBuilding();
+        context.reportLoaded();
         return Promise.resolve({ frames: request.gain });
       },
     ),
@@ -71,7 +73,9 @@ test('the browser client runs a job and reports its phases', async () => {
 
     expect(result).toEqual({ frames: 3 });
     expect(host.phases).toEqual([
-      { type: 'loading', jobId: expect.any(String) },
+      { type: 'loading', jobId: expect.any(String), loaded: 1, total: 4 },
+      { type: 'building', jobId: expect.any(String) },
+      { type: 'loaded', jobId: expect.any(String) },
     ]);
   });
 });

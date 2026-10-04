@@ -28,8 +28,8 @@ export type VocalsGpuRuntime = {
 
 export type VocalsGpuRuntimeOptions = {
   graph: VocalsGraph;
-  modelUrl: string;
-  modelDataUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
+  modelDataFile: Uint8Array<ArrayBuffer>;
   modelDataPath: string;
   inspect?: (tap: StftInferenceTap) => Promise<void>;
 };
@@ -49,8 +49,10 @@ export const createVocalsGpuRuntime = async (
     geometry: graph,
     inputShape: shape,
     outputShape: shape,
-    modelUrl: options.modelUrl,
-    externalData: [{ path: options.modelDataPath, data: options.modelDataUrl }],
+    modelFile: options.modelFile,
+    externalData: [
+      { path: options.modelDataPath, data: options.modelDataFile },
+    ],
     frameShader: vocalsFrameShader,
     overlapAddShader: vocalsOverlapAddShader,
     graphCapture: true,

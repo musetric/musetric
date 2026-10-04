@@ -117,7 +117,7 @@ export type BeatThisGpuTap = {
 
 export type BeatThisGpuRuntimeOptions = {
   graph: BeatThisGraph;
-  modelUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
   filterbank: Float32Array;
   inspect?: (tap: BeatThisGpuTap) => Promise<void>;
 };
@@ -126,7 +126,7 @@ export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
   const { graph } = options;
-  const session = await ort.InferenceSession.create(options.modelUrl, {
+  const session = await ort.InferenceSession.create(options.modelFile, {
     executionProviders: [
       await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
     ],

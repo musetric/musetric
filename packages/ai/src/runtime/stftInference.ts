@@ -73,7 +73,7 @@ export type StftInferenceOptions = {
   geometry: ChunkGeometry;
   inputShape: readonly number[];
   outputShape: readonly number[];
-  modelUrl: string;
+  modelFile: Uint8Array<ArrayBuffer>;
   externalData?: NonNullable<
     ort.InferenceSession.SessionOptions['externalData']
   >;
@@ -105,7 +105,7 @@ export const createStftInferenceRuntime = async (
   });
   const { device } = webgpu;
 
-  const session = await ort.InferenceSession.create(options.modelUrl, {
+  const session = await ort.InferenceSession.create(options.modelFile, {
     executionProviders: [
       await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
     ],

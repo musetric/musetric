@@ -6,10 +6,10 @@ use std::{
 
 use musetric_db::{Analysis, PendingJob, blob_path};
 use musetric_gpu::{
-    Download, ExecutorFailure, ExecutorPass, ExecutorPhase, ExecutorSession,
+    Download, ExecutorFailure, ExecutorPass, ExecutorPhase, ExecutorProgress, ExecutorSession,
     ExecutorSessionOptions, ModelFile, PhaseSink, UnitSession, ensure_model_file,
 };
-use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport, StepWaiting};
+use musetric_jobs::{ByteProgress, StepAnswer, StepPass, StepPhase, StepReport, StepWaiting};
 use musetric_media::{
     Downmix, MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
 };
@@ -90,18 +90,35 @@ pub(crate) struct BrowserAnalysis {
     pub(crate) build: BuildRequest,
 }
 
-pub(crate) fn read_phase(phase: ExecutorPhase) -> StepPhase {
+fn read_phase(phase: ExecutorPhase) -> Option<StepPhase> {
     match phase {
-        ExecutorPhase::Loading => StepPhase::Loading,
+        ExecutorPhase::Loading(progress) => Some(StepPhase::Loading {
+            progress: progress.map(read_progress),
+        }),
+        ExecutorPhase::Building => Some(StepPhase::Building),
+        ExecutorPhase::Loaded => None,
         ExecutorPhase::Running {
             pass,
             unit,
             unit_count,
-        } => StepPhase::Running {
+        } => Some(StepPhase::Running {
             pass: read_pass(pass),
             unit,
             unit_count,
-        },
+        }),
+    }
+}
+
+fn read_progress(progress: ExecutorProgress) -> ByteProgress {
+    ByteProgress {
+        done: progress.done,
+        total: progress.total,
+    }
+}
+
+pub(crate) fn show_phase(report: &StepReport, phase: ExecutorPhase, unit: Option<&StepPhase>) {
+    if let Some(shown) = read_phase(phase).or_else(|| unit.cloned()) {
+        report(shown);
     }
 }
 
@@ -209,7 +226,7 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
     });
     session.wait_ready().await?;
-    (job.report)(StepPhase::Loading);
+    (job.report)(StepPhase::Loading { progress: None });
     let bound = write_database(&job.context.storage, {
         let project_id = job.job.project_id;
         let step = job.job.step;
@@ -224,23 +241,40 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
     let request = (job.analysis.build)(&attempt_id, &session.attempt_url(&attempt_id), &hosted)?;
     let ticket = session.send_job(job.analysis.api, &request)?;
     let mut answered = Box::pin(async move { ticket.wait().await });
-    tokio::select! {
-        finished = &mut answered => {
-            return early_job(finished);
+    let opened = units.wait_opened(&attempt_id);
+    tokio::pin!(opened);
+    loop {
+        tokio::select! {
+            finished = &mut answered => {
+                return early_job(finished);
+            }
+            outcome = &mut opened => {
+                outcome?;
+                break;
+            }
+            Some(phase) = reported.recv() => show_phase(job.report, phase, None),
         }
-        outcome = units.wait_opened(&attempt_id) => outcome?,
     }
-    (job.report)(StepPhase::Running {
+    let running = StepPhase::Running {
         pass: StepPass::Decode,
         unit: 0,
         unit_count: 1,
-    });
+    };
+    (job.report)(running.clone());
     session.send_unit(&attempt_id, 0, 1)?;
-    tokio::select! {
-        finished = &mut answered => {
-            return early_job(finished);
+    let folded = units.folded(&attempt_id);
+    tokio::pin!(folded);
+    loop {
+        tokio::select! {
+            finished = &mut answered => {
+                return early_job(finished);
+            }
+            outcome = &mut folded => {
+                outcome?;
+                break;
+            }
+            Some(phase) = reported.recv() => show_phase(job.report, phase, Some(&running)),
         }
-        outcome = units.folded(&attempt_id) => outcome?,
     }
     session.send_unit_close(&attempt_id)?;
     loop {
@@ -249,11 +283,7 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
                 finished.map_err(Failure::from)?;
                 break;
             }
-            received = reported.recv() => {
-                if let Some(phase) = received {
-                    (job.report)(read_phase(phase));
-                }
-            }
+            Some(phase) = reported.recv() => show_phase(job.report, phase, None),
         }
     }
     units.finalize(&attempt_id)

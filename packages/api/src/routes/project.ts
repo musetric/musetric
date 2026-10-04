@@ -36,6 +36,7 @@ export const processingPhaseSchema = z.enum([
   'preparing',
   'decoding',
   'loading',
+  'building',
   'running',
   'saving',
 ]);
@@ -59,6 +60,7 @@ export const processingStepSchema = z.object({
   phase: processingPhaseSchema.optional(),
   download: downloadSchema.optional(),
   decoded: z.number().optional(),
+  loaded: z.number().optional(),
   total: z.number().optional(),
   pass: processingPassSchema.optional(),
   unit: z.number().optional(),
