@@ -1,4 +1,4 @@
-import { IconButton, Stack, Typography } from '@mui/material';
+import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -15,33 +15,31 @@ export const TempoButton: FC = () => {
   const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
   const tempoBpm = useEngineStore((state) => state.tempoBpm);
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
+  const label = t('pages.project.player.controls.tempo');
 
   return (
-    <IconButton
-      color={tempoBpm !== sourceTempoBpm ? 'primary' : 'inherit'}
-      disabled={!frameCount || recording || realtimeFailed}
-      sx={{
-        borderRadius: 1,
-        px: 1,
-        py: 0,
-      }}
-      onClick={(event) => {
-        setTempoAnchorEl(event.currentTarget);
-      }}
-    >
-      <Stack alignItems='center'>
-        <TempoIcon fontSize='small' />
-        <Typography
-          component='span'
-          variant='caption'
-          fontSize={10}
-          lineHeight={1}
+    <Tooltip title={label}>
+      <Box>
+        <IconButton
+          size='small'
+          disabled={!frameCount || recording || realtimeFailed}
+          color={tempoBpm === sourceTempoBpm ? 'inherit' : 'primary'}
+          aria-label={label}
+          sx={{ borderRadius: 2, px: 2, py: 1 }}
+          onClick={(event) => {
+            setTempoAnchorEl(event.currentTarget);
+          }}
         >
-          {t('pages.project.player.controls.tempoValue', {
-            value: tempoBpm,
-          })}
-        </Typography>
-      </Stack>
-    </IconButton>
+          <Stack alignItems='center' gap={0.5}>
+            <TempoIcon fontSize='small' />
+            <Typography variant='caption' lineHeight={1} noWrap>
+              {t('pages.project.player.controls.tempoValue', {
+                value: tempoBpm,
+              })}
+            </Typography>
+          </Stack>
+        </IconButton>
+      </Box>
+    </Tooltip>
   );
 };

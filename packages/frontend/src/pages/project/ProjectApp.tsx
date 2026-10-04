@@ -5,12 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
-import { MetronomeToggleButton } from './buttons/MetronomeToggleButton.js';
 import { ProjectBackButton } from './buttons/ProjectBackButton.js';
-import { SubtitlesToggleButton } from './buttons/SubtitlesToggleButton.js';
-import { TempoButton } from './buttons/TempoButton.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
-import { TransposeButton } from './buttons/TransposeButton.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
 import { ProjectHeaderMenu } from './menu/ProjectHeaderMenu.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
@@ -48,15 +44,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <>
           <ProjectBackButton />
           <Box flexGrow={1} />
-          <Stack direction='row' gap={1}>
-            <SubtitlesToggleButton />
-            <MetronomeToggleButton />
-            <TransposeButton />
-            <TransposePicker />
-            <TempoButton />
-            <TempoPicker />
-            <ProjectHeaderMenu />
-          </Stack>
+          <ProjectHeaderMenu />
         </>
       }
     >
@@ -65,11 +53,13 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
         )}
         <ProjectContent />
-        <PlaybackPanel projectId={project.id} />
+        <PlaybackPanel />
       </Stack>
       <RhythmTempoSync projectId={project.id} />
       <AudioSettings />
       <ProjectSettings />
+      <TransposePicker />
+      <TempoPicker />
     </ProjectLayout>
   );
 };

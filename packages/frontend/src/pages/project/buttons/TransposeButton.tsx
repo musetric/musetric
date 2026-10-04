@@ -1,4 +1,4 @@
-import { IconButton, Stack, Typography } from '@mui/material';
+import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,8 +25,9 @@ export const TransposeButton: FC = () => {
     (state) => state.setTransposeAnchorEl,
   );
   const keyQuery = useQuery(endpoints.key.get(projectId));
+  const label = t('pages.project.player.controls.transpose');
 
-  const label =
+  const value =
     keyQuery.status === 'success'
       ? formatKeyCompact(
           transposeKeyRoot(keyQuery.data.root, transposeSemitones),
@@ -37,29 +38,26 @@ export const TransposeButton: FC = () => {
         });
 
   return (
-    <IconButton
-      color={transposeSemitones !== 0 ? 'primary' : 'inherit'}
-      disabled={!frameCount || recording || realtimeFailed}
-      sx={{
-        borderRadius: 1,
-        px: 1,
-        py: 0,
-      }}
-      onClick={(event) => {
-        setTransposeAnchorEl(event.currentTarget);
-      }}
-    >
-      <Stack alignItems='center'>
-        <TransposeIcon fontSize='small' />
-        <Typography
-          component='span'
-          variant='caption'
-          fontSize={10}
-          lineHeight={1}
+    <Tooltip title={label}>
+      <Box>
+        <IconButton
+          size='small'
+          disabled={!frameCount || recording || realtimeFailed}
+          color={transposeSemitones === 0 ? 'inherit' : 'primary'}
+          aria-label={label}
+          sx={{ borderRadius: 2, px: 2, py: 1 }}
+          onClick={(event) => {
+            setTransposeAnchorEl(event.currentTarget);
+          }}
         >
-          {label}
-        </Typography>
-      </Stack>
-    </IconButton>
+          <Stack alignItems='center' gap={0.5}>
+            <TransposeIcon fontSize='small' />
+            <Typography variant='caption' lineHeight={1} noWrap>
+              {value}
+            </Typography>
+          </Stack>
+        </IconButton>
+      </Box>
+    </Tooltip>
   );
 };

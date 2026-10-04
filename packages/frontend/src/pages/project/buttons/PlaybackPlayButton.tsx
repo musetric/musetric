@@ -24,16 +24,16 @@ export const PlaybackPlayButton: FC = () => {
       onClick={() => {
         void engine.player.play();
       }}
-      size='small'
       sx={{
         alignSelf: 'stretch',
-        borderBottomLeftRadius: 0,
-        borderTopLeftRadius: 0,
+        borderRadius: '0 999px 999px 0',
         flex: 1,
+        mr: -1,
+        p: 0,
       }}
       title={t('pages.project.player.controls.play')}
     >
-      <PlayArrowRoundedIcon />
+      <PlayArrowRoundedIcon fontSize='large' />
     </IconButton>
   );
 };
