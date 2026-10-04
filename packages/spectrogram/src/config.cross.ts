@@ -99,10 +99,6 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
   extractConfig<SpectrogramConfig>(config, allSpectrogramConfigKeys);
 
-export const hasSpectrogramComparison = (
-  config: Pick<SpectrogramConfig, 'lanes' | 'comparison'>,
-): boolean => config.lanes[config.comparison.target].showSpectrogram;
-
 const isConfigComplete = (
   config: Partial<SpectrogramConfig>,
 ): config is SpectrogramConfig =>

@@ -13,7 +13,6 @@ import {
 import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidations.js';
 import {
   allTrackKeys,
-  hasSpectrogramComparison,
   mapTrackKeys,
   type SpectrogramConfig,
   type TrackKey,
@@ -87,10 +86,7 @@ export const createTrackWork = (
     const lane = runtime.config.lanes[key];
     return {
       spectrogram: lane.showSpectrogram,
-      fundamental:
-        lane.showFundamental ||
-        lane.showNotes ||
-        hasSpectrogramComparison(runtime.config),
+      fundamental: lane.showFundamental || lane.showNotes,
     };
   });
 

@@ -21,7 +21,46 @@ import {
   writeCentreTone,
 } from './processor.fixtures.js';
 
+const maxRedInColumns = (
+  pixels: Uint8ClampedArray,
+  width: number,
+  from: number,
+  to: number,
+): number => {
+  let max = 0;
+  for (let index = 0; index < pixels.length; index += 4) {
+    const column = (index / 4) % width;
+    if (column >= from && column < to) {
+      max = Math.max(max, pixels[index]);
+    }
+  }
+  return max;
+};
+
 describe('spectrogram processor', () => {
+  it('draws the recording before the playhead and the lead after it', async () => {
+    const base = singleBandConfig();
+    const config = singleBandConfig({
+      lanes: {
+        ...base.lanes,
+        recording: { ...base.lanes.recording, showSpectrogram: true },
+      },
+    });
+    await withProcessor({ device, config }, async (processor) => {
+      const length = config.sampleRate * 5;
+      const lead = createTone(length, toneFrequency, config.sampleRate);
+      const recording = createSilence(length);
+      await processor.render({ lead, recording }, 0.5);
+      const pixels = await readCanvas(config.canvas);
+      const { width } = config.viewSize;
+      const playhead = Math.floor(config.playheadRatio * width);
+      expect(maxRedInColumns(pixels, width, 0, playhead - 1)).toBeLessThan(16);
+      expect(
+        maxRedInColumns(pixels, width, playhead + 2, width),
+      ).toBeGreaterThan(40);
+    });
+  });
+
   it('renders a tone into its expected frequency row', async () => {
     const config = singleBandConfig();
     await withProcessor({ device, config }, async (processor) => {

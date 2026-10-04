@@ -10,7 +10,7 @@ struct DrawParams {
   recordingCloseColor : vec4f,
   recordingMissColor : vec4f,
   recordingTimingMissColor : vec4f,
-  recordingForeground : vec4f,
+  playhead : vec4f,
   comparisonThresholds : vec4f,
   lineWidths : vec4f,
   overlayTuning : vec4f,
@@ -67,7 +67,7 @@ fn segmentLineMask(
   if (
     startFrequency <= 0.0 ||
     endFrequency <= 0.0 ||
-    centsDistance(startFrequency, endFrequency) > drawParams.overlayTuning.w
+    centsDistance(startFrequency, endFrequency) > drawParams.overlayTuning.z
   ) {
     return 0.0;
   }
@@ -131,7 +131,7 @@ fn lineMaskAtPixel(
   let distance = centsDistance(frequency, centerFrequency);
   let normalizedDistance = distance / widthCents;
   var mask = clamp(
-    exp(-0.5 * normalizedDistance * normalizedDistance) * drawParams.overlayTuning.z,
+    exp(-0.5 * normalizedDistance * normalizedDistance) * drawParams.overlayTuning.y,
     0.0,
     1.0,
   );
@@ -208,17 +208,23 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   if (drawParams.noteVisibility.x != 0u && pixelMidiRow % 2 == 0) {
     color = mix(color, drawParams.foreground.xyz, drawParams.overlayTuning.x);
   }
-  if (drawParams.visibility.x != 0u) {
-    let intensity = sampleSpectrogram(layer0Slot, y, 0u, width, textureHeight);
+  let beforePlayhead = f32(x) + 0.5 < drawParams.playhead.x * f32(width);
+  let recordingSide = drawParams.visibility.y != 0u &&
+    (beforePlayhead || drawParams.visibility.x == 0u);
+  let sideVisible = select(
+    drawParams.visibility.x,
+    drawParams.visibility.y,
+    recordingSide,
+  );
+  if (sideVisible != 0u) {
+    let intensity = sampleSpectrogram(
+      select(layer0Slot, layer1Slot, recordingSide),
+      y,
+      select(0u, 1u, recordingSide),
+      width,
+      textureHeight,
+    );
     color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));
-  }
-  if (drawParams.visibility.y != 0u) {
-    let intensity = sampleSpectrogram(layer1Slot, y, 1u, width, textureHeight);
-    var tint = drawParams.recordingForeground.xyz;
-    if (targetFrequency > 0.0) {
-      tint = targetTint(targetVerdict);
-    }
-    color = mix(color, tint, clamp(intensity * drawParams.overlayTuning.y, 0.0, 1.0));
   }
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
