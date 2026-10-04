@@ -47,6 +47,11 @@ web manifest from the same file.
 ## Toolchain
 
 Android builds need `ANDROID_HOME`, `NDK_HOME` and JDK 21 in `JAVA_HOME`.
+libopus is cross-compiled with CMake, which finds the NDK through
+`ANDROID_NDK_HOME`: point it at the same NDK as `NDK_HOME`. On Windows, Ninja
+must be on `PATH` too, because the Visual Studio generator cannot target
+Android; the Build Tools ship it under
+`Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja`.
 iOS builds need Xcode, the `aarch64-apple-ios` Rust target, XcodeGen and an
 Apple team id in `DEVELOPMENT_TEAM`.
 
