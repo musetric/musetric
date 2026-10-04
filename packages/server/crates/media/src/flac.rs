@@ -14,13 +14,10 @@ use flacenc::{
     source::{Context, Fill, FrameBuf},
 };
 
-use crate::{BoxedError, pcm::CHANNELS};
+use crate::{BoxedError, SampleDepth, pcm::CHANNELS};
 
-const BITS_PER_SAMPLE: usize = 24;
 const BLOCK_FRAMES: usize = 4096;
 const WRITE_BUFFER_BYTE_LENGTH: usize = 256 * 1024;
-const SCALE: f32 = 8_388_608.0;
-const HIGHEST: f32 = 8_388_607.0;
 const HEADER_MOVED: &str = "The flac header changed length while the stream was written";
 const SEEK_SECONDS: u64 = 2;
 const SEEK_POINTS: usize = 512;
@@ -55,15 +52,20 @@ pub(crate) struct FlacWriter {
     sample_rate: u32,
     smallest_frame: usize,
     largest_frame: usize,
+    depth: SampleDepth,
     failure: Option<BoxedError>,
 }
 
 impl FlacWriter {
-    pub(crate) fn create(to: &Path, sample_rate: u32) -> Result<Self, BoxedError> {
+    pub(crate) fn create(
+        to: &Path,
+        sample_rate: u32,
+        depth: SampleDepth,
+    ) -> Result<Self, BoxedError> {
         let configuration = verify(Configuration::default())?;
         let verbatim = verify(verbatim_configuration())?;
-        let mut stream = Stream::new(usize::try_from(sample_rate)?, CHANNELS, BITS_PER_SAMPLE)
-            .map_err(describe)?;
+        let mut stream =
+            Stream::new(usize::try_from(sample_rate)?, CHANNELS, depth.bits()).map_err(describe)?;
         stream
             .stream_info_mut()
             .set_block_sizes(BLOCK_FRAMES, BLOCK_FRAMES)
@@ -76,7 +78,7 @@ impl FlacWriter {
             verbatim,
             stream,
             frames: FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).map_err(describe)?,
-            context: Context::new(BITS_PER_SAMPLE, CHANNELS),
+            context: Context::new(depth.bits(), CHANNELS),
             file,
             pending: Vec::with_capacity(BLOCK_FRAMES * CHANNELS),
             frame_positions: Vec::new(),
@@ -85,6 +87,7 @@ impl FlacWriter {
             sample_rate,
             smallest_frame: usize::MAX,
             largest_frame: 0,
+            depth,
             failure: None,
         })
     }
@@ -93,8 +96,8 @@ impl FlacWriter {
         if self.failure.is_some() {
             return;
         }
-        self.pending.push(quantize(left));
-        self.pending.push(quantize(right));
+        self.pending.push(self.depth.quantize(left));
+        self.pending.push(self.depth.quantize(right));
         if self.pending.len() >= BLOCK_FRAMES * CHANNELS {
             self.encode();
         }
@@ -119,7 +122,7 @@ impl FlacWriter {
             .current_frame_number()
             .ok_or("The flac writer lost the frame number")?;
         let mut sink = encode_frame(&self.configuration, &self.frames, number, &self.stream)?;
-        if sink.as_slice().len() > raw_byte_length(self.pending.len()) {
+        if sink.as_slice().len() > raw_byte_length(self.pending.len(), self.depth) {
             sink = encode_frame(&self.verbatim, &self.frames, number, &self.stream)?;
         }
         let encoded = sink.as_slice();
@@ -188,8 +191,8 @@ fn encode_frame(
     Ok(sink)
 }
 
-const fn raw_byte_length(samples: usize) -> usize {
-    samples * BITS_PER_SAMPLE.div_ceil(8) + FRAME_OVERHEAD_BYTES
+const fn raw_byte_length(samples: usize, depth: SampleDepth) -> usize {
+    samples * depth.bytes() + FRAME_OVERHEAD_BYTES
 }
 
 fn write_header(stream: &Stream, seek_table: &[u8]) -> Result<Vec<u8>, BoxedError> {
@@ -261,14 +264,6 @@ fn describe(failure: impl Display) -> BoxedError {
     failure.to_string().into()
 }
 
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "the value is clamped to the 24-bit range before it is truncated"
-)]
-fn quantize(value: f32) -> i32 {
-    (value * SCALE).round().clamp(-SCALE, HIGHEST) as i32
-}
-
 #[cfg(test)]
 mod tests {
     use std::{fs::File, path::Path};
@@ -284,7 +279,7 @@ mod tests {
         BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
         containing_frame, raw_byte_length, seek_spacing, seek_table,
     };
-    use crate::pcm::CHANNELS;
+    use crate::{SampleDepth, pcm::CHANNELS};
 
     const RATE: u32 = 48_000;
 
@@ -329,7 +324,8 @@ mod tests {
     fn keeps_every_frame_within_its_raw_samples() {
         let blocks = 4;
         let path = std::env::temp_dir().join(format!("musetric-flac-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
+            .expect("the writer should be created");
         let mut state = 1;
         for _ in 0..BLOCK_FRAMES * blocks {
             let sample = noise(&mut state) / 8.0;
@@ -342,7 +338,7 @@ mod tests {
         std::fs::remove_file(&path).expect("the stream should be removed");
 
         let header = MAGIC.len() + 4 + STREAM_INFO_USIZE + 4 + SEEK_POINTS * SEEK_POINT_BYTES;
-        let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS);
+        let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS, SampleDepth::TwentyFour);
         let limit = u64::try_from(header + raw * blocks).expect("the limit fits");
         assert!(
             written <= limit,
@@ -385,7 +381,8 @@ mod tests {
         let blocks = 160;
         let path =
             std::env::temp_dir().join(format!("musetric-flac-seek-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
+            .expect("the writer should be created");
         let mut state = 1;
         for _ in 0..BLOCK_FRAMES * blocks {
             let sample = noise(&mut state) / 8.0;
@@ -413,7 +410,8 @@ mod tests {
     fn stops_taking_samples_once_a_write_fails() {
         let path =
             std::env::temp_dir().join(format!("musetric-flac-fail-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE).expect("the writer should be created");
+        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
+            .expect("the writer should be created");
         let read_only = File::open(&path).expect("the stream should reopen");
         writer.file = std::io::BufWriter::with_capacity(0, read_only);
         let mut state = 1;

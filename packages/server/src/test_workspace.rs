@@ -9,7 +9,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{publish::Publication, realtime::Rooms, routes::RouteState, storage::Storage};
+use crate::{
+    mixdown::Mixdowns, publish::Publication, realtime::Rooms, routes::RouteState, storage::Storage,
+};
 use axum::http::StatusCode;
 use musetric_db::{
     OpenOptions as DatabaseOptions, PendingJob, Reader, Writer, blob_path, init_database,
@@ -193,6 +195,7 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         .expect("the executor host should start");
     RouteState {
         rooms: Arc::new(Rooms::create()),
+        mixdowns: Arc::new(Mixdowns::create(&storage.work_path)),
         storage,
         queue,
         executor,

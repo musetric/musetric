@@ -9,6 +9,7 @@ import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
 import { ProjectHeaderMenu } from './menu/ProjectHeaderMenu.js';
+import { MixdownDialog } from './mixdown/MixdownDialog.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
@@ -60,6 +61,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       <ProjectSettings />
       <TransposePicker />
       <TempoPicker />
+      <MixdownDialog />
     </ProjectLayout>
   );
 };

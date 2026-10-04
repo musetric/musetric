@@ -4,6 +4,7 @@ use rusty_aac::encode::{AacEncoder as CodecEncoder, AacEncoderConfig};
 use crate::BoxedError;
 
 pub const FRAME_SAMPLES: u32 = 1024;
+pub const ENCODER_DELAY: u32 = FRAME_SAMPLES;
 
 pub struct AacEncoder {
     encoder: CodecEncoder,

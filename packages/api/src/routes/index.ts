@@ -1,6 +1,7 @@
 export * as audio from './audio.js';
 export * as chords from './chords.js';
 export * as key from './key.js';
+export * as mixdown from './mixdown.js';
 export * as models from './models.js';
 export * as preview from './preview.js';
 export * as processing from './processing.js';

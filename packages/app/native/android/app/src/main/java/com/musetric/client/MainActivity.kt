@@ -21,6 +21,7 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     applyWebViewInsets(webView)
+    shareDownloads(this, webView)
   }
 
   private fun applyWebViewInsets(webView: WebView) {

@@ -9,6 +9,7 @@ export type ProjectState = {
   subtitlesOpen: boolean;
   chordsOpen: boolean;
   audioSettingsOpen: boolean;
+  mixdownOpen: boolean;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
 };
@@ -18,6 +19,7 @@ const initialState: ProjectState = {
   subtitlesOpen: true,
   chordsOpen: true,
   audioSettingsOpen: false,
+  mixdownOpen: false,
 };
 
 export type ProjectActions = {
@@ -25,6 +27,7 @@ export type ProjectActions = {
   setSubtitlesOpen: (value: boolean) => void;
   setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
+  setMixdownOpen: (value: boolean) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
 };
@@ -45,6 +48,7 @@ export const useProjectStore = create<State>()(
     setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
     setChordsOpen: (chordsOpen) => set({ chordsOpen }),
     setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
+    setMixdownOpen: (mixdownOpen) => set({ mixdownOpen }),
     setTransposeAnchorEl: (transposeAnchorEl) =>
       set({
         transposeAnchorEl,
