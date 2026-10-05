@@ -99,6 +99,17 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
   extractConfig<SpectrogramConfig>(config, allSpectrogramConfigKeys);
 
+const isFundamentalShown = (lane: SpectrogramLaneConfig): boolean =>
+  lane.showFundamental || lane.showNotes;
+
+export const isFundamentalNeeded = (
+  config: Pick<SpectrogramConfig, 'lanes' | 'comparison'>,
+  key: TrackKey,
+): boolean =>
+  isFundamentalShown(config.lanes[key]) ||
+  (key === config.comparison.reference &&
+    isFundamentalShown(config.lanes[config.comparison.target]));
+
 const isConfigComplete = (
   config: Partial<SpectrogramConfig>,
 ): config is SpectrogramConfig =>

@@ -126,7 +126,7 @@ export const createEngineSpectrogram = (
           recording: {
             ...defaultSpectrogramConfig.lanes.recording,
             showSpectrogram: !notes,
-            showFundamental: notes,
+            showFundamental: true,
             showNotes: notes,
             truncateAfterPlayhead: recording,
           },

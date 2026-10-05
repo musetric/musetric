@@ -17,6 +17,8 @@ const noteGridStripeAmount = 0.12;
 const fundamentalLineMaskBoost = 1.18;
 const maxSegmentSpanCents = 720;
 const laneDividerAmount = 0.24;
+const stackedLineWidthPixels = 3;
+const stackedLineOutlinePixels = 1;
 
 const areLaneConfigsEqual = (
   first: SpectrogramLaneConfig,
@@ -96,8 +98,8 @@ export const createColorsCell = (device: GPUDevice) =>
       const lineWidths = [
         targetLane.lineWidthCents,
         referenceLane.lineWidthCents,
-        0,
-        0,
+        stackedLineWidthPixels,
+        stackedLineOutlinePixels,
       ] as const;
       const overlayTuning = [
         noteGridStripeAmount,
