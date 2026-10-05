@@ -27,6 +27,7 @@ export type SpectrogramGestureContext = {
   getPlayheadRatio: () => number;
   getMinFrequency: () => number;
   getMaxFrequency: () => number;
+  getFrequencyBandCount: () => number;
 };
 
 const readPositionState = (
@@ -60,6 +61,7 @@ const readRangeState = (
   maximumSize: logMaxRange,
   panDirection: 1,
   reverse: true,
+  bandCount: context.getFrequencyBandCount(),
 });
 
 const readState = (

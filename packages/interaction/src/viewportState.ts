@@ -23,6 +23,7 @@ export type ViewportRangeState = {
   maximumSize: number;
   panDirection: number;
   reverse: boolean;
+  bandCount: number;
 };
 
 export type ViewportState = ViewportPositionState | ViewportRangeState;
@@ -60,7 +61,8 @@ const panRangeViewport = (
   viewportSize: number,
 ): ViewportStateUpdate => {
   const size = state.upper - state.lower;
-  const rawShift = (state.panDirection * delta * size) / viewportSize;
+  const rawShift =
+    (state.panDirection * delta * size * state.bandCount) / viewportSize;
   const shift = clamp(
     rawShift,
     state.minimumValue - state.lower,

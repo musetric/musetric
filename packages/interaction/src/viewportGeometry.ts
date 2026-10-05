@@ -38,7 +38,10 @@ export const getViewportCoordinateAnchorRatio = (
     return state.originRatio;
   }
 
-  return getAxisRatio(element.getBoundingClientRect(), axis, coordinate);
+  const ratio = getAxisRatio(element.getBoundingClientRect(), axis, coordinate);
+  if (ratio === undefined) return undefined;
+  const bandRatio = ratio * state.bandCount;
+  return bandRatio - Math.min(Math.floor(bandRatio), state.bandCount - 1);
 };
 
 export type ViewportPointAnchorRequest = {

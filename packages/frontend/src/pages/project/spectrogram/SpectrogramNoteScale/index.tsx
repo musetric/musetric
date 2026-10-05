@@ -77,12 +77,21 @@ export const SpectrogramNoteScale: FC = () => {
       context.textBaseline = 'middle';
       context.lineWidth = 1;
 
+      const bandCount = notesMode ? 1 : 2;
+      const bandHeight = height / bandCount;
       const markerSpacing =
-        markers.length > 1 ? height / (markers.length - 1) : height;
+        markers.length > 1 ? bandHeight / (markers.length - 1) : bandHeight;
       const withNaturalLabels = markerSpacing >= 16;
 
-      for (const marker of markers) {
-        const y = alignPixel(marker.topRatio * height, pixelRatio);
+      const placements = Array.from({ length: bandCount }, (_, band) =>
+        markers.map((marker) => ({
+          marker,
+          y: alignPixel((band + marker.topRatio) * bandHeight, pixelRatio),
+        })),
+      ).flat();
+
+      for (const placement of placements) {
+        const { marker, y } = placement;
         const octave = isOctaveMidi(marker.midi);
 
         if (notesMode) {

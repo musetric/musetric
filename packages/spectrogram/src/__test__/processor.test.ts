@@ -21,43 +21,95 @@ import {
   writeCentreTone,
 } from './processor.fixtures.js';
 
-const maxRedInColumns = (
+type PixelRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+const maxRedInRect = (
   pixels: Uint8ClampedArray,
   width: number,
-  from: number,
-  to: number,
+  rect: PixelRect,
 ): number => {
   let max = 0;
-  for (let index = 0; index < pixels.length; index += 4) {
-    const column = (index / 4) % width;
-    if (column >= from && column < to) {
-      max = Math.max(max, pixels[index]);
+  for (let y = rect.top; y < rect.bottom; y += 1) {
+    for (let x = rect.left; x < rect.right; x += 1) {
+      max = Math.max(max, pixels[(y * width + x) * 4]);
     }
   }
   return max;
 };
 
+const stackedConfig = () => {
+  const base = singleBandConfig();
+  return singleBandConfig({
+    lanes: {
+      ...base.lanes,
+      recording: { ...base.lanes.recording, showSpectrogram: true },
+    },
+  });
+};
+
 describe('spectrogram processor', () => {
-  it('draws the recording before the playhead and the lead after it', async () => {
-    const base = singleBandConfig();
-    const config = singleBandConfig({
-      lanes: {
-        ...base.lanes,
-        recording: { ...base.lanes.recording, showSpectrogram: true },
-      },
-    });
+  it('draws the lead across the whole width above the recording', async () => {
+    const config = stackedConfig();
     await withProcessor({ device, config }, async (processor) => {
       const length = config.sampleRate * 5;
       const lead = createTone(length, toneFrequency, config.sampleRate);
       const recording = createSilence(length);
       await processor.render({ lead, recording }, 0.5);
       const pixels = await readCanvas(config.canvas);
-      const { width } = config.viewSize;
+      const { width, height } = config.viewSize;
+      const split = Math.floor(height / 2);
       const playhead = Math.floor(config.playheadRatio * width);
-      expect(maxRedInColumns(pixels, width, 0, playhead - 1)).toBeLessThan(16);
       expect(
-        maxRedInColumns(pixels, width, playhead + 2, width),
+        maxRedInRect(pixels, width, {
+          left: 0,
+          right: playhead - 1,
+          top: 0,
+          bottom: split,
+        }),
       ).toBeGreaterThan(40);
+      expect(
+        maxRedInRect(pixels, width, {
+          left: 0,
+          right: width,
+          top: split + 1,
+          bottom: height,
+        }),
+      ).toBeLessThan(16);
+    });
+  });
+
+  it('draws the recording in its own frequency rows below the lead', async () => {
+    const config = stackedConfig();
+    await withProcessor({ device, config }, async (processor) => {
+      const length = config.sampleRate * 5;
+      const lead = createSilence(length);
+      const recording = createTone(length, toneFrequency, config.sampleRate);
+      await processor.render({ lead, recording }, 0.5);
+      const pixels = await readCanvas(config.canvas);
+      const { width, height } = config.viewSize;
+      const split = Math.floor(height / 2);
+      const bandHeight = height - split;
+      expect(
+        maxRedInRect(pixels, width, {
+          left: 0,
+          right: width,
+          top: 0,
+          bottom: split,
+        }),
+      ).toBeLessThan(16);
+
+      const recordingBand = pixels.subarray(split * width * 4);
+      const expectedRow = rowAtFrequency(toneFrequency, {
+        ...config,
+        viewSize: { width, height: bandHeight },
+      });
+      const actualRow = brightestRow(recordingBand, width, bandHeight);
+      expect(Math.abs(actualRow - expectedRow)).toBeLessThan(bandHeight * 0.15);
     });
   });
 

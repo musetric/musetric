@@ -10,7 +10,6 @@ struct DrawParams {
   recordingCloseColor : vec4f,
   recordingMissColor : vec4f,
   recordingTimingMissColor : vec4f,
-  playhead : vec4f,
   comparisonThresholds : vec4f,
   lineWidths : vec4f,
   overlayTuning : vec4f,
@@ -184,6 +183,31 @@ fn sampleSpectrogram(slot: u32, y: u32, layer: u32, width: u32, height: u32) -> 
   ).r;
 }
 
+fn sampleBandSpectrogram(
+  slot: u32,
+  bandY: u32,
+  bandHeight: u32,
+  layer: u32,
+  width: u32,
+  textureHeight: u32,
+) -> f32 {
+  let rowsPerPixel = f32(textureHeight - 1u) / f32(max(bandHeight, 2u) - 1u);
+  let firstRow = min(
+    u32(floor(f32(bandY) * rowsPerPixel + 0.5)),
+    textureHeight - 1u,
+  );
+  let lastRow = clamp(
+    u32(floor(f32(bandY + 1u) * rowsPerPixel + 0.5)),
+    firstRow + 1u,
+    textureHeight,
+  );
+  var value = 0.0;
+  for (var row = firstRow; row < lastRow; row += 1u) {
+    value = max(value, sampleSpectrogram(slot, row, layer, width, textureHeight));
+  }
+  return value;
+}
+
 @fragment
 fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location(0) vec4f {
   let dimensions = textureDimensions(spectrogramTextures);
@@ -201,30 +225,39 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let targetFrequency = targetLine[targetSlot];
   let targetVerdict = targetVerdicts[targetSlot];
 
-  let pixelFrequency = frequencyAtPixel(y, height);
+  let stacked = drawParams.visibility.x != 0u && drawParams.visibility.y != 0u;
+  let splitRow = select(textureHeight, textureHeight / 2u, stacked);
+  let recordingBand = y >= splitRow;
+  let bandTop = select(0u, splitRow, recordingBand);
+  let bandHeight = select(splitRow, textureHeight - splitRow, recordingBand);
+  let bandY = y - bandTop;
+
+  let pixelFrequency = frequencyAtPixel(bandY, f32(bandHeight));
   let pixelMidiRow = i32(floor(midiAtFrequency(pixelFrequency) + 0.5));
 
   var color = drawParams.background.xyz;
   if (drawParams.noteVisibility.x != 0u && pixelMidiRow % 2 == 0) {
     color = mix(color, drawParams.foreground.xyz, drawParams.overlayTuning.x);
   }
-  let beforePlayhead = f32(x) + 0.5 < drawParams.playhead.x * f32(width);
-  let recordingSide = drawParams.visibility.y != 0u &&
-    (beforePlayhead || drawParams.visibility.x == 0u);
-  let sideVisible = select(
+  let recordingShown = recordingBand || drawParams.visibility.x == 0u;
+  let laneVisible = select(
     drawParams.visibility.x,
     drawParams.visibility.y,
-    recordingSide,
+    recordingShown,
   );
-  if (sideVisible != 0u) {
-    let intensity = sampleSpectrogram(
-      select(layer0Slot, layer1Slot, recordingSide),
-      y,
-      select(0u, 1u, recordingSide),
+  if (laneVisible != 0u) {
+    let intensity = sampleBandSpectrogram(
+      select(layer0Slot, layer1Slot, recordingShown),
+      bandY,
+      bandHeight,
+      select(0u, 1u, recordingShown),
       width,
       textureHeight,
     );
     color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));
+  }
+  if (stacked && y == splitRow) {
+    color = mix(color, drawParams.foreground.xyz, drawParams.overlayTuning.w);
   }
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
