@@ -15,6 +15,8 @@ import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
 
+const noteNamesInset = 16;
+
 export const ProjectSpectrogramVisualization: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
   const spectrogramAreaRef = useRef<HTMLDivElement>(null);
@@ -45,13 +47,22 @@ export const ProjectSpectrogramVisualization: FC = () => {
         <SpectrogramNoteScale />
         {spectrum && (
           <>
-            <TrackLabel kind='delivery' stemType='lead' />
+            <Box
+              position='absolute'
+              top={0}
+              right={0}
+              bottom='50%'
+              left={noteNamesInset}
+              sx={{ pointerEvents: 'none' }}
+            >
+              <TrackLabel kind='delivery' stemType='lead' />
+            </Box>
             <Box
               position='absolute'
               top='50%'
               right={0}
               bottom={0}
-              left={0}
+              left={noteNamesInset}
               sx={{ pointerEvents: 'none' }}
             >
               <TrackLabel kind='recording' />

@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../../api/index.js';
+import { formatDuration } from '../../../../common/formatDuration.js';
 import { doneCount, stepOrder } from '../../../processing/queue.js';
 import { stepTitles } from '../../../processing/stepTitles.js';
 import { formatKeyCompact } from '../../../project/key/keyFormat.js';
-import { formatDuration } from '../../common/formatDuration.js';
 
 const getActiveStep = (
   projectInfo: api.project.Item,

@@ -46,7 +46,7 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
           sx={{ border: 0, borderRadius: 2, px: 2, py: 1, minWidth: 68 }}
           onClick={() => {
             if (target.panel === 'details') {
-              setDetailsView(selected ? undefined : target.view);
+              setDetailsView(target.view);
               return;
             }
             engine.store.update((state) => {

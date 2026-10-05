@@ -1,14 +1,12 @@
-import { Alert, Box, Stack } from '@mui/material';
+import { Alert, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
-import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
-import { ProjectHeaderMenu } from './menu/ProjectHeaderMenu.js';
 import { MixPopover } from './mix/MixPopover.js';
 import { MixdownDialog } from './mixdown/MixdownDialog.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
@@ -41,15 +39,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   useEffect(() => engine.decoder.mount(project.id), [project.id]);
 
   return (
-    <ProjectLayout
-      heading={
-        <>
-          <ProjectBackButton />
-          <Box flexGrow={1} />
-          <ProjectHeaderMenu />
-        </>
-      }
-    >
+    <ProjectLayout>
       <Stack width='100%' flexGrow={1} minHeight={0} gap={2}>
         {realtimeFailed && (
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>

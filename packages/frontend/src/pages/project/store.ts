@@ -4,7 +4,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 export type DetailsView = 'text' | 'tracks';
 
 export type ProjectState = {
-  detailsView?: DetailsView;
+  detailsView: DetailsView;
   chordsOpen: boolean;
   audioSettingsOpen: boolean;
   mixdownOpen: boolean;
@@ -21,7 +21,7 @@ const initialState: ProjectState = {
 };
 
 export type ProjectActions = {
-  setDetailsView: (value: DetailsView | undefined) => void;
+  setDetailsView: (value: DetailsView) => void;
   setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
   setMixdownOpen: (value: boolean) => void;

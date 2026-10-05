@@ -6,6 +6,7 @@ import { endpoints } from '../../api/index.js';
 import { routes } from '../../app/router/routes.js';
 import { ViewError } from '../../components/ViewError.js';
 import { ViewPending } from '../../components/ViewPending.js';
+import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 import { ProjectProgressFlow } from './Flow/ProjectProgressFlow.js';
 import { ProjectApp } from './ProjectApp.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
@@ -28,7 +29,7 @@ export const ProjectPage: FC = () => {
     const errorMessage = apiError.getMessage(project.error);
 
     return (
-      <ProjectLayout>
+      <ProjectLayout heading={<ProjectBackButton />}>
         <ViewError
           message={errorMessage ?? t('pages.project.progress.error.project')}
         />
@@ -38,7 +39,7 @@ export const ProjectPage: FC = () => {
 
   if (project.status === 'pending') {
     return (
-      <ProjectLayout>
+      <ProjectLayout heading={<ProjectBackButton />}>
         <ViewPending message={t('pages.project.progress.loading')} />
       </ProjectLayout>
     );
