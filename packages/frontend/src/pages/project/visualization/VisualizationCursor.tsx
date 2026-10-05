@@ -1,15 +1,20 @@
 import { Box } from '@mui/material';
+import { type TimelineMode } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
-import { useProjectStore } from '../store.js';
 import { subscribePlayheadDrag } from './subscribePlayheadDrag.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
 } from './visualizationRender.js';
 
-export const VisualizationCursor: FC = () => {
+export type VisualizationCursorProps = {
+  mode: TimelineMode;
+};
+
+export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
+  const { mode } = props;
   const ref = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
 
@@ -32,17 +37,16 @@ export const VisualizationCursor: FC = () => {
     const render = () => {
       const { frameCount, frameIndex } = engine.store.get();
       const { playheadRatio } = useSettingsStore.getState();
-      const { visualizationMode } = useProjectStore.getState();
       const waveformCursorRatio = frameCount ? frameIndex / frameCount : 0;
       const cursorRatio =
-        visualizationMode === 'tracks' ? waveformCursorRatio : playheadRatio;
+        mode === 'tracks' ? waveformCursorRatio : playheadRatio;
       const cursorX = alignPixel(
         cursorRatio * parentWidth,
         window.devicePixelRatio,
       );
 
       element.style.transform = `translateX(${cursorX}px)`;
-      handle.style.display = visualizationMode === 'tracks' ? 'none' : '';
+      handle.style.display = mode === 'tracks' ? 'none' : '';
     };
 
     const resize = () => {
@@ -58,7 +62,6 @@ export const VisualizationCursor: FC = () => {
       onResize: resize,
       render,
       engineKeys: ['frameCount', 'frameIndex'],
-      projectKeys: ['visualizationMode'],
       settingsKeys: ['playheadRatio'],
     });
 
@@ -66,7 +69,7 @@ export const VisualizationCursor: FC = () => {
       unsubscribeDrag();
       unsubscribeRender();
     };
-  }, []);
+  }, [mode]);
 
   return (
     <Box

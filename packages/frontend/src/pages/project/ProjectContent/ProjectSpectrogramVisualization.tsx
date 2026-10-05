@@ -58,9 +58,9 @@ export const ProjectSpectrogramVisualization: FC = () => {
             </Box>
           </>
         )}
-        <VisualizationCursor />
+        <VisualizationCursor mode='spectrogram' />
       </Box>
-      <VisualizationTimeline />
+      <VisualizationTimeline mode='spectrogram' />
       <Box
         position='absolute'
         top={`${chordBlockInset}px`}

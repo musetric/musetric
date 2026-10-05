@@ -25,7 +25,7 @@ export const TempoButton: FC = () => {
           disabled={!frameCount || recording || realtimeFailed}
           color={tempoBpm === sourceTempoBpm ? 'inherit' : 'primary'}
           aria-label={label}
-          sx={{ borderRadius: 2, px: 2, py: 1 }}
+          sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
           onClick={(event) => {
             setTempoAnchorEl(event.currentTarget);
           }}
@@ -33,9 +33,7 @@ export const TempoButton: FC = () => {
           <Stack alignItems='center' gap={0.5}>
             <TempoIcon fontSize='small' />
             <Typography variant='caption' lineHeight={1} noWrap>
-              {t('pages.project.player.controls.tempoValue', {
-                value: tempoBpm,
-              })}
+              {tempoBpm}
             </Typography>
           </Stack>
         </IconButton>

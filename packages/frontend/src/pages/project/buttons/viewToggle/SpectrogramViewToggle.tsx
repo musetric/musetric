@@ -3,32 +3,26 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NoteBarsIcon } from '../../../../icons/NoteBarsIcon.js';
 import { SpectrogramIcon } from '../../../../icons/SpectrogramIcon.js';
-import { WaveformIcon } from '../../../../icons/WaveformIcon.js';
-import { ModeToggleButton } from './ModeToggleButton.js';
+import { ViewToggleButton } from './ViewToggleButton.js';
 
-export const VisualizationModeToggle: FC = () => {
+export const SpectrogramViewToggle: FC = () => {
   const { t } = useTranslation();
 
   return (
     <Stack
       direction='row'
-      gap={{ xs: 1, sm: 0.5 }}
-      p={{ xs: 0, sm: 0.5 }}
+      gap={0.5}
+      p={0.5}
       borderRadius={2}
-      sx={{ backgroundColor: { xs: 'transparent', sm: 'action.hover' } }}
+      bgcolor='action.hover'
     >
-      <ModeToggleButton
-        mode='tracks'
-        icon={<WaveformIcon fontSize='small' />}
-        label={t('pages.project.visualizationMode.tracks')}
-      />
-      <ModeToggleButton
-        mode='notes'
+      <ViewToggleButton
+        target={{ panel: 'spectrogram', view: 'notes' }}
         icon={<NoteBarsIcon fontSize='small' />}
         label={t('pages.project.visualizationMode.notes')}
       />
-      <ModeToggleButton
-        mode='spectrum'
+      <ViewToggleButton
+        target={{ panel: 'spectrogram', view: 'spectrum' }}
         icon={<SpectrogramIcon fontSize='small' />}
         label={t('pages.project.visualizationMode.spectrum')}
       />
