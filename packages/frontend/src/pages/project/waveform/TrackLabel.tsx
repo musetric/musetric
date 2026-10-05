@@ -10,14 +10,17 @@ const stemLabels: Record<StemType, (t: TFunction) => string> = {
   instrumental: (t) => t('pages.project.waveform.stemType.instrumental'),
 };
 
-export type TrackLabelProps =
+export type TrackLabelProps = (
   | {
       kind: 'delivery';
       stemType: StemType;
     }
   | {
       kind: 'recording';
-    };
+    }
+) & {
+  variant?: 'overlay' | 'inline';
+};
 
 export const TrackLabel: FC<TrackLabelProps> = (props) => {
   const { t } = useTranslation();
@@ -25,6 +28,14 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
     props.kind === 'recording'
       ? t('pages.project.waveform.stemType.recording')
       : stemLabels[props.stemType](t);
+
+  if (props.variant === 'inline') {
+    return (
+      <Typography variant='subtitle2' color='text.primary'>
+        {label}
+      </Typography>
+    );
+  }
 
   return (
     <Typography

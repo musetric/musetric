@@ -1,16 +1,25 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { createTimelineProcessor } from '@musetric/audio/timeline';
+import {
+  createTimelineProcessor,
+  type TimelineMode,
+} from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useSettingsStore } from '../settings/store.js';
-import { useProjectStore } from '../store.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
 } from './visualizationRender.js';
 
-export const VisualizationTimeline: FC = () => {
+export type VisualizationTimelineProps = {
+  mode: TimelineMode;
+};
+
+export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
+  props,
+) => {
+  const { mode } = props;
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -36,10 +45,9 @@ export const VisualizationTimeline: FC = () => {
     const render = () => {
       const { duration, frameIndex, frameCount } = engine.store.get();
       const { visibleTime, playheadRatio } = useSettingsStore.getState();
-      const { visualizationMode } = useProjectStore.getState();
 
       processor.updateConfig({
-        mode: visualizationMode === 'tracks' ? 'tracks' : 'spectrogram',
+        mode,
         duration,
         frameIndex,
         frameCount,
@@ -50,7 +58,7 @@ export const VisualizationTimeline: FC = () => {
 
       let cursorRatio = playheadRatio;
 
-      if (visualizationMode === 'tracks') {
+      if (mode === 'tracks') {
         cursorRatio = frameCount ? frameIndex / frameCount : 0;
       }
 
@@ -74,7 +82,6 @@ export const VisualizationTimeline: FC = () => {
       onResize: resize,
       render,
       engineKeys: ['duration', 'frameCount', 'frameIndex'],
-      projectKeys: ['visualizationMode'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 
@@ -82,7 +89,7 @@ export const VisualizationTimeline: FC = () => {
       unsubscribe();
       processor.dispose();
     };
-  }, [theme]);
+  }, [theme, mode]);
 
   return (
     <Box

@@ -96,7 +96,6 @@ export const ChordLane: FC = () => {
       onResize: resize,
       render,
       engineKeys: ['duration', 'frameCount', 'frameIndex'],
-      projectKeys: [],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 
@@ -163,7 +162,7 @@ export const ChordLane: FC = () => {
           </Box>
         ))}
       </Box>
-      <VisualizationCursor />
+      <VisualizationCursor mode='spectrogram' />
     </Box>
   );
 };

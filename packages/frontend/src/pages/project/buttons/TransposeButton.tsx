@@ -45,7 +45,7 @@ export const TransposeButton: FC = () => {
           disabled={!frameCount || recording || realtimeFailed}
           color={transposeSemitones === 0 ? 'inherit' : 'primary'}
           aria-label={label}
-          sx={{ borderRadius: 2, px: 2, py: 1 }}
+          sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
           onClick={(event) => {
             setTransposeAnchorEl(event.currentTarget);
           }}

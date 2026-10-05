@@ -16,7 +16,7 @@ export const MetronomeToggleButton: FC = () => {
         size='small'
         color={metronomeEnabled ? 'primary' : 'inherit'}
         aria-label={label}
-        sx={{ borderRadius: 2, px: 2, py: 1 }}
+        sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
         onClick={() => {
           engine.store.update((state) => {
             state.metronomeEnabled = !state.metronomeEnabled;

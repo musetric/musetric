@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
 import { type FC } from 'react';
 import { ProjectDetails } from './ProjectDetails.js';
-import { ProjectVisualization } from './ProjectVisualization.js';
+import { ProjectSpectrogramVisualization } from './ProjectSpectrogramVisualization.js';
 
 export const ProjectContent: FC = () => (
   <Box
@@ -17,6 +17,6 @@ export const ProjectContent: FC = () => (
     overflow='hidden'
   >
     <ProjectDetails />
-    <ProjectVisualization />
+    <ProjectSpectrogramVisualization />
   </Box>
 );

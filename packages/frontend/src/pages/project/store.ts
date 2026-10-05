@@ -1,33 +1,31 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { engine } from '../../engine/engine.js';
 
-export type VisualizationMode = 'notes' | 'spectrum' | 'tracks';
+export type DetailsView = 'text' | 'tracks';
 
 export type ProjectState = {
-  visualizationMode: VisualizationMode;
-  subtitlesOpen: boolean;
+  detailsView?: DetailsView;
   chordsOpen: boolean;
   audioSettingsOpen: boolean;
   mixdownOpen: boolean;
+  mixAnchorEl?: HTMLElement;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
 };
 
 const initialState: ProjectState = {
-  visualizationMode: 'spectrum',
-  subtitlesOpen: true,
-  chordsOpen: true,
+  detailsView: 'text',
+  chordsOpen: false,
   audioSettingsOpen: false,
   mixdownOpen: false,
 };
 
 export type ProjectActions = {
-  setVisualizationMode: (value: VisualizationMode) => void;
-  setSubtitlesOpen: (value: boolean) => void;
+  setDetailsView: (value: DetailsView | undefined) => void;
   setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
   setMixdownOpen: (value: boolean) => void;
+  setMixAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
 };
@@ -37,18 +35,14 @@ type State = ProjectState & ProjectActions;
 export const useProjectStore = create<State>()(
   subscribeWithSelector((set) => ({
     ...initialState,
-    setVisualizationMode: (visualizationMode) => {
-      set({ visualizationMode });
-      if (visualizationMode !== 'tracks') {
-        engine.store.update((state) => {
-          state.spectrogramView = visualizationMode;
-        });
-      }
-    },
-    setSubtitlesOpen: (subtitlesOpen) => set({ subtitlesOpen }),
+    setDetailsView: (detailsView) => set({ detailsView }),
     setChordsOpen: (chordsOpen) => set({ chordsOpen }),
     setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
     setMixdownOpen: (mixdownOpen) => set({ mixdownOpen }),
+    setMixAnchorEl: (mixAnchorEl) =>
+      set({
+        mixAnchorEl,
+      }),
     setTransposeAnchorEl: (transposeAnchorEl) =>
       set({
         transposeAnchorEl,
