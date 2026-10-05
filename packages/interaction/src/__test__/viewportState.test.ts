@@ -35,6 +35,7 @@ describe('viewportState', () => {
         maximumSize: 20,
         panDirection: 1,
         reverse: true,
+        bandCount: 1,
       },
       anchorRatio: 0.25,
       scale: 2,
