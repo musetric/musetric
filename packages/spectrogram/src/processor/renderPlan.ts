@@ -13,6 +13,7 @@ import {
 import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidations.js';
 import {
   allTrackKeys,
+  isFundamentalNeeded,
   mapTrackKeys,
   type SpectrogramConfig,
   type TrackKey,
@@ -85,7 +86,7 @@ export const createTrackWork = (
     const lane = runtime.config.lanes[key];
     return {
       spectrogram: lane.showSpectrogram,
-      fundamental: lane.showFundamental || lane.showNotes,
+      fundamental: isFundamentalNeeded(runtime.config, key),
     };
   });
 
@@ -146,6 +147,7 @@ export const createConfigInvalidationScope = (
     const lane = next.lanes[key];
     if (
       !isLaneComputeConfigEqual(current.lanes[key], lane) ||
+      isFundamentalNeeded(current, key) !== isFundamentalNeeded(next, key) ||
       (playheadMoved && lane.truncateAfterPlayhead)
     ) {
       changedTracks.add(key);

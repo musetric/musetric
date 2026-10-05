@@ -28,19 +28,31 @@ type PixelRect = {
   bottom: number;
 };
 
-const maxRedInRect = (
+type PixelMeasure = (red: number, green: number, blue: number) => number;
+
+const maxInRect = (
   pixels: Uint8ClampedArray,
   width: number,
   rect: PixelRect,
+  measure: PixelMeasure,
 ): number => {
   let max = 0;
   for (let y = rect.top; y < rect.bottom; y += 1) {
     for (let x = rect.left; x < rect.right; x += 1) {
-      max = Math.max(max, pixels[(y * width + x) * 4]);
+      const index = (y * width + x) * 4;
+      max = Math.max(
+        max,
+        measure(pixels[index], pixels[index + 1], pixels[index + 2]),
+      );
     }
   }
   return max;
 };
+
+const redness: PixelMeasure = (red) => red;
+
+const greenness: PixelMeasure = (red, green, blue) =>
+  green - Math.max(red, blue);
 
 const stackedConfig = () => {
   const base = singleBandConfig();
@@ -65,20 +77,20 @@ describe('spectrogram processor', () => {
       const split = Math.floor(height / 2);
       const playhead = Math.floor(config.playheadRatio * width);
       expect(
-        maxRedInRect(pixels, width, {
-          left: 0,
-          right: playhead - 1,
-          top: 0,
-          bottom: split,
-        }),
+        maxInRect(
+          pixels,
+          width,
+          { left: 0, right: playhead - 1, top: 0, bottom: split },
+          redness,
+        ),
       ).toBeGreaterThan(40);
       expect(
-        maxRedInRect(pixels, width, {
-          left: 0,
-          right: width,
-          top: split + 1,
-          bottom: height,
-        }),
+        maxInRect(
+          pixels,
+          width,
+          { left: 0, right: width, top: split + 1, bottom: height },
+          redness,
+        ),
       ).toBeLessThan(16);
     });
   });
@@ -95,12 +107,12 @@ describe('spectrogram processor', () => {
       const split = Math.floor(height / 2);
       const bandHeight = height - split;
       expect(
-        maxRedInRect(pixels, width, {
-          left: 0,
-          right: width,
-          top: 0,
-          bottom: split,
-        }),
+        maxInRect(
+          pixels,
+          width,
+          { left: 0, right: width, top: 0, bottom: split },
+          redness,
+        ),
       ).toBeLessThan(16);
 
       const recordingBand = pixels.subarray(split * width * 4);
@@ -110,6 +122,46 @@ describe('spectrogram processor', () => {
       });
       const actualRow = brightestRow(recordingBand, width, bandHeight);
       expect(Math.abs(actualRow - expectedRow)).toBeLessThan(bandHeight * 0.15);
+    });
+  });
+
+  it('draws the recording pitch over the lead in the match colour', async () => {
+    const base = stackedConfig();
+    const config = singleBandConfig({
+      lanes: {
+        ...base.lanes,
+        recording: { ...base.lanes.recording, showFundamental: true },
+      },
+    });
+    await withProcessor({ device, config }, async (processor) => {
+      const length = config.sampleRate * 5;
+      const samples = {
+        lead: createTone(length, toneFrequency, config.sampleRate),
+        recording: createTone(length, toneFrequency, config.sampleRate),
+      };
+      await processor.render(samples, 0.5);
+      while (processor.hasPendingWork()) {
+        await processor.render(samples, 0.5);
+      }
+      const pixels = await readCanvas(config.canvas);
+      const { width, height } = config.viewSize;
+      const split = Math.floor(height / 2);
+      expect(
+        maxInRect(
+          pixels,
+          width,
+          { left: 0, right: width, top: 0, bottom: split },
+          greenness,
+        ),
+      ).toBeGreaterThan(40);
+      expect(
+        maxInRect(
+          pixels,
+          width,
+          { left: 0, right: width, top: split, bottom: height },
+          greenness,
+        ),
+      ).toBeLessThan(16);
     });
   });
 

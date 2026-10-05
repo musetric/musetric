@@ -165,6 +165,66 @@ fn lineMaskAtPixel(
   return mask;
 }
 
+fn segmentDistance(
+  point: vec2f,
+  height: f32,
+  startIndex: u32,
+  startFrequency: f32,
+  endIndex: u32,
+  endFrequency: f32,
+) -> f32 {
+  if (
+    startFrequency <= 0.0 ||
+    endFrequency <= 0.0 ||
+    centsDistance(startFrequency, endFrequency) > drawParams.overlayTuning.z
+  ) {
+    return height;
+  }
+
+  let start = vec2f(
+    f32(startIndex) + 0.5,
+    pixelYAtFrequency(startFrequency, height) + 0.5,
+  );
+  let end = vec2f(
+    f32(endIndex) + 0.5,
+    pixelYAtFrequency(endFrequency, height) + 0.5,
+  );
+  return distanceToSegment(point, start, end);
+}
+
+fn lineDistanceAtPixel(
+  point: vec2f,
+  width: u32,
+  height: f32,
+  x: u32,
+  centerFrequency: f32,
+  previousFrequency: f32,
+  nextFrequency: f32,
+) -> f32 {
+  if (centerFrequency <= 0.0) {
+    return height;
+  }
+
+  var distance = abs(point.y - pixelYAtFrequency(centerFrequency, height) - 0.5);
+  if (x > 0u && previousFrequency > 0.0) {
+    distance = min(
+      distance,
+      segmentDistance(point, height, x - 1u, previousFrequency, x, centerFrequency),
+    );
+  }
+  if (x + 1u < width && nextFrequency > 0.0) {
+    distance = min(
+      distance,
+      segmentDistance(point, height, x, centerFrequency, x + 1u, nextFrequency),
+    );
+  }
+  return distance;
+}
+
+fn stripeCoverage(distance: f32, halfWidth: f32) -> f32 {
+  return 1.0 - smoothstep(halfWidth - 0.5, halfWidth + 0.5, distance);
+}
+
 fn slotForScreenX(baseSlot: u32, screenX: u32, width: u32) -> u32 {
   return (baseSlot + screenX) % width;
 }
@@ -212,7 +272,6 @@ fn sampleBandSpectrogram(
 fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location(0) vec4f {
   let dimensions = textureDimensions(spectrogramTextures);
   let width = dimensions.x;
-  let height = f32(dimensions.y);
   let textureHeight = dimensions.y;
   let x = min(u32(position.x), width - 1u);
   let y = min(u32(position.y), textureHeight - 1u);
@@ -262,9 +321,11 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
   let targetLineWidthCents = drawParams.lineWidths.x;
+  let bandPoint = vec2f(position.x, position.y - f32(bandTop));
+  let bandPixelHeight = f32(bandHeight);
 
   var referenceMask = 0.0;
-  let referenceVisible = drawParams.visibility.z != 0u;
+  let referenceVisible = !recordingBand && drawParams.visibility.z != 0u;
   if (referenceVisible) {
     var referencePrev = 0.0;
     if (x > 0u) {
@@ -279,9 +340,9 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       ];
     }
     referenceMask = lineMaskAtPixel(
-      position.xy,
+      bandPoint,
       width,
-      height,
+      bandPixelHeight,
       x,
       referenceFrequency,
       referencePrev,
@@ -291,7 +352,8 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   }
 
   var targetMask = 0.0;
-  let targetVisible = drawParams.visibility.w != 0u;
+  var targetOutlineMask = 0.0;
+  let targetVisible = !recordingBand && drawParams.visibility.w != 0u;
   if (targetVisible) {
     var targetPrev = 0.0;
     if (x > 0u) {
@@ -305,20 +367,39 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
         slotForScreenX(drawParams.ringSlots.w, x + 1u, width)
       ];
     }
-    targetMask = lineMaskAtPixel(
-      position.xy,
-      width,
-      height,
-      x,
-      targetFrequency,
-      targetPrev,
-      targetNext,
-      targetLineWidthCents,
-    );
+    if (stacked) {
+      let distance = lineDistanceAtPixel(
+        bandPoint,
+        width,
+        bandPixelHeight,
+        x,
+        targetFrequency,
+        targetPrev,
+        targetNext,
+      );
+      let halfWidth = 0.5 * drawParams.lineWidths.z;
+      targetMask = stripeCoverage(distance, halfWidth);
+      targetOutlineMask = stripeCoverage(
+        distance,
+        halfWidth + drawParams.lineWidths.w,
+      );
+    } else {
+      targetMask = lineMaskAtPixel(
+        bandPoint,
+        width,
+        bandPixelHeight,
+        x,
+        targetFrequency,
+        targetPrev,
+        targetNext,
+        targetLineWidthCents,
+      );
+    }
   }
 
   let referenceLineColor = vec3f(1.0);
   color = mix(color, referenceLineColor, referenceMask);
+  color = mix(color, drawParams.background.xyz, targetOutlineMask);
   var targetLineColor = drawParams.primary.xyz;
   if (targetFrequency > 0.0) {
     targetLineColor = targetTint(targetVerdict);
