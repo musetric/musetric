@@ -28,15 +28,18 @@ export const SpectrogramCanvas: FC = () => {
     return <ViewError message={t('pages.project.progress.error.audioTrack')} />;
   }
 
-  if (decoderStatus === 'pending') {
-    return <ViewPending />;
-  }
-
   return (
-    <Box
-      component='canvas'
-      ref={setCanvas}
-      sx={{ width: '100%', height: '100%', display: 'block' }}
-    />
+    <Box position='relative' width='100%' height='100%'>
+      <Box
+        component='canvas'
+        ref={setCanvas}
+        sx={{ width: '100%', height: '100%', display: 'block' }}
+      />
+      {decoderStatus === 'pending' && (
+        <Box position='absolute' top={0} right={0} bottom={0} left={0}>
+          <ViewPending />
+        </Box>
+      )}
+    </Box>
   );
 };

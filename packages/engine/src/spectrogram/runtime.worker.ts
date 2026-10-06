@@ -69,11 +69,8 @@ export const createSpectrogramRuntime = async (
     allTrackKeys.some((key) => samplesByLane[key] !== undefined);
 
   const render = async () => {
-    if (!hasAnySamples()) {
-      return;
-    }
     const ok = await processor.render(samplesByLane, trackProgress);
-    if (!ok) {
+    if (!ok || !hasAnySamples()) {
       return;
     }
     setStatus('success');
@@ -121,9 +118,10 @@ export const createSpectrogramRuntime = async (
       samplesByLane = { ...emptySamples(), ...message.samples };
       await render();
     },
-    unmount: () => {
+    unmount: async () => {
       samplesByLane = emptySamples();
       setStatus('pending');
+      await render();
     },
     patchSamples: (message) => {
       const samples = samplesByLane[message.trackKey];
