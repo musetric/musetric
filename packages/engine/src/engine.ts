@@ -33,7 +33,7 @@ const initialState: EngineState = {
     },
   },
   colors: defaultSpectrogramConfig.colors,
-  spectrogramView: 'spectrum',
+  spectrogramView: 'notes',
   frequencyRanges: {
     notes: {
       minFrequency: defaultSpectrogramConfig.minFrequency,

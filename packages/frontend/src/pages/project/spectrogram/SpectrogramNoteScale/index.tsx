@@ -57,11 +57,14 @@ export const SpectrogramNoteScale: FC = () => {
     const drawLabel = (y: number, label: string, color: string) => {
       const x = 6;
       const metrics = context.measureText(label);
+      const inkOffset =
+        (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) /
+        2;
 
       context.fillStyle = labelBackground;
       context.fillRect(x - 2, y - 6, metrics.width + 4, 12);
       context.fillStyle = color;
-      context.fillText(label, x, y);
+      context.fillText(label, x, y + inkOffset);
     };
 
     const render = () => {

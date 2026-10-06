@@ -2,7 +2,7 @@ import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { IconButton, Slider, Stack, Typography } from '@mui/material';
 import { type FC, useEffect, useRef, useState } from 'react';
-import { formatDuration } from './formatDuration.js';
+import { formatDuration } from '../../../common/formatDuration.js';
 
 export type SongPlayerProps = {
   url: string;

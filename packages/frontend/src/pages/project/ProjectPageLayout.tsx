@@ -1,7 +1,6 @@
 import { Stack } from '@mui/material';
 import { type FC, type ReactNode } from 'react';
 import { safeAreaPadding } from '../../app/theme/safeArea.js';
-import { ProjectBackButton } from './buttons/ProjectBackButton.js';
 
 export type ProjectLayoutProps = {
   children: ReactNode;
@@ -9,7 +8,6 @@ export type ProjectLayoutProps = {
 };
 export const ProjectLayout: FC<ProjectLayoutProps> = (props) => {
   const { children, heading } = props;
-  const headingContent = heading ?? <ProjectBackButton />;
 
   return (
     <Stack
@@ -18,9 +16,11 @@ export const ProjectLayout: FC<ProjectLayoutProps> = (props) => {
       gap={2}
       sx={(theme) => safeAreaPadding(theme, 2)}
     >
-      <Stack direction='row' gap={2} alignItems='center' position='relative'>
-        {headingContent}
-      </Stack>
+      {heading && (
+        <Stack direction='row' gap={2} alignItems='center' position='relative'>
+          {heading}
+        </Stack>
+      )}
       {children}
     </Stack>
   );
