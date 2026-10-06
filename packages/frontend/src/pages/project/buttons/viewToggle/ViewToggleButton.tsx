@@ -25,6 +25,10 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
   const { target, icon, label } = props;
   const detailsView = useProjectStore((state) => state.detailsView);
   const setDetailsView = useProjectStore((state) => state.setDetailsView);
+  const spectrogramOpen = useProjectStore((state) => state.spectrogramOpen);
+  const setSpectrogramOpen = useProjectStore(
+    (state) => state.setSpectrogramOpen,
+  );
   const spectrogramView = useEngineStore((state) => state.spectrogramView);
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
@@ -32,7 +36,7 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
   const selected =
     target.panel === 'details'
       ? detailsView === target.view
-      : spectrogramView === target.view;
+      : spectrogramOpen && spectrogramView === target.view;
 
   return (
     <Tooltip title={label}>
@@ -46,9 +50,10 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
           sx={{ border: 0, borderRadius: 2, px: 2, py: 1, minWidth: 68 }}
           onClick={() => {
             if (target.panel === 'details') {
-              setDetailsView(target.view);
+              setDetailsView(selected ? undefined : target.view);
               return;
             }
+            setSpectrogramOpen(!selected);
             engine.store.update((state) => {
               state.spectrogramView = target.view;
             });

@@ -32,10 +32,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
   return (
     <Box
       ref={ref}
-      flex={{
-        xs: '2 1 0',
-        md: '1 1 0',
-      }}
+      gridArea='picture'
       display='grid'
       gridTemplateRows='minmax(0, 1fr) auto'
       position='relative'
