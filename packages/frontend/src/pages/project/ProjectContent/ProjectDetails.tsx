@@ -37,9 +37,22 @@ export const ProjectDetails: FC = () => {
         </Typography>
         <ProjectHeaderMenu />
       </Stack>
-      <Box flex='1 1 0' minHeight={0}>
-        {detailsView === 'text' ? <Subtitle /> : <ProjectTracksVisualization />}
-      </Box>
+      {detailsView === 'text' ? (
+        <Box
+          flex='1 1 0'
+          minHeight={0}
+          p={1}
+          bgcolor='background.default'
+          borderRadius={2}
+          overflow='hidden'
+        >
+          <Subtitle />
+        </Box>
+      ) : (
+        <Box flex='1 1 0' minHeight={0}>
+          <ProjectTracksVisualization />
+        </Box>
+      )}
     </Stack>
   );
 };

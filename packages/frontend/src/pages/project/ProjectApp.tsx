@@ -39,7 +39,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   useEffect(() => engine.decoder.mount(project.id), [project.id]);
 
   return (
-    <ProjectLayout>
+    <ProjectLayout framed>
       <Stack width='100%' flexGrow={1} minHeight={0} gap={2}>
         {realtimeFailed && (
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>

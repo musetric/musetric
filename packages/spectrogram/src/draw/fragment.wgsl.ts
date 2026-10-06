@@ -13,6 +13,8 @@ struct DrawParams {
   comparisonThresholds : vec4f,
   lineWidths : vec4f,
   overlayTuning : vec4f,
+  frameColor : vec4f,
+  laneLayout : vec4f,
   visibility : vec4u,
   noteVisibility : vec4u,
   ringSlots : vec4u,
@@ -221,6 +223,29 @@ fn lineDistanceAtPixel(
   return distance;
 }
 
+fn cornerCoverage(point: vec2f, center: vec2f, radius: f32) -> f32 {
+  return clamp(radius - distance(point, center) + 0.5, 0.0, 1.0);
+}
+
+fn bandCornerCoverage(point: vec2f, top: f32, bottom: f32, width: f32) -> f32 {
+  let radius = drawParams.laneLayout.y;
+  var centerY = 0.0;
+  if (point.y < top + radius) {
+    centerY = top + radius;
+  } else if (point.y > bottom - radius) {
+    centerY = bottom - radius;
+  } else {
+    return 1.0;
+  }
+  if (point.x < radius) {
+    return cornerCoverage(point, vec2f(radius, centerY), radius);
+  }
+  if (point.x > width - radius) {
+    return cornerCoverage(point, vec2f(width - radius, centerY), radius);
+  }
+  return 1.0;
+}
+
 fn stripeCoverage(distance: f32, halfWidth: f32) -> f32 {
   return 1.0 - smoothstep(halfWidth - 0.5, halfWidth + 0.5, distance);
 }
@@ -285,10 +310,15 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let targetVerdict = targetVerdicts[targetSlot];
 
   let stacked = drawParams.visibility.x != 0u && drawParams.visibility.y != 0u;
-  let splitRow = select(textureHeight, textureHeight / 2u, stacked);
-  let recordingBand = y >= splitRow;
-  let bandTop = select(0u, splitRow, recordingBand);
-  let bandHeight = select(splitRow, textureHeight - splitRow, recordingBand);
+  let laneGap = min(u32(drawParams.laneLayout.x), textureHeight);
+  let splitRow = select(textureHeight, (textureHeight - laneGap) / 2u, stacked);
+  let gapEnd = select(textureHeight, splitRow + laneGap, stacked);
+  if (y >= splitRow && y < gapEnd) {
+    return vec4f(drawParams.frameColor.xyz, 1.0);
+  }
+  let recordingBand = y >= gapEnd;
+  let bandTop = select(0u, gapEnd, recordingBand);
+  let bandHeight = select(splitRow, textureHeight - gapEnd, recordingBand);
   let bandY = y - bandTop;
 
   let pixelFrequency = frequencyAtPixel(bandY, f32(bandHeight));
@@ -314,9 +344,6 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       textureHeight,
     );
     color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));
-  }
-  if (stacked && y == splitRow) {
-    color = mix(color, drawParams.foreground.xyz, drawParams.overlayTuning.w);
   }
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
@@ -405,6 +432,14 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     targetLineColor = targetTint(targetVerdict);
   }
   color = mix(color, targetLineColor, targetMask);
+
+  let coverage = bandCornerCoverage(
+    position.xy,
+    f32(bandTop),
+    f32(bandTop + bandHeight),
+    f32(width),
+  );
+  color = mix(drawParams.frameColor.xyz, color, coverage);
 
   return vec4f(color, 1.0);
 }

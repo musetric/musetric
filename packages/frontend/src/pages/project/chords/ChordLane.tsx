@@ -1,4 +1,4 @@
-import { alpha, Box, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { type api } from '@musetric/api';
 import { getTrackProgress } from '@musetric/engine';
 import { useQuery } from '@tanstack/react-query';
@@ -8,7 +8,6 @@ import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useSettingsStore } from '../settings/store.js';
-import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
@@ -113,11 +112,10 @@ export const ChordLane: FC = () => {
       position='relative'
       height={`${chordLaneHeight}px`}
       overflow='hidden'
+      bgcolor='background.default'
+      borderRadius={2}
       sx={{
         flexShrink: 0,
-        boxSizing: 'content-box',
-        borderBottom: 1,
-        borderColor: 'grey.700',
         userSelect: 'none',
       }}
     >
@@ -146,7 +144,6 @@ export const ChordLane: FC = () => {
             sx={(theme) => ({
               boxSizing: 'border-box',
               borderLeft: `1px solid ${theme.palette.default.main}`,
-              backgroundColor: alpha(theme.palette.text.primary, 0.06),
             })}
           >
             <Typography
@@ -162,7 +159,6 @@ export const ChordLane: FC = () => {
           </Box>
         ))}
       </Box>
-      <VisualizationCursor mode='spectrogram' />
     </Box>
   );
 };

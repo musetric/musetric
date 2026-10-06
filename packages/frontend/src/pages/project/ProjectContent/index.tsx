@@ -13,7 +13,7 @@ export const ProjectContent: FC = () => (
     width='100%'
     flexGrow={1}
     minHeight={0}
-    gap={1}
+    gap={2}
     overflow='hidden'
   >
     <ProjectDetails />

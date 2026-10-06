@@ -17,26 +17,41 @@ export const ProjectTracksVisualization: FC = () => {
         display='grid'
         gridTemplateRows='1fr auto'
         height='100%'
+        mx={1}
         position='relative'
       >
-        <Stack position='relative' gap={1}>
-          {stemTypes.map((stemType) => (
-            <Box
-              key={stemType}
-              component={Paper}
-              elevation={3}
-              height={80}
-              flexShrink={0}
-            >
-              <WaveformCanvas kind='delivery' stemType={stemType} />
+        <Box
+          display='grid'
+          mx={-1}
+          px={1}
+          bgcolor='background.default'
+          borderRadius={2}
+        >
+          <Stack position='relative' gap={1} py={1}>
+            {stemTypes.map((stemType) => (
+              <Box
+                key={stemType}
+                component={Paper}
+                elevation={3}
+                height={80}
+                flexShrink={0}
+              >
+                <WaveformCanvas kind='delivery' stemType={stemType} />
+              </Box>
+            ))}
+            <Box component={Paper} elevation={3} height={80} flexShrink={0}>
+              <WaveformCanvas kind='recording' />
             </Box>
-          ))}
-          <Box component={Paper} elevation={3} height={80} flexShrink={0}>
-            <WaveformCanvas kind='recording' />
-          </Box>
-          <VisualizationCursor mode='tracks' />
-        </Stack>
-        <Box position='sticky' bottom={0} sx={{ pointerEvents: 'none' }}>
+            <VisualizationCursor mode='tracks' />
+          </Stack>
+        </Box>
+        <Box
+          position='sticky'
+          bottom={0}
+          bgcolor='grey.900'
+          zIndex={2}
+          sx={{ pointerEvents: 'none' }}
+        >
           <VisualizationTimeline mode='tracks' />
         </Box>
       </Box>

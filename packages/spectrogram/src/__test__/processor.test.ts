@@ -1,5 +1,10 @@
+import { parseHexColor } from '@musetric/utils';
 import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
+import {
+  stackedLaneGap,
+  stackedLaneRadius,
+} from '../common/stackedLanes.es.js';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramProcessor } from '../processor.js';
 import {
@@ -54,6 +59,30 @@ const redness: PixelMeasure = (red) => red;
 const greenness: PixelMeasure = (red, green, blue) =>
   green - Math.max(red, blue);
 
+const maxRedClearOfCorners = (
+  pixels: Uint8ClampedArray,
+  config: SpectrogramConfig,
+): number => {
+  const { width, height } = config.viewSize;
+  return maxInRect(
+    pixels,
+    width,
+    {
+      left: stackedLaneRadius,
+      right: width - stackedLaneRadius,
+      top: 0,
+      bottom: height,
+    },
+    redness,
+  );
+};
+
+const stackedBands = (height: number) => {
+  const leadHeight = Math.floor((height - stackedLaneGap) / 2);
+  const recordingTop = leadHeight + stackedLaneGap;
+  return { leadHeight, recordingTop, recordingHeight: height - recordingTop };
+};
+
 const stackedConfig = () => {
   const base = singleBandConfig();
   return singleBandConfig({
@@ -74,13 +103,13 @@ describe('spectrogram processor', () => {
       await processor.render({ lead, recording }, 0.5);
       const pixels = await readCanvas(config.canvas);
       const { width, height } = config.viewSize;
-      const split = Math.floor(height / 2);
+      const bands = stackedBands(height);
       const playhead = Math.floor(config.playheadRatio * width);
       expect(
         maxInRect(
           pixels,
           width,
-          { left: 0, right: playhead - 1, top: 0, bottom: split },
+          { left: 0, right: playhead - 1, top: 0, bottom: bands.leadHeight },
           redness,
         ),
       ).toBeGreaterThan(40);
@@ -88,10 +117,28 @@ describe('spectrogram processor', () => {
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: split + 1, bottom: height },
+          {
+            left: stackedLaneRadius,
+            right: width - stackedLaneRadius,
+            top: bands.recordingTop,
+            bottom: height,
+          },
           redness,
         ),
       ).toBeLessThan(16);
+      expect(
+        maxInRect(
+          pixels,
+          width,
+          {
+            left: 0,
+            right: width,
+            top: bands.leadHeight,
+            bottom: bands.recordingTop,
+          },
+          redness,
+        ),
+      ).toBe(parseHexColor(config.colors.frame).red);
     });
   });
 
@@ -104,24 +151,34 @@ describe('spectrogram processor', () => {
       await processor.render({ lead, recording }, 0.5);
       const pixels = await readCanvas(config.canvas);
       const { width, height } = config.viewSize;
-      const split = Math.floor(height / 2);
-      const bandHeight = height - split;
+      const bands = stackedBands(height);
       expect(
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: 0, bottom: split },
+          {
+            left: stackedLaneRadius,
+            right: width - stackedLaneRadius,
+            top: 0,
+            bottom: bands.leadHeight,
+          },
           redness,
         ),
       ).toBeLessThan(16);
 
-      const recordingBand = pixels.subarray(split * width * 4);
+      const recordingBand = pixels.subarray(bands.recordingTop * width * 4);
       const expectedRow = rowAtFrequency(toneFrequency, {
         ...config,
-        viewSize: { width, height: bandHeight },
+        viewSize: { width, height: bands.recordingHeight },
       });
-      const actualRow = brightestRow(recordingBand, width, bandHeight);
-      expect(Math.abs(actualRow - expectedRow)).toBeLessThan(bandHeight * 0.15);
+      const actualRow = brightestRow(
+        recordingBand,
+        width,
+        bands.recordingHeight,
+      );
+      expect(Math.abs(actualRow - expectedRow)).toBeLessThan(
+        bands.recordingHeight * 0.15,
+      );
     });
   });
 
@@ -145,12 +202,12 @@ describe('spectrogram processor', () => {
       }
       const pixels = await readCanvas(config.canvas);
       const { width, height } = config.viewSize;
-      const split = Math.floor(height / 2);
+      const bands = stackedBands(height);
       expect(
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: 0, bottom: split },
+          { left: 0, right: width, top: 0, bottom: bands.leadHeight },
           greenness,
         ),
       ).toBeGreaterThan(40);
@@ -158,7 +215,7 @@ describe('spectrogram processor', () => {
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: split, bottom: height },
+          { left: 0, right: width, top: bands.recordingTop, bottom: height },
           greenness,
         ),
       ).toBeLessThan(16);
@@ -193,7 +250,7 @@ describe('spectrogram processor', () => {
       const lead = createSilence(config.sampleRate * 5);
       await processor.render({ lead }, 0.5);
       const pixels = await readCanvas(config.canvas);
-      expect(maxRed(pixels)).toBeLessThan(16);
+      expect(maxRedClearOfCorners(pixels, config)).toBeLessThan(16);
     });
   });
 
@@ -219,7 +276,7 @@ describe('spectrogram processor', () => {
       const lead = createSilence(config.sampleRate * 5);
       await processor.render({ lead }, 0.5);
       const silent = await readCanvas(config.canvas);
-      expect(maxRed(silent)).toBeLessThan(16);
+      expect(maxRedClearOfCorners(silent, config)).toBeLessThan(16);
 
       const invalidation = writeCentreTone(lead, config.sampleRate);
       await processor.render({ lead }, 0.5);
@@ -239,7 +296,7 @@ describe('spectrogram processor', () => {
       const lead = createSilence(config.sampleRate * 5);
       await processor.render({ lead }, 0.5);
       const silent = await readCanvas(config.canvas);
-      expect(maxRed(silent)).toBeLessThan(16);
+      expect(maxRedClearOfCorners(silent, config)).toBeLessThan(16);
 
       const invalidation = writeCentreTone(lead, config.sampleRate);
       processor.updateConfig({
@@ -250,7 +307,7 @@ describe('spectrogram processor', () => {
       });
       await processor.render({ lead }, 0.5);
       const stale = await readCanvas(config.canvas);
-      expect(maxRed(stale)).toBeLessThan(16);
+      expect(maxRedClearOfCorners(stale, config)).toBeLessThan(16);
 
       processor.invalidateSamples([invalidation]);
       await processor.render({ lead }, 0.5);
