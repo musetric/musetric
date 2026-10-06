@@ -5,7 +5,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProcessingPause } from '../../processing/ProcessingPause.js';
 import { doneCount, stepOrder } from '../../processing/queue.js';
-import { ProjectBackButton } from '../buttons/ProjectBackButton.js';
+import { ProjectHomeButton } from '../buttons/ProjectHomeButton.js';
 import { ProjectLayout } from '../ProjectPageLayout.js';
 import { FlowPause } from './FlowPause.js';
 import { FlowStep } from './Step/FlowStep.js';
@@ -23,7 +23,7 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
     <ProjectLayout
       heading={
         <>
-          <ProjectBackButton />
+          <ProjectHomeButton />
           <Typography variant='h6' noWrap flexGrow={1}>
             {project.name}
           </Typography>

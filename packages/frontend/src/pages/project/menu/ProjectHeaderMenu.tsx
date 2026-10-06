@@ -19,13 +19,14 @@ export const ProjectHeaderMenu: FC = () => {
       <Tooltip title={t('pages.project.menu.title')}>
         <IconButton
           size='small'
+          sx={{ p: 0.5 }}
           disabled={realtimeFailed}
           aria-label={t('pages.project.menu.title')}
           onClick={(event) => {
             setAnchorEl(event.currentTarget);
           }}
         >
-          <MenuIcon />
+          <MenuIcon fontSize='small' />
         </IconButton>
       </Tooltip>
       <Menu

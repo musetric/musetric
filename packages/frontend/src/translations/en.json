@@ -76,7 +76,6 @@
   "pages.project.player.controls.transpose": "Song key",
   "pages.project.player.controls.transposeReset": "Reset key",
   "pages.project.player.controls.transposeValue": "{{value}} st",
-  "pages.project.progress.back": "Back",
   "pages.project.progress.background": "Processing keeps running if you leave this page",
   "pages.project.progress.backHome": "Back to home",
   "pages.project.progress.download.cached": "Cached",
