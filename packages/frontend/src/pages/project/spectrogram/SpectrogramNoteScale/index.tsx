@@ -1,10 +1,16 @@
 import { alpha, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { getFrequencyRange } from '@musetric/engine';
+import { stackedLaneGap, stackedLaneRadius } from '@musetric/spectrogram';
 import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../../engine/engine.js';
-import { getNoteMarkers, isNaturalMidi, isOctaveMidi } from './noteMarker.js';
+import {
+  getNoteMarkers,
+  isNaturalMidi,
+  isOctaveMidi,
+  type NoteMarker,
+} from './noteMarker.js';
 
 const alignPixel = (value: number, pixelRatio: number) =>
   Math.round(value * pixelRatio) / pixelRatio;
@@ -31,7 +37,7 @@ export const SpectrogramNoteScale: FC = () => {
       semitone: alpha(theme.palette.common.white, 0.06),
     };
     const noteLabelColor = alpha(theme.palette.text.primary, 0.55);
-    const labelBackground = alpha(theme.palette.background.default, 0.6);
+    const labelBackground = alpha(theme.palette.common.black, 0.8);
     const font = `12px ${theme.typography.fontFamily}`;
     let pixelRatio = window.devicePixelRatio || 1;
     let width = 0;
@@ -81,27 +87,20 @@ export const SpectrogramNoteScale: FC = () => {
       context.lineWidth = 1;
 
       const bandCount = notesMode ? 1 : 2;
-      const bandHeight = height / bandCount;
+      const bandGap = notesMode ? 0 : stackedLaneGap;
+      const bandHeight = (height - bandGap * (bandCount - 1)) / bandCount;
       const markerSpacing =
         markers.length > 1 ? bandHeight / (markers.length - 1) : bandHeight;
       const withNaturalLabels = markerSpacing >= 16;
 
-      const placements = Array.from({ length: bandCount }, (_, band) =>
-        markers.map((marker) => ({
-          marker,
-          y: alignPixel((band + marker.topRatio) * bandHeight, pixelRatio),
-        })),
-      ).flat();
-
-      for (const placement of placements) {
-        const { marker, y } = placement;
+      const drawMarker = (marker: NoteMarker, y: number) => {
         const octave = isOctaveMidi(marker.midi);
 
         if (notesMode) {
           if (octave || (withNaturalLabels && isNaturalMidi(marker.midi))) {
             drawLabel(y, marker.label, noteLabelColor);
           }
-          continue;
+          return;
         }
 
         context.strokeStyle = octave ? colors.octave : colors.semitone;
@@ -113,6 +112,22 @@ export const SpectrogramNoteScale: FC = () => {
         if (octave) {
           drawLabel(y, marker.label, noteLabelColor);
         }
+      };
+
+      for (let band = 0; band < bandCount; band++) {
+        const top = band * (bandHeight + bandGap);
+
+        context.save();
+        context.beginPath();
+        context.roundRect(0, top, width, bandHeight, stackedLaneRadius);
+        context.clip();
+        for (const marker of markers) {
+          drawMarker(
+            marker,
+            alignPixel(top + marker.topRatio * bandHeight, pixelRatio),
+          );
+        }
+        context.restore();
       }
 
       context.restore();

@@ -21,7 +21,8 @@ const isSpectrogramColorsEqual = (
   first.recordingMatch === second.recordingMatch &&
   first.recordingClose === second.recordingClose &&
   first.recordingMiss === second.recordingMiss &&
-  first.recordingTimingMiss === second.recordingTimingMiss;
+  first.recordingTimingMiss === second.recordingTimingMiss &&
+  first.frame === second.frame;
 
 const isSpectrogramLanesEqual = (
   first: Record<string, SpectrogramLaneConfig>,

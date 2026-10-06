@@ -1,4 +1,4 @@
-import { Typography } from '@mui/material';
+import { alpha, Typography } from '@mui/material';
 import { type StemType } from '@musetric/audio';
 import { type TFunction } from 'i18next';
 import { type FC } from 'react';
@@ -19,7 +19,7 @@ export type TrackLabelProps = (
       kind: 'recording';
     }
 ) & {
-  variant?: 'overlay' | 'inline';
+  variant?: 'overlay' | 'spectrogram' | 'inline';
 };
 
 export const TrackLabel: FC<TrackLabelProps> = (props) => {
@@ -39,17 +39,27 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
 
   return (
     <Typography
-      variant='subtitle2'
+      variant='caption'
       fontWeight={600}
+      lineHeight={1}
       color='text.secondary'
-      sx={{
+      sx={(theme) => ({
         position: 'absolute',
-        top: 10,
-        left: 12,
+        top: 12,
+        left: 8,
+        px: 0.5,
+        py: 0.25,
+        borderRadius: 1,
+        ...(props.variant === 'spectrogram'
+          ? { backgroundColor: alpha(theme.palette.common.black, 0.8) }
+          : {
+              backgroundColor: theme.palette.background.paper,
+              backgroundImage: 'var(--Paper-overlay)',
+            }),
         zIndex: 1,
         pointerEvents: 'none',
         userSelect: 'none',
-      }}
+      })}
     >
       {label}
     </Typography>

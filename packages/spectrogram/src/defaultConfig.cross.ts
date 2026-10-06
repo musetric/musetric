@@ -66,6 +66,7 @@ export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
     recordingClose: '#ffeb3b',
     recordingMiss: '#f44336',
     recordingTimingMiss: '#ba68c8',
+    frame: '#212121',
   },
   lanes: {
     lead: {

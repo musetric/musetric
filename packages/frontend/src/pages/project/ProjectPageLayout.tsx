@@ -5,15 +5,17 @@ import { safeAreaPadding } from '../../app/theme/safeArea.js';
 export type ProjectLayoutProps = {
   children: ReactNode;
   heading?: ReactNode;
+  framed?: boolean;
 };
 export const ProjectLayout: FC<ProjectLayoutProps> = (props) => {
-  const { children, heading } = props;
+  const { children, heading, framed } = props;
 
   return (
     <Stack
       height='100dvh'
       position='relative'
       gap={2}
+      bgcolor={framed ? 'grey.900' : undefined}
       sx={(theme) => safeAreaPadding(theme, 2)}
     >
       {heading && (

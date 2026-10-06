@@ -102,14 +102,10 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       <Box
         component='canvas'
         ref={canvasRef}
-        bgcolor='background.default'
         sx={{
           display: 'block',
           width: '100%',
           height: '100%',
-          borderTop: 1,
-          borderColor: 'grey.700',
-          boxSizing: 'border-box',
         }}
       />
       <Box
