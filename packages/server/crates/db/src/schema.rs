@@ -135,14 +135,29 @@ const CREATE_RECORDING: &str = "
   CREATE TABLE Recording (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
-    blobId TEXT NOT NULL UNIQUE,
     waveBlobId TEXT NOT NULL UNIQUE,
     sampleRate INTEGER NOT NULL,
     frameCount INTEGER NOT NULL,
+    freshApplied INTEGER NOT NULL DEFAULT 1,
     UNIQUE(projectId),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 ";
+
+const CREATE_RECORDING_PIECE: &str = "
+  CREATE TABLE RecordingPiece (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL,
+    blobId TEXT NOT NULL UNIQUE,
+    layer TEXT NOT NULL CHECK (layer IN ('base', 'fresh')),
+    songStartFrame INTEGER NOT NULL,
+    frameCount INTEGER NOT NULL,
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+";
+
+const CREATE_RECORDING_PIECE_INDEX: &str =
+    "CREATE INDEX RecordingPiece_projectId_index ON RecordingPiece (projectId);";
 
 const CREATE_PROCESSING: &str = "
   CREATE TABLE Processing (
@@ -168,6 +183,8 @@ const V001_INITIAL: Migration = &[
     CREATE_KEY,
     CREATE_CHORDS,
     CREATE_RECORDING,
+    CREATE_RECORDING_PIECE,
+    CREATE_RECORDING_PIECE_INDEX,
     CREATE_PROCESSING,
     INSERT_PROCESSING,
 ];

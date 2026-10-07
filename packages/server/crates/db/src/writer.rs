@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, Result, Transaction, TransactionBe
 
 use crate::{
     analysis::{Analysis, StemLoudness, write_stem_loudness},
-    audio::MasterType,
+    audio::{MasterType, RecordingPiece},
     database::{OpenOptions, open_database},
     failure::BoxedError,
     processing::{
@@ -13,6 +13,18 @@ use crate::{
     },
     project::{write_processing_paused, write_project_order, write_project_paused},
 };
+
+fn write_fresh_applied(
+    transaction: &Transaction,
+    project_id: i64,
+    fresh_applied: bool,
+) -> Result<()> {
+    transaction.execute(
+        "UPDATE Recording SET freshApplied = ?2 WHERE projectId = ?1",
+        (project_id, fresh_applied),
+    )?;
+    Ok(())
+}
 
 pub struct NewPreview {
     pub blob_id: String,
@@ -47,7 +59,6 @@ pub struct NewStems {
 
 pub struct NewRecording {
     pub project_id: i64,
-    pub blob_id: String,
     pub wave_blob_id: String,
     pub sample_rate: i64,
     pub frame_count: i64,
@@ -133,11 +144,10 @@ impl Writer {
     pub fn create_recording(&self, recording: &NewRecording) -> Result<(), BoxedError> {
         self.write(|transaction| {
             transaction.execute(
-                "INSERT INTO Recording (projectId, blobId, waveBlobId, sampleRate, frameCount)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO Recording (projectId, waveBlobId, sampleRate, frameCount)
+                 VALUES (?1, ?2, ?3, ?4)",
                 (
                     recording.project_id,
-                    &recording.blob_id,
                     &recording.wave_blob_id,
                     recording.sample_rate,
                     recording.frame_count,
@@ -145,6 +155,44 @@ impl Writer {
             )?;
             Ok(())
         })
+    }
+
+    pub fn replace_recording_pieces(
+        &self,
+        project_id: i64,
+        pieces: &[RecordingPiece],
+        fresh_applied: bool,
+    ) -> Result<(), BoxedError> {
+        self.write(|transaction| {
+            transaction.execute(
+                "DELETE FROM RecordingPiece WHERE projectId = ?1",
+                [project_id],
+            )?;
+            for piece in pieces {
+                transaction.execute(
+                    "INSERT INTO RecordingPiece
+                       (projectId, blobId, layer, songStartFrame, frameCount)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    (
+                        project_id,
+                        &piece.blob_id,
+                        piece.layer.name(),
+                        piece.song_start_frame,
+                        piece.frame_count,
+                    ),
+                )?;
+            }
+            write_fresh_applied(transaction, project_id, fresh_applied)?;
+            Ok(())
+        })
+    }
+
+    pub fn set_recording_fresh_applied(
+        &self,
+        project_id: i64,
+        fresh_applied: bool,
+    ) -> Result<(), BoxedError> {
+        self.write(|transaction| write_fresh_applied(transaction, project_id, fresh_applied))
     }
 
     pub fn remove_project(&self, project_id: i64) -> Result<bool, BoxedError> {

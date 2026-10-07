@@ -33,7 +33,13 @@ export type AudioDecode = {
     frameIndex: number;
     samples: Float32Array;
   }) => void;
+  reloadRecording: () => Promise<boolean>;
   unmount: () => void;
+};
+
+type MountedAudio = {
+  projectId: number;
+  sampleRate: number;
 };
 
 export const createAudioDecode = (
@@ -41,6 +47,40 @@ export const createAudioDecode = (
 ): AudioDecode => {
   const { playerPort, spectrogramPort } = options;
   let recordingFrameCount = 0;
+  let recordingVersion = 0;
+  let mountedAudio: MountedAudio | undefined = undefined;
+  let reloadOnMount = false;
+
+  const replaceRecording = (samples: Float32Array<ArrayBuffer>): void => {
+    playerPort.methods.patchRecording({
+      frameIndex: 0,
+      samples: samples.slice(),
+    });
+    spectrogramPort.methods.patchSamples({
+      trackKey: 'recording',
+      frameIndex: 0,
+      samples: samples.slice(),
+    });
+  };
+
+  const reloadRecording = async (): Promise<boolean> => {
+    const mounted = mountedAudio;
+    if (!mounted) {
+      reloadOnMount = true;
+      return true;
+    }
+    recordingVersion += 1;
+    const version = recordingVersion;
+    const content = await getRecordingAudioContent(mounted.projectId);
+    const recording = await decodeWav(content.buffer, mounted.sampleRate);
+    if (version !== recordingVersion || mountedAudio !== mounted) {
+      return false;
+    }
+    replaceRecording(
+      fitChannelToFrameCount(recording.channels[0], recordingFrameCount),
+    );
+    return true;
+  };
 
   return {
     mount: async (message) => {
@@ -66,6 +106,7 @@ export const createAudioDecode = (
         recording.frameCount,
       );
       recordingFrameCount = frameCount;
+      mountedAudio = { projectId, sampleRate };
       const recordingChannels = recording.channels.map((channel) =>
         fitChannelToFrameCount(channel, frameCount),
       );
@@ -84,9 +125,16 @@ export const createAudioDecode = (
           recording: recordingChannels,
         },
       });
+      if (reloadOnMount) {
+        reloadOnMount = false;
+        reloadRecording().catch((error: unknown) => {
+          console.error('Failed to reload the recording', error);
+        });
+      }
       return { frameCount };
     },
     patchRecordingSamples: (message) => {
+      recordingVersion += 1;
       const skippedFrameCount = Math.max(0, -message.frameIndex);
       const frameIndex = Math.max(0, message.frameIndex);
       const frameCount = Math.min(
@@ -110,8 +158,11 @@ export const createAudioDecode = (
         samples: patch.slice(),
       });
     },
+    reloadRecording,
     unmount: () => {
+      reloadOnMount = false;
       recordingFrameCount = 0;
+      mountedAudio = undefined;
       playerPort.methods.unmount();
       spectrogramPort.methods.unmount();
     },

@@ -1,3 +1,5 @@
+use std::path::Path as FilePath;
+
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -6,19 +8,21 @@ use axum::{
     response::Response,
     routing::{get, post},
 };
-use musetric_db::{MasterType, ProjectItem, Reader, Recording, StemLoudness, blob_path};
+use musetric_db::{MasterType, ProjectItem, Reader, StemLoudness, blob_path};
 use musetric_media::{
     ENCODER_DELAY, Mixdown, MixdownChannels, MixdownFormat, MixdownTrack, SampleDepth,
     write_mixdown,
 };
 use serde::Deserialize;
 use serde_json::json;
+use tokio::fs::{remove_file, write as write_file};
 
 use crate::{
     analysis::read_gains,
     blob_response::{NamedFile, send_named},
     failure::{Failure, finish, invalid_number},
     mixdown::MixdownFile,
+    recording::{encode_wav, read_composite},
     routes::{
         RouteState,
         item::{json_response, missing_message},
@@ -80,7 +84,6 @@ struct MixdownBody {
 struct SongAudio {
     project: ProjectItem,
     stems: Vec<Option<String>>,
-    recording: Option<Recording>,
     loudness: Vec<StemLoudness>,
 }
 
@@ -131,11 +134,25 @@ async fn create(state: &RouteState, project_id: i64, body: MixdownBody) -> Resul
     let audio = read(&state.storage, move |reader| read_audio(reader, project_id))
         .await?
         .ok_or_else(|| Failure::NotFound(missing_message(project_id)))?;
-    let mixdown = plan(state, &audio, &body.volumes, format)?;
+    let mut mixdown = plan(state, &audio, &body.volumes, format)?;
+    let recording_gain = read_volume(body.volumes.recording)?;
+    let lead_in = usize::try_from(ENCODER_DELAY).map_err(Failure::failed)?;
     let (mixdown_id, path) = state.mixdowns.reserve().await.map_err(Failure::failed)?;
-    write_mixdown(state.storage.pcm.as_ref(), mixdown, &path)
-        .await
-        .map_err(Failure::failed)?;
+    let recording_path = path.with_extension("recording.wav");
+    let recorded = write_recording(state, project_id, &recording_path).await?;
+    if recorded {
+        mixdown.tracks.push(MixdownTrack {
+            from: recording_path.clone(),
+            gain: recording_gain,
+            channels: MixdownChannels::Mono,
+            lead_in,
+        });
+    }
+    let written = write_mixdown(state.storage.pcm.as_ref(), mixdown, &path).await;
+    if recorded {
+        let _ = remove_file(&recording_path).await;
+    }
+    written.map_err(Failure::failed)?;
     let (extension, content_type) = describe(format);
     let filename = format!("{} (mix).{extension}", audio.project.name);
     state.mixdowns.register(
@@ -159,7 +176,6 @@ fn read_audio(
     Ok(Some(SongAudio {
         project,
         stems,
-        recording: reader.recording(project_id)?,
         loudness: reader.stem_loudness(project_id)?,
     }))
 }
@@ -195,6 +211,22 @@ fn read_volume(volume: f32) -> Result<f32, Failure> {
     Err(Failure::Invalid(INVALID_BODY.to_owned()))
 }
 
+async fn write_recording(
+    state: &RouteState,
+    project_id: i64,
+    path: &FilePath,
+) -> Result<bool, Failure> {
+    let Some(composite) = read_composite(&state.storage, project_id)
+        .await
+        .map_err(Failure::failed)?
+    else {
+        return Ok(false);
+    };
+    let bytes = encode_wav(&composite).map_err(Failure::failed)?;
+    write_file(path, bytes).await.map_err(Failure::failed)?;
+    Ok(true)
+}
+
 fn plan(
     state: &RouteState,
     audio: &SongAudio,
@@ -213,14 +245,6 @@ fn plan(
             gain: read_volume(volume)? * stem_scale,
             channels: MixdownChannels::Stereo,
             lead_in: 0,
-        });
-    }
-    if let Some(recording) = &audio.recording {
-        tracks.push(MixdownTrack {
-            from: blob_path(&state.storage.blobs_path, &recording.blob_id),
-            gain: read_volume(volumes.recording)?,
-            channels: MixdownChannels::Mono,
-            lead_in: usize::try_from(ENCODER_DELAY).map_err(Failure::failed)?,
         });
     }
     Ok(Mixdown {

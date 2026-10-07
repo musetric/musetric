@@ -12,6 +12,7 @@ mod mixdown;
 mod publish;
 mod range;
 mod realtime;
+mod recording;
 mod router;
 mod routes;
 mod serve;

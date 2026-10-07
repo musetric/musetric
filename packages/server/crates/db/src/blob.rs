@@ -5,8 +5,8 @@ use rusqlite::{Connection, Result};
 const REFERENCED_BLOB_IDS: &str = "SELECT blobId FROM AudioMaster
      UNION ALL SELECT blobId FROM AudioDelivery
      UNION ALL SELECT waveBlobId AS blobId FROM AudioDelivery
-     UNION ALL SELECT blobId FROM Recording
      UNION ALL SELECT waveBlobId AS blobId FROM Recording
+     UNION ALL SELECT blobId FROM RecordingPiece
      UNION ALL SELECT blobId FROM Preview
      UNION ALL SELECT blobId FROM Subtitle
      UNION ALL SELECT blobId FROM Rhythm

@@ -25,6 +25,8 @@ export type EngineDecoder = {
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;
+  sendRecordingUndo: () => void;
+  sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
   sendPlayerRecord: () => void;
   sendPlayerStop: () => void;
@@ -46,6 +48,11 @@ export type CreateEngineDecoderOptions = {
   onRecordingPeaksChanged: (message: {
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
+  }) => void;
+  onRecordingHistoryChanged: (message: {
+    canUndo: boolean;
+    canRedo: boolean;
+    audioChanged: boolean;
   }) => void;
   onRecordingStreamFailed: () => void;
   onPlayerPlayRequested: () => void;
@@ -77,6 +84,7 @@ export const createEngineDecoder = (
     spectrogramPort,
     playheadPort,
     onRecordingPeaksChanged,
+    onRecordingHistoryChanged,
     onRecordingStreamFailed,
     onPlayerPlayRequested,
     onPlayerRecordRequested,
@@ -132,6 +140,7 @@ export const createEngineDecoder = (
         state.statuses.realtime = 'pending';
         state.frameCount = undefined;
         state.duration = 0;
+        state.recordingHistory = { canUndo: false, canRedo: false };
       });
     },
     recordingStreamFinished: () => {
@@ -148,6 +157,7 @@ export const createEngineDecoder = (
       onRecordingStreamFailed();
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
+    recordingHistoryChanged: onRecordingHistoryChanged,
     playerPlayRequested: onPlayerPlayRequested,
     playerRecordRequested: onPlayerRecordRequested,
     playerStopRequested: onPlayerStopRequested,
@@ -197,6 +207,12 @@ export const createEngineDecoder = (
       }
       port.methods.finishRecordingStream({ sequence });
       await recordingStreamPromise.promise;
+    },
+    sendRecordingUndo: () => {
+      port.methods.sendRecordingUndo();
+    },
+    sendRecordingRedo: () => {
+      port.methods.sendRecordingRedo();
     },
     sendPlayerPlay: () => {
       port.methods.sendPlayerPlay();

@@ -300,8 +300,8 @@ const BLOB_COLUMNS: [&str; 10] = [
     "Chords.blobId",
     "Key.blobId",
     "Preview.blobId",
-    "Recording.blobId",
     "Recording.waveBlobId",
+    "RecordingPiece.blobId",
     "Rhythm.blobId",
     "Subtitle.blobId",
 ];
@@ -318,8 +318,10 @@ const BLOB_SEED: &str = "
   INSERT INTO Rhythm (projectId, blobId) VALUES (1, 'Rhythm.blobId');
   INSERT INTO Key (projectId, blobId) VALUES (1, 'Key.blobId');
   INSERT INTO Chords (projectId, blobId) VALUES (1, 'Chords.blobId');
-  INSERT INTO Recording (projectId, blobId, waveBlobId, sampleRate, frameCount)
-    VALUES (1, 'Recording.blobId', 'Recording.waveBlobId', 44100, 100);
+  INSERT INTO Recording (projectId, waveBlobId, sampleRate, frameCount)
+    VALUES (1, 'Recording.waveBlobId', 44100, 100);
+  INSERT INTO RecordingPiece (projectId, blobId, layer, songStartFrame, frameCount)
+    VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100);
 ";
 
 fn blob_columns(path: &Path) -> Vec<String> {

@@ -21,6 +21,13 @@ export const getRecordingAudioContent = async (projectId: number) =>
     },
   });
 
+export const getRecordingHistory = async (projectId: number) =>
+  await requestWithAxios(axios, api.audio.recordingHistory.base, {
+    params: {
+      projectId,
+    },
+  });
+
 export const getDeliveryAudioWave = async (
   projectId: number,
   stemType: StemType,
