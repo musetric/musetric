@@ -1,6 +1,7 @@
 import { Box, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
 import { type FC, useRef } from 'react';
+import { getPageBackground } from '../pageBackground.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
@@ -41,9 +42,11 @@ export const ProjectTracksVisualization: FC = () => {
         <Box
           position='sticky'
           bottom={0}
-          bgcolor='grey.900'
           zIndex={2}
-          sx={{ pointerEvents: 'none' }}
+          sx={(theme) => ({
+            pointerEvents: 'none',
+            bgcolor: getPageBackground(theme),
+          })}
         >
           <VisualizationTimeline mode='tracks' />
         </Box>

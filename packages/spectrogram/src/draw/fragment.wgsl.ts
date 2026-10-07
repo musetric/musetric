@@ -13,7 +13,6 @@ struct DrawParams {
   comparisonThresholds : vec4f,
   lineWidths : vec4f,
   overlayTuning : vec4f,
-  frameColor : vec4f,
   laneLayout : vec4f,
   visibility : vec4u,
   noteVisibility : vec4u,
@@ -314,7 +313,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let splitRow = select(textureHeight, (textureHeight - laneGap) / 2u, stacked);
   let gapEnd = select(textureHeight, splitRow + laneGap, stacked);
   if (y >= splitRow && y < gapEnd) {
-    return vec4f(drawParams.frameColor.xyz, 1.0);
+    return vec4f(0.0);
   }
   let recordingBand = y >= gapEnd;
   let bandTop = select(0u, gapEnd, recordingBand);
@@ -439,8 +438,6 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     f32(bandTop + bandHeight),
     f32(width),
   );
-  color = mix(drawParams.frameColor.xyz, color, coverage);
-
-  return vec4f(color, 1.0);
+  return vec4f(color * coverage, coverage);
 }
 `;

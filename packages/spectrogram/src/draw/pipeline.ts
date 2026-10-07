@@ -6,7 +6,7 @@ export const createPipeline = (
   context: GPUCanvasContext,
 ) => {
   const format = navigator.gpu.getPreferredCanvasFormat();
-  context.configure({ device, format });
+  context.configure({ device, format, alphaMode: 'premultiplied' });
 
   const vertexModule = device.createShaderModule({
     label: 'draw-vertex-shader',

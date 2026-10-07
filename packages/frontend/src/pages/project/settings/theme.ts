@@ -18,7 +18,6 @@ export const useThemeSpectrogramColors = () => {
       recordingClose: defaultSpectrogramConfig.colors.recordingClose,
       recordingMiss: theme.palette.error.main,
       recordingTimingMiss: defaultSpectrogramConfig.colors.recordingTimingMiss,
-      frame: theme.palette.grey[900],
     };
     engine.store.update((state) => {
       state.colors = colors;
