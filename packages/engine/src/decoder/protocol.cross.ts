@@ -16,6 +16,8 @@ export type EngineDecoderOutboundMethods = {
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;
+  sendRecordingUndo: () => void;
+  sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
   sendPlayerRecord: () => void;
   sendPlayerStop: () => void;
@@ -39,6 +41,11 @@ export type EngineDecoderInboundMethods = {
   recordingPeaksChanged: (message: {
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
+  }) => void;
+  recordingHistoryChanged: (message: {
+    canUndo: boolean;
+    canRedo: boolean;
+    audioChanged: boolean;
   }) => void;
   playerPlayRequested: () => void;
   playerRecordRequested: () => void;
@@ -74,6 +81,7 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingStreamFinished',
       'recordingStreamFailed',
       'recordingPeaksChanged',
+      'recordingHistoryChanged',
       'playerPlayRequested',
       'playerRecordRequested',
       'playerStopRequested',
@@ -89,6 +97,8 @@ export const engineDecoderChannel = createMessageChannel<
       'unmount',
       'startRecordingStream',
       'finishRecordingStream',
+      'sendRecordingUndo',
+      'sendRecordingRedo',
       'sendPlayerPlay',
       'sendPlayerRecord',
       'sendPlayerStop',

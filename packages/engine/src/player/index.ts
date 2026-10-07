@@ -139,6 +139,10 @@ export const createEnginePlayer = (
       }
     },
     seek: (frameIndex, origin) => {
+      const { recording, playing } = store.get();
+      if (recording && playing) {
+        return;
+      }
       store.update((state) => {
         state.frameIndex = frameIndex;
         state.playerFrameIndexPending = true;
@@ -220,6 +224,13 @@ export const createEnginePlayer = (
     },
     applyRemoteFrameIndex: (frameIndex, frozen, revision, source) => {
       const currentState = store.get();
+      if (
+        currentState.recording &&
+        currentState.playing &&
+        !currentState.isSlave
+      ) {
+        return;
+      }
       if (
         source === 'playback' &&
         (currentState.playerFrameIndexPending ||

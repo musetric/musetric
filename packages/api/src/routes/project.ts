@@ -179,6 +179,12 @@ export namespace realtime {
         peaks: number[];
       }
     | { type: 'recording.finished'; sessionId: string }
+    | {
+        type: 'recording.changed';
+        canUndo: boolean;
+        canRedo: boolean;
+        audioChanged: boolean;
+      }
     | { type: 'error'; error: string }
     | { type: 'player.play' }
     | { type: 'player.record' }

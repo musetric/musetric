@@ -1,6 +1,8 @@
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes};
 use serde_json::{Value, json};
 
+use crate::recording::History;
+
 pub(crate) fn text(event: &Value) -> Message {
     Message::Text(Utf8Bytes::from(event.to_string()))
 }
@@ -18,6 +20,15 @@ pub(crate) fn recording_started(session_id: &str) -> Value {
 
 pub(crate) fn recording_finished(session_id: &str) -> Value {
     json!({ "type": "recording.finished", "sessionId": session_id })
+}
+
+pub(crate) fn recording_changed(history: History, audio_changed: bool) -> Value {
+    json!({
+        "type": "recording.changed",
+        "canUndo": history.can_undo,
+        "canRedo": history.can_redo,
+        "audioChanged": audio_changed,
+    })
 }
 
 pub(crate) fn peaks_changed(start_peak_index: usize, peaks: &[f32]) -> Value {

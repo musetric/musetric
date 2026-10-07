@@ -81,6 +81,22 @@ export namespace recordingContent {
   export type Response = z.infer<typeof base.responseSchema>;
 }
 
+export namespace recordingHistory {
+  export const base = createApiRoute({
+    method: 'get',
+    path: '/api/audio/project/:projectId/recording/history',
+    paramsSchema: recordingParamsSchema,
+    requestSchema: z.void(),
+    responseSchema: z.object({
+      canUndo: z.boolean(),
+      canRedo: z.boolean(),
+    }),
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
 export namespace recordingWave {
   export const base = createApiRoute({
     method: 'get',

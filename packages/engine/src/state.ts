@@ -41,6 +41,11 @@ export type FrequencyRange = {
   maxFrequency: number;
 };
 
+export type RecordingHistory = {
+  canUndo: boolean;
+  canRedo: boolean;
+};
+
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
@@ -51,6 +56,7 @@ export type EngineState = {
   playing: boolean;
   frozen: boolean;
   recording: boolean;
+  recordingHistory: RecordingHistory;
   isSlave: boolean;
   playerCommandPending: boolean;
   playerFrameIndexPending: boolean;

@@ -14,6 +14,7 @@ export const PlayerProgress: FC = () => {
   const currentTimeRef = useRef<HTMLSpanElement>(null);
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
+  const recording = useEngineStore((state) => state.recording && state.playing);
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
@@ -100,7 +101,7 @@ export const PlayerProgress: FC = () => {
         min={0}
         max={progressScale}
         defaultValue={Math.round(initialProgress * progressScale)}
-        disabled={!frameCount || realtimeFailed}
+        disabled={!frameCount || realtimeFailed || recording}
         size='small'
         sx={{
           flexGrow: 1,

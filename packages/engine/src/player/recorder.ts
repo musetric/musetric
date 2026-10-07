@@ -124,6 +124,7 @@ export const createEngineRecorder = (
 
   const stopInitializedSession = async (session: RecordingSession) => {
     const frameIndex = await getEnginePlayback().stop();
+    const { revision } = store.get().seekEvent;
 
     if (!session.decoderStreamStarted) {
       return;
@@ -131,7 +132,9 @@ export const createEngineRecorder = (
 
     if (session.playerStreamStarted) {
       await closeDecoderStream(session);
-      getEnginePlayback().seek(frameIndex);
+      if (store.get().seekEvent.revision === revision) {
+        getEnginePlayback().seek(frameIndex);
+      }
       return;
     }
 

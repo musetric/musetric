@@ -2,6 +2,7 @@ import { Box, Stack, type Theme } from '@mui/material';
 import { type FC } from 'react';
 import { MetronomeToggleButton } from '../buttons/MetronomeToggleButton.js';
 import { PlaybackControlsButton } from '../buttons/PlaybackControlsButton.js';
+import { RecordingHistoryButtons } from '../buttons/RecordingHistoryButtons.js';
 import { TempoButton } from '../buttons/TempoButton.js';
 import { TransposeButton } from '../buttons/TransposeButton.js';
 import { DetailsViewToggle } from '../buttons/viewToggle/DetailsViewToggle.js';
@@ -9,9 +10,10 @@ import { SpectrogramViewToggle } from '../buttons/viewToggle/SpectrogramViewTogg
 import { MixButton } from '../mix/MixButton.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
-const desktopAreas = '"details . click mix transport key tempo . spectrogram"';
+const desktopAreas =
+  '"details history . click mix transport key tempo . spectrogram"';
 
-const desktopColumns = 'auto 1fr auto auto auto auto auto 1fr auto';
+const desktopColumns = 'auto auto 1fr auto auto auto auto auto 1fr auto';
 
 const singleRowMinWidth = 680;
 
@@ -46,6 +48,9 @@ export const PlaybackPanel: FC = () => (
       <Box sx={phoneRowSx}>
         <Box gridArea='details'>
           <DetailsViewToggle />
+        </Box>
+        <Box gridArea='history'>
+          <RecordingHistoryButtons />
         </Box>
         <Box gridArea='spectrogram'>
           <SpectrogramViewToggle />

@@ -7,8 +7,8 @@ use crate::{
         Analysis, StemLoudness, read_all_stem_loudness, read_analysis_blob, read_stem_loudness,
     },
     audio::{
-        AudioDelivery, MasterType, Recording, StemType, read_delivery, read_master_blob,
-        read_recording,
+        AudioDelivery, MasterType, Recording, RecordingPiece, StemType, read_delivery,
+        read_master_blob, read_recording, read_recording_pieces,
     },
     blob::read_referenced_blob_ids,
     database::{OpenOptions, open_database},
@@ -123,6 +123,10 @@ impl Reader {
 
     pub fn recording(&self, project_id: i64) -> Result<Option<Recording>, BoxedError> {
         self.read(|connection| read_recording(connection, project_id))
+    }
+
+    pub fn recording_pieces(&self, project_id: i64) -> Result<Vec<RecordingPiece>, BoxedError> {
+        self.read(|connection| read_recording_pieces(connection, project_id))
     }
 
     pub fn preview(&self, preview_id: i64) -> Result<Option<Preview>, BoxedError> {

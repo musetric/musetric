@@ -9,11 +9,13 @@ use axum::{
     routing::get,
 };
 use musetric_db::{MASTER_TYPES, MasterType, STEM_TYPES, StemType};
+use serde_json::json;
 
 use crate::{
     blob_response::{CachedBlob, StoredBlob, send_cached, send_generated, send_stored},
     failure::{Failure, finish, invalid_number, invalid_option},
-    routes::RouteState,
+    recording::{encode_wav, read_composite, read_history},
+    routes::{RouteState, item::json_response},
     storage::{Storage, read},
     wav,
 };
@@ -52,6 +54,10 @@ pub(crate) fn create_router() -> Router<RouteState> {
         .route(
             "/api/audio/project/{projectId}/recording/wave",
             get(recording_wave),
+        )
+        .route(
+            "/api/audio/project/{projectId}/recording/history",
+            get(recording_history),
         )
 }
 
@@ -117,6 +123,16 @@ async fn recording_content(
         return finish(Err(invalid_number(PROJECT_ID)));
     };
     finish(send_recording_content(&state.storage, project_id).await)
+}
+
+async fn recording_history(
+    State(state): State<RouteState>,
+    Path(raw_project_id): Path<String>,
+) -> Response<Body> {
+    let Ok(project_id) = raw_project_id.parse::<i64>() else {
+        return finish(Err(invalid_number(PROJECT_ID)));
+    };
+    finish(send_recording_history(&state.storage, project_id).await)
 }
 
 async fn recording_wave(
@@ -220,19 +236,27 @@ async fn send_recording_content(
     storage: &Arc<Storage>,
     project_id: i64,
 ) -> Result<Response<Body>, Failure> {
-    let found = read(storage, move |database| database.recording(project_id)).await?;
-    let Some(recording) = found else {
+    let Some(composite) = read_composite(storage, project_id)
+        .await
+        .map_err(Failure::failed)?
+    else {
         return Ok(send_generated(wav::CONTENT_TYPE, wav::create_empty()));
     };
-    let blob = StoredBlob {
-        missing_message: format!(
-            "Recording audio blob for id {} not found",
-            recording.blob_id
-        ),
-        blob_id: recording.blob_id,
-        content_type: wav::CONTENT_TYPE,
-    };
-    send_stored(storage, blob).await
+    let bytes = encode_wav(&composite).map_err(Failure::failed)?;
+    Ok(send_generated(wav::CONTENT_TYPE, bytes))
+}
+
+async fn send_recording_history(
+    storage: &Arc<Storage>,
+    project_id: i64,
+) -> Result<Response<Body>, Failure> {
+    let history = read_history(storage, project_id)
+        .await
+        .map_err(Failure::failed)?;
+    Ok(json_response(&json!({
+        "canUndo": history.can_undo,
+        "canRedo": history.can_redo,
+    })))
 }
 
 async fn send_recording_wave(

@@ -48,6 +48,10 @@ const initialState: EngineState = {
   playing: false,
   frozen: false,
   recording: false,
+  recordingHistory: {
+    canUndo: false,
+    canRedo: false,
+  },
   isSlave: false,
   playerCommandPending: false,
   playerFrameIndexPending: false,
@@ -132,6 +136,15 @@ export const createEngine = (): Engine => {
           startPeakIndex: message.startPeakIndex,
           peaks: message.peaks,
         });
+      },
+      onRecordingHistoryChanged: (message) => {
+        store.update((state) => {
+          state.recordingHistory = {
+            canUndo: message.canUndo,
+            canRedo: message.canRedo,
+          };
+        });
+        ref.waveform.refreshRecording();
       },
       onRecordingStreamFailed: () => {
         void ref.player.stop();

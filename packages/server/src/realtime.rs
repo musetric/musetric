@@ -21,6 +21,7 @@ use serde_json::Value;
 
 use crate::{
     realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
+    recording::{TakeFormat, set_fresh_applied},
     routes::RouteState,
     storage::{Storage, read},
 };
@@ -166,6 +167,14 @@ async fn handle_text(
             start_recording(channel, rooms, connection, start).await
         }
         "recording.finish" => finish_recording(channel, rooms, connection).await,
+        "recording.undo" => {
+            change_history(rooms, connection, false).await;
+            true
+        }
+        "recording.redo" => {
+            change_history(rooms, connection, true).await;
+            true
+        }
         "player.play" => {
             rooms.claim_master(connection.project_id, connection.member, false);
             true
@@ -213,13 +222,8 @@ async fn start_recording(
         refuse_recording(rooms, connection, start.session_id);
         return true;
     }
-    let created = session::Session::create(
-        &connection.storage,
-        connection.project_id,
-        start.sample_rate,
-        start.frame_count,
-    )
-    .await;
+    let created =
+        session::Session::create(&connection.storage, connection.project_id, start.format).await;
     let session = match created {
         Ok(session) => session,
         Err(error) => {
@@ -336,7 +340,9 @@ async fn write_packet(
     if written == 0 {
         return Ok(None);
     }
-    let patch = session.patch_peaks(stream.frame_index, written).await?;
+    let patch = session
+        .patch_peaks(stream.frame_index, &stream.samples[..written])
+        .await?;
     let chunk = packet::create_chunk(stream.frame_index, &stream.samples[..written])?;
     Ok(Some(WrittenPacket { chunk, patch }))
 }
@@ -347,20 +353,45 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
     };
     rooms.save_session(connection.project_id, connection.member);
     let finished = session.finish(&connection.storage).await;
-    if finished.is_ok() {
+    if let Ok(committed) = finished {
         rooms.broadcast_event(
             connection.project_id,
             &events::recording_finished(&id),
             None,
         );
+        if let Some(history) = committed {
+            rooms.broadcast_event(
+                connection.project_id,
+                &events::recording_changed(history, false),
+                None,
+            );
+        }
     }
     rooms.end_session(connection.project_id, connection.member);
-    finished
+    finished.map(|_| ())
+}
+
+async fn change_history(rooms: &Rooms, connection: &Connection, applied: bool) {
+    if !matches!(
+        rooms.begin_session(connection.project_id, connection.member),
+        rooms::Begin::Started
+    ) {
+        return;
+    }
+    rooms.save_session(connection.project_id, connection.member);
+    let changed = set_fresh_applied(&connection.storage, connection.project_id, applied).await;
+    rooms.end_session(connection.project_id, connection.member);
+    if let Ok(Some(history)) = changed {
+        rooms.broadcast_event(
+            connection.project_id,
+            &events::recording_changed(history, true),
+            None,
+        );
+    }
 }
 
 struct RecordingStart {
-    sample_rate: i64,
-    frame_count: i64,
+    format: TakeFormat,
     session_id: String,
 }
 
@@ -373,8 +404,10 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
         return None;
     }
     Some(RecordingStart {
-        sample_rate,
-        frame_count,
+        format: TakeFormat {
+            sample_rate,
+            frame_count,
+        },
         session_id,
     })
 }
@@ -424,8 +457,11 @@ mod tests {
         tungstenite::{Message as ClientMessage, Utf8Bytes},
     };
 
+    use musetric_db::{RecordingLayer, RecordingPiece};
+
     use super::packet;
     use crate::{
+        recording::read_composite,
         routes,
         storage::Storage,
         test_workspace::{Workspace, create_route_state},
@@ -436,10 +472,15 @@ mod tests {
       VALUES (1, 'Fixture project', 48000, 480000);
     ";
     const FRAME_COUNT: usize = 4;
+    const SONG_FRAME_COUNT: usize = 8;
+    const QUARTER: i16 = 8191;
+    const HALF: i16 = 16383;
+    const THREE_QUARTERS: i16 = 24575;
     const LONG_TAKE: usize = 48_000 * 300;
     const OWNER_TAKE: &str = "owner-take";
     const LISTENER_TAKE: &str = "listener-take";
     const SECOND_TAKE: &str = "second-take";
+    const THIRD_TAKE: &str = "third-take";
     const SILENCE: Duration = Duration::from_millis(300);
 
     type ClientSocket = tokio_tungstenite::WebSocketStream<
@@ -555,16 +596,56 @@ mod tests {
             .expect("the fixture packet should fit the realtime protocol")
     }
 
-    async fn finish_take(owner: &mut ClientSocket, listener: &mut ClientSocket) {
+    async fn finish_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         send_json(owner, json!({ "type": "recording.finish" })).await;
         assert_eq!(
             receive_json(owner).await,
-            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+            json!({ "type": "recording.finished", "sessionId": session_id })
         );
         assert_eq!(
             receive_json(listener).await,
-            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+            json!({ "type": "recording.finished", "sessionId": session_id })
         );
+    }
+
+    fn changed_message(can_undo: bool, can_redo: bool, audio_changed: bool) -> Value {
+        json!({
+            "type": "recording.changed",
+            "canUndo": can_undo,
+            "canRedo": can_redo,
+            "audioChanged": audio_changed,
+        })
+    }
+
+    async fn expect_changed(sockets: [&mut ClientSocket; 2], expected: &Value) {
+        for socket in sockets {
+            assert_eq!(&receive_json(socket).await, expected);
+        }
+    }
+
+    async fn restart_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
+        send_json(owner, start_message(session_id, SONG_FRAME_COUNT)).await;
+        let started = json!({ "type": "recording.started", "sessionId": session_id });
+        assert_eq!(receive_json(owner).await, started);
+        assert_eq!(receive_json(listener).await, started);
+    }
+
+    async fn sing(
+        owner: &mut ClientSocket,
+        listener: &mut ClientSocket,
+        frame_index: u32,
+        samples: &[f32],
+    ) {
+        send_packet(owner, chunk(frame_index, samples)).await;
+        assert_eq!(receive_binary(listener).await, chunk(frame_index, samples));
+        let patch = receive_json(owner).await;
+        assert_eq!(patch["type"], "recording.peaksChanged");
+        assert_eq!(receive_json(listener).await, patch);
+    }
+
+    async fn commit_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
+        finish_take(owner, listener, session_id).await;
+        expect_changed([owner, listener], &changed_message(true, false, false)).await;
     }
 
     fn stored_recording(storage: &Storage) -> musetric_db::Recording {
@@ -573,6 +654,44 @@ mod tests {
             .recording(1)
             .expect("the recording should be readable")
             .expect("the recording should be stored")
+    }
+
+    fn stored_pieces(storage: &Storage) -> Vec<RecordingPiece> {
+        storage
+            .database
+            .recording_pieces(1)
+            .expect("the recording pieces should be readable")
+    }
+
+    fn piece(
+        layer: RecordingLayer,
+        song_start_frame: i64,
+        frame_count: i64,
+    ) -> (RecordingLayer, i64, i64) {
+        (layer, song_start_frame, frame_count)
+    }
+
+    fn layout(pieces: &[RecordingPiece]) -> Vec<(RecordingLayer, i64, i64)> {
+        pieces
+            .iter()
+            .map(|stored| piece(stored.layer, stored.song_start_frame, stored.frame_count))
+            .collect()
+    }
+
+    fn read_samples(storage: &Storage, blob_id: &str) -> Vec<i16> {
+        std::fs::read(musetric_db::blob_path(&storage.blobs_path, blob_id))
+            .expect("the recording piece should exist")[44..]
+            .chunks_exact(2)
+            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+            .collect()
+    }
+
+    async fn composite(storage: &Arc<Storage>) -> Vec<i16> {
+        read_composite(storage, 1)
+            .await
+            .expect("the composite should render")
+            .expect("the recording should exist")
+            .samples
     }
 
     async fn start_recording_room(base: &str) -> (ClientSocket, ClientSocket) {
@@ -659,21 +778,18 @@ mod tests {
             .expect("the peak patch should contain values");
         assert_eq!(peaks.len(), 8);
         assert_eq!(peaks[0], -1.0);
-        assert_eq!(peaks[1], 0.0);
-        assert_eq!(peaks[4], 0.0);
+        assert_eq!(peaks[1], -1.0);
+        assert_eq!(peaks[4], 32767.0 / 32768.0);
         assert_eq!(peaks[5], 32767.0 / 32768.0);
         assert_eq!(receive_json(&mut listener).await, patch);
 
-        finish_take(&mut owner, &mut listener).await;
-        let recording = stored_recording(&storage);
-        let audio = std::fs::read(musetric_db::blob_path(
-            &storage.blobs_path,
-            &recording.blob_id,
-        ))
-        .expect("the recording wav should exist");
-        assert_eq!(&audio[..4], b"RIFF");
-        assert_eq!(&audio[44..46], &(-32768_i16).to_le_bytes());
-        assert_eq!(&audio[46..48], &(16383_i16).to_le_bytes());
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        let pieces = stored_pieces(&storage);
+        assert_eq!(layout(&pieces), [piece(RecordingLayer::Fresh, 0, 4)]);
+        assert_eq!(
+            read_samples(&storage, &pieces[0].blob_id),
+            [-32768, HALF, 32767, -8192]
+        );
     }
 
     #[tokio::test]
@@ -890,7 +1006,7 @@ mod tests {
         let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
-        finish_take(&mut owner, &mut listener).await;
+        finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
         let reserved = stored_recording(&storage);
 
         send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT * 2)).await;
@@ -911,7 +1027,6 @@ mod tests {
         );
 
         let reused = stored_recording(&storage);
-        assert_eq!(reused.blob_id, reserved.blob_id);
         assert_eq!(reused.wave_blob_id, reserved.wave_blob_id);
         assert_eq!(
             usize::try_from(reused.frame_count).expect("the frame count should be positive"),
@@ -920,27 +1035,141 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refuses_to_record_over_audio_that_went_missing() {
+    async fn undoes_and_redoes_the_fresh_take_without_rewriting_it() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
         let storage = workspace.create_storage();
         let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
-        let (mut owner, mut listener) = start_recording_room(&base).await;
-        finish_take(&mut owner, &mut listener).await;
-        let recording = stored_recording(&storage);
-        let audio = musetric_db::blob_path(&storage.blobs_path, &recording.blob_id);
-        std::fs::remove_file(&audio).expect("the recording wav should be removed");
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        let recorded = stored_pieces(&storage);
 
-        send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT)).await;
+        send_json(&mut owner, json!({ "type": "recording.undo" })).await;
+        expect_changed(
+            [&mut owner, &mut listener],
+            &changed_message(false, true, true),
+        )
+        .await;
+        assert_eq!(composite(&storage).await, [0; SONG_FRAME_COUNT]);
+        assert_eq!(stored_pieces(&storage), recorded);
+
+        send_json(&mut listener, json!({ "type": "recording.redo" })).await;
+        expect_changed(
+            [&mut owner, &mut listener],
+            &changed_message(true, false, true),
+        )
+        .await;
+        assert_eq!(
+            composite(&storage).await,
+            [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
+        );
+        assert_eq!(stored_pieces(&storage), recorded);
+    }
+
+    #[tokio::test]
+    async fn glues_touching_takes_into_one_base_file() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.25; 4]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        let first = stored_pieces(&storage)[0].blob_id.clone();
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        sing(&mut owner, &mut listener, 2, &[0.5; 4]).await;
+        commit_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        restart_take(&mut owner, &mut listener, THIRD_TAKE).await;
+        sing(&mut owner, &mut listener, 6, &[0.75; 2]).await;
+        commit_take(&mut owner, &mut listener, THIRD_TAKE).await;
+
+        let pieces = stored_pieces(&storage);
+        assert_eq!(
+            layout(&pieces),
+            [
+                piece(RecordingLayer::Base, 0, 6),
+                piece(RecordingLayer::Fresh, 6, 2),
+            ]
+        );
+        assert!(pieces.iter().all(|stored| stored.blob_id != first));
+        assert_eq!(
+            read_samples(&storage, &pieces[0].blob_id),
+            [QUARTER, QUARTER, HALF, HALF, HALF, HALF]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [
+                QUARTER,
+                QUARTER,
+                HALF,
+                HALF,
+                HALF,
+                HALF,
+                THREE_QUARTERS,
+                THREE_QUARTERS
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_recording_when_a_base_file_is_missing() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.25; 4]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        sing(&mut owner, &mut listener, 4, &[0.5; 2]).await;
+        commit_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        let lost = &stored_pieces(&storage)[0].blob_id;
+        std::fs::remove_file(musetric_db::blob_path(&storage.blobs_path, lost))
+            .expect("the base file should be removable");
+
+        restart_take(&mut owner, &mut listener, THIRD_TAKE).await;
+        sing(&mut owner, &mut listener, 6, &[0.75; 2]).await;
+        commit_take(&mut owner, &mut listener, THIRD_TAKE).await;
 
         assert_eq!(
-            receive_json(&mut owner).await,
-            json!({
-                "type": "error",
-                "error": "Failed to start recording session: The recorded audio of this project is missing",
-            })
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Base, 4, 2),
+                piece(RecordingLayer::Fresh, 6, 2),
+            ]
         );
-        assert!(!audio.exists(), "the missing wav should not be recreated");
+        assert_eq!(
+            composite(&storage).await,
+            [0, 0, 0, 0, HALF, HALF, THREE_QUARTERS, THREE_QUARTERS]
+        );
+    }
+
+    #[tokio::test]
+    async fn forgets_an_undone_take_once_the_next_one_finishes() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.25; 4]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        send_json(&mut owner, json!({ "type": "recording.undo" })).await;
+        expect_changed(
+            [&mut owner, &mut listener],
+            &changed_message(false, true, true),
+        )
+        .await;
+
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        sing(&mut owner, &mut listener, 4, &[0.5; 2]).await;
+        commit_take(&mut owner, &mut listener, SECOND_TAKE).await;
+
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [piece(RecordingLayer::Fresh, 4, 2)]
+        );
+        assert_eq!(composite(&storage).await, [0, 0, 0, 0, HALF, HALF, 0, 0]);
     }
 
     #[tokio::test]
