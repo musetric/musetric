@@ -3,6 +3,7 @@ import {
   type SpectrogramColumnRange,
   type SpectrogramSampleRange,
 } from '../common/extConfig.js';
+import { type SpectrogramSource } from '../common/source.js';
 import { createPipeline } from './pipeline.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -15,7 +16,7 @@ export type SpectrogramSliceSamples = {
     range: SpectrogramColumnRange,
   ) => void;
   write: (options: {
-    samples: Float32Array;
+    source: SpectrogramSource;
     baseColumn: number;
     playheadRatio: number;
     truncateAfterPlayhead: boolean;
@@ -62,7 +63,7 @@ export const createSpectrogramSliceSamplesCell = (
         dispatch,
         write: (options) => {
           const {
-            samples,
+            source,
             baseColumn,
             playheadRatio,
             truncateAfterPlayhead,
@@ -70,7 +71,7 @@ export const createSpectrogramSliceSamplesCell = (
             invalidations,
           } = options;
           const writeResult = state.samples.write({
-            samples,
+            source,
             baseColumn,
             config: state.config,
             playheadRatio,
@@ -82,6 +83,8 @@ export const createSpectrogramSliceSamplesCell = (
             baseColumn,
             baseWindowStart: writeResult.baseWindowStart,
             ringStart: writeResult.ringStart,
+            ringLength: state.samples.array.length,
+            mapped: source.mapped,
           });
         },
       };

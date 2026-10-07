@@ -26,6 +26,7 @@ pub(crate) struct History {
 pub(crate) struct TakeFormat {
     pub(crate) sample_rate: i64,
     pub(crate) frame_count: i64,
+    pub(crate) tempo: f64,
 }
 
 pub(crate) struct FinishedTake<'area> {
@@ -34,9 +35,9 @@ pub(crate) struct FinishedTake<'area> {
     pub(crate) piece: RecordingPiece,
 }
 
-pub(crate) struct Composite {
+pub(crate) struct Sounding {
     pub(crate) sample_rate: i64,
-    pub(crate) samples: Vec<i16>,
+    pub(crate) pieces: Vec<RecordingPiece>,
 }
 
 type PcmCache = HashMap<String, Vec<i16>>;
@@ -128,13 +129,23 @@ fn sounding<'piece>(
         .collect()
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "frame positions stay far below 2^53 and are clamped to the song before indexing"
+)]
 fn place(samples: &mut [i16], piece: &RecordingPiece, source: &[i16]) {
-    let Ok(start) = usize::try_from(piece.song_start_frame) else {
-        return;
-    };
-    let target = samples.get_mut(start..).unwrap_or_default();
-    let count = target.len().min(source.len());
-    target[..count].copy_from_slice(&source[..count]);
+    let start = piece.song_start_frame as f64;
+    let end = start + piece.frame_count as f64 * piece.tempo;
+    let first = start.max(0.0).ceil() as usize;
+    let last = end.min(samples.len() as f64).ceil().max(0.0) as usize;
+    for (offset, sample) in samples.iter_mut().enumerate().take(last).skip(first) {
+        let recorded = ((offset as f64 - start) / piece.tempo).round() as usize;
+        if let Some(value) = source.get(recorded) {
+            *sample = *value;
+        }
+    }
 }
 
 fn render(frame_count: i64, layers: &[&RecordingPiece], pcm: &PcmCache) -> Vec<i16> {
@@ -164,30 +175,27 @@ async fn compose(
     ))
 }
 
-pub(crate) async fn read_composite(
+pub(crate) async fn read_sounding(
     storage: &Arc<Storage>,
     project_id: i64,
-) -> Result<Option<Composite>, BoxedError> {
+) -> Result<Option<Sounding>, BoxedError> {
     let Some((recording, pieces)) = read_state(storage, project_id).await? else {
         return Ok(None);
     };
-    let samples = compose(storage, &recording, &pieces).await?;
-    Ok(Some(Composite {
+    Ok(Some(Sounding {
         sample_rate: recording.sample_rate,
-        samples,
+        pieces: sounding(&recording, &pieces).into_iter().cloned().collect(),
     }))
 }
 
-pub(crate) fn encode_wav(composite: &Composite) -> Result<Vec<u8>, BoxedError> {
-    let mut bytes = create_header(
-        u32::try_from(composite.samples.len())?,
-        u32::try_from(composite.sample_rate)?,
-    );
-    bytes.reserve(composite.samples.len() * 2);
-    for sample in &composite.samples {
-        bytes.extend_from_slice(&sample.to_le_bytes());
-    }
-    Ok(bytes)
+pub(crate) async fn holds_piece(
+    storage: &Arc<Storage>,
+    project_id: i64,
+    blob_id: &str,
+) -> Result<bool, BoxedError> {
+    Ok(read_state(storage, project_id)
+        .await?
+        .is_some_and(|(_, pieces)| pieces.iter().any(|piece| piece.blob_id == blob_id)))
 }
 
 #[expect(
@@ -358,6 +366,7 @@ pub(crate) async fn commit_take(
             layer: RecordingLayer::Base,
             song_start_frame: plan.song_start_frame,
             frame_count: plan.frame_count,
+            tempo: plan.tempo,
         });
     }
     next.push(take.piece);
@@ -409,12 +418,14 @@ mod tests {
             layer: RecordingLayer::Base,
             song_start_frame: 0,
             frame_count: 6,
+            tempo: 1.0,
         };
         let fresh = RecordingPiece {
             blob_id: "fresh".to_owned(),
             layer: RecordingLayer::Fresh,
             song_start_frame: 2,
             frame_count: 2,
+            tempo: 1.0,
         };
         let mut pcm = PcmCache::new();
         pcm.insert("base".to_owned(), vec![1; 6]);
@@ -422,6 +433,21 @@ mod tests {
 
         assert_eq!(render(8, &[&base], &pcm), [1, 1, 1, 1, 1, 1, 0, 0]);
         assert_eq!(render(8, &[&base, &fresh], &pcm), [1, 1, 9, 9, 1, 1, 0, 0]);
+    }
+
+    #[test]
+    fn places_a_slow_piece_on_the_song_timeline() {
+        let slow = RecordingPiece {
+            blob_id: "slow".to_owned(),
+            layer: RecordingLayer::Base,
+            song_start_frame: 1,
+            frame_count: 4,
+            tempo: 0.5,
+        };
+        let mut pcm = PcmCache::new();
+        pcm.insert("slow".to_owned(), vec![1, 2, 3, 4]);
+
+        assert_eq!(render(4, &[&slow], &pcm), [0, 1, 3, 0]);
     }
 
     #[test]

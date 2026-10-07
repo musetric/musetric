@@ -29,6 +29,19 @@ const recordingParamsSchema = z.object({
   projectId: z.number(),
 });
 
+const recordingPieceParamsSchema = z.object({
+  projectId: z.number(),
+  blobId: z.string(),
+});
+
+export const recordingPieceSchema = z.object({
+  blobId: z.string(),
+  sampleRate: z.number(),
+  songStartFrame: z.number(),
+  frameCount: z.number(),
+  tempo: z.number(),
+});
+
 export namespace masterContent {
   export const base = createApiRoute({
     method: 'get',
@@ -68,11 +81,24 @@ export namespace deliveryWave {
   export type Response = z.infer<typeof base.responseSchema>;
 }
 
-export namespace recordingContent {
+export namespace recordingPieces {
   export const base = createApiRoute({
     method: 'get',
-    path: '/api/audio/project/:projectId/recording/content',
+    path: '/api/audio/project/:projectId/recording/pieces',
     paramsSchema: recordingParamsSchema,
+    requestSchema: z.void(),
+    responseSchema: z.object({ pieces: z.array(recordingPieceSchema) }),
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
+export namespace recordingPiece {
+  export const base = createApiRoute({
+    method: 'get',
+    path: '/api/audio/project/:projectId/recording/piece/:blobId',
+    paramsSchema: recordingPieceParamsSchema,
     requestSchema: z.void(),
     responseSchema: z.instanceof(Uint8Array<ArrayBuffer>),
   });

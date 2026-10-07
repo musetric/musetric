@@ -75,6 +75,7 @@ export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
       lineWidthCents: 5,
       truncateAfterPlayhead: false,
       gainDb: 0,
+      sourceStretch: 1,
     },
     recording: {
       showSpectrogram: true,
@@ -83,6 +84,7 @@ export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
       lineWidthCents: 6,
       truncateAfterPlayhead: false,
       gainDb: 0,
+      sourceStretch: 4,
     },
   },
   comparison: {

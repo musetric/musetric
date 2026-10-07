@@ -14,11 +14,13 @@ use serde_json::json;
 use crate::{
     blob_response::{CachedBlob, StoredBlob, send_cached, send_generated, send_stored},
     failure::{Failure, finish, invalid_number, invalid_option},
-    recording::{encode_wav, read_composite, read_history},
+    recording::{Sounding, holds_piece, read_history, read_sounding},
     routes::{RouteState, item::json_response},
     storage::{Storage, read},
     wav,
 };
+
+const PIECE_FILENAME: &str = "take.wav";
 
 const FLAC_FORMAT: &str = "flac";
 const FLAC_CONTENT_TYPE: &str = "audio/flac";
@@ -48,8 +50,12 @@ pub(crate) fn create_router() -> Router<RouteState> {
             get(delivery_wave),
         )
         .route(
-            "/api/audio/project/{projectId}/recording/content",
-            get(recording_content),
+            "/api/audio/project/{projectId}/recording/pieces",
+            get(recording_pieces),
+        )
+        .route(
+            "/api/audio/project/{projectId}/recording/piece/{blobId}",
+            get(recording_piece),
         )
         .route(
             "/api/audio/project/{projectId}/recording/wave",
@@ -115,14 +121,25 @@ async fn delivery_wave(
     finish(send_peaks(&state.storage, project_id, stem, request.headers()).await)
 }
 
-async fn recording_content(
+async fn recording_pieces(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
         return finish(Err(invalid_number(PROJECT_ID)));
     };
-    finish(send_recording_content(&state.storage, project_id).await)
+    finish(send_recording_pieces(&state.storage, project_id).await)
+}
+
+async fn recording_piece(
+    State(state): State<RouteState>,
+    Path((raw_project_id, blob_id)): Path<(String, String)>,
+    request: Request<Body>,
+) -> Response<Body> {
+    let Ok(project_id) = raw_project_id.parse::<i64>() else {
+        return finish(Err(invalid_number(PROJECT_ID)));
+    };
+    finish(send_recording_piece(&state.storage, project_id, blob_id, request.headers()).await)
 }
 
 async fn recording_history(
@@ -232,18 +249,56 @@ async fn send_peaks(
     send_cached(storage, request, blob).await
 }
 
-async fn send_recording_content(
+async fn send_recording_pieces(
     storage: &Arc<Storage>,
     project_id: i64,
 ) -> Result<Response<Body>, Failure> {
-    let Some(composite) = read_composite(storage, project_id)
+    let found = read_sounding(storage, project_id)
         .await
-        .map_err(Failure::failed)?
+        .map_err(Failure::failed)?;
+    let Some(Sounding {
+        sample_rate,
+        pieces,
+    }) = found
     else {
-        return Ok(send_generated(wav::CONTENT_TYPE, wav::create_empty()));
+        return Ok(json_response(&json!({ "pieces": [] })));
     };
-    let bytes = encode_wav(&composite).map_err(Failure::failed)?;
-    Ok(send_generated(wav::CONTENT_TYPE, bytes))
+    let listed: Vec<_> = pieces
+        .iter()
+        .map(|piece| {
+            json!({
+                "blobId": piece.blob_id,
+                "sampleRate": sample_rate,
+                "songStartFrame": piece.song_start_frame,
+                "frameCount": piece.frame_count,
+                "tempo": piece.tempo,
+            })
+        })
+        .collect();
+    Ok(json_response(&json!({ "pieces": listed })))
+}
+
+async fn send_recording_piece(
+    storage: &Arc<Storage>,
+    project_id: i64,
+    blob_id: String,
+    request: &HeaderMap,
+) -> Result<Response<Body>, Failure> {
+    let held = holds_piece(storage, project_id, &blob_id)
+        .await
+        .map_err(Failure::failed)?;
+    if !held {
+        return Err(Failure::NotFound(format!(
+            "Recording piece {blob_id} of project {project_id} not found"
+        )));
+    }
+    let blob = CachedBlob {
+        missing_message: format!("Recording piece blob for id {blob_id} not found"),
+        blob_id,
+        filename: PIECE_FILENAME.to_owned(),
+        content_type: wav::CONTENT_TYPE.to_owned(),
+    };
+    send_cached(storage, request, blob).await
 }
 
 async fn send_recording_history(

@@ -11,6 +11,7 @@ import {
   type SpectrogramSampleRange,
 } from '../common/extConfig.js';
 import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidations.js';
+import { type SpectrogramSource } from '../common/source.js';
 import {
   allTrackKeys,
   isFundamentalNeeded,
@@ -20,7 +21,6 @@ import {
 } from '../config.cross.js';
 import { type SpectrogramRuntime } from '../configurator.js';
 import { type SpectrogramLaneWork } from '../lane/index.js';
-import { type SpectrogramSamples } from '../processor.js';
 
 const emptyInvalidations: readonly SpectrogramSampleInvalidation[] = [];
 
@@ -66,7 +66,7 @@ export const hasVisibleWork = (work: SpectrogramLaneWork): boolean =>
 
 export type TrackResident = {
   valid: boolean;
-  samples: Float32Array | undefined;
+  source: SpectrogramSource | undefined;
   sampleLength: number;
   baseColumn: number;
 };
@@ -74,7 +74,7 @@ export type TrackResident = {
 export const createTrackResidents = (): Record<TrackKey, TrackResident> =>
   mapTrackKeys(() => ({
     valid: false,
-    samples: undefined,
+    source: undefined,
     sampleLength: 0,
     baseColumn: 0,
   }));
@@ -156,13 +156,15 @@ export const createConfigInvalidationScope = (
   return changedTracks;
 };
 
+export type TrackSources = Partial<Record<TrackKey, SpectrogramSource>>;
+
 type CreateRenderPlansOptions = {
   columns: boolean[];
   configInvalidationScope: ConfigInvalidationScope;
   invalidatedSamples: readonly SpectrogramSampleInvalidation[];
   residents: Record<TrackKey, TrackResident>;
   runtime: SpectrogramRuntime;
-  samples: SpectrogramSamples;
+  samples: TrackSources;
   trackProgress: number;
   work: Record<TrackKey, SpectrogramLaneWork>;
 };
@@ -195,7 +197,11 @@ export const createRenderPlans = (
     const resident = residents[key];
     const present = trackSamples !== undefined;
     const baseColumn = present
-      ? computeBaseColumn(runtime.config, trackProgress, trackSamples.length)
+      ? computeBaseColumn(
+          runtime.config,
+          trackProgress,
+          trackSamples.songLength,
+        )
       : resident.baseColumn;
     const baseSlot = floorMod(baseColumn, runtime.config.windowCount);
     const invalidations = getTrackInvalidations(invalidatedSamples, key);
@@ -203,7 +209,7 @@ export const createRenderPlans = (
     const forceFullUpload =
       isTrackConfigInvalidated(configInvalidationScope, key) ||
       !resident.valid ||
-      resident.samples !== trackSamples ||
+      resident.source !== trackSamples ||
       resident.sampleLength !== (trackSamples?.length ?? 0);
 
     let ranges: readonly SpectrogramColumnRange[] = [];
@@ -217,7 +223,9 @@ export const createRenderPlans = (
           columns,
           grid: runtime.config,
           baseColumn,
-          analysisWindowSize: getMaxAnalysisWindowSize(runtime, trackWork),
+          analysisWindowSize: Math.ceil(
+            getMaxAnalysisWindowSize(runtime, trackWork) * trackSamples.reach,
+          ),
           invalidations,
         });
         ranges = toColumnRanges(runtime.config, baseColumn, columns);
@@ -238,7 +246,7 @@ export const createRenderPlans = (
 
 export type WriteTrackSamplesOptions = {
   runtime: SpectrogramRuntime;
-  samples: SpectrogramSamples;
+  samples: TrackSources;
   plans: Record<TrackKey, TrackRenderPlan>;
   work: Record<TrackKey, SpectrogramLaneWork>;
   trackProgress: number;
@@ -256,7 +264,7 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
     const { lane } = runtime.tracks[key];
     if (plan.ranges.length > 0 && trackWork.spectrogram) {
       lane.writeSamples({
-        samples: trackSamples,
+        source: trackSamples,
         baseColumn: plan.baseColumn,
         playheadRatio: runtime.config.playheadRatio,
         work: trackWork,
@@ -266,7 +274,7 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
     }
     if (trackWork.fundamental) {
       lane.preparePitch({
-        samples: trackSamples,
+        source: trackSamples,
         projection: { baseColumn: plan.baseColumn, baseSlot: plan.baseSlot },
         trackProgress,
         truncated: runtime.config.lanes[key].truncateAfterPlayhead,
@@ -286,7 +294,7 @@ export const hasPendingPitch = (
 
 export const drainPendingInvalidations = (
   pending: readonly SpectrogramSampleInvalidation[],
-  samples: SpectrogramSamples,
+  samples: TrackSources,
 ): readonly SpectrogramSampleInvalidation[] =>
   pending.length < 1
     ? emptyInvalidations
@@ -298,7 +306,7 @@ export const drainPendingInvalidations = (
 
 export const commitResidentPlans = (
   residents: Record<TrackKey, TrackResident>,
-  samples: SpectrogramSamples,
+  samples: TrackSources,
   plans: Record<TrackKey, TrackRenderPlan>,
   work: Record<TrackKey, SpectrogramLaneWork>,
 ): void => {
@@ -307,7 +315,7 @@ export const commitResidentPlans = (
     if (plan.clearMissing) {
       residents[key] = {
         valid: false,
-        samples: undefined,
+        source: undefined,
         sampleLength: 0,
         baseColumn: 0,
       };
@@ -316,7 +324,7 @@ export const commitResidentPlans = (
     if (plan.present) {
       residents[key] = {
         valid: hasVisibleWork(work[key]),
-        samples: samples[key],
+        source: samples[key],
         sampleLength: samples[key]?.length ?? 0,
         baseColumn: plan.baseColumn,
       };

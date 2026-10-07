@@ -17,21 +17,20 @@ export const PlaybackRecordButton: FC = () => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
-  const tempoBpm = useEngineStore((state) => state.tempoBpm);
-  const transposeSemitones = useEngineStore(
-    (state) => state.transposeSemitones,
-  );
-  const altered = tempoBpm !== sourceTempoBpm || transposeSemitones !== 0;
+  const transposed = useEngineStore((state) => state.transposeSemitones !== 0);
   const disabled =
-    !frameCount || realtimeFailed || altered || isSlave || playerCommandPending;
+    !frameCount ||
+    realtimeFailed ||
+    transposed ||
+    isSlave ||
+    playerCommandPending;
 
   return (
     <Tooltip
       enterTouchDelay={0}
       title={
-        altered
-          ? t('pages.project.player.controls.recordAltered')
+        transposed
+          ? t('pages.project.player.controls.recordTransposed')
           : t('pages.project.player.controls.record')
       }
     >

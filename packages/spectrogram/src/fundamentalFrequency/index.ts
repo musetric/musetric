@@ -1,6 +1,7 @@
 import { type FourierMode } from '@musetric/fft';
 import { createFourierCell } from '@musetric/fft/gpu';
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
+import { type SpectrogramSource } from '../common/source.js';
 import { createPitchInverseCell } from './inverse.js';
 import { createPitchParamsCell } from './params.js';
 import { createPitchPipelines } from './pipeline.js';
@@ -8,8 +9,8 @@ import {
   createPitchSchedule,
   type PitchFrameRange,
   type PitchPlan,
-  type PitchSampleRange,
 } from './schedule.es.js';
+import { type PitchSampleRange } from './scheduleState.es.js';
 import { createPitchSettings, type PitchSettings } from './settings.es.js';
 import {
   createPitchBindGroupsCell,
@@ -29,7 +30,7 @@ export type PitchProjection = {
 };
 
 export type PitchPrepareInput = {
-  samples: Float32Array;
+  source: SpectrogramSource;
   projection: PitchProjection;
   trackProgress: number;
   truncated: boolean;
@@ -67,7 +68,7 @@ type Pending = {
 };
 
 type SampleIdentity = {
-  samples: Float32Array | undefined;
+  source: SpectrogramSource | undefined;
   length: number;
 };
 
@@ -92,7 +93,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
   const fourierCell = createFourierCell(device);
   const inverseCell = createPitchInverseCell(device);
   let pending: Pending | undefined = undefined;
-  const identity: SampleIdentity = { samples: undefined, length: 0 };
+  const identity: SampleIdentity = { source: undefined, length: 0 };
 
   return {
     get: (arg) => {
@@ -272,15 +273,16 @@ export const createSpectrogramFundamentalFrequencyCell = (
         lineBuffer: line,
         decodedBuffer: buffers.decoded,
         prepare: (input) => {
-          const { samples, projection } = input;
+          const { source, projection } = input;
           const reset =
-            identity.samples !== samples || identity.length !== samples.length;
-          identity.samples = samples;
-          identity.length = samples.length;
-          const trackFrames = frameCountOf(settings, samples.length);
+            identity.source !== source || identity.length !== source.length;
+          identity.source = source;
+          identity.length = source.length;
+          const trackFrames = frameCountOf(settings, source.songLength);
           const availableSamples = input.truncated
-            ? Math.round(input.trackProgress * samples.length)
-            : samples.length;
+            ? Math.round(input.trackProgress * source.songLength)
+            : source.songLength;
+          const reach = Math.ceil(settings.support * (source.reach - 1));
           const firstTime = projection.baseColumn * arg.columnStep;
           const lastTime =
             (projection.baseColumn + arg.windowCount - 1) * arg.columnStep;
@@ -290,13 +292,17 @@ export const createSpectrogramFundamentalFrequencyCell = (
             availableSamples,
             visibleFirst: Math.floor(firstTime / settings.hop) - 1,
             visibleLast: Math.ceil(lastTime / settings.hop) + 1,
-            invalidations: input.invalidations,
+            invalidations: input.invalidations.map((invalidation) => ({
+              frameIndex: invalidation.frameIndex - reach,
+              frameCount: invalidation.frameCount + 2 * reach,
+            })),
             reset,
+            position: source.position,
           });
           uploadSpans(device, buffers.span, {
             plan,
-            samples,
-            availableSamples,
+            source,
+            availableSamples: Math.round(source.position(availableSamples)),
           });
           uploadSlots(device, buffers.slots, plan);
           const shownFrames = input.truncated

@@ -15,6 +15,7 @@
   },
   "scripts": {
     "check:ts": "tsc --build",
+    "test": "vitest run",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
@@ -47,6 +48,7 @@
     "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
+    "vitest": "catalog:",
     "zod": "catalog:",
     "zustand": "catalog:"
   }

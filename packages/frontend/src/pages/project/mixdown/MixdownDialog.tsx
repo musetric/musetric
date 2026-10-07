@@ -49,7 +49,9 @@ export const MixdownDialog: FC = () => {
   const [formatName, setFormatName] = useState<FormatName>('m4a');
   const [bitrate, setBitrate] = useState<api.mixdown.Bitrate>(256);
   const [bitDepth, setBitDepth] = useState<api.mixdown.BitDepth>(24);
-  const mixdown = useMutation(endpoints.mixdown.create(projectId));
+  const mixdown = useMutation(
+    endpoints.mixdown.create(projectId, engine.player.exportRecording),
+  );
 
   const close = () => {
     setOpen(false);
@@ -162,7 +164,7 @@ export const MixdownDialog: FC = () => {
           onClick={() => {
             const { trackVolumes } = engine.store.get();
             mixdown.mutate(
-              { ...readFormat(), volumes: trackVolumes },
+              { format: readFormat(), volumes: trackVolumes },
               {
                 onSuccess: (created) => {
                   downloadFile(

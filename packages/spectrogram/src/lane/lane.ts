@@ -5,6 +5,7 @@ import {
   type SpectrogramColumnRange,
   type SpectrogramSampleRange,
 } from '../common/extConfig.js';
+import { type SpectrogramSource } from '../common/source.js';
 import {
   type SpectrogramSpectralBand,
   type TrackKey,
@@ -84,7 +85,7 @@ export type SpectrogramLane = {
   dispatchPitch: (pass: GPUComputePassEncoder) => void;
   pitchPending: () => boolean;
   writeSamples: (options: {
-    samples: Float32Array;
+    source: SpectrogramSource;
     baseColumn: number;
     playheadRatio: number;
     work: SpectrogramLaneWork;

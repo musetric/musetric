@@ -4,6 +4,7 @@ import {
   defaultBenchStatsConfig,
   selectBenchRunsPerSample,
 } from '@musetric/utils';
+import { toSpectrogramSource } from '../common/source.js';
 import { createGpuTimer } from '../common/timer/gpu.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 import { createSpectrogramFundamentalFrequencyCell } from '../fundamentalFrequency/index.js';
@@ -120,7 +121,7 @@ export const measureKernelRow = async (
     );
     const prepare = (shift: number): void => {
       pitch.prepare({
-        samples,
+        source: toSpectrogramSource(samples),
         projection: { baseColumn: baseColumn + shift, baseSlot: shift },
         trackProgress: 0,
         truncated: false,

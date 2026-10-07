@@ -1,61 +1,13 @@
+import { fitRunSpan } from './runSpan.es.js';
+import {
+  createScheduleState,
+  floorMod,
+  invalidate,
+  type PitchSampleRange,
+  resetState,
+  type ScheduleState,
+} from './scheduleState.es.js';
 import { type PitchSettings } from './settings.es.js';
-
-const floorMod = (value: number, modulus: number): number =>
-  ((value % modulus) + modulus) % modulus;
-
-type ScheduleState = {
-  observed: Int32Array;
-  observedFinal: Uint8Array;
-  decoded: Int32Array;
-  decodedFinal: Uint8Array;
-};
-
-const createScheduleState = (ringFrames: number): ScheduleState => ({
-  observed: new Int32Array(ringFrames).fill(-1),
-  observedFinal: new Uint8Array(ringFrames),
-  decoded: new Int32Array(ringFrames).fill(-1),
-  decodedFinal: new Uint8Array(ringFrames),
-});
-
-const resetState = (state: ScheduleState): void => {
-  state.observed.fill(-1);
-  state.observedFinal.fill(0);
-  state.decoded.fill(-1);
-  state.decodedFinal.fill(0);
-};
-
-export type PitchSampleRange = {
-  frameIndex: number;
-  frameCount: number;
-};
-
-const invalidate = (
-  state: ScheduleState,
-  settings: PitchSettings,
-  range: PitchSampleRange,
-): void => {
-  const { hop, support, ringFrames, historyFrames, lookaheadFrames } = settings;
-  const first = Math.ceil((range.frameIndex - support) / hop);
-  const last = Math.floor(
-    (range.frameIndex + range.frameCount - 1 + support) / hop,
-  );
-  for (let frame = first; frame <= last; frame += 1) {
-    const slot = floorMod(frame, ringFrames);
-    if (state.observed[slot] === frame) {
-      state.observed[slot] = -1;
-    }
-  }
-  for (
-    let frame = first - lookaheadFrames;
-    frame <= last + historyFrames;
-    frame += 1
-  ) {
-    const slot = floorMod(frame, ringFrames);
-    if (state.decoded[slot] === frame) {
-      state.decodedFinal[slot] = 0;
-    }
-  }
-};
 
 const isObserved = (state: ScheduleState, frame: number, ring: number) => {
   const slot = floorMod(frame, ring);
@@ -93,6 +45,7 @@ type RunPlanner = {
   settings: PitchSettings;
   plan: PitchPlan;
   spanEnd: number;
+  position: (songFrame: number) => number;
 };
 
 const addRun = (
@@ -101,16 +54,23 @@ const addRun = (
   count: number,
 ): PitchFrameRange | undefined => {
   const { settings, plan } = planner;
-  const { hop, support, batchSlots, maxRuns } = settings;
+  const { batchSlots, maxRuns } = settings;
   const hasPredecessor = first > 0;
   const free = batchSlots - plan.slots.length;
   if (plan.spans.length >= maxRuns || free <= (hasPredecessor ? 1 : 0)) {
     return undefined;
   }
-  const taken = Math.min(count, free - (hasPredecessor ? 1 : 0));
   const startFrame = hasPredecessor ? first - 1 : first;
-  const sampleStart = startFrame * hop - support;
-  const length = (first + taken - 1 - startFrame) * hop + 2 * support + 1;
+  const span = fitRunSpan(
+    planner,
+    startFrame,
+    first,
+    Math.min(count, free - (hasPredecessor ? 1 : 0)),
+  );
+  if (!span) {
+    return undefined;
+  }
+  const { taken, sampleStart, length } = span;
   const spanOffset = planner.spanEnd;
   plan.spans.push({ sampleStart, spanOffset, length });
   planner.spanEnd += length;
@@ -127,7 +87,7 @@ const addRun = (
     const slotIndex = plan.slots.length;
     plan.slots.push({
       frame,
-      spanOffset: spanOffset + (frame - startFrame) * hop,
+      spanOffset: spanOffset + span.offsetOf(frame),
       predecessor: index > 0 || hasPredecessor ? slotIndex - 1 : -1,
       observe: true,
     });
@@ -143,6 +103,7 @@ export type PitchScheduleInput = {
   visibleLast: number;
   invalidations: readonly PitchSampleRange[];
   reset: boolean;
+  position: (songFrame: number) => number;
 };
 
 const observationRange = (
@@ -215,7 +176,9 @@ const markObserved = (
     for (let frame = run.first; frame < run.first + run.count; frame += 1) {
       const slot = floorMod(frame, ringFrames);
       const ready =
-        !input.truncated || frame * hop + support <= input.availableSamples;
+        !input.truncated ||
+        input.position(frame * hop) + support <=
+          input.position(input.availableSamples);
       state.observed[slot] = frame;
       state.observedFinal[slot] = ready ? 1 : 0;
       final &&= ready;
@@ -234,6 +197,7 @@ const planObservations = (
     settings,
     plan,
     spanEnd: 0,
+    position: input.position,
   };
   const collected = collectRuns(
     state,

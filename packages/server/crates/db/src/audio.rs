@@ -115,6 +115,7 @@ pub struct RecordingPiece {
     pub layer: RecordingLayer,
     pub song_start_frame: i64,
     pub frame_count: i64,
+    pub tempo: f64,
 }
 
 pub(crate) fn read_master_blob(
@@ -176,7 +177,7 @@ pub(crate) fn read_recording_pieces(
     project_id: i64,
 ) -> Result<Vec<RecordingPiece>> {
     let mut statement = connection.prepare(
-        "SELECT blobId, layer, songStartFrame, frameCount FROM RecordingPiece
+        "SELECT blobId, layer, songStartFrame, frameCount, tempo FROM RecordingPiece
          WHERE projectId = ?1 ORDER BY songStartFrame, id",
     )?;
     let rows = statement.query_map([project_id], |row| {
@@ -185,17 +186,19 @@ pub(crate) fn read_recording_pieces(
             row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
+            row.get::<_, f64>(4)?,
         ))
     })?;
     let mut pieces = Vec::new();
     for row in rows {
-        let (blob_id, layer_name, song_start_frame, frame_count) = row?;
+        let (blob_id, layer_name, song_start_frame, frame_count, tempo) = row?;
         if let Some(layer) = RecordingLayer::parse(&layer_name) {
             pieces.push(RecordingPiece {
                 blob_id,
                 layer,
                 song_start_frame,
                 frame_count,
+                tempo,
             });
         }
     }

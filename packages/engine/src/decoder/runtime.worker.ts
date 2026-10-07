@@ -1,3 +1,4 @@
+import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { type Playhead } from '../player/playhead.cross.js';
@@ -14,6 +15,7 @@ import {
 import {
   createRecordingController,
   type RecordingController,
+  waitWithTimeout,
 } from './recordingController.worker.js';
 import { createRecordingHistory } from './recordingHistory.worker.js';
 import {
@@ -34,7 +36,7 @@ const handleRealtimePacket = (audioDecode: AudioDecode, data: ArrayBuffer) => {
   if (data.byteLength !== recordingPacketHeaderByteLength + byteLength) {
     throw new Error('Project realtime packet has invalid byte length');
   }
-  audioDecode.patchRecordingSamples({
+  audioDecode.patchLiveTake({
     frameIndex,
     samples: new Float32Array(
       data,
@@ -43,6 +45,13 @@ const handleRealtimePacket = (audioDecode: AudioDecode, data: ArrayBuffer) => {
     ),
   });
 };
+
+const takeFinishTimeoutMs = 10000;
+
+type TakeEvent = Extract<
+  api.project.realtime.Event,
+  { type: 'recording.started' | 'recording.finished' }
+>;
 
 export type CreateDecoderWorkerRuntimeOptions = {
   port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
@@ -64,23 +73,40 @@ export const createDecoderWorkerRuntime = (
   let recordingSessionId: string | undefined = undefined;
   let recordingReady = false;
   let backendRevision = 0;
+  let finishedTakeId: string | undefined = undefined;
 
   let recordingController: RecordingController | undefined = undefined;
 
-  const applyRecordingState = (
-    started: boolean,
-    connection: ProjectRealtime,
-  ): void => {
-    recordingReady = started;
-    if (!started) {
-      recordingStream?.notifyFinished();
+  const applyTakeEvent = (event: TakeEvent, connection: ProjectRealtime) => {
+    const own = event.sessionId === recordingSessionId;
+    if (event.type === 'recording.finished') {
+      finishedTakeId = event.sessionId;
+      audioDecode.reloadRecording(event.sessionId).catch((error: unknown) => {
+        console.error('Failed to reload the recording', error);
+      });
+      if (own) {
+        recordingReady = false;
+        recordingStream?.notifyFinished();
+      }
       return;
     }
+    if (!own) {
+      audioDecode.beginLiveTake({
+        takeId: event.sessionId,
+        tempo: event.tempo,
+        startFrame: event.startFrame,
+      });
+      return;
+    }
+    recordingReady = true;
     recordingStream?.notifyStarted();
     connection.flush();
   };
 
-  const recordingHistory = createRecordingHistory({ port, audioDecode });
+  const recordingHistory = createRecordingHistory({
+    port,
+    reload: async () => audioDecode.reloadRecording(finishedTakeId),
+  });
 
   const realtime = createProjectRealtime({
     isRecordingReady: () => recordingReady,
@@ -103,9 +129,7 @@ export const createDecoderWorkerRuntime = (
         event.type === 'recording.started' ||
         event.type === 'recording.finished'
       ) {
-        if (event.sessionId === recordingSessionId) {
-          applyRecordingState(event.type === 'recording.started', realtime);
-        }
+        applyTakeEvent(event, realtime);
         return;
       }
       if (event.type === 'player.play') {
@@ -215,22 +239,27 @@ export const createDecoderWorkerRuntime = (
     startRecordingStream: (message) => {
       realtime.open(message.projectId);
       recordingController.clearRecordingStream();
+      recordingSessionId = crypto.randomUUID();
+      audioDecode.beginLiveTake({
+        takeId: recordingSessionId,
+        tempo: message.tempo,
+      });
       recordingStream = createRecordingStream({
         port: recordingStreamChannel.outbound(message.port),
         onChunk: (chunk) => {
-          audioDecode.patchRecordingSamples(chunk);
+          audioDecode.patchLiveTake(chunk);
           realtime.sendBinary(
             createRecordingPacket(chunk.frameIndex, chunk.samples),
           );
         },
       });
-      recordingSessionId = crypto.randomUUID();
       realtime.sendJson({
         type: 'recording.start',
         sessionId: recordingSessionId,
         sampleRate: message.sampleRate,
         frameCount: message.frameCount,
         latencyFrameCount: message.latencyFrameCount,
+        tempo: message.tempo,
       });
     },
     finishRecordingStream: (message) => {
@@ -251,6 +280,18 @@ export const createDecoderWorkerRuntime = (
           port.methods.recordingStreamFinished();
         })
         .catch(recordingController.failRecordingStream);
+    },
+    exportRecording: async () => {
+      try {
+        if (recordingStream) {
+          await waitWithTimeout(recordingStream.finish, takeFinishTimeoutMs);
+        }
+        const samples = await audioDecode.exportRecording();
+        port.methods.recordingExported({ samples });
+      } catch (error) {
+        console.error('Failed to export the recording', error);
+        port.methods.recordingExportFailed();
+      }
     },
     sendRecordingUndo: () => {
       realtime.sendJson({ type: 'recording.undo' });

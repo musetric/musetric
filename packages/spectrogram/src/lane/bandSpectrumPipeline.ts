@@ -5,6 +5,7 @@ import {
   type SpectrogramColumnRange,
   type SpectrogramSampleRange,
 } from '../common/extConfig.js';
+import { type SpectrogramSource } from '../common/source.js';
 import {
   type SpectrogramSpectralBand,
   type TrackKey,
@@ -30,7 +31,7 @@ type BandDispatchRange = (
 ) => void;
 
 export type BandSampleWrite = {
-  samples: Float32Array;
+  source: SpectrogramSource;
   baseColumn: number;
   playheadRatio: number;
   forceFullUpload: boolean;
@@ -62,7 +63,11 @@ export const buildBandSpectrumPipeline = (
     windowSize: paddedWindowSize,
     windowCount: config.windowCount,
   });
-  const sliceSamples = cells.sliceSamplesCell.get({ out: signal, config });
+  const sliceSamples = cells.sliceSamplesCell.get({
+    out: signal,
+    config,
+    sourceStretch: laneConfig.sourceStretch,
+  });
   const fourier = cells.fourierCell.get({ signal, config });
   const magnitudify = cells.magnitudifyCell.get({ signal, config });
   const decibelify = cells.decibelifyCell.get({

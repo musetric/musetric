@@ -11,6 +11,10 @@ import {
   type SpectrogramSampleInvalidation,
 } from './common/sampleInvalidations.js';
 import {
+  type SpectrogramSourceInput,
+  toSpectrogramSource,
+} from './common/source.js';
+import {
   allTrackKeys,
   mapTrackKeys,
   type SpectrogramConfig,
@@ -36,6 +40,7 @@ import {
   isRenderNoop,
   type RenderResult,
   type TrackRenderPlan,
+  type TrackSources,
   writeTrackSamples,
 } from './processor/renderPlan.js';
 
@@ -85,7 +90,15 @@ const encodeRenderCommand =
 
 const noConfigInvalidations: ReadonlySet<TrackKey> = new Set();
 
-export type SpectrogramSamples = Partial<Record<TrackKey, Float32Array>>;
+export type SpectrogramSamples = Partial<
+  Record<TrackKey, SpectrogramSourceInput>
+>;
+
+const toTrackSources = (samples: SpectrogramSamples): TrackSources =>
+  mapTrackKeys((key) => {
+    const input = samples[key];
+    return input === undefined ? undefined : toSpectrogramSource(input);
+  });
 
 export type SpectrogramFundamentalLine = {
   baseColumn: number;
@@ -173,9 +186,10 @@ export const createSpectrogramProcessor = (
 
   const runRender = timer.markers.total(
     async (
-      samples: SpectrogramSamples,
+      inputs: SpectrogramSamples,
       trackProgress: number,
     ): Promise<RenderResult> => {
+      const samples = toTrackSources(inputs);
       const runtime = configurator.configure();
       if (!runtime) {
         return { ok: false };

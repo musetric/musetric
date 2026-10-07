@@ -34,6 +34,7 @@ pub(crate) struct Session {
     project_id: i64,
     song_frame_count: i64,
     sample_rate: i64,
+    tempo: f64,
     area: PathBuf,
     take: StagedBlob,
     audio: File,
@@ -68,6 +69,7 @@ impl Session {
             project_id,
             song_frame_count: recording.frame_count,
             sample_rate: recording.sample_rate,
+            tempo: format.tempo,
             area,
             take,
             audio,
@@ -78,8 +80,17 @@ impl Session {
         })
     }
 
+    pub(crate) fn anchor(&self) -> Option<i64> {
+        self.anchor
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        reason = "frame positions stay far below 2^53"
+    )]
     fn recorded_limit(&self, anchor: i64) -> i64 {
-        self.song_frame_count - anchor
+        ((self.song_frame_count - anchor) as f64 / self.tempo).ceil() as i64
     }
 
     pub(crate) async fn write_chunk(
@@ -134,7 +145,7 @@ impl Session {
         let mut touched: Option<(usize, usize)> = None;
         for (index, sample) in samples.iter().enumerate() {
             let recorded = (offset + i64::try_from(index)?) as f64;
-            let song = anchor as f64 + recorded;
+            let song = anchor as f64 + recorded * self.tempo;
             let peak = peak_index(song, step);
             if peak >= WAVE_PEAK_COUNT {
                 break;
@@ -201,6 +212,7 @@ impl Session {
                     layer: RecordingLayer::Fresh,
                     song_start_frame: anchor,
                     frame_count: self.recorded_frame_count,
+                    tempo: self.tempo,
                 };
                 let take = FinishedTake {
                     area: &self.area,

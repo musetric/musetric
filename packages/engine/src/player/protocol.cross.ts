@@ -77,18 +77,48 @@ export const playerChannel = createMessageChannel<
   },
 });
 
-export type PlayerTracks = Record<
-  StemType | 'recording',
-  Float32Array<ArrayBuffer>[]
->;
+export type PlayerRecordingPiece = {
+  songStartFrame: number;
+  tempo: number;
+  samples: Float32Array<ArrayBuffer>;
+};
 
-export type PlayerDataMethods = {
-  mount: (message: { frameCount: number; tracks: PlayerTracks }) => void;
-  unmount: () => void;
-  patchRecording: (message: {
+export const pieceBuffers = (pieces: PlayerRecordingPiece[]) =>
+  pieces.map((piece) => piece.samples.buffer);
+
+export const recordingDataKeys = [
+  'setRecordingPieces',
+  'beginLiveTake',
+  'appendLiveTake',
+] as const;
+
+export type PlayerTracks = Record<StemType, Float32Array<ArrayBuffer>[]>;
+
+export type LiveTakeStart = {
+  takeId: string;
+  tempo: number;
+  startFrame?: number;
+};
+
+export type RecordingDataMethods = {
+  setRecordingPieces: (message: {
+    pieces: PlayerRecordingPiece[];
+    finishedTakeId?: string;
+  }) => void;
+  beginLiveTake: (message: LiveTakeStart) => void;
+  appendLiveTake: (message: {
     frameIndex: number;
     samples: Float32Array<ArrayBuffer>;
   }) => void;
+};
+
+export type PlayerDataMethods = RecordingDataMethods & {
+  mount: (message: {
+    frameCount: number;
+    tracks: PlayerTracks;
+    recording: PlayerRecordingPiece[];
+  }) => void;
+  unmount: () => void;
 };
 
 export const playerDataChannel = createMessageChannel<
@@ -99,13 +129,16 @@ export const playerDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount', 'patchRecording'],
+    keys: ['mount', 'unmount', ...recordingDataKeys],
     transfers: {
-      mount: (message) =>
-        Object.values(message.tracks).flatMap((channels) =>
+      mount: (message) => [
+        ...Object.values(message.tracks).flatMap((channels) =>
           channels.map((channel) => channel.buffer),
         ),
-      patchRecording: (message) => [message.samples.buffer],
+        ...pieceBuffers(message.recording),
+      ],
+      setRecordingPieces: (message) => pieceBuffers(message.pieces),
+      appendLiveTake: (message) => [message.samples.buffer],
     },
   },
 });

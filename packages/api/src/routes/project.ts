@@ -172,7 +172,12 @@ export namespace realtime {
   export type Response = z.infer<typeof base.responseSchema>;
 
   export type Event =
-    | { type: 'recording.started'; sessionId: string }
+    | {
+        type: 'recording.started';
+        sessionId: string;
+        tempo: number;
+        startFrame?: number;
+      }
     | {
         type: 'recording.peaksChanged';
         startPeakIndex: number;
@@ -183,7 +188,6 @@ export namespace realtime {
         type: 'recording.changed';
         canUndo: boolean;
         canRedo: boolean;
-        audioChanged: boolean;
       }
     | { type: 'error'; error: string }
     | { type: 'player.play' }

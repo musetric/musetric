@@ -29,6 +29,7 @@ export type CreateRecordingRuntimeOptions = {
   getPlaying: () => boolean;
   getInputLatencyFrameCount: () => number;
   getOutputLatencyFrameCount: () => number;
+  getTempoRatio: () => number;
   applyLatencyFrameCounts: (counts: LatencyFrameCounts) => void;
 };
 
@@ -49,6 +50,7 @@ export const createRecordingRuntime = (
     getPlaying,
     getInputLatencyFrameCount,
     getOutputLatencyFrameCount,
+    getTempoRatio,
     applyLatencyFrameCounts,
   } = options;
 
@@ -59,11 +61,16 @@ export const createRecordingRuntime = (
   let recordingSequence = 0;
   let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
   let inputOffsetFrameIndex = 0;
+  let leadInFrameCount = 0;
 
   const setRecordingWriteFrameIndex = (nextFrameIndex: number) => {
-    const compensatedFrameIndex = nextFrameIndex - getOutputLatencyFrameCount();
-    recordingWriteFrameIndex = compensatedFrameIndex;
-    recordingChunkFrameIndex = compensatedFrameIndex;
+    const tempoRatio = getTempoRatio();
+    const startFrame =
+      nextFrameIndex - getOutputLatencyFrameCount() * tempoRatio;
+    leadInFrameCount = Math.max(0, Math.ceil(-startFrame / tempoRatio));
+    const firstFrame = Math.round(startFrame + leadInFrameCount * tempoRatio);
+    recordingWriteFrameIndex = firstFrame;
+    recordingChunkFrameIndex = firstFrame;
   };
 
   const flushRecordingBuffer = (): number => {
@@ -83,6 +90,10 @@ export const createRecordingRuntime = (
   };
 
   const pushRecordingSample = (sample: number): void => {
+    if (leadInFrameCount > 0) {
+      leadInFrameCount -= 1;
+      return;
+    }
     chunkSamples[recordingOffset] = Math.max(-1, Math.min(1, sample));
     recordingOffset += 1;
     recordingWriteFrameIndex += 1;

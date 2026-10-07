@@ -1,10 +1,7 @@
-use std::path::Path as FilePath;
-
 use axum::{
     Router,
-    body::{Body, to_bytes},
-    extract::{Path, State},
-    http::Request,
+    body::Body,
+    extract::{DefaultBodyLimit, Multipart, Path, State},
     response::Response,
     routing::{get, post},
 };
@@ -15,14 +12,14 @@ use musetric_media::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use tokio::fs::{remove_file, write as write_file};
 
 use crate::{
     analysis::read_gains,
     blob_response::{NamedFile, send_named},
+    blobs::upload_area,
     failure::{Failure, finish, invalid_number},
+    form::{Field, Form, UploadTarget, UploadedFile, read_form},
     mixdown::MixdownFile,
-    recording::{encode_wav, read_composite},
     routes::{
         RouteState,
         item::{json_response, missing_message},
@@ -30,7 +27,10 @@ use crate::{
     storage::read,
 };
 
-const BODY_LIMIT: usize = 4 * 1024;
+const UPLOAD_LIMIT: usize = 200 * 1024 * 1024;
+const FORMAT_FIELD: &str = "format";
+const VOLUMES_FIELD: &str = "volumes";
+const RECORDING_FIELD: &str = "recording";
 const PROJECT_ID: &str = "projectId";
 const INVALID_BODY: &str = "body Invalid mixdown request";
 const KILOBIT: u32 = 1000;
@@ -45,6 +45,7 @@ pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
         .route("/api/project/{projectId}/mixdown", post(handle_create))
         .route("/api/mixdown/{mixdownId}/content", get(handle_content))
+        .layer(DefaultBodyLimit::max(UPLOAD_LIMIT))
 }
 
 #[derive(Deserialize)]
@@ -74,11 +75,10 @@ struct Volumes {
     recording: f32,
 }
 
-#[derive(Deserialize)]
-struct MixdownBody {
-    #[serde(flatten)]
+struct MixdownRequest<'form> {
     format: FormatBody,
     volumes: Volumes,
+    recording: Option<&'form UploadedFile>,
 }
 
 struct SongAudio {
@@ -90,23 +90,46 @@ struct SongAudio {
 async fn handle_create(
     State(state): State<RouteState>,
     Path(raw_project_id): Path<String>,
-    request: Request<Body>,
+    multipart: Multipart,
 ) -> Response<Body> {
     let Ok(project_id) = raw_project_id.parse::<i64>() else {
         return finish(Err(invalid_number(PROJECT_ID)));
     };
-    let payload = match to_bytes(request.into_body(), BODY_LIMIT).await {
-        Ok(payload) => payload,
-        Err(error) => return finish(Err(Failure::failed(error))),
+    let area = upload_area(&state.storage.work_path);
+    let target = UploadTarget {
+        area: &area,
+        blobs_path: &state.storage.blobs_path,
     };
-    let Ok(body) = serde_json::from_slice::<MixdownBody>(&payload) else {
-        return finish(Err(Failure::Invalid(INVALID_BODY.to_owned())));
+    let form = match read_form(multipart, target).await {
+        Ok(form) => form,
+        Err(failure) => return finish(Err(failure)),
     };
-    finish(
-        create(&state, project_id, body)
-            .await
-            .map(|mixdown_id| json_response(&json!({ "mixdownId": mixdown_id }))),
-    )
+    let created = match read_request(&form) {
+        Ok(request) => create(&state, project_id, request).await,
+        Err(failure) => Err(failure),
+    };
+    form.discard().await;
+    finish(created.map(|mixdown_id| json_response(&json!({ "mixdownId": mixdown_id }))))
+}
+
+fn read_request(form: &Form) -> Result<MixdownRequest<'_>, Failure> {
+    let invalid = || Failure::Invalid(INVALID_BODY.to_owned());
+    let Field::Text(format) = form.field(FORMAT_FIELD) else {
+        return Err(invalid());
+    };
+    let Field::Text(volumes) = form.field(VOLUMES_FIELD) else {
+        return Err(invalid());
+    };
+    let recording = match form.field(RECORDING_FIELD) {
+        Field::Missing => None,
+        Field::File(file) => Some(file),
+        Field::Text(_) => return Err(invalid()),
+    };
+    Ok(MixdownRequest {
+        format: serde_json::from_str(format).map_err(|_| invalid())?,
+        volumes: serde_json::from_str(volumes).map_err(|_| invalid())?,
+        recording,
+    })
 }
 
 async fn handle_content(
@@ -129,30 +152,28 @@ async fn handle_content(
     )
 }
 
-async fn create(state: &RouteState, project_id: i64, body: MixdownBody) -> Result<String, Failure> {
-    let format = read_format(&body.format)?;
+async fn create(
+    state: &RouteState,
+    project_id: i64,
+    request: MixdownRequest<'_>,
+) -> Result<String, Failure> {
+    let format = read_format(&request.format)?;
     let audio = read(&state.storage, move |reader| read_audio(reader, project_id))
         .await?
         .ok_or_else(|| Failure::NotFound(missing_message(project_id)))?;
-    let mut mixdown = plan(state, &audio, &body.volumes, format)?;
-    let recording_gain = read_volume(body.volumes.recording)?;
-    let lead_in = usize::try_from(ENCODER_DELAY).map_err(Failure::failed)?;
-    let (mixdown_id, path) = state.mixdowns.reserve().await.map_err(Failure::failed)?;
-    let recording_path = path.with_extension("recording.wav");
-    let recorded = write_recording(state, project_id, &recording_path).await?;
-    if recorded {
+    let mut mixdown = plan(state, &audio, &request.volumes, format)?;
+    if let Some(recording) = request.recording {
         mixdown.tracks.push(MixdownTrack {
-            from: recording_path.clone(),
-            gain: recording_gain,
+            from: recording.staged.path().to_path_buf(),
+            gain: read_volume(request.volumes.recording)?,
             channels: MixdownChannels::Mono,
-            lead_in,
+            lead_in: usize::try_from(ENCODER_DELAY).map_err(Failure::failed)?,
         });
     }
-    let written = write_mixdown(state.storage.pcm.as_ref(), mixdown, &path).await;
-    if recorded {
-        let _ = remove_file(&recording_path).await;
-    }
-    written.map_err(Failure::failed)?;
+    let (mixdown_id, path) = state.mixdowns.reserve().await.map_err(Failure::failed)?;
+    write_mixdown(state.storage.pcm.as_ref(), mixdown, &path)
+        .await
+        .map_err(Failure::failed)?;
     let (extension, content_type) = describe(format);
     let filename = format!("{} (mix).{extension}", audio.project.name);
     state.mixdowns.register(
@@ -209,22 +230,6 @@ fn read_volume(volume: f32) -> Result<f32, Failure> {
         return Ok(volume);
     }
     Err(Failure::Invalid(INVALID_BODY.to_owned()))
-}
-
-async fn write_recording(
-    state: &RouteState,
-    project_id: i64,
-    path: &FilePath,
-) -> Result<bool, Failure> {
-    let Some(composite) = read_composite(&state.storage, project_id)
-        .await
-        .map_err(Failure::failed)?
-    else {
-        return Ok(false);
-    };
-    let bytes = encode_wav(&composite).map_err(Failure::failed)?;
-    write_file(path, bytes).await.map_err(Failure::failed)?;
-    Ok(true)
 }
 
 fn plan(

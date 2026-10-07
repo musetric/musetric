@@ -11,12 +11,14 @@ struct SliceSamplesParams {
   screenBase : u32,
   baseColumn : i32,
   baseWindowStart : i32,
+  mapped : u32,
 };
 
 @group(0) @binding(0) var<storage, read> samples : array<f32>;
 @group(0) @binding(1) var<storage, read_write> signal : array<f32>;
 @group(0) @binding(2) var<uniform> params : SliceSamplesParams;
 @group(0) @binding(3) var<storage, read> windowFunction : array<f32>;
+@group(0) @binding(4) var<storage, read> columnOffsets : array<i32>;
 
 fn roundToI32(value: f32) -> i32 {
   return i32(floor(value + 0.5));
@@ -43,10 +45,14 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let windowStart = roundToI32(
     f32(absoluteColumn) * step - f32(windowSize) * 0.5,
   );
-  let localOffset = u32(windowStart - params.baseWindowStart);
+  var signedOffset = windowStart - params.baseWindowStart;
+  if (params.mapped != 0u) {
+    signedOffset = columnOffsets[screenColumn];
+  }
+  let localOffset = u32(max(signedOffset, 0));
 
   var value = 0.0;
-  if (sampleIndex < windowSize) {
+  if (sampleIndex < windowSize && signedOffset >= 0) {
     let localIndex = localOffset + sampleIndex;
     let ringIndex = (params.ringStart + localIndex) % visibleSamples;
     value = samples[ringIndex] * windowFunction[sampleIndex];

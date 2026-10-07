@@ -171,14 +171,15 @@ impl Writer {
             for piece in pieces {
                 transaction.execute(
                     "INSERT INTO RecordingPiece
-                       (projectId, blobId, layer, songStartFrame, frameCount)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                       (projectId, blobId, layer, songStartFrame, frameCount, tempo)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                     (
                         project_id,
                         &piece.blob_id,
                         piece.layer.name(),
                         piece.song_start_frame,
                         piece.frame_count,
+                        piece.tempo,
                     ),
                 )?;
             }

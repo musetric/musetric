@@ -320,8 +320,8 @@ const BLOB_SEED: &str = "
   INSERT INTO Chords (projectId, blobId) VALUES (1, 'Chords.blobId');
   INSERT INTO Recording (projectId, waveBlobId, sampleRate, frameCount)
     VALUES (1, 'Recording.waveBlobId', 44100, 100);
-  INSERT INTO RecordingPiece (projectId, blobId, layer, songStartFrame, frameCount)
-    VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100);
+  INSERT INTO RecordingPiece (projectId, blobId, layer, songStartFrame, frameCount, tempo)
+    VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100, 1.0);
 ";
 
 fn blob_columns(path: &Path) -> Vec<String> {
