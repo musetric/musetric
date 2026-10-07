@@ -1,4 +1,3 @@
-import { parseHexColor } from '@musetric/utils';
 import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
 import {
@@ -33,7 +32,14 @@ type PixelRect = {
   bottom: number;
 };
 
-type PixelMeasure = (red: number, green: number, blue: number) => number;
+type Pixel = {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+};
+
+type PixelMeasure = (pixel: Pixel) => number;
 
 const maxInRect = (
   pixels: Uint8ClampedArray,
@@ -47,17 +53,24 @@ const maxInRect = (
       const index = (y * width + x) * 4;
       max = Math.max(
         max,
-        measure(pixels[index], pixels[index + 1], pixels[index + 2]),
+        measure({
+          red: pixels[index],
+          green: pixels[index + 1],
+          blue: pixels[index + 2],
+          alpha: pixels[index + 3],
+        }),
       );
     }
   }
   return max;
 };
 
-const redness: PixelMeasure = (red) => red;
+const redness: PixelMeasure = (pixel) => pixel.red;
 
-const greenness: PixelMeasure = (red, green, blue) =>
-  green - Math.max(red, blue);
+const opacity: PixelMeasure = (pixel) => pixel.alpha;
+
+const greenness: PixelMeasure = (pixel) =>
+  pixel.green - Math.max(pixel.red, pixel.blue);
 
 const maxRedClearOfCorners = (
   pixels: Uint8ClampedArray,
@@ -94,7 +107,7 @@ const stackedConfig = () => {
 };
 
 describe('spectrogram processor', () => {
-  it('draws the lead across the whole width above the recording', async () => {
+  it('draws the lead across the whole width above the recording, clear between', async () => {
     const config = stackedConfig();
     await withProcessor({ device, config }, async (processor) => {
       const length = config.sampleRate * 5;
@@ -136,9 +149,9 @@ describe('spectrogram processor', () => {
             top: bands.leadHeight,
             bottom: bands.recordingTop,
           },
-          redness,
+          opacity,
         ),
-      ).toBe(parseHexColor(config.colors.frame).red);
+      ).toBe(0);
     });
   });
 
