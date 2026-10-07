@@ -18,6 +18,8 @@ export class PlayerProcessor
         port,
         dataPort: playerDataChannel.inbound(message.dataPort),
         playheadPorts: message.playheadPorts,
+        sampleRate,
+        getCurrentTime: () => currentTime,
       });
       this.handleProcess = (
         inputs: Float32Array[][],

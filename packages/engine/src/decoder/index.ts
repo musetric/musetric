@@ -22,9 +22,11 @@ export type EngineDecoder = {
     sampleRate: number;
     frameCount: number;
     latencyFrameCount: number;
+    tempo: number;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;
+  exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
@@ -52,7 +54,6 @@ export type CreateEngineDecoderOptions = {
   onRecordingHistoryChanged: (message: {
     canUndo: boolean;
     canRedo: boolean;
-    audioChanged: boolean;
   }) => void;
   onRecordingStreamFailed: () => void;
   onPlayerPlayRequested: () => void;
@@ -98,6 +99,9 @@ export const createEngineDecoder = (
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let mountPromise: ControlledPromise<void> | undefined = undefined;
   let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
+  let recordingExportPromise:
+    | ControlledPromise<Float32Array<ArrayBuffer> | undefined>
+    | undefined = undefined;
   const runtimeSampleRate = options.sampleRate;
 
   port.instance.onerror = () => {
@@ -158,6 +162,14 @@ export const createEngineDecoder = (
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
     recordingHistoryChanged: onRecordingHistoryChanged,
+    recordingExported: (message) => {
+      recordingExportPromise?.resolve(message.samples);
+      recordingExportPromise = undefined;
+    },
+    recordingExportFailed: () => {
+      recordingExportPromise?.resolve(undefined);
+      recordingExportPromise = undefined;
+    },
     playerPlayRequested: onPlayerPlayRequested,
     playerRecordRequested: onPlayerRecordRequested,
     playerStopRequested: onPlayerStopRequested,
@@ -207,6 +219,18 @@ export const createEngineDecoder = (
       }
       port.methods.finishRecordingStream({ sequence });
       await recordingStreamPromise.promise;
+    },
+    exportRecording: async () => {
+      recordingExportPromise ??= createControlledPromise<
+        Float32Array<ArrayBuffer> | undefined
+      >();
+      const { promise } = recordingExportPromise;
+      port.methods.exportRecording();
+      const samples = await promise;
+      if (!samples) {
+        throw new Error('Failed to export the recording');
+      }
+      return samples;
     },
     sendRecordingUndo: () => {
       port.methods.sendRecordingUndo();

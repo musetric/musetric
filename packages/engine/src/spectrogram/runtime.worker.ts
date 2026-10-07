@@ -1,4 +1,3 @@
-import { allTrackKeys, mapTrackKeys } from '@musetric/spectrogram';
 import {
   averageMetrics,
   createSpectrogramProcessor,
@@ -11,11 +10,8 @@ import { type Playhead } from '../player/playhead.cross.js';
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
-  type SpectrogramLaneSamples,
 } from './protocol.cross.js';
-
-const emptySamples = (): SpectrogramLaneSamples =>
-  mapTrackKeys(() => undefined);
+import { createRecordingSource } from './recordingSource.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
   port: ReturnType<
@@ -59,18 +55,17 @@ export const createSpectrogramRuntime = async (
     });
 
   let processor = createProcessor();
-  let samplesByLane: SpectrogramLaneSamples = emptySamples();
+  let lead: Float32Array | undefined = undefined;
+  const recording = createRecordingSource();
   let trackProgress = 0;
   let frameCount = 0;
   let playing = false;
   let rendering = false;
 
-  const hasAnySamples = () =>
-    allTrackKeys.some((key) => samplesByLane[key] !== undefined);
-
   const render = async () => {
-    const ok = await processor.render(samplesByLane, trackProgress);
-    if (!ok || !hasAnySamples()) {
+    const samples = lead ? { lead, recording: recording.get(lead.length) } : {};
+    const ok = await processor.render(samples, trackProgress);
+    if (!ok || !lead) {
       return;
     }
     setStatus('success');
@@ -115,27 +110,35 @@ export const createSpectrogramRuntime = async (
 
   dataPort.bindHandlers({
     mount: async (message) => {
-      samplesByLane = { ...emptySamples(), ...message.samples };
+      lead = message.lead;
+      recording.clear();
+      recording.setPieces(message.recording);
       await render();
     },
     unmount: async () => {
-      samplesByLane = emptySamples();
+      lead = undefined;
+      recording.clear();
       setStatus('pending');
       await render();
     },
-    patchSamples: (message) => {
-      const samples = samplesByLane[message.trackKey];
-      if (!samples) {
+    setRecordingPieces: (message) => {
+      recording.setPieces(message.pieces, message.finishedTakeId);
+      if (!playing) {
+        renderPaused();
+      }
+    },
+    beginLiveTake: (message) => {
+      recording.beginLiveTake(message);
+    },
+    appendLiveTake: (message) => {
+      const range = recording.appendLiveTake(
+        message.frameIndex,
+        message.samples,
+      );
+      if (!range) {
         return;
       }
-      samples.set(message.samples, message.frameIndex);
-      processor.invalidateSamples([
-        {
-          trackKey: message.trackKey,
-          frameIndex: message.frameIndex,
-          frameCount: message.samples.length,
-        },
-      ]);
+      processor.invalidateSamples([{ trackKey: 'recording', ...range }]);
       if (!playing) {
         renderPaused();
       }

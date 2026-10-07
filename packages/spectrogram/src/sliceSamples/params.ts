@@ -10,6 +10,7 @@ export const slotOffsetByteOffset = 28;
 export const screenBaseByteOffset = 32;
 export const baseColumnByteOffset = 36;
 export const baseWindowStartByteOffset = 40;
+export const mappedByteOffset = 44;
 const paramsByteLength = 48;
 
 export type SliceSamplesParams = {
@@ -49,6 +50,8 @@ export type StateParams = {
     baseColumn: number;
     baseWindowStart: number;
     ringStart: number;
+    ringLength: number;
+    mapped: boolean;
   }) => void;
   writeRange: (range: SpectrogramColumnRange) => number;
 };
@@ -63,8 +66,10 @@ export const createParamsCell = (device: GPUDevice) =>
         capacity: value.windowCount,
       });
       let ringStart = 0;
+      let ringLength = value.visibleSamples;
       let baseColumn = 0;
       let baseWindowStart = 0;
+      let mapped = false;
 
       return {
         value,
@@ -74,6 +79,8 @@ export const createParamsCell = (device: GPUDevice) =>
           baseColumn = frame.baseColumn;
           baseWindowStart = frame.baseWindowStart;
           ringStart = frame.ringStart;
+          ringLength = frame.ringLength;
+          mapped = frame.mapped;
         },
         writeRange: (range) =>
           params.write((view) => {
@@ -81,14 +88,14 @@ export const createParamsCell = (device: GPUDevice) =>
             view.setUint32(4, value.paddedWindowSize, true);
             view.setUint32(8, value.signalStride, true);
             view.setUint32(12, value.windowCount, true);
-            view.setUint32(16, value.visibleSamples, true);
+            view.setUint32(16, ringLength, true);
             view.setFloat32(20, value.step, true);
             view.setUint32(ringStartByteOffset, ringStart, true);
             view.setUint32(slotOffsetByteOffset, range.slotOffset, true);
             view.setUint32(screenBaseByteOffset, range.screenBase, true);
             view.setInt32(baseColumnByteOffset, baseColumn, true);
             view.setInt32(baseWindowStartByteOffset, baseWindowStart, true);
-            view.setUint32(44, 0, true);
+            view.setUint32(mappedByteOffset, mapped ? 1 : 0, true);
           }),
       };
     },

@@ -64,13 +64,12 @@ mod tests {
     const FLAC: &str = "audio/flac";
     const FMP4: &str = "audio/mp4";
     const NO_STORE: &str = "no-store";
-    const WAV_HEADER_BYTE_LENGTH: usize = 44;
     const PEAKS_BYTE_LENGTH: usize = 3840 * 2 * 4;
     const SOURCE_URL: &str = "/api/audio/project/1/master/source/content";
     const LEAD_URL: &str = "/api/audio/project/1/master/lead/content";
     const DELIVERY_URL: &str = "/api/audio/project/1/delivery/lead/content";
     const WAVE_URL: &str = "/api/audio/project/1/delivery/lead/wave";
-    const RECORDING_URL: &str = "/api/audio/project/1/recording/content";
+    const RECORDING_PIECES_URL: &str = "/api/audio/project/1/recording/pieces";
     const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/wave";
     const CREATE_PROJECT: &str = "
       INSERT INTO Project (id, name, sampleRate, frameCount)
@@ -416,25 +415,12 @@ mod tests {
         workspace.seed(CREATE_PROJECT);
         let router = create_test_router(&workspace).await;
 
-        let content = request(router.clone(), RECORDING_URL).await;
+        let pieces = request(router.clone(), RECORDING_PIECES_URL).await;
         let wave = request(router, RECORDING_WAVE_URL).await;
 
-        assert_eq!(content.status(), StatusCode::OK);
-        assert_eq!(
-            read_header(&content, "cache-control"),
-            Some(NO_STORE.to_owned())
-        );
-        assert_eq!(
-            read_header(&content, "content-type"),
-            Some("audio/wav".to_owned())
-        );
-        assert_eq!(read_header(&content, "content-length"), None);
+        assert_eq!(pieces.status(), StatusCode::OK);
+        assert_eq!(read_body(pieces).await, "{\"pieces\":[]}");
         assert_eq!(read_header(&wave, "content-length"), None);
-        let header = to_bytes(content.into_body(), WAV_HEADER_BYTE_LENGTH)
-            .await
-            .expect("the body should be readable");
-        assert_eq!(header.len(), WAV_HEADER_BYTE_LENGTH);
-        assert_eq!(&header[..4], b"RIFF");
         assert_eq!(
             read_header(&wave, "cache-control"),
             Some(NO_STORE.to_owned())

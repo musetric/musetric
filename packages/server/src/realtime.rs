@@ -110,6 +110,7 @@ struct Connection {
 struct Take {
     session: session::Session,
     id: String,
+    anchored: bool,
 }
 
 impl Connection {
@@ -222,6 +223,7 @@ async fn start_recording(
         refuse_recording(rooms, connection, start.session_id);
         return true;
     }
+    let tempo = start.format.tempo;
     let created =
         session::Session::create(&connection.storage, connection.project_id, start.format).await;
     let session = match created {
@@ -234,14 +236,24 @@ async fn start_recording(
             return false;
         }
     };
+    rooms.begin_take(
+        connection.project_id,
+        rooms::RoomTake {
+            owner: connection.member,
+            session_id: start.session_id.clone(),
+            tempo,
+            start_frame: None,
+        },
+    );
     rooms.broadcast_event(
         connection.project_id,
-        &events::recording_started(&start.session_id),
+        &events::recording_started(&start.session_id, tempo, None),
         None,
     );
     connection.take = Some(Take {
         session,
         id: start.session_id,
+        anchored: false,
     });
     true
 }
@@ -297,7 +309,10 @@ async fn handle_packet(
     if connection.refused.is_some() {
         return true;
     }
-    let Some(Take { session, .. }) = connection.take.as_mut() else {
+    let Some(Take {
+        session, anchored, ..
+    }) = connection.take.as_mut()
+    else {
         channel
             .close(
                 CLOSE_UNSUPPORTED,
@@ -313,6 +328,10 @@ async fn handle_packet(
     let Some(written) = outcome else {
         return true;
     };
+    if !*anchored && let Some(start_frame) = session.anchor() {
+        rooms.anchor_take(connection.project_id, connection.member, start_frame);
+        *anchored = true;
+    }
     rooms.broadcast_packet(connection.project_id, written.chunk, connection.member);
     if let Some(patch) = written.patch {
         rooms.broadcast_event(
@@ -348,9 +367,10 @@ async fn write_packet(
 }
 
 async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<(), BoxedError> {
-    let Some(Take { session, id }) = connection.take.take() else {
+    let Some(Take { session, id, .. }) = connection.take.take() else {
         return Ok(());
     };
+    rooms.end_take(connection.project_id, connection.member);
     rooms.save_session(connection.project_id, connection.member);
     let finished = session.finish(&connection.storage).await;
     if let Ok(committed) = finished {
@@ -362,7 +382,7 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
         if let Some(history) = committed {
             rooms.broadcast_event(
                 connection.project_id,
-                &events::recording_changed(history, false),
+                &events::recording_changed(history),
                 None,
             );
         }
@@ -384,7 +404,7 @@ async fn change_history(rooms: &Rooms, connection: &Connection, applied: bool) {
     if let Ok(Some(history)) = changed {
         rooms.broadcast_event(
             connection.project_id,
-            &events::recording_changed(history, true),
+            &events::recording_changed(history),
             None,
         );
     }
@@ -400,13 +420,20 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
     let frame_count = read_integer(event.get("frameCount")?)?;
     let latency_frame_count = read_integer(event.get("latencyFrameCount")?)?;
     let session_id = event.get("sessionId")?.as_str()?.to_owned();
-    if sample_rate == 0 || frame_count < 0 || latency_frame_count < 0 {
+    let tempo = event.get("tempo").map_or(Some(1.0), Value::as_f64)?;
+    if sample_rate == 0
+        || frame_count < 0
+        || latency_frame_count < 0
+        || !tempo.is_finite()
+        || tempo <= 0.0
+    {
         return None;
     }
     Some(RecordingStart {
         format: TakeFormat {
             sample_rate,
             frame_count,
+            tempo,
         },
         session_id,
     })
@@ -461,7 +488,7 @@ mod tests {
 
     use super::packet;
     use crate::{
-        recording::read_composite,
+        recording::read_sounding,
         routes,
         storage::Storage,
         test_workspace::{Workspace, create_route_state},
@@ -608,12 +635,11 @@ mod tests {
         );
     }
 
-    fn changed_message(can_undo: bool, can_redo: bool, audio_changed: bool) -> Value {
+    fn changed_message(can_undo: bool, can_redo: bool) -> Value {
         json!({
             "type": "recording.changed",
             "canUndo": can_undo,
             "canRedo": can_redo,
-            "audioChanged": audio_changed,
         })
     }
 
@@ -625,7 +651,7 @@ mod tests {
 
     async fn restart_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         send_json(owner, start_message(session_id, SONG_FRAME_COUNT)).await;
-        let started = json!({ "type": "recording.started", "sessionId": session_id });
+        let started = json!({ "type": "recording.started", "sessionId": session_id, "tempo": 1.0 });
         assert_eq!(receive_json(owner).await, started);
         assert_eq!(receive_json(listener).await, started);
     }
@@ -645,7 +671,7 @@ mod tests {
 
     async fn commit_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         finish_take(owner, listener, session_id).await;
-        expect_changed([owner, listener], &changed_message(true, false, false)).await;
+        expect_changed([owner, listener], &changed_message(true, false)).await;
     }
 
     fn stored_recording(storage: &Storage) -> musetric_db::Recording {
@@ -687,11 +713,19 @@ mod tests {
     }
 
     async fn composite(storage: &Arc<Storage>) -> Vec<i16> {
-        read_composite(storage, 1)
+        let sounding = read_sounding(storage, 1)
             .await
-            .expect("the composite should render")
-            .expect("the recording should exist")
-            .samples
+            .expect("the sounding pieces should be readable")
+            .expect("the recording should exist");
+        let mut samples = vec![0_i16; SONG_FRAME_COUNT];
+        for piece in &sounding.pieces {
+            let start = usize::try_from(piece.song_start_frame)
+                .expect("the piece should start inside the song");
+            let source = read_samples(storage, &piece.blob_id);
+            let end = (start + source.len()).min(SONG_FRAME_COUNT);
+            samples[start..end].copy_from_slice(&source[..end - start]);
+        }
+        samples
     }
 
     async fn start_recording_room(base: &str) -> (ClientSocket, ClientSocket) {
@@ -707,7 +741,7 @@ mod tests {
         send_json(&mut owner, start_message(OWNER_TAKE, frame_count)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 1.0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
@@ -715,7 +749,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 1.0 })
         );
         (owner, listener)
     }
@@ -927,7 +961,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE })
+            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "tempo": 1.0 })
         );
     }
 
@@ -1012,11 +1046,11 @@ mod tests {
         send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT * 2)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "tempo": 1.0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "tempo": 1.0 })
         );
 
         let samples = [0.25_f32; FRAME_COUNT * 2];
@@ -1046,20 +1080,12 @@ mod tests {
         let recorded = stored_pieces(&storage);
 
         send_json(&mut owner, json!({ "type": "recording.undo" })).await;
-        expect_changed(
-            [&mut owner, &mut listener],
-            &changed_message(false, true, true),
-        )
-        .await;
+        expect_changed([&mut owner, &mut listener], &changed_message(false, true)).await;
         assert_eq!(composite(&storage).await, [0; SONG_FRAME_COUNT]);
         assert_eq!(stored_pieces(&storage), recorded);
 
         send_json(&mut listener, json!({ "type": "recording.redo" })).await;
-        expect_changed(
-            [&mut owner, &mut listener],
-            &changed_message(true, false, true),
-        )
-        .await;
+        expect_changed([&mut owner, &mut listener], &changed_message(true, false)).await;
         assert_eq!(
             composite(&storage).await,
             [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
@@ -1068,7 +1094,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn glues_touching_takes_into_one_base_file() {
+    async fn glues_takes_of_one_tempo_into_one_base_file() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
         let storage = workspace.create_storage();
@@ -1146,6 +1172,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stores_a_slow_take_raw_with_its_tempo() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let mut owner = connect(&base).await;
+        let mut listener = connect(&base).await;
+        let mut start = start_message(OWNER_TAKE, SONG_FRAME_COUNT);
+        start["tempo"] = json!(0.5);
+        send_json(&mut owner, start).await;
+        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 0.5 });
+        assert_eq!(receive_json(&mut owner).await, started);
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "player.record" })
+        );
+        assert_eq!(receive_json(&mut listener).await, started);
+
+        let samples = [0.5_f32; SONG_FRAME_COUNT * 2 + 2];
+        send_packet(&mut owner, chunk(0, &samples)).await;
+        assert_eq!(
+            receive_binary(&mut listener).await,
+            chunk(0, &samples[..SONG_FRAME_COUNT * 2])
+        );
+        let patch = receive_json(&mut owner).await;
+        assert_eq!(patch["type"], "recording.peaksChanged");
+        assert_eq!(receive_json(&mut listener).await, patch);
+        finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        expect_changed([&mut owner, &mut listener], &changed_message(true, false)).await;
+
+        let pieces = stored_pieces(&storage);
+        assert_eq!(layout(&pieces), [piece(RecordingLayer::Fresh, 0, 16)]);
+        assert!((pieces[0].tempo - 0.5).abs() < f64::EPSILON);
+        assert_eq!(read_samples(&storage, &pieces[0].blob_id), [HALF; 16]);
+    }
+
+    #[tokio::test]
+    async fn replays_a_running_take_to_a_member_that_joins_late() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 3, &[0.5; 2]).await;
+
+        let mut late = connect(&base).await;
+        send_json(&mut late, json!({ "type": "player.sync.request" })).await;
+
+        assert_eq!(receive_json(&mut late).await["type"], "player.sync.state");
+        assert_eq!(
+            receive_json(&mut late).await,
+            json!({
+                "type": "recording.started",
+                "sessionId": OWNER_TAKE,
+                "tempo": 1.0,
+                "startFrame": 3,
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn forgets_an_undone_take_once_the_next_one_finishes() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
@@ -1155,11 +1241,7 @@ mod tests {
         sing(&mut owner, &mut listener, 0, &[0.25; 4]).await;
         commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
         send_json(&mut owner, json!({ "type": "recording.undo" })).await;
-        expect_changed(
-            [&mut owner, &mut listener],
-            &changed_message(false, true, true),
-        )
-        .await;
+        expect_changed([&mut owner, &mut listener], &changed_message(false, true)).await;
 
         restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
         sing(&mut owner, &mut listener, 4, &[0.5; 2]).await;

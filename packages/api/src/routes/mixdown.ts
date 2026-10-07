@@ -33,11 +33,13 @@ export namespace create {
     method: 'post',
     path: '/api/project/:projectId/mixdown',
     paramsSchema: z.object({ projectId: z.number() }),
-    requestSchema: z.intersection(
-      formatSchema,
-      z.object({ volumes: volumesSchema }),
-    ),
+    requestSchema: z.object({
+      format: formatSchema,
+      volumes: volumesSchema,
+      recording: z.file().optional(),
+    }),
     responseSchema: z.object({ mixdownId: z.string() }),
+    isMultipart: true,
   });
   export type Params = z.infer<typeof base.paramsSchema>;
   export type Request = z.infer<typeof base.requestSchema>;

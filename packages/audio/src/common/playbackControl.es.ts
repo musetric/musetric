@@ -1,5 +1,5 @@
 export const getMinTempoBpm = (sourceTempoBpm: number) =>
-  Math.floor(sourceTempoBpm * 0.25);
+  Math.ceil(sourceTempoBpm * 0.25);
 export const getMaxTempoBpm = (sourceTempoBpm: number) =>
   Math.ceil(sourceTempoBpm * 2);
 

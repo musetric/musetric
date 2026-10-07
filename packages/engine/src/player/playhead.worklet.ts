@@ -9,6 +9,7 @@ export type PlayheadPublisher = {
 
 export const createPlayheadPublisher = (
   ports: MessagePort[],
+  getCurrentTime: () => number,
 ): PlayheadPublisher => {
   const subscribers = ports.map(playheadChannel.outbound);
   let publishedFrameIndex = -1;
@@ -18,7 +19,7 @@ export const createPlayheadPublisher = (
   const publishNow = (value: PlayheadValue) => {
     publishedFrameIndex = value.frameIndex;
     publishedRevision = value.revision;
-    publishedTime = currentTime;
+    publishedTime = getCurrentTime();
     for (const subscriber of subscribers) {
       subscriber.methods.publish(value);
     }
@@ -32,7 +33,7 @@ export const createPlayheadPublisher = (
       if (unchanged) {
         return;
       }
-      if (currentTime - publishedTime < publishIntervalSeconds) {
+      if (getCurrentTime() - publishedTime < publishIntervalSeconds) {
         return;
       }
       publishNow(value);

@@ -17,7 +17,7 @@ const sanitizeLogMessage = (message: string) =>
 const getErrorMessage = (error: unknown): string =>
   sanitizeLogMessage(error instanceof Error ? error.message : String(error));
 
-const waitWithTimeout = async (
+export const waitWithTimeout = async (
   promise: Promise<void>,
   timeoutMs: number,
 ): Promise<boolean> =>

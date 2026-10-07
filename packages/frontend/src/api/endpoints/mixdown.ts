@@ -3,12 +3,15 @@ import { requestWithAxios } from '@musetric/api/dom';
 import axios from 'axios';
 import { mutationOptions } from '../queryClient.js';
 
-export const create = (projectId: number) =>
+export const create = (
+  projectId: number,
+  renderRecording: () => Promise<File | undefined>,
+) =>
   mutationOptions({
     mutationKey: ['mixdown', 'create', projectId],
-    mutationFn: async (data: api.mixdown.create.Request) =>
+    mutationFn: async (data: Omit<api.mixdown.create.Request, 'recording'>) =>
       requestWithAxios(axios, api.mixdown.create.base, {
         params: { projectId },
-        data,
+        data: { ...data, recording: await renderRecording() },
       }),
   });

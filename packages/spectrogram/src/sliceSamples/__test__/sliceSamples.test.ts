@@ -20,6 +20,7 @@ import {
   type SpectrogramColumnRange,
   windowStartForColumn,
 } from '../../common/extConfig.js';
+import { toSpectrogramSource } from '../../common/source.js';
 import { createSignalBufferCell } from '../../state/signal.js';
 import { createSpectrogramSliceSamplesCell } from '../index.js';
 
@@ -59,7 +60,11 @@ const withSlice = async <T>(
   const sliceCell = createSpectrogramSliceSamplesCell(device);
   try {
     const signal = signalCell.get({ windowSize: bandWindowSize, windowCount });
-    const slice = sliceCell.get({ out: signal, config: sliceConfig });
+    const slice = sliceCell.get({
+      out: signal,
+      config: sliceConfig,
+      sourceStretch: 1,
+    });
     return await fn(slice, signal);
   } finally {
     sliceCell.dispose();
@@ -130,7 +135,7 @@ const runSlice = async (
   range: SpectrogramColumnRange,
 ): Promise<Float32Array> => {
   slice.write({
-    samples,
+    source: toSpectrogramSource(samples),
     baseColumn,
     playheadRatio: 0,
     truncateAfterPlayhead: false,
@@ -266,7 +271,7 @@ describe('sliceSamples', () => {
       fractionalWidth,
       async (incremental, incrementalSignal, full, fullSignal) => {
         incremental.write({
-          samples: incrementalSamples,
+          source: toSpectrogramSource(incrementalSamples),
           baseColumn: firstBase,
           playheadRatio: 0,
           truncateAfterPlayhead: false,
@@ -284,7 +289,7 @@ describe('sliceSamples', () => {
         }
 
         incremental.write({
-          samples: incrementalSamples,
+          source: toSpectrogramSource(incrementalSamples),
           baseColumn: secondBase,
           playheadRatio: 0,
           truncateAfterPlayhead: false,
@@ -294,7 +299,7 @@ describe('sliceSamples', () => {
         await dispatchRanges(incremental, ranges);
 
         full.write({
-          samples: Float32Array.from(incrementalSamples),
+          source: toSpectrogramSource(Float32Array.from(incrementalSamples)),
           baseColumn: secondBase,
           playheadRatio: 0,
           truncateAfterPlayhead: false,
@@ -334,7 +339,7 @@ describe('sliceSamples', () => {
     await withSlice(fractionalVisibleConfig, 16, 7, async (slice) => {
       device.pushErrorScope('validation');
       slice.write({
-        samples: sampleData,
+        source: toSpectrogramSource(sampleData),
         baseColumn: firstBase,
         playheadRatio: 0,
         truncateAfterPlayhead: false,
@@ -342,7 +347,7 @@ describe('sliceSamples', () => {
         invalidations: [],
       });
       slice.write({
-        samples: sampleData,
+        source: toSpectrogramSource(sampleData),
         baseColumn: secondBase,
         playheadRatio: 0,
         truncateAfterPlayhead: false,

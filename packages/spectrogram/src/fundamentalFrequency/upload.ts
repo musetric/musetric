@@ -1,9 +1,10 @@
+import { type SpectrogramSource } from '../common/source.js';
 import { type PitchPlan } from './schedule.es.js';
 import { pitchSlotBytes } from './state.js';
 
 type SpanUpload = {
   plan: PitchPlan;
-  samples: Float32Array;
+  source: SpectrogramSource;
   availableSamples: number;
 };
 
@@ -12,21 +13,17 @@ export const uploadSpans = (
   target: GPUBuffer,
   upload: SpanUpload,
 ): void => {
-  const { plan, samples, availableSamples } = upload;
+  const { plan, source, availableSamples } = upload;
   const last = plan.spans.at(-1);
   if (!last) {
     return;
   }
   const staging = new Float32Array(last.spanOffset + last.length);
-  const end = Math.min(samples.length, availableSamples);
+  const end = Math.min(source.length, availableSamples);
   for (const span of plan.spans) {
-    const from = Math.max(0, span.sampleStart);
-    const to = Math.min(end, span.sampleStart + span.length);
-    if (to > from) {
-      staging.set(
-        samples.subarray(from, to),
-        span.spanOffset + from - span.sampleStart,
-      );
+    const count = Math.min(span.length, end - span.sampleStart);
+    if (count > 0) {
+      source.read(staging, span.spanOffset, span.sampleStart, count);
     }
   }
   device.queue.writeBuffer(target, 0, staging);

@@ -26,6 +26,7 @@ export type SpectrogramLaneConfig = {
   lineWidthCents: number;
   truncateAfterPlayhead: boolean;
   gainDb: number;
+  sourceStretch: number;
 };
 
 export type SpectrogramSpectralBand = {

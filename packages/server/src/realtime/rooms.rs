@@ -62,11 +62,19 @@ impl Player {
     }
 }
 
+pub(crate) struct RoomTake {
+    pub(crate) owner: MemberId,
+    pub(crate) session_id: String,
+    pub(crate) tempo: f64,
+    pub(crate) start_frame: Option<i64>,
+}
+
 struct Room {
     members: HashMap<MemberId, UnboundedSender<Message>>,
     player: Option<Player>,
     session_owner: Option<MemberId>,
     saving: bool,
+    take: Option<RoomTake>,
 }
 
 impl Room {
@@ -76,6 +84,7 @@ impl Room {
             player: None,
             session_owner: None,
             saving: false,
+            take: None,
         }
     }
 
@@ -185,11 +194,34 @@ impl Rooms {
 
     pub(crate) fn request_sync(&self, project_id: i64, member: MemberId) {
         self.in_room(project_id, |room| {
-            let Some(player) = room.player.as_ref() else {
-                return;
-            };
-            let state = player.sync_state();
-            room.send_to(member, &state);
+            if let Some(player) = room.player.as_ref() {
+                room.send_to(member, &player.sync_state());
+            }
+            if let Some(take) = room.take.as_ref().filter(|take| take.owner != member) {
+                let started =
+                    events::recording_started(&take.session_id, take.tempo, take.start_frame);
+                room.send_to(member, &started);
+            }
+        });
+    }
+
+    pub(crate) fn begin_take(&self, project_id: i64, take: RoomTake) {
+        self.in_room(project_id, |room| room.take = Some(take));
+    }
+
+    pub(crate) fn anchor_take(&self, project_id: i64, member: MemberId, start_frame: i64) {
+        self.in_room(project_id, |room| {
+            if let Some(take) = room.take.as_mut().filter(|take| take.owner == member) {
+                take.start_frame = Some(start_frame);
+            }
+        });
+    }
+
+    pub(crate) fn end_take(&self, project_id: i64, member: MemberId) {
+        self.in_room(project_id, |room| {
+            if room.take.as_ref().is_some_and(|take| take.owner == member) {
+                room.take = None;
+            }
         });
     }
 

@@ -9,6 +9,7 @@ export const createPipeline = (device: GPUDevice) => {
       'storage',
       'dynamic-uniform',
       'read-only-storage',
+      'read-only-storage',
     ]),
   });
   const pipelineLayout = device.createPipelineLayout({

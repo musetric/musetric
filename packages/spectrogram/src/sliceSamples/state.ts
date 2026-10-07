@@ -10,6 +10,7 @@ import {
 export type StateArg = {
   out: GPUBuffer;
   config: ExtSpectrogramConfig;
+  sourceStretch: number;
 };
 
 export type State = {
@@ -33,6 +34,7 @@ export const createStateCell = (
     out: GPUBuffer;
     params: StateParams;
     samples: GPUBuffer;
+    columnOffsets: GPUBuffer;
     windowFunction: GPUBuffer;
   };
   const bindGroupCell = createResourceCell({
@@ -51,6 +53,7 @@ export const createStateCell = (
             },
           },
           { binding: 3, resource: { buffer: arg.windowFunction } },
+          { binding: 4, resource: { buffer: arg.columnOffsets } },
         ],
       }),
     dispose: () => undefined,
@@ -58,19 +61,24 @@ export const createStateCell = (
       current.out === next.out &&
       current.params === next.params &&
       current.samples === next.samples &&
+      current.columnOffsets === next.columnOffsets &&
       current.windowFunction === next.windowFunction,
   });
 
   return {
     get: (arg) => {
-      const { out, config } = arg;
+      const { out, config, sourceStretch } = arg;
       const params = paramsCell.get(config);
-      const samples = samplesCell.get(params.value.visibleSamples);
+      const samples = samplesCell.get({
+        ringLength: params.value.visibleSamples * Math.ceil(sourceStretch),
+        windowCount: params.value.windowCount,
+      });
       const windowFunction = windowFunctionCell.get(config);
       const bindGroup = bindGroupCell.get({
         out,
         params,
         samples: samples.buffer,
+        columnOffsets: samples.columnOffsets,
         windowFunction: windowFunction.buffer,
       });
 

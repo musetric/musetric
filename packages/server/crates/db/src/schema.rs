@@ -152,6 +152,7 @@ const CREATE_RECORDING_PIECE: &str = "
     layer TEXT NOT NULL CHECK (layer IN ('base', 'fresh')),
     songStartFrame INTEGER NOT NULL,
     frameCount INTEGER NOT NULL,
+    tempo REAL NOT NULL,
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 ";

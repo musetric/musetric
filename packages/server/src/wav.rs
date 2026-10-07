@@ -5,13 +5,8 @@ const PCM_FORMAT: u16 = 1;
 const CHANNEL_COUNT: u16 = 1;
 const FORMAT_CHUNK_BYTE_LENGTH: u32 = 16;
 const RIFF_HEADER_BYTE_LENGTH: u32 = 36;
-const DEFAULT_SAMPLE_RATE: u32 = 48000;
 
 pub(crate) const CONTENT_TYPE: &str = "audio/wav";
-
-pub(crate) fn create_empty() -> Vec<u8> {
-    create_header(0, DEFAULT_SAMPLE_RATE)
-}
 
 pub(crate) fn create_header(frame_count: u32, sample_rate: u32) -> Vec<u8> {
     let bytes_per_sample = u32::from(BYTES_PER_SAMPLE);

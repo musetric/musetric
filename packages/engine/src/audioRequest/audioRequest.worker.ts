@@ -14,10 +14,18 @@ export const getDeliveryAudioContent = async (
     },
   });
 
-export const getRecordingAudioContent = async (projectId: number) =>
-  await requestWithAxios(axios, api.audio.recordingContent.base, {
+export const getRecordingPieces = async (projectId: number) =>
+  await requestWithAxios(axios, api.audio.recordingPieces.base, {
     params: {
       projectId,
+    },
+  });
+
+export const getRecordingPiece = async (projectId: number, blobId: string) =>
+  await requestWithAxios(axios, api.audio.recordingPiece.base, {
+    params: {
+      projectId,
+      blobId,
     },
   });
 

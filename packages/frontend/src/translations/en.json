@@ -68,7 +68,7 @@
   "pages.project.player.controls.original": "original",
   "pages.project.player.controls.play": "Play",
   "pages.project.player.controls.record": "Record vocal",
-  "pages.project.player.controls.recordAltered": "Recording works at the original key and tempo",
+  "pages.project.player.controls.recordTransposed": "Recording works at the original key",
   "pages.project.player.controls.redoTake": "Redo the last take",
   "pages.project.player.controls.stop": "Stop",
   "pages.project.player.controls.tempo": "Song tempo",

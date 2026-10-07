@@ -97,7 +97,12 @@ fn spectrum(
   }
 
   let frequencyBase = slotIndex * params.phaseBins;
-  let hop = f32(params.hop);
+  var distance = f32(params.hop);
+  if (predecessor >= 0) {
+    distance = f32(
+      slots[slotIndex].spanOffset - slots[u32(predecessor)].spanOffset,
+    );
+  }
   let fftSize = f32(params.fftSize);
   let level = powerTotals[0];
   let minimumPower = exp2(
@@ -112,8 +117,9 @@ fn spectrum(
       let b = vec2<f32>(signal[previous], signal[previous + 1u]);
       let product = vec2<f32>(a.x * b.x + a.y * b.y, a.y * b.x - a.x * b.y);
       let binOmega = tau * f32(bin) / fftSize;
-      let deviation = wrapPhase(atan2(product.y, product.x) - binOmega * hop);
-      frequency = (binOmega + deviation / hop) * params.sampleRate / tau;
+      let deviation =
+        wrapPhase(atan2(product.y, product.x) - binOmega * distance);
+      frequency = (binOmega + deviation / distance) * params.sampleRate / tau;
     }
     frequencies[frequencyBase + bin] = frequency;
   }

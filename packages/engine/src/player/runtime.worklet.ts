@@ -15,6 +15,7 @@ import {
   type LatencyFrameCounts,
   type RecordingRuntime,
 } from './recording.worklet.js';
+import { createRecordingTrack } from './recordingTrack.worklet.js';
 
 type MixTrackIntoBuffersOptions = {
   inputBuffers: Float32Array[];
@@ -61,6 +62,8 @@ export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
   playheadPorts: MessagePort[];
+  sampleRate: number;
+  getCurrentTime: () => number;
 };
 
 export type PlayerRuntime = {
@@ -71,9 +74,10 @@ export type PlayerRuntime = {
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
 ): Promise<PlayerRuntime> => {
-  const { port, dataPort } = options;
+  const { port, dataPort, sampleRate } = options;
   const playhead: PlayheadPublisher = createPlayheadPublisher(
     options.playheadPorts,
+    options.getCurrentTime,
   );
 
   let frameCount = 0;
@@ -86,10 +90,13 @@ export const createPlayerRuntime = async (
   let inputLatencyFrameCount = 0;
   let outputLatencyFrameCount = 0;
   let outputOffsetFrameIndex = 0;
+  let tempoRatio = 1;
+  let transposeSemitones = 0;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
+  const recordingTrack = await createRecordingTrack(sampleRate);
 
   const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
     latencyFrameCount = Math.max(0, counts.latencyFrameCount);
@@ -105,6 +112,7 @@ export const createPlayerRuntime = async (
     getPlaying: () => playing,
     getInputLatencyFrameCount: () => inputLatencyFrameCount,
     getOutputLatencyFrameCount: () => outputLatencyFrameCount,
+    getTempoRatio: () => tempoRatio,
     applyLatencyFrameCounts,
   });
 
@@ -150,12 +158,15 @@ export const createPlayerRuntime = async (
     );
   };
 
-  const getCurrentOutputFrameIndex = () => frameIndex + outputOffsetFrameIndex;
+  const getCurrentOutputFrameIndex = () =>
+    frameIndex + Math.round(outputOffsetFrameIndex * tempoRatio);
 
   dataPort.bindHandlers({
     mount: (message) => {
       frameCount = message.frameCount;
       tracks = message.tracks;
+      recordingTrack.clear();
+      recordingTrack.setPieces(message.recording);
       frameIndex = 0;
       outputOffsetFrameIndex = 0;
       playing = false;
@@ -163,18 +174,19 @@ export const createPlayerRuntime = async (
       playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
-    patchRecording: (message) => {
-      const channels = tracks?.recording;
-      if (!channels) {
-        return;
-      }
-      for (const channel of channels) {
-        channel.set(message.samples, message.frameIndex);
-      }
+    setRecordingPieces: (message) => {
+      recordingTrack.setPieces(message.pieces, message.finishedTakeId);
+    },
+    beginLiveTake: (message) => {
+      recordingTrack.beginLiveTake(message);
+    },
+    appendLiveTake: (message) => {
+      recordingTrack.appendLiveTake(message.frameIndex, message.samples);
     },
     unmount: () => {
       frameCount = 0;
       tracks = undefined;
+      recordingTrack.clear();
       frameIndex = 0;
       outputOffsetFrameIndex = 0;
       playing = false;
@@ -223,9 +235,11 @@ export const createPlayerRuntime = async (
       playhead.publishNow({ frameIndex, revision });
     },
     setTransposeSemitones: (message) => {
+      transposeSemitones = message.transposeSemitones;
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
     },
     setTempoRatio: (message) => {
+      tempoRatio = message.tempoRatio;
       timePitchProcessor.setTempoRatio(message.tempoRatio);
     },
     setTrackVolume: (message) => {
@@ -282,16 +296,17 @@ export const createPlayerRuntime = async (
               volume: trackVolumes[stemType] ?? 1,
             });
           }
-
-          if (!recordingRuntime.isActive()) {
-            mixTrackIntoBuffers({
-              ...baseOptions,
-              track: tracks?.recording,
-              volume: recordingVolume,
-            });
-          }
         },
       );
+      if (!recordingRuntime.isActive()) {
+        recordingTrack.mixInto({
+          outputs,
+          songFrame: currentOutputFrameIndex,
+          tempoRatio,
+          transposeSemitones,
+          volume: recordingVolume,
+        });
+      }
 
       const outputAdvance = advanceOffsetFrameIndex(
         outputOffsetFrameIndex,

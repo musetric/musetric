@@ -68,7 +68,21 @@ pub(crate) async fn read_form(
     mut multipart: Multipart,
     target: UploadTarget<'_>,
 ) -> Result<Form, Failure> {
-    let mut values = HashMap::new();
+    let mut form = Form {
+        values: HashMap::new(),
+    };
+    if let Err(failure) = read_fields(&mut multipart, &target, &mut form).await {
+        form.discard().await;
+        return Err(failure);
+    }
+    Ok(form)
+}
+
+async fn read_fields(
+    multipart: &mut Multipart,
+    target: &UploadTarget<'_>,
+    form: &mut Form,
+) -> Result<(), Failure> {
     while let Some(mut field) = multipart.next_field().await.map_err(Failure::failed)? {
         let name = field.name().unwrap_or_default().to_owned();
         let uploaded_name = field.file_name().map(ToOwned::to_owned);
@@ -78,7 +92,7 @@ pub(crate) async fn read_form(
             .to_owned();
         let value = match uploaded_name {
             Some(filename) => {
-                let staged = store_field(&mut field, &target).await?;
+                let staged = store_field(&mut field, target).await?;
                 FormValue::File(UploadedFile {
                     staged,
                     filename,
@@ -87,9 +101,11 @@ pub(crate) async fn read_form(
             }
             None => FormValue::Text(field.text().await.map_err(Failure::failed)?),
         };
-        values.insert(name, value);
+        if let Some(FormValue::File(replaced)) = form.values.insert(name, value) {
+            replaced.staged.discard().await;
+        }
     }
-    Ok(Form { values })
+    Ok(())
 }
 
 async fn store_field(
@@ -97,10 +113,21 @@ async fn store_field(
     target: &UploadTarget<'_>,
 ) -> Result<StagedBlob, Failure> {
     let staged = stage_blob(target.area, target.blobs_path);
+    if let Err(failure) = write_field(field, &staged).await {
+        staged.discard().await;
+        return Err(failure);
+    }
+    Ok(staged)
+}
+
+async fn write_field(
+    field: &mut axum::extract::multipart::Field<'_>,
+    staged: &StagedBlob,
+) -> Result<(), Failure> {
     let mut file = staged.create().await.map_err(Failure::failed)?;
     while let Some(chunk) = field.chunk().await.map_err(Failure::failed)? {
         file.write_all(&chunk).await.map_err(Failure::failed)?;
     }
     file.flush().await.map_err(Failure::failed)?;
-    Ok(staged)
+    Ok(())
 }

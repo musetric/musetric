@@ -13,9 +13,11 @@ export type EngineDecoderOutboundMethods = {
     sampleRate: number;
     frameCount: number;
     latencyFrameCount: number;
+    tempo: number;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;
+  exportRecording: () => void;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
@@ -45,8 +47,9 @@ export type EngineDecoderInboundMethods = {
   recordingHistoryChanged: (message: {
     canUndo: boolean;
     canRedo: boolean;
-    audioChanged: boolean;
   }) => void;
+  recordingExported: (message: { samples: Float32Array<ArrayBuffer> }) => void;
+  recordingExportFailed: () => void;
   playerPlayRequested: () => void;
   playerRecordRequested: () => void;
   playerStopRequested: () => void;
@@ -72,6 +75,9 @@ export const engineDecoderChannel = createMessageChannel<
   EngineDecoderOutboundMethods
 >({
   inbound: {
+    transfers: {
+      recordingExported: (message) => [message.samples.buffer],
+    },
     keys: [
       'booted',
       'setState',
@@ -82,6 +88,8 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingStreamFailed',
       'recordingPeaksChanged',
       'recordingHistoryChanged',
+      'recordingExported',
+      'recordingExportFailed',
       'playerPlayRequested',
       'playerRecordRequested',
       'playerStopRequested',
@@ -97,6 +105,7 @@ export const engineDecoderChannel = createMessageChannel<
       'unmount',
       'startRecordingStream',
       'finishRecordingStream',
+      'exportRecording',
       'sendRecordingUndo',
       'sendRecordingRedo',
       'sendPlayerPlay',

@@ -1,6 +1,12 @@
-import { type SpectrogramConfig, type TrackKey } from '@musetric/spectrogram';
+import { type SpectrogramConfig } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
+import {
+  pieceBuffers,
+  type PlayerRecordingPiece,
+  recordingDataKeys,
+  type RecordingDataMethods,
+} from '../player/protocol.cross.js';
 
 export type SpectrogramOutboundMethods = {
   boot: (message: { dataPort: MessagePort; playheadPort: MessagePort }) => void;
@@ -45,18 +51,12 @@ export const spectrogramChannel = createMessageChannel<
   },
 });
 
-export type SpectrogramLaneSamples = Partial<
-  Record<TrackKey, Float32Array<ArrayBuffer>>
->;
-
-export type SpectrogramDataMethods = {
-  mount: (message: { samples: SpectrogramLaneSamples }) => void;
-  unmount: () => void;
-  patchSamples: (message: {
-    trackKey: TrackKey;
-    frameIndex: number;
-    samples: Float32Array<ArrayBuffer>;
+export type SpectrogramDataMethods = RecordingDataMethods & {
+  mount: (message: {
+    lead: Float32Array<ArrayBuffer>;
+    recording: PlayerRecordingPiece[];
   }) => void;
+  unmount: () => void;
 };
 
 export const spectrogramDataChannel = createMessageChannel<
@@ -67,11 +67,14 @@ export const spectrogramDataChannel = createMessageChannel<
     keys: [],
   },
   outbound: {
-    keys: ['mount', 'unmount', 'patchSamples'],
+    keys: ['mount', 'unmount', ...recordingDataKeys],
     transfers: {
-      mount: (message) =>
-        Object.values(message.samples).map((samples) => samples.buffer),
-      patchSamples: (message) => [message.samples.buffer],
+      mount: (message) => [
+        message.lead.buffer,
+        ...pieceBuffers(message.recording),
+      ],
+      setRecordingPieces: (message) => pieceBuffers(message.pieces),
+      appendLiveTake: (message) => [message.samples.buffer],
     },
   },
 });
