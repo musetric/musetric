@@ -33,6 +33,7 @@ const createPlayer = async () => {
     tracks: { lead: silence(), backing: silence(), instrumental: silence() },
     recording: [],
   });
+  await settle();
   const player = playerChannel.outbound(control.port2).methods;
   player.setMetronome({
     beatsInSamples: Int32Array.of(beat),
