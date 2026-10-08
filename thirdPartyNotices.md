@@ -173,8 +173,8 @@ SOFTWARE.
 ## Beat This!
 
 - Source: https://github.com/CPJKU/beat_this
-- Usage: Beat This! beat and downbeat tracker. The `final0` checkpoint is the basis of the ONNX graph this project runs, its mel filterbank is the basis of the WebGPU log-mel front end, and the chunking, aggregation and peak picking around them reproduce the upstream `split_piece`, `aggregate_prediction` and `minimal` `Postprocessor`, which are the exported graph's input and output contract. The audio decoding and the tempo/meter estimation are independent implementations.
-- Local files: `packages/ai/src/rhythm/beatPeaks.ts`, `packages/ai/src/rhythm/rhythmSummary.ts`, `packages/ai/src/rhythm/types.ts`, `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/runtime/rhythm/`, `packages/ai/src/service/browserRhythm.ts`.
+- Usage: Beat This! beat and downbeat tracker. The `final0` checkpoint is the basis of the ONNX graph this project runs, its mel filterbank is the basis of the WebGPU log-mel front end, the chunking and aggregation around them reproduce the upstream `split_piece` and `aggregate_prediction`, which are the exported graph's input and output contract, and the beat tracking reproduces the upstream `dbn` `Postprocessor` (see madmom below). The audio decoding and the tempo/meter estimation are independent implementations.
+- Local files: `packages/ai/src/rhythm/downbeatTracker.ts`, `packages/ai/src/rhythm/rhythmSummary.ts`, `packages/ai/src/rhythm/types.ts`, `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/runtime/rhythm/`, `packages/ai/src/service/browserRhythm.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
@@ -207,6 +207,39 @@ SOFTWARE.
 - Local files: `packages/ai/src/models/beatThisModel.ts`, `packages/ai/src/service/browserRhythm.ts`.
 - License: MIT, inherited from the upstream Beat This! weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
+
+## madmom
+
+- Source: https://github.com/CPJKU/madmom
+- Usage: the dynamic Bayesian network downbeat tracker (`DBNDownBeatTrackingProcessor` with `BarStateSpace`, `BarTransitionModel`, `RNNDownBeatTrackingObservationModel` and the hidden Markov model Viterbi decoder), ported to TypeScript with the parameters Beat This! passes to it. It turns the Beat This! beat and downbeat probabilities into beat times. No madmom data or model files are used.
+- Local files: `packages/ai/src/rhythm/downbeatTracker.ts`.
+- License: BSD-2-Clause for the source code. The madmom data and model files are licensed CC BY-NC-SA 4.0 and are not used.
+- License source: upstream `LICENSE`.
+
+Copyright (c) 2012-2014 Department of Computational Perception,
+Johannes Kepler University, Linz, Austria and Austrian Research Institute for
+Artificial Intelligence (OFAI), Vienna, Austria.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Opus (libopus)
 

@@ -1,4 +1,4 @@
-import { pickBeatTimes } from '../../rhythm/beatPeaks.js';
+import { trackBeatTimes } from '../../rhythm/downbeatTracker.js';
 import {
   consecutiveProbeBpms,
   summarizeRhythm,
@@ -57,7 +57,7 @@ export const runRhythmTask = async (
   try {
     const audio = await fetchAudio(task.unitInput);
     const logits = await runtime.analyze(audio);
-    const { beats, downbeats } = pickBeatTimes(
+    const { beats, downbeats } = trackBeatTimes(
       logits.beat,
       logits.downbeat,
       graph.fps,
