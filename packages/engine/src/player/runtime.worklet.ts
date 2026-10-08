@@ -207,6 +207,7 @@ export const createPlayerRuntime = async (
 
       applyLatencyFrameCounts(message);
       outputOffsetFrameIndex = 0;
+      metronome.reset(frameIndex);
       playing = true;
       recordingRuntime.resetInputOffset();
       port.methods.setPlaying({ playing, frameIndex, revision });
@@ -276,7 +277,6 @@ export const createPlayerRuntime = async (
       const currentTracks = tracks;
       const outputFrameCount = outputs[0].length;
       const currentOutputFrameIndex = getCurrentOutputFrameIndex();
-      const oldFrameIndex = frameIndex;
       const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
@@ -321,8 +321,8 @@ export const createPlayerRuntime = async (
       );
 
       metronome.process({
-        oldFrameIndex,
-        newFrameIndex: frameIndex,
+        oldFrameIndex: currentOutputFrameIndex,
+        newFrameIndex: getCurrentOutputFrameIndex(),
         outputs,
         outputFrameCount,
       });
