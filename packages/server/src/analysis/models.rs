@@ -143,7 +143,7 @@ pub(crate) const BEAT_THIS_FILTERBANK: &str = "mel-filterbank.bin";
 pub(crate) const BEAT_THIS: ModelBundle = ModelBundle {
     label: "Rhythm analysis model",
     model_id: "musetric/beat-this-onnx",
-    revision: "a951177c3583b157ca20fe487823b9c232c02487",
+    revision: "25308706dda545c0d5950065bb0604ad71bcf1f5",
     directory: "beat-this-onnx",
     sample_rate: 22050,
     layout: CacheLayout::Flat,

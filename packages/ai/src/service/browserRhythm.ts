@@ -1,4 +1,4 @@
-import { pickBeatTimes } from '../rhythm/beatPeaks.js';
+import { trackBeatTimes } from '../rhythm/downbeatTracker.js';
 import {
   consecutiveProbeBpms,
   summarizeRhythm,
@@ -32,7 +32,7 @@ export const analyzeRhythm = createBrowserJobApi<BrowserAnalyzeRhythmRequest>(
         run: async (bytes) => {
           const audio = floatsFromBytes(bytes);
           const logits = await runtime.analyze(audio);
-          const { beats, downbeats } = pickBeatTimes(
+          const { beats, downbeats } = trackBeatTimes(
             logits.beat,
             logits.downbeat,
             request.graph.fps,
