@@ -15,7 +15,7 @@ import {
   createEngineSpectrogram,
   type EngineSpectrogram,
 } from './spectrogram/index.js';
-import { type EngineState } from './state.js';
+import { type EngineState, getActiveRecording } from './state.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const notesMaxFrequency = 1100;
@@ -48,10 +48,7 @@ const initialState: EngineState = {
   playing: false,
   frozen: false,
   recording: false,
-  recordingHistory: {
-    canUndo: false,
-    canRedo: false,
-  },
+  recordings: [],
   isSlave: false,
   playerCommandPending: false,
   playerFrameIndexPending: false,
@@ -132,19 +129,17 @@ export const createEngine = (): Engine => {
       spectrogramPort: spectrogramChannel.port1,
       playheadPort: decoderPlayheadChannel.port2,
       onRecordingPeaksChanged: (message) => {
-        ref.waveform.applyRecordingPeakPatch({
-          startPeakIndex: message.startPeakIndex,
-          peaks: message.peaks,
+        ref.waveform.applyRecordingPeakPatch(message);
+      },
+      onRecordingsChanged: (recordings) => {
+        store.update((state) => {
+          state.recordings = recordings;
         });
       },
-      onRecordingHistoryChanged: (message) => {
-        store.update((state) => {
-          state.recordingHistory = {
-            canUndo: message.canUndo,
-            canRedo: message.canRedo,
-          };
-        });
-        ref.waveform.refreshRecording();
+      onRecordingContentChanged: (recordingId) => {
+        if (getActiveRecording(store.get())?.id === recordingId) {
+          ref.waveform.refreshRecording();
+        }
       },
       onRecordingStreamFailed: () => {
         void ref.player.stop();

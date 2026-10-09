@@ -112,7 +112,7 @@ export const createSpectrogramRuntime = async (
     mount: async (message) => {
       lead = message.lead;
       recording.clear();
-      recording.setPieces(message.recording);
+      recording.setPieces({ pieces: message.recording });
       await render();
     },
     unmount: async () => {
@@ -122,7 +122,7 @@ export const createSpectrogramRuntime = async (
       await render();
     },
     setRecordingPieces: (message) => {
-      recording.setPieces(message.pieces, message.finishedTakeId);
+      recording.setPieces(message);
       if (!playing) {
         renderPaused();
       }

@@ -21,11 +21,12 @@ use serde_json::Value;
 
 use crate::{
     realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
-    recording::{TakeFormat, set_fresh_applied},
+    recording::{TakeFormat, is_active_recording, read_recordings, set_fresh_applied},
     routes::RouteState,
     storage::{Storage, read},
 };
 
+pub(crate) use events::recording_item;
 pub(crate) use rooms::Rooms;
 
 const SAVE_WAIT: Duration = Duration::from_secs(30);
@@ -110,6 +111,7 @@ struct Connection {
 struct Take {
     session: session::Session,
     id: String,
+    recording_id: i64,
     anchored: bool,
 }
 
@@ -168,12 +170,10 @@ async fn handle_text(
             start_recording(channel, rooms, connection, start).await
         }
         "recording.finish" => finish_recording(channel, rooms, connection).await,
-        "recording.undo" => {
-            change_history(rooms, connection, false).await;
-            true
-        }
-        "recording.redo" => {
-            change_history(rooms, connection, true).await;
+        "recording.undo" | "recording.redo" => {
+            if let Some(recording_id) = event.get("recordingId").and_then(read_integer) {
+                change_history(rooms, connection, recording_id, kind == "recording.redo").await;
+            }
             true
         }
         "player.play" => {
@@ -223,9 +223,26 @@ async fn start_recording(
         refuse_recording(rooms, connection, start.session_id);
         return true;
     }
+    let active = is_active_recording(
+        &connection.storage,
+        connection.project_id,
+        start.recording_id,
+    )
+    .await;
+    if !matches!(active, Ok(true)) {
+        rooms.end_session(connection.project_id, connection.member);
+        rooms.stop_player(connection.project_id);
+        refuse_recording(rooms, connection, start.session_id);
+        return true;
+    }
     let tempo = start.format.tempo;
-    let created =
-        session::Session::create(&connection.storage, connection.project_id, start.format).await;
+    let created = session::Session::create(
+        &connection.storage,
+        connection.project_id,
+        start.recording_id,
+        start.format,
+    )
+    .await;
     let session = match created {
         Ok(session) => session,
         Err(error) => {
@@ -241,18 +258,20 @@ async fn start_recording(
         rooms::RoomTake {
             owner: connection.member,
             session_id: start.session_id.clone(),
+            recording_id: start.recording_id,
             tempo,
             start_frame: None,
         },
     );
     rooms.broadcast_event(
         connection.project_id,
-        &events::recording_started(&start.session_id, tempo, None),
+        &events::recording_started(&start.session_id, start.recording_id, tempo, None),
         None,
     );
     connection.take = Some(Take {
         session,
         id: start.session_id,
+        recording_id: start.recording_id,
         anchored: false,
     });
     true
@@ -310,7 +329,10 @@ async fn handle_packet(
         return true;
     }
     let Some(Take {
-        session, anchored, ..
+        session,
+        recording_id,
+        anchored,
+        ..
     }) = connection.take.as_mut()
     else {
         channel
@@ -336,7 +358,7 @@ async fn handle_packet(
     if let Some(patch) = written.patch {
         rooms.broadcast_event(
             connection.project_id,
-            &events::peaks_changed(patch.start_peak_index, &patch.peaks),
+            &events::peaks_changed(*recording_id, patch.start_peak_index, &patch.peaks),
             None,
         );
     }
@@ -367,31 +389,40 @@ async fn write_packet(
 }
 
 async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<(), BoxedError> {
-    let Some(Take { session, id, .. }) = connection.take.take() else {
+    let Some(Take {
+        session,
+        id,
+        recording_id,
+        ..
+    }) = connection.take.take()
+    else {
         return Ok(());
     };
     rooms.end_take(connection.project_id, connection.member);
     rooms.save_session(connection.project_id, connection.member);
     let finished = session.finish(&connection.storage).await;
-    if let Ok(committed) = finished {
+    if let Ok(committed) = finished.as_ref() {
         rooms.broadcast_event(
             connection.project_id,
             &events::recording_finished(&id),
             None,
         );
-        if let Some(history) = committed {
+        if committed.is_some() {
             rooms.broadcast_event(
                 connection.project_id,
-                &events::recording_changed(history),
+                &events::recording_changed(recording_id),
                 None,
             );
         }
     }
     rooms.end_session(connection.project_id, connection.member);
+    if matches!(finished, Ok(Some(_))) {
+        announce_recordings(rooms, &connection.storage, connection.project_id).await;
+    }
     finished.map(|_| ())
 }
 
-async fn change_history(rooms: &Rooms, connection: &Connection, applied: bool) {
+async fn change_history(rooms: &Rooms, connection: &Connection, recording_id: i64, applied: bool) {
     if !matches!(
         rooms.begin_session(connection.project_id, connection.member),
         rooms::Begin::Started
@@ -399,23 +430,38 @@ async fn change_history(rooms: &Rooms, connection: &Connection, applied: bool) {
         return;
     }
     rooms.save_session(connection.project_id, connection.member);
-    let changed = set_fresh_applied(&connection.storage, connection.project_id, applied).await;
+    let changed = set_fresh_applied(
+        &connection.storage,
+        connection.project_id,
+        recording_id,
+        applied,
+    )
+    .await;
     rooms.end_session(connection.project_id, connection.member);
-    if let Ok(Some(history)) = changed {
+    if let Ok(Some(_)) = changed {
         rooms.broadcast_event(
             connection.project_id,
-            &events::recording_changed(history),
+            &events::recording_changed(recording_id),
             None,
         );
+        announce_recordings(rooms, &connection.storage, connection.project_id).await;
+    }
+}
+
+pub(crate) async fn announce_recordings(rooms: &Rooms, storage: &Arc<Storage>, project_id: i64) {
+    if let Ok(recordings) = read_recordings(storage, project_id).await {
+        rooms.broadcast_event(project_id, &events::recording_list(&recordings), None);
     }
 }
 
 struct RecordingStart {
     format: TakeFormat,
     session_id: String,
+    recording_id: i64,
 }
 
 fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<RecordingStart> {
+    let recording_id = read_integer(event.get("recordingId")?)?;
     let sample_rate = read_integer(event.get("sampleRate")?)?;
     let frame_count = read_integer(event.get("frameCount")?)?;
     let latency_frame_count = read_integer(event.get("latencyFrameCount")?)?;
@@ -436,6 +482,7 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
             tempo,
         },
         session_id,
+        recording_id,
     })
 }
 
@@ -497,6 +544,10 @@ mod tests {
     const PROJECT: &str = "
       INSERT INTO Project (id, name, sampleRate, frameCount)
       VALUES (1, 'Fixture project', 48000, 480000);
+      INSERT INTO Recording (id, projectId, name, active) VALUES (1, 1, 'Recording 1', 1);
+    ";
+    const SECOND_RECORDING: &str = "
+      INSERT INTO Recording (id, projectId, name, active) VALUES (2, 1, 'Recording 2', 0);
     ";
     const FRAME_COUNT: usize = 4;
     const SONG_FRAME_COUNT: usize = 8;
@@ -611,6 +662,7 @@ mod tests {
     fn start_message(session_id: &str, frame_count: usize) -> Value {
         json!({
             "type": "recording.start",
+            "recordingId": 1,
             "sampleRate": 48000,
             "frameCount": frame_count,
             "latencyFrameCount": 0,
@@ -625,33 +677,37 @@ mod tests {
 
     async fn finish_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         send_json(owner, json!({ "type": "recording.finish" })).await;
-        assert_eq!(
-            receive_json(owner).await,
-            json!({ "type": "recording.finished", "sessionId": session_id })
-        );
-        assert_eq!(
-            receive_json(listener).await,
-            json!({ "type": "recording.finished", "sessionId": session_id })
-        );
+        let finished = json!({ "type": "recording.finished", "sessionId": session_id });
+        assert_eq!(receive_json(owner).await, finished);
+        assert_eq!(receive_json(listener).await, finished);
     }
 
-    fn changed_message(can_undo: bool, can_redo: bool) -> Value {
-        json!({
-            "type": "recording.changed",
-            "canUndo": can_undo,
-            "canRedo": can_redo,
-        })
+    async fn expect_listed(socket: &mut ClientSocket, histories: &[(bool, bool)]) {
+        let listed = receive_json(socket).await;
+        assert_eq!(listed["type"], "recording.list");
+        let recordings = listed["recordings"]
+            .as_array()
+            .expect("the list should hold recordings");
+        let found: Vec<(bool, bool)> = recordings
+            .iter()
+            .map(|recording| (recording["canUndo"] == true, recording["canRedo"] == true))
+            .collect();
+        assert_eq!(found, histories);
     }
 
-    async fn expect_changed(sockets: [&mut ClientSocket; 2], expected: &Value) {
+    async fn expect_changed(sockets: [&mut ClientSocket; 2], can_undo: bool, can_redo: bool) {
         for socket in sockets {
-            assert_eq!(&receive_json(socket).await, expected);
+            assert_eq!(
+                receive_json(socket).await,
+                json!({ "type": "recording.changed", "recordingId": 1 })
+            );
+            expect_listed(socket, &[(can_undo, can_redo)]).await;
         }
     }
 
     async fn restart_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         send_json(owner, start_message(session_id, SONG_FRAME_COUNT)).await;
-        let started = json!({ "type": "recording.started", "sessionId": session_id, "tempo": 1.0 });
+        let started = json!({ "type": "recording.started", "sessionId": session_id, "recordingId": 1, "tempo": 1.0 });
         assert_eq!(receive_json(owner).await, started);
         assert_eq!(receive_json(listener).await, started);
     }
@@ -671,15 +727,17 @@ mod tests {
 
     async fn commit_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         finish_take(owner, listener, session_id).await;
-        expect_changed([owner, listener], &changed_message(true, false)).await;
+        expect_changed([owner, listener], true, false).await;
     }
 
-    fn stored_recording(storage: &Storage) -> musetric_db::Recording {
+    fn stored_audio(storage: &Storage) -> musetric_db::RecordingAudio {
         storage
             .database
             .recording(1)
             .expect("the recording should be readable")
             .expect("the recording should be stored")
+            .audio
+            .expect("the recording should hold audio")
     }
 
     fn stored_pieces(storage: &Storage) -> Vec<RecordingPiece> {
@@ -713,7 +771,7 @@ mod tests {
     }
 
     async fn composite(storage: &Arc<Storage>) -> Vec<i16> {
-        let sounding = read_sounding(storage, 1)
+        let sounding = read_sounding(storage, 1, 1)
             .await
             .expect("the sounding pieces should be readable")
             .expect("the recording should exist");
@@ -741,7 +799,7 @@ mod tests {
         send_json(&mut owner, start_message(OWNER_TAKE, frame_count)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
@@ -749,7 +807,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0 })
         );
         (owner, listener)
     }
@@ -961,7 +1019,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "recordingId": 1, "tempo": 1.0 })
         );
     }
 
@@ -1041,16 +1099,16 @@ mod tests {
         let (mut owner, mut listener) = start_recording_room(&base).await;
 
         finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
-        let reserved = stored_recording(&storage);
+        let reserved = stored_audio(&storage);
 
         send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT * 2)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0 })
         );
 
         let samples = [0.25_f32; FRAME_COUNT * 2];
@@ -1060,7 +1118,7 @@ mod tests {
             chunk(0, &samples[..FRAME_COUNT])
         );
 
-        let reused = stored_recording(&storage);
+        let reused = stored_audio(&storage);
         assert_eq!(reused.wave_blob_id, reserved.wave_blob_id);
         assert_eq!(
             usize::try_from(reused.frame_count).expect("the frame count should be positive"),
@@ -1079,13 +1137,21 @@ mod tests {
         commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
         let recorded = stored_pieces(&storage);
 
-        send_json(&mut owner, json!({ "type": "recording.undo" })).await;
-        expect_changed([&mut owner, &mut listener], &changed_message(false, true)).await;
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.undo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], false, true).await;
         assert_eq!(composite(&storage).await, [0; SONG_FRAME_COUNT]);
         assert_eq!(stored_pieces(&storage), recorded);
 
-        send_json(&mut listener, json!({ "type": "recording.redo" })).await;
-        expect_changed([&mut owner, &mut listener], &changed_message(true, false)).await;
+        send_json(
+            &mut listener,
+            json!({ "type": "recording.redo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], true, false).await;
         assert_eq!(
             composite(&storage).await,
             [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
@@ -1182,7 +1248,7 @@ mod tests {
         let mut start = start_message(OWNER_TAKE, SONG_FRAME_COUNT);
         start["tempo"] = json!(0.5);
         send_json(&mut owner, start).await;
-        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "tempo": 0.5 });
+        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 0.5 });
         assert_eq!(receive_json(&mut owner).await, started);
         assert_eq!(
             receive_json(&mut listener).await,
@@ -1200,7 +1266,7 @@ mod tests {
         assert_eq!(patch["type"], "recording.peaksChanged");
         assert_eq!(receive_json(&mut listener).await, patch);
         finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
-        expect_changed([&mut owner, &mut listener], &changed_message(true, false)).await;
+        expect_changed([&mut owner, &mut listener], true, false).await;
 
         let pieces = stored_pieces(&storage);
         assert_eq!(layout(&pieces), [piece(RecordingLayer::Fresh, 0, 16)]);
@@ -1225,6 +1291,7 @@ mod tests {
             json!({
                 "type": "recording.started",
                 "sessionId": OWNER_TAKE,
+                "recordingId": 1,
                 "tempo": 1.0,
                 "startFrame": 3,
             })
@@ -1240,8 +1307,12 @@ mod tests {
         let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
         sing(&mut owner, &mut listener, 0, &[0.25; 4]).await;
         commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
-        send_json(&mut owner, json!({ "type": "recording.undo" })).await;
-        expect_changed([&mut owner, &mut listener], &changed_message(false, true)).await;
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.undo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], false, true).await;
 
         restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
         sing(&mut owner, &mut listener, 4, &[0.5; 2]).await;
@@ -1337,6 +1408,104 @@ mod tests {
         assert_eq!(
             receive_json(&mut listener).await,
             json!({ "type": "player.stop" })
+        );
+    }
+
+    async fn start_second_take(owner: &mut ClientSocket, listener: &mut ClientSocket) {
+        let mut start = start_message(SECOND_TAKE, SONG_FRAME_COUNT);
+        start["recordingId"] = json!(2);
+        send_json(owner, start).await;
+        let started = json!({
+            "type": "recording.started",
+            "sessionId": SECOND_TAKE,
+            "recordingId": 2,
+            "tempo": 1.0,
+        });
+        assert_eq!(receive_json(owner).await, started);
+        assert_eq!(receive_json(listener).await, started);
+    }
+
+    #[tokio::test]
+    async fn refuses_a_take_into_a_recording_that_is_not_active() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        workspace.seed(SECOND_RECORDING);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let mut owner = connect(&base).await;
+        let mut start = start_message(OWNER_TAKE, FRAME_COUNT);
+        start["recordingId"] = json!(2);
+
+        send_json(&mut owner, start).await;
+
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "player.stop" })
+        );
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+        );
+        let hidden = storage
+            .database
+            .recording(2)
+            .expect("the recording should be readable")
+            .expect("the recording should be stored");
+        assert_eq!(hidden.audio, None);
+    }
+
+    #[tokio::test]
+    async fn keeps_the_undo_of_each_recording_apart() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        workspace.seed(SECOND_RECORDING);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+        finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        for socket in [&mut owner, &mut listener] {
+            assert_eq!(
+                receive_json(socket).await,
+                json!({ "type": "recording.changed", "recordingId": 1 })
+            );
+            expect_listed(socket, &[(true, false), (false, false)]).await;
+        }
+
+        storage
+            .writer
+            .activate_recording(1, 2)
+            .expect("the second recording should become active");
+        start_second_take(&mut owner, &mut listener).await;
+        send_packet(&mut owner, chunk(4, &[0.25; 2])).await;
+        assert_eq!(receive_binary(&mut listener).await, chunk(4, &[0.25; 2]));
+        let patch = receive_json(&mut owner).await;
+        assert_eq!(patch["recordingId"], 2);
+        assert_eq!(receive_json(&mut listener).await, patch);
+        finish_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        for socket in [&mut owner, &mut listener] {
+            assert_eq!(
+                receive_json(socket).await,
+                json!({ "type": "recording.changed", "recordingId": 2 })
+            );
+            expect_listed(socket, &[(true, false), (true, false)]).await;
+        }
+
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.undo", "recordingId": 2 }),
+        )
+        .await;
+        for socket in [&mut owner, &mut listener] {
+            assert_eq!(
+                receive_json(socket).await,
+                json!({ "type": "recording.changed", "recordingId": 2 })
+            );
+            expect_listed(socket, &[(true, false), (false, true)]).await;
+        }
+        assert_eq!(
+            composite(&storage).await,
+            [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
         );
     }
 }

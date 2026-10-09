@@ -135,30 +135,36 @@ const CREATE_RECORDING: &str = "
   CREATE TABLE Recording (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
-    waveBlobId TEXT NOT NULL UNIQUE,
-    sampleRate INTEGER NOT NULL,
-    frameCount INTEGER NOT NULL,
+    name TEXT NOT NULL COLLATE NOCASE,
+    active INTEGER NOT NULL DEFAULT 0,
+    waveBlobId TEXT UNIQUE,
+    sampleRate INTEGER,
+    frameCount INTEGER,
     freshApplied INTEGER NOT NULL DEFAULT 1,
-    UNIQUE(projectId),
+    UNIQUE(projectId, name),
+    CHECK ((waveBlobId IS NULL) = (sampleRate IS NULL) AND (sampleRate IS NULL) = (frameCount IS NULL)),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
   );
 ";
 
+const CREATE_RECORDING_ACTIVE_INDEX: &str =
+    "CREATE UNIQUE INDEX Recording_active_index ON Recording (projectId) WHERE active = 1;";
+
 const CREATE_RECORDING_PIECE: &str = "
   CREATE TABLE RecordingPiece (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projectId INTEGER NOT NULL,
+    recordingId INTEGER NOT NULL,
     blobId TEXT NOT NULL UNIQUE,
     layer TEXT NOT NULL CHECK (layer IN ('base', 'fresh')),
     songStartFrame INTEGER NOT NULL,
     frameCount INTEGER NOT NULL,
     tempo REAL NOT NULL,
-    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+    FOREIGN KEY (recordingId) REFERENCES Recording(id) ON DELETE CASCADE
   );
 ";
 
 const CREATE_RECORDING_PIECE_INDEX: &str =
-    "CREATE INDEX RecordingPiece_projectId_index ON RecordingPiece (projectId);";
+    "CREATE INDEX RecordingPiece_recordingId_index ON RecordingPiece (recordingId);";
 
 const CREATE_PROCESSING: &str = "
   CREATE TABLE Processing (
@@ -184,6 +190,7 @@ const V001_INITIAL: Migration = &[
     CREATE_KEY,
     CREATE_CHORDS,
     CREATE_RECORDING,
+    CREATE_RECORDING_ACTIVE_INDEX,
     CREATE_RECORDING_PIECE,
     CREATE_RECORDING_PIECE_INDEX,
     CREATE_PROCESSING,

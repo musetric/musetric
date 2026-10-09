@@ -65,6 +65,7 @@ impl Player {
 pub(crate) struct RoomTake {
     pub(crate) owner: MemberId,
     pub(crate) session_id: String,
+    pub(crate) recording_id: i64,
     pub(crate) tempo: f64,
     pub(crate) start_frame: Option<i64>,
 }
@@ -198,8 +199,12 @@ impl Rooms {
                 room.send_to(member, &player.sync_state());
             }
             if let Some(take) = room.take.as_ref().filter(|take| take.owner != member) {
-                let started =
-                    events::recording_started(&take.session_id, take.tempo, take.start_frame);
+                let started = events::recording_started(
+                    &take.session_id,
+                    take.recording_id,
+                    take.tempo,
+                    take.start_frame,
+                );
                 room.send_to(member, &started);
             }
         });
@@ -275,6 +280,18 @@ impl Rooms {
             }
         });
         started.unwrap_or(Begin::Busy)
+    }
+
+    pub(crate) fn begin_edit(&self, project_id: i64) -> Option<MemberId> {
+        let editor = self.next_member.fetch_add(1, Ordering::Relaxed);
+        let mut projects = self.lock();
+        let room = projects.entry(project_id).or_insert_with(Room::create);
+        if room.session_owner.is_some() {
+            return None;
+        }
+        room.session_owner = Some(editor);
+        room.saving = true;
+        Some(editor)
     }
 
     pub(crate) fn save_session(&self, project_id: i64, member: MemberId) {

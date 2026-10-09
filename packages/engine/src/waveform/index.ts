@@ -10,7 +10,7 @@ import {
   subscribeResizeObserver,
 } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
-import { type EngineState } from '../state.js';
+import { type EngineState, getActiveRecording } from '../state.js';
 import { waveformChannel } from './protocol.cross.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
@@ -34,6 +34,7 @@ export type EngineWaveform = {
   refreshDelivery: (stemType: StemType) => void;
   refreshRecording: () => void;
   applyRecordingPeakPatch: (message: {
+    recordingId: number;
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
   }) => void;
@@ -89,6 +90,12 @@ export const createEngineWaveform = (
       });
     },
   );
+  store.subscribe(
+    (state) => getActiveRecording(state)?.id,
+    (recordingId) => {
+      port.methods.setRecording({ recordingId });
+    },
+  );
 
   return {
     port,
@@ -142,6 +149,7 @@ export const createEngineWaveform = (
 
       port.methods.mountRecording({
         projectId,
+        recordingId: getActiveRecording(store.get())?.id,
         canvas: offscreenCanvas,
         colors: store.get().colors,
         viewSize,

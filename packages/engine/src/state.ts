@@ -1,3 +1,4 @@
+import { type api } from '@musetric/api';
 import { type StemType } from '@musetric/audio';
 import { type SpectrogramColors } from '@musetric/spectrogram';
 
@@ -41,11 +42,6 @@ export type FrequencyRange = {
   maxFrequency: number;
 };
 
-export type RecordingHistory = {
-  canUndo: boolean;
-  canRedo: boolean;
-};
-
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
@@ -56,7 +52,7 @@ export type EngineState = {
   playing: boolean;
   frozen: boolean;
   recording: boolean;
-  recordingHistory: RecordingHistory;
+  recordings: api.recording.Item[];
   isSlave: boolean;
   playerCommandPending: boolean;
   playerFrameIndexPending: boolean;
@@ -87,6 +83,11 @@ export type EngineState = {
   metronomeBeats: number[];
   metronomeDownbeats: number[];
 };
+
+export const getActiveRecording = (
+  state: Pick<EngineState, 'recordings'>,
+): api.recording.Item | undefined =>
+  state.recordings.find((recording) => recording.active);
 
 export const getFrequencyRange = (
   state: Pick<EngineState, 'frequencyRanges' | 'spectrogramView'>,

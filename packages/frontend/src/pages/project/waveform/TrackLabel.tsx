@@ -1,8 +1,10 @@
 import { alpha, Typography } from '@mui/material';
 import { type StemType } from '@musetric/audio';
+import { getActiveRecording } from '@musetric/engine';
 import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 const stemLabels: Record<StemType, (t: TFunction) => string> = {
   lead: (t) => t('pages.project.waveform.stemType.lead'),
@@ -24,9 +26,12 @@ export type TrackLabelProps = (
 
 export const TrackLabel: FC<TrackLabelProps> = (props) => {
   const { t } = useTranslation();
+  const recordingName = useEngineStore(
+    (state) => getActiveRecording(state)?.name,
+  );
   const label =
     props.kind === 'recording'
-      ? t('pages.project.waveform.stemType.recording')
+      ? (recordingName ?? t('pages.project.waveform.stemType.recording'))
       : stemLabels[props.stemType](t);
 
   if (props.variant === 'inline') {

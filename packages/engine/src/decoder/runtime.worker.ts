@@ -1,6 +1,7 @@
 import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
+import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
 import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
@@ -17,7 +18,10 @@ import {
   type RecordingController,
   waitWithTimeout,
 } from './recordingController.worker.js';
-import { createRecordingHistory } from './recordingHistory.worker.js';
+import {
+  createRecordingList,
+  isRecordingListEvent,
+} from './recordingList.worker.js';
 import {
   createRecordingPacket,
   createRecordingStream,
@@ -69,6 +73,8 @@ export const createDecoderWorkerRuntime = (
 
   const audioDecode = createAudioDecode({ playerPort, spectrogramPort });
 
+  const recordingList = createRecordingList({ port, audioDecode });
+
   let recordingStream: RecordingStream | undefined = undefined;
   let recordingSessionId: string | undefined = undefined;
   let recordingReady = false;
@@ -91,6 +97,9 @@ export const createDecoderWorkerRuntime = (
       return;
     }
     if (!own) {
+      if (event.recordingId !== recordingList.getActiveId()) {
+        return;
+      }
       audioDecode.beginLiveTake({
         takeId: event.sessionId,
         tempo: event.tempo,
@@ -103,26 +112,14 @@ export const createDecoderWorkerRuntime = (
     connection.flush();
   };
 
-  const recordingHistory = createRecordingHistory({
-    port,
-    reload: async () => audioDecode.reloadRecording(finishedTakeId),
-  });
-
   const realtime = createProjectRealtime({
     isRecordingReady: () => recordingReady,
     onOpen: () => {
       port.methods.setRealtimeState({ status: 'success' });
     },
     onEvent: (event) => {
-      if (event.type === 'recording.peaksChanged') {
-        port.methods.recordingPeaksChanged({
-          startPeakIndex: event.startPeakIndex,
-          peaks: new Float32Array(event.peaks),
-        });
-        return;
-      }
-      if (event.type === 'recording.changed') {
-        recordingHistory.apply(event);
+      if (isRecordingListEvent(event)) {
+        recordingList.applyEvent(event, finishedTakeId);
         return;
       }
       if (
@@ -220,9 +217,10 @@ export const createDecoderWorkerRuntime = (
     mount: async (message) => {
       try {
         realtime.open(message.projectId);
+        const { recordings } = await getRecordingList(message.projectId);
+        recordingList.apply(recordings);
         const mounted = await audioDecode.mount(message);
         port.methods.mounted({ frameCount: mounted.frameCount });
-        void recordingHistory.load(message.projectId);
         realtime.sendJson({ type: 'player.sync.request' });
       } catch (error) {
         console.error('Failed to load and decode project audio track', error);
@@ -230,6 +228,7 @@ export const createDecoderWorkerRuntime = (
       }
     },
     unmount: () => {
+      recordingList.clear();
       frameIndexStream.stop();
       recordingController.clearRecordingStream();
       realtime.close();
@@ -239,6 +238,13 @@ export const createDecoderWorkerRuntime = (
     startRecordingStream: (message) => {
       realtime.open(message.projectId);
       recordingController.clearRecordingStream();
+      const recordingId = recordingList.getActiveId();
+      if (recordingId === undefined) {
+        port.methods.recordingStreamFailed({
+          error: 'The project has no active recording',
+        });
+        return;
+      }
       recordingSessionId = crypto.randomUUID();
       audioDecode.beginLiveTake({
         takeId: recordingSessionId,
@@ -255,6 +261,7 @@ export const createDecoderWorkerRuntime = (
       });
       realtime.sendJson({
         type: 'recording.start',
+        recordingId,
         sessionId: recordingSessionId,
         sampleRate: message.sampleRate,
         frameCount: message.frameCount,
@@ -294,10 +301,16 @@ export const createDecoderWorkerRuntime = (
       }
     },
     sendRecordingUndo: () => {
-      realtime.sendJson({ type: 'recording.undo' });
+      const recordingId = recordingList.getActiveId();
+      if (recordingId !== undefined) {
+        realtime.sendJson({ type: 'recording.undo', recordingId });
+      }
     },
     sendRecordingRedo: () => {
-      realtime.sendJson({ type: 'recording.redo' });
+      const recordingId = recordingList.getActiveId();
+      if (recordingId !== undefined) {
+        realtime.sendJson({ type: 'recording.redo', recordingId });
+      }
     },
     sendPlayerPlay: () => {
       realtime.sendJson({ type: 'player.play' });

@@ -12,6 +12,8 @@ import { MixdownDialog } from './mixdown/MixdownDialog.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
+import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
+import { RecordingListPicker } from './recording/RecordingListPicker.js';
 import { RhythmTempoSync } from './rhythm/RhythmTempoSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
@@ -54,6 +56,8 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       <TempoPicker />
       <MixPopover />
       <MixdownDialog />
+      <RecordingListPicker />
+      <RecordingDeleteDialog />
     </ProjectLayout>
   );
 };

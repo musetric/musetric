@@ -2,6 +2,7 @@ import { createTimePitchProcessor } from '@musetric/audio/player';
 import {
   type LiveTakeStart,
   type PlayerRecordingPiece,
+  type RecordingPiecesUpdate,
 } from './protocol.cross.js';
 import {
   type RecordingPiece,
@@ -29,7 +30,7 @@ export type RecordingMix = {
 };
 
 export type RecordingTrack = {
-  setPieces: (pieces: PlayerRecordingPiece[], finishedTakeId?: string) => void;
+  setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
   appendLiveTake: (frameIndex: number, samples: Float32Array) => void;
   clear: () => void;
@@ -76,9 +77,9 @@ export const createRecordingTrack = async (
   };
 
   return {
-    setPieces: (next, finishedTakeId) => {
-      pieces = next.map(toPiece);
-      if (live && live.takeId === finishedTakeId) {
+    setPieces: (next) => {
+      pieces = next.pieces.map(toPiece);
+      if (live && (next.switched || live.takeId === next.finishedTakeId)) {
         live = undefined;
       }
       update();

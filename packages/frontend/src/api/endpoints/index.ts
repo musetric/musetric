@@ -4,5 +4,6 @@ export * as mixdown from './mixdown.js';
 export * as models from './models.js';
 export * as processing from './processing.js';
 export * as project from './project.js';
+export * as recording from './recording.js';
 export * as rhythm from './rhythm.js';
 export * as subtitle from './subtitle.js';

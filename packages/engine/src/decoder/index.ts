@@ -1,3 +1,4 @@
+import { type api } from '@musetric/api';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -48,13 +49,12 @@ export type CreateEngineDecoderOptions = {
   spectrogramPort: MessagePort;
   playheadPort: MessagePort;
   onRecordingPeaksChanged: (message: {
+    recordingId: number;
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
   }) => void;
-  onRecordingHistoryChanged: (message: {
-    canUndo: boolean;
-    canRedo: boolean;
-  }) => void;
+  onRecordingsChanged: (recordings: api.recording.Item[]) => void;
+  onRecordingContentChanged: (recordingId: number) => void;
   onRecordingStreamFailed: () => void;
   onPlayerPlayRequested: () => void;
   onPlayerRecordRequested: () => void;
@@ -85,7 +85,8 @@ export const createEngineDecoder = (
     spectrogramPort,
     playheadPort,
     onRecordingPeaksChanged,
-    onRecordingHistoryChanged,
+    onRecordingsChanged,
+    onRecordingContentChanged,
     onRecordingStreamFailed,
     onPlayerPlayRequested,
     onPlayerRecordRequested,
@@ -144,7 +145,7 @@ export const createEngineDecoder = (
         state.statuses.realtime = 'pending';
         state.frameCount = undefined;
         state.duration = 0;
-        state.recordingHistory = { canUndo: false, canRedo: false };
+        state.recordings = [];
       });
     },
     recordingStreamFinished: () => {
@@ -161,7 +162,12 @@ export const createEngineDecoder = (
       onRecordingStreamFailed();
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
-    recordingHistoryChanged: onRecordingHistoryChanged,
+    recordingsChanged: (message) => {
+      onRecordingsChanged(message.recordings);
+    },
+    recordingContentChanged: (message) => {
+      onRecordingContentChanged(message.recordingId);
+    },
     recordingExported: (message) => {
       recordingExportPromise?.resolve(message.samples);
       recordingExportPromise = undefined;

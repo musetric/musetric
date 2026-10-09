@@ -12,6 +12,9 @@ export type ProjectState = {
   mixAnchorEl?: HTMLElement;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
+  recordingListAnchorEl?: HTMLElement;
+  deletingRecordingId?: number;
+  renamingRecordingId?: number;
 };
 
 const initialState: ProjectState = {
@@ -31,6 +34,9 @@ export type ProjectActions = {
   setMixAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
+  setRecordingListAnchorEl: (anchorEl: HTMLElement | undefined) => void;
+  setDeletingRecordingId: (recordingId: number | undefined) => void;
+  setRenamingRecordingId: (recordingId: number | undefined) => void;
 };
 
 type State = ProjectState & ProjectActions;
@@ -54,6 +60,18 @@ export const useProjectStore = create<State>()(
     setTempoAnchorEl: (tempoAnchorEl) =>
       set({
         tempoAnchorEl,
+      }),
+    setRecordingListAnchorEl: (recordingListAnchorEl) =>
+      set({
+        recordingListAnchorEl,
+      }),
+    setDeletingRecordingId: (deletingRecordingId) =>
+      set({
+        deletingRecordingId,
+      }),
+    setRenamingRecordingId: (renamingRecordingId) =>
+      set({
+        renamingRecordingId,
       }),
   })),
 );

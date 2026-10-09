@@ -7,6 +7,7 @@ import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { RecordingLaneHeader } from '../recording/RecordingLaneHeader.js';
 import { TrackLabel } from './TrackLabel.js';
 
 export type WaveformCanvasProps =
@@ -46,7 +47,11 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
 
   return (
     <Box position='relative' width='100%' height='100%'>
-      <TrackLabel {...props} />
+      {props.kind === 'recording' ? (
+        <RecordingLaneHeader />
+      ) : (
+        <TrackLabel {...props} />
+      )}
       <Box
         ref={setCanvas}
         component='canvas'

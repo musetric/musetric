@@ -14,25 +14,34 @@ export const getDeliveryAudioContent = async (
     },
   });
 
-export const getRecordingPieces = async (projectId: number) =>
+export const getRecordingList = async (projectId: number) =>
+  await requestWithAxios(axios, api.recording.list.base, {
+    params: {
+      projectId,
+    },
+  });
+
+export const getRecordingPieces = async (
+  projectId: number,
+  recordingId: number,
+) =>
   await requestWithAxios(axios, api.audio.recordingPieces.base, {
     params: {
       projectId,
+      recordingId,
     },
   });
 
-export const getRecordingPiece = async (projectId: number, blobId: string) =>
+export const getRecordingPiece = async (
+  projectId: number,
+  recordingId: number,
+  blobId: string,
+) =>
   await requestWithAxios(axios, api.audio.recordingPiece.base, {
     params: {
       projectId,
+      recordingId,
       blobId,
-    },
-  });
-
-export const getRecordingHistory = async (projectId: number) =>
-  await requestWithAxios(axios, api.audio.recordingHistory.base, {
-    params: {
-      projectId,
     },
   });
 
@@ -47,9 +56,13 @@ export const getDeliveryAudioWave = async (
     },
   });
 
-export const getRecordingAudioWave = async (projectId: number) =>
+export const getRecordingAudioWave = async (
+  projectId: number,
+  recordingId: number,
+) =>
   await requestWithAxios(axios, api.audio.recordingWave.base, {
     params: {
       projectId,
+      recordingId,
     },
   });

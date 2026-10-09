@@ -100,11 +100,14 @@ export type LiveTakeStart = {
   startFrame?: number;
 };
 
+export type RecordingPiecesUpdate = {
+  pieces: PlayerRecordingPiece[];
+  finishedTakeId?: string;
+  switched?: boolean;
+};
+
 export type RecordingDataMethods = {
-  setRecordingPieces: (message: {
-    pieces: PlayerRecordingPiece[];
-    finishedTakeId?: string;
-  }) => void;
+  setRecordingPieces: (message: RecordingPiecesUpdate) => void;
   beginLiveTake: (message: LiveTakeStart) => void;
   appendLiveTake: (message: {
     frameIndex: number;

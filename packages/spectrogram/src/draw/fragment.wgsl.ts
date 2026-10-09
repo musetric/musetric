@@ -315,9 +315,10 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   if (y >= splitRow && y < gapEnd) {
     return vec4f(0.0);
   }
-  let recordingBand = y >= gapEnd;
-  let bandTop = select(0u, gapEnd, recordingBand);
-  let bandHeight = select(splitRow, textureHeight - gapEnd, recordingBand);
+  let recordingBand = stacked && y < splitRow;
+  let lowerBand = stacked && !recordingBand;
+  let bandTop = select(0u, gapEnd, lowerBand);
+  let bandHeight = select(splitRow, textureHeight - gapEnd, lowerBand);
   let bandY = y - bandTop;
 
   let pixelFrequency = frequencyAtPixel(bandY, f32(bandHeight));

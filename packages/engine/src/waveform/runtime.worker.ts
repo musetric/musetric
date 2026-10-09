@@ -24,6 +24,7 @@ type WaveformItem = {
   processor: WaveformProcessor;
   wavePeaks?: Float32Array;
   projectId: number;
+  recordingId?: number;
   frameCount: number;
 };
 
@@ -103,11 +104,30 @@ export const createWaveformRuntime = (
 
   const reloadRecording = async (): Promise<void> => {
     const item = recordingWaveformItem;
-    if (!item) {
+    const recordingId = item?.recordingId;
+    if (!item || recordingId === undefined) {
       return;
     }
-    item.wavePeaks = await getRecordingAudioWave(item.projectId);
+    const wavePeaks = await getRecordingAudioWave(item.projectId, recordingId);
+    if (recordingWaveformItem !== item || item.recordingId !== recordingId) {
+      return;
+    }
+    item.wavePeaks = wavePeaks;
     renderItem(item);
+  };
+
+  const refreshRecording = async (): Promise<void> => {
+    try {
+      await reloadRecording();
+      port.methods.setRecordingState({
+        status: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to refresh recording waveform', error);
+      port.methods.setRecordingState({
+        status: 'error',
+      });
+    }
   };
 
   type CreateWaveformItemMessage = {
@@ -149,7 +169,10 @@ export const createWaveformRuntime = (
     },
     mountRecording: async (message) => {
       try {
-        recordingWaveformItem = createWaveformItem(message);
+        recordingWaveformItem = {
+          ...createWaveformItem(message),
+          recordingId: message.recordingId,
+        };
         await reloadRecording();
         port.methods.setRecordingState({
           status: 'success',
@@ -211,22 +234,18 @@ export const createWaveformRuntime = (
         });
       }
     },
-    refreshRecording: async () => {
-      try {
-        await reloadRecording();
-        port.methods.setRecordingState({
-          status: 'success',
-        });
-      } catch (error) {
-        console.error('Failed to refresh recording waveform', error);
-        port.methods.setRecordingState({
-          status: 'error',
-        });
+    refreshRecording,
+    setRecording: async (message) => {
+      const item = recordingWaveformItem;
+      if (!item || item.recordingId === message.recordingId) {
+        return;
       }
+      item.recordingId = message.recordingId;
+      await refreshRecording();
     },
     applyRecordingPeakPatch: (message) => {
       const item = recordingWaveformItem;
-      if (!item?.wavePeaks) {
+      if (!item?.wavePeaks || item.recordingId !== message.recordingId) {
         return;
       }
 
