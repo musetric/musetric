@@ -27,10 +27,12 @@ const deliveryParamsSchema = z.object({
 
 const recordingParamsSchema = z.object({
   projectId: z.number(),
+  recordingId: z.number(),
 });
 
 const recordingPieceParamsSchema = z.object({
   projectId: z.number(),
+  recordingId: z.number(),
   blobId: z.string(),
 });
 
@@ -84,7 +86,7 @@ export namespace deliveryWave {
 export namespace recordingPieces {
   export const base = createApiRoute({
     method: 'get',
-    path: '/api/audio/project/:projectId/recording/pieces',
+    path: '/api/audio/project/:projectId/recording/:recordingId/pieces',
     paramsSchema: recordingParamsSchema,
     requestSchema: z.void(),
     responseSchema: z.object({ pieces: z.array(recordingPieceSchema) }),
@@ -97,7 +99,7 @@ export namespace recordingPieces {
 export namespace recordingPiece {
   export const base = createApiRoute({
     method: 'get',
-    path: '/api/audio/project/:projectId/recording/piece/:blobId',
+    path: '/api/audio/project/:projectId/recording/:recordingId/piece/:blobId',
     paramsSchema: recordingPieceParamsSchema,
     requestSchema: z.void(),
     responseSchema: z.instanceof(Uint8Array<ArrayBuffer>),
@@ -107,26 +109,10 @@ export namespace recordingPiece {
   export type Response = z.infer<typeof base.responseSchema>;
 }
 
-export namespace recordingHistory {
-  export const base = createApiRoute({
-    method: 'get',
-    path: '/api/audio/project/:projectId/recording/history',
-    paramsSchema: recordingParamsSchema,
-    requestSchema: z.void(),
-    responseSchema: z.object({
-      canUndo: z.boolean(),
-      canRedo: z.boolean(),
-    }),
-  });
-  export type Params = z.infer<typeof base.paramsSchema>;
-  export type Request = z.infer<typeof base.requestSchema>;
-  export type Response = z.infer<typeof base.responseSchema>;
-}
-
 export namespace recordingWave {
   export const base = createApiRoute({
     method: 'get',
-    path: '/api/audio/project/:projectId/recording/wave',
+    path: '/api/audio/project/:projectId/recording/:recordingId/wave',
     paramsSchema: recordingParamsSchema,
     requestSchema: z.void(),
     responseSchema: z.instanceof(Float32Array<ArrayBuffer>),

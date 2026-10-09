@@ -12,6 +12,7 @@ const CONTENT_TYPE_ERROR: &str = "application/json; charset=utf-8";
 pub(crate) enum Failure {
     Invalid(String),
     NotFound(String),
+    Conflict(String),
     Failed(String),
 }
 
@@ -46,6 +47,7 @@ fn create_failure_response(failure: Failure) -> Response<Body> {
     let (status, message) = match failure {
         Failure::Invalid(message) => (StatusCode::BAD_REQUEST, message),
         Failure::NotFound(message) => (StatusCode::NOT_FOUND, message),
+        Failure::Conflict(message) => (StatusCode::CONFLICT, message),
         Failure::Failed(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
     };
     let payload = serde_json::json!({ "message": message }).to_string();

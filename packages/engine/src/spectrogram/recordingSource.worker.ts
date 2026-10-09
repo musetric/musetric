@@ -5,6 +5,7 @@ import {
 import {
   type LiveTakeStart,
   type PlayerRecordingPiece,
+  type RecordingPiecesUpdate,
 } from '../player/protocol.cross.js';
 import {
   type RecordingPiece,
@@ -45,7 +46,7 @@ export type SongRange = {
 };
 
 export type RecordingSource = {
-  setPieces: (pieces: PlayerRecordingPiece[], finishedTakeId?: string) => void;
+  setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
   appendLiveTake: (
     frameIndex: number,
@@ -67,9 +68,9 @@ export const createRecordingSource = (): RecordingSource => {
   };
 
   return {
-    setPieces: (next, finishedTakeId) => {
-      pieces = next.map(toPiece);
-      if (live && live.takeId === finishedTakeId) {
+    setPieces: (next) => {
+      pieces = next.pieces.map(toPiece);
+      if (live && (next.switched || live.takeId === next.finishedTakeId)) {
         live = undefined;
       }
       reset();

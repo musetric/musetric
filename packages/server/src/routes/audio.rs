@@ -14,8 +14,12 @@ use serde_json::json;
 use crate::{
     blob_response::{CachedBlob, StoredBlob, send_cached, send_generated, send_stored},
     failure::{Failure, finish, invalid_number, invalid_option},
-    recording::{Sounding, holds_piece, read_history, read_sounding},
-    routes::{RouteState, item::json_response},
+    recording::{Sounding, holds_piece, read_sounding, read_wave_blob},
+    routes::{
+        RouteState,
+        item::json_response,
+        recording::{missing_recording, read_ids},
+    },
     storage::{Storage, read},
     wav,
 };
@@ -50,20 +54,16 @@ pub(crate) fn create_router() -> Router<RouteState> {
             get(delivery_wave),
         )
         .route(
-            "/api/audio/project/{projectId}/recording/pieces",
+            "/api/audio/project/{projectId}/recording/{recordingId}/pieces",
             get(recording_pieces),
         )
         .route(
-            "/api/audio/project/{projectId}/recording/piece/{blobId}",
+            "/api/audio/project/{projectId}/recording/{recordingId}/piece/{blobId}",
             get(recording_piece),
         )
         .route(
-            "/api/audio/project/{projectId}/recording/wave",
+            "/api/audio/project/{projectId}/recording/{recordingId}/wave",
             get(recording_wave),
-        )
-        .route(
-            "/api/audio/project/{projectId}/recording/history",
-            get(recording_history),
         )
 }
 
@@ -123,43 +123,44 @@ async fn delivery_wave(
 
 async fn recording_pieces(
     State(state): State<RouteState>,
-    Path(raw_project_id): Path<String>,
+    Path((raw_project_id, raw_recording_id)): Path<(String, String)>,
 ) -> Response<Body> {
-    let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return finish(Err(invalid_number(PROJECT_ID)));
+    let (project_id, recording_id) = match read_ids(&raw_project_id, &raw_recording_id) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
-    finish(send_recording_pieces(&state.storage, project_id).await)
+    finish(send_recording_pieces(&state.storage, project_id, recording_id).await)
 }
 
 async fn recording_piece(
     State(state): State<RouteState>,
-    Path((raw_project_id, blob_id)): Path<(String, String)>,
+    Path((raw_project_id, raw_recording_id, blob_id)): Path<(String, String, String)>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return finish(Err(invalid_number(PROJECT_ID)));
+    let (project_id, recording_id) = match read_ids(&raw_project_id, &raw_recording_id) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
-    finish(send_recording_piece(&state.storage, project_id, blob_id, request.headers()).await)
-}
-
-async fn recording_history(
-    State(state): State<RouteState>,
-    Path(raw_project_id): Path<String>,
-) -> Response<Body> {
-    let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return finish(Err(invalid_number(PROJECT_ID)));
-    };
-    finish(send_recording_history(&state.storage, project_id).await)
+    finish(
+        send_recording_piece(
+            &state.storage,
+            (project_id, recording_id),
+            blob_id,
+            request.headers(),
+        )
+        .await,
+    )
 }
 
 async fn recording_wave(
     State(state): State<RouteState>,
-    Path(raw_project_id): Path<String>,
+    Path((raw_project_id, raw_recording_id)): Path<(String, String)>,
 ) -> Response<Body> {
-    let Ok(project_id) = raw_project_id.parse::<i64>() else {
-        return finish(Err(invalid_number(PROJECT_ID)));
+    let (project_id, recording_id) = match read_ids(&raw_project_id, &raw_recording_id) {
+        Ok(found) => found,
+        Err(failure) => return finish(Err(failure)),
     };
-    finish(send_recording_wave(&state.storage, project_id).await)
+    finish(send_recording_wave(&state.storage, project_id, recording_id).await)
 }
 
 async fn send_master(
@@ -252,16 +253,16 @@ async fn send_peaks(
 async fn send_recording_pieces(
     storage: &Arc<Storage>,
     project_id: i64,
+    recording_id: i64,
 ) -> Result<Response<Body>, Failure> {
-    let found = read_sounding(storage, project_id)
-        .await
-        .map_err(Failure::failed)?;
     let Some(Sounding {
         sample_rate,
         pieces,
-    }) = found
+    }) = read_sounding(storage, project_id, recording_id)
+        .await
+        .map_err(Failure::failed)?
     else {
-        return Ok(json_response(&json!({ "pieces": [] })));
+        return Err(missing_recording(project_id, recording_id));
     };
     let listed: Vec<_> = pieces
         .iter()
@@ -280,16 +281,16 @@ async fn send_recording_pieces(
 
 async fn send_recording_piece(
     storage: &Arc<Storage>,
-    project_id: i64,
+    (project_id, recording_id): (i64, i64),
     blob_id: String,
     request: &HeaderMap,
 ) -> Result<Response<Body>, Failure> {
-    let held = holds_piece(storage, project_id, &blob_id)
+    let held = holds_piece(storage, project_id, recording_id, &blob_id)
         .await
         .map_err(Failure::failed)?;
     if !held {
         return Err(Failure::NotFound(format!(
-            "Recording piece {blob_id} of project {project_id} not found"
+            "Recording piece {blob_id} of recording {recording_id} not found"
         )));
     }
     let blob = CachedBlob {
@@ -301,36 +302,24 @@ async fn send_recording_piece(
     send_cached(storage, request, blob).await
 }
 
-async fn send_recording_history(
-    storage: &Arc<Storage>,
-    project_id: i64,
-) -> Result<Response<Body>, Failure> {
-    let history = read_history(storage, project_id)
-        .await
-        .map_err(Failure::failed)?;
-    Ok(json_response(&json!({
-        "canUndo": history.can_undo,
-        "canRedo": history.can_redo,
-    })))
-}
-
 async fn send_recording_wave(
     storage: &Arc<Storage>,
     project_id: i64,
+    recording_id: i64,
 ) -> Result<Response<Body>, Failure> {
-    let found = read(storage, move |database| database.recording(project_id)).await?;
-    let Some(recording) = found else {
+    let found = read_wave_blob(storage, project_id, recording_id)
+        .await
+        .map_err(Failure::failed)?;
+    let Some(wave_blob_id) = found.ok_or_else(|| missing_recording(project_id, recording_id))?
+    else {
         return Ok(send_generated(
             PEAKS_CONTENT_TYPE,
             vec![0; PEAK_BYTE_LENGTH],
         ));
     };
     let blob = StoredBlob {
-        missing_message: format!(
-            "Recording wave blob for id {} not found",
-            recording.wave_blob_id
-        ),
-        blob_id: recording.wave_blob_id,
+        missing_message: format!("Recording wave blob for id {wave_blob_id} not found"),
+        blob_id: wave_blob_id,
         content_type: PEAKS_CONTENT_TYPE,
     };
     send_stored(storage, blob).await

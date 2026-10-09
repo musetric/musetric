@@ -1,6 +1,8 @@
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
+import { getActiveRecording } from '@musetric/engine';
 import { stackedLaneGap } from '@musetric/spectrogram';
 import { type FC, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import {
   chordBlockInset,
@@ -8,6 +10,7 @@ import {
   chordLaneHeight,
 } from '../chords/ChordLane.js';
 import { ChordsToggleButton } from '../chords/ChordsToggleButton.js';
+import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
 import { useSpectrogramGesture } from '../spectrogram/useSpectrogramGesture.js';
@@ -18,11 +21,18 @@ import { TrackLabel } from '../waveform/TrackLabel.js';
 
 const noteNamesInset = 16;
 
-const recordingBandTop = `calc(50% + ${stackedLaneGap / 2}px)`;
+const leadBandTop = `calc(50% + ${stackedLaneGap / 2}px)`;
+
+const notesPickerInset = 32;
 
 export const ProjectSpectrogramVisualization: FC = () => {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const spectrogramAreaRef = useRef<HTMLDivElement>(null);
+  const emptyRecordingName = useEngineStore((state) => {
+    const active = getActiveRecording(state);
+    return active?.empty && !state.recording ? active.name : undefined;
+  });
   const chordsOpen = useProjectStore((state) => state.chordsOpen);
   const spectrum = useEngineStore(
     (state) => state.spectrogramView === 'spectrum',
@@ -50,13 +60,47 @@ export const ProjectSpectrogramVisualization: FC = () => {
         <Box ref={spectrogramAreaRef} height='100%' position='relative'>
           <SpectrogramCanvas />
           <SpectrogramNoteScale />
-          {spectrum && (
+          {spectrum ? (
             <>
               <Box
                 position='absolute'
                 top={0}
                 right={0}
-                bottom={recordingBandTop}
+                bottom={leadBandTop}
+                left={noteNamesInset}
+                sx={{ pointerEvents: 'none' }}
+              >
+                <Box
+                  position='absolute'
+                  top={8}
+                  left={8}
+                  zIndex={1}
+                  sx={{ pointerEvents: 'auto' }}
+                >
+                  <RecordingPicker variant='picture' />
+                </Box>
+                {emptyRecordingName !== undefined && (
+                  <Typography
+                    variant='body2'
+                    color='text.secondary'
+                    position='absolute'
+                    top='50%'
+                    left={0}
+                    right={0}
+                    textAlign='center'
+                    sx={{ transform: 'translateY(-50%)' }}
+                  >
+                    {t('pages.project.recording.emptyBand', {
+                      name: emptyRecordingName,
+                    })}
+                  </Typography>
+                )}
+              </Box>
+              <Box
+                position='absolute'
+                top={leadBandTop}
+                right={0}
+                bottom={0}
                 left={noteNamesInset}
                 sx={{ pointerEvents: 'none' }}
               >
@@ -66,17 +110,11 @@ export const ProjectSpectrogramVisualization: FC = () => {
                   variant='spectrogram'
                 />
               </Box>
-              <Box
-                position='absolute'
-                top={recordingBandTop}
-                right={0}
-                bottom={0}
-                left={noteNamesInset}
-                sx={{ pointerEvents: 'none' }}
-              >
-                <TrackLabel kind='recording' variant='spectrogram' />
-              </Box>
             </>
+          ) : (
+            <Box position='absolute' top={8} left={notesPickerInset} zIndex={1}>
+              <RecordingPicker variant='picture' />
+            </Box>
           )}
         </Box>
         <VisualizationCursor mode='spectrogram' />

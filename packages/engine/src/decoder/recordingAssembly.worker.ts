@@ -44,7 +44,10 @@ type LoadedPiece = {
 };
 
 export type RecordingAssembly = {
-  load: (projectId: number) => Promise<PlayerRecordingPiece[]>;
+  load: (
+    projectId: number,
+    recordingId: number,
+  ) => Promise<PlayerRecordingPiece[]>;
 };
 
 export const createRecordingAssembly = (
@@ -54,6 +57,7 @@ export const createRecordingAssembly = (
 
   const decode = async (
     projectId: number,
+    recordingId: number,
     blobId: string,
   ): Promise<Float32Array<ArrayBuffer> | undefined> => {
     const cached = decoded.get(blobId);
@@ -61,7 +65,7 @@ export const createRecordingAssembly = (
       return cached;
     }
     try {
-      const content = await getRecordingPiece(projectId, blobId);
+      const content = await getRecordingPiece(projectId, recordingId, blobId);
       const { channels } = await decodeWav(content.buffer, sampleRate);
       return channels[0];
     } catch (error) {
@@ -72,27 +76,30 @@ export const createRecordingAssembly = (
     }
   };
 
-  const loadOnce = async (projectId: number): Promise<LoadedPiece[]> => {
-    const { pieces } = await getRecordingPieces(projectId);
+  const loadOnce = async (
+    projectId: number,
+    recordingId: number,
+  ): Promise<LoadedPiece[]> => {
+    const { pieces } = await getRecordingPieces(projectId, recordingId);
     return await Promise.all(
       pieces.map(async (piece) => ({
         songStartFrame: (piece.songStartFrame * sampleRate) / piece.sampleRate,
         tempo: piece.tempo,
         blobId: piece.blobId,
-        samples: await decode(projectId, piece.blobId),
+        samples: await decode(projectId, recordingId, piece.blobId),
       })),
     );
   };
 
   return {
-    load: async (projectId) => {
-      let loaded = await loadOnce(projectId);
+    load: async (projectId, recordingId) => {
+      let loaded = await loadOnce(projectId, recordingId);
       for (
         let attempt = 1;
         attempt < loadAttempts && loaded.some((piece) => !piece.samples);
         attempt += 1
       ) {
-        loaded = await loadOnce(projectId);
+        loaded = await loadOnce(projectId, recordingId);
       }
       const present = loaded.flatMap((piece) =>
         piece.samples ? [{ ...piece, samples: piece.samples }] : [],

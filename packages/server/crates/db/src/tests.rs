@@ -5,8 +5,9 @@ use std::{
 };
 
 use crate::{
-    MIGRATIONS, Migration, MigrationFailure, MigrationReport, OpenOptions, create_backup_name,
-    init_database, open_database, open_readonly, read_schema_version, run_migrations,
+    MIGRATIONS, Migration, MigrationFailure, MigrationReport, NewProject, OpenOptions, Reader,
+    RecordingLayer, RecordingOutcome, RecordingPiece, Writer, create_backup_name, init_database,
+    open_database, open_readonly, read_schema_version, run_migrations,
 };
 use rusqlite::Connection;
 use time::macros::datetime;
@@ -318,9 +319,10 @@ const BLOB_SEED: &str = "
   INSERT INTO Rhythm (projectId, blobId) VALUES (1, 'Rhythm.blobId');
   INSERT INTO Key (projectId, blobId) VALUES (1, 'Key.blobId');
   INSERT INTO Chords (projectId, blobId) VALUES (1, 'Chords.blobId');
-  INSERT INTO Recording (projectId, waveBlobId, sampleRate, frameCount)
-    VALUES (1, 'Recording.waveBlobId', 44100, 100);
-  INSERT INTO RecordingPiece (projectId, blobId, layer, songStartFrame, frameCount, tempo)
+  INSERT INTO Recording (projectId, name, active, waveBlobId, sampleRate, frameCount)
+    VALUES (1, 'Recording 1', 1, 'Recording.waveBlobId', 44100, 100);
+  INSERT INTO Recording (projectId, name) VALUES (1, 'Recording 2');
+  INSERT INTO RecordingPiece (recordingId, blobId, layer, songStartFrame, frameCount, tempo)
     VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100, 1.0);
 ";
 
@@ -381,4 +383,141 @@ fn lists_a_value_stored_in_every_blob_column() {
     blob_ids.sort();
 
     assert_eq!(blob_ids, BLOB_COLUMNS);
+}
+
+fn open_project(workspace: &Workspace) -> (Writer, Reader, i64) {
+    init_database(&workspace.database_path()).unwrap();
+    let writer = Writer::open(&workspace.database_path()).unwrap();
+    let project_id = writer
+        .create_project(&NewProject {
+            name: "song".to_owned(),
+            song_blob_id: "song".to_owned(),
+            sample_rate: 48000,
+            frame_count: 100,
+            preview: None,
+        })
+        .unwrap();
+    let reader = Reader::open(&workspace.database_path()).unwrap();
+    (writer, reader, project_id)
+}
+
+fn listed(reader: &Reader, project_id: i64) -> Vec<(String, bool)> {
+    reader
+        .recordings(project_id)
+        .unwrap()
+        .into_iter()
+        .map(|recording| (recording.name, recording.active))
+        .collect()
+}
+
+#[test]
+fn creates_the_first_recording_together_with_the_project() {
+    let workspace = Workspace::new();
+    let (_writer, reader, project_id) = open_project(&workspace);
+
+    assert_eq!(
+        listed(&reader, project_id),
+        [("Recording 1".to_owned(), true)]
+    );
+    assert_eq!(reader.recordings(project_id).unwrap()[0].audio, None);
+}
+
+#[test]
+fn keeps_exactly_one_recording_active() {
+    let workspace = Workspace::new();
+    let (writer, reader, project_id) = open_project(&workspace);
+    let first = reader.recordings(project_id).unwrap()[0].id;
+
+    writer.create_recording(project_id).unwrap();
+    writer.create_recording(project_id).unwrap();
+    assert_eq!(
+        writer.activate_recording(project_id, first).unwrap(),
+        RecordingOutcome::Done
+    );
+
+    assert_eq!(
+        listed(&reader, project_id),
+        [
+            ("Recording 1".to_owned(), true),
+            ("Recording 2".to_owned(), false),
+            ("Recording 3".to_owned(), false),
+        ]
+    );
+    assert_eq!(writer.create_recording(404).unwrap(), None);
+    assert_eq!(
+        writer.activate_recording(404, first).unwrap(),
+        RecordingOutcome::Missing
+    );
+}
+
+#[test]
+fn refuses_a_name_another_recording_of_the_project_holds() {
+    let workspace = Workspace::new();
+    let (writer, reader, project_id) = open_project(&workspace);
+    let second = writer.create_recording(project_id).unwrap().unwrap();
+
+    assert_eq!(
+        writer
+            .rename_recording(project_id, second, "recording 1")
+            .unwrap(),
+        RecordingOutcome::Refused
+    );
+    assert_eq!(
+        writer
+            .rename_recording(project_id, second, "Slow verse")
+            .unwrap(),
+        RecordingOutcome::Done
+    );
+    assert_eq!(
+        writer
+            .create_recording(project_id)
+            .unwrap()
+            .map(|id| { reader.recording(id).unwrap().unwrap().name }),
+        Some("Recording 2".to_owned())
+    );
+}
+
+#[test]
+fn hands_the_active_role_to_a_neighbour_of_a_removed_recording() {
+    let workspace = Workspace::new();
+    let (writer, reader, project_id) = open_project(&workspace);
+    let first = reader.recordings(project_id).unwrap()[0].id;
+    let second = writer.create_recording(project_id).unwrap().unwrap();
+    writer.create_recording(project_id).unwrap();
+    writer.activate_recording(project_id, second).unwrap();
+    writer
+        .replace_recording_pieces(
+            second,
+            &[RecordingPiece {
+                blob_id: "take".to_owned(),
+                layer: RecordingLayer::Fresh,
+                song_start_frame: 0,
+                frame_count: 10,
+                tempo: 1.0,
+            }],
+            true,
+        )
+        .unwrap();
+
+    assert_eq!(
+        writer.remove_recording(project_id, second).unwrap(),
+        RecordingOutcome::Done
+    );
+    assert_eq!(
+        listed(&reader, project_id),
+        [
+            ("Recording 1".to_owned(), true),
+            ("Recording 3".to_owned(), false),
+        ]
+    );
+    assert!(reader.recording_pieces(second).unwrap().is_empty());
+    assert_eq!(reader.referenced_blob_ids().unwrap(), ["song"]);
+
+    writer
+        .remove_recording(project_id, reader.recordings(project_id).unwrap()[1].id)
+        .unwrap();
+    assert_eq!(
+        writer.remove_recording(project_id, first).unwrap(),
+        RecordingOutcome::Refused
+    );
 }

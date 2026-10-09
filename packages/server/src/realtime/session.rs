@@ -31,7 +31,7 @@ pub(crate) struct PeakPatch {
 }
 
 pub(crate) struct Session {
-    project_id: i64,
+    recording_id: i64,
     song_frame_count: i64,
     sample_rate: i64,
     tempo: f64,
@@ -48,6 +48,7 @@ impl Session {
     pub(crate) async fn create(
         storage: &Arc<Storage>,
         project_id: i64,
+        recording_id: i64,
         format: TakeFormat,
     ) -> Result<Self, BoxedError> {
         let found =
@@ -57,7 +58,7 @@ impl Session {
         }
         let area = recording_area(&storage.work_path, project_id);
         open_area(&area).await?;
-        let recording = ensure_recording(storage, &area, project_id, format).await?;
+        let recording = ensure_recording(storage, &area, recording_id, format).await?;
         let take = stage_blob(&area, &storage.blobs_path);
         let mut audio = take.create().await?;
         audio
@@ -66,7 +67,7 @@ impl Session {
         let wave =
             open_for_update(&blob_path(&storage.blobs_path, &recording.wave_blob_id)).await?;
         Ok(Self {
-            project_id,
+            recording_id,
             song_frame_count: recording.frame_count,
             sample_rate: recording.sample_rate,
             tempo: format.tempo,
@@ -219,7 +220,9 @@ impl Session {
                     blob: self.take,
                     piece,
                 };
-                commit_take(storage, self.project_id, take).await.map(Some)
+                commit_take(storage, self.recording_id, take)
+                    .await
+                    .map(Some)
             }
             _ => {
                 self.take.discard().await;

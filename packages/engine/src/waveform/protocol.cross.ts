@@ -14,6 +14,7 @@ export type WaveformOutboundMethods = {
   }) => void;
   mountRecording: (message: {
     projectId: number;
+    recordingId?: number;
     canvas: OffscreenCanvas;
     colors: WaveformColors;
     viewSize: ViewSize;
@@ -27,7 +28,9 @@ export type WaveformOutboundMethods = {
   resizeRecording: (message: { viewSize: ViewSize }) => void;
   refreshDelivery: (message: { stemType: StemType }) => void;
   refreshRecording: () => void;
+  setRecording: (message: { recordingId?: number }) => void;
   applyRecordingPeakPatch: (message: {
+    recordingId: number;
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
   }) => void;
@@ -62,6 +65,7 @@ export const waveformChannel = createMessageChannel<
       'resizeRecording',
       'refreshDelivery',
       'refreshRecording',
+      'setRecording',
       'applyRecordingPeakPatch',
     ],
     transfers: {

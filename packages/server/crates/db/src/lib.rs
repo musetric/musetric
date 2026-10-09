@@ -9,6 +9,7 @@ mod preview;
 mod processing;
 mod project;
 mod reader;
+mod recording;
 mod runner;
 mod schema;
 mod writer;
@@ -17,10 +18,7 @@ mod writer;
 mod tests;
 
 pub use analysis::{Analysis, StemLoudness};
-pub use audio::{
-    AudioDelivery, MASTER_TYPES, MasterType, Recording, RecordingLayer, RecordingPiece, STEM_TYPES,
-    StemType,
-};
+pub use audio::{AudioDelivery, MASTER_TYPES, MasterType, STEM_TYPES, StemType};
 pub use backup::create_backup_name;
 pub use blob::blob_path;
 pub use database::{OpenOptions, open_database, open_readonly, read_schema_version};
@@ -33,8 +31,7 @@ pub use processing::{
 };
 pub use project::ProjectItem;
 pub use reader::{ProjectOverview, Reader};
+pub use recording::{Recording, RecordingAudio, RecordingLayer, RecordingOutcome, RecordingPiece};
 pub use runner::{MigrationReport, init_database, run_migrations};
 pub use schema::{MIGRATIONS, Migration};
-pub use writer::{
-    NewDelivery, NewPreview, NewProject, NewRecording, NewStem, NewStems, ProjectEdit, Writer,
-};
+pub use writer::{NewDelivery, NewPreview, NewProject, NewStem, NewStems, ProjectEdit, Writer};

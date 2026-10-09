@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createApiEvent } from '../common/apiEvent.js';
 import { createApiRoute } from '../common/apiRoute.js';
 import * as preview from './preview.js';
+import type * as recording from './recording.js';
 
 export const downloadStatusSchema = z.enum(['processing', 'cached', 'done']);
 
@@ -175,20 +176,19 @@ export namespace realtime {
     | {
         type: 'recording.started';
         sessionId: string;
+        recordingId: number;
         tempo: number;
         startFrame?: number;
       }
     | {
         type: 'recording.peaksChanged';
+        recordingId: number;
         startPeakIndex: number;
         peaks: number[];
       }
     | { type: 'recording.finished'; sessionId: string }
-    | {
-        type: 'recording.changed';
-        canUndo: boolean;
-        canRedo: boolean;
-      }
+    | { type: 'recording.changed'; recordingId: number }
+    | { type: 'recording.list'; recordings: recording.Item[] }
     | { type: 'error'; error: string }
     | { type: 'player.play' }
     | { type: 'player.record' }

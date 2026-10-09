@@ -1,6 +1,8 @@
 use std::{collections::HashMap, path::Path, sync::Arc};
 
-use musetric_db::{BoxedError, NewRecording, Recording, RecordingLayer, RecordingPiece, blob_path};
+use musetric_db::{
+    BoxedError, Recording, RecordingAudio, RecordingLayer, RecordingPiece, blob_path,
+};
 use musetric_media::WAVE_PEAK_COUNT;
 use tokio::fs::{read as read_file, rename, try_exists, write as write_file};
 
@@ -14,7 +16,7 @@ use crate::{
 
 const FULL_SCALE: f64 = 32768.0;
 const PEAK_BYTE_LENGTH: usize = WAVE_PEAK_COUNT * 2 * 4;
-const MISSING_RECORDING: &str = "The recording of this project is missing";
+const MISSING_RECORDING: &str = "The recording is missing";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct History {
@@ -40,20 +42,38 @@ pub(crate) struct Sounding {
     pub(crate) pieces: Vec<RecordingPiece>,
 }
 
+pub(crate) struct RecordingSummary {
+    pub(crate) id: i64,
+    pub(crate) name: String,
+    pub(crate) active: bool,
+    pub(crate) history: History,
+    pub(crate) empty: bool,
+}
+
 type PcmCache = HashMap<String, Vec<i16>>;
 
 async fn read_state(
     storage: &Arc<Storage>,
-    project_id: i64,
+    recording_id: i64,
 ) -> Result<Option<(Recording, Vec<RecordingPiece>)>, BoxedError> {
     read_database(storage, move |database| {
-        let Some(recording) = database.recording(project_id)? else {
+        let Some(recording) = database.recording(recording_id)? else {
             return Ok(None);
         };
-        let pieces = database.recording_pieces(project_id)?;
+        let pieces = database.recording_pieces(recording_id)?;
         Ok(Some((recording, pieces)))
     })
     .await
+}
+
+async fn read_project_state(
+    storage: &Arc<Storage>,
+    project_id: i64,
+    recording_id: i64,
+) -> Result<Option<(Recording, Vec<RecordingPiece>)>, BoxedError> {
+    Ok(read_state(storage, recording_id)
+        .await?
+        .filter(|(recording, _)| recording.project_id == project_id))
 }
 
 fn history_of(recording: &Recording, pieces: &[RecordingPiece]) -> History {
@@ -64,14 +84,37 @@ fn history_of(recording: &Recording, pieces: &[RecordingPiece]) -> History {
     }
 }
 
-pub(crate) async fn read_history(
+pub(crate) async fn read_recordings(
     storage: &Arc<Storage>,
     project_id: i64,
-) -> Result<History, BoxedError> {
-    Ok(read_state(storage, project_id)
-        .await?
-        .map(|(recording, pieces)| history_of(&recording, &pieces))
-        .unwrap_or_default())
+) -> Result<Vec<RecordingSummary>, BoxedError> {
+    read_database(storage, move |database| {
+        let mut summaries = Vec::new();
+        for recording in database.recordings(project_id)? {
+            let pieces = database.recording_pieces(recording.id)?;
+            summaries.push(RecordingSummary {
+                id: recording.id,
+                history: history_of(&recording, &pieces),
+                empty: sounding(&recording, &pieces).is_empty(),
+                name: recording.name,
+                active: recording.active,
+            });
+        }
+        Ok(summaries)
+    })
+    .await
+}
+
+pub(crate) async fn is_active_recording(
+    storage: &Arc<Storage>,
+    project_id: i64,
+    recording_id: i64,
+) -> Result<bool, BoxedError> {
+    Ok(
+        read_database(storage, move |database| database.recording(recording_id))
+            .await?
+            .is_some_and(|recording| recording.project_id == project_id && recording.active),
+    )
 }
 
 async fn read_pcm(storage: &Arc<Storage>, blob_id: &str) -> Result<Option<Vec<i16>>, BoxedError> {
@@ -161,6 +204,7 @@ fn render(frame_count: i64, layers: &[&RecordingPiece], pcm: &PcmCache) -> Vec<i
 async fn compose(
     storage: &Arc<Storage>,
     recording: &Recording,
+    frame_count: i64,
     pieces: &[RecordingPiece],
 ) -> Result<Vec<i16>, BoxedError> {
     let blob_ids = sounding(recording, pieces)
@@ -168,32 +212,47 @@ async fn compose(
         .map(|piece| piece.blob_id.clone())
         .collect();
     let pcm = load_pcm(storage, blob_ids).await?;
-    Ok(render(
-        recording.frame_count,
-        &sounding(recording, pieces),
-        &pcm,
-    ))
+    Ok(render(frame_count, &sounding(recording, pieces), &pcm))
 }
 
 pub(crate) async fn read_sounding(
     storage: &Arc<Storage>,
     project_id: i64,
+    recording_id: i64,
 ) -> Result<Option<Sounding>, BoxedError> {
-    let Some((recording, pieces)) = read_state(storage, project_id).await? else {
+    let Some((recording, pieces)) = read_project_state(storage, project_id, recording_id).await?
+    else {
         return Ok(None);
     };
+    let Some(audio) = recording.audio.as_ref() else {
+        return Ok(Some(Sounding {
+            sample_rate: 0,
+            pieces: Vec::new(),
+        }));
+    };
     Ok(Some(Sounding {
-        sample_rate: recording.sample_rate,
+        sample_rate: audio.sample_rate,
         pieces: sounding(&recording, &pieces).into_iter().cloned().collect(),
     }))
+}
+
+pub(crate) async fn read_wave_blob(
+    storage: &Arc<Storage>,
+    project_id: i64,
+    recording_id: i64,
+) -> Result<Option<Option<String>>, BoxedError> {
+    Ok(read_project_state(storage, project_id, recording_id)
+        .await?
+        .map(|(recording, _)| recording.audio.map(|audio| audio.wave_blob_id)))
 }
 
 pub(crate) async fn holds_piece(
     storage: &Arc<Storage>,
     project_id: i64,
+    recording_id: i64,
     blob_id: &str,
 ) -> Result<bool, BoxedError> {
-    Ok(read_state(storage, project_id)
+    Ok(read_project_state(storage, project_id, recording_id)
         .await?
         .is_some_and(|(_, pieces)| pieces.iter().any(|piece| piece.blob_id == blob_id)))
 }
@@ -258,52 +317,51 @@ fn encode_peaks(peaks: &[f32]) -> Vec<u8> {
     bytes
 }
 
-async fn write_peaks(storage: &Arc<Storage>, project_id: i64) -> Result<(), BoxedError> {
-    let (recording, pieces) = read_state(storage, project_id)
+async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), BoxedError> {
+    let (recording, pieces) = read_state(storage, recording_id)
         .await?
         .ok_or(MISSING_RECORDING)?;
-    let samples = compose(storage, &recording, &pieces).await?;
-    let path = blob_path(&storage.blobs_path, &recording.wave_blob_id);
+    let Some(audio) = recording.audio.as_ref() else {
+        return Ok(());
+    };
+    let samples = compose(storage, &recording, audio.frame_count, &pieces).await?;
+    let path = blob_path(&storage.blobs_path, &audio.wave_blob_id);
     let staged = path.with_extension("next");
     write_file(&staged, encode_peaks(&measure_peaks(&samples))).await?;
     rename(&staged, &path).await?;
     Ok(())
 }
 
-async fn refresh_peaks(storage: &Arc<Storage>, project_id: i64) {
-    let _ = write_peaks(storage, project_id).await;
+async fn refresh_peaks(storage: &Arc<Storage>, recording_id: i64) {
+    let _ = write_peaks(storage, recording_id).await;
 }
 
 pub(crate) async fn ensure_recording(
     storage: &Arc<Storage>,
     area: &Path,
-    project_id: i64,
+    recording_id: i64,
     format: TakeFormat,
-) -> Result<Recording, BoxedError> {
-    let existing = read_database(storage, move |database| database.recording(project_id)).await?;
-    if let Some(recording) = existing {
-        return Ok(recording);
+) -> Result<RecordingAudio, BoxedError> {
+    let existing = read_database(storage, move |database| database.recording(recording_id))
+        .await?
+        .ok_or(MISSING_RECORDING)?;
+    if let Some(audio) = existing.audio {
+        return Ok(audio);
     }
     let wave = stage_blob(area, &storage.blobs_path);
     wave.create().await?;
     write_file(wave.path(), vec![0_u8; PEAK_BYTE_LENGTH]).await?;
-    let recording = NewRecording {
-        project_id,
+    let audio = RecordingAudio {
         wave_blob_id: wave.blob_id().to_owned(),
         sample_rate: format.sample_rate,
         frame_count: format.frame_count,
     };
-    let created = Recording {
-        wave_blob_id: recording.wave_blob_id.clone(),
-        sample_rate: format.sample_rate,
-        frame_count: format.frame_count,
-        fresh_applied: true,
-    };
+    let stored = audio.clone();
     publish(storage, &[&wave], move |writer| {
-        writer.create_recording(&recording)
+        writer.set_recording_audio(recording_id, &stored)
     })
     .await?;
-    Ok(created)
+    Ok(audio)
 }
 
 async fn write_planned(
@@ -331,12 +389,17 @@ async fn write_planned(
 
 pub(crate) async fn commit_take(
     storage: &Arc<Storage>,
-    project_id: i64,
+    recording_id: i64,
     take: FinishedTake<'_>,
 ) -> Result<History, BoxedError> {
-    let (recording, stored) = read_state(storage, project_id)
+    let (recording, stored) = read_state(storage, recording_id)
         .await?
         .ok_or(MISSING_RECORDING)?;
+    let sample_rate = recording
+        .audio
+        .as_ref()
+        .ok_or(MISSING_RECORDING)?
+        .sample_rate;
     let pieces = present_pieces(storage, stored).await?;
     let base = base_pieces(&pieces);
     let planned = match fresh_piece(&pieces) {
@@ -356,7 +419,7 @@ pub(crate) async fn commit_take(
             reused.to_owned()
         } else {
             let blob = stage_blob(take.area, &storage.blobs_path);
-            write_planned(&blob, plan, &pcm, recording.sample_rate).await?;
+            write_planned(&blob, plan, &pcm, sample_rate).await?;
             let blob_id = blob.blob_id().to_owned();
             staged.push(blob);
             blob_id
@@ -373,10 +436,10 @@ pub(crate) async fn commit_take(
     staged.push(take.blob);
     let committed: Vec<&StagedBlob> = staged.iter().collect();
     publish(storage, &committed, move |writer| {
-        writer.replace_recording_pieces(project_id, &next, true)
+        writer.replace_recording_pieces(recording_id, &next, true)
     })
     .await?;
-    refresh_peaks(storage, project_id).await;
+    refresh_peaks(storage, recording_id).await;
     Ok(History {
         can_undo: true,
         can_redo: false,
@@ -386,19 +449,21 @@ pub(crate) async fn commit_take(
 pub(crate) async fn set_fresh_applied(
     storage: &Arc<Storage>,
     project_id: i64,
+    recording_id: i64,
     applied: bool,
 ) -> Result<Option<History>, BoxedError> {
-    let Some((recording, pieces)) = read_state(storage, project_id).await? else {
+    let Some((recording, pieces)) = read_project_state(storage, project_id, recording_id).await?
+    else {
         return Ok(None);
     };
     if fresh_piece(&pieces).is_none() || recording.fresh_applied == applied {
         return Ok(None);
     }
     write_database(storage, move |writer| {
-        writer.set_recording_fresh_applied(project_id, applied)
+        writer.set_recording_fresh_applied(recording_id, applied)
     })
     .await?;
-    refresh_peaks(storage, project_id).await;
+    refresh_peaks(storage, recording_id).await;
     Ok(Some(History {
         can_undo: applied,
         can_redo: !applied,

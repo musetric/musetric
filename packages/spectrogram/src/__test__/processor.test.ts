@@ -1,9 +1,6 @@
 import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
-import {
-  stackedLaneGap,
-  stackedLaneRadius,
-} from '../common/stackedLanes.es.js';
+import { stackedLaneRadius } from '../common/stackedLanes.es.js';
 import { type SpectrogramConfig } from '../config.cross.js';
 import { type SpectrogramProcessor } from '../processor.js';
 import {
@@ -20,6 +17,8 @@ import {
   expectMatchesReference,
   progressForColumns,
   singleBandConfig,
+  stackedBands,
+  stackedConfig,
   toneFrequency,
   withProcessor,
   writeCentreTone,
@@ -90,24 +89,8 @@ const maxRedClearOfCorners = (
   );
 };
 
-const stackedBands = (height: number) => {
-  const leadHeight = Math.floor((height - stackedLaneGap) / 2);
-  const recordingTop = leadHeight + stackedLaneGap;
-  return { leadHeight, recordingTop, recordingHeight: height - recordingTop };
-};
-
-const stackedConfig = () => {
-  const base = singleBandConfig();
-  return singleBandConfig({
-    lanes: {
-      ...base.lanes,
-      recording: { ...base.lanes.recording, showSpectrogram: true },
-    },
-  });
-};
-
 describe('spectrogram processor', () => {
-  it('draws the lead across the whole width above the recording, clear between', async () => {
+  it('draws the lead across the whole width below the recording, clear between', async () => {
     const config = stackedConfig();
     await withProcessor({ device, config }, async (processor) => {
       const length = config.sampleRate * 5;
@@ -122,7 +105,12 @@ describe('spectrogram processor', () => {
         maxInRect(
           pixels,
           width,
-          { left: 0, right: playhead - 1, top: 0, bottom: bands.leadHeight },
+          {
+            left: 0,
+            right: playhead - 1,
+            top: bands.leadTop,
+            bottom: height,
+          },
           redness,
         ),
       ).toBeGreaterThan(40);
@@ -133,8 +121,8 @@ describe('spectrogram processor', () => {
           {
             left: stackedLaneRadius,
             right: width - stackedLaneRadius,
-            top: bands.recordingTop,
-            bottom: height,
+            top: 0,
+            bottom: bands.recordingHeight,
           },
           redness,
         ),
@@ -146,8 +134,8 @@ describe('spectrogram processor', () => {
           {
             left: 0,
             right: width,
-            top: bands.leadHeight,
-            bottom: bands.recordingTop,
+            top: bands.recordingHeight,
+            bottom: bands.leadTop,
           },
           opacity,
         ),
@@ -155,7 +143,7 @@ describe('spectrogram processor', () => {
     });
   });
 
-  it('draws the recording in its own frequency rows below the lead', async () => {
+  it('draws the recording in its own frequency rows above the lead', async () => {
     const config = stackedConfig();
     await withProcessor({ device, config }, async (processor) => {
       const length = config.sampleRate * 5;
@@ -172,14 +160,17 @@ describe('spectrogram processor', () => {
           {
             left: stackedLaneRadius,
             right: width - stackedLaneRadius,
-            top: 0,
-            bottom: bands.leadHeight,
+            top: bands.leadTop,
+            bottom: height,
           },
           redness,
         ),
       ).toBeLessThan(16);
 
-      const recordingBand = pixels.subarray(bands.recordingTop * width * 4);
+      const recordingBand = pixels.subarray(
+        0,
+        bands.recordingHeight * width * 4,
+      );
       const expectedRow = rowAtFrequency(toneFrequency, {
         ...config,
         viewSize: { width, height: bands.recordingHeight },
@@ -220,7 +211,7 @@ describe('spectrogram processor', () => {
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: 0, bottom: bands.leadHeight },
+          { left: 0, right: width, top: bands.leadTop, bottom: height },
           greenness,
         ),
       ).toBeGreaterThan(40);
@@ -228,7 +219,7 @@ describe('spectrogram processor', () => {
         maxInRect(
           pixels,
           width,
-          { left: 0, right: width, top: bands.recordingTop, bottom: height },
+          { left: 0, right: width, top: 0, bottom: bands.recordingHeight },
           greenness,
         ),
       ).toBeLessThan(16);

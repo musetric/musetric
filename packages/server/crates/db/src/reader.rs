@@ -6,10 +6,7 @@ use crate::{
     analysis::{
         Analysis, StemLoudness, read_all_stem_loudness, read_analysis_blob, read_stem_loudness,
     },
-    audio::{
-        AudioDelivery, MasterType, Recording, RecordingPiece, StemType, read_delivery,
-        read_master_blob, read_recording, read_recording_pieces,
-    },
+    audio::{AudioDelivery, MasterType, StemType, read_delivery, read_master_blob},
     blob::read_referenced_blob_ids,
     database::{OpenOptions, open_database},
     failure::BoxedError,
@@ -21,6 +18,9 @@ use crate::{
     project::{
         ProjectItem, read_processing_paused, read_project, read_project_name, read_project_paused,
         read_projects,
+    },
+    recording::{
+        Recording, RecordingPiece, read_recording, read_recording_pieces, read_recordings,
     },
 };
 
@@ -121,12 +121,16 @@ impl Reader {
         self.read(|connection| read_delivery(connection, project_id, stem))
     }
 
-    pub fn recording(&self, project_id: i64) -> Result<Option<Recording>, BoxedError> {
-        self.read(|connection| read_recording(connection, project_id))
+    pub fn recording(&self, recording_id: i64) -> Result<Option<Recording>, BoxedError> {
+        self.read(|connection| read_recording(connection, recording_id))
     }
 
-    pub fn recording_pieces(&self, project_id: i64) -> Result<Vec<RecordingPiece>, BoxedError> {
-        self.read(|connection| read_recording_pieces(connection, project_id))
+    pub fn recordings(&self, project_id: i64) -> Result<Vec<Recording>, BoxedError> {
+        self.read(|connection| read_recordings(connection, project_id))
+    }
+
+    pub fn recording_pieces(&self, recording_id: i64) -> Result<Vec<RecordingPiece>, BoxedError> {
+        self.read(|connection| read_recording_pieces(connection, recording_id))
     }
 
     pub fn preview(&self, preview_id: i64) -> Result<Option<Preview>, BoxedError> {

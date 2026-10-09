@@ -1,5 +1,6 @@
 import { createGpuContext } from '@musetric/utils/gpu';
 import { expect } from 'vitest';
+import { stackedLaneGap } from '../common/stackedLanes.es.js';
 import { allTrackKeys, type SpectrogramConfig } from '../config.cross.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 import {
@@ -48,6 +49,22 @@ export const singleBandConfig = (
     viewSize: { width: 128, height: 128 },
     ...overrides,
   });
+
+export const stackedBands = (height: number) => {
+  const recordingHeight = Math.floor((height - stackedLaneGap) / 2);
+  const leadTop = recordingHeight + stackedLaneGap;
+  return { recordingHeight, leadTop, leadHeight: height - leadTop };
+};
+
+export const stackedConfig = () => {
+  const base = singleBandConfig();
+  return singleBandConfig({
+    lanes: {
+      ...base.lanes,
+      recording: { ...base.lanes.recording, showSpectrogram: true },
+    },
+  });
+};
 
 export const withProcessor = async <T>(
   options: CreateSpectrogramProcessorOptions,

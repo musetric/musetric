@@ -166,7 +166,7 @@ export const createPlayerRuntime = async (
       frameCount = message.frameCount;
       tracks = message.tracks;
       recordingTrack.clear();
-      recordingTrack.setPieces(message.recording);
+      recordingTrack.setPieces({ pieces: message.recording });
       frameIndex = 0;
       outputOffsetFrameIndex = 0;
       playing = false;
@@ -175,7 +175,7 @@ export const createPlayerRuntime = async (
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
     setRecordingPieces: (message) => {
-      recordingTrack.setPieces(message.pieces, message.finishedTakeId);
+      recordingTrack.setPieces(message);
     },
     beginLiveTake: (message) => {
       recordingTrack.beginLiveTake(message);

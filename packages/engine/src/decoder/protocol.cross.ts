@@ -1,3 +1,4 @@
+import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type EngineDecoderOutboundMethods = {
@@ -41,13 +42,12 @@ export type EngineDecoderInboundMethods = {
   recordingStreamFinished: () => void;
   recordingStreamFailed: (message: { error: string }) => void;
   recordingPeaksChanged: (message: {
+    recordingId: number;
     startPeakIndex: number;
     peaks: Float32Array<ArrayBuffer>;
   }) => void;
-  recordingHistoryChanged: (message: {
-    canUndo: boolean;
-    canRedo: boolean;
-  }) => void;
+  recordingsChanged: (message: { recordings: api.recording.Item[] }) => void;
+  recordingContentChanged: (message: { recordingId: number }) => void;
   recordingExported: (message: { samples: Float32Array<ArrayBuffer> }) => void;
   recordingExportFailed: () => void;
   playerPlayRequested: () => void;
@@ -87,7 +87,8 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingStreamFinished',
       'recordingStreamFailed',
       'recordingPeaksChanged',
-      'recordingHistoryChanged',
+      'recordingsChanged',
+      'recordingContentChanged',
       'recordingExported',
       'recordingExportFailed',
       'playerPlayRequested',

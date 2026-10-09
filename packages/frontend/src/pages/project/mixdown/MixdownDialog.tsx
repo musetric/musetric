@@ -74,6 +74,7 @@ export const MixdownDialog: FC = () => {
             gridAutoRows='80px'
             gap={1}
           >
+            <TrackVolumeControl kind='recording' />
             {stemTypes.map((stemType) => (
               <TrackVolumeControl
                 key={stemType}
@@ -81,7 +82,6 @@ export const MixdownDialog: FC = () => {
                 stemType={stemType}
               />
             ))}
-            <TrackVolumeControl kind='recording' />
           </Box>
           <Stack gap={1}>
             <Typography variant='subtitle2'>

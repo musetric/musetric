@@ -1,7 +1,7 @@
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes};
 use serde_json::{Value, json};
 
-use crate::recording::History;
+use crate::recording::RecordingSummary;
 
 pub(crate) fn text(event: &Value) -> Message {
     Message::Text(Utf8Bytes::from(event.to_string()))
@@ -14,8 +14,18 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started(session_id: &str, tempo: f64, start_frame: Option<i64>) -> Value {
-    let mut event = json!({ "type": "recording.started", "sessionId": session_id, "tempo": tempo });
+pub(crate) fn recording_started(
+    session_id: &str,
+    recording_id: i64,
+    tempo: f64,
+    start_frame: Option<i64>,
+) -> Value {
+    let mut event = json!({
+        "type": "recording.started",
+        "sessionId": session_id,
+        "recordingId": recording_id,
+        "tempo": tempo,
+    });
     if let Some(frame) = start_frame {
         event["startFrame"] = json!(frame);
     }
@@ -26,17 +36,30 @@ pub(crate) fn recording_finished(session_id: &str) -> Value {
     json!({ "type": "recording.finished", "sessionId": session_id })
 }
 
-pub(crate) fn recording_changed(history: History) -> Value {
+pub(crate) fn recording_changed(recording_id: i64) -> Value {
+    json!({ "type": "recording.changed", "recordingId": recording_id })
+}
+
+pub(crate) fn recording_item(recording: &RecordingSummary) -> Value {
     json!({
-        "type": "recording.changed",
-        "canUndo": history.can_undo,
-        "canRedo": history.can_redo,
+        "id": recording.id,
+        "name": recording.name,
+        "active": recording.active,
+        "canUndo": recording.history.can_undo,
+        "canRedo": recording.history.can_redo,
+        "empty": recording.empty,
     })
 }
 
-pub(crate) fn peaks_changed(start_peak_index: usize, peaks: &[f32]) -> Value {
+pub(crate) fn recording_list(recordings: &[RecordingSummary]) -> Value {
+    let listed: Vec<Value> = recordings.iter().map(recording_item).collect();
+    json!({ "type": "recording.list", "recordings": listed })
+}
+
+pub(crate) fn peaks_changed(recording_id: i64, start_peak_index: usize, peaks: &[f32]) -> Value {
     json!({
         "type": "recording.peaksChanged",
+        "recordingId": recording_id,
         "startPeakIndex": start_peak_index,
         "peaks": peaks,
     })

@@ -30,6 +30,7 @@ export type AudioDecode = {
   mount: (message: { projectId: number; sampleRate: number }) => Promise<{
     frameCount: number;
   }>;
+  setActiveRecording: (recordingId: number | undefined) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
   patchLiveTake: (chunk: RecordingChunk) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
@@ -41,6 +42,7 @@ type MountedAudio = {
   projectId: number;
   sampleRate: number;
   frameCount: number;
+  recordingId: number | undefined;
   pieces: PlayerRecordingPiece[];
 };
 
@@ -49,14 +51,20 @@ type Recording = {
   stretch: Promise<TakeStretch>;
 };
 
+type Reload = {
+  finishedTakeId?: string;
+  switched?: boolean;
+};
+
 export const createAudioDecode = (
   options: CreateAudioDecodeOptions,
 ): AudioDecode => {
   const { playerPort, spectrogramPort } = options;
   let mounted: MountedAudio | undefined = undefined;
   let recording: Recording | undefined = undefined;
+  let activeRecordingId: number | undefined = undefined;
   let reloading: Promise<void> = Promise.resolve();
-  let reloadOnMount: { finishedTakeId?: string } | undefined = undefined;
+  let reloadOnMount: Reload | undefined = undefined;
 
   const getRecording = (sampleRate: number): Recording => {
     recording ??= {
@@ -66,33 +74,53 @@ export const createAudioDecode = (
     return recording;
   };
 
-  const reloadPieces = async (finishedTakeId?: string): Promise<void> => {
+  const loadPieces = async (
+    current: Pick<MountedAudio, 'projectId' | 'sampleRate'>,
+    recordingId: number | undefined,
+  ): Promise<PlayerRecordingPiece[]> => {
+    if (recordingId === undefined) {
+      return [];
+    }
+    return await getRecording(current.sampleRate).assembly.load(
+      current.projectId,
+      recordingId,
+    );
+  };
+
+  const reloadPieces = async (reload: Reload): Promise<void> => {
     const current = mounted;
     if (!current) {
-      reloadOnMount = { finishedTakeId };
+      reloadOnMount = { finishedTakeId: reload.finishedTakeId };
       return;
     }
-    const pieces = await getRecording(current.sampleRate).assembly.load(
-      current.projectId,
-    );
-    if (mounted !== current) {
+    const recordingId = activeRecordingId;
+    if (reload.switched && current.recordingId === recordingId) {
       return;
     }
+    const pieces = await loadPieces(current, recordingId);
+    if (mounted !== current || activeRecordingId !== recordingId) {
+      return;
+    }
+    const switched =
+      Boolean(reload.switched) || current.recordingId !== recordingId;
+    current.recordingId = recordingId;
     current.pieces = pieces;
     playerPort.methods.setRecordingPieces({
       pieces: copyPieces(pieces),
-      finishedTakeId,
+      finishedTakeId: reload.finishedTakeId,
+      switched,
     });
     spectrogramPort.methods.setRecordingPieces({
       pieces: copyPieces(pieces),
-      finishedTakeId,
+      finishedTakeId: reload.finishedTakeId,
+      switched,
     });
   };
 
-  const reloadRecording = async (finishedTakeId?: string): Promise<void> => {
+  const queueReload = async (reload: Reload): Promise<void> => {
     const next = reloading
       .catch(() => undefined)
-      .then(async () => reloadPieces(finishedTakeId));
+      .then(async () => reloadPieces(reload));
     reloading = next;
     await next;
   };
@@ -100,7 +128,7 @@ export const createAudioDecode = (
   return {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
-      const { assembly } = getRecording(sampleRate);
+      const recordingId = activeRecordingId;
       const [lead, backing, instrumental, pieces] = await Promise.all([
         getDeliveryAudioContent(projectId, 'lead').then(async (content) =>
           decodeMp4(content.buffer, sampleRate),
@@ -111,14 +139,14 @@ export const createAudioDecode = (
         getDeliveryAudioContent(projectId, 'instrumental').then(
           async (content) => decodeMp4(content.buffer, sampleRate),
         ),
-        assembly.load(projectId),
+        loadPieces({ projectId, sampleRate }, recordingId),
       ]);
       const frameCount = Math.max(
         lead.frameCount,
         backing.frameCount,
         instrumental.frameCount,
       );
-      mounted = { projectId, sampleRate, frameCount, pieces };
+      mounted = { projectId, sampleRate, frameCount, recordingId, pieces };
       spectrogramPort.methods.mount({
         lead: lead.channels[0].slice(),
         recording: copyPieces(pieces),
@@ -132,14 +160,26 @@ export const createAudioDecode = (
         },
         recording: copyPieces(pieces),
       });
-      if (reloadOnMount) {
-        const { finishedTakeId } = reloadOnMount;
-        reloadOnMount = undefined;
-        reloadRecording(finishedTakeId).catch((error: unknown) => {
+      const pending = reloadOnMount;
+      reloadOnMount = undefined;
+      if (pending || activeRecordingId !== recordingId) {
+        queueReload(pending ?? {}).catch((error: unknown) => {
           console.error('Failed to reload the recording', error);
         });
       }
       return { frameCount };
+    },
+    setActiveRecording: (recordingId) => {
+      if (activeRecordingId === recordingId) {
+        return;
+      }
+      activeRecordingId = recordingId;
+      if (!mounted) {
+        return;
+      }
+      queueReload({ switched: true }).catch((error: unknown) => {
+        console.error('Failed to switch the recording', error);
+      });
     },
     beginLiveTake: (take) => {
       playerPort.methods.beginLiveTake(take);
@@ -155,7 +195,7 @@ export const createAudioDecode = (
         samples: chunk.samples.slice(),
       });
     },
-    reloadRecording,
+    reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
     exportRecording: async () => {
       await reloading.catch(() => undefined);
       const current = mounted;
@@ -168,6 +208,7 @@ export const createAudioDecode = (
     unmount: () => {
       mounted = undefined;
       reloadOnMount = undefined;
+      activeRecordingId = undefined;
       playerPort.methods.unmount();
       spectrogramPort.methods.unmount();
     },

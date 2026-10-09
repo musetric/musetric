@@ -6,6 +6,7 @@ mod models;
 mod preview;
 mod processing;
 mod project;
+mod recording;
 mod status;
 
 use std::{path::PathBuf, sync::Arc};
@@ -36,6 +37,7 @@ pub(crate) fn create_router(state: RouteState) -> Router {
         .merge(preview::create_router())
         .merge(processing::create_router())
         .merge(project::create_router())
+        .merge(recording::create_router())
         .merge(status::create_router())
         .merge(realtime::create_router())
         .with_state(state)
@@ -69,8 +71,12 @@ mod tests {
     const LEAD_URL: &str = "/api/audio/project/1/master/lead/content";
     const DELIVERY_URL: &str = "/api/audio/project/1/delivery/lead/content";
     const WAVE_URL: &str = "/api/audio/project/1/delivery/lead/wave";
-    const RECORDING_PIECES_URL: &str = "/api/audio/project/1/recording/pieces";
-    const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/wave";
+    const RECORDING_PIECES_URL: &str = "/api/audio/project/1/recording/1/pieces";
+    const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/1/wave";
+    const RECORDINGS_URL: &str = "/api/project/1/recording";
+    const CREATE_RECORDING: &str = "
+      INSERT INTO Recording (id, projectId, name, active) VALUES (1, 1, 'Recording 1', 1);
+    ";
     const CREATE_PROJECT: &str = "
       INSERT INTO Project (id, name, sampleRate, frameCount)
       VALUES (1, 'Fixture project', 44100, 441000);
@@ -114,6 +120,46 @@ mod tests {
             .expect("the body should be readable")
             .to_bytes();
         String::from_utf8(payload.to_vec()).expect("the body should be text")
+    }
+
+    async fn send(router: Router, method: &str, url: &str, body: &str) -> Response<Body> {
+        let request = Request::builder()
+            .method(method)
+            .uri(url)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_owned()))
+            .expect("the request should be valid");
+        router
+            .oneshot(request)
+            .await
+            .expect("the router should answer")
+    }
+
+    async fn read_recordings(response: Response<Body>) -> Vec<(String, bool)> {
+        assert_eq!(response.status(), StatusCode::OK);
+        let listed: serde_json::Value =
+            serde_json::from_str(&read_body(response).await).expect("the list should be json");
+        listed["recordings"]
+            .as_array()
+            .expect("the list should hold recordings")
+            .iter()
+            .map(|recording| {
+                (
+                    recording["name"]
+                        .as_str()
+                        .expect("a recording should have a name")
+                        .to_owned(),
+                    recording["active"] == true,
+                )
+            })
+            .collect()
+    }
+
+    fn named(names: &[(&str, bool)]) -> Vec<(String, bool)> {
+        names
+            .iter()
+            .map(|(name, active)| ((*name).to_owned(), *active))
+            .collect()
     }
 
     async fn request(router: Router, url: &str) -> Response<Body> {
@@ -413,6 +459,7 @@ mod tests {
     async fn hands_out_an_empty_take_when_nothing_is_recorded() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
         let router = create_test_router(&workspace).await;
 
         let pieces = request(router.clone(), RECORDING_PIECES_URL).await;
@@ -467,5 +514,139 @@ mod tests {
             Some("attachment; filename*=UTF-8''preview.png".to_owned())
         );
         assert_eq!(read_body(response).await, PREVIEW);
+    }
+
+    #[tokio::test]
+    async fn creates_renames_activates_and_removes_recordings() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
+        let router = create_test_router(&workspace).await;
+
+        let created = send(
+            router.clone(),
+            "POST",
+            &format!("{RECORDINGS_URL}/create"),
+            "",
+        )
+        .await;
+        assert_eq!(
+            read_recordings(created).await,
+            named(&[("Recording 1", false), ("Recording 2", true)])
+        );
+
+        let renamed = send(
+            router.clone(),
+            "PATCH",
+            &format!("{RECORDINGS_URL}/2/edit"),
+            "{\"name\":\"  Slow verse  \"}",
+        )
+        .await;
+        assert_eq!(
+            read_recordings(renamed).await,
+            named(&[("Recording 1", false), ("Slow verse", true)])
+        );
+        let taken = send(
+            router.clone(),
+            "PATCH",
+            &format!("{RECORDINGS_URL}/1/edit"),
+            "{\"name\":\"slow VERSE\"}",
+        )
+        .await;
+        assert_eq!(taken.status(), StatusCode::CONFLICT);
+        let empty = send(
+            router.clone(),
+            "PATCH",
+            &format!("{RECORDINGS_URL}/1/edit"),
+            "{\"name\":\" \"}",
+        )
+        .await;
+        assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
+
+        let activated = send(
+            router.clone(),
+            "POST",
+            &format!("{RECORDINGS_URL}/1/activate"),
+            "",
+        )
+        .await;
+        assert_eq!(
+            read_recordings(activated).await,
+            named(&[("Recording 1", true), ("Slow verse", false)])
+        );
+
+        let removed = send(
+            router.clone(),
+            "DELETE",
+            &format!("{RECORDINGS_URL}/1/remove"),
+            "",
+        )
+        .await;
+        assert_eq!(
+            read_recordings(removed).await,
+            named(&[("Slow verse", true)])
+        );
+        let last = send(
+            router.clone(),
+            "DELETE",
+            &format!("{RECORDINGS_URL}/2/remove"),
+            "",
+        )
+        .await;
+        assert_eq!(last.status(), StatusCode::CONFLICT);
+        let listed = request(router, &format!("{RECORDINGS_URL}/list")).await;
+        assert_eq!(
+            read_recordings(listed).await,
+            named(&[("Slow verse", true)])
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_to_switch_the_recording_while_a_take_is_saved() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
+        let state = create_route_state(&workspace, workspace.create_storage()).await;
+        let saving = state.rooms.begin_edit(1).expect("the room should be free");
+        let router = create_router(state.clone());
+
+        let created = send(
+            router.clone(),
+            "POST",
+            &format!("{RECORDINGS_URL}/create"),
+            "",
+        )
+        .await;
+        let renamed = send(
+            router.clone(),
+            "PATCH",
+            &format!("{RECORDINGS_URL}/1/edit"),
+            "{\"name\":\"Warm up\"}",
+        )
+        .await;
+
+        assert_eq!(created.status(), StatusCode::CONFLICT);
+        assert_eq!(renamed.status(), StatusCode::OK);
+        state.rooms.end_session(1, saving);
+        let freed = send(router, "POST", &format!("{RECORDINGS_URL}/create"), "").await;
+        assert_eq!(freed.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn keeps_a_recording_inside_its_own_project() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
+        workspace.seed(
+            "INSERT INTO Project (id, name, sampleRate, frameCount)
+             VALUES (2, 'Other project', 44100, 441000);",
+        );
+        let router = create_test_router(&workspace).await;
+
+        let pieces = request(router.clone(), "/api/audio/project/2/recording/1/pieces").await;
+        let activated = send(router, "POST", "/api/project/2/recording/1/activate", "").await;
+
+        assert_eq!(pieces.status(), StatusCode::NOT_FOUND);
+        assert_eq!(activated.status(), StatusCode::NOT_FOUND);
     }
 }

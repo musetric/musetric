@@ -1,5 +1,6 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import { Box, IconButton, Tooltip } from '@mui/material';
+import { getActiveRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
@@ -18,8 +19,12 @@ export const PlaybackRecordButton: FC = () => {
     (state) => state.statuses.realtime === 'error',
   );
   const transposed = useEngineStore((state) => state.transposeSemitones !== 0);
+  const recordingName = useEngineStore(
+    (state) => getActiveRecording(state)?.name,
+  );
   const disabled =
     !frameCount ||
+    recordingName === undefined ||
     realtimeFailed ||
     transposed ||
     isSlave ||
@@ -31,7 +36,7 @@ export const PlaybackRecordButton: FC = () => {
       title={
         transposed
           ? t('pages.project.player.controls.recordTransposed')
-          : t('pages.project.player.controls.record')
+          : t('pages.project.player.controls.record', { name: recordingName })
       }
     >
       <Box component='span' flex={1} alignSelf='stretch' display='flex' ml={-1}>
