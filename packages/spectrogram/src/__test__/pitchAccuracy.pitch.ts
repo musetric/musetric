@@ -1,13 +1,9 @@
 import { createGpuContext } from '@musetric/utils/gpu';
 import { commands } from '@vitest/browser/context';
 import { inject, it } from 'vitest';
-import { type SpectrogramConfig } from '../config.cross.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 import { createPitchSettings } from '../fundamentalFrequency/settings.es.js';
-import {
-  createSpectrogramProcessor,
-  type SpectrogramProcessor,
-} from '../processor.js';
+import { trackPitch } from '../pitchTrack.js';
 import {
   comparePitch,
   formatPitchCsv,
@@ -51,85 +47,26 @@ const columnRangeOf = (
   };
 };
 
-const buildConfig = (request: PitchExtractRequest): SpectrogramConfig => ({
-  ...defaultSpectrogramConfig,
-  canvas: new OffscreenCanvas(request.columns, 8),
-  viewSize: { width: request.columns, height: 8 },
-  visibleTime: (hop * (request.columns - 1)) / sampleRate,
-  playheadRatio: 0,
-  windowSize: request.windowSize,
-  zeroPaddingFactor: request.zeroPaddingFactor,
-  lanes: {
-    lead: {
-      ...defaultSpectrogramConfig.lanes.lead,
-      showSpectrogram: false,
-      showFundamental: true,
-      showNotes: false,
-    },
-    recording: {
-      ...defaultSpectrogramConfig.lanes.recording,
-      showSpectrogram: false,
-      showFundamental: false,
-      showNotes: false,
-    },
-  },
-});
-
-const renderUntilComplete = async (
-  processor: SpectrogramProcessor,
-  samples: Float32Array,
-  progress: number,
-): Promise<void> => {
-  await processor.render({ lead: samples }, progress);
-  while (processor.hasPendingWork()) {
-    await processor.render({ lead: samples }, progress);
-  }
-};
-
 const extractFundamental = async (
   device: GPUDevice,
   samples: Float32Array,
   request: PitchExtractRequest,
 ): Promise<PitchExtractResult> => {
   const range = columnRangeOf(samples, request);
-  const values = new Float32Array(Math.max(0, range.last - range.first));
-  const confidence = new Float32Array(values.length);
-  const processor = createSpectrogramProcessor({
+  const track = await trackPitch({
     device,
-    config: buildConfig(request),
+    samples,
+    firstFrame: range.first,
+    frameCount: Math.max(0, range.last - range.first),
+    columns: request.columns,
+    windowSize: request.windowSize,
+    zeroPaddingFactor: request.zeroPaddingFactor,
   });
-  try {
-    for (
-      let baseColumn = range.first;
-      baseColumn < range.last;
-      baseColumn += request.columns
-    ) {
-      const progress =
-        (baseColumn * hop + request.windowSize / 2) / samples.length;
-      await renderUntilComplete(processor, samples, progress);
-      const frames = await processor.readFundamentalFrames(
-        'lead',
-        baseColumn,
-        request.columns,
-      );
-      if (!frames) {
-        throw new Error('the fundamental frames were not rendered');
-      }
-      const count = Math.min(request.columns, range.last - baseColumn);
-      values.set(frames.values.subarray(0, count), baseColumn - range.first);
-      confidence.set(
-        frames.confidence.subarray(0, count),
-        baseColumn - range.first,
-      );
-    }
-  } finally {
-    processor.dispose();
-  }
   return {
-    hopSeconds: hop / sampleRate,
+    hopSeconds: track.hopSeconds,
     startSeconds: request.pcmStartSeconds + (range.first * hop) / sampleRate,
-    values: Array.from(values),
-    confidence: Array.from(confidence),
+    values: Array.from(track.values),
+    confidence: Array.from(track.confidence),
   };
 };
 

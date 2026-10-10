@@ -12,15 +12,17 @@ pub enum ProcessingStep {
     Rhythm,
     Key,
     Chords,
+    VoiceRange,
 }
 
-pub const PROCESSING_STEPS: [ProcessingStep; 6] = [
+pub const PROCESSING_STEPS: [ProcessingStep; 7] = [
     ProcessingStep::Separation,
     ProcessingStep::Voices,
     ProcessingStep::Transcription,
     ProcessingStep::Rhythm,
     ProcessingStep::Key,
     ProcessingStep::Chords,
+    ProcessingStep::VoiceRange,
 ];
 
 impl ProcessingStep {
@@ -33,6 +35,7 @@ impl ProcessingStep {
             "rhythm" => Some(Self::Rhythm),
             "key" => Some(Self::Key),
             "chords" => Some(Self::Chords),
+            "voiceRange" => Some(Self::VoiceRange),
             _ => None,
         }
     }
@@ -46,6 +49,7 @@ impl ProcessingStep {
             Self::Rhythm => "rhythm",
             Self::Key => "key",
             Self::Chords => "chords",
+            Self::VoiceRange => "voiceRange",
         }
     }
 
@@ -54,7 +58,7 @@ impl ProcessingStep {
         match self {
             Self::Separation => MasterType::Source,
             Self::Voices => MasterType::Vocals,
-            Self::Transcription => MasterType::Lead,
+            Self::Transcription | Self::VoiceRange => MasterType::Lead,
             Self::Rhythm | Self::Key | Self::Chords => MasterType::Instrumental,
         }
     }

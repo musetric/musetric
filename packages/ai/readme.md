@@ -15,6 +15,9 @@ The analyses it serves:
 - **Transcription** — word-timestamped lyric segments (Whisper large-v3 q4 via
   `@huggingface/transformers`, which runs on `onnxruntime-web`).
 - **Chords, key, rhythm** — the smaller webgpu analyses.
+- **Voice range** — the pitch range of the lead and the level of its upper
+  bands, which the notes and spectrum views open on (the pitch tracker of
+  `@musetric/spectrogram` on WebGPU, no model).
 
 Both model families are fetched from the core's model cache (downloaded and
 sha256-verified by the rust side from Hugging Face, `musetric/*-onnx`). The

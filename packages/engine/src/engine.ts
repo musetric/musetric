@@ -15,10 +15,29 @@ import {
   createEngineSpectrogram,
   type EngineSpectrogram,
 } from './spectrogram/index.js';
-import { type EngineState, getActiveRecording } from './state.js';
+import {
+  type EngineState,
+  type FrequencyRange,
+  getActiveRecording,
+  type SpectrogramViewMode,
+} from './state.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const notesMaxFrequency = 1100;
+
+export const defaultFrequencyRanges: Record<
+  SpectrogramViewMode,
+  FrequencyRange
+> = {
+  notes: {
+    minFrequency: defaultSpectrogramConfig.minFrequency,
+    maxFrequency: notesMaxFrequency,
+  },
+  spectrum: {
+    minFrequency: defaultSpectrogramConfig.minFrequency,
+    maxFrequency: defaultSpectrogramConfig.maxFrequency,
+  },
+};
 
 const initialState: EngineState = {
   statuses: {
@@ -34,16 +53,7 @@ const initialState: EngineState = {
   },
   colors: defaultSpectrogramConfig.colors,
   spectrogramView: 'notes',
-  frequencyRanges: {
-    notes: {
-      minFrequency: defaultSpectrogramConfig.minFrequency,
-      maxFrequency: notesMaxFrequency,
-    },
-    spectrum: {
-      minFrequency: defaultSpectrogramConfig.minFrequency,
-      maxFrequency: defaultSpectrogramConfig.maxFrequency,
-    },
-  },
+  frequencyRanges: defaultFrequencyRanges,
   duration: 0,
   playing: false,
   frozen: false,

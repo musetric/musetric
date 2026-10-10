@@ -29,7 +29,8 @@ const SEED: &str = "
   INSERT INTO ProcessingStep (projectId, step, status)
   VALUES (1, 'separation', 'pending'), (1, 'voices', 'pending'),
          (1, 'transcription', 'pending'), (1, 'rhythm', 'pending'),
-         (1, 'key', 'pending'), (1, 'chords', 'pending');
+         (1, 'key', 'pending'), (1, 'chords', 'pending'),
+         (1, 'voiceRange', 'pending');
 ";
 
 struct Workspace {
@@ -115,6 +116,9 @@ fn result_statements(step: ProcessingStep) -> &'static str {
         ProcessingStep::Key => "INSERT INTO Key (projectId, blobId) VALUES (1, 'key-blob');",
         ProcessingStep::Chords => {
             "INSERT INTO Chords (projectId, blobId) VALUES (1, 'chords-blob');"
+        }
+        ProcessingStep::VoiceRange => {
+            "INSERT INTO VoiceRange (projectId, blobId) VALUES (1, 'voice-range-blob');"
         }
     }
 }
@@ -267,6 +271,7 @@ async fn runs_every_pending_step_once() {
             "separation",
             "voices",
             "transcription",
+            "voiceRange",
             "rhythm",
             "key",
             "chords"
@@ -436,7 +441,7 @@ async fn records_a_panicking_step_and_keeps_the_queue_alive() {
 
     assert_eq!(
         runner.seen(),
-        vec!["transcription", "rhythm", "key", "chords"]
+        vec!["transcription", "voiceRange", "rhythm", "key", "chords"]
     );
     let processing = queue
         .processing(1)
@@ -583,7 +588,7 @@ async fn holds_a_finished_step_until_its_status_is_written() {
         .await
         .expect("the drain should finish once writes succeed");
 
-    assert_eq!(runner.seen().len(), 6);
+    assert_eq!(runner.seen().len(), 7);
     let processing = queue
         .processing(1)
         .await

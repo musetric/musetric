@@ -76,7 +76,13 @@ impl HostedModel {
     }
 }
 
-pub(crate) type BuildRequest = fn(&str, &str, &HostedModel) -> Result<Value, Failure>;
+pub(crate) struct RequestInput<'input> {
+    pub(crate) attempt_id: &'input str,
+    pub(crate) attempt_url: &'input str,
+    pub(crate) files: &'input HostedModel,
+}
+
+pub(crate) type BuildRequest = fn(&RequestInput<'_>) -> Result<Value, Failure>;
 
 pub(crate) struct BrowserAnalysis {
     pub(crate) label: &'static str,
@@ -238,7 +244,12 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         return Err(Failure::Refused("the attempt is not active".to_owned()));
     }
     let hosted = register_files(&session, &job.analysis.serve, &job.files).await?;
-    let request = (job.analysis.build)(&attempt_id, &session.attempt_url(&attempt_id), &hosted)?;
+    let attempt_url = session.attempt_url(&attempt_id);
+    let request = (job.analysis.build)(&RequestInput {
+        attempt_id: &attempt_id,
+        attempt_url: &attempt_url,
+        files: &hosted,
+    })?;
     let ticket = session.send_job(job.analysis.api, &request)?;
     let mut answered = Box::pin(async move { ticket.wait().await });
     let opened = units.wait_opened(&attempt_id);

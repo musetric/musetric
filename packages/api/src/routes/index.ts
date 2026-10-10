@@ -9,3 +9,4 @@ export * as project from './project.js';
 export * as recording from './recording.js';
 export * as rhythm from './rhythm.js';
 export * as subtitle from './subtitle.js';
+export * as voiceRange from './voiceRange.js';
