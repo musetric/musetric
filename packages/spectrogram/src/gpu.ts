@@ -10,6 +10,7 @@ export * from './draw/index.js';
 export * from './index.js';
 export * from './lane/index.js';
 export * from './magnitudify/index.js';
+export * from './pitchTrack.js';
 export * from './processor.js';
 export * from './remap/index.js';
 export * from './sliceSamples/index.js';

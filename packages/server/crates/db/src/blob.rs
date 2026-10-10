@@ -11,7 +11,8 @@ const REFERENCED_BLOB_IDS: &str = "SELECT blobId FROM AudioMaster
      UNION ALL SELECT blobId FROM Subtitle
      UNION ALL SELECT blobId FROM Rhythm
      UNION ALL SELECT blobId FROM Key
-     UNION ALL SELECT blobId FROM Chords";
+     UNION ALL SELECT blobId FROM Chords
+     UNION ALL SELECT blobId FROM VoiceRange";
 
 #[must_use]
 pub fn blob_path(blobs_path: &Path, blob_id: &str) -> PathBuf {

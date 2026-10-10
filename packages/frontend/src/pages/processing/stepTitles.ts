@@ -10,4 +10,5 @@ export const stepTitles = (
   rhythm: t('pages.project.progress.steps.rhythm'),
   key: t('pages.project.progress.steps.key'),
   chords: t('pages.project.progress.steps.chords'),
+  voiceRange: t('pages.project.progress.steps.voiceRange'),
 });

@@ -54,6 +54,28 @@ struct Key {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct VoicePitch {
+    min_frequency: f64,
+    max_frequency: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct VoiceBand {
+    min_frequency: f64,
+    max_frequency: f64,
+    level_db: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VoiceRange {
+    pitch: Option<VoicePitch>,
+    bands: Vec<VoiceBand>,
+}
+
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Word {
     #[expect(dead_code, reason = "read to hold the result to its shape")]
@@ -83,6 +105,7 @@ pub(crate) fn check_result(
         Analysis::Key => read(result).and_then(|key| check_key(&key)),
         Analysis::Subtitle => read::<Vec<SubtitleSegment>>(result)
             .and_then(|segments| check_subtitles(&segments, duration)),
+        Analysis::VoiceRange => read(result).and_then(|range| check_voice_range(&range)),
     };
     checked.map_err(|reason| format!("The {} result is invalid: {reason}", name(analysis)))
 }
@@ -93,6 +116,7 @@ const fn name(analysis: Analysis) -> &'static str {
         Analysis::Chords => "chords",
         Analysis::Key => "key",
         Analysis::Subtitle => "transcription",
+        Analysis::VoiceRange => "voice range",
     }
 }
 
@@ -188,6 +212,43 @@ fn check_key(key: &Key) -> Result<(), String> {
             "the confidence {} is not a probability",
             key.confidence
         ));
+    }
+    Ok(())
+}
+
+fn check_voice_range(range: &VoiceRange) -> Result<(), String> {
+    if let Some(pitch) = &range.pitch {
+        check_frequencies("pitch", pitch.min_frequency, pitch.max_frequency)?;
+    }
+    let mut previous_max = 0.0;
+    for band in &range.bands {
+        check_frequencies("band", band.min_frequency, band.max_frequency)?;
+        if band.min_frequency >= band.max_frequency {
+            return Err(format!("the band at {} Hz is empty", band.min_frequency));
+        }
+        if band.min_frequency < previous_max {
+            return Err(format!(
+                "the band at {} Hz overlaps the one below",
+                band.min_frequency
+            ));
+        }
+        if !band.level_db.is_finite() {
+            return Err(format!(
+                "the band at {} Hz has the level {} dB",
+                band.min_frequency, band.level_db
+            ));
+        }
+        previous_max = band.max_frequency;
+    }
+    Ok(())
+}
+
+fn check_frequencies(name: &str, min: f64, max: f64) -> Result<(), String> {
+    if !(min.is_finite() && max.is_finite() && min > 0.0) {
+        return Err(format!("the {name} spans {min} to {max} Hz"));
+    }
+    if max < min {
+        return Err(format!("the {name} at {min} Hz ends below where it starts"));
     }
     Ok(())
 }

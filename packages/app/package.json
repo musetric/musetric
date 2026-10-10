@@ -42,6 +42,7 @@
     "@musetric/ai": "workspace:*",
     "@musetric/cqt": "workspace:*",
     "@musetric/fft": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "onnxruntime-web": "catalog:",
     "zod": "catalog:"

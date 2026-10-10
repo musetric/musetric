@@ -17,6 +17,7 @@ import { RecordingListPicker } from './recording/RecordingListPicker.js';
 import { RhythmTempoSync } from './rhythm/RhythmTempoSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
+import { VoiceRangeSync } from './spectrogram/VoiceRangeSync.js';
 
 export type ProjectAppProps = {
   project: api.project.Item;
@@ -50,6 +51,12 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <PlaybackPanel />
       </Stack>
       <RhythmTempoSync projectId={project.id} />
+      <VoiceRangeSync
+        projectId={project.id}
+        leadSpectrogramGainDb={
+          project.audioAnalysis?.leadSpectrogramGainDb ?? 0
+        }
+      />
       <AudioSettings />
       <ProjectSettings />
       <TransposePicker />

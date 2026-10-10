@@ -35,6 +35,10 @@ pub(crate) fn create_router() -> Router<RouteState> {
             "/api/subtitle/project/{projectId}",
             create_route(Analysis::Subtitle),
         )
+        .route(
+            "/api/voice-range/project/{projectId}",
+            create_route(Analysis::VoiceRange),
+        )
 }
 
 fn create_route(analysis: Analysis) -> MethodRouter<RouteState> {

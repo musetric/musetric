@@ -10,6 +10,7 @@ pub enum Analysis {
     Key,
     Rhythm,
     Subtitle,
+    VoiceRange,
 }
 
 impl Analysis {
@@ -20,6 +21,7 @@ impl Analysis {
             Self::Key => "Key",
             Self::Rhythm => "Rhythm",
             Self::Subtitle => "Subtitle",
+            Self::VoiceRange => "VoiceRange",
         }
     }
 }

@@ -100,6 +100,12 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
               title={t('pages.project.progress.steps.chords')}
               step={project.processing.steps.chords}
             />
+            <FlowStep
+              projectId={project.id}
+              stepName='voiceRange'
+              title={t('pages.project.progress.steps.voiceRange')}
+              step={project.processing.steps.voiceRange}
+            />
           </Stack>
           <Stack direction='row' gap={2} alignItems='center'>
             <MemoryOutlinedIcon

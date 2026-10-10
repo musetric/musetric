@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use musetric_db::{Analysis, ProcessingStep};
+use musetric_media::Downmix;
 use serde_json::{Value, json};
 
 use crate::analysis::{
@@ -11,6 +12,8 @@ use crate::analysis::{
         chord_net_graph, skey_graph,
     },
 };
+
+const VOICE_RANGE_SAMPLE_RATE: u32 = 48_000;
 
 pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<BrowserAnalysis> {
     match step {
@@ -46,6 +49,17 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             files: SKEY.cached(models_path),
             serve: Serve::Files,
             build: build_key,
+        }),
+        ProcessingStep::VoiceRange => Some(BrowserAnalysis {
+            label: "Headless voice range analysis",
+            api: "musetricAiAnalyzeVoiceRange",
+            stored: Analysis::VoiceRange,
+            sample_rate: VOICE_RANGE_SAMPLE_RATE,
+            downmix: Downmix::Mean,
+            require_shader_f16: false,
+            files: Vec::new(),
+            serve: Serve::Files,
+            build: build_voice_range,
         }),
         ProcessingStep::Separation | ProcessingStep::Voices | ProcessingStep::Transcription => None,
     }
@@ -89,5 +103,21 @@ fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result
         "outputs": ["result"],
         "modelUrl": files.url(SKEY_MODEL)?,
         "graph": skey_graph(),
+    }))
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "every step builds its request through the same fallible signature"
+)]
+fn build_voice_range(
+    attempt_id: &str,
+    attempt_url: &str,
+    _files: &HostedModel,
+) -> Result<Value, Failure> {
+    Ok(json!({
+        "attemptId": attempt_id,
+        "attemptUrl": attempt_url,
+        "outputs": ["result"],
     }))
 }

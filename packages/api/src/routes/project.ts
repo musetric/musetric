@@ -30,6 +30,7 @@ export const processingStepNameSchema = z.enum([
   'rhythm',
   'key',
   'chords',
+  'voiceRange',
 ]);
 export type ProcessingStepName = z.infer<typeof processingStepNameSchema>;
 
@@ -78,6 +79,7 @@ export const processingStepsSchema = z.object({
   rhythm: processingStepSchema,
   key: processingStepSchema,
   chords: processingStepSchema,
+  voiceRange: processingStepSchema,
 });
 
 export const processingSchema = z.object({

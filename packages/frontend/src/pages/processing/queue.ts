@@ -7,6 +7,7 @@ export const stepOrder: api.project.ProcessingStepName[] = [
   'rhythm',
   'key',
   'chords',
+  'voiceRange',
 ];
 
 export type RunningStep = {

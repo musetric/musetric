@@ -294,7 +294,7 @@ fn shards_a_blob_path_by_the_first_two_byte_pairs() {
     );
 }
 
-const BLOB_COLUMNS: [&str; 10] = [
+const BLOB_COLUMNS: [&str; 11] = [
     "AudioDelivery.blobId",
     "AudioDelivery.waveBlobId",
     "AudioMaster.blobId",
@@ -305,6 +305,7 @@ const BLOB_COLUMNS: [&str; 10] = [
     "RecordingPiece.blobId",
     "Rhythm.blobId",
     "Subtitle.blobId",
+    "VoiceRange.blobId",
 ];
 
 const BLOB_SEED: &str = "
@@ -319,6 +320,7 @@ const BLOB_SEED: &str = "
   INSERT INTO Rhythm (projectId, blobId) VALUES (1, 'Rhythm.blobId');
   INSERT INTO Key (projectId, blobId) VALUES (1, 'Key.blobId');
   INSERT INTO Chords (projectId, blobId) VALUES (1, 'Chords.blobId');
+  INSERT INTO VoiceRange (projectId, blobId) VALUES (1, 'VoiceRange.blobId');
   INSERT INTO Recording (projectId, name, active, waveBlobId, sampleRate, frameCount)
     VALUES (1, 'Recording 1', 1, 'Recording.waveBlobId', 44100, 100);
   INSERT INTO Recording (projectId, name) VALUES (1, 'Recording 2');

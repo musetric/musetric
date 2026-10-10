@@ -103,6 +103,7 @@
   "pages.project.progress.steps.rhythm": "Rhythm",
   "pages.project.progress.steps.separation": "Stems",
   "pages.project.progress.steps.transcription": "Lyrics",
+  "pages.project.progress.steps.voiceRange": "Voice range",
   "pages.project.progress.steps.voices": "Voices",
   "pages.project.progress.trackTitle": "Processing",
   "pages.project.progress.waiting.absent": "Waiting for the GPU worker",

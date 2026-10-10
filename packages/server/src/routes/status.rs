@@ -83,6 +83,7 @@ mod tests {
 \"separation\":{\"status\":\"done\"},\
 \"transcription\":{\"pass\":\"decode\",\"phase\":\"running\",\"status\":\"processing\",\
 \"unit\":3,\"unitCount\":12},\
+\"voiceRange\":{\"status\":\"pending\"},\
 \"voices\":{\"status\":\"done\"}}},\"projectId\":7}\n\n";
 
     fn create_step(status: StepStatus, phase: Option<StepPhase>) -> StepView {
@@ -108,7 +109,7 @@ mod tests {
             project_id,
             processing: Processing {
                 done: false,
-                steps: [(); 6].map(|()| create_step(StepStatus::Pending, None)),
+                steps: [(); 7].map(|()| create_step(StepStatus::Pending, None)),
             },
         }
     }
@@ -152,6 +153,7 @@ mod tests {
                         attempt: 2,
                         limit: Some(5),
                     }),
+                    create_step(StepStatus::Pending, None),
                 ],
             },
         };

@@ -15,7 +15,7 @@ const CREATE_PROCESSING_STEP: &str = "
   CREATE TABLE ProcessingStep (
     projectId INTEGER NOT NULL,
     step TEXT NOT NULL CHECK (
-      step IN ('separation', 'voices', 'transcription', 'rhythm', 'key', 'chords')
+      step IN ('separation', 'voices', 'transcription', 'rhythm', 'key', 'chords', 'voiceRange')
     ),
     status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'failed')),
     error TEXT,
@@ -131,6 +131,15 @@ const CREATE_CHORDS: &str = "
   );
 ";
 
+const CREATE_VOICE_RANGE: &str = "
+  CREATE TABLE VoiceRange (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL UNIQUE,
+    blobId TEXT NOT NULL UNIQUE,
+    FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+  );
+";
+
 const CREATE_RECORDING: &str = "
   CREATE TABLE Recording (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,6 +198,7 @@ const V001_INITIAL: Migration = &[
     CREATE_RHYTHM,
     CREATE_KEY,
     CREATE_CHORDS,
+    CREATE_VOICE_RANGE,
     CREATE_RECORDING,
     CREATE_RECORDING_ACTIVE_INDEX,
     CREATE_RECORDING_PIECE,
