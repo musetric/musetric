@@ -5,7 +5,7 @@ use musetric_media::Downmix;
 use serde_json::{Value, json};
 
 use crate::analysis::{
-    browser::{BrowserAnalysis, Failure, HostedModel, Serve},
+    browser::{BrowserAnalysis, Failure, RequestInput, Serve},
     models::{
         BEAT_THIS, BEAT_THIS_FILTERBANK, BEAT_THIS_MODEL, CHORD_NET, CHORD_NET_MODEL,
         CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, beat_this_graph,
@@ -65,43 +65,35 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
     }
 }
 
-fn build_chords(
-    attempt_id: &str,
-    attempt_url: &str,
-    files: &HostedModel,
-) -> Result<Value, Failure> {
+fn build_chords(input: &RequestInput<'_>) -> Result<Value, Failure> {
     Ok(json!({
-        "attemptId": attempt_id,
-        "attemptUrl": attempt_url,
+        "attemptId": input.attempt_id,
+        "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": files.url(CHORD_NET_MODEL)?,
-        "planUrl": files.url(CHORD_NET_PLAN)?,
-        "planManifestUrl": files.url(CHORD_NET_PLAN_MANIFEST)?,
+        "modelUrl": input.files.url(CHORD_NET_MODEL)?,
+        "planUrl": input.files.url(CHORD_NET_PLAN)?,
+        "planManifestUrl": input.files.url(CHORD_NET_PLAN_MANIFEST)?,
         "graph": chord_net_graph(),
     }))
 }
 
-fn build_rhythm(
-    attempt_id: &str,
-    attempt_url: &str,
-    files: &HostedModel,
-) -> Result<Value, Failure> {
+fn build_rhythm(input: &RequestInput<'_>) -> Result<Value, Failure> {
     Ok(json!({
-        "attemptId": attempt_id,
-        "attemptUrl": attempt_url,
+        "attemptId": input.attempt_id,
+        "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": files.url(BEAT_THIS_MODEL)?,
-        "filterbankUrl": files.url(BEAT_THIS_FILTERBANK)?,
+        "modelUrl": input.files.url(BEAT_THIS_MODEL)?,
+        "filterbankUrl": input.files.url(BEAT_THIS_FILTERBANK)?,
         "graph": beat_this_graph(),
     }))
 }
 
-fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result<Value, Failure> {
+fn build_key(input: &RequestInput<'_>) -> Result<Value, Failure> {
     Ok(json!({
-        "attemptId": attempt_id,
-        "attemptUrl": attempt_url,
+        "attemptId": input.attempt_id,
+        "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": files.url(SKEY_MODEL)?,
+        "modelUrl": input.files.url(SKEY_MODEL)?,
         "graph": skey_graph(),
     }))
 }
@@ -110,14 +102,10 @@ fn build_key(attempt_id: &str, attempt_url: &str, files: &HostedModel) -> Result
     clippy::unnecessary_wraps,
     reason = "every step builds its request through the same fallible signature"
 )]
-fn build_voice_range(
-    attempt_id: &str,
-    attempt_url: &str,
-    _files: &HostedModel,
-) -> Result<Value, Failure> {
+fn build_voice_range(input: &RequestInput<'_>) -> Result<Value, Failure> {
     Ok(json!({
-        "attemptId": attempt_id,
-        "attemptUrl": attempt_url,
+        "attemptId": input.attempt_id,
+        "attemptUrl": input.attempt_url,
         "outputs": ["result"],
     }))
 }
