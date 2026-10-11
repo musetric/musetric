@@ -21,7 +21,7 @@ fn project(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (frame >= 0 && frame < params.shownFrames) {
     let entry = decoded[u32(frame) % params.ringFrames];
     if (entry.frame == frame) {
-      value = entry.frequency;
+      value = entry.frequency * params.frequencyScale;
     }
   }
   line[(params.baseSlot + screen) % params.windowCount] = value;

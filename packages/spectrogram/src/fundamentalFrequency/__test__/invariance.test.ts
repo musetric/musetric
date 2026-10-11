@@ -126,6 +126,7 @@ const steps = (from: number, to: number, step: number): number[] =>
 
 const expectLineFromFrames = async (
   processor: SpectrogramProcessor,
+  frequencyScale = 1,
 ): Promise<void> => {
   const line = await processor.readFundamentalLine('lead');
   if (!line) {
@@ -138,7 +139,7 @@ const expectLineFromFrames = async (
   const frames = await readFrames(processor, 'lead', first, count);
   const expected = Array.from(
     line.values,
-    (_, index) => frames[frameAt(index) - first],
+    (_, index) => frames[frameAt(index) - first] * frequencyScale,
   );
   expect(expected.filter((value) => value > 0).length).toBeGreaterThan(
     line.values.length / 2,
@@ -230,6 +231,21 @@ describe('pitch frames', () => {
     await withProcessor({ device, config }, async (processor) => {
       await renderComplete(processor, { lead }, 4.2 / durationSeconds);
       await expectLineFromFrames(processor);
+    });
+  });
+
+  it('draws the line moved by the lane key', async () => {
+    const config = pitchConfig('lead', 700, 2.5);
+    const transposed: SpectrogramConfig = {
+      ...config,
+      lanes: {
+        ...config.lanes,
+        lead: { ...config.lanes.lead, transposeSemitones: 12 },
+      },
+    };
+    await withProcessor({ device, config: transposed }, async (processor) => {
+      await renderComplete(processor, { lead }, 4.2 / durationSeconds);
+      await expectLineFromFrames(processor, 2);
     });
   });
 

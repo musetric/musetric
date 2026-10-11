@@ -14,6 +14,7 @@ import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidation
 import { type SpectrogramSource } from '../common/source.js';
 import {
   allTrackKeys,
+  getLaneFrequencyScale,
   isFundamentalNeeded,
   mapTrackKeys,
   type SpectrogramConfig,
@@ -49,7 +50,8 @@ const isLaneComputeConfigEqual = (
   current.showFundamental === next.showFundamental &&
   current.showNotes === next.showNotes &&
   current.truncateAfterPlayhead === next.truncateAfterPlayhead &&
-  current.gainDb === next.gainDb;
+  current.gainDb === next.gainDb &&
+  current.transposeSemitones === next.transposeSemitones;
 
 const isColorComputeConfigEqual = (
   current: SpectrogramConfig['comparison'],
@@ -278,6 +280,7 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
         projection: { baseColumn: plan.baseColumn, baseSlot: plan.baseSlot },
         trackProgress,
         truncated: runtime.config.lanes[key].truncateAfterPlayhead,
+        frequencyScale: getLaneFrequencyScale(runtime.config.lanes[key]),
         invalidations: plan.invalidations,
       });
     }

@@ -61,7 +61,7 @@ struct RemapParams {
   displayGamma: f32,
   slotOffset: u32,
   columnCount: u32,
-  padding2: f32,
+  frequencyScale: f32,
   bands: array<vec4f, ${spectrumCount * 2}>,
 };
 
@@ -170,7 +170,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let frequency = frequencyAtRow(y);
   let intensity = baseDisplayIntensity(
     x,
-    frequency,
+    frequency / params.frequencyScale,
     params.sampleRate,
     params.gain,
     params.decibelFactor,

@@ -125,6 +125,7 @@ export const measureKernelRow = async (
         projection: { baseColumn: baseColumn + shift, baseSlot: shift },
         trackProgress: 0,
         truncated: false,
+        frequencyScale: 1,
         invalidations: [],
       });
     };

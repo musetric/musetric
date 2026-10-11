@@ -35,12 +35,14 @@ export type RemapParams = {
   displayGamma: number;
   slotOffset: number;
   columnCount: number;
+  frequencyScale: number;
   bands: RemapBandParams[];
 };
 
 export type RemapParamsArg = {
   config: SpectrogramConfig;
   gainDb: number;
+  frequencyScale: number;
   spectra: SpectrogramBandSpectrum[];
 };
 
@@ -67,6 +69,7 @@ const toParams = (arg: RemapParamsArg): RemapParams => {
     displayGamma: visual.displayGamma,
     slotOffset: 0,
     columnCount: width,
+    frequencyScale: arg.frequencyScale,
     bands: arg.spectra.map((spectrum) => ({
       windowSize: spectrum.windowSize,
       halfSize: spectrum.windowSize / 2,
@@ -146,7 +149,7 @@ export const createParamsCell = (device: GPUDevice) =>
               true,
             );
             view.setUint32(columnCountByteOffset, columnCount, true);
-            view.setUint32(60, 0, true);
+            view.setFloat32(60, value.frequencyScale, true);
             value.bands.forEach((band, index) => {
               const offset = headerByteLength + index * bandByteLength;
               view.setFloat32(offset, band.windowSize, true);
@@ -190,5 +193,6 @@ export const createParamsCell = (device: GPUDevice) =>
       current.config.viewSize.width === next.config.viewSize.width &&
       current.config.viewSize.height === next.config.viewSize.height &&
       current.gainDb === next.gainDb &&
+      current.frequencyScale === next.frequencyScale &&
       areSpectraEqual(current.spectra, next.spectra),
   });

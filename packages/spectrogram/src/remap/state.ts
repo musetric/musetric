@@ -21,6 +21,7 @@ export type StateArg = {
   texture: GPUTextureView;
   config: SpectrogramConfig;
   gainDb: number;
+  frequencyScale: number;
 };
 
 export type State = {
@@ -87,8 +88,14 @@ export const createStateCell = (
 
   return {
     get: (arg) => {
-      const { spectra, texture, config, gainDb, pipelines } = arg;
-      const params = paramsCell.get({ config, gainDb, spectra });
+      const { spectra, texture, config, gainDb, frequencyScale, pipelines } =
+        arg;
+      const params = paramsCell.get({
+        config,
+        gainDb,
+        frequencyScale,
+        spectra,
+      });
       const bindGroup = bindGroupCell.get({
         spectra,
         texture,

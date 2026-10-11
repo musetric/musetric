@@ -1,4 +1,4 @@
-import { getFrequencyRange } from '@musetric/engine';
+import { getFrequencyRange, toStoredFrequencyRange } from '@musetric/engine';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
@@ -42,10 +42,10 @@ export const useSpectrogramGesture = (
       },
       setFrequencyRange: (minFrequency, maxFrequency) => {
         engine.store.update((state) => {
-          state.frequencyRanges[state.spectrogramView] = {
-            minFrequency,
-            maxFrequency,
-          };
+          state.frequencyRanges[state.spectrogramView] = toStoredFrequencyRange(
+            state,
+            { minFrequency, maxFrequency },
+          );
         });
       },
       seek: (frameIndex) => {

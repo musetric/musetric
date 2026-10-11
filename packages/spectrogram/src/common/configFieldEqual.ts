@@ -36,7 +36,8 @@ const isSpectrogramLanesEqual = (
       a.showNotes === b.showNotes &&
       a.lineWidthCents === b.lineWidthCents &&
       a.truncateAfterPlayhead === b.truncateAfterPlayhead &&
-      a.gainDb === b.gainDb
+      a.gainDb === b.gainDb &&
+      a.transposeSemitones === b.transposeSemitones
     );
   });
 

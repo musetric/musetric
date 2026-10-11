@@ -113,6 +113,7 @@ export const createEngineSpectrogram = (
         view: SpectrogramViewMode,
         recording: boolean,
         leadSpectrogramGainDb: number,
+        transposeSemitones: number,
       ) => {
         const notes = view === 'notes';
         return {
@@ -122,6 +123,7 @@ export const createEngineSpectrogram = (
             showFundamental: notes,
             showNotes: notes,
             gainDb: leadSpectrogramGainDb,
+            transposeSemitones,
           },
           recording: {
             ...defaultSpectrogramConfig.lanes.recording,
@@ -129,6 +131,7 @@ export const createEngineSpectrogram = (
             showFundamental: true,
             showNotes: notes,
             truncateAfterPlayhead: recording,
+            transposeSemitones,
           },
         };
       };
@@ -138,6 +141,7 @@ export const createEngineSpectrogram = (
           state.spectrogramView,
           state.recording,
           state.leadSpectrogramGainDb,
+          state.transposeSemitones,
         ),
       });
 
@@ -165,7 +169,7 @@ export const createEngineSpectrogram = (
       const unsubscribeView = store.subscribe(
         (state) => {
           const range = getFrequencyRange(state);
-          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${range.minFrequency}:${range.maxFrequency}`;
+          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${range.minFrequency}:${range.maxFrequency}`;
         },
         () => {
           port.methods.updateConfig({
