@@ -98,20 +98,33 @@ export const createPlayerRuntime = async (
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   const recordingTrack = await createRecordingTrack(sampleRate);
 
+  const getCurrentOutputFrameIndex = () =>
+    frameIndex + Math.round(outputOffsetFrameIndex * tempoRatio);
+
   const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
+    const outputFrameIndex = getCurrentOutputFrameIndex();
     latencyFrameCount = Math.max(0, counts.latencyFrameCount);
     inputLatencyFrameCount = Math.max(0, counts.inputLatencyFrameCount);
     outputLatencyFrameCount = Math.max(
       0,
       latencyFrameCount - inputLatencyFrameCount,
     );
+    if (playing && outputOffsetFrameIndex > outputLatencyFrameCount) {
+      outputOffsetFrameIndex = outputLatencyFrameCount;
+      frameIndex =
+        outputFrameIndex - Math.round(outputOffsetFrameIndex * tempoRatio);
+    }
   };
 
   const recordingRuntime: RecordingRuntime = createRecordingRuntime({
     port,
     getPlaying: () => playing,
+    getFrameIndex: () => frameIndex,
     getInputLatencyFrameCount: () => inputLatencyFrameCount,
-    getOutputLatencyFrameCount: () => outputLatencyFrameCount,
+    getPendingOutputFrameCount: () =>
+      playing
+        ? outputLatencyFrameCount - outputOffsetFrameIndex
+        : outputLatencyFrameCount,
     getTempoRatio: () => tempoRatio,
     applyLatencyFrameCounts,
   });
@@ -157,9 +170,6 @@ export const createPlayerRuntime = async (
       (processedFrameCount * remainingOutputFrameCount) / outputFrameCount,
     );
   };
-
-  const getCurrentOutputFrameIndex = () =>
-    frameIndex + Math.round(outputOffsetFrameIndex * tempoRatio);
 
   dataPort.bindHandlers({
     mount: (message) => {

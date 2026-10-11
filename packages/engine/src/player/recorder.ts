@@ -24,6 +24,7 @@ const getAudioDevices = async () => {
 
 type RecordingSession = {
   projectId: number;
+  startPlayback: boolean;
   initializePromise: Promise<void>;
   stopPromise?: Promise<void>;
   stopRequested: boolean;
@@ -37,8 +38,9 @@ type RecordingSession = {
 };
 
 export type EngineRecorder = {
-  record: (projectId: number) => Promise<void>;
+  record: (projectId: number, startPlayback: boolean) => Promise<void>;
   stop: () => Promise<void>;
+  finish: () => Promise<void>;
 };
 
 export type CreateEngineRecorderOptions = {
@@ -122,7 +124,15 @@ export const createEngineRecorder = (
     setRecording(false);
   };
 
-  const stopInitializedSession = async (session: RecordingSession) => {
+  const stopInitializedSession = async (
+    session: RecordingSession,
+    keepPlaying: boolean,
+  ) => {
+    if (keepPlaying) {
+      await closeDecoderStream(session);
+      return;
+    }
+
     const frameIndex = await getEnginePlayback().stop();
     const { revision } = store.get().seekEvent;
 
@@ -141,7 +151,10 @@ export const createEngineRecorder = (
     await closeDecoderStream(session);
   };
 
-  const stopSession = async (session: RecordingSession) => {
+  const stopSession = async (
+    session: RecordingSession,
+    keepPlaying: boolean,
+  ) => {
     session.stopRequested = true;
     try {
       try {
@@ -154,7 +167,7 @@ export const createEngineRecorder = (
         return;
       }
 
-      await stopInitializedSession(session);
+      await stopInitializedSession(session, keepPlaying);
     } finally {
       cleanupSession(session);
       if (currentSession === session) {
@@ -164,8 +177,11 @@ export const createEngineRecorder = (
     }
   };
 
-  const requestSessionStop = async (session: RecordingSession) => {
-    session.stopPromise ??= stopSession(session).finally(() => {
+  const requestSessionStop = async (
+    session: RecordingSession,
+    keepPlaying: boolean,
+  ) => {
+    session.stopPromise ??= stopSession(session, keepPlaying).finally(() => {
       session.stopPromise = undefined;
     });
     await session.stopPromise;
@@ -232,6 +248,13 @@ export const createEngineRecorder = (
       const gain = context.createGain();
       gain.gain.value = store.get().recordingGain;
       source.connect(gain);
+      const disconnectPlayerInput =
+        getEnginePlayback().connectRecordingSource(gain);
+      session.disconnectPlayerInput = () => {
+        disconnectPlayerInput();
+        source.disconnect(gain);
+        gain.disconnect();
+      };
       const recordingStreamChannel = new MessageChannel();
       const {
         latencyFrameCount,
@@ -261,7 +284,7 @@ export const createEngineRecorder = (
         (state) => state.playing,
         (playing) => {
           if (!playing && currentSession === session) {
-            void requestSessionStop(session);
+            void requestSessionStop(session, false);
           }
         },
       );
@@ -271,15 +294,8 @@ export const createEngineRecorder = (
           gain.gain.setValueAtTime(recordingGain, context.currentTime);
         },
       );
-      const disconnectPlayerInput =
-        getEnginePlayback().connectRecordingSource(gain);
-      session.disconnectPlayerInput = () => {
-        disconnectPlayerInput();
-        source.disconnect(gain);
-        gain.disconnect();
-      };
 
-      if (isStopRequested(session)) {
+      if (isStopRequested(session) || !session.startPlayback) {
         return;
       }
 
@@ -290,9 +306,10 @@ export const createEngineRecorder = (
     }
   };
 
-  const createSession = (projectId: number) => {
+  const createSession = (projectId: number, startPlayback: boolean) => {
     const session: RecordingSession = {
       projectId,
+      startPlayback,
       initializePromise: Promise.resolve(),
       stopRequested: false,
       decoderStreamStarted: false,
@@ -303,12 +320,12 @@ export const createEngineRecorder = (
   };
 
   const ref: EngineRecorder = {
-    record: async (projectId) => {
+    record: async (projectId, startPlayback) => {
       if (currentSession) {
         return currentSession.initializePromise;
       }
 
-      const session = createSession(projectId);
+      const session = createSession(projectId, startPlayback);
       currentSession = session;
       session.initializePromise = initializeSession(session);
 
@@ -328,7 +345,16 @@ export const createEngineRecorder = (
         return;
       }
 
-      await requestSessionStop(session);
+      await requestSessionStop(session, false);
+    },
+    finish: async () => {
+      const session = currentSession;
+      if (!session) {
+        setRecording(false);
+        return;
+      }
+
+      await requestSessionStop(session, true);
     },
   };
 

@@ -6,6 +6,7 @@ import {
   burstLength,
   burstSeconds,
   createHarness,
+  createTakeStream,
   rate,
   settle,
   timingTolerance,
@@ -118,6 +119,74 @@ const recordThroughLoopback = async (loopback: Loopback) => {
   return runs.flatMap((run) => run.centers);
 };
 
+const toggleOutputLatency = 512;
+
+type ToggledTake = {
+  fromSeconds: number;
+  toSeconds: number;
+};
+
+type LatencyCounts = {
+  latencyFrameCount: number;
+  inputLatencyFrameCount: number;
+};
+
+type Toggles = {
+  tempo: number;
+  playLatency: LatencyCounts;
+  takes: ToggledTake[];
+};
+
+const recordTogglesThroughLoopback = async (toggles: Toggles) => {
+  const { tempo, playLatency, takes } = toggles;
+  const roundTrip = toggleOutputLatency + inputLatency;
+  const harness = await createHarness([]);
+  harness.player.methods.setTempoRatio({ tempoRatio: tempo });
+  harness.player.methods.play({ revision: 1, ...playLatency });
+  await settle();
+  const streams = takes.map(() => createTakeStream());
+  const blockAt = (seconds: number) =>
+    Math.round((seconds / tempo) * (rate / blockSize));
+  const lastBlock = Math.max(...takes.map((take) => blockAt(take.toSeconds)));
+  const played: number[] = [];
+  for (let block = 0; block <= lastBlock; block += 1) {
+    for (const [index, take] of takes.entries()) {
+      if (block === blockAt(take.fromSeconds)) {
+        harness.player.methods.startRecording({
+          frameIndex: 0,
+          revision: 1,
+          latencyFrameCount: roundTrip,
+          inputLatencyFrameCount: inputLatency,
+          notificationPort: streams[index].notification,
+        });
+        await settle();
+      }
+      if (block === blockAt(take.toSeconds)) {
+        harness.player.methods.flushRecording();
+        await settle();
+      }
+    }
+    const input = new Float32Array(blockSize);
+    for (let index = 0; index < blockSize; index += 1) {
+      input[index] = played[block * blockSize + index - roundTrip] ?? 0;
+    }
+    played.push(...harness.process(input));
+  }
+  return {
+    played: burstCenters(Float32Array.from(played)),
+    takes: streams.map((stream) =>
+      toRuns(stream.chunks).flatMap((run) =>
+        burstCenters(runSamples(run)).map(
+          (center) => run.startFrame + center * tempo,
+        ),
+      ),
+    ),
+  };
+};
+
+const toHalfSeconds = (centers: number[]) =>
+  centers.map((center) => Math.round(center / (rate / 2)) / 2);
+
 const songCenters = burstSeconds.map(
   (second) => second * rate + (burstLength - 1) / 2,
 );
@@ -183,13 +252,47 @@ describe('player recording loopback', () => {
         3.25 * rate,
       ]);
       const centers = runs.flatMap((run) => run.centers);
-      expect(
-        centers.map((center) => Math.round(center / (rate / 2)) / 2),
-      ).toEqual([1, 1.5, 3.5, 4, 4.5, 5]);
+      expect(toHalfSeconds(centers)).toEqual([1, 1.5, 3.5, 4, 4.5, 5]);
       for (const center of centers) {
         expect(Math.abs(nearestError(center, songCenters))).toBeLessThan(
           timingTolerance,
         );
+      }
+    },
+  );
+
+  it.each([
+    ['the same latency', 1, toggleOutputLatency + inputLatency, inputLatency],
+    ['an unknown latency', 1, 0, 0],
+    ['a longer latency', 1, 4 * (toggleOutputLatency + inputLatency), 0],
+    ['the same latency', 0.8, toggleOutputLatency + inputLatency, inputLatency],
+    ['an unknown latency', 1.25, 0, 0],
+    ['a longer latency', 0.8, 4 * (toggleOutputLatency + inputLatency), 0],
+  ])(
+    'places takes toggled during playback started with %s at tempo %f',
+    async (_name, tempo, latencyFrameCount, inputLatencyFrameCount) => {
+      const { played, takes } = await recordTogglesThroughLoopback({
+        tempo,
+        playLatency: { latencyFrameCount, inputLatencyFrameCount },
+        takes: [
+          { fromSeconds: 1.25, toSeconds: 2.75 },
+          { fromSeconds: 3.25, toSeconds: 4.75 },
+        ],
+      });
+      expect(takes.map(toHalfSeconds)).toEqual([
+        [1.5, 2, 2.5],
+        [3.5, 4, 4.5],
+      ]);
+      for (const center of takes.flat()) {
+        expect(Math.abs(nearestError(center, songCenters))).toBeLessThan(
+          timingTolerance,
+        );
+      }
+      expect(played.length).toBeGreaterThan(5);
+      for (const [index, center] of played.slice(1).entries()) {
+        expect(
+          Math.abs(center - played[index] - rate / 2 / tempo),
+        ).toBeLessThan(timingTolerance);
       }
     },
   );

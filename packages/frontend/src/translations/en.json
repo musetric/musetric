@@ -71,6 +71,7 @@
   "pages.project.player.controls.recordTransposed": "Recording works at the original key",
   "pages.project.player.controls.redoTake": "Redo the last take in “{{name}}”",
   "pages.project.player.controls.stop": "Stop",
+  "pages.project.player.controls.stopRecording": "Stop recording, keep playing",
   "pages.project.player.controls.tempo": "Song tempo",
   "pages.project.player.controls.tempoReset": "Reset tempo",
   "pages.project.player.controls.tempoValue": "{{value}} BPM",

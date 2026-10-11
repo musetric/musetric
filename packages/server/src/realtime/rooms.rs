@@ -178,12 +178,16 @@ impl Rooms {
                 room.broadcast_event(&events::player_started(recording), Some(member));
                 return true;
             }
-            if player.master == Some(member) && player.recording == recording {
-                return true;
+            if player.master != Some(member) {
+                let state = player.sync_state();
+                room.send_to(member, &state);
+                return false;
             }
-            let state = player.sync_state();
-            room.send_to(member, &state);
-            false
+            if player.recording != recording {
+                player.recording = recording;
+                room.broadcast_event(&events::player_started(recording), Some(member));
+            }
+            true
         });
         claimed.unwrap_or(false)
     }

@@ -186,11 +186,35 @@ fn sounding<'piece>(
     clippy::cast_sign_loss,
     reason = "frame positions stay far below 2^53 and are clamped to the song before indexing"
 )]
-fn place(samples: &mut [i16], piece: &RecordingPiece, source: &[i16]) {
+fn song_span(frame_count: usize, piece: &RecordingPiece) -> (usize, usize) {
     let start = piece.song_start_frame as f64;
     let end = start + piece.frame_count as f64 * piece.tempo;
     let first = start.max(0.0).ceil() as usize;
-    let last = end.min(samples.len() as f64).ceil().max(0.0) as usize;
+    let last = end.min(frame_count as f64).ceil().max(0.0) as usize;
+    (first, last)
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::float_cmp,
+    reason = "frame positions stay far below 2^53 and are clamped to the song before indexing; only a piece at exactly the original tempo maps every frame to itself"
+)]
+fn place(samples: &mut [i16], piece: &RecordingPiece, source: &[i16]) {
+    let (first, last) = song_span(samples.len(), piece);
+    if piece.tempo == 1.0 {
+        let skip =
+            usize::try_from(piece.song_start_frame.min(0).unsigned_abs()).unwrap_or(usize::MAX);
+        let count = last
+            .saturating_sub(first)
+            .min(source.len().saturating_sub(skip));
+        if count > 0 {
+            samples[first..first + count].copy_from_slice(&source[skip..skip + count]);
+        }
+        return;
+    }
+    let start = piece.song_start_frame as f64;
     for (offset, sample) in samples.iter_mut().enumerate().take(last).skip(first) {
         let recorded = ((offset as f64 - start) / piece.tempo).round() as usize;
         if let Some(value) = source.get(recorded) {
@@ -211,16 +235,12 @@ fn render(frame_count: i64, layers: &[&RecordingPiece], pcm: &PcmCache) -> Vec<i
 
 async fn compose(
     storage: &Arc<Storage>,
-    recording: &Recording,
+    layers: &[&RecordingPiece],
     frame_count: i64,
-    pieces: &[RecordingPiece],
 ) -> Result<Vec<i16>, BoxedError> {
-    let blob_ids = sounding(recording, pieces)
-        .iter()
-        .map(|piece| piece.blob_id.clone())
-        .collect();
+    let blob_ids = layers.iter().map(|piece| piece.blob_id.clone()).collect();
     let pcm = load_pcm(storage, blob_ids).await?;
-    Ok(render(frame_count, &sounding(recording, pieces), &pcm))
+    Ok(render(frame_count, layers, &pcm))
 }
 
 pub(crate) async fn read_sounding(
@@ -292,27 +312,50 @@ pub(crate) fn sample_value(sample: i16) -> f32 {
 }
 
 #[expect(
+    clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
     reason = "frame positions stay far below 2^53"
 )]
-fn measure_peaks(samples: &[i16]) -> Vec<f32> {
+fn peak_start(index: usize, frames_per_peak: f64) -> usize {
+    let mut frame = (index as f64 * frames_per_peak).ceil() as usize;
+    while frame > 0 && peak_index((frame - 1) as f64, frames_per_peak) >= index {
+        frame -= 1;
+    }
+    while peak_index(frame as f64, frames_per_peak) < index {
+        frame += 1;
+    }
+    frame
+}
+
+fn measure_peaks(samples: &[i16], layers: &[&RecordingPiece]) -> Vec<f32> {
     let step = frames_per_peak(i64::try_from(samples.len()).unwrap_or(i64::MAX));
+    let spans: Vec<(usize, usize)> = layers
+        .iter()
+        .map(|piece| song_span(samples.len(), piece))
+        .collect();
     let mut peaks = vec![0.0_f32; WAVE_PEAK_COUNT * 2];
-    let mut last_index = None;
-    for (frame, sample) in samples.iter().enumerate() {
-        let index = peak_index(frame as f64, step);
-        if index >= WAVE_PEAK_COUNT {
+    let mut end = 0;
+    for index in 0..WAVE_PEAK_COUNT {
+        let start = end;
+        if start >= samples.len() {
             break;
         }
-        let value = sample_value(*sample);
-        let base = index * 2;
-        if last_index != Some(index) {
-            peaks[base] = value;
-            peaks[base + 1] = value;
-            last_index = Some(index);
+        end = peak_start(index + 1, step).min(samples.len());
+        if !spans
+            .iter()
+            .any(|&(first, last)| first < end && start < last)
+        {
+            continue;
         }
-        peaks[base] = peaks[base].min(value);
-        peaks[base + 1] = peaks[base + 1].max(value);
+        let mut low = i16::MAX;
+        let mut high = i16::MIN;
+        for &sample in &samples[start..end] {
+            low = low.min(sample);
+            high = high.max(sample);
+        }
+        peaks[index * 2] = sample_value(low);
+        peaks[index * 2 + 1] = sample_value(high);
     }
     peaks
 }
@@ -332,15 +375,16 @@ async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), Bo
     let Some(audio) = recording.audio.as_ref() else {
         return Ok(());
     };
-    let samples = compose(storage, &recording, audio.frame_count, &pieces).await?;
+    let layers = sounding(&recording, &pieces);
+    let samples = compose(storage, &layers, audio.frame_count).await?;
     let path = blob_path(&storage.blobs_path, &audio.wave_blob_id);
     let staged = path.with_extension("next");
-    write_file(&staged, encode_peaks(&measure_peaks(&samples))).await?;
+    write_file(&staged, encode_peaks(&measure_peaks(&samples, &layers))).await?;
     rename(&staged, &path).await?;
     Ok(())
 }
 
-async fn refresh_peaks(storage: &Arc<Storage>, recording_id: i64) {
+pub(crate) async fn refresh_peaks(storage: &Arc<Storage>, recording_id: i64) {
     let _ = write_peaks(storage, recording_id).await;
 }
 
@@ -496,7 +540,6 @@ pub(crate) async fn commit_take(
         writer.replace_recording_pieces(recording_id, &next, true)
     })
     .await?;
-    refresh_peaks(storage, recording_id).await;
     Ok(History {
         can_undo: true,
         can_redo: false,
@@ -531,7 +574,60 @@ pub(crate) async fn set_fresh_applied(
 mod tests {
     use musetric_db::{RecordingLayer, RecordingPiece};
 
-    use super::{PcmCache, measure_peaks, render};
+    use musetric_media::WAVE_PEAK_COUNT;
+
+    use super::{PcmCache, frames_per_peak, measure_peaks, peak_index, render, sample_value};
+
+    fn piece(blob_id: &str, song_start_frame: i64, frame_count: i64, tempo: f64) -> RecordingPiece {
+        RecordingPiece {
+            blob_id: blob_id.to_owned(),
+            layer: RecordingLayer::Base,
+            song_start_frame,
+            frame_count,
+            tempo,
+        }
+    }
+
+    fn noise(length: usize, seed: u32) -> Vec<i16> {
+        let mut state = seed;
+        (0..length)
+            .map(|_| {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                let [_, _, low, high] = state.to_le_bytes();
+                i16::from_le_bytes([low, high])
+            })
+            .collect()
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "frame positions stay far below 2^53"
+    )]
+    fn measure_every_frame(samples: &[i16]) -> Vec<f32> {
+        let step = frames_per_peak(i64::try_from(samples.len()).unwrap_or(i64::MAX));
+        let mut peaks = vec![0.0_f32; WAVE_PEAK_COUNT * 2];
+        let mut last_index = None;
+        for (frame, sample) in samples.iter().enumerate() {
+            let index = peak_index(frame as f64, step);
+            if index >= WAVE_PEAK_COUNT {
+                break;
+            }
+            let value = sample_value(*sample);
+            let base = index * 2;
+            if last_index != Some(index) {
+                peaks[base] = value;
+                peaks[base + 1] = value;
+                last_index = Some(index);
+            }
+            peaks[base] = peaks[base].min(value);
+            peaks[base + 1] = peaks[base + 1].max(value);
+        }
+        peaks
+    }
+
+    fn bits(peaks: &[f32]) -> Vec<u32> {
+        peaks.iter().map(|peak| peak.to_bits()).collect()
+    }
 
     #[test]
     fn layers_the_fresh_take_over_the_base() {
@@ -573,8 +669,55 @@ mod tests {
     }
 
     #[test]
+    fn copies_a_piece_at_the_original_tempo() {
+        let early = piece("early", -2, 6, 1.0);
+        let short = piece("short", 6, 4, 1.0);
+        let late = piece("late", 10, 2, 1.0);
+        let mut pcm = PcmCache::new();
+        pcm.insert("early".to_owned(), vec![1, 2, 3, 4, 5, 6]);
+        pcm.insert("short".to_owned(), vec![7, 8]);
+        pcm.insert("late".to_owned(), vec![9, 9]);
+
+        assert_eq!(
+            render(8, &[&early, &short, &late], &pcm),
+            [3, 4, 5, 6, 0, 0, 7, 8]
+        );
+    }
+
+    #[test]
+    fn measures_the_peaks_of_every_frame_only_where_the_take_sounds() {
+        for frame_count in [3_000_usize, 10_007, 480_013, 1_000_003] {
+            let length = i64::try_from(frame_count).expect("the song length should fit");
+            let layers = [
+                piece("early", -length / 50, length / 10, 1.0),
+                piece("slow", length / 5, length / 8, 0.8),
+                piece("fast", length / 4, length / 10, 1.25),
+                piece("over", length / 3, length / 20, 1.0),
+                piece("tail", length - length / 30, length / 10, 1.0),
+            ];
+            let mut pcm = PcmCache::new();
+            for (seed, layer) in (1_u32..).zip(&layers) {
+                let recorded = usize::try_from(layer.frame_count).expect("the piece should fit");
+                pcm.insert(layer.blob_id.clone(), noise(recorded - recorded / 7, seed));
+            }
+            let sounding: Vec<&RecordingPiece> = layers.iter().collect();
+            let samples = render(length, &sounding, &pcm);
+
+            assert_eq!(
+                bits(&measure_peaks(&samples, &sounding)),
+                bits(&measure_every_frame(&samples))
+            );
+            assert_eq!(
+                bits(&measure_peaks(&vec![0; frame_count], &[])),
+                bits(&measure_every_frame(&vec![0; frame_count]))
+            );
+        }
+    }
+
+    #[test]
     fn measures_peaks_per_segment() {
-        let peaks = measure_peaks(&[0, 16384, -16384, 0]);
+        let whole = piece("whole", 0, 4, 1.0);
+        let peaks = measure_peaks(&[0, 16384, -16384, 0], &[&whole]);
 
         assert!((peaks[0] - 0.0).abs() < f32::EPSILON);
         assert!((peaks[3] - 0.5).abs() < f32::EPSILON);
