@@ -38,7 +38,7 @@ export const RecordingListPicker: FC = () => {
         transformOrigin={{ horizontal: 'left', vertical: 'top' }}
         slotProps={{ paper: { sx: { mt: 0.5, width: 560 } } }}
       >
-        <RecordingList compact={false} />
+        <RecordingList compact={false} onClose={close} />
       </Popover>
     );
   }
@@ -51,7 +51,7 @@ export const RecordingListPicker: FC = () => {
         mx='auto'
         pb='max(8px, env(safe-area-inset-bottom))'
       >
-        <RecordingList compact />
+        <RecordingList compact onClose={close} />
       </Box>
     </Drawer>
   );

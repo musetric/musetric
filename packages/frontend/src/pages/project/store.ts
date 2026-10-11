@@ -15,6 +15,7 @@ export type ProjectState = {
   recordingListAnchorEl?: HTMLElement;
   deletingRecordingId?: number;
   renamingRecordingId?: number;
+  creatingRecordingId?: number;
 };
 
 const initialState: ProjectState = {
@@ -37,6 +38,7 @@ export type ProjectActions = {
   setRecordingListAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setDeletingRecordingId: (recordingId: number | undefined) => void;
   setRenamingRecordingId: (recordingId: number | undefined) => void;
+  setCreatingRecordingId: (recordingId: number | undefined) => void;
 };
 
 type State = ProjectState & ProjectActions;
@@ -72,6 +74,12 @@ export const useProjectStore = create<State>()(
     setRenamingRecordingId: (renamingRecordingId) =>
       set({
         renamingRecordingId,
+        creatingRecordingId: undefined,
+      }),
+    setCreatingRecordingId: (creatingRecordingId) =>
+      set({
+        renamingRecordingId: creatingRecordingId,
+        creatingRecordingId,
       }),
   })),
 );

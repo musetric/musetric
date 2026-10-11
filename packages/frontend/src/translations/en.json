@@ -111,6 +111,8 @@
   "pages.project.progress.waiting.lost": "Reconnecting to the GPU worker",
   "pages.project.realtime.error": "Unexpected realtime connection error. Reopen the project to continue.",
   "pages.project.recording.choose": "Choose the recording to play, show and record into",
+  "pages.project.recording.close": "Close",
+  "pages.project.recording.create": "Create",
   "pages.project.recording.delete": "Delete",
   "pages.project.recording.deleteDialog.cancel": "Cancel",
   "pages.project.recording.deleteDialog.confirm": "Delete",
