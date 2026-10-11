@@ -9,7 +9,11 @@ export type Pipelines = {
 export const createPipelines = (device: GPUDevice): Pipelines => {
   const layout = device.createBindGroupLayout({
     label: 'magnitudify-bind-group-layout',
-    entries: computeBufferEntries(['storage', 'storage', 'dynamic-uniform']),
+    entries: computeBufferEntries([
+      'storage',
+      'storage',
+      'dynamic-read-only-storage',
+    ]),
   });
   const pipelineLayout = device.createPipelineLayout({
     label: 'magnitudify-pipeline-layout',

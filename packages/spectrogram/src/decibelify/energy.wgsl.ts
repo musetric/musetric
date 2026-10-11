@@ -11,7 +11,7 @@ struct DecibelifyParams {
 };
 
 @group(0) @binding(0) var<storage, read> magnitude: array<f32>;
-@group(0) @binding(1) var<uniform> params: DecibelifyParams;
+@group(0) @binding(1) var<storage, read> params: DecibelifyParams;
 @group(0) @binding(2) var<storage, read_write> columnEnergy: array<f32>;
 @group(0) @binding(3) var<storage, read_write> signal: array<f32>;
 

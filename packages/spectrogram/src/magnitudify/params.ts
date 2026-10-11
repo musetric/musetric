@@ -1,5 +1,5 @@
 import { createResourceCell } from '@musetric/utils';
-import { createDynamicUniformParams } from '../common/dynamicUniform.js';
+import { createDynamicStorageParams } from '../common/dynamicUniform.js';
 import {
   type ExtSpectrogramConfig,
   type SpectrogramColumnRange,
@@ -34,7 +34,7 @@ export const createParamsCell = (device: GPUDevice) =>
   createResourceCell({
     create: (config: ExtSpectrogramConfig): StateParams => {
       const value = toParams(config);
-      const params = createDynamicUniformParams(device, {
+      const params = createDynamicStorageParams(device, {
         label: 'magnitudify-params-buffer',
         byteLength: paramsByteLength,
         capacity: value.windowCount,

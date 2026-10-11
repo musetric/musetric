@@ -1,12 +1,17 @@
 export type ComputeBufferKind =
   | 'read-only-storage'
   | 'storage'
-  | 'dynamic-uniform';
+  | 'dynamic-uniform'
+  | 'dynamic-read-only-storage';
 
 const bufferByKind: Record<ComputeBufferKind, GPUBufferBindingLayout> = {
   'read-only-storage': { type: 'read-only-storage' },
   storage: { type: 'storage' },
   'dynamic-uniform': { type: 'uniform', hasDynamicOffset: true },
+  'dynamic-read-only-storage': {
+    type: 'read-only-storage',
+    hasDynamicOffset: true,
+  },
 };
 
 export const computeBufferEntries = (

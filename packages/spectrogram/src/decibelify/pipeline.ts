@@ -13,7 +13,7 @@ export const createPipelines = (device: GPUDevice): Pipelines => {
     label: 'decibelify-bind-group-layout',
     entries: computeBufferEntries([
       'read-only-storage',
-      'dynamic-uniform',
+      'dynamic-read-only-storage',
       'storage',
       'storage',
     ]),
