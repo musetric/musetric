@@ -1,6 +1,7 @@
 import { decodeMp4 } from '@musetric/audio/decoder';
 import { getDeliveryAudioContent } from '../audioRequest/audioRequest.worker.js';
 import {
+  type LiveTakeChunk,
   type LiveTakeStart,
   type playerDataChannel,
   type PlayerRecordingPiece,
@@ -21,18 +22,13 @@ export type CreateAudioDecodeOptions = {
   >;
 };
 
-export type RecordingChunk = {
-  frameIndex: number;
-  samples: Float32Array;
-};
-
 export type AudioDecode = {
   mount: (message: { projectId: number; sampleRate: number }) => Promise<{
     frameCount: number;
   }>;
   setActiveRecording: (recordingId: number | undefined) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
-  patchLiveTake: (chunk: RecordingChunk) => void;
+  patchLiveTake: (chunk: LiveTakeChunk) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
   exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
   unmount: () => void;
@@ -187,11 +183,11 @@ export const createAudioDecode = (
     },
     patchLiveTake: (chunk) => {
       playerPort.methods.appendLiveTake({
-        frameIndex: chunk.frameIndex,
+        ...chunk,
         samples: chunk.samples.slice(),
       });
       spectrogramPort.methods.appendLiveTake({
-        frameIndex: chunk.frameIndex,
+        ...chunk,
         samples: chunk.samples.slice(),
       });
     },

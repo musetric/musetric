@@ -1,5 +1,12 @@
 import { createTimePitchProcessor } from '@musetric/audio/player';
 import {
+  continuesRun,
+  createLiveRun,
+  type LiveRun,
+  liveRunPieces,
+} from './liveTake.cross.js';
+import {
+  type LiveTakeChunk,
   type LiveTakeStart,
   type PlayerRecordingPiece,
   type RecordingPiecesUpdate,
@@ -18,7 +25,7 @@ const toPiece = (piece: PlayerRecordingPiece): RecordingPiece => ({
 });
 
 type LiveTake = LiveTakeStart & {
-  piece?: RecordingPiece;
+  runs: LiveRun[];
 };
 
 export type RecordingMix = {
@@ -32,7 +39,7 @@ export type RecordingMix = {
 export type RecordingTrack = {
   setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
-  appendLiveTake: (frameIndex: number, samples: Float32Array) => void;
+  appendLiveTake: (chunk: LiveTakeChunk) => void;
   clear: () => void;
   mixInto: (mix: RecordingMix) => void;
 };
@@ -46,33 +53,27 @@ export const createRecordingTrack = async (
   let scratch = new Float32Array(128);
 
   const update = () => {
-    const layers = live?.piece ? [...pieces, live.piece] : pieces;
+    const layers = live ? [...pieces, ...liveRunPieces(live.runs)] : pieces;
     voice.setSegments(toRecordingSegments(layers));
   };
 
-  const appendToLive = (
-    take: LiveTake,
-    frameIndex: number,
-    samples: Float32Array,
-  ) => {
-    take.piece ??= {
-      songStartFrame: take.startFrame ?? frameIndex,
-      tempo: take.tempo,
-      frameCount: 0,
-      samples: new Float32Array(sampleRate * 8),
-    };
-    const { piece } = take;
-    const offset = frameIndex - piece.songStartFrame;
-    if (offset < 0) {
-      return;
+  const appendToLive = (take: LiveTake, chunk: LiveTakeChunk) => {
+    let run = take.runs.at(-1);
+    if (!continuesRun(run, chunk)) {
+      run = createLiveRun(chunk, take.tempo);
+      take.runs.push(run);
     }
-    const end = offset + samples.length;
+    const { piece } = run;
+    const offset = chunk.offset - run.firstOffset;
+    const end = offset + chunk.samples.length;
     if (end > piece.samples.length) {
-      const grown = new Float32Array(Math.max(end, piece.samples.length * 2));
+      const grown = new Float32Array(
+        Math.max(end, piece.samples.length * 2, sampleRate * 8),
+      );
       grown.set(piece.samples.subarray(0, piece.frameCount));
       piece.samples = grown;
     }
-    piece.samples.set(samples, offset);
+    piece.samples.set(chunk.samples, offset);
     piece.frameCount = Math.max(piece.frameCount, end);
   };
 
@@ -88,14 +89,14 @@ export const createRecordingTrack = async (
       if (live?.takeId === take.takeId) {
         return;
       }
-      live = { ...take };
+      live = { ...take, runs: [] };
       update();
     },
-    appendLiveTake: (frameIndex, samples) => {
+    appendLiveTake: (chunk) => {
       if (!live) {
         return;
       }
-      appendToLive(live, frameIndex, samples);
+      appendToLive(live, chunk);
       update();
     },
     clear: () => {

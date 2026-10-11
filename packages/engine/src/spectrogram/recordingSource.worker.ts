@@ -3,6 +3,13 @@ import {
   type SpectrogramSource,
 } from '@musetric/spectrogram';
 import {
+  continuesRun,
+  createLiveRun,
+  type LiveRun,
+  liveRunPieces,
+} from '../player/liveTake.cross.js';
+import {
+  type LiveTakeChunk,
   type LiveTakeStart,
   type PlayerRecordingPiece,
   type RecordingPiecesUpdate,
@@ -36,8 +43,12 @@ const buildSource = (
     songLength,
   );
 
+type SourceRun = LiveRun & {
+  writtenFrameCount: number;
+};
+
 type LiveTake = LiveTakeStart & {
-  piece?: RecordingPiece;
+  runs: SourceRun[];
 };
 
 export type SongRange = {
@@ -48,10 +59,7 @@ export type SongRange = {
 export type RecordingSource = {
   setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
-  appendLiveTake: (
-    frameIndex: number,
-    samples: Float32Array,
-  ) => SongRange | undefined;
+  appendLiveTake: (chunk: LiveTakeChunk) => SongRange | undefined;
   get: (songLength: number) => SpectrogramSource;
   clear: () => void;
 };
@@ -67,6 +75,24 @@ export const createRecordingSource = (): RecordingSource => {
     cached = undefined;
   };
 
+  const openRun = (take: LiveTake, chunk: LiveTakeChunk): SourceRun => {
+    const previous = take.runs.at(-1);
+    if (previous) {
+      previous.piece.frameCount = previous.writtenFrameCount;
+    }
+    const run: SourceRun = {
+      ...createLiveRun(chunk, take.tempo),
+      writtenFrameCount: 0,
+    };
+    run.piece.frameCount = Math.max(
+      0,
+      Math.ceil((knownSongLength - run.piece.songStartFrame) / take.tempo),
+    );
+    take.runs.push(run);
+    reset();
+    return run;
+  };
+
   return {
     setPieces: (next) => {
       pieces = next.pieces.map(toPiece);
@@ -79,33 +105,22 @@ export const createRecordingSource = (): RecordingSource => {
       if (live?.takeId === take.takeId) {
         return;
       }
-      live = { ...take };
+      live = { ...take, runs: [] };
       reset();
     },
-    appendLiveTake: (frameIndex, samples) => {
+    appendLiveTake: (chunk) => {
       const take = live;
       if (!take) {
         return undefined;
       }
-      if (!take.piece) {
-        const songStartFrame = take.startFrame ?? frameIndex;
-        take.piece = {
-          songStartFrame,
-          tempo: take.tempo,
-          frameCount: Math.max(
-            0,
-            Math.ceil((knownSongLength - songStartFrame) / take.tempo),
-          ),
-          samples: new Float32Array(0),
-        };
-        reset();
-      }
-      const { piece } = take;
-      const offset = frameIndex - piece.songStartFrame;
-      if (offset < 0 || offset >= piece.frameCount) {
+      const last = take.runs.at(-1);
+      const run = continuesRun(last, chunk) ? last : openRun(take, chunk);
+      const { piece } = run;
+      const offset = chunk.offset - run.firstOffset;
+      if (offset >= piece.frameCount) {
         return undefined;
       }
-      const end = Math.min(piece.frameCount, offset + samples.length);
+      const end = Math.min(piece.frameCount, offset + chunk.samples.length);
       if (end > piece.samples.length) {
         const grown = new Float32Array(
           Math.min(piece.frameCount, Math.max(end, piece.samples.length * 2)),
@@ -113,10 +128,11 @@ export const createRecordingSource = (): RecordingSource => {
         grown.set(piece.samples);
         piece.samples = grown;
       }
-      piece.samples.set(samples.subarray(0, end - offset), offset);
+      piece.samples.set(chunk.samples.subarray(0, end - offset), offset);
+      run.writtenFrameCount = Math.max(run.writtenFrameCount, end);
       return {
         frameIndex: Math.floor(piece.songStartFrame + offset * take.tempo),
-        frameCount: Math.ceil(samples.length * take.tempo) + 1,
+        frameCount: Math.ceil(chunk.samples.length * take.tempo) + 1,
       };
     },
     get: (songLength) => {
@@ -124,7 +140,7 @@ export const createRecordingSource = (): RecordingSource => {
       if (cached?.songLength === songLength) {
         return cached.source;
       }
-      const layers = live?.piece ? [...pieces, live.piece] : pieces;
+      const layers = live ? [...pieces, ...liveRunPieces(live.runs)] : pieces;
       const source = buildSource(layers, songLength);
       cached = { songLength, source };
       return source;

@@ -14,22 +14,13 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started(
-    session_id: &str,
-    recording_id: i64,
-    tempo: f64,
-    start_frame: Option<i64>,
-) -> Value {
-    let mut event = json!({
+pub(crate) fn recording_started(session_id: &str, recording_id: i64, tempo: f64) -> Value {
+    json!({
         "type": "recording.started",
         "sessionId": session_id,
         "recordingId": recording_id,
         "tempo": tempo,
-    });
-    if let Some(frame) = start_frame {
-        event["startFrame"] = json!(frame);
-    }
-    event
+    })
 }
 
 pub(crate) fn recording_finished(session_id: &str) -> Value {

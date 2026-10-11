@@ -1,6 +1,7 @@
+import { type LiveTakeChunk } from '../player/protocol.cross.js';
 import { type recordingStreamChannel } from '../player/recordingStream.cross.js';
 
-export const recordingPacketHeaderByteLength = 8;
+const recordingPacketHeaderByteLength = 12;
 
 type ControlledPromise = {
   promise: Promise<void>;
@@ -15,16 +16,15 @@ const createControlledPromise = (): ControlledPromise => {
   };
 };
 
-export const createRecordingPacket = (
-  frameIndex: number,
-  samples: Float32Array,
-): ArrayBuffer => {
+export const createRecordingPacket = (chunk: LiveTakeChunk): ArrayBuffer => {
+  const { samples } = chunk;
   const packet = new ArrayBuffer(
     recordingPacketHeaderByteLength + samples.byteLength,
   );
   const view = new DataView(packet);
-  view.setUint32(0, frameIndex, true);
-  view.setUint32(4, samples.length, true);
+  view.setUint32(0, chunk.startFrame, true);
+  view.setUint32(4, chunk.offset, true);
+  view.setUint32(8, samples.length, true);
   for (let index = 0; index < samples.length; index += 1) {
     view.setFloat32(
       recordingPacketHeaderByteLength + index * Float32Array.BYTES_PER_ELEMENT,
@@ -33,6 +33,27 @@ export const createRecordingPacket = (
     );
   }
   return packet;
+};
+
+export const readRecordingPacket = (data: ArrayBuffer): LiveTakeChunk => {
+  if (data.byteLength < recordingPacketHeaderByteLength) {
+    throw new Error('Project realtime packet is missing a header');
+  }
+  const view = new DataView(data);
+  const frameCount = view.getUint32(8, true);
+  const byteLength = frameCount * Float32Array.BYTES_PER_ELEMENT;
+  if (data.byteLength !== recordingPacketHeaderByteLength + byteLength) {
+    throw new Error('Project realtime packet has invalid byte length');
+  }
+  return {
+    startFrame: view.getUint32(0, true),
+    offset: view.getUint32(4, true),
+    samples: new Float32Array(
+      data,
+      recordingPacketHeaderByteLength,
+      frameCount,
+    ),
+  };
 };
 
 type FlushWaiter = {
@@ -55,11 +76,9 @@ const resolveFlushWaiters = (
   return remaining;
 };
 
-type ChunkSamples = { frameIndex: number; samples: Float32Array };
-
 export type RecordingStreamOptions = {
   port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
-  onChunk: (chunk: ChunkSamples) => void;
+  onChunk: (chunk: LiveTakeChunk) => void;
 };
 
 export type RecordingStream = {
@@ -104,14 +123,10 @@ export const createRecordingStream = (
       flushWaiters = resolveFlushWaiters(processedFlushSequence, flushWaiters);
     },
     chunk: (message) => {
-      const skippedFrameCount = Math.max(0, -message.frameIndex);
-      const alignedSamples = message.samples.subarray(skippedFrameCount);
-      if (alignedSamples.length === 0) {
-        return;
-      }
       onChunk({
-        frameIndex: Math.max(0, message.frameIndex),
-        samples: alignedSamples,
+        startFrame: message.startFrame,
+        offset: message.offset,
+        samples: message.samples,
       });
     },
   });

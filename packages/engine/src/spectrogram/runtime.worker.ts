@@ -131,10 +131,7 @@ export const createSpectrogramRuntime = async (
       recording.beginLiveTake(message);
     },
     appendLiveTake: (message) => {
-      const range = recording.appendLiveTake(
-        message.frameIndex,
-        message.samples,
-      );
+      const range = recording.appendLiveTake(message);
       if (!range) {
         return;
       }
