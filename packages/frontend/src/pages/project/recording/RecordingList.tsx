@@ -1,9 +1,18 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { Box, Button, Divider, Stack, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Divider,
+  IconButton,
+  Stack,
+  Typography,
+} from '@mui/material';
 import { getActiveRecording, getTrackProgress } from '@musetric/engine';
-import { useMutation } from '@tanstack/react-query';
+import { useIsMutating, useMutation } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
@@ -12,6 +21,7 @@ import { formatDuration } from '../../../common/formatDuration.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { getRecordingColumns, getRecordingLayout } from './recordingLayout.js';
+import { getRecordingNameFormId } from './recordingNameForm.js';
 import { RecordingRow } from './RecordingRow.js';
 
 const lastTickRatio = 0.98;
@@ -36,10 +46,11 @@ const getRulerTicks = (duration: number) => {
 
 export type RecordingListProps = {
   compact: boolean;
+  onClose: () => void;
 };
 
 export const RecordingList: FC<RecordingListProps> = (props) => {
-  const { compact } = props;
+  const { compact, onClose } = props;
   const { t } = useTranslation();
   const { projectId } = routes.project.useAssertMatch();
   const layout = getRecordingLayout(compact);
@@ -53,7 +64,17 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   const setDeletingRecordingId = useProjectStore(
     (state) => state.setDeletingRecordingId,
   );
+  const creatingRecordingId = useProjectStore(
+    (state) => state.creatingRecordingId,
+  );
+  const setCreatingRecordingId = useProjectStore(
+    (state) => state.setCreatingRecordingId,
+  );
   const created = useMutation(endpoints.recording.create(projectId));
+  const naming =
+    useIsMutating({
+      mutationKey: endpoints.recording.edit(projectId).mutationKey,
+    }) > 0;
   const waveLeft = layout.sidePadding + layout.checkWidth + layout.nameWidth;
   const actionSx = {
     typography: compact ? 'body1' : 'body2',
@@ -62,7 +83,15 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   };
 
   return (
-    <Stack py={2}>
+    <Stack py={2} position='relative'>
+      <IconButton
+        size='small'
+        aria-label={t('pages.project.recording.close')}
+        onClick={onClose}
+        sx={{ position: 'absolute', top: 4, left: 11, zIndex: 1 }}
+      >
+        <CloseRoundedIcon fontSize='small' />
+      </IconButton>
       <Box position='relative'>
         <Box
           display='grid'
@@ -126,23 +155,43 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
       </Box>
       <Divider sx={{ my: 2 }} />
       <Stack direction='row' alignItems='center' gap={1} px={2}>
-        <Button
-          color='inherit'
-          startIcon={<AddRoundedIcon />}
-          loading={created.isPending}
-          onClick={() => {
-            created.mutate(undefined, {
-              onSuccess: (response) => {
-                setRenamingRecordingId(
-                  response.recordings.find((recording) => recording.active)?.id,
-                );
-              },
-            });
-          }}
-          sx={actionSx}
-        >
-          {t('pages.project.recording.new')}
-        </Button>
+        {creatingRecordingId === undefined ? (
+          <Button
+            key='new'
+            color='inherit'
+            startIcon={<AddRoundedIcon />}
+            loading={created.isPending}
+            onClick={() => {
+              created.mutate(undefined, {
+                onSuccess: (response) => {
+                  setCreatingRecordingId(
+                    response.recordings.find((recording) => recording.active)
+                      ?.id,
+                  );
+                },
+              });
+            }}
+            sx={actionSx}
+          >
+            {t('pages.project.recording.new')}
+          </Button>
+        ) : (
+          <Button
+            key='create'
+            type='submit'
+            form={getRecordingNameFormId(creatingRecordingId)}
+            variant='contained'
+            color='success'
+            startIcon={<CheckRoundedIcon />}
+            loading={naming}
+            onMouseDown={(event) => {
+              event.preventDefault();
+            }}
+            sx={actionSx}
+          >
+            {t('pages.project.recording.create')}
+          </Button>
+        )}
         <Box flex={1} />
         <Button
           color='inherit'
