@@ -1,10 +1,9 @@
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
+import { type LiveTakeChunk } from './protocol.cross.js';
 
-export type RecordingStreamChunkMessage = {
+export type RecordingStreamChunkMessage = LiveTakeChunk & {
   sequence: number;
-  frameIndex: number;
-  samples: Float32Array<ArrayBuffer>;
 };
 
 export type RecordingStreamFlushMessage = {

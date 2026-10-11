@@ -4,6 +4,12 @@ import { createRecordingSource } from '../recordingSource.worker.js';
 const ramp = (length: number, from: number): Float32Array<ArrayBuffer> =>
   Float32Array.from({ length }, (_, index) => from + index);
 
+const chunk = (
+  startFrame: number,
+  offset: number,
+  samples: Float32Array<ArrayBuffer>,
+) => ({ startFrame, offset, samples });
+
 const read = (
   source: ReturnType<ReturnType<typeof createRecordingSource>['get']>,
   from: number,
@@ -33,9 +39,9 @@ describe('recording source', () => {
     });
     recording.get(20);
     recording.beginLiveTake({ takeId: 'take', tempo: 0.5 });
-    const first = recording.appendLiveTake(10, ramp(4, 1));
+    const first = recording.appendLiveTake(chunk(10, 0, ramp(4, 1)));
     const source = recording.get(20);
-    const second = recording.appendLiveTake(14, ramp(4, 5));
+    const second = recording.appendLiveTake(chunk(10, 4, ramp(4, 5)));
     expect(recording.get(20)).toBe(source);
     expect(first).toEqual({ frameIndex: 10, frameCount: 3 });
     expect(second).toEqual({ frameIndex: 12, frameCount: 3 });
@@ -46,7 +52,7 @@ describe('recording source', () => {
     const recording = createRecordingSource();
     recording.get(20);
     recording.beginLiveTake({ takeId: 'take', tempo: 1 });
-    recording.appendLiveTake(0, ramp(4, 1));
+    recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
     recording.setPieces({ pieces: [], finishedTakeId: 'take' });
     expect(read(recording.get(20), 0, 4)).toEqual([0, 0, 0, 0]);
   });
@@ -55,7 +61,7 @@ describe('recording source', () => {
     const recording = createRecordingSource();
     recording.get(20);
     recording.beginLiveTake({ takeId: 'take', tempo: 1 });
-    recording.appendLiveTake(0, ramp(4, 1));
+    recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
     recording.setPieces({ pieces: [], finishedTakeId: 'other' });
     expect(read(recording.get(20), 0, 4)).toEqual([1, 2, 3, 4]);
     recording.setPieces({
@@ -65,13 +71,33 @@ describe('recording source', () => {
     expect(read(recording.get(20), 0, 4)).toEqual([0, 0, 50, 51]);
   });
 
-  it('places a live take joined late at its start and ignores frames past the song', () => {
+  it('places a live take joined late where it was heard and ignores frames past the song', () => {
     const recording = createRecordingSource();
+    recording.setPieces({
+      pieces: [{ songStartFrame: 0, tempo: 1, samples: ramp(20, 100) }],
+    });
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 0.5, startFrame: 4 });
-    recording.appendLiveTake(8, ramp(4, 1));
-    const late = recording.appendLiveTake(44, ramp(4, 1));
+    recording.beginLiveTake({ takeId: 'take', tempo: 0.5 });
+    recording.appendLiveTake(chunk(4, 4, ramp(4, 1)));
+    const late = recording.appendLiveTake(chunk(4, 40, ramp(4, 1)));
     expect(late).toBeUndefined();
-    expect(read(recording.get(20), 4, 8)).toEqual([0, 0, 0, 0, 1, 2, 3, 4]);
+    expect(read(recording.get(20), 0, 10)).toEqual([
+      100, 101, 102, 103, 104, 105, 1, 2, 3, 4,
+    ]);
+  });
+
+  it('keeps the earlier runs of a live take and the song between them after a seek', () => {
+    const recording = createRecordingSource();
+    recording.setPieces({
+      pieces: [{ songStartFrame: 0, tempo: 1, samples: ramp(20, 100) }],
+    });
+    recording.get(20);
+    recording.beginLiveTake({ takeId: 'take', tempo: 1 });
+    recording.appendLiveTake(chunk(2, 0, ramp(4, 1)));
+    const seeked = recording.appendLiveTake(chunk(12, 0, ramp(2, 50)));
+    expect(seeked).toEqual({ frameIndex: 12, frameCount: 3 });
+    expect(read(recording.get(20), 0, 14)).toEqual([
+      100, 101, 1, 2, 3, 4, 106, 107, 108, 109, 110, 111, 50, 51,
+    ]);
   });
 });

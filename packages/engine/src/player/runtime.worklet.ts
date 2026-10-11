@@ -181,7 +181,7 @@ export const createPlayerRuntime = async (
       recordingTrack.beginLiveTake(message);
     },
     appendLiveTake: (message) => {
-      recordingTrack.appendLiveTake(message.frameIndex, message.samples);
+      recordingTrack.appendLiveTake(message);
     },
     unmount: () => {
       frameCount = 0;

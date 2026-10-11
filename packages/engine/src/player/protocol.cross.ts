@@ -97,7 +97,12 @@ export type PlayerTracks = Record<StemType, Float32Array<ArrayBuffer>[]>;
 export type LiveTakeStart = {
   takeId: string;
   tempo: number;
-  startFrame?: number;
+};
+
+export type LiveTakeChunk = {
+  startFrame: number;
+  offset: number;
+  samples: Float32Array<ArrayBuffer>;
 };
 
 export type RecordingPiecesUpdate = {
@@ -109,10 +114,7 @@ export type RecordingPiecesUpdate = {
 export type RecordingDataMethods = {
   setRecordingPieces: (message: RecordingPiecesUpdate) => void;
   beginLiveTake: (message: LiveTakeStart) => void;
-  appendLiveTake: (message: {
-    frameIndex: number;
-    samples: Float32Array<ArrayBuffer>;
-  }) => void;
+  appendLiveTake: (message: LiveTakeChunk) => void;
 };
 
 export type PlayerDataMethods = RecordingDataMethods & {

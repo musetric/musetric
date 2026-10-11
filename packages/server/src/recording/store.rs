@@ -9,7 +9,7 @@ use tokio::fs::{read as read_file, rename, try_exists, write as write_file};
 use crate::{
     blobs::{StagedBlob, stage_blob},
     publish::publish,
-    recording::plan::{PlannedPiece, base_pieces, fresh_piece, keep_base, merge_fresh},
+    recording::plan::{PlannedPiece, base_pieces, fresh_pieces, keep_base, merge_fresh, plan_take},
     storage::{Storage, read_database, write_database},
     wav::{HEADER_BYTE_LENGTH, create_header},
 };
@@ -31,10 +31,14 @@ pub(crate) struct TakeFormat {
     pub(crate) tempo: f64,
 }
 
-pub(crate) struct FinishedTake<'area> {
-    pub(crate) area: &'area Path,
+pub(crate) struct TakeRun {
     pub(crate) blob: StagedBlob,
     pub(crate) piece: RecordingPiece,
+}
+
+pub(crate) struct FinishedTake<'area> {
+    pub(crate) area: &'area Path,
+    pub(crate) runs: Vec<TakeRun>,
 }
 
 pub(crate) struct Sounding {
@@ -77,7 +81,9 @@ async fn read_project_state(
 }
 
 fn history_of(recording: &Recording, pieces: &[RecordingPiece]) -> History {
-    let has_fresh = fresh_piece(pieces).is_some();
+    let has_fresh = pieces
+        .iter()
+        .any(|piece| piece.layer == RecordingLayer::Fresh);
     History {
         can_undo: has_fresh && recording.fresh_applied,
         can_redo: has_fresh && !recording.fresh_applied,
@@ -117,8 +123,8 @@ pub(crate) async fn is_active_recording(
     )
 }
 
-async fn read_pcm(storage: &Arc<Storage>, blob_id: &str) -> Result<Option<Vec<i16>>, BoxedError> {
-    let bytes = match read_file(blob_path(&storage.blobs_path, blob_id)).await {
+async fn read_pcm(path: &Path) -> Result<Option<Vec<i16>>, BoxedError> {
+    let bytes = match read_file(path).await {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.into()),
@@ -141,7 +147,7 @@ async fn load_pcm(
     blob_ids.dedup();
     let mut cache = PcmCache::with_capacity(blob_ids.len());
     for blob_id in blob_ids {
-        if let Some(pcm) = read_pcm(storage, &blob_id).await? {
+        if let Some(pcm) = read_pcm(&blob_path(&storage.blobs_path, &blob_id)).await? {
             cache.insert(blob_id, pcm);
         }
     }
@@ -165,11 +171,13 @@ fn sounding<'piece>(
     recording: &Recording,
     pieces: &'piece [RecordingPiece],
 ) -> Vec<&'piece RecordingPiece> {
-    pieces
+    let base = pieces
         .iter()
-        .filter(|piece| piece.layer == RecordingLayer::Base)
-        .chain(fresh_piece(pieces).filter(|_| recording.fresh_applied))
-        .collect()
+        .filter(|piece| piece.layer == RecordingLayer::Base);
+    let fresh = pieces
+        .iter()
+        .filter(|piece| recording.fresh_applied && piece.layer == RecordingLayer::Fresh);
+    base.chain(fresh).collect()
 }
 
 #[expect(
@@ -387,6 +395,51 @@ async fn write_planned(
     Ok(())
 }
 
+async fn assemble_take(
+    storage: &Arc<Storage>,
+    take: FinishedTake<'_>,
+    sample_rate: i64,
+) -> Result<(Vec<StagedBlob>, Vec<RecordingPiece>), BoxedError> {
+    let runs: Vec<RecordingPiece> = take.runs.iter().map(|run| run.piece.clone()).collect();
+    let planned = plan_take(&runs);
+    let mut pcm = PcmCache::new();
+    if planned.iter().any(|plan| plan.reused_blob(&runs).is_none()) {
+        for run in &take.runs {
+            if let Some(samples) = read_pcm(run.blob.path()).await? {
+                pcm.insert(run.piece.blob_id.clone(), samples);
+            }
+        }
+    }
+    let mut unused: HashMap<String, StagedBlob> = take
+        .runs
+        .into_iter()
+        .map(|run| (run.piece.blob_id, run.blob))
+        .collect();
+    let mut blobs = Vec::with_capacity(planned.len());
+    let mut pieces = Vec::with_capacity(planned.len());
+    for plan in &planned {
+        let reused = plan
+            .reused_blob(&runs)
+            .and_then(|blob_id| unused.remove(blob_id));
+        let blob = if let Some(blob) = reused {
+            blob
+        } else {
+            let blob = stage_blob(take.area, &storage.blobs_path);
+            write_planned(&blob, plan, &pcm, sample_rate).await?;
+            blob
+        };
+        pieces.push(RecordingPiece {
+            blob_id: blob.blob_id().to_owned(),
+            layer: RecordingLayer::Fresh,
+            song_start_frame: plan.song_start_frame,
+            frame_count: plan.frame_count,
+            tempo: plan.tempo,
+        });
+        blobs.push(blob);
+    }
+    Ok((blobs, pieces))
+}
+
 pub(crate) async fn commit_take(
     storage: &Arc<Storage>,
     recording_id: i64,
@@ -402,9 +455,11 @@ pub(crate) async fn commit_take(
         .sample_rate;
     let pieces = present_pieces(storage, stored).await?;
     let base = base_pieces(&pieces);
-    let planned = match fresh_piece(&pieces) {
-        Some(fresh) if recording.fresh_applied => merge_fresh(&base, fresh),
-        _ => keep_base(&base),
+    let fresh = fresh_pieces(&pieces);
+    let planned = if recording.fresh_applied && !fresh.is_empty() {
+        merge_fresh(&base, &fresh)
+    } else {
+        keep_base(&base)
     };
     let source_ids: Vec<String> = planned
         .iter()
@@ -413,12 +468,13 @@ pub(crate) async fn commit_take(
         .collect();
     let pcm = load_pcm(storage, source_ids).await?;
     let mut staged = Vec::new();
-    let mut next = Vec::with_capacity(planned.len() + 1);
+    let mut next = Vec::with_capacity(planned.len() + take.runs.len());
+    let area = take.area;
     for plan in &planned {
         let blob_id = if let Some(reused) = plan.reused_blob(&pieces) {
             reused.to_owned()
         } else {
-            let blob = stage_blob(take.area, &storage.blobs_path);
+            let blob = stage_blob(area, &storage.blobs_path);
             write_planned(&blob, plan, &pcm, sample_rate).await?;
             let blob_id = blob.blob_id().to_owned();
             staged.push(blob);
@@ -432,8 +488,9 @@ pub(crate) async fn commit_take(
             tempo: plan.tempo,
         });
     }
-    next.push(take.piece);
-    staged.push(take.blob);
+    let (take_blobs, take_pieces) = assemble_take(storage, take, sample_rate).await?;
+    next.extend(take_pieces);
+    staged.extend(take_blobs);
     let committed: Vec<&StagedBlob> = staged.iter().collect();
     publish(storage, &committed, move |writer| {
         writer.replace_recording_pieces(recording_id, &next, true)
@@ -456,7 +513,7 @@ pub(crate) async fn set_fresh_applied(
     else {
         return Ok(None);
     };
-    if fresh_piece(&pieces).is_none() || recording.fresh_applied == applied {
+    if fresh_pieces(&pieces).is_empty() || recording.fresh_applied == applied {
         return Ok(None);
     }
     write_database(storage, move |writer| {

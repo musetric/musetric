@@ -22,8 +22,8 @@ export const subscribePlayheadDrag = (
 
   const handlePointerDown = (event: PointerEvent) => {
     if (!event.isPrimary || event.button !== 0) return;
-    const { frameIndex, frameCount, recording } = engine.store.get();
-    if (recording || !frameCount) return;
+    const { frameIndex, frameCount } = engine.store.get();
+    if (!frameCount) return;
     event.stopPropagation();
     event.preventDefault();
     handle.setPointerCapture(event.pointerId);

@@ -15,7 +15,7 @@ use tokio::{
 use crate::{
     blobs::{StagedBlob, close_area, open_area, recording_area, stage_blob},
     recording::{
-        FinishedTake, History, TakeFormat, commit_take, ensure_recording, frames_per_peak,
+        FinishedTake, History, TakeFormat, TakeRun, commit_take, ensure_recording, frames_per_peak,
         peak_index, sample_value,
     },
     storage::{Storage, read_database},
@@ -30,18 +30,44 @@ pub(crate) struct PeakPatch {
     pub(crate) peaks: Vec<f32>,
 }
 
+struct Run {
+    start_frame: i64,
+    blob: StagedBlob,
+    audio: File,
+    frame_count: i64,
+}
+
+struct LivePeak {
+    low: f32,
+    high: f32,
+    run: usize,
+}
+
+impl LivePeak {
+    fn add(&mut self, value: f32, run: usize) {
+        if self.run == run {
+            self.low = self.low.min(value);
+            self.high = self.high.max(value);
+        } else {
+            *self = Self {
+                low: value,
+                high: value,
+                run,
+            };
+        }
+    }
+}
+
 pub(crate) struct Session {
     recording_id: i64,
     song_frame_count: i64,
     sample_rate: i64,
     tempo: f64,
     area: PathBuf,
-    take: StagedBlob,
-    audio: File,
+    blobs_path: PathBuf,
+    runs: Vec<Run>,
     wave: File,
-    anchor: Option<i64>,
-    recorded_frame_count: i64,
-    live_peaks: BTreeMap<usize, (f32, f32)>,
+    live_peaks: BTreeMap<usize, LivePeak>,
 }
 
 impl Session {
@@ -59,11 +85,6 @@ impl Session {
         let area = recording_area(&storage.work_path, project_id);
         open_area(&area).await?;
         let recording = ensure_recording(storage, &area, recording_id, format).await?;
-        let take = stage_blob(&area, &storage.blobs_path);
-        let mut audio = take.create().await?;
-        audio
-            .write_all(&create_header(0, u32::try_from(recording.sample_rate)?))
-            .await?;
         let wave =
             open_for_update(&blob_path(&storage.blobs_path, &recording.wave_blob_id)).await?;
         Ok(Self {
@@ -72,17 +93,11 @@ impl Session {
             sample_rate: recording.sample_rate,
             tempo: format.tempo,
             area,
-            take,
-            audio,
+            blobs_path: storage.blobs_path.clone(),
+            runs: Vec::new(),
             wave,
-            anchor: None,
-            recorded_frame_count: 0,
             live_peaks: BTreeMap::new(),
         })
-    }
-
-    pub(crate) fn anchor(&self) -> Option<i64> {
-        self.anchor
     }
 
     #[expect(
@@ -90,39 +105,61 @@ impl Session {
         clippy::cast_precision_loss,
         reason = "frame positions stay far below 2^53"
     )]
-    fn recorded_limit(&self, anchor: i64) -> i64 {
-        ((self.song_frame_count - anchor) as f64 / self.tempo).ceil() as i64
+    fn recorded_limit(&self, start_frame: i64) -> i64 {
+        ((self.song_frame_count - start_frame) as f64 / self.tempo).ceil() as i64
+    }
+
+    async fn open_run(&self, start_frame: i64) -> Result<Run, BoxedError> {
+        let blob = stage_blob(&self.area, &self.blobs_path);
+        let mut audio = blob.create().await?;
+        audio
+            .write_all(&create_header(0, u32::try_from(self.sample_rate)?))
+            .await?;
+        Ok(Run {
+            start_frame,
+            blob,
+            audio,
+            frame_count: 0,
+        })
     }
 
     pub(crate) async fn write_chunk(
         &mut self,
-        frame_index: u32,
+        start_frame: u32,
+        offset: u32,
         samples: &[f32],
     ) -> Result<usize, BoxedError> {
-        if self.anchor.is_none() && i64::from(frame_index) >= self.song_frame_count {
-            return Ok(0);
-        }
-        let anchor = *self.anchor.get_or_insert(i64::from(frame_index));
-        let offset = i64::from(frame_index) - anchor;
-        if offset < 0 {
-            return Ok(0);
-        }
-        let available = usize::try_from((self.recorded_limit(anchor) - offset).max(0)).unwrap_or(0);
+        let run_start = i64::from(start_frame);
+        let run_offset = i64::from(offset);
+        let available =
+            usize::try_from((self.recorded_limit(run_start) - run_offset).max(0)).unwrap_or(0);
         let frame_length = samples.len().min(available);
         if frame_length == 0 {
             return Ok(0);
         }
+        let continues = run_offset > 0
+            && self
+                .runs
+                .last()
+                .is_some_and(|run| run.start_frame == run_start);
+        if !continues {
+            let run = self.open_run(run_start).await?;
+            self.runs.push(run);
+        }
+        let Some(run) = self.runs.last_mut() else {
+            return Ok(0);
+        };
         let mut chunk = Vec::with_capacity(frame_length * usize::from(BYTES_PER_SAMPLE));
         for sample in &samples[..frame_length] {
             chunk.extend_from_slice(&to_pcm(*sample).to_le_bytes());
         }
-        self.audio
-            .seek(SeekFrom::Start(frame_offset(offset)?))
+        run.audio
+            .seek(SeekFrom::Start(frame_offset(run_offset)?))
             .await?;
-        self.audio.write_all(&chunk).await?;
-        self.recorded_frame_count = self
-            .recorded_frame_count
-            .max(offset + i64::try_from(frame_length)?);
+        run.audio.write_all(&chunk).await?;
+        run.frame_count = run
+            .frame_count
+            .max(run_offset + i64::try_from(frame_length)?);
         Ok(frame_length)
     }
 
@@ -132,21 +169,19 @@ impl Session {
     )]
     pub(crate) async fn patch_peaks(
         &mut self,
-        frame_index: u32,
+        start_frame: u32,
+        offset: u32,
         samples: &[f32],
     ) -> Result<Option<PeakPatch>, BoxedError> {
-        let Some(anchor) = self.anchor else {
-            return Ok(None);
-        };
         if samples.is_empty() || self.song_frame_count == 0 {
             return Ok(None);
         }
+        let run = self.runs.len();
         let step = frames_per_peak(self.song_frame_count);
-        let offset = i64::from(frame_index) - anchor;
         let mut touched: Option<(usize, usize)> = None;
         for (index, sample) in samples.iter().enumerate() {
-            let recorded = (offset + i64::try_from(index)?) as f64;
-            let song = anchor as f64 + recorded * self.tempo;
+            let recorded = (i64::from(offset) + i64::try_from(index)?) as f64;
+            let song = f64::from(start_frame) + recorded * self.tempo;
             let peak = peak_index(song, step);
             if peak >= WAVE_PEAK_COUNT {
                 break;
@@ -154,11 +189,12 @@ impl Session {
             let value = sample_value(to_pcm(*sample));
             self.live_peaks
                 .entry(peak)
-                .and_modify(|(low, high)| {
-                    *low = low.min(value);
-                    *high = high.max(value);
-                })
-                .or_insert((value, value));
+                .and_modify(|live| live.add(value, run))
+                .or_insert(LivePeak {
+                    low: value,
+                    high: value,
+                    run,
+                });
             touched = Some(touched.map_or((peak, peak), |(first, _)| (first, peak)));
         }
         let Some((first, last)) = touched else {
@@ -166,7 +202,10 @@ impl Session {
         };
         let mut peaks = Vec::with_capacity((last - first + 1) * 2);
         for peak in first..=last {
-            let (low, high) = self.live_peaks.get(&peak).copied().unwrap_or_default();
+            let (low, high) = self
+                .live_peaks
+                .get(&peak)
+                .map_or((0.0, 0.0), |live| (live.low, live.high));
             peaks.push(low);
             peaks.push(high);
         }
@@ -196,38 +235,39 @@ impl Session {
         mut self,
         storage: &Arc<Storage>,
     ) -> Result<Option<History>, BoxedError> {
-        let header = create_header(
-            u32::try_from(self.recorded_frame_count)?,
-            u32::try_from(self.sample_rate)?,
-        );
-        self.audio.seek(SeekFrom::Start(0)).await?;
-        self.audio.write_all(&header).await?;
-        self.audio.flush().await?;
-        self.wave.flush().await?;
-        drop(self.audio);
-        drop(self.wave);
-        let committed = match self.anchor {
-            Some(anchor) if self.recorded_frame_count > 0 => {
-                let piece = RecordingPiece {
-                    blob_id: self.take.blob_id().to_owned(),
+        let mut runs = Vec::with_capacity(self.runs.len());
+        for mut run in self.runs {
+            let header = create_header(
+                u32::try_from(run.frame_count)?,
+                u32::try_from(self.sample_rate)?,
+            );
+            run.audio.seek(SeekFrom::Start(0)).await?;
+            run.audio.write_all(&header).await?;
+            run.audio.flush().await?;
+            drop(run.audio);
+            runs.push(TakeRun {
+                piece: RecordingPiece {
+                    blob_id: run.blob.blob_id().to_owned(),
                     layer: RecordingLayer::Fresh,
-                    song_start_frame: anchor,
-                    frame_count: self.recorded_frame_count,
+                    song_start_frame: run.start_frame,
+                    frame_count: run.frame_count,
                     tempo: self.tempo,
-                };
-                let take = FinishedTake {
-                    area: &self.area,
-                    blob: self.take,
-                    piece,
-                };
-                commit_take(storage, self.recording_id, take)
-                    .await
-                    .map(Some)
-            }
-            _ => {
-                self.take.discard().await;
-                Ok(None)
-            }
+                },
+                blob: run.blob,
+            });
+        }
+        self.wave.flush().await?;
+        drop(self.wave);
+        let committed = if runs.is_empty() {
+            Ok(None)
+        } else {
+            let take = FinishedTake {
+                area: &self.area,
+                runs,
+            };
+            commit_take(storage, self.recording_id, take)
+                .await
+                .map(Some)
         };
         close_area(&self.area).await;
         committed

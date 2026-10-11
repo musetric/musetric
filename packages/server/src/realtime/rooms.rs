@@ -67,7 +67,6 @@ pub(crate) struct RoomTake {
     pub(crate) session_id: String,
     pub(crate) recording_id: i64,
     pub(crate) tempo: f64,
-    pub(crate) start_frame: Option<i64>,
 }
 
 struct Room {
@@ -199,12 +198,8 @@ impl Rooms {
                 room.send_to(member, &player.sync_state());
             }
             if let Some(take) = room.take.as_ref().filter(|take| take.owner != member) {
-                let started = events::recording_started(
-                    &take.session_id,
-                    take.recording_id,
-                    take.tempo,
-                    take.start_frame,
-                );
+                let started =
+                    events::recording_started(&take.session_id, take.recording_id, take.tempo);
                 room.send_to(member, &started);
             }
         });
@@ -212,14 +207,6 @@ impl Rooms {
 
     pub(crate) fn begin_take(&self, project_id: i64, take: RoomTake) {
         self.in_room(project_id, |room| room.take = Some(take));
-    }
-
-    pub(crate) fn anchor_take(&self, project_id: i64, member: MemberId, start_frame: i64) {
-        self.in_room(project_id, |room| {
-            if let Some(take) = room.take.as_mut().filter(|take| take.owner == member) {
-                take.start_frame = Some(start_frame);
-            }
-        });
     }
 
     pub(crate) fn end_take(&self, project_id: i64, member: MemberId) {

@@ -112,7 +112,6 @@ struct Take {
     session: session::Session,
     id: String,
     recording_id: i64,
-    anchored: bool,
 }
 
 impl Connection {
@@ -260,19 +259,17 @@ async fn start_recording(
             session_id: start.session_id.clone(),
             recording_id: start.recording_id,
             tempo,
-            start_frame: None,
         },
     );
     rooms.broadcast_event(
         connection.project_id,
-        &events::recording_started(&start.session_id, start.recording_id, tempo, None),
+        &events::recording_started(&start.session_id, start.recording_id, tempo),
         None,
     );
     connection.take = Some(Take {
         session,
         id: start.session_id,
         recording_id: start.recording_id,
-        anchored: false,
     });
     true
 }
@@ -331,7 +328,6 @@ async fn handle_packet(
     let Some(Take {
         session,
         recording_id,
-        anchored,
         ..
     }) = connection.take.as_mut()
     else {
@@ -350,10 +346,6 @@ async fn handle_packet(
     let Some(written) = outcome else {
         return true;
     };
-    if !*anchored && let Some(start_frame) = session.anchor() {
-        rooms.anchor_take(connection.project_id, connection.member, start_frame);
-        *anchored = true;
-    }
     rooms.broadcast_packet(connection.project_id, written.chunk, connection.member);
     if let Some(patch) = written.patch {
         rooms.broadcast_event(
@@ -376,15 +368,16 @@ async fn write_packet(
 ) -> Result<Option<WrittenPacket>, BoxedError> {
     let stream = packet::parse(raw_packet)?;
     let written = session
-        .write_chunk(stream.frame_index, &stream.samples)
+        .write_chunk(stream.start_frame, stream.offset, &stream.samples)
         .await?;
     if written == 0 {
         return Ok(None);
     }
+    let samples = &stream.samples[..written];
     let patch = session
-        .patch_peaks(stream.frame_index, &stream.samples[..written])
+        .patch_peaks(stream.start_frame, stream.offset, samples)
         .await?;
-    let chunk = packet::create_chunk(stream.frame_index, &stream.samples[..written])?;
+    let chunk = packet::create_chunk(stream.start_frame, stream.offset, samples)?;
     Ok(Some(WrittenPacket { chunk, patch }))
 }
 
@@ -670,9 +663,13 @@ mod tests {
         })
     }
 
-    fn chunk(frame_index: u32, samples: &[f32]) -> Vec<u8> {
-        packet::create_chunk(frame_index, samples)
+    fn chunk_at(start_frame: u32, offset: u32, samples: &[f32]) -> Vec<u8> {
+        packet::create_chunk(start_frame, offset, samples)
             .expect("the fixture packet should fit the realtime protocol")
+    }
+
+    fn chunk(start_frame: u32, samples: &[f32]) -> Vec<u8> {
+        chunk_at(start_frame, 0, samples)
     }
 
     async fn finish_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
@@ -712,17 +709,26 @@ mod tests {
         assert_eq!(receive_json(listener).await, started);
     }
 
-    async fn sing(
+    async fn sing_packet(
         owner: &mut ClientSocket,
         listener: &mut ClientSocket,
-        frame_index: u32,
-        samples: &[f32],
-    ) {
-        send_packet(owner, chunk(frame_index, samples)).await;
-        assert_eq!(receive_binary(listener).await, chunk(frame_index, samples));
+        packet: Vec<u8>,
+    ) -> Value {
+        send_packet(owner, packet.clone()).await;
+        assert_eq!(receive_binary(listener).await, packet);
         let patch = receive_json(owner).await;
         assert_eq!(patch["type"], "recording.peaksChanged");
         assert_eq!(receive_json(listener).await, patch);
+        patch
+    }
+
+    async fn sing(
+        owner: &mut ClientSocket,
+        listener: &mut ClientSocket,
+        start_frame: u32,
+        samples: &[f32],
+    ) -> Value {
+        sing_packet(owner, listener, chunk(start_frame, samples)).await
     }
 
     async fn commit_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
@@ -1293,7 +1299,6 @@ mod tests {
                 "sessionId": OWNER_TAKE,
                 "recordingId": 1,
                 "tempo": 1.0,
-                "startFrame": 3,
             })
         );
     }
@@ -1507,5 +1512,118 @@ mod tests {
             composite(&storage).await,
             [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
         );
+    }
+
+    #[tokio::test]
+    async fn keeps_every_run_of_a_take_that_skipped_ahead() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.25; 2]).await;
+        sing(&mut owner, &mut listener, 5, &[0.5; 2]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Fresh, 0, 2),
+                piece(RecordingLayer::Fresh, 5, 2),
+            ]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [QUARTER, QUARTER, 0, 0, 0, HALF, HALF, 0]
+        );
+    }
+
+    #[tokio::test]
+    async fn lets_the_last_run_of_a_take_win_where_it_was_sung_again() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing_packet(&mut owner, &mut listener, chunk(0, &[1.0; 3])).await;
+        sing_packet(&mut owner, &mut listener, chunk_at(0, 3, &[1.0; 3])).await;
+        let middle = sing(&mut owner, &mut listener, 2, &[0.75; 2]).await;
+        let start = sing(&mut owner, &mut listener, 0, &[0.25; 1]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+
+        let three_quarters = f64::from(THREE_QUARTERS) / 32768.0;
+        let quarter = f64::from(QUARTER) / 32768.0;
+        assert_eq!(middle["startPeakIndex"], 2);
+        assert_eq!(middle["peaks"], json!(vec![three_quarters; 4]));
+        assert_eq!(start["startPeakIndex"], 0);
+        assert_eq!(start["peaks"], json!(vec![quarter; 2]));
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [piece(RecordingLayer::Fresh, 0, 6)]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [
+                QUARTER,
+                32767,
+                THREE_QUARTERS,
+                THREE_QUARTERS,
+                32767,
+                32767,
+                0,
+                0
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn undoes_and_redoes_every_run_of_a_take_at_once() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.25; SONG_FRAME_COUNT]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        sing(&mut owner, &mut listener, 1, &[0.5; 1]).await;
+        sing(&mut owner, &mut listener, 5, &[0.75; 2]).await;
+        commit_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        let sung = [
+            QUARTER,
+            HALF,
+            QUARTER,
+            QUARTER,
+            QUARTER,
+            THREE_QUARTERS,
+            THREE_QUARTERS,
+            QUARTER,
+        ];
+
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Base, 0, 8),
+                piece(RecordingLayer::Fresh, 1, 1),
+                piece(RecordingLayer::Fresh, 5, 2),
+            ]
+        );
+        assert_eq!(composite(&storage).await, sung);
+
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.undo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], false, true).await;
+        assert_eq!(composite(&storage).await, [QUARTER; SONG_FRAME_COUNT]);
+
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.redo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], true, false).await;
+        assert_eq!(composite(&storage).await, sung);
     }
 }

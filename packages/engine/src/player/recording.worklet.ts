@@ -56,21 +56,23 @@ export const createRecordingRuntime = (
 
   const chunkSamples = new Float32Array(chunkFrameCount);
   let recordingOffset = 0;
-  let recordingWriteFrameIndex = 0;
-  let recordingChunkFrameIndex = 0;
+  let runStartFrame = 0;
+  let runWriteOffset = 0;
+  let runChunkOffset = 0;
   let recordingSequence = 0;
   let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
   let inputOffsetFrameIndex = 0;
   let leadInFrameCount = 0;
 
-  const setRecordingWriteFrameIndex = (nextFrameIndex: number) => {
-    const tempoRatio = getTempoRatio();
-    const startFrame =
-      nextFrameIndex - getOutputLatencyFrameCount() * tempoRatio;
-    leadInFrameCount = Math.max(0, Math.ceil(-startFrame / tempoRatio));
-    const firstFrame = Math.round(startFrame + leadInFrameCount * tempoRatio);
-    recordingWriteFrameIndex = firstFrame;
-    recordingChunkFrameIndex = firstFrame;
+  const startRun = (nextFrameIndex: number) => {
+    const outputLatencyFrameCount = getOutputLatencyFrameCount();
+    leadInFrameCount = Math.ceil(outputLatencyFrameCount);
+    runStartFrame = Math.round(
+      nextFrameIndex +
+        (leadInFrameCount - outputLatencyFrameCount) * getTempoRatio(),
+    );
+    runWriteOffset = 0;
+    runChunkOffset = 0;
   };
 
   const flushRecordingBuffer = (): number => {
@@ -81,11 +83,12 @@ export const createRecordingRuntime = (
     recordingSequence += 1;
     recordingNotificationPort?.methods.chunk({
       sequence: recordingSequence,
-      frameIndex: recordingChunkFrameIndex,
+      startFrame: runStartFrame,
+      offset: runChunkOffset,
       samples: chunkSamples.slice(0, recordingOffset),
     });
     recordingOffset = 0;
-    recordingChunkFrameIndex = recordingWriteFrameIndex;
+    runChunkOffset = runWriteOffset;
     return recordingSequence;
   };
 
@@ -96,7 +99,7 @@ export const createRecordingRuntime = (
     }
     chunkSamples[recordingOffset] = Math.max(-1, Math.min(1, sample));
     recordingOffset += 1;
-    recordingWriteFrameIndex += 1;
+    runWriteOffset += 1;
 
     if (recordingOffset === chunkFrameCount) {
       flushRecordingBuffer();
@@ -148,7 +151,7 @@ export const createRecordingRuntime = (
       recordingOffset = 0;
       recordingSequence = 0;
       inputOffsetFrameIndex = 0;
-      setRecordingWriteFrameIndex(message.frameIndex);
+      startRun(message.frameIndex);
     },
     flush: (): number => {
       const sequence = flushRecordingBuffer() + 1;
@@ -165,7 +168,7 @@ export const createRecordingRuntime = (
     handleSeek: (frameIndex) => {
       flushRecordingBuffer();
       inputOffsetFrameIndex = 0;
-      setRecordingWriteFrameIndex(frameIndex);
+      startRun(frameIndex);
     },
     resetInputOffset: () => {
       inputOffsetFrameIndex = 0;

@@ -180,7 +180,6 @@ export namespace realtime {
         sessionId: string;
         recordingId: number;
         tempo: number;
-        startFrame?: number;
       }
     | {
         type: 'recording.peaksChanged';

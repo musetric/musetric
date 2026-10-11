@@ -6,7 +6,7 @@ import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
-import { type AudioDecode, createAudioDecode } from './audioDecode.worker.js';
+import { createAudioDecode } from './audioDecode.worker.js';
 import { createPlayerFrameIndexStream } from './playerFrameIndexStream.worker.js';
 import { type engineDecoderChannel } from './protocol.cross.js';
 import {
@@ -25,30 +25,9 @@ import {
 import {
   createRecordingPacket,
   createRecordingStream,
-  recordingPacketHeaderByteLength,
+  readRecordingPacket,
   type RecordingStream,
 } from './recordingStream.worker.js';
-
-const handleRealtimePacket = (audioDecode: AudioDecode, data: ArrayBuffer) => {
-  if (data.byteLength < recordingPacketHeaderByteLength) {
-    throw new Error('Project realtime packet is missing a header');
-  }
-  const view = new DataView(data);
-  const frameIndex = view.getUint32(0, true);
-  const frameCount = view.getUint32(4, true);
-  const byteLength = frameCount * Float32Array.BYTES_PER_ELEMENT;
-  if (data.byteLength !== recordingPacketHeaderByteLength + byteLength) {
-    throw new Error('Project realtime packet has invalid byte length');
-  }
-  audioDecode.patchLiveTake({
-    frameIndex,
-    samples: new Float32Array(
-      data,
-      recordingPacketHeaderByteLength,
-      frameCount,
-    ),
-  });
-};
 
 const takeFinishTimeoutMs = 10000;
 
@@ -103,7 +82,6 @@ export const createDecoderWorkerRuntime = (
       audioDecode.beginLiveTake({
         takeId: event.sessionId,
         tempo: event.tempo,
-        startFrame: event.startFrame,
       });
       return;
     }
@@ -176,7 +154,7 @@ export const createDecoderWorkerRuntime = (
       assertNever(event, 'Unhandled project realtime event');
     },
     onPacket: (data) => {
-      handleRealtimePacket(audioDecode, data);
+      audioDecode.patchLiveTake(readRecordingPacket(data));
     },
     onClose: (error) => {
       port.methods.setRealtimeState({ status: 'error' });
@@ -254,9 +232,7 @@ export const createDecoderWorkerRuntime = (
         port: recordingStreamChannel.outbound(message.port),
         onChunk: (chunk) => {
           audioDecode.patchLiveTake(chunk);
-          realtime.sendBinary(
-            createRecordingPacket(chunk.frameIndex, chunk.samples),
-          );
+          realtime.sendBinary(createRecordingPacket(chunk));
         },
       });
       realtime.sendJson({
