@@ -10,6 +10,7 @@ export const PlaybackControlsButton: FC = () => {
   const playing = useEngineStore((state) => state.playing);
   const recording = useEngineStore((state) => state.recording);
   const active = playing || recording;
+  const playingColor = active ? 'action.selected' : 'action.hover';
 
   return (
     <Box
@@ -20,12 +21,12 @@ export const PlaybackControlsButton: FC = () => {
       alignItems='center'
       borderRadius={999}
       sx={{
-        backgroundColor: recording ? 'error.dark' : 'action.hover',
+        backgroundColor: recording ? 'error.dark' : playingColor,
         opacity: frameCount ? 1 : 0.5,
         transition: 'background-color 160ms linear',
       }}
     >
-      {!active && <PlaybackRecordButton />}
+      <PlaybackRecordButton />
       {!active && <PlaybackPlayButton />}
       {active && <PlaybackStopButton />}
     </Box>

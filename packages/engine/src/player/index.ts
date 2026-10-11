@@ -18,6 +18,7 @@ export type EnginePlayer = {
   seek: (frameIndex: number, origin: EngineSeekOrigin) => void;
   setFrozen: (frozen: boolean) => void;
   record: (projectId: number) => Promise<void>;
+  stopRecording: () => Promise<void>;
   exportRecording: () => Promise<File | undefined>;
   applyRemoteStop: () => Promise<void>;
   applyRemoteFrameIndex: (
@@ -182,6 +183,7 @@ export const createEnginePlayer = (
         return;
       }
 
+      const { playing } = currentState;
       store.update((draft) => {
         draft.recording = true;
         draft.playing = true;
@@ -189,16 +191,46 @@ export const createEnginePlayer = (
       });
       try {
         getDecoderValue().sendPlayerRecord();
-        await getEngineRecorder().record(projectId);
+        await getEngineRecorder().record(projectId, !playing);
       } catch (error) {
-        if (!store.get().isSlave) {
+        const state = store.get();
+        if (!state.isSlave && !playing) {
           getDecoderValue().sendPlayerStop();
+        } else if (!state.isSlave && state.playing) {
+          getDecoderValue().sendPlayerPlay();
         }
         store.update((draft) => {
           draft.recording = false;
-          draft.playing = false;
+          if (!playing) {
+            draft.playing = false;
+          }
         });
         throw error;
+      } finally {
+        store.update((draft) => {
+          draft.playerCommandPending = false;
+        });
+      }
+    },
+    stopRecording: async () => {
+      const currentState = store.get();
+      if (
+        currentState.playerCommandPending ||
+        !currentState.recording ||
+        currentState.isSlave
+      ) {
+        return;
+      }
+
+      store.update((draft) => {
+        draft.playerCommandPending = true;
+      });
+      try {
+        await getEngineRecorder().finish();
+        const state = store.get();
+        if (!state.isSlave && state.playing) {
+          getDecoderValue().sendPlayerPlay();
+        }
       } finally {
         store.update((draft) => {
           draft.playerCommandPending = false;

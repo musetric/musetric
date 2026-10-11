@@ -72,27 +72,13 @@ export const noise = (length: number): Float32Array<ArrayBuffer> => {
   });
 };
 
-export type Harness = {
-  process: (input: Float32Array) => Float32Array;
-  player: ReturnType<typeof playerChannel.outbound<MessagePort>>;
-  data: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
+export type TakeStream = {
   chunks: LiveTakeChunk[];
   notification: MessagePort;
 };
 
-export const createHarness = async (
-  recording: PlayerRecordingPiece[],
-): Promise<Harness> => {
-  const control = new MessageChannel();
-  const data = new MessageChannel();
+export const createTakeStream = (): TakeStream => {
   const stream = new MessageChannel();
-  const runtime = await createPlayerRuntime({
-    port: playerChannel.inbound(control.port1),
-    dataPort: playerDataChannel.inbound(data.port1),
-    playheadPorts: [],
-    sampleRate: rate,
-    getCurrentTime: () => 0,
-  });
   const chunks: LiveTakeChunk[] = [];
   createRecordingStream({
     port: recordingStreamChannel.outbound(stream.port2),
@@ -100,6 +86,28 @@ export const createHarness = async (
       chunks.push(chunk);
     },
   });
+  return { chunks, notification: stream.port1 };
+};
+
+export type Harness = TakeStream & {
+  process: (input: Float32Array) => Float32Array;
+  player: ReturnType<typeof playerChannel.outbound<MessagePort>>;
+  data: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
+};
+
+export const createHarness = async (
+  recording: PlayerRecordingPiece[],
+): Promise<Harness> => {
+  const control = new MessageChannel();
+  const data = new MessageChannel();
+  const runtime = await createPlayerRuntime({
+    port: playerChannel.inbound(control.port1),
+    dataPort: playerDataChannel.inbound(data.port1),
+    playheadPorts: [],
+    sampleRate: rate,
+    getCurrentTime: () => 0,
+  });
+  const take = createTakeStream();
   const frameCount = songSeconds * rate;
   const dataPort = playerDataChannel.outbound(data.port2);
   dataPort.methods.mount({
@@ -123,7 +131,6 @@ export const createHarness = async (
     },
     player: playerChannel.outbound(control.port2),
     data: dataPort,
-    chunks,
-    notification: stream.port1,
+    ...take,
   };
 };

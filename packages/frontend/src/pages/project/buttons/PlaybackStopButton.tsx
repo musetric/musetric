@@ -25,9 +25,10 @@ export const PlaybackStopButton: FC = () => {
       }}
       sx={{
         alignSelf: 'stretch',
-        borderRadius: 999,
+        borderRadius: '0 999px 999px 0',
         flex: 1,
-        mx: -1,
+        mr: -1,
+        p: 0,
       }}
       title={t('pages.project.player.controls.stop')}
     >

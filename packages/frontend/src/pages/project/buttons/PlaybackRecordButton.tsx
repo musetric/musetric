@@ -18,6 +18,7 @@ export const PlaybackRecordButton: FC = () => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
+  const recording = useEngineStore((state) => state.recording);
   const transposed = useEngineStore((state) => state.transposeSemitones !== 0);
   const recordingName = useEngineStore(
     (state) => getActiveRecording(state)?.name,
@@ -30,20 +31,26 @@ export const PlaybackRecordButton: FC = () => {
     isSlave ||
     playerCommandPending;
 
+  const recordTitle = transposed
+    ? t('pages.project.player.controls.recordTransposed')
+    : t('pages.project.player.controls.record', { name: recordingName });
+  const title = recording
+    ? t('pages.project.player.controls.stopRecording')
+    : recordTitle;
+
   return (
-    <Tooltip
-      enterTouchDelay={0}
-      title={
-        transposed
-          ? t('pages.project.player.controls.recordTransposed')
-          : t('pages.project.player.controls.record', { name: recordingName })
-      }
-    >
+    <Tooltip enterTouchDelay={0} title={title}>
       <Box component='span' flex={1} alignSelf='stretch' display='flex' ml={-1}>
         <IconButton
-          color='error'
+          aria-label={title}
+          aria-pressed={recording}
+          color={recording ? 'inherit' : 'error'}
           disabled={disabled}
           onClick={() => {
+            if (recording) {
+              void engine.player.stopRecording();
+              return;
+            }
             void engine.player.record(projectId);
           }}
           sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}

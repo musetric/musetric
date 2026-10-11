@@ -21,7 +21,9 @@ use serde_json::Value;
 
 use crate::{
     realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
-    recording::{TakeFormat, is_active_recording, read_recordings, set_fresh_applied},
+    recording::{
+        TakeFormat, is_active_recording, read_recordings, refresh_peaks, set_fresh_applied,
+    },
     routes::RouteState,
     storage::{Storage, read},
 };
@@ -69,7 +71,7 @@ async fn serve(
         run_connection(&mut channel, &state.rooms, &mut connection).await;
     }
     state.rooms.leave(project_id, member);
-    let _ = finish_session(&state.rooms, &mut connection).await;
+    let _ = finish_session(&mut channel, &state.rooms, &mut connection).await;
 }
 
 async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id: i64) -> bool {
@@ -213,7 +215,7 @@ async fn start_recording(
         refuse_recording(rooms, connection, start.session_id);
         return true;
     }
-    if finish_session(rooms, connection).await.is_err() {
+    if finish_session(channel, rooms, connection).await.is_err() {
         channel.fail("Failed to start recording session").await;
         return false;
     }
@@ -309,7 +311,7 @@ async fn finish_recording(
         );
         return true;
     }
-    if finish_session(rooms, connection).await.is_err() {
+    if finish_session(channel, rooms, connection).await.is_err() {
         channel.fail("Failed to finish recording session").await;
         return false;
     }
@@ -381,7 +383,11 @@ async fn write_packet(
     Ok(Some(WrittenPacket { chunk, patch }))
 }
 
-async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<(), BoxedError> {
+async fn finish_session(
+    channel: &mut Channel,
+    rooms: &Rooms,
+    connection: &mut Connection,
+) -> Result<(), BoxedError> {
     let Some(Take {
         session,
         id,
@@ -400,7 +406,9 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
             &events::recording_finished(&id),
             None,
         );
+        channel.flush().await;
         if committed.is_some() {
+            refresh_peaks(&connection.storage, recording_id).await;
             rooms.broadcast_event(
                 connection.project_id,
                 &events::recording_changed(recording_id),
@@ -416,10 +424,7 @@ async fn finish_session(rooms: &Rooms, connection: &mut Connection) -> Result<()
 }
 
 async fn change_history(rooms: &Rooms, connection: &Connection, recording_id: i64, applied: bool) {
-    if !matches!(
-        rooms.begin_session(connection.project_id, connection.member),
-        rooms::Begin::Started
-    ) {
+    if !begin_after_save(rooms, connection).await {
         return;
     }
     rooms.save_session(connection.project_id, connection.member);
@@ -1207,6 +1212,62 @@ mod tests {
                 THREE_QUARTERS,
                 THREE_QUARTERS
             ]
+        );
+    }
+
+    async fn toggle_recording(owner: &mut ClientSocket, listener: &mut ClientSocket, kind: &str) {
+        send_json(owner, json!({ "type": kind })).await;
+        assert_eq!(receive_json(listener).await, json!({ "type": kind }));
+    }
+
+    #[tokio::test]
+    async fn records_takes_toggled_during_one_playback() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let mut owner = connect(&base).await;
+        let mut listener = connect(&base).await;
+        toggle_recording(&mut owner, &mut listener, "player.play").await;
+
+        toggle_recording(&mut owner, &mut listener, "player.record").await;
+        restart_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        sing(&mut owner, &mut listener, 2, &[0.25; 2]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        toggle_recording(&mut owner, &mut listener, "player.play").await;
+        toggle_recording(&mut owner, &mut listener, "player.record").await;
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+        sing(&mut owner, &mut listener, 6, &[0.5; 2]).await;
+        commit_take(&mut owner, &mut listener, SECOND_TAKE).await;
+
+        send_json(&mut listener, json!({ "type": "player.sync.request" })).await;
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({
+                "type": "player.sync.state",
+                "active": true,
+                "recording": true,
+                "frozen": false,
+                "frameIndex": 0.0,
+                "revision": 0,
+            })
+        );
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Base, 2, 2),
+                piece(RecordingLayer::Fresh, 6, 2),
+            ]
+        );
+        send_json(
+            &mut owner,
+            json!({ "type": "recording.undo", "recordingId": 1 }),
+        )
+        .await;
+        expect_changed([&mut owner, &mut listener], false, true).await;
+        assert_eq!(
+            composite(&storage).await,
+            [0, 0, QUARTER, QUARTER, 0, 0, 0, 0]
         );
     }
 

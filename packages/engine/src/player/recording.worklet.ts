@@ -27,8 +27,9 @@ export type RecordingRuntimePort = ReturnType<
 export type CreateRecordingRuntimeOptions = {
   port: RecordingRuntimePort;
   getPlaying: () => boolean;
+  getFrameIndex: () => number;
   getInputLatencyFrameCount: () => number;
-  getOutputLatencyFrameCount: () => number;
+  getPendingOutputFrameCount: () => number;
   getTempoRatio: () => number;
   applyLatencyFrameCounts: (counts: LatencyFrameCounts) => void;
 };
@@ -48,8 +49,9 @@ export const createRecordingRuntime = (
   const {
     port,
     getPlaying,
+    getFrameIndex,
     getInputLatencyFrameCount,
-    getOutputLatencyFrameCount,
+    getPendingOutputFrameCount,
     getTempoRatio,
     applyLatencyFrameCounts,
   } = options;
@@ -65,11 +67,11 @@ export const createRecordingRuntime = (
   let leadInFrameCount = 0;
 
   const startRun = (nextFrameIndex: number) => {
-    const outputLatencyFrameCount = getOutputLatencyFrameCount();
-    leadInFrameCount = Math.ceil(outputLatencyFrameCount);
+    const pendingOutputFrameCount = getPendingOutputFrameCount();
+    leadInFrameCount = Math.ceil(pendingOutputFrameCount);
     runStartFrame = Math.round(
       nextFrameIndex +
-        (leadInFrameCount - outputLatencyFrameCount) * getTempoRatio(),
+        (leadInFrameCount - pendingOutputFrameCount) * getTempoRatio(),
     );
     runWriteOffset = 0;
     runChunkOffset = 0;
@@ -151,7 +153,7 @@ export const createRecordingRuntime = (
       recordingOffset = 0;
       recordingSequence = 0;
       inputOffsetFrameIndex = 0;
-      startRun(message.frameIndex);
+      startRun(getPlaying() ? getFrameIndex() : message.frameIndex);
     },
     flush: (): number => {
       const sequence = flushRecordingBuffer() + 1;

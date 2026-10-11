@@ -47,7 +47,7 @@ impl Channel {
         let _ = self.socket.send(events::close(code, reason)).await;
     }
 
-    async fn flush(&mut self) {
+    pub(crate) async fn flush(&mut self) {
         while let Ok(message) = self.outgoing.try_recv() {
             if self.socket.send(message).await.is_err() {
                 return;
