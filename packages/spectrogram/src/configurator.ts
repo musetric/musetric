@@ -12,6 +12,7 @@ import {
 import {
   allTrackKeys,
   buildSpectrogramConfig,
+  getLaneFrequencyScale,
   mapTrackKeys,
   type SpectrogramConfig,
   type TrackKey,
@@ -113,6 +114,7 @@ export const createSpectrogramConfigurator = (
               texture: texture.layerViews[index],
               config: nextConfig,
               gainDb: nextConfig.lanes[key].gainDb,
+              frequencyScale: getLaneFrequencyScale(nextConfig.lanes[key]),
             })
           : undefined;
         return { lane, remap };
