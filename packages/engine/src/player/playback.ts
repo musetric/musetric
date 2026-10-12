@@ -7,7 +7,7 @@ import {
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
-import { type EngineState } from '../state.js';
+import { type EngineState, getLeadTransposeSemitones } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
@@ -182,6 +182,11 @@ export const createEnginePlayback = async (
       });
     },
   );
+  store.subscribe(getLeadTransposeSemitones, (transposeSemitones) => {
+    port.methods.setLeadTransposeSemitones({
+      transposeSemitones,
+    });
+  });
   store.subscribe(
     (state) => state.tempoRatio,
     (tempoRatio) => {

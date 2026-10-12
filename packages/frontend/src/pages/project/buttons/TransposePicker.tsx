@@ -1,5 +1,12 @@
-import { Box, Drawer, Popover, useMediaQuery } from '@mui/material';
-import { type FC } from 'react';
+import {
+  Box,
+  Drawer,
+  Popover,
+  type PopoverActions,
+  useMediaQuery,
+} from '@mui/material';
+import { type FC, useEffect, useRef } from 'react';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { TransposePickerContent } from './TransposePickerContent.js';
 
@@ -9,10 +16,17 @@ export const TransposePicker: FC = () => {
   const setTransposeAnchorEl = useProjectStore(
     (state) => state.setTransposeAnchorEl,
   );
+  const voiceOctave = useEngineStore((state) => state.voiceOctave);
+  const popoverActionsRef = useRef<PopoverActions>(null);
+
+  useEffect(() => {
+    popoverActionsRef.current?.updatePosition();
+  }, [voiceOctave]);
 
   if (isDesktop) {
     return (
       <Popover
+        action={popoverActionsRef}
         open={transposeAnchorEl !== undefined}
         anchorEl={transposeAnchorEl}
         onClose={() => {

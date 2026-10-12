@@ -1,6 +1,8 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { createTimePitchProcessor } from '@musetric/audio/player';
+import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
+import { mixTrackIntoBuffers } from './mixTrack.worklet.js';
 import {
   createPlayheadPublisher,
   type PlayheadPublisher,
@@ -17,46 +19,9 @@ import {
 } from './recording.worklet.js';
 import { createRecordingTrack } from './recordingTrack.worklet.js';
 
-type MixTrackIntoBuffersOptions = {
-  inputBuffers: Float32Array[];
-  outputFrameIndex: number;
-  inputFrameOffset: number;
-  inputFrameCount: number;
-  channelCount: number;
-  track: Float32Array[] | undefined;
-  volume: number;
-};
-
-const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
-  const {
-    inputBuffers,
-    outputFrameIndex,
-    inputFrameOffset,
-    inputFrameCount,
-    channelCount,
-    track,
-    volume,
-  } = options;
-  if (!track) {
-    return;
-  }
-
-  for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
-    const input = inputBuffers[channelIndex];
-
-    const samples = track[channelIndex] ?? track[0];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!samples) {
-      continue;
-    }
-
-    const frameBase = outputFrameIndex + inputFrameOffset;
-    for (let offset = 0; offset < inputFrameCount; offset += 1) {
-      const sample = samples[frameBase + offset] ?? 0;
-      input[offset] += sample * volume;
-    }
-  }
-};
+const accompanimentStemTypes = stemTypes.filter(
+  (stemType) => stemType !== 'lead',
+);
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
@@ -92,11 +57,18 @@ export const createPlayerRuntime = async (
   let outputOffsetFrameIndex = 0;
   let tempoRatio = 1;
   let transposeSemitones = 0;
+  let leadTransposeSemitones = 0;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
+  const leadVoice = await createLeadVoice(sampleRate);
   const recordingTrack = await createRecordingTrack(sampleRate);
+
+  const resetTimePitch = () => {
+    timePitchProcessor.reset();
+    leadVoice.reset();
+  };
 
   const getCurrentOutputFrameIndex = () =>
     frameIndex + Math.round(outputOffsetFrameIndex * tempoRatio);
@@ -201,7 +173,7 @@ export const createPlayerRuntime = async (
       outputOffsetFrameIndex = 0;
       playing = false;
       recordingRuntime.resetInputOffset();
-      timePitchProcessor.reset();
+      resetTimePitch();
       playhead.publishNow({ frameIndex, revision });
       port.methods.setPlaying({ playing, frameIndex, revision });
     },
@@ -231,7 +203,7 @@ export const createPlayerRuntime = async (
     },
     setFrozen: (message) => {
       frozen = message.frozen;
-      timePitchProcessor.reset();
+      resetTimePitch();
     },
     seek: (message) => {
       revision = message.revision;
@@ -240,7 +212,7 @@ export const createPlayerRuntime = async (
       if (recordingRuntime.isActive()) {
         recordingRuntime.handleSeek(message.frameIndex);
       }
-      timePitchProcessor.reset();
+      resetTimePitch();
       metronome.reset(message.frameIndex);
       metronome.clear();
       playhead.publishNow({ frameIndex, revision });
@@ -249,9 +221,14 @@ export const createPlayerRuntime = async (
       transposeSemitones = message.transposeSemitones;
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
     },
+    setLeadTransposeSemitones: (message) => {
+      leadTransposeSemitones = message.transposeSemitones;
+      leadVoice.setTransposeSemitones(message.transposeSemitones);
+    },
     setTempoRatio: (message) => {
       tempoRatio = message.tempoRatio;
       timePitchProcessor.setTempoRatio(message.tempoRatio);
+      leadVoice.setTempoRatio(message.tempoRatio);
     },
     setTrackVolume: (message) => {
       trackVolumes[message.stemType] = message.volume;
@@ -287,6 +264,7 @@ export const createPlayerRuntime = async (
       const currentTracks = tracks;
       const outputFrameCount = outputs[0].length;
       const currentOutputFrameIndex = getCurrentOutputFrameIndex();
+      const leadApart = leadTransposeSemitones !== transposeSemitones;
       const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
@@ -299,7 +277,9 @@ export const createPlayerRuntime = async (
             channelCount,
           };
 
-          for (const stemType of stemTypes) {
+          for (const stemType of leadApart
+            ? accompanimentStemTypes
+            : stemTypes) {
             mixTrackIntoBuffers({
               ...baseOptions,
               track: currentTracks[stemType],
@@ -308,6 +288,14 @@ export const createPlayerRuntime = async (
           }
         },
       );
+      if (leadApart) {
+        leadVoice.mixInto({
+          outputs,
+          outputFrameIndex: currentOutputFrameIndex,
+          track: currentTracks.lead,
+          volume: trackVolumes.lead ?? 1,
+        });
+      }
       if (!recordingRuntime.isActive()) {
         recordingTrack.mixInto({
           outputs,
@@ -342,7 +330,7 @@ export const createPlayerRuntime = async (
         outputOffsetFrameIndex = 0;
         playing = false;
         recordingRuntime.resetInputOffset();
-        timePitchProcessor.reset();
+        resetTimePitch();
         metronome.reset(0);
         metronome.clear();
         playhead.publishNow({ frameIndex, revision });

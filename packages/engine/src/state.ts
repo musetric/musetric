@@ -37,6 +37,10 @@ export type RecordingLatencySource = 'estimated' | 'manual' | 'calibrated';
 
 export type SpectrogramViewMode = 'notes' | 'spectrum';
 
+export type VoiceOctave = -1 | 0 | 1;
+
+export type SingerVoice = 'original' | 'shifted';
+
 export type FrequencyRange = {
   minFrequency: number;
   maxFrequency: number;
@@ -60,6 +64,8 @@ export type EngineState = {
   frameIndex: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
+  voiceOctave: VoiceOctave;
+  singerVoice: SingerVoice;
   tempoRatio: number;
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
@@ -88,17 +94,32 @@ export const getActiveRecording = (
 ): api.recording.Item | undefined =>
   state.recordings.find((recording) => recording.active);
 
-const getTransposeScale = (transposeSemitones: number) =>
-  2 ** (transposeSemitones / 12);
+export const getNoteShiftSemitones = (
+  state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
+): number => 12 * state.voiceOctave + state.transposeSemitones;
+
+export const getLeadTransposeSemitones = (
+  state: Pick<
+    EngineState,
+    'transposeSemitones' | 'voiceOctave' | 'singerVoice'
+  >,
+): number =>
+  state.singerVoice === 'shifted'
+    ? getNoteShiftSemitones(state)
+    : state.transposeSemitones;
+
+const getNoteShiftScale = (
+  state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
+) => 2 ** (getNoteShiftSemitones(state) / 12);
 
 export const getFrequencyRange = (
   state: Pick<
     EngineState,
-    'frequencyRanges' | 'spectrogramView' | 'transposeSemitones'
+    'frequencyRanges' | 'spectrogramView' | 'transposeSemitones' | 'voiceOctave'
   >,
 ): FrequencyRange => {
   const range = state.frequencyRanges[state.spectrogramView];
-  const scale = getTransposeScale(state.transposeSemitones);
+  const scale = getNoteShiftScale(state);
   return {
     minFrequency: range.minFrequency * scale,
     maxFrequency: range.maxFrequency * scale,
@@ -106,10 +127,10 @@ export const getFrequencyRange = (
 };
 
 export const toStoredFrequencyRange = (
-  state: Pick<EngineState, 'transposeSemitones'>,
+  state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
   range: FrequencyRange,
 ): FrequencyRange => {
-  const scale = getTransposeScale(state.transposeSemitones);
+  const scale = getNoteShiftScale(state);
   return {
     minFrequency: range.minFrequency / scale,
     maxFrequency: range.maxFrequency / scale,

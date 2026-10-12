@@ -87,6 +87,7 @@ export type TimePitchProcessor = {
   reset: () => void;
   setTransposeSemitones: (transposeSemitones: number) => void;
   setTempoRatio: (tempoRatio: number) => void;
+  setFormantCompensation: (formantCompensation: boolean) => void;
 };
 
 export const createTimePitchProcessor = async (
@@ -101,6 +102,7 @@ export const createTimePitchProcessor = async (
   let inputFrameFraction = 0;
   let transposeSemitones = 0;
   let tempoRatio = 1;
+  let formantCompensation = false;
 
   return {
     process: (outputs, fillInput) => {
@@ -127,7 +129,7 @@ export const createTimePitchProcessor = async (
       }
 
       wasmModule._setTransposeSemitones(transposeSemitones, tonalityLimit);
-      wasmModule._setFormantSemitones(0, false);
+      wasmModule._setFormantSemitones(0, formantCompensation);
       wasmModule._setFormantBase(0);
 
       for (const inputBuffer of state.inputBuffers) {
@@ -165,6 +167,9 @@ export const createTimePitchProcessor = async (
     },
     setTempoRatio: (nextTempoRatio) => {
       tempoRatio = nextTempoRatio;
+    },
+    setFormantCompensation: (nextFormantCompensation) => {
+      formantCompensation = nextFormantCompensation;
     },
   };
 };

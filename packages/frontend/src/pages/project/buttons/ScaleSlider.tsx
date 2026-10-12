@@ -11,6 +11,7 @@ type ScaleSliderLabel = {
 
 export type ScaleSliderProps = {
   title: string;
+  caption?: string;
   value: number;
   min: number;
   max: number;
@@ -29,6 +30,7 @@ export type ScaleSliderProps = {
 export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
   const {
     title,
+    caption,
     value,
     min,
     max,
@@ -54,9 +56,21 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
 
   return (
     <Stack gap={3.5}>
-      <Typography fontSize={15} fontWeight={700}>
-        {title}
-      </Typography>
+      <Stack
+        direction='row'
+        justifyContent='space-between'
+        alignItems='baseline'
+        gap={2}
+      >
+        <Typography fontSize={15} fontWeight={700}>
+          {title}
+        </Typography>
+        {caption !== undefined && (
+          <Typography fontSize={12} color='text.secondary'>
+            {caption}
+          </Typography>
+        )}
+      </Stack>
       <Stack alignItems='center' gap={1}>
         <Stack direction='row' alignItems='baseline' gap={1}>
           <Typography

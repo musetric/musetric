@@ -11,8 +11,8 @@ import { type Store } from '../common/store.js';
 import {
   type EngineState,
   getFrequencyRange,
+  getNoteShiftSemitones,
   getTrackProgress,
-  type SpectrogramViewMode,
 } from '../state.js';
 import { spectrogramChannel } from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
@@ -109,40 +109,30 @@ export const createEngineSpectrogram = (
       const offscreenCanvas = canvas.transferControlToOffscreen();
       const engineState = store.get();
 
-      const buildLanes = (
-        view: SpectrogramViewMode,
-        recording: boolean,
-        leadSpectrogramGainDb: number,
-        transposeSemitones: number,
-      ) => {
-        const notes = view === 'notes';
+      const buildLanes = (state: EngineState) => {
+        const notes = state.spectrogramView === 'notes';
         return {
           lead: {
             ...defaultSpectrogramConfig.lanes.lead,
             showSpectrogram: !notes,
             showFundamental: notes,
             showNotes: notes,
-            gainDb: leadSpectrogramGainDb,
-            transposeSemitones,
+            gainDb: state.leadSpectrogramGainDb,
+            transposeSemitones: getNoteShiftSemitones(state),
           },
           recording: {
             ...defaultSpectrogramConfig.lanes.recording,
             showSpectrogram: !notes,
             showFundamental: true,
             showNotes: notes,
-            truncateAfterPlayhead: recording,
-            transposeSemitones,
+            truncateAfterPlayhead: state.recording,
+            transposeSemitones: state.transposeSemitones,
           },
         };
       };
       const buildStateView = (state: EngineState) => ({
         ...getFrequencyRange(state),
-        lanes: buildLanes(
-          state.spectrogramView,
-          state.recording,
-          state.leadSpectrogramGainDb,
-          state.transposeSemitones,
-        ),
+        lanes: buildLanes(state),
       });
 
       port.methods.setFrameCount({ frameCount: engineState.frameCount ?? 0 });
@@ -169,7 +159,7 @@ export const createEngineSpectrogram = (
       const unsubscribeView = store.subscribe(
         (state) => {
           const range = getFrequencyRange(state);
-          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${range.minFrequency}:${range.maxFrequency}`;
+          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${state.voiceOctave}:${range.minFrequency}:${range.maxFrequency}`;
         },
         () => {
           port.methods.updateConfig({
