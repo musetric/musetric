@@ -106,25 +106,25 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             '@media (any-pointer: coarse)': { py: '20px' },
           }}
         />
-        <Box position='relative' height={12}>
+        <Box position='relative' height={14}>
           {Array.from({ length: max - min + 1 }, (_, index) => {
             const tick = min + index;
             const fromOriginal = tick - original;
             const tickStyle = {
               width: '1px',
-              height: 3,
+              height: 4,
               bgcolor: 'action.disabled',
             };
             if (fromOriginal % mediumTickEvery === 0) {
-              tickStyle.height = 6;
+              tickStyle.height = 8;
+              tickStyle.bgcolor = 'text.disabled';
             }
             if (fromOriginal % largeTickEvery === 0) {
-              tickStyle.height = 9;
-              tickStyle.bgcolor = 'text.disabled';
+              tickStyle.height = 14;
+              tickStyle.bgcolor = 'text.secondary';
             }
             if (tick === original) {
               tickStyle.width = '2px';
-              tickStyle.height = 12;
               tickStyle.bgcolor = 'text.primary';
             }
             return (
