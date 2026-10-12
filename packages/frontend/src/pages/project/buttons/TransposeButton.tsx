@@ -1,4 +1,12 @@
-import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import {
+  Badge,
+  Box,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import { type VoiceOctave } from '@musetric/engine';
 import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,11 +29,22 @@ export const TransposeButton: FC = () => {
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
+  const voiceOctave = useEngineStore((state) => state.voiceOctave);
   const setTransposeAnchorEl = useProjectStore(
     (state) => state.setTransposeAnchorEl,
   );
   const keyQuery = useQuery(endpoints.key.get(projectId));
-  const label = t('pages.project.player.controls.transpose');
+  const labels: Record<VoiceOctave, string> = {
+    [-1]: t('pages.project.player.controls.transposeOctaveDown'),
+    0: t('pages.project.player.controls.transpose'),
+    1: t('pages.project.player.controls.transposeOctaveUp'),
+  };
+  const badges: Record<VoiceOctave, string> = {
+    [-1]: t('pages.project.player.controls.voiceOctaveDownBadge'),
+    0: '',
+    1: t('pages.project.player.controls.voiceOctaveUpBadge'),
+  };
+  const label = labels[voiceOctave];
 
   const value =
     keyQuery.status === 'success'
@@ -43,7 +62,11 @@ export const TransposeButton: FC = () => {
         <IconButton
           size='small'
           disabled={!frameCount || recording || realtimeFailed}
-          color={transposeSemitones === 0 ? 'inherit' : 'primary'}
+          color={
+            transposeSemitones === 0 && voiceOctave === 0
+              ? 'inherit'
+              : 'primary'
+          }
           aria-label={label}
           sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
           onClick={(event) => {
@@ -51,7 +74,22 @@ export const TransposeButton: FC = () => {
           }}
         >
           <Stack alignItems='center' gap={0.5}>
-            <TransposeIcon fontSize='small' />
+            <Badge
+              badgeContent={badges[voiceOctave]}
+              color='primary'
+              invisible={voiceOctave === 0}
+              sx={{
+                '& .MuiBadge-badge': {
+                  height: 16,
+                  minWidth: 16,
+                  px: 1,
+                  fontSize: 10,
+                  fontWeight: 700,
+                },
+              }}
+            >
+              <TransposeIcon fontSize='small' />
+            </Badge>
             <Typography variant='caption' lineHeight={1} noWrap>
               {value}
             </Typography>

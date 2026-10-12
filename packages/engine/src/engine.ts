@@ -70,6 +70,7 @@ const initialState: EngineState = {
     origin: 'player',
   },
   transposeSemitones: 0,
+  voiceOctave: 0,
   tempoRatio: 1,
   audioDevices: [],
   latencyFrameCount: 0,
