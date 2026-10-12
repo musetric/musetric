@@ -1,116 +1,64 @@
-import '@ncdai/react-wheel-picker/style.css';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { Box, Button, Stack, Typography } from '@mui/material';
-import { getMaxTempoBpm, getMinTempoBpm } from '@musetric/audio';
-import {
-  WheelPicker,
-  type WheelPickerOption,
-  WheelPickerWrapper,
-} from '@ncdai/react-wheel-picker';
+import { maxTempoRatio, minTempoRatio } from '@musetric/audio';
+import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { endpoints } from '../../../api/index.js';
+import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { ScaleSlider } from './ScaleSlider.js';
 
-const getTempoOptions = (
-  sourceTempoBpm: number,
-  t: (key: string, options: { value: number }) => string,
-) => {
-  const maxTempoBpm = getMaxTempoBpm(sourceTempoBpm);
-  const minTempoBpm = getMinTempoBpm(sourceTempoBpm);
-
-  return Array.from(
-    { length: maxTempoBpm - minTempoBpm + 1 },
-    (_, index): WheelPickerOption<number> => {
-      const value = maxTempoBpm - index;
-      const ratio = sourceTempoBpm > 0 ? value / sourceTempoBpm : 1;
-      const roundedRatio = Math.round(ratio * 100) / 100;
-      const deltaLabel =
-        value === sourceTempoBpm
-          ? t('pages.project.player.controls.original', { value: 0 })
-          : `${roundedRatio.toFixed(2)}x`;
-      const bpmLabel = t('pages.project.player.controls.tempoValue', { value });
-
-      return {
-        value,
-        label: (
-          <Box
-            component='span'
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto 1fr',
-              alignItems: 'center',
-              width: '100%',
-              px: 2,
-            }}
-          >
-            <span />
-            <span>{bpmLabel}</span>
-            <Box component='span' sx={{ opacity: 0.6, justifySelf: 'end' }}>
-              {deltaLabel}
-            </Box>
-          </Box>
-        ),
-        textValue: bpmLabel,
-      };
-    },
-  );
-};
+const stepsPerRatio = 20;
+const labelledTempoRatios = [minTempoRatio, 0.5, 1.5, maxTempoRatio];
 
 export const TempoPickerContent: FC = () => {
   const { t } = useTranslation();
+  const { projectId } = routes.project.useAssertMatch();
   const recording = useEngineStore((state) => state.recording);
-  const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
-  const tempoBpm = useEngineStore((state) => state.tempoBpm);
+  const tempoRatio = useEngineStore((state) => state.tempoRatio);
+  const rhythmQuery = useQuery(endpoints.rhythm.get(projectId));
+  const sourceTempoBpm =
+    rhythmQuery.status === 'success' && rhythmQuery.data.bpm > 0
+      ? rhythmQuery.data.bpm
+      : undefined;
 
   return (
-    <Stack gap={2}>
-      <Typography variant='h6' textAlign='center'>
-        {t('pages.project.player.controls.tempo')}
-      </Typography>
-      <Box
-        sx={{
-          '& [data-rwp-highlight-wrapper]': {
-            backgroundColor: 'primary.main',
-            borderRadius: 2,
-            color: 'primary.contrastText',
-            fontWeight: 700,
-          },
-          '& [data-rwp-highlight-item]': {
-            fontSize: '1rem',
-            fontWeight: 700,
-          },
-        }}
-      >
-        <WheelPickerWrapper>
-          <WheelPicker
-            value={tempoBpm}
-            options={getTempoOptions(sourceTempoBpm, t)}
-            visibleCount={16}
-            onValueChange={(nextTempoBpm) => {
-              if (recording) {
-                return;
-              }
-              engine.store.update((state) => {
-                state.tempoBpm = nextTempoBpm;
-              });
-            }}
-          />
-        </WheelPickerWrapper>
-      </Box>
-      <Button
-        size='large'
-        variant='outlined'
-        startIcon={<RestartAltIcon />}
-        disabled={recording || tempoBpm === sourceTempoBpm}
-        onClick={() => {
-          engine.store.update((state) => {
-            state.tempoBpm = sourceTempoBpm;
-          });
-        }}
-      >
-        {t('pages.project.player.controls.tempoReset')}
-      </Button>
-    </Stack>
+    <ScaleSlider
+      title={t('pages.project.player.controls.tempoTitle')}
+      value={Math.round(tempoRatio * stepsPerRatio)}
+      min={Math.round(minTempoRatio * stepsPerRatio)}
+      max={Math.round(maxTempoRatio * stepsPerRatio)}
+      original={stepsPerRatio}
+      largeTickEvery={stepsPerRatio / 2}
+      mediumTickEvery={stepsPerRatio / 4}
+      valueText={tempoRatio.toFixed(2)}
+      unit={t('pages.project.player.controls.tempoRatioUnit')}
+      info={
+        sourceTempoBpm === undefined
+          ? undefined
+          : t('pages.project.player.controls.tempoValue', {
+              value: Math.round(sourceTempoBpm * tempoRatio),
+            })
+      }
+      originalInfo={
+        sourceTempoBpm === undefined
+          ? undefined
+          : t('pages.project.player.controls.tempoValue', {
+              value: Math.round(sourceTempoBpm),
+            })
+      }
+      labels={labelledTempoRatios.map((ratio) => ({
+        value: Math.round(ratio * stepsPerRatio),
+        label: t('pages.project.player.controls.tempoRatioValue', {
+          value: ratio,
+        }),
+      }))}
+      disabled={recording}
+      onChange={(steps) => {
+        engine.store.update((state) => {
+          state.tempoRatio = steps / stepsPerRatio;
+        });
+      }}
+    />
   );
 };

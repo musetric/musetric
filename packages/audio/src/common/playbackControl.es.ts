@@ -1,7 +1,5 @@
-export const getMinTempoBpm = (sourceTempoBpm: number) =>
-  Math.ceil(sourceTempoBpm * 0.25);
-export const getMaxTempoBpm = (sourceTempoBpm: number) =>
-  Math.ceil(sourceTempoBpm * 2);
+export const minTempoRatio = 0.2;
+export const maxTempoRatio = 2;
 
-export const minTransposeSemitones = -12;
-export const maxTransposeSemitones = 12;
+export const minTransposeSemitones = -6;
+export const maxTransposeSemitones = 6;

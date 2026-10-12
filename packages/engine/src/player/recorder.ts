@@ -256,18 +256,14 @@ export const createEngineRecorder = (
         gain.disconnect();
       };
       const recordingStreamChannel = new MessageChannel();
-      const {
-        latencyFrameCount,
-        inputLatencyFrameCount,
-        tempoBpm,
-        sourceTempoBpm,
-      } = store.get();
+      const { latencyFrameCount, inputLatencyFrameCount, tempoRatio } =
+        store.get();
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,
         frameCount,
         latencyFrameCount,
-        tempo: tempoBpm / sourceTempoBpm,
+        tempo: tempoRatio,
         port: recordingStreamChannel.port1,
       });
       session.decoderStreamStarted = true;

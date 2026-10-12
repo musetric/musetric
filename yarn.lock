@@ -1805,7 +1805,6 @@ __metadata:
     "@musetric/spa-router": "workspace:*"
     "@musetric/spectrogram": "workspace:*"
     "@musetric/utils": "workspace:*"
-    "@ncdai/react-wheel-picker": "catalog:"
     "@tanstack/react-query": "catalog:"
     "@types/node": "catalog:"
     "@types/react": "catalog:"
@@ -1979,15 +1978,6 @@ __metadata:
     "@emnapi/core": ^1.7.1
     "@emnapi/runtime": ^1.7.1
   checksum: 10c0/344518bf3ef65051dda4c00969f293aa4a21ab7dc7822b3f48519b17cd5eaa3f0bc34898d115d50ba59b1817a0cb905d46f7a7223c8249239cd14c28db388e10
-  languageName: node
-  linkType: hard
-
-"@ncdai/react-wheel-picker@npm:1.2.2":
-  version: 1.2.2
-  resolution: "@ncdai/react-wheel-picker@npm:1.2.2"
-  peerDependencies:
-    react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
-  checksum: 10c0/db03f065a339cfaddea80794cbfa36acc5c79ccc7a44a67088fe0bc14572dbfa582632d9773e71e50d0ddc8420411891e00c74bbef727abb2648e24912d0806f
   languageName: node
   linkType: hard
 

@@ -27,7 +27,7 @@ export const TransposePicker: FC = () => {
           vertical: 'bottom',
         }}
       >
-        <Box width={340} p={2}>
+        <Box width={380} p={4}>
           <TransposePickerContent />
         </Box>
       </Popover>
@@ -46,7 +46,7 @@ export const TransposePicker: FC = () => {
         width='100%'
         maxWidth={460}
         mx='auto'
-        p={2}
+        p={4}
         pb='max(18px, env(safe-area-inset-bottom))'
       >
         <TransposePickerContent />

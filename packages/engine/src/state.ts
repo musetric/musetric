@@ -60,8 +60,7 @@ export type EngineState = {
   frameIndex: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
-  sourceTempoBpm: number;
-  tempoBpm: number;
+  tempoRatio: number;
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
   audioDevices: MediaDeviceInfo[];
@@ -89,10 +88,8 @@ export const getActiveRecording = (
 ): api.recording.Item | undefined =>
   state.recordings.find((recording) => recording.active);
 
-const getTransposeRangeGrowth = (transposeSemitones: number) => {
-  const scale = 2 ** (transposeSemitones / 12);
-  return { low: Math.min(scale, 1), high: Math.max(scale, 1) };
-};
+const getTransposeScale = (transposeSemitones: number) =>
+  2 ** (transposeSemitones / 12);
 
 export const getFrequencyRange = (
   state: Pick<
@@ -101,10 +98,10 @@ export const getFrequencyRange = (
   >,
 ): FrequencyRange => {
   const range = state.frequencyRanges[state.spectrogramView];
-  const growth = getTransposeRangeGrowth(state.transposeSemitones);
+  const scale = getTransposeScale(state.transposeSemitones);
   return {
-    minFrequency: range.minFrequency * growth.low,
-    maxFrequency: range.maxFrequency * growth.high,
+    minFrequency: range.minFrequency * scale,
+    maxFrequency: range.maxFrequency * scale,
   };
 };
 
@@ -112,10 +109,10 @@ export const toStoredFrequencyRange = (
   state: Pick<EngineState, 'transposeSemitones'>,
   range: FrequencyRange,
 ): FrequencyRange => {
-  const growth = getTransposeRangeGrowth(state.transposeSemitones);
+  const scale = getTransposeScale(state.transposeSemitones);
   return {
-    minFrequency: range.minFrequency / growth.low,
-    maxFrequency: range.maxFrequency / growth.high,
+    minFrequency: range.minFrequency / scale,
+    maxFrequency: range.maxFrequency / scale,
   };
 };
 
