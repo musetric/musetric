@@ -8,7 +8,7 @@ import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { ScaleSlider } from './ScaleSlider.js';
 
-const tenthsPerRatio = 10;
+const stepsPerRatio = 20;
 const labelledTempoRatios = [minTempoRatio, 0.5, 1.5, maxTempoRatio];
 
 export const TempoPickerContent: FC = () => {
@@ -25,11 +25,12 @@ export const TempoPickerContent: FC = () => {
   return (
     <ScaleSlider
       title={t('pages.project.player.controls.tempoTitle')}
-      value={Math.round(tempoRatio * tenthsPerRatio)}
-      min={Math.round(minTempoRatio * tenthsPerRatio)}
-      max={Math.round(maxTempoRatio * tenthsPerRatio)}
-      original={tenthsPerRatio}
-      valueText={tempoRatio.toFixed(1)}
+      value={Math.round(tempoRatio * stepsPerRatio)}
+      min={Math.round(minTempoRatio * stepsPerRatio)}
+      max={Math.round(maxTempoRatio * stepsPerRatio)}
+      original={stepsPerRatio}
+      subdivision={2}
+      valueText={tempoRatio.toFixed(2)}
       unit={t('pages.project.player.controls.tempoRatioUnit')}
       info={
         sourceTempoBpm === undefined
@@ -46,15 +47,15 @@ export const TempoPickerContent: FC = () => {
             })
       }
       labels={labelledTempoRatios.map((ratio) => ({
-        value: Math.round(ratio * tenthsPerRatio),
+        value: Math.round(ratio * stepsPerRatio),
         label: t('pages.project.player.controls.tempoRatioValue', {
           value: ratio,
         }),
       }))}
       disabled={recording}
-      onChange={(tenths) => {
+      onChange={(steps) => {
         engine.store.update((state) => {
-          state.tempoRatio = tenths / tenthsPerRatio;
+          state.tempoRatio = steps / stepsPerRatio;
         });
       }}
     />

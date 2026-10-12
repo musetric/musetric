@@ -33,7 +33,7 @@ export const TempoButton: FC = () => {
             <TempoIcon fontSize='small' />
             <Typography variant='caption' lineHeight={1} noWrap>
               {t('pages.project.player.controls.tempoRatioValue', {
-                value: tempoRatio.toFixed(1),
+                value: tempoRatio.toFixed(2),
               })}
             </Typography>
           </Stack>

@@ -27,6 +27,7 @@ export const TransposePickerContent: FC = () => {
       min={minTransposeSemitones}
       max={maxTransposeSemitones}
       original={0}
+      subdivision={1}
       valueText={formatTransposeSemitones(transposeSemitones)}
       unit={t('pages.project.player.controls.semitoneUnit')}
       info={

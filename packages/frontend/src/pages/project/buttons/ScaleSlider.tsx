@@ -15,6 +15,7 @@ export type ScaleSliderProps = {
   min: number;
   max: number;
   original: number;
+  subdivision: number;
   valueText: string;
   unit: string;
   info?: string;
@@ -31,6 +32,7 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
     min,
     max,
     original,
+    subdivision,
     valueText,
     unit,
     info,
@@ -106,14 +108,21 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
           {Array.from({ length: max - min + 1 }, (_, index) => {
             const tick = min + index;
             const labelled = labels.some((label) => label.value === tick);
-            const tickStyle =
-              tick === original
-                ? { width: '2px', height: 12, bgcolor: 'text.primary' }
-                : {
-                    width: '1px',
-                    height: labelled ? 9 : 5,
-                    bgcolor: labelled ? 'text.disabled' : 'action.disabled',
-                  };
+            const whole = (tick - original) % subdivision === 0;
+            const tickStyle = {
+              width: '1px',
+              height: whole ? 5 : 3,
+              bgcolor: 'action.disabled',
+            };
+            if (labelled) {
+              tickStyle.height = 9;
+              tickStyle.bgcolor = 'text.disabled';
+            }
+            if (tick === original) {
+              tickStyle.width = '2px';
+              tickStyle.height = 12;
+              tickStyle.bgcolor = 'text.primary';
+            }
             return (
               <Box
                 key={tick}
