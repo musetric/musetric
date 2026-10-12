@@ -29,7 +29,8 @@ export const TempoPickerContent: FC = () => {
       min={Math.round(minTempoRatio * stepsPerRatio)}
       max={Math.round(maxTempoRatio * stepsPerRatio)}
       original={stepsPerRatio}
-      subdivision={2}
+      largeTickEvery={stepsPerRatio / 2}
+      mediumTickEvery={stepsPerRatio / 4}
       valueText={tempoRatio.toFixed(2)}
       unit={t('pages.project.player.controls.tempoRatioUnit')}
       info={
