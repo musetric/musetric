@@ -24,7 +24,7 @@ export const TempoPickerContent: FC = () => {
 
   return (
     <ScaleSlider
-      title={t('pages.project.player.controls.tempo')}
+      title={t('pages.project.player.controls.tempoTitle')}
       value={Math.round(tempoRatio * tenthsPerRatio)}
       min={Math.round(minTempoRatio * tenthsPerRatio)}
       max={Math.round(maxTempoRatio * tenthsPerRatio)}

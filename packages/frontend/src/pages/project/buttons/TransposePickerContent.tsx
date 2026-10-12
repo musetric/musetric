@@ -22,7 +22,7 @@ export const TransposePickerContent: FC = () => {
 
   return (
     <ScaleSlider
-      title={t('pages.project.player.controls.transpose')}
+      title={t('pages.project.player.controls.transposeTitle')}
       value={transposeSemitones}
       min={minTransposeSemitones}
       max={maxTransposeSemitones}
