@@ -10,6 +10,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { formatKeyCompact, transposeKeyRoot } from '../key/keyFormat.js';
 import { formatTransposeSemitones } from './formatTransposeSemitones.js';
 import { ScaleSlider } from './ScaleSlider.js';
+import { SingerVoiceToggle } from './SingerVoiceToggle.js';
 import { VoiceOctaveToggle } from './VoiceOctaveToggle.js';
 
 export const TransposePickerContent: FC = () => {
@@ -19,6 +20,7 @@ export const TransposePickerContent: FC = () => {
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
+  const voiceOctave = useEngineStore((state) => state.voiceOctave);
   const keyQuery = useQuery(endpoints.key.get(projectId));
   const sourceKey = keyQuery.status === 'success' ? keyQuery.data : undefined;
 
@@ -66,6 +68,12 @@ export const TransposePickerContent: FC = () => {
       />
       <Divider />
       <VoiceOctaveToggle />
+      {voiceOctave !== 0 && (
+        <>
+          <Divider />
+          <SingerVoiceToggle />
+        </>
+      )}
     </Stack>
   );
 };

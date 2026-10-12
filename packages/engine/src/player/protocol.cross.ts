@@ -18,6 +18,7 @@ export type PlayerOutboundMethods = {
   setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number; revision: number }) => void;
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
+  setLeadTransposeSemitones: (message: { transposeSemitones: number }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
   setTrackVolume: (message: { stemType: StemType; volume: number }) => void;
   setRecordingVolume: (message: { volume: number }) => void;
@@ -63,6 +64,7 @@ export const playerChannel = createMessageChannel<
       'stop',
       'setFrozen',
       'setTransposeSemitones',
+      'setLeadTransposeSemitones',
       'setTempoRatio',
       'setTrackVolume',
       'setRecordingVolume',

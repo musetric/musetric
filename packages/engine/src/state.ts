@@ -39,6 +39,8 @@ export type SpectrogramViewMode = 'notes' | 'spectrum';
 
 export type VoiceOctave = -1 | 0 | 1;
 
+export type SingerVoice = 'original' | 'shifted';
+
 export type FrequencyRange = {
   minFrequency: number;
   maxFrequency: number;
@@ -63,6 +65,7 @@ export type EngineState = {
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   voiceOctave: VoiceOctave;
+  singerVoice: SingerVoice;
   tempoRatio: number;
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
@@ -94,6 +97,16 @@ export const getActiveRecording = (
 export const getNoteShiftSemitones = (
   state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
 ): number => 12 * state.voiceOctave + state.transposeSemitones;
+
+export const getLeadTransposeSemitones = (
+  state: Pick<
+    EngineState,
+    'transposeSemitones' | 'voiceOctave' | 'singerVoice'
+  >,
+): number =>
+  state.singerVoice === 'shifted'
+    ? getNoteShiftSemitones(state)
+    : state.transposeSemitones;
 
 const getNoteShiftScale = (
   state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,

@@ -71,6 +71,7 @@ const initialState: EngineState = {
   },
   transposeSemitones: 0,
   voiceOctave: 0,
+  singerVoice: 'original',
   tempoRatio: 1,
   audioDevices: [],
   latencyFrameCount: 0,
