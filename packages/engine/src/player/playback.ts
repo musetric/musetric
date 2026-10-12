@@ -183,12 +183,10 @@ export const createEnginePlayback = async (
     },
   );
   store.subscribe(
-    (state) => state.tempoBpm,
-    (tempoBpm) => {
-      const { sourceTempoBpm } = store.get();
-
+    (state) => state.tempoRatio,
+    (tempoRatio) => {
       port.methods.setTempoRatio({
-        tempoRatio: tempoBpm / sourceTempoBpm,
+        tempoRatio,
       });
     },
   );

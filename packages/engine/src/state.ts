@@ -60,8 +60,7 @@ export type EngineState = {
   frameIndex: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
-  sourceTempoBpm: number;
-  tempoBpm: number;
+  tempoRatio: number;
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
   audioDevices: MediaDeviceInfo[];

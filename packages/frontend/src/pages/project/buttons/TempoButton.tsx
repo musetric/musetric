@@ -12,8 +12,7 @@ export const TempoButton: FC = () => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const sourceTempoBpm = useEngineStore((state) => state.sourceTempoBpm);
-  const tempoBpm = useEngineStore((state) => state.tempoBpm);
+  const tempoRatio = useEngineStore((state) => state.tempoRatio);
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
   const label = t('pages.project.player.controls.tempo');
 
@@ -23,7 +22,7 @@ export const TempoButton: FC = () => {
         <IconButton
           size='small'
           disabled={!frameCount || recording || realtimeFailed}
-          color={tempoBpm === sourceTempoBpm ? 'inherit' : 'primary'}
+          color={tempoRatio === 1 ? 'inherit' : 'primary'}
           aria-label={label}
           sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
           onClick={(event) => {
@@ -33,7 +32,9 @@ export const TempoButton: FC = () => {
           <Stack alignItems='center' gap={0.5}>
             <TempoIcon fontSize='small' />
             <Typography variant='caption' lineHeight={1} noWrap>
-              {tempoBpm}
+              {t('pages.project.player.controls.tempoRatioValue', {
+                value: tempoRatio.toFixed(1),
+              })}
             </Typography>
           </Stack>
         </IconButton>

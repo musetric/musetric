@@ -14,7 +14,7 @@ import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
 import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
 import { RecordingListPicker } from './recording/RecordingListPicker.js';
-import { RhythmTempoSync } from './rhythm/RhythmTempoSync.js';
+import { RhythmMetronomeSync } from './rhythm/RhythmMetronomeSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
 import { VoiceRangeSync } from './spectrogram/VoiceRangeSync.js';
@@ -50,7 +50,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <ProjectContent />
         <PlaybackPanel />
       </Stack>
-      <RhythmTempoSync projectId={project.id} />
+      <RhythmMetronomeSync projectId={project.id} />
       <VoiceRangeSync
         projectId={project.id}
         leadSpectrogramGainDb={

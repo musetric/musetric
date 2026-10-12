@@ -3,11 +3,11 @@ import { type FC, useEffect, useRef } from 'react';
 import { endpoints } from '../../../api/index.js';
 import { engine } from '../../../engine/engine.js';
 
-export type RhythmTempoSyncProps = {
+export type RhythmMetronomeSyncProps = {
   projectId: number;
 };
 
-export const RhythmTempoSync: FC<RhythmTempoSyncProps> = (props) => {
+export const RhythmMetronomeSync: FC<RhythmMetronomeSyncProps> = (props) => {
   const { projectId } = props;
   const rhythmQuery = useQuery(endpoints.rhythm.get(projectId));
   const appliedRef = useRef(false);
@@ -15,15 +15,9 @@ export const RhythmTempoSync: FC<RhythmTempoSyncProps> = (props) => {
   useEffect(() => {
     if (appliedRef.current) return;
     if (rhythmQuery.status !== 'success') return;
-    const detectedBpm = Math.round(rhythmQuery.data.bpm);
-    if (detectedBpm <= 0) return;
     appliedRef.current = true;
     const { beats, downbeats } = rhythmQuery.data;
     engine.store.update((state) => {
-      const ratio =
-        state.sourceTempoBpm > 0 ? state.tempoBpm / state.sourceTempoBpm : 1;
-      state.sourceTempoBpm = detectedBpm;
-      state.tempoBpm = Math.round(detectedBpm * ratio);
       state.metronomeBeats = beats;
       state.metronomeDownbeats = downbeats;
     });
