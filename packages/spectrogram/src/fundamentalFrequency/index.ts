@@ -34,7 +34,6 @@ export type PitchPrepareInput = {
   projection: PitchProjection;
   trackProgress: number;
   truncated: boolean;
-  frequencyScale: number;
   invalidations: readonly PitchSampleRange[];
 };
 
@@ -59,13 +58,13 @@ export type PitchArg = {
   fourierMode: FourierMode;
   columnStep: number;
   windowCount: number;
+  columnScale: GPUBuffer;
 };
 
 type Pending = {
   plan: PitchPlan;
   trackFrames: number;
   shownFrames: number;
-  frequencyScale: number;
   projection: PitchProjection;
 };
 
@@ -104,7 +103,12 @@ export const createSpectrogramFundamentalFrequencyCell = (
       const buffers = buffersCell.get(settings);
       const params = paramsCell.get(settings);
       const line = lineCell.get(arg.windowCount);
-      const bindGroups = bindGroupsCell.get({ buffers, line, params });
+      const bindGroups = bindGroupsCell.get({
+        buffers,
+        line,
+        columnScale: arg.columnScale,
+        params,
+      });
       const fourier = fourierCell.get({
         signal: buffers.signal,
         config: {
@@ -133,7 +137,6 @@ export const createSpectrogramFundamentalFrequencyCell = (
         windowCount: arg.windowCount,
         baseSlot: state.projection.baseSlot,
         shownFrames: state.shownFrames,
-        frequencyScale: state.frequencyScale,
       });
 
       const analysisStage = (
@@ -314,13 +317,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
                 Math.floor(availableSamples / settings.hop) + 1,
               )
             : trackFrames;
-          pending = {
-            plan,
-            trackFrames,
-            shownFrames,
-            frequencyScale: input.frequencyScale,
-            projection,
-          };
+          pending = { plan, trackFrames, shownFrames, projection };
         },
         stages,
         dispatch: (pass) => {

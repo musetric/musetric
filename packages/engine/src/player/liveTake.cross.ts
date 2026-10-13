@@ -16,12 +16,14 @@ export const continuesRun = (
 export const createLiveRun = (
   chunk: LiveTakeChunk,
   tempo: number,
+  transpose: number,
 ): LiveRun => ({
   startFrame: chunk.startFrame,
   firstOffset: chunk.offset,
   piece: {
     songStartFrame: chunk.startFrame + chunk.offset * tempo,
     tempo,
+    transpose,
     frameCount: 0,
     samples: new Float32Array(0),
   },

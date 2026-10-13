@@ -12,6 +12,7 @@ const piece = (
 ): RecordingPiece => ({
   songStartFrame,
   tempo,
+  transpose: 0,
   frameCount,
   samples: new Float32Array(frameCount),
 });

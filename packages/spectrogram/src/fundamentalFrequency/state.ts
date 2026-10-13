@@ -169,6 +169,7 @@ export type PitchBindGroups = {
 type BindGroupsArg = {
   buffers: PitchBuffers;
   line: GPUBuffer;
+  columnScale: GPUBuffer;
   params: PitchParams;
 };
 
@@ -177,7 +178,7 @@ const createBindGroups = (
   pipelines: PitchPipelines,
   arg: BindGroupsArg,
 ): PitchBindGroups => {
-  const { buffers, line, params } = arg;
+  const { buffers, line, columnScale, params } = arg;
   const uniform = { buffer: params.buffer, size: params.byteLength };
   const create = (
     pipeline: GPUComputePipeline,
@@ -244,6 +245,7 @@ const createBindGroups = (
       { buffer: buffers.decoded },
       { buffer: line },
       uniform,
+      { buffer: columnScale },
     ]),
   };
 };
@@ -258,5 +260,6 @@ export const createPitchBindGroupsCell = (
     equals: (current, next) =>
       current.buffers === next.buffers &&
       current.line === next.line &&
+      current.columnScale === next.columnScale &&
       current.params === next.params,
   });

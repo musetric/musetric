@@ -25,6 +25,7 @@ import {
   buildBandSpectrumPipeline,
   createBandSpectrumCell,
 } from './bandSpectrumPipeline.js';
+import { type ColumnScaleWrite, createColumnScaleCell } from './columnScale.js';
 
 export type SpectrogramLaneWork = {
   spectrogram: boolean;
@@ -52,6 +53,7 @@ export type SpectrogramLaneOptions = {
 
 type BuildSpectrogramLaneArgs = {
   cells: BandPipelineCells;
+  columnScaleCell: ReturnType<typeof createColumnScaleCell>;
   fundamentalFrequencyCell: ReturnType<
     typeof createSpectrogramFundamentalFrequencyCell
   >;
@@ -80,6 +82,8 @@ export type SpectrogramLane = {
   bandSpectra: SpectrogramBandSpectrum[];
   fundamentalLineBuffer: GPUBuffer;
   fundamentalDecodedBuffer: GPUBuffer;
+  columnScaleBuffer: GPUBuffer;
+  writeColumnScales: (write: Omit<ColumnScaleWrite, 'columnStep'>) => void;
   pitchSettings: PitchSettings;
   preparePitch: (input: PitchPrepareInput) => void;
   dispatchPitch: (pass: GPUComputePassEncoder) => void;
@@ -104,6 +108,7 @@ const buildSpectrogramLane = (
 ): SpectrogramLane => {
   const {
     cells,
+    columnScaleCell,
     fundamentalFrequencyCell,
     getBandSpectrumCells,
     options,
@@ -115,11 +120,13 @@ const buildSpectrogramLane = (
     config,
     options.label,
   );
+  const columnScale = columnScaleCell.get(config.windowCount);
   const fundamentalFrequency = fundamentalFrequencyCell.get({
     sampleRate: config.sampleRate,
     fourierMode: config.fourierMode,
     columnStep: config.columnStep,
     windowCount: config.windowCount,
+    columnScale: columnScale.buffer,
   });
 
   const externalSpectralBands = laneConfig.showSpectrogram
@@ -164,6 +171,10 @@ const buildSpectrogramLane = (
     bandSpectra,
     fundamentalLineBuffer: fundamentalFrequency.lineBuffer,
     fundamentalDecodedBuffer: fundamentalFrequency.decodedBuffer,
+    columnScaleBuffer: columnScale.buffer,
+    writeColumnScales: (write) => {
+      columnScale.write({ ...write, columnStep: config.columnStep });
+    },
     pitchSettings: fundamentalFrequency.settings,
     preparePitch: fundamentalFrequency.prepare,
     dispatchPitch: fundamentalFrequency.dispatch,
@@ -214,6 +225,7 @@ export const createSpectrogramLaneCell = (
   options: SpectrogramLaneOptions,
 ): SpectrogramLaneCell => {
   const cells = createBandPipelineCells(device);
+  const columnScaleCell = createColumnScaleCell(device);
   const fundamentalFrequencyCell =
     createSpectrogramFundamentalFrequencyCell(device);
   const bandSpectrumCells: BandSpectrumCell[] = [];
@@ -234,6 +246,7 @@ export const createSpectrogramLaneCell = (
     create: (config) =>
       buildSpectrogramLane({
         cells,
+        columnScaleCell,
         fundamentalFrequencyCell,
         getBandSpectrumCells,
         options,
@@ -272,6 +285,7 @@ export const createSpectrogramLaneCell = (
         cell.dispose();
       }
       fundamentalFrequencyCell.dispose();
+      columnScaleCell.dispose();
       disposeBandPipelineCells(cells);
     },
   };

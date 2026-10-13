@@ -1,6 +1,7 @@
 export type RecordingPiece = {
   songStartFrame: number;
   tempo: number;
+  transpose: number;
   frameCount: number;
   samples: Float32Array;
 };

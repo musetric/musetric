@@ -82,6 +82,7 @@ export const createDecoderWorkerRuntime = (
       audioDecode.beginLiveTake({
         takeId: event.sessionId,
         tempo: event.tempo,
+        transpose: event.transpose,
       });
       return;
     }
@@ -227,6 +228,7 @@ export const createDecoderWorkerRuntime = (
       audioDecode.beginLiveTake({
         takeId: recordingSessionId,
         tempo: message.tempo,
+        transpose: message.transpose,
       });
       recordingStream = createRecordingStream({
         port: recordingStreamChannel.outbound(message.port),
@@ -243,6 +245,7 @@ export const createDecoderWorkerRuntime = (
         frameCount: message.frameCount,
         latencyFrameCount: message.latencyFrameCount,
         tempo: message.tempo,
+        transpose: message.transpose,
       });
     },
     finishRecordingStream: (message) => {

@@ -68,7 +68,6 @@
   "pages.project.player.controls.original": "Original",
   "pages.project.player.controls.play": "Play",
   "pages.project.player.controls.record": "Record into “{{name}}”",
-  "pages.project.player.controls.recordTransposed": "Recording works at the original key",
   "pages.project.player.controls.redoTake": "Redo the last take in “{{name}}”",
   "pages.project.player.controls.semitoneUnit": "st",
   "pages.project.player.controls.singerVoice": "Singer's voice",

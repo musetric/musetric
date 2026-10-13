@@ -24,6 +24,7 @@ export type EngineDecoder = {
     frameCount: number;
     latencyFrameCount: number;
     tempo: number;
+    transpose: number;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;

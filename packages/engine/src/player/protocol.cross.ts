@@ -82,6 +82,7 @@ export const playerChannel = createMessageChannel<
 export type PlayerRecordingPiece = {
   songStartFrame: number;
   tempo: number;
+  transpose: number;
   samples: Float32Array<ArrayBuffer>;
 };
 
@@ -99,6 +100,7 @@ export type PlayerTracks = Record<StemType, Float32Array<ArrayBuffer>[]>;
 export type LiveTakeStart = {
   takeId: string;
   tempo: number;
+  transpose: number;
 };
 
 export type LiveTakeChunk = {

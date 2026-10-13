@@ -20,6 +20,7 @@ import { createVoice } from './voice.worklet.js';
 const toPiece = (piece: PlayerRecordingPiece): RecordingPiece => ({
   songStartFrame: piece.songStartFrame,
   tempo: piece.tempo,
+  transpose: piece.transpose,
   frameCount: piece.samples.length,
   samples: piece.samples,
 });
@@ -60,7 +61,7 @@ export const createRecordingTrack = async (
   const appendToLive = (take: LiveTake, chunk: LiveTakeChunk) => {
     let run = take.runs.at(-1);
     if (!continuesRun(run, chunk)) {
-      run = createLiveRun(chunk, take.tempo);
+      run = createLiveRun(chunk, take.tempo, take.transpose);
       take.runs.push(run);
     }
     const { piece } = run;

@@ -7,22 +7,35 @@ import {
   noise,
   rate,
   settle,
+  sine,
   timingTolerance,
+  zeroCrossingFrequency,
 } from './player.fixtures.js';
 
 type VoicePlayback = {
   raw: Float32Array<ArrayBuffer>;
   pieceTempo: number;
   playTempo: number;
+  pieceTranspose: number;
+  playTranspose: number;
 };
 
 const playVoice = async (playback: VoicePlayback) => {
-  const { raw, pieceTempo, playTempo } = playback;
+  const { raw, pieceTempo, playTempo, pieceTranspose, playTranspose } =
+    playback;
   const songStart = Math.round(2 * rate);
   const harness = await createHarness([
-    { songStartFrame: songStart, tempo: pieceTempo, samples: raw.slice() },
+    {
+      songStartFrame: songStart,
+      tempo: pieceTempo,
+      transpose: pieceTranspose,
+      samples: raw.slice(),
+    },
   ]);
   harness.player.methods.setTempoRatio({ tempoRatio: playTempo });
+  harness.player.methods.setTransposeSemitones({
+    transposeSemitones: playTranspose,
+  });
   harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
   harness.player.methods.seek({ frameIndex: songStart, revision: 1 });
   harness.player.methods.play({
@@ -50,6 +63,8 @@ describe('player voice', () => {
         raw,
         pieceTempo: tempo,
         playTempo: tempo,
+        pieceTranspose: 0,
+        playTranspose: 0,
       });
       expect(Array.from(played.subarray(0, raw.length))).toEqual(
         Array.from(raw),
@@ -61,7 +76,13 @@ describe('player voice', () => {
     const pieceTempo = 0.5;
     const playTempo = 1;
     const raw = burstTrack([0.25, 0.75, 1.25], Math.round(1.5 * rate));
-    const played = await playVoice({ raw, pieceTempo, playTempo });
+    const played = await playVoice({
+      raw,
+      pieceTempo,
+      playTempo,
+      pieceTranspose: 0,
+      playTranspose: 0,
+    });
     const sung = burstCenters(raw).map(
       (center) => (center * pieceTempo) / playTempo,
     );
@@ -72,11 +93,62 @@ describe('player voice', () => {
     });
   });
 
+  it.each([
+    [3, 3],
+    [-6, -6],
+    [6, 6],
+  ])(
+    'plays a take sung at %i exactly as it was sung when the song is at %i',
+    async (pieceTranspose, playTranspose) => {
+      const raw = noise(rate);
+      const played = await playVoice({
+        raw,
+        pieceTempo: 1,
+        playTempo: 1,
+        pieceTranspose,
+        playTranspose,
+      });
+      expect(Array.from(played.subarray(0, raw.length))).toEqual(
+        Array.from(raw),
+      );
+    },
+  );
+
+  it.each([
+    [0, 3, 3],
+    [-2, 4, 6],
+    [5, -5, -10],
+    [6, -6, -12],
+  ])(
+    'shifts a take sung at %i when the song is at %i by %i semitones',
+    async (pieceTranspose, playTranspose, sounding) => {
+      const frequency = 220;
+      const played = await playVoice({
+        raw: sine(frequency, 2 * rate),
+        pieceTempo: 1,
+        playTempo: 1,
+        pieceTranspose,
+        playTranspose,
+      });
+      const heard = zeroCrossingFrequency(
+        played.subarray(Math.round(0.5 * rate), Math.round(1.5 * rate)),
+      );
+      const expected = frequency * 2 ** (sounding / 12);
+      expect(Math.abs(heard / expected - 1)).toBeLessThan(0.01);
+    },
+  );
+
   it('leaves nothing of the previous take after a seek', async () => {
-    const loud = { songStartFrame: rate, tempo: 0.5, samples: noise(rate) };
+    const loud = {
+      songStartFrame: rate,
+      tempo: 0.5,
+      transpose: 0,
+      samples: noise(rate),
+    };
     const silent = {
       songStartFrame: 3 * rate,
       tempo: 0.5,
+      transpose: 0,
       samples: new Float32Array(rate),
     };
     const harness = await createHarness([loud, silent]);
@@ -109,7 +181,11 @@ describe('player voice', () => {
   it('plays the run of a live take that was sung last', async () => {
     const harness = await createHarness([]);
     harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
-    harness.data.methods.beginLiveTake({ takeId: 'take', tempo: 1 });
+    harness.data.methods.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+    });
     harness.data.methods.appendLiveTake({
       startFrame: rate,
       offset: 0,

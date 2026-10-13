@@ -14,12 +14,18 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started(session_id: &str, recording_id: i64, tempo: f64) -> Value {
+pub(crate) fn recording_started(
+    session_id: &str,
+    recording_id: i64,
+    tempo: f64,
+    transpose: i64,
+) -> Value {
     json!({
         "type": "recording.started",
         "sessionId": session_id,
         "recordingId": recording_id,
         "tempo": tempo,
+        "transpose": transpose,
     })
 }
 
