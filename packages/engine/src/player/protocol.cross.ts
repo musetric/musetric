@@ -4,6 +4,13 @@ import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 
 export const playerProcessorName = 'player-processor';
 
+export type PlayerRange = {
+  fromFrame: number;
+  toFrame: number;
+};
+
+export type PlayerRangeRepeat = 'cycle' | 'once';
+
 export type PlayerOutboundMethods = {
   boot: (message: {
     dataPort: MessagePort;
@@ -28,12 +35,18 @@ export type PlayerOutboundMethods = {
     enabled: boolean;
     volume: number;
   }) => void;
+  setRange: (message: {
+    range?: PlayerRange;
+    repeat: PlayerRangeRepeat;
+    stopFrame?: number;
+  }) => void;
   startRecording: (message: {
     frameIndex: number;
     revision: number;
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
     notificationPort: MessagePort;
+    pass?: boolean;
   }) => void;
   flushRecording: () => void;
 };
@@ -47,6 +60,8 @@ export type PlayerInboundMethods = {
     positionJump?: true;
   }) => void;
   recordingFlushed: (message: { sequence: number }) => void;
+  recordingPassStarted: () => void;
+  recordingPassEnded: (message: { complete: boolean }) => void;
 };
 
 export const playerChannel = createMessageChannel<
@@ -54,7 +69,13 @@ export const playerChannel = createMessageChannel<
   PlayerOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setPlaying', 'recordingFlushed'],
+    keys: [
+      'booted',
+      'setPlaying',
+      'recordingFlushed',
+      'recordingPassStarted',
+      'recordingPassEnded',
+    ],
   },
   outbound: {
     keys: [
@@ -69,6 +90,7 @@ export const playerChannel = createMessageChannel<
       'setTrackVolume',
       'setRecordingVolume',
       'setMetronome',
+      'setRange',
       'startRecording',
       'flushRecording',
     ],

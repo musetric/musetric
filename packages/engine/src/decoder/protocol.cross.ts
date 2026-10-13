@@ -1,6 +1,12 @@
 import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
+export type SettledLoopTry = {
+  id: string;
+  startFrame: number;
+  frameCount: number;
+};
+
 export type EngineDecoderOutboundMethods = {
   boot: (message: {
     playerPort: MessagePort;
@@ -17,9 +23,20 @@ export type EngineDecoderOutboundMethods = {
     tempo: number;
     transpose: number;
     octave: number;
+    draft: boolean;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;
+  settleLoopTry: (message: { keep: boolean }) => void;
+  selectLoopTry: (message: { tryId?: string }) => void;
+  deleteLoopTry: (message: { tryId: string }) => void;
+  discardLoopTries: () => void;
+  insertLoopTry: (message: {
+    projectId: number;
+    tryId: string;
+    sampleRate: number;
+    frameCount: number;
+  }) => void;
   exportRecording: () => void;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
@@ -52,6 +69,8 @@ export type EngineDecoderInboundMethods = {
   recordingContentChanged: (message: { recordingId: number }) => void;
   recordingExported: (message: { samples: Float32Array<ArrayBuffer> }) => void;
   recordingExportFailed: () => void;
+  loopTrySettled: (message: { loopTry?: SettledLoopTry }) => void;
+  loopTryInserted: (message: { inserted: boolean }) => void;
   playerPlayRequested: () => void;
   playerRecordRequested: () => void;
   playerStopRequested: () => void;
@@ -93,6 +112,8 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingContentChanged',
       'recordingExported',
       'recordingExportFailed',
+      'loopTrySettled',
+      'loopTryInserted',
       'playerPlayRequested',
       'playerRecordRequested',
       'playerStopRequested',
@@ -108,6 +129,11 @@ export const engineDecoderChannel = createMessageChannel<
       'unmount',
       'startRecordingStream',
       'finishRecordingStream',
+      'settleLoopTry',
+      'selectLoopTry',
+      'deleteLoopTry',
+      'discardLoopTries',
+      'insertLoopTry',
       'exportRecording',
       'sendRecordingUndo',
       'sendRecordingRedo',

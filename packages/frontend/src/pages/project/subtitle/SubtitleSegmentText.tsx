@@ -45,7 +45,7 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
       {segment.words.length > 0
         ? segment.words.map((word, index) => (
             <Fragment key={`${word.start}-${index}`}>
-              <SubtitleWord word={word} />
+              <SubtitleWord word={word} index={index} />
               {index < segment.words.length - 1 ? ' ' : ''}
             </Fragment>
           ))

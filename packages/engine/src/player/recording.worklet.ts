@@ -1,4 +1,4 @@
-import { type playerChannel } from './protocol.cross.js';
+import { type playerChannel, type PlayerRange } from './protocol.cross.js';
 import { recordingStreamChannel } from './recordingStream.cross.js';
 
 export const chunkFrameCount = 256;
@@ -14,6 +14,7 @@ export type StartRecordingMessage = {
   latencyFrameCount: number;
   inputLatencyFrameCount: number;
   notificationPort: MessagePort;
+  pass?: boolean;
 };
 
 export type RecordingStreamPort = ReturnType<
@@ -31,6 +32,7 @@ export type CreateRecordingRuntimeOptions = {
   getInputLatencyFrameCount: () => number;
   getPendingOutputFrameCount: () => number;
   getTempoRatio: () => number;
+  getLoop: () => PlayerRange | undefined;
   applyLatencyFrameCounts: (counts: LatencyFrameCounts) => void;
 };
 
@@ -53,6 +55,7 @@ export const createRecordingRuntime = (
     getInputLatencyFrameCount,
     getPendingOutputFrameCount,
     getTempoRatio,
+    getLoop,
     applyLatencyFrameCounts,
   } = options;
 
@@ -65,16 +68,49 @@ export const createRecordingRuntime = (
   let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
   let inputOffsetFrameIndex = 0;
   let leadInFrameCount = 0;
+  let pass = false;
+  let passShift = 0;
+  let passState: 'waiting' | 'writing' | 'ended' = 'waiting';
+  let runEndOffset = Number.POSITIVE_INFINITY;
+
+  const findPass = (nextFrameIndex: number) => {
+    const loop = getLoop();
+    if (!loop) {
+      return undefined;
+    }
+    const length = loop.toFrame - loop.fromFrame;
+    if (length <= 0) {
+      return undefined;
+    }
+    let shift = 0;
+    while (loop.fromFrame + shift < nextFrameIndex) {
+      shift += length;
+    }
+    return {
+      fromFrame: loop.fromFrame + shift,
+      toFrame: loop.toFrame + shift,
+      shift,
+    };
+  };
 
   const startRun = (nextFrameIndex: number) => {
     const pendingOutputFrameCount = getPendingOutputFrameCount();
-    leadInFrameCount = Math.ceil(pendingOutputFrameCount);
+    const tempoRatio = getTempoRatio();
+    const target = pass ? findPass(nextFrameIndex) : undefined;
+    const punchInFrameCount = target
+      ? Math.max(0, Math.ceil((target.fromFrame - nextFrameIndex) / tempoRatio))
+      : 0;
+    leadInFrameCount = Math.ceil(pendingOutputFrameCount) + punchInFrameCount;
     runStartFrame = Math.round(
       nextFrameIndex +
-        (leadInFrameCount - pendingOutputFrameCount) * getTempoRatio(),
+        (leadInFrameCount - pendingOutputFrameCount) * tempoRatio,
     );
     runWriteOffset = 0;
     runChunkOffset = 0;
+    passShift = target?.shift ?? 0;
+    runEndOffset = target
+      ? Math.max(0, Math.floor((target.toFrame - runStartFrame) / tempoRatio))
+      : Number.POSITIVE_INFINITY;
   };
 
   const flushRecordingBuffer = (): number => {
@@ -85,7 +121,7 @@ export const createRecordingRuntime = (
     recordingSequence += 1;
     recordingNotificationPort?.methods.chunk({
       sequence: recordingSequence,
-      startFrame: runStartFrame,
+      startFrame: runStartFrame - passShift,
       offset: runChunkOffset,
       samples: chunkSamples.slice(0, recordingOffset),
     });
@@ -94,10 +130,30 @@ export const createRecordingRuntime = (
     return recordingSequence;
   };
 
+  const endPass = (complete: boolean) => {
+    if (!pass || passState === 'ended') {
+      return;
+    }
+    passState = 'ended';
+    flushRecordingBuffer();
+    port.methods.recordingPassEnded({ complete });
+  };
+
   const pushRecordingSample = (sample: number): void => {
     if (leadInFrameCount > 0) {
       leadInFrameCount -= 1;
       return;
+    }
+    if (passState === 'ended') {
+      return;
+    }
+    if (runWriteOffset >= runEndOffset) {
+      endPass(true);
+      return;
+    }
+    if (pass && passState === 'waiting') {
+      passState = 'writing';
+      port.methods.recordingPassStarted();
     }
     chunkSamples[recordingOffset] = Math.max(-1, Math.min(1, sample));
     recordingOffset += 1;
@@ -153,6 +209,8 @@ export const createRecordingRuntime = (
       recordingOffset = 0;
       recordingSequence = 0;
       inputOffsetFrameIndex = 0;
+      pass = message.pass === true;
+      passState = 'waiting';
       startRun(getPlaying() ? getFrameIndex() : message.frameIndex);
     },
     flush: (): number => {
@@ -162,12 +220,19 @@ export const createRecordingRuntime = (
       recordingNotificationPort = undefined;
       recordingOffset = 0;
       inputOffsetFrameIndex = 0;
+      pass = false;
+      passShift = 0;
+      runEndOffset = Number.POSITIVE_INFINITY;
       port.methods.recordingFlushed({
         sequence,
       });
       return sequence;
     },
     handleSeek: (frameIndex) => {
+      if (pass) {
+        endPass(false);
+        return;
+      }
       flushRecordingBuffer();
       inputOffsetFrameIndex = 0;
       startRun(frameIndex);

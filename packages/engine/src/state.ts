@@ -41,6 +41,35 @@ export type VoiceOctave = -1 | 0 | 1;
 
 export type SingerVoice = 'original' | 'shifted';
 
+export type EngineRange = {
+  fromFrame: number;
+  toFrame: number;
+};
+
+export type EngineRangeRepeat = 'cycle' | 'once';
+
+export type EngineRangePlay = {
+  startFrame?: number;
+  stopFrame?: number;
+};
+
+export type EngineLoopStage = 'range' | 'sing';
+
+export type EngineViewWindow = {
+  startFrame: number;
+  frameCount: number;
+};
+
+export type LoopTry = {
+  id: string;
+  number: number;
+  startFrame: number;
+  frameCount: number;
+  tempoRatio: number;
+};
+
+export type LoopTryPhase = 'armed' | 'writing';
+
 export type FrequencyRange = {
   minFrequency: number;
   maxFrequency: number;
@@ -52,6 +81,7 @@ export type EngineState = {
   colors: SpectrogramColors;
   spectrogramView: SpectrogramViewMode;
   frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
+  viewWindow?: EngineViewWindow;
   duration: number;
   playing: boolean;
   frozen: boolean;
@@ -87,6 +117,13 @@ export type EngineState = {
   metronomeVolume: number;
   metronomeBeats: number[];
   metronomeDownbeats: number[];
+  range?: EngineRange;
+  rangeRepeat: EngineRangeRepeat;
+  rangeStopFrame?: number;
+  loopStage?: EngineLoopStage;
+  loopTries: LoopTry[];
+  loopSelectedTryId?: string;
+  loopTryPhase?: LoopTryPhase;
 };
 
 export const getActiveRecording = (
@@ -133,3 +170,11 @@ export const getTrackProgress = (
   if (!state.frameCount) return 0;
   return state.frameIndex / state.frameCount;
 };
+
+export const clampToRange = (
+  frameIndex: number,
+  range: EngineRange | undefined,
+): number =>
+  range
+    ? Math.min(range.toFrame - 1, Math.max(range.fromFrame, frameIndex))
+    : frameIndex;

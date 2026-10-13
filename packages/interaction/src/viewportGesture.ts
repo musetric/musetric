@@ -22,6 +22,7 @@ import {
   type ActivePan,
   type ActivePinchZoom,
   type ActiveZoom,
+  type ViewportCustomPan,
   type ViewportGesture,
   type ViewportGestureMode,
   type ViewportGestureOptions,
@@ -44,6 +45,7 @@ export const createViewportGesture = (
     readState,
     applyState,
     setFreeze,
+    customPan,
     zoomSensitivity = 0.002,
   } = options;
   const physics = createInertialDragPhysics();
@@ -52,6 +54,7 @@ export const createViewportGesture = (
   let activePan: ActivePan | undefined = undefined;
   let activePinchZoom: ActivePinchZoom | undefined = undefined;
   let activeDragZoom: ActiveDragZoom | undefined = undefined;
+  let activeCustomPan: ViewportCustomPan | undefined = undefined;
   let inertiaRunner: InertiaRunner<GestureAxis> | undefined = undefined;
 
   const freeze = () => {
@@ -107,6 +110,9 @@ export const createViewportGesture = (
     activePan = undefined;
     activePinchZoom = undefined;
     activeDragZoom = undefined;
+    const customPanToEnd = activeCustomPan;
+    activeCustomPan = undefined;
+    customPanToEnd?.end();
   };
 
   const stopInertia = () => {
@@ -185,7 +191,11 @@ export const createViewportGesture = (
 
   const handlePanStart = (event: GesturePanStart) => {
     stopInertia();
-    if (isZoomDragModifier(event.modifiers)) {
+    const zoomDrag = isZoomDragModifier(event.modifiers);
+    activeCustomPan = zoomDrag ? undefined : customPan?.(event);
+    if (activeCustomPan) {
+      mode = 'custom-pan';
+    } else if (zoomDrag) {
       startDragZoom(event);
     } else {
       startPan(event);
@@ -194,6 +204,11 @@ export const createViewportGesture = (
   };
 
   const handlePanUpdate = (event: GesturePanUpdate) => {
+    if (mode === 'custom-pan' && activeCustomPan) {
+      activeCustomPan.update(event.delta);
+      return;
+    }
+
     if (mode === 'pan' && activePan && activePan.axis === event.axis) {
       applyPan(activePan, event.delta);
       return;
@@ -220,6 +235,15 @@ export const createViewportGesture = (
   };
 
   const handlePanEnd = (event: GesturePanEnd) => {
+    if (mode === 'custom-pan') {
+      const customPanToEnd = activeCustomPan;
+      activeCustomPan = undefined;
+      mode = 'idle';
+      customPanToEnd?.end();
+      releaseFrozen();
+      return;
+    }
+
     if (mode === 'pan' && activePan && activePan.axis === event.axis) {
       if (Math.abs(event.velocity) >= physics.inertiaMinimumVelocity) {
         startPanInertia(event.axis, event.velocity);

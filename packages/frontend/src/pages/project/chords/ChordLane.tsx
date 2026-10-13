@@ -7,11 +7,11 @@ import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { useSettingsStore } from '../settings/store.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
 } from '../visualization/visualizationRender.js';
+import { getVisualizationView } from '../visualization/visualizationView.js';
 import { findChordBlockIndex, getChordBlocks } from './chordBlocks.js';
 
 export const chordLaneHeight = 28;
@@ -53,7 +53,7 @@ export const ChordLane: FC = () => {
 
     const render = () => {
       const state = engine.store.get();
-      const { visibleTime, playheadRatio } = useSettingsStore.getState();
+      const { visibleTime, playheadRatio } = getVisualizationView();
       const pixelsPerSecond = view.laneWidth / visibleTime;
       const stripWidth = state.duration * pixelsPerSecond;
 
@@ -94,7 +94,7 @@ export const ChordLane: FC = () => {
       resizeTarget: lane,
       onResize: resize,
       render,
-      engineKeys: ['duration', 'frameCount', 'frameIndex'],
+      engineKeys: ['duration', 'frameCount', 'frameIndex', 'viewWindow'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 

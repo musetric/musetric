@@ -12,6 +12,7 @@ import {
   type spectrogramDataChannel,
 } from './protocol.cross.js';
 import { createRecordingSource } from './recordingSource.worker.js';
+import { createViewWindowState } from './viewWindow.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
   port: ReturnType<
@@ -61,9 +62,14 @@ export const createSpectrogramRuntime = async (
   let frameCount = 0;
   let playing = false;
   let rendering = false;
+  const viewWindow = createViewWindowState();
 
   const render = async () => {
     const samples = lead ? { lead, recording: recording.get(lead.length) } : {};
+    const view = viewWindow.view(trackProgress * frameCount);
+    if (view) {
+      processor.updateConfig(view);
+    }
     const ok = await processor.render(samples, trackProgress);
     if (!ok || !lead) {
       return;
@@ -146,6 +152,7 @@ export const createSpectrogramRuntime = async (
     mount: async (message) => {
       try {
         trackProgress = message.trackProgress;
+        viewWindow.remember(message.config);
         processor.dispose();
         processor = createProcessor();
         processor.updateConfig(message.config);
@@ -193,7 +200,17 @@ export const createSpectrogramRuntime = async (
       renderPaused();
     },
     updateConfig: (message) => {
-      processor.updateConfig(message.patch);
+      viewWindow.remember(message.patch);
+      processor.updateConfig(viewWindow.filter(message.patch));
+      if (!playing) {
+        renderPaused();
+      }
+    },
+    setViewWindow: (message) => {
+      const restore = viewWindow.set(message.window);
+      if (restore) {
+        processor.updateConfig(restore);
+      }
       if (!playing) {
         renderPaused();
       }

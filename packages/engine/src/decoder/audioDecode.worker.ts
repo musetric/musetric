@@ -29,6 +29,7 @@ export type AudioDecode = {
   setActiveRecording: (recordingId: number | undefined) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
   patchLiveTake: (chunk: LiveTakeChunk) => void;
+  clearLiveTake: (takeId: string) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
   exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
   unmount: () => void;
@@ -189,6 +190,20 @@ export const createAudioDecode = (
       spectrogramPort.methods.appendLiveTake({
         ...chunk,
         samples: chunk.samples.slice(),
+      });
+    },
+    clearLiveTake: (takeId) => {
+      const current = mounted;
+      if (!current) {
+        return;
+      }
+      playerPort.methods.setRecordingPieces({
+        pieces: copyPieces(current.pieces),
+        finishedTakeId: takeId,
+      });
+      spectrogramPort.methods.setRecordingPieces({
+        pieces: copyPieces(current.pieces),
+        finishedTakeId: takeId,
       });
     },
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),

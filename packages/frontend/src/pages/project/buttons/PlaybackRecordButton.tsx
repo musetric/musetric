@@ -1,11 +1,13 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Badge, Box, IconButton, Tooltip } from '@mui/material';
 import { getActiveRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { lockLoop } from '../loop/loopActions.js';
+import { getBeatsToFrom } from '../loop/loopCountdown.js';
 
 export const PlaybackRecordButton: FC = () => {
   const { projectId } = routes.project.useAssertMatch();
@@ -19,6 +21,14 @@ export const PlaybackRecordButton: FC = () => {
     (state) => state.statuses.realtime === 'error',
   );
   const recording = useEngineStore((state) => state.recording);
+  const stage = useEngineStore((state) => state.loopStage);
+  const looping = stage !== undefined;
+  const phase = useEngineStore((state) => state.loopTryPhase);
+  const beats = useEngineStore((state) =>
+    state.loopTryPhase === 'armed'
+      ? getBeatsToFrom(state, engine.context.sampleRate)
+      : undefined,
+  );
   const recordingName = useEngineStore(
     (state) => getActiveRecording(state)?.name,
   );
@@ -29,9 +39,19 @@ export const PlaybackRecordButton: FC = () => {
     isSlave ||
     playerCommandPending;
 
-  const title = recording
-    ? t('pages.project.player.controls.stopRecording')
-    : t('pages.project.player.controls.record', { name: recordingName });
+  const getTitle = () => {
+    if (looping) {
+      return phase
+        ? t('pages.project.loop.cancelTry')
+        : t('pages.project.loop.recordTry');
+    }
+    return recording
+      ? t('pages.project.player.controls.stopRecording')
+      : t('pages.project.player.controls.record', { name: recordingName });
+  };
+  const title = getTitle();
+  const pressed = looping ? phase !== undefined : recording;
+  const writing = recording && phase !== 'armed';
 
   return (
     <Tooltip enterTouchDelay={0} title={title}>
@@ -41,10 +61,21 @@ export const PlaybackRecordButton: FC = () => {
       >
         <IconButton
           aria-label={title}
-          aria-pressed={recording}
-          color={recording ? 'inherit' : 'error'}
+          aria-pressed={pressed}
+          color={writing ? 'inherit' : 'error'}
           disabled={disabled}
           onClick={() => {
+            if (looping) {
+              if (phase) {
+                void engine.player.cancelTry();
+                return;
+              }
+              if (stage === 'range') {
+                lockLoop();
+              }
+              void engine.player.recordTry(projectId);
+              return;
+            }
             if (recording) {
               void engine.player.stopRecording();
               return;
@@ -53,7 +84,30 @@ export const PlaybackRecordButton: FC = () => {
           }}
           sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}
         >
-          <MicRoundedIcon />
+          {phase === 'armed' ? (
+            <Badge
+              badgeContent={beats}
+              color='error'
+              invisible={beats === undefined}
+            >
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  border: 2,
+                  borderColor: 'error.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <MicRoundedIcon fontSize='small' />
+              </Box>
+            </Badge>
+          ) : (
+            <MicRoundedIcon />
+          )}
         </IconButton>
       </Box>
     </Tooltip>

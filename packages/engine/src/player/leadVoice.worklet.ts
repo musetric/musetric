@@ -1,11 +1,15 @@
 import { createTimePitchProcessor } from '@musetric/audio/player';
-import { mixTrackIntoBuffers } from './mixTrack.worklet.js';
+import {
+  type MixTrackFrames,
+  mixTrackIntoBuffers,
+} from './mixTrack.worklet.js';
 
 export type LeadVoiceMixOptions = {
   outputs: Float32Array[];
   outputFrameIndex: number;
   track: Float32Array[] | undefined;
   volume: number;
+  frames?: MixTrackFrames;
 };
 
 export type LeadVoice = {
@@ -41,7 +45,7 @@ export const createLeadVoice = async (
     setTempoRatio: processor.setTempoRatio,
     reset: processor.reset,
     mixInto: (options) => {
-      const { outputs, outputFrameIndex, track, volume } = options;
+      const { outputs, outputFrameIndex, track, volume, frames } = options;
       const leadBuffers = getBuffers(outputs);
       processor.process(
         leadBuffers,
@@ -54,6 +58,7 @@ export const createLeadVoice = async (
             channelCount: outputs.length,
             track,
             volume,
+            frames,
           });
         },
       );

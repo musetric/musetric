@@ -1,4 +1,4 @@
-import { Slider, Stack, Typography } from '@mui/material';
+import { Box, Slider, Stack, Typography } from '@mui/material';
 import { getTrackProgress } from '@musetric/engine';
 import { isPrimaryPointerButton } from '@musetric/interaction';
 import { type FC, useEffect, useRef } from 'react';
@@ -6,6 +6,7 @@ import { formatDuration } from '../../../common/formatDuration.js';
 import { engine } from '../../../engine/engine.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { LoopProgressRange } from '../loop/LoopProgressRange.js';
 
 const progressScale = 1000;
 
@@ -97,32 +98,33 @@ export const PlayerProgress: FC = () => {
       >
         {formatDuration(initialProgress * duration)}
       </Typography>
-      <Slider
-        ref={ref}
-        min={0}
-        max={progressScale}
-        defaultValue={Math.round(initialProgress * progressScale)}
-        disabled={!frameCount || realtimeFailed}
-        size='small'
-        sx={{
-          flexGrow: 1,
-          mx: 1.5,
-          '& .MuiSlider-thumb': {
-            color: 'primary.main',
-          },
-          '& .MuiSlider-track': {
-            color: 'primary.main',
-          },
-        }}
-        onChange={(_, value) => {
-          if (!frameCount) {
-            return;
-          }
+      <Box sx={{ flexGrow: 1, mx: 1.5, position: 'relative', display: 'flex' }}>
+        <Slider
+          ref={ref}
+          min={0}
+          max={progressScale}
+          defaultValue={Math.round(initialProgress * progressScale)}
+          disabled={!frameCount || realtimeFailed}
+          size='small'
+          sx={{
+            '& .MuiSlider-thumb': {
+              color: 'primary.main',
+            },
+            '& .MuiSlider-track': {
+              color: 'primary.main',
+            },
+          }}
+          onChange={(_, value) => {
+            if (!frameCount) {
+              return;
+            }
 
-          const frameIndex = Math.round((value / progressScale) * frameCount);
-          engine.player.seek(frameIndex, 'playerProgress');
-        }}
-      />
+            const frameIndex = Math.round((value / progressScale) * frameCount);
+            engine.player.seek(frameIndex, 'playerProgress');
+          }}
+        />
+        <LoopProgressRange />
+      </Box>
       <Typography
         variant='caption'
         sx={{

@@ -26,6 +26,9 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
         minHeight: 0,
         overflow: 'auto',
         scrollbarGutter: 'stable',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
     >
       <Box sx={{ height: 'calc(50% - 2em)', flexShrink: 0 }} />

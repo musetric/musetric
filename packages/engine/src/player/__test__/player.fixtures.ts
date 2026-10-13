@@ -64,6 +64,45 @@ export const burstCenters = (signal: Float32Array): number[] => {
   return centers;
 };
 
+export const nearestError = (
+  value: number,
+  targets: readonly number[],
+): number =>
+  targets.reduce(
+    (best, target) =>
+      Math.abs(value - target) < Math.abs(best) ? value - target : best,
+    Number.POSITIVE_INFINITY,
+  );
+
+export type TakeRun = {
+  startFrame: number;
+  chunks: LiveTakeChunk[];
+};
+
+export const toRuns = (chunks: readonly LiveTakeChunk[]): TakeRun[] => {
+  const runs: TakeRun[] = [];
+  for (const chunk of chunks) {
+    const last = runs.at(-1);
+    if (last && chunk.offset > 0 && last.startFrame === chunk.startFrame) {
+      last.chunks.push(chunk);
+    } else {
+      runs.push({ startFrame: chunk.startFrame, chunks: [chunk] });
+    }
+  }
+  return runs;
+};
+
+export const runSamples = (run: TakeRun): Float32Array => {
+  const last = run.chunks.at(-1);
+  const samples = new Float32Array(
+    last ? last.offset + last.samples.length : 0,
+  );
+  for (const chunk of run.chunks) {
+    samples.set(chunk.samples, chunk.offset);
+  }
+  return samples;
+};
+
 export const noise = (length: number): Float32Array<ArrayBuffer> => {
   let seed = 1;
   return Float32Array.from({ length }, () => {

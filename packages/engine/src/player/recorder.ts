@@ -1,30 +1,24 @@
 import {
   createMicrophoneAudioConstraints,
   estimateRecordingLatency,
-  mobileUserAgentPattern,
-  resolveAudioInputDevice,
 } from '@musetric/audio/recording';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineState } from '../state.js';
+import { settleLoopTry } from './loopTry.js';
+import {
+  getAudioDevices,
+  resolvePreferredStream,
+  stopMediaStream,
+} from './microphone.js';
 import { type EnginePlayback } from './playback.js';
-
-const stopMediaStream = (stream: MediaStream) => {
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-};
-
-const getAudioDevices = async () => {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter(
-    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
-  );
-};
 
 type RecordingSession = {
   projectId: number;
   startPlayback: boolean;
+  pass: boolean;
+  passComplete: boolean;
+  tempoRatio: number;
   initializePromise: Promise<void>;
   stopPromise?: Promise<void>;
   stopRequested: boolean;
@@ -38,9 +32,15 @@ type RecordingSession = {
 };
 
 export type EngineRecorder = {
-  record: (projectId: number, startPlayback: boolean) => Promise<void>;
+  record: (
+    projectId: number,
+    startPlayback: boolean,
+    pass?: boolean,
+  ) => Promise<void>;
   stop: () => Promise<void>;
   finish: () => Promise<void>;
+  handlePassStarted: () => void;
+  handlePassEnded: (complete: boolean) => void;
 };
 
 export type CreateEngineRecorderOptions = {
@@ -64,27 +64,17 @@ export const createEngineRecorder = (
 
   const isStopRequested = (session: RecordingSession) => session.stopRequested;
 
-  const resolvePreferredStream = async (
-    stream: MediaStream,
-    devices: MediaDeviceInfo[],
-  ): Promise<MediaStream> => {
-    const preferredDevice = resolveAudioInputDevice(devices, {
-      preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
-    });
-    if (!preferredDevice) {
-      return stream;
+  const settleTry = async (session: RecordingSession, keepPlaying: boolean) => {
+    if (!session.pass) {
+      return;
     }
-    const [currentTrack] = stream.getAudioTracks();
-    const currentDeviceId = currentTrack.getSettings().deviceId;
-    if (preferredDevice.deviceId === currentDeviceId) {
-      return stream;
-    }
-    stopMediaStream(stream);
-    return navigator.mediaDevices.getUserMedia({
-      audio: createMicrophoneAudioConstraints({
-        deviceId: preferredDevice.deviceId,
-        sampleRate: context.sampleRate,
-      }),
+    await settleLoopTry({
+      store,
+      decoder: getDecoder(),
+      settled: session.decoderStreamStarted,
+      keep: session.passComplete,
+      tempoRatio: session.tempoRatio,
+      keepPlaying,
     });
   };
 
@@ -116,7 +106,9 @@ export const createEngineRecorder = (
   };
 
   const failSession = (session: RecordingSession) => {
-    void closeDecoderStream(session);
+    void closeDecoderStream(session).then(async () =>
+      settleTry(session, false),
+    );
     cleanupSession(session);
     if (currentSession === session) {
       currentSession = undefined;
@@ -173,6 +165,7 @@ export const createEngineRecorder = (
       if (currentSession === session) {
         currentSession = undefined;
       }
+      await settleTry(session, keepPlaying);
       setRecording(false);
     }
   };
@@ -209,7 +202,11 @@ export const createEngineRecorder = (
 
       const devices = await getAudioDevices();
       if (store.get().microphoneDeviceId === undefined) {
-        stream = await resolvePreferredStream(stream, devices);
+        stream = await resolvePreferredStream(
+          stream,
+          devices,
+          context.sampleRate,
+        );
         session.stream = stream;
         if (isStopRequested(session)) {
           return;
@@ -271,6 +268,7 @@ export const createEngineRecorder = (
         tempo: tempoRatio,
         transpose: transposeSemitones,
         octave: voiceOctave,
+        draft: session.pass,
         port: recordingStreamChannel.port1,
       });
       session.decoderStreamStarted = true;
@@ -280,6 +278,7 @@ export const createEngineRecorder = (
         latencyFrameCount,
         inputLatencyFrameCount,
         notificationPort: recordingStreamChannel.port2,
+        pass: session.pass,
       });
       session.playerStreamStarted = true;
 
@@ -309,26 +308,30 @@ export const createEngineRecorder = (
     }
   };
 
-  const createSession = (projectId: number, startPlayback: boolean) => {
-    const session: RecordingSession = {
-      projectId,
-      startPlayback,
-      initializePromise: Promise.resolve(),
-      stopRequested: false,
-      decoderStreamStarted: false,
-      decoderStreamClosed: false,
-      playerStreamStarted: false,
-    };
-    return session;
-  };
+  const createSession = (
+    projectId: number,
+    startPlayback: boolean,
+    pass: boolean,
+  ): RecordingSession => ({
+    projectId,
+    startPlayback,
+    pass,
+    passComplete: false,
+    tempoRatio: store.get().tempoRatio,
+    initializePromise: Promise.resolve(),
+    stopRequested: false,
+    decoderStreamStarted: false,
+    decoderStreamClosed: false,
+    playerStreamStarted: false,
+  });
 
   const ref: EngineRecorder = {
-    record: async (projectId, startPlayback) => {
+    record: async (projectId, startPlayback, pass) => {
       if (currentSession) {
         return currentSession.initializePromise;
       }
 
-      const session = createSession(projectId, startPlayback);
+      const session = createSession(projectId, startPlayback, pass === true);
       currentSession = session;
       session.initializePromise = initializeSession(session);
 
@@ -358,6 +361,20 @@ export const createEngineRecorder = (
       }
 
       await requestSessionStop(session, true);
+    },
+    handlePassStarted: () => {
+      if (currentSession?.pass) {
+        store.update((state) => {
+          state.loopTryPhase = 'writing';
+        });
+      }
+    },
+    handlePassEnded: (complete) => {
+      const session = currentSession;
+      if (session?.pass) {
+        session.passComplete = complete;
+        void requestSessionStop(session, true);
+      }
     },
   };
 

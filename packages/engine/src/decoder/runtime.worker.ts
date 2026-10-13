@@ -7,6 +7,7 @@ import { type playerDataChannel } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { createAudioDecode } from './audioDecode.worker.js';
+import { createLoopTries } from './loopTries.worker.js';
 import { createPlayerFrameIndexStream } from './playerFrameIndexStream.worker.js';
 import { type engineDecoderChannel } from './protocol.cross.js';
 import {
@@ -54,7 +55,10 @@ export const createDecoderWorkerRuntime = (
 
   const recordingList = createRecordingList({ port, audioDecode });
 
+  const loopTries = createLoopTries({ audioDecode });
+
   let recordingStream: RecordingStream | undefined = undefined;
+  let draftStream = false;
   let recordingSessionId: string | undefined = undefined;
   let recordingReady = false;
   let backendRevision = 0;
@@ -208,6 +212,7 @@ export const createDecoderWorkerRuntime = (
       }
     },
     unmount: () => {
+      loopTries.clear();
       recordingList.clear();
       frameIndexStream.stop();
       recordingController.clearRecordingStream();
@@ -216,6 +221,12 @@ export const createDecoderWorkerRuntime = (
       port.methods.unmounted();
     },
     startRecordingStream: (message) => {
+      draftStream = message.draft;
+      if (message.draft) {
+        recordingController.clearRecordingStream();
+        recordingStream = loopTries.openDraft(message);
+        return;
+      }
       realtime.open(message.projectId);
       recordingController.clearRecordingStream();
       const recordingId = recordingList.getActiveId();
@@ -260,7 +271,9 @@ export const createDecoderWorkerRuntime = (
       void stream
         .waitForFlush(message.sequence)
         .then(async () =>
-          recordingController.finishCurrentRecordingStream(stream),
+          draftStream
+            ? undefined
+            : recordingController.finishCurrentRecordingStream(stream),
         )
         .then(() => {
           if (recordingStream === stream) {
@@ -269,6 +282,31 @@ export const createDecoderWorkerRuntime = (
           port.methods.recordingStreamFinished();
         })
         .catch(recordingController.failRecordingStream);
+    },
+    settleLoopTry: (message) => {
+      port.methods.loopTrySettled({ loopTry: loopTries.settle(message.keep) });
+    },
+    selectLoopTry: (message) => {
+      loopTries.select(message.tryId);
+    },
+    deleteLoopTry: (message) => {
+      loopTries.remove(message.tryId);
+    },
+    discardLoopTries: () => {
+      loopTries.discard();
+    },
+    insertLoopTry: async (message) => {
+      const recordingId = recordingList.getActiveId();
+      const inserted =
+        recordingId !== undefined &&
+        (await loopTries.insert({
+          projectId: message.projectId,
+          recordingId,
+          tryId: message.tryId,
+          sampleRate: message.sampleRate,
+          frameCount: message.frameCount,
+        }));
+      port.methods.loopTryInserted({ inserted });
     },
     exportRecording: async () => {
       try {

@@ -3,7 +3,13 @@ import { useTheme } from '@mui/material/styles';
 import { type api } from '@musetric/api';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
+import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
+import { SubtitleLoopBand } from './SubtitleLoopBand.js';
+import {
+  getSubtitleLoopWordsKey,
+  parseSubtitleLoopWordsKey,
+} from './subtitleLoopBands.js';
 import { getSubtitlePlaybackTimeFromState } from './subtitlePlayback.js';
 import { SubtitleSegmentText } from './SubtitleSegmentText.js';
 import { useSubtitleSegmentStatus } from './useSubtitleSegmentStatus.js';
@@ -130,9 +136,28 @@ export type SubtitleSegmentProps = {
 export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
   const { index, segment, subtitleCursor } = props;
   const status = useSubtitleSegmentStatus(index, subtitleCursor);
+  const loopedKey = useEngineStore((state) =>
+    getSubtitleLoopWordsKey(segment, state, engine.context.sampleRate),
+  );
+  const loopedWords = parseSubtitleLoopWordsKey(loopedKey);
 
   return (
-    <Box data-subtitle-segment-index={index} sx={{ py: 1 }}>
+    <Box
+      data-subtitle-segment-index={index}
+      sx={(theme) => ({
+        py: 1,
+        alignSelf: 'stretch',
+        display: 'flex',
+        justifyContent: 'center',
+        position: 'relative',
+        isolation: 'isolate',
+        bgcolor:
+          loopedKey === 'all'
+            ? alpha(theme.palette.primary.main, 0.14)
+            : undefined,
+      })}
+    >
+      {loopedWords && <SubtitleLoopBand words={loopedWords} />}
       {status === 'active' ? (
         <ActiveSubtitleSegment segment={segment} />
       ) : (

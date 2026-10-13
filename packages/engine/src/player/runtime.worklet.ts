@@ -4,6 +4,15 @@ import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
 import { mixTrackIntoBuffers } from './mixTrack.worklet.js';
 import {
+  advanceOffsetFrameIndex,
+  getAdvancedFrameCount,
+} from './outputAdvance.worklet.js';
+import {
+  createRangeFrames,
+  processRangeMetronome,
+  type RangeFrames,
+} from './playerRange.worklet.js';
+import {
   createPlayheadPublisher,
   type PlayheadPublisher,
 } from './playhead.worklet.js';
@@ -65,6 +74,7 @@ export const createPlayerRuntime = async (
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   const leadVoice = await createLeadVoice(sampleRate);
   const recordingTrack = await createRecordingTrack(sampleRate);
+  let range: RangeFrames | undefined = undefined;
 
   const getVoiceShiftSemitones = () => (voiceShifted ? 12 * voiceOctave : 0);
 
@@ -107,49 +117,46 @@ export const createPlayerRuntime = async (
         ? outputLatencyFrameCount - outputOffsetFrameIndex
         : outputLatencyFrameCount,
     getTempoRatio: () => tempoRatio,
+    getLoop: () => (range?.repeat === 'cycle' ? range.range : undefined),
     applyLatencyFrameCounts,
   });
 
-  const advanceOffsetFrameIndex = (
-    offsetFrameIndex: number,
-    limitFrameCount: number,
-    advanceFrameCount: number,
-  ) => {
-    if (offsetFrameIndex >= limitFrameCount) {
-      return {
-        offsetFrameIndex: limitFrameCount,
-        remainingFrameCount: advanceFrameCount,
-      };
-    }
-
-    const offsetRemainingFrameCount = limitFrameCount - offsetFrameIndex;
-    if (advanceFrameCount <= offsetRemainingFrameCount) {
-      return {
-        offsetFrameIndex: offsetFrameIndex + advanceFrameCount,
-        remainingFrameCount: 0,
-      };
-    }
-
-    return {
-      offsetFrameIndex: limitFrameCount,
-      remainingFrameCount: advanceFrameCount - offsetRemainingFrameCount,
-    };
+  const finishPlayback = (nextFrameIndex: number) => {
+    frameIndex = nextFrameIndex;
+    outputOffsetFrameIndex = 0;
+    playing = false;
+    recordingRuntime.resetInputOffset();
+    resetTimePitch();
+    metronome.reset(nextFrameIndex);
+    metronome.clear();
+    playhead.publishNow({ frameIndex, revision });
+    port.methods.setPlaying({
+      playing,
+      frameIndex,
+      revision,
+      positionJump: true,
+    });
   };
 
-  const getAdvancedFrameCount = (
-    processedFrameCount: number,
-    outputFrameCount: number,
-    remainingOutputFrameCount: number,
+  const mixRecording = (
+    outputs: Float32Array[],
+    currentOutputFrameIndex: number,
   ) => {
-    if (remainingOutputFrameCount === outputFrameCount) {
-      return processedFrameCount;
+    const songFrame = range
+      ? range.songFrame(currentOutputFrameIndex)
+      : currentOutputFrameIndex;
+    if (recordingRuntime.isActive() || (range && songFrame >= range.endFrame)) {
+      return;
     }
-    if (remainingOutputFrameCount === 0 || outputFrameCount === 0) {
-      return 0;
-    }
-    return Math.round(
-      (processedFrameCount * remainingOutputFrameCount) / outputFrameCount,
-    );
+    recordingTrack.mixInto({
+      outputs,
+      songFrame,
+      tempoRatio,
+      transposeSemitones,
+      voiceOctave,
+      voiceShifted,
+      volume: recordingVolume,
+    });
   };
 
   dataPort.bindHandlers({
@@ -250,6 +257,11 @@ export const createPlayerRuntime = async (
     setMetronome: (message) => {
       metronome.setConfig(message, frameIndex);
     },
+    setRange: (message) => {
+      range = message.range
+        ? createRangeFrames(message.range, message.repeat, message.stopFrame)
+        : undefined;
+    },
     startRecording: (message) => {
       revision = message.revision;
       recordingRuntime.start(message);
@@ -295,6 +307,7 @@ export const createPlayerRuntime = async (
               ...baseOptions,
               track: currentTracks[stemType],
               volume: trackVolumes[stemType] ?? 1,
+              frames: range,
             });
           }
         },
@@ -305,19 +318,10 @@ export const createPlayerRuntime = async (
           outputFrameIndex: currentOutputFrameIndex,
           track: currentTracks.lead,
           volume: trackVolumes.lead ?? 1,
+          frames: range,
         });
       }
-      if (!recordingRuntime.isActive()) {
-        recordingTrack.mixInto({
-          outputs,
-          songFrame: currentOutputFrameIndex,
-          tempoRatio,
-          transposeSemitones,
-          voiceOctave,
-          voiceShifted,
-          volume: recordingVolume,
-        });
-      }
+      mixRecording(outputs, currentOutputFrameIndex);
 
       const outputAdvance = advanceOffsetFrameIndex(
         outputOffsetFrameIndex,
@@ -331,28 +335,23 @@ export const createPlayerRuntime = async (
         outputAdvance.remainingFrameCount,
       );
 
-      metronome.process({
-        oldFrameIndex: currentOutputFrameIndex,
-        newFrameIndex: getCurrentOutputFrameIndex(),
+      processRangeMetronome({
+        metronome,
+        range,
+        currentFrameIndex: currentOutputFrameIndex,
+        nextFrameIndex: getCurrentOutputFrameIndex(),
         outputs,
-        outputFrameCount,
       });
+      if (range) {
+        frameIndex = range.songFrame(frameIndex);
+      }
+      if (range?.repeat === 'once' && frameIndex >= range.endFrame) {
+        finishPlayback(range.range.fromFrame);
+        return;
+      }
 
       if (frameIndex >= frameCount) {
-        frameIndex = 0;
-        outputOffsetFrameIndex = 0;
-        playing = false;
-        recordingRuntime.resetInputOffset();
-        resetTimePitch();
-        metronome.reset(0);
-        metronome.clear();
-        playhead.publishNow({ frameIndex, revision });
-        port.methods.setPlaying({
-          playing,
-          frameIndex,
-          revision,
-          positionJump: true,
-        });
+        finishPlayback(0);
         return;
       }
 

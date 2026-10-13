@@ -88,3 +88,25 @@ export namespace remove {
   export type Request = z.infer<typeof base.requestSchema>;
   export type Response = z.infer<typeof base.responseSchema>;
 }
+
+export namespace insertTake {
+  export const base = createApiRoute({
+    method: 'post',
+    path: '/api/project/:projectId/recording/:recordingId/take',
+    paramsSchema: recordingParamsSchema,
+    requestSchema: z.object({
+      startFrame: z.number(),
+      tempo: z.number(),
+      transpose: z.number(),
+      octave: z.number(),
+      sampleRate: z.number(),
+      frameCount: z.number(),
+      samples: z.file(),
+    }),
+    responseSchema: listSchema,
+    isMultipart: true,
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}

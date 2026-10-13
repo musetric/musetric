@@ -92,6 +92,8 @@ const initialState: EngineState = {
   metronomeVolume: 0.3,
   metronomeBeats: [],
   metronomeDownbeats: [],
+  rangeRepeat: 'cycle',
+  loopTries: [],
 };
 
 export type Engine = {
