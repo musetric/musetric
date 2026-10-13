@@ -13,6 +13,8 @@ export type VoiceBlock = {
   songFrame: number;
   tempoRatio: number;
   transposeSemitones: number;
+  voiceOctave: number;
+  voiceShifted: boolean;
 };
 
 export type Voice = {
@@ -42,7 +44,9 @@ export const createVoice = (stretcher: TimePitchProcessor): Voice => {
     const { piece } = part.segment;
     const { samples } = piece;
     const ratio = block.tempoRatio / piece.tempo;
-    const transposeSemitones = block.transposeSemitones - piece.transpose;
+    const octaves = block.voiceShifted ? block.voiceOctave - piece.octave : 0;
+    const transposeSemitones =
+      block.transposeSemitones - piece.transpose + 12 * octaves;
     const stretched =
       Math.abs(ratio - 1) >= unitRatioTolerance || transposeSemitones !== 0;
     const continued =

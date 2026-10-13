@@ -45,6 +45,7 @@ type LoadedPiece = {
   songStartFrame: number;
   tempo: number;
   transpose: number;
+  octave: number;
   blobId: string;
   samples: Float32Array<ArrayBuffer> | undefined;
 };
@@ -92,6 +93,7 @@ export const createRecordingAssembly = (
         songStartFrame: (piece.songStartFrame * sampleRate) / piece.sampleRate,
         tempo: piece.tempo,
         transpose: piece.transpose,
+        octave: piece.octave,
         blobId: piece.blobId,
         samples: await decode(projectId, recordingId, piece.blobId),
       })),
@@ -116,6 +118,7 @@ export const createRecordingAssembly = (
         songStartFrame: piece.songStartFrame,
         tempo: piece.tempo,
         transpose: piece.transpose,
+        octave: piece.octave,
         samples: piece.samples,
       }));
     },

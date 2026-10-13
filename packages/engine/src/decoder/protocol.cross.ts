@@ -16,6 +16,7 @@ export type EngineDecoderOutboundMethods = {
     latencyFrameCount: number;
     tempo: number;
     transpose: number;
+    octave: number;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (message: { sequence: number }) => void;

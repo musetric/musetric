@@ -18,7 +18,7 @@ export type PlayerOutboundMethods = {
   setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number; revision: number }) => void;
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
-  setLeadTransposeSemitones: (message: { transposeSemitones: number }) => void;
+  setVoiceOctave: (message: { voiceOctave: number; shifted: boolean }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
   setTrackVolume: (message: { stemType: StemType; volume: number }) => void;
   setRecordingVolume: (message: { volume: number }) => void;
@@ -64,7 +64,7 @@ export const playerChannel = createMessageChannel<
       'stop',
       'setFrozen',
       'setTransposeSemitones',
-      'setLeadTransposeSemitones',
+      'setVoiceOctave',
       'setTempoRatio',
       'setTrackVolume',
       'setRecordingVolume',
@@ -83,6 +83,7 @@ export type PlayerRecordingPiece = {
   songStartFrame: number;
   tempo: number;
   transpose: number;
+  octave: number;
   samples: Float32Array<ArrayBuffer>;
 };
 
@@ -101,6 +102,7 @@ export type LiveTakeStart = {
   takeId: string;
   tempo: number;
   transpose: number;
+  octave: number;
 };
 
 export type LiveTakeChunk = {

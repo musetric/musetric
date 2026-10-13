@@ -64,6 +64,7 @@ pub(crate) struct Session {
     sample_rate: i64,
     tempo: f64,
     transpose: i64,
+    octave: i64,
     area: PathBuf,
     blobs_path: PathBuf,
     runs: Vec<Run>,
@@ -94,6 +95,7 @@ impl Session {
             sample_rate: recording.sample_rate,
             tempo: format.tempo,
             transpose: format.transpose,
+            octave: format.octave,
             area,
             blobs_path: storage.blobs_path.clone(),
             runs: Vec::new(),
@@ -255,6 +257,7 @@ impl Session {
                     frame_count: run.frame_count,
                     tempo: self.tempo,
                     transpose: self.transpose,
+                    octave: self.octave,
                 },
                 blob: run.blob,
             });

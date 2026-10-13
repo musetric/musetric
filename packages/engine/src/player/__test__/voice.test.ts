@@ -18,23 +18,39 @@ type VoicePlayback = {
   playTempo: number;
   pieceTranspose: number;
   playTranspose: number;
+  pieceOctave?: number;
+  voiceOctave?: number;
+  voiceShifted?: boolean;
 };
 
 const playVoice = async (playback: VoicePlayback) => {
-  const { raw, pieceTempo, playTempo, pieceTranspose, playTranspose } =
-    playback;
+  const {
+    raw,
+    pieceTempo,
+    playTempo,
+    pieceTranspose,
+    playTranspose,
+    pieceOctave = 0,
+    voiceOctave = 0,
+    voiceShifted = false,
+  } = playback;
   const songStart = Math.round(2 * rate);
   const harness = await createHarness([
     {
       songStartFrame: songStart,
       tempo: pieceTempo,
       transpose: pieceTranspose,
+      octave: pieceOctave,
       samples: raw.slice(),
     },
   ]);
   harness.player.methods.setTempoRatio({ tempoRatio: playTempo });
   harness.player.methods.setTransposeSemitones({
     transposeSemitones: playTranspose,
+  });
+  harness.player.methods.setVoiceOctave({
+    voiceOctave,
+    shifted: voiceShifted,
   });
   harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
   harness.player.methods.seek({ frameIndex: songStart, revision: 1 });
@@ -138,17 +154,85 @@ describe('player voice', () => {
     },
   );
 
+  it.each([
+    [-1, -1, true],
+    [-1, 0, false],
+    [1, -1, false],
+  ])(
+    'plays a take sung at octave %i exactly as it was sung at octave %i with a shifted voice %s',
+    async (pieceOctave, voiceOctave, voiceShifted) => {
+      const raw = noise(rate);
+      const played = await playVoice({
+        raw,
+        pieceTempo: 1,
+        playTempo: 1,
+        pieceTranspose: 0,
+        playTranspose: 0,
+        pieceOctave,
+        voiceOctave,
+        voiceShifted,
+      });
+      expect(Array.from(played.subarray(0, raw.length))).toEqual(
+        Array.from(raw),
+      );
+    },
+  );
+
+  it.each([
+    {
+      pieceTranspose: 0,
+      pieceOctave: -1,
+      playTranspose: 0,
+      voiceOctave: 0,
+      sounding: 12,
+    },
+    {
+      pieceTranspose: -2,
+      pieceOctave: 0,
+      playTranspose: 1,
+      voiceOctave: -1,
+      sounding: -9,
+    },
+    {
+      pieceTranspose: 2,
+      pieceOctave: 1,
+      playTranspose: 0,
+      voiceOctave: 0,
+      sounding: -14,
+    },
+  ])(
+    'shifts a take sung at $pieceTranspose in octave $pieceOctave to $playTranspose in octave $voiceOctave by $sounding semitones with a shifted voice',
+    async (row) => {
+      const { sounding, ...shift } = row;
+      const frequency = 220;
+      const played = await playVoice({
+        raw: sine(frequency, 2 * rate),
+        pieceTempo: 1,
+        playTempo: 1,
+        ...shift,
+        voiceShifted: true,
+      });
+      const heard = zeroCrossingFrequency(
+        played.subarray(Math.round(0.5 * rate), Math.round(1.5 * rate)),
+      );
+      const expected = frequency * 2 ** (sounding / 12);
+      expect(Math.abs(heard / expected - 1)).toBeLessThan(0.01);
+    },
+  );
+
   it('leaves nothing of the previous take after a seek', async () => {
     const loud = {
       songStartFrame: rate,
       tempo: 0.5,
       transpose: 0,
+      octave: 0,
       samples: noise(rate),
     };
     const silent = {
       songStartFrame: 3 * rate,
       tempo: 0.5,
       transpose: 0,
+      octave: 0,
       samples: new Float32Array(rate),
     };
     const harness = await createHarness([loud, silent]);
@@ -185,6 +269,7 @@ describe('player voice', () => {
       takeId: 'take',
       tempo: 1,
       transpose: 0,
+      octave: 0,
     });
     harness.data.methods.appendLiveTake({
       startFrame: rate,

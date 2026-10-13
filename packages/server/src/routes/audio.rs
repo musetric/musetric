@@ -274,6 +274,7 @@ async fn send_recording_pieces(
                 "frameCount": piece.frame_count,
                 "tempo": piece.tempo,
                 "transpose": piece.transpose,
+                "octave": piece.octave,
             })
         })
         .collect();

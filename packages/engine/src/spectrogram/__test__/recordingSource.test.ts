@@ -25,7 +25,13 @@ describe('recording source', () => {
     const recording = createRecordingSource();
     recording.setPieces({
       pieces: [
-        { songStartFrame: 4, tempo: 0.5, transpose: 0, samples: ramp(8, 10) },
+        {
+          songStartFrame: 4,
+          tempo: 0.5,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(8, 10),
+        },
       ],
     });
     const source = recording.get(12);
@@ -34,15 +40,51 @@ describe('recording source', () => {
     expect(read(source, 4, 8)).toEqual([10, 11, 12, 13, 14, 15, 16, 17]);
   });
 
+  it('places each piece at the key and octave it was sung in', () => {
+    const recording = createRecordingSource();
+    recording.setPieces({
+      pieces: [
+        {
+          songStartFrame: 0,
+          tempo: 1,
+          transpose: -2,
+          octave: -1,
+          samples: ramp(4, 1),
+        },
+        {
+          songStartFrame: 4,
+          tempo: 1,
+          transpose: 3,
+          octave: 0,
+          samples: ramp(4, 1),
+        },
+      ],
+    });
+    const source = recording.get(8);
+    expect(source.transposeAt(1)).toBe(-14);
+    expect(source.transposeAt(5)).toBe(3);
+  });
+
   it('keeps a live take in place while it grows and reports the song it covers', () => {
     const recording = createRecordingSource();
     recording.setPieces({
       pieces: [
-        { songStartFrame: 0, tempo: 1, transpose: 0, samples: ramp(20, 100) },
+        {
+          songStartFrame: 0,
+          tempo: 1,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(20, 100),
+        },
       ],
     });
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 0.5, transpose: 0 });
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 0.5,
+      transpose: 0,
+      octave: 0,
+    });
     const first = recording.appendLiveTake(chunk(10, 0, ramp(4, 1)));
     const source = recording.get(20);
     const second = recording.appendLiveTake(chunk(10, 4, ramp(4, 5)));
@@ -55,7 +97,12 @@ describe('recording source', () => {
   it('drops the live take once its pieces arrive', () => {
     const recording = createRecordingSource();
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 1, transpose: 0 });
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+      octave: 0,
+    });
     recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
     recording.setPieces({ pieces: [], finishedTakeId: 'take' });
     expect(read(recording.get(20), 0, 4)).toEqual([0, 0, 0, 0]);
@@ -64,13 +111,24 @@ describe('recording source', () => {
   it('keeps a live take of another session until the pieces switch recordings', () => {
     const recording = createRecordingSource();
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 1, transpose: 0 });
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+      octave: 0,
+    });
     recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
     recording.setPieces({ pieces: [], finishedTakeId: 'other' });
     expect(read(recording.get(20), 0, 4)).toEqual([1, 2, 3, 4]);
     recording.setPieces({
       pieces: [
-        { songStartFrame: 2, tempo: 1, transpose: 0, samples: ramp(2, 50) },
+        {
+          songStartFrame: 2,
+          tempo: 1,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(2, 50),
+        },
       ],
       switched: true,
     });
@@ -81,11 +139,22 @@ describe('recording source', () => {
     const recording = createRecordingSource();
     recording.setPieces({
       pieces: [
-        { songStartFrame: 0, tempo: 1, transpose: 0, samples: ramp(20, 100) },
+        {
+          songStartFrame: 0,
+          tempo: 1,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(20, 100),
+        },
       ],
     });
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 0.5, transpose: 0 });
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 0.5,
+      transpose: 0,
+      octave: 0,
+    });
     recording.appendLiveTake(chunk(4, 4, ramp(4, 1)));
     const late = recording.appendLiveTake(chunk(4, 40, ramp(4, 1)));
     expect(late).toBeUndefined();
@@ -98,11 +167,22 @@ describe('recording source', () => {
     const recording = createRecordingSource();
     recording.setPieces({
       pieces: [
-        { songStartFrame: 0, tempo: 1, transpose: 0, samples: ramp(20, 100) },
+        {
+          songStartFrame: 0,
+          tempo: 1,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(20, 100),
+        },
       ],
     });
     recording.get(20);
-    recording.beginLiveTake({ takeId: 'take', tempo: 1, transpose: 0 });
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+      octave: 0,
+    });
     recording.appendLiveTake(chunk(2, 0, ramp(4, 1)));
     const seeked = recording.appendLiveTake(chunk(12, 0, ramp(2, 50)));
     expect(seeked).toEqual({ frameIndex: 12, frameCount: 3 });

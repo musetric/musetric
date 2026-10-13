@@ -13,6 +13,7 @@ const piece = (
   songStartFrame,
   tempo,
   transpose: 0,
+  octave: 0,
   frameCount,
   samples: new Float32Array(frameCount),
 });

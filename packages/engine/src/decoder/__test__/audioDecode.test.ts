@@ -32,6 +32,7 @@ vi.mock('../../audioRequest/audioRequest.worker.js', () => ({
           frameCount: 4,
           tempo: 1,
           transpose: 0,
+          octave: 0,
         },
       ],
     };

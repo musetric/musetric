@@ -82,12 +82,8 @@ export const TransposePickerContent: FC = () => {
       />
       <Divider />
       <VoiceOctaveToggle />
-      {voiceOctave !== 0 && (
-        <>
-          <Divider />
-          <SingerVoiceToggle />
-        </>
-      )}
+      <Divider />
+      <SingerVoiceToggle />
     </Stack>
   );
 };

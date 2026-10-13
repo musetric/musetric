@@ -261,6 +261,7 @@ export const createEngineRecorder = (
         inputLatencyFrameCount,
         tempoRatio,
         transposeSemitones,
+        voiceOctave,
       } = store.get();
       getDecoder().startRecordingStream({
         projectId: session.projectId,
@@ -269,6 +270,7 @@ export const createEngineRecorder = (
         latencyFrameCount,
         tempo: tempoRatio,
         transpose: transposeSemitones,
+        octave: voiceOctave,
         port: recordingStreamChannel.port1,
       });
       session.decoderStreamStarted = true;

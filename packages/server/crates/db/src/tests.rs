@@ -325,8 +325,8 @@ const BLOB_SEED: &str = "
     VALUES (1, 'Recording 1', 1, 'Recording.waveBlobId', 44100, 100);
   INSERT INTO Recording (projectId, name) VALUES (1, 'Recording 2');
   INSERT INTO RecordingPiece
-    (recordingId, blobId, layer, songStartFrame, frameCount, tempo, transpose)
-    VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100, 1.0, 0);
+    (recordingId, blobId, layer, songStartFrame, frameCount, tempo, transpose, octave)
+    VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100, 1.0, 0, 0);
 ";
 
 fn blob_columns(path: &Path) -> Vec<String> {
@@ -498,6 +498,7 @@ fn hands_the_active_role_to_a_neighbour_of_a_removed_recording() {
                 frame_count: 10,
                 tempo: 1.0,
                 transpose: 0,
+                octave: 0,
             }],
             true,
         )

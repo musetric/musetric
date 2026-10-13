@@ -181,6 +181,7 @@ export namespace realtime {
         recordingId: number;
         tempo: number;
         transpose: number;
+        octave: number;
       }
     | {
         type: 'recording.peaksChanged';
