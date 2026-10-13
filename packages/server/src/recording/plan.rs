@@ -16,6 +16,8 @@ pub(crate) struct PlannedPiece {
     pub(crate) song_start_frame: i64,
     pub(crate) frame_count: i64,
     pub(crate) tempo: f64,
+    pub(crate) transpose: i64,
+    pub(crate) octave: i64,
 }
 
 impl PlannedPiece {
@@ -29,6 +31,8 @@ impl PlannedPiece {
             song_start_frame: piece.song_start_frame,
             frame_count: piece.frame_count,
             tempo: piece.tempo,
+            transpose: piece.transpose,
+            octave: piece.octave,
         }
     }
 
@@ -57,6 +61,8 @@ impl PlannedPiece {
             )),
             frame_count,
             tempo: self.tempo,
+            transpose: self.transpose,
+            octave: self.octave,
         }
     }
 
@@ -137,6 +143,8 @@ fn cut_under(pieces: Vec<PlannedPiece>, top: &PlannedPiece) -> Vec<PlannedPiece>
 
 fn touches(previous: &PlannedPiece, next: &PlannedPiece) -> bool {
     (previous.tempo - next.tempo).abs() < TEMPO_TOLERANCE
+        && previous.transpose == next.transpose
+        && previous.octave == next.octave
         && (previous.song_end() - next.song_start()).abs() < TOUCH_TOLERANCE_FRAMES
 }
 
@@ -208,6 +216,8 @@ mod tests {
             song_start_frame,
             frame_count,
             tempo,
+            transpose: 0,
+            octave: 0,
         }
     }
 
@@ -233,7 +243,44 @@ mod tests {
                 song_start_frame: 0,
                 frame_count: 60,
                 tempo: 1.0,
+                transpose: 0,
+                octave: 0,
             }]
+        );
+    }
+
+    #[test]
+    fn splits_the_base_where_the_key_changes() {
+        let base = [piece("a", 0, 60, 1.0)];
+        let mut transposed = piece("b", 10, 30, 1.0);
+        transposed.transpose = 12;
+
+        let merged = merge_fresh(&base, &[transposed]);
+
+        assert_eq!(
+            merged.iter().map(|plan| plan.transpose).collect::<Vec<_>>(),
+            [0, 12, 0]
+        );
+        assert_eq!(
+            merged
+                .iter()
+                .map(|plan| plan.frame_count)
+                .collect::<Vec<_>>(),
+            [10, 30, 20]
+        );
+    }
+
+    #[test]
+    fn splits_the_base_where_the_octave_changes() {
+        let base = [piece("a", 0, 60, 1.0)];
+        let mut lower = piece("b", 10, 30, 1.0);
+        lower.octave = -1;
+
+        let merged = merge_fresh(&base, &[lower]);
+
+        assert_eq!(
+            merged.iter().map(|plan| plan.octave).collect::<Vec<_>>(),
+            [0, -1, 0]
         );
     }
 
@@ -252,18 +299,24 @@ mod tests {
                     song_start_frame: 0,
                     frame_count: 10,
                     tempo: 1.0,
+                    transpose: 0,
+                    octave: 0,
                 },
                 PlannedPiece {
                     sources: vec![source("b", 0, 60)],
                     song_start_frame: 10,
                     frame_count: 60,
                     tempo: 0.5,
+                    transpose: 0,
+                    octave: 0,
                 },
                 PlannedPiece {
                     sources: vec![source("a", 40, 20)],
                     song_start_frame: 40,
                     frame_count: 20,
                     tempo: 1.0,
+                    transpose: 0,
+                    octave: 0,
                 },
             ]
         );
@@ -317,12 +370,16 @@ mod tests {
                     song_start_frame: 0,
                     frame_count: 40,
                     tempo: 1.0,
+                    transpose: 0,
+                    octave: 0,
                 },
                 PlannedPiece {
                     sources: vec![source("c", 0, 10)],
                     song_start_frame: 50,
                     frame_count: 10,
                     tempo: 0.5,
+                    transpose: 0,
+                    octave: 0,
                 },
             ]
         );
@@ -360,6 +417,8 @@ mod tests {
                 song_start_frame: 0,
                 frame_count: 100,
                 tempo: 1.0,
+                transpose: 0,
+                octave: 0,
             }]
         );
     }
@@ -377,6 +436,8 @@ mod tests {
                 song_start_frame: 30,
                 frame_count: 50,
                 tempo: 0.5,
+                transpose: 0,
+                octave: 0,
             }]
         );
         assert_eq!(take[0].reused_blob(&runs), Some("a"));
@@ -407,6 +468,8 @@ mod tests {
                 song_start_frame: 0,
                 frame_count: 100,
                 tempo: 1.0,
+                transpose: 0,
+                octave: 0,
             }]
         );
     }
@@ -424,6 +487,8 @@ mod tests {
                 song_start_frame: 10,
                 frame_count: 60,
                 tempo: 1.0,
+                transpose: 0,
+                octave: 0,
             }]
         );
     }
@@ -445,6 +510,8 @@ mod tests {
                 song_start_frame: 0,
                 frame_count: 70,
                 tempo: 1.0,
+                transpose: 0,
+                octave: 0,
             }]
         );
     }
@@ -466,6 +533,8 @@ mod tests {
                 song_start_frame: 0,
                 frame_count: 200,
                 tempo: 0.5,
+                transpose: 0,
+                octave: 0,
             }]
         );
     }

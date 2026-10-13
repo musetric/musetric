@@ -1,6 +1,7 @@
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes};
 use serde_json::{Value, json};
 
+use super::rooms::RoomTake;
 use crate::recording::RecordingSummary;
 
 pub(crate) fn text(event: &Value) -> Message {
@@ -14,12 +15,14 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started(session_id: &str, recording_id: i64, tempo: f64) -> Value {
+pub(crate) fn recording_started(take: &RoomTake) -> Value {
     json!({
         "type": "recording.started",
-        "sessionId": session_id,
-        "recordingId": recording_id,
-        "tempo": tempo,
+        "sessionId": take.session_id,
+        "recordingId": take.recording_id,
+        "tempo": take.tempo,
+        "transpose": take.transpose,
+        "octave": take.octave,
     })
 }
 

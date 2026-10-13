@@ -126,7 +126,7 @@ export const createEngineSpectrogram = (
             showFundamental: true,
             showNotes: notes,
             truncateAfterPlayhead: state.recording,
-            transposeSemitones: state.transposeSemitones,
+            transposeSemitones: getNoteShiftSemitones(state),
           },
         };
       };

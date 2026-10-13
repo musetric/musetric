@@ -236,7 +236,6 @@ async fn start_recording(
         refuse_recording(rooms, connection, start.session_id);
         return true;
     }
-    let tempo = start.format.tempo;
     let created = session::Session::create(
         &connection.storage,
         connection.project_id,
@@ -254,20 +253,17 @@ async fn start_recording(
             return false;
         }
     };
-    rooms.begin_take(
-        connection.project_id,
-        rooms::RoomTake {
-            owner: connection.member,
-            session_id: start.session_id.clone(),
-            recording_id: start.recording_id,
-            tempo,
-        },
-    );
-    rooms.broadcast_event(
-        connection.project_id,
-        &events::recording_started(&start.session_id, start.recording_id, tempo),
-        None,
-    );
+    let take = rooms::RoomTake {
+        owner: connection.member,
+        session_id: start.session_id.clone(),
+        recording_id: start.recording_id,
+        tempo: start.format.tempo,
+        transpose: start.format.transpose,
+        octave: start.format.octave,
+    };
+    let started = events::recording_started(&take);
+    rooms.begin_take(connection.project_id, take);
+    rooms.broadcast_event(connection.project_id, &started, None);
     connection.take = Some(Take {
         session,
         id: start.session_id,
@@ -465,6 +461,8 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
     let latency_frame_count = read_integer(event.get("latencyFrameCount")?)?;
     let session_id = event.get("sessionId")?.as_str()?.to_owned();
     let tempo = event.get("tempo").map_or(Some(1.0), Value::as_f64)?;
+    let transpose = event.get("transpose").map_or(Some(0), read_integer)?;
+    let octave = event.get("octave").map_or(Some(0), read_integer)?;
     if sample_rate == 0
         || frame_count < 0
         || latency_frame_count < 0
@@ -478,6 +476,8 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
             sample_rate,
             frame_count,
             tempo,
+            transpose,
+            octave,
         },
         session_id,
         recording_id,
@@ -709,7 +709,7 @@ mod tests {
 
     async fn restart_take(owner: &mut ClientSocket, listener: &mut ClientSocket, session_id: &str) {
         send_json(owner, start_message(session_id, SONG_FRAME_COUNT)).await;
-        let started = json!({ "type": "recording.started", "sessionId": session_id, "recordingId": 1, "tempo": 1.0 });
+        let started = json!({ "type": "recording.started", "sessionId": session_id, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 });
         assert_eq!(receive_json(owner).await, started);
         assert_eq!(receive_json(listener).await, started);
     }
@@ -810,7 +810,7 @@ mod tests {
         send_json(&mut owner, start_message(OWNER_TAKE, frame_count)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
@@ -818,7 +818,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
         (owner, listener)
     }
@@ -1030,7 +1030,7 @@ mod tests {
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "recordingId": 1, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
     }
 
@@ -1115,11 +1115,11 @@ mod tests {
         send_json(&mut owner, start_message(SECOND_TAKE, FRAME_COUNT * 2)).await;
         assert_eq!(
             receive_json(&mut owner).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
         assert_eq!(
             receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0 })
+            json!({ "type": "recording.started", "sessionId": SECOND_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
 
         let samples = [0.25_f32; FRAME_COUNT * 2];
@@ -1315,7 +1315,7 @@ mod tests {
         let mut start = start_message(OWNER_TAKE, SONG_FRAME_COUNT);
         start["tempo"] = json!(0.5);
         send_json(&mut owner, start).await;
-        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 0.5 });
+        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 0.5, "transpose": 0, "octave": 0 });
         assert_eq!(receive_json(&mut owner).await, started);
         assert_eq!(
             receive_json(&mut listener).await,
@@ -1342,6 +1342,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stores_a_transposed_take_raw_with_its_key_and_octave() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let mut owner = connect(&base).await;
+        let mut listener = connect(&base).await;
+        let mut start = start_message(OWNER_TAKE, SONG_FRAME_COUNT);
+        start["transpose"] = json!(12);
+        start["octave"] = json!(-1);
+        send_json(&mut owner, start).await;
+        let started = json!({ "type": "recording.started", "sessionId": OWNER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 12, "octave": -1 });
+        assert_eq!(receive_json(&mut owner).await, started);
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "player.record" })
+        );
+        assert_eq!(receive_json(&mut listener).await, started);
+
+        let samples = [0.5_f32; SONG_FRAME_COUNT];
+        send_packet(&mut owner, chunk(0, &samples)).await;
+        assert_eq!(receive_binary(&mut listener).await, chunk(0, &samples));
+        let patch = receive_json(&mut owner).await;
+        assert_eq!(patch["type"], "recording.peaksChanged");
+        assert_eq!(receive_json(&mut listener).await, patch);
+        finish_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        expect_changed([&mut owner, &mut listener], true, false).await;
+
+        let pieces = stored_pieces(&storage);
+        assert_eq!(layout(&pieces), [piece(RecordingLayer::Fresh, 0, 8)]);
+        assert_eq!(pieces[0].transpose, 12);
+        assert_eq!(pieces[0].octave, -1);
+        assert_eq!(
+            read_samples(&storage, &pieces[0].blob_id),
+            [HALF; SONG_FRAME_COUNT]
+        );
+    }
+
+    #[tokio::test]
     async fn replays_a_running_take_to_a_member_that_joins_late() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
@@ -1360,6 +1399,8 @@ mod tests {
                 "sessionId": OWNER_TAKE,
                 "recordingId": 1,
                 "tempo": 1.0,
+                "transpose": 0,
+                "octave": 0,
             })
         );
     }
@@ -1486,6 +1527,8 @@ mod tests {
             "sessionId": SECOND_TAKE,
             "recordingId": 2,
             "tempo": 1.0,
+            "transpose": 0,
+            "octave": 0,
         });
         assert_eq!(receive_json(owner).await, started);
         assert_eq!(receive_json(listener).await, started);

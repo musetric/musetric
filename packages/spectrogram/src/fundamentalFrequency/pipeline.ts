@@ -139,6 +139,11 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
     label: 'project',
     code: projectShader,
     entryPoint: 'project',
-    kinds: ['read-only-storage', 'storage', 'dynamic-uniform'],
+    kinds: [
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+      'read-only-storage',
+    ],
   }),
 });

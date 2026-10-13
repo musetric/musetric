@@ -104,9 +104,6 @@ export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
 const isFundamentalShown = (lane: SpectrogramLaneConfig): boolean =>
   lane.showFundamental || lane.showNotes;
 
-export const getLaneFrequencyScale = (lane: SpectrogramLaneConfig): number =>
-  2 ** (lane.transposeSemitones / 12);
-
 export const isFundamentalNeeded = (
   config: Pick<SpectrogramConfig, 'lanes' | 'comparison'>,
   key: TrackKey,

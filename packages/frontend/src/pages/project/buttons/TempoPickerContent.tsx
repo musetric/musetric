@@ -54,6 +54,15 @@ export const TempoPickerContent: FC = () => {
         }),
       }))}
       disabled={recording}
+      onReset={
+        tempoRatio === 1
+          ? undefined
+          : () => {
+              engine.store.update((state) => {
+                state.tempoRatio = 1;
+              });
+            }
+      }
       onChange={(steps) => {
         engine.store.update((state) => {
           state.tempoRatio = steps / stepsPerRatio;

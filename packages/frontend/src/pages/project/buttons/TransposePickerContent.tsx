@@ -21,6 +21,7 @@ export const TransposePickerContent: FC = () => {
     (state) => state.transposeSemitones,
   );
   const voiceOctave = useEngineStore((state) => state.voiceOctave);
+  const original = transposeSemitones === 0 && voiceOctave === 0;
   const keyQuery = useQuery(endpoints.key.get(projectId));
   const sourceKey = keyQuery.status === 'success' ? keyQuery.data : undefined;
 
@@ -60,6 +61,16 @@ export const TransposePickerContent: FC = () => {
           }),
         )}
         disabled={recording}
+        onReset={
+          original
+            ? undefined
+            : () => {
+                engine.store.update((state) => {
+                  state.transposeSemitones = 0;
+                  state.voiceOctave = 0;
+                });
+              }
+        }
         onChange={(semitones) => {
           engine.store.update((state) => {
             state.transposeSemitones = semitones;
@@ -68,12 +79,8 @@ export const TransposePickerContent: FC = () => {
       />
       <Divider />
       <VoiceOctaveToggle />
-      {voiceOctave !== 0 && (
-        <>
-          <Divider />
-          <SingerVoiceToggle />
-        </>
-      )}
+      <Divider />
+      <SingerVoiceToggle />
     </Stack>
   );
 };

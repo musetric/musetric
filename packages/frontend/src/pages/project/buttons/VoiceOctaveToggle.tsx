@@ -17,12 +17,7 @@ export const VoiceOctaveToggle: FC = () => {
 
   return (
     <Stack gap={2}>
-      <Stack
-        direction='row'
-        justifyContent='space-between'
-        alignItems='baseline'
-        gap={2}
-      >
+      <Stack direction='row' alignItems='baseline' gap={2}>
         <Typography fontSize={15} fontWeight={700}>
           {t('pages.project.player.controls.voiceOctave')}
         </Typography>

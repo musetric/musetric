@@ -12,6 +12,7 @@ import {
   createPitchSettings,
   type PitchSettings,
 } from '../fundamentalFrequency/settings.es.js';
+import { createColumnScaleCell } from '../lane/columnScale.js';
 import { playback60Fps } from './bench.es.js';
 import {
   type PitchPerfMetric,
@@ -108,12 +109,14 @@ export const measureKernelRow = async (
     frames - settings.historyFrames - settings.lookaheadFrames - 3;
   const baseColumn = settings.historyFrames + 2;
   const cell = createSpectrogramFundamentalFrequencyCell(device);
+  const scaleCell = createColumnScaleCell(device);
   try {
     const pitch = cell.get({
       sampleRate,
       fourierMode,
       columnStep: settings.hop,
       windowCount,
+      columnScale: scaleCell.get(windowCount).buffer,
     });
     const samples = synthesizeVoice(
       (baseColumn + windowCount + 400) * settings.hop,
@@ -125,7 +128,6 @@ export const measureKernelRow = async (
         projection: { baseColumn: baseColumn + shift, baseSlot: shift },
         trackProgress: 0,
         truncated: false,
-        frequencyScale: 1,
         invalidations: [],
       });
     };
@@ -157,6 +159,7 @@ export const measureKernelRow = async (
     };
   } finally {
     cell.dispose();
+    scaleCell.dispose();
   }
 };
 

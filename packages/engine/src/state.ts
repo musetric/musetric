@@ -98,16 +98,6 @@ export const getNoteShiftSemitones = (
   state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
 ): number => 12 * state.voiceOctave + state.transposeSemitones;
 
-export const getLeadTransposeSemitones = (
-  state: Pick<
-    EngineState,
-    'transposeSemitones' | 'voiceOctave' | 'singerVoice'
-  >,
-): number =>
-  state.singerVoice === 'shifted'
-    ? getNoteShiftSemitones(state)
-    : state.transposeSemitones;
-
 const getNoteShiftScale = (
   state: Pick<EngineState, 'transposeSemitones' | 'voiceOctave'>,
 ) => 2 ** (getNoteShiftSemitones(state) / 12);

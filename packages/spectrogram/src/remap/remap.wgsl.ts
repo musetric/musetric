@@ -61,13 +61,14 @@ struct RemapParams {
   displayGamma: f32,
   slotOffset: u32,
   columnCount: u32,
-  frequencyScale: f32,
+  padding2: f32,
   bands: array<vec4f, ${spectrumCount * 2}>,
 };
 
 @group(0) @binding(0) var texture: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(1) var<uniform> params: RemapParams;
 ${createSpectrumBindings(spectrumCount)}
+@group(0) @binding(${2 + spectrumCount * 2}) var<storage, read> columnScale: array<f32>;
 
 fn frequencyAtRow(y: u32) -> f32 {
   var ratio = 0.0;
@@ -170,7 +171,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let frequency = frequencyAtRow(y);
   let intensity = baseDisplayIntensity(
     x,
-    frequency / params.frequencyScale,
+    frequency / columnScale[x],
     params.sampleRate,
     params.gain,
     params.decibelFactor,

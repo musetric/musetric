@@ -72,6 +72,25 @@ export const noise = (length: number): Float32Array<ArrayBuffer> => {
   });
 };
 
+export const sine = (
+  frequency: number,
+  length: number,
+): Float32Array<ArrayBuffer> =>
+  Float32Array.from(
+    { length },
+    (_, index) => 0.5 * Math.sin((2 * Math.PI * frequency * index) / rate),
+  );
+
+export const zeroCrossingFrequency = (signal: Float32Array): number => {
+  let crossings = 0;
+  for (let index = 1; index < signal.length; index += 1) {
+    if (signal[index - 1] < 0 !== signal[index] < 0) {
+      crossings += 1;
+    }
+  }
+  return (crossings / 2) * (rate / signal.length);
+};
+
 export type TakeStream = {
   chunks: LiveTakeChunk[];
   notification: MessagePort;

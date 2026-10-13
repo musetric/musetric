@@ -53,6 +53,8 @@ pub struct RecordingPiece {
     pub song_start_frame: i64,
     pub frame_count: i64,
     pub tempo: f64,
+    pub transpose: i64,
+    pub octave: i64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -109,7 +111,8 @@ pub(crate) fn read_recording_pieces(
     recording_id: i64,
 ) -> Result<Vec<RecordingPiece>> {
     let mut statement = connection.prepare(
-        "SELECT blobId, layer, songStartFrame, frameCount, tempo FROM RecordingPiece
+        "SELECT blobId, layer, songStartFrame, frameCount, tempo, transpose, octave
+         FROM RecordingPiece
          WHERE recordingId = ?1 ORDER BY songStartFrame, id",
     )?;
     let rows = statement.query_map([recording_id], |row| {
@@ -119,11 +122,13 @@ pub(crate) fn read_recording_pieces(
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, f64>(4)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
         ))
     })?;
     let mut pieces = Vec::new();
     for row in rows {
-        let (blob_id, layer_name, song_start_frame, frame_count, tempo) = row?;
+        let (blob_id, layer_name, song_start_frame, frame_count, tempo, transpose, octave) = row?;
         if let Some(layer) = RecordingLayer::parse(&layer_name) {
             pieces.push(RecordingPiece {
                 blob_id,
@@ -131,6 +136,8 @@ pub(crate) fn read_recording_pieces(
                 song_start_frame,
                 frame_count,
                 tempo,
+                transpose,
+                octave,
             });
         }
     }
@@ -295,8 +302,8 @@ pub(crate) fn write_recording_pieces(
     for piece in pieces {
         transaction.execute(
             "INSERT INTO RecordingPiece
-               (recordingId, blobId, layer, songStartFrame, frameCount, tempo)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+               (recordingId, blobId, layer, songStartFrame, frameCount, tempo, transpose, octave)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             (
                 recording_id,
                 &piece.blob_id,
@@ -304,6 +311,8 @@ pub(crate) fn write_recording_pieces(
                 piece.song_start_frame,
                 piece.frame_count,
                 piece.tempo,
+                piece.transpose,
+                piece.octave,
             ),
         )?;
     }

@@ -22,6 +22,8 @@ import {
 const toPiece = (piece: PlayerRecordingPiece): RecordingPiece => ({
   songStartFrame: piece.songStartFrame,
   tempo: piece.tempo,
+  transpose: piece.transpose,
+  octave: piece.octave,
   frameCount: piece.samples.length,
   samples: piece.samples,
 });
@@ -38,6 +40,7 @@ const buildSource = (
         (segment.songStartFrame - segment.piece.songStartFrame) /
         segment.piece.tempo,
       tempo: segment.piece.tempo,
+      transpose: segment.piece.transpose + 12 * segment.piece.octave,
       getSamples: () => segment.piece.samples,
     })),
     songLength,
@@ -81,7 +84,7 @@ export const createRecordingSource = (): RecordingSource => {
       previous.piece.frameCount = previous.writtenFrameCount;
     }
     const run: SourceRun = {
-      ...createLiveRun(chunk, take.tempo),
+      ...createLiveRun(chunk, take.tempo, take.transpose, take.octave),
       writtenFrameCount: 0,
     };
     run.piece.frameCount = Math.max(

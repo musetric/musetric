@@ -30,6 +30,7 @@ describe('spectrogram source', () => {
           songEndFrame: 6,
           rawStartFrame: 0,
           tempo: 0.5,
+          transpose: 0,
           getSamples: () => raw,
         },
       ],
@@ -47,6 +48,28 @@ describe('spectrogram source', () => {
     ]);
   });
 
+  it('tells the key each part of the song was sung in', () => {
+    const raw = ramp(4, 100);
+    const source = createMappedSource(
+      [
+        {
+          songStartFrame: 2,
+          songEndFrame: 6,
+          rawStartFrame: 0,
+          tempo: 1,
+          transpose: 12,
+          getSamples: () => raw,
+        },
+      ],
+      10,
+    );
+    expect(source.transposeAt(1)).toBe(0);
+    expect(source.transposeAt(2)).toBe(12);
+    expect(source.transposeAt(5.5)).toBe(12);
+    expect(source.transposeAt(6)).toBe(0);
+    expect(createPlainSource(raw).transposeAt(2)).toBe(0);
+  });
+
   it('starts a cut piece at its raw offset and keeps neighbours apart', () => {
     const slow = ramp(8, 100);
     const fast = ramp(4, 200);
@@ -57,6 +80,7 @@ describe('spectrogram source', () => {
           songEndFrame: 2,
           rawStartFrame: 4,
           tempo: 0.5,
+          transpose: 0,
           getSamples: () => slow,
         },
         {
@@ -64,6 +88,7 @@ describe('spectrogram source', () => {
           songEndFrame: 6,
           rawStartFrame: 0,
           tempo: 2,
+          transpose: 0,
           getSamples: () => fast,
         },
       ],

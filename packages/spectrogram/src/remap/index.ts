@@ -5,6 +5,7 @@ import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 16;
 const storageBuffersPerSpectrum = 2;
+const columnScaleStorageBuffers = 1;
 
 export type SpectrogramRemap = {
   dispatch: (
@@ -17,7 +18,9 @@ export const createSpectrogramRemapCell = (
   device: GPUDevice,
 ): ResourceCell<StateArg, SpectrogramRemap> => {
   const maxSpectrumCount = Math.floor(
-    device.limits.maxStorageBuffersPerShaderStage / storageBuffersPerSpectrum,
+    (device.limits.maxStorageBuffersPerShaderStage -
+      columnScaleStorageBuffers) /
+      storageBuffersPerSpectrum,
   );
   const pipelineCell = createResourceCell({
     create: (spectrumCount: number) => createPipeline(device, spectrumCount),
@@ -31,7 +34,8 @@ export const createSpectrogramRemapCell = (
       if (arg.spectra.length > maxSpectrumCount) {
         throw new Error(
           `Spectrogram spectralBands count ${arg.spectra.length} requires ${
-            arg.spectra.length * storageBuffersPerSpectrum
+            arg.spectra.length * storageBuffersPerSpectrum +
+            columnScaleStorageBuffers
           } storage buffers, but this GPU supports ${
             device.limits.maxStorageBuffersPerShaderStage
           } per shader stage.`,

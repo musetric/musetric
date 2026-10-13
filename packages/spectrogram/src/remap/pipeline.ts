@@ -27,6 +27,7 @@ export const createPipeline = (device: GPUDevice, spectrumCount: number) => {
         buffer: { type: 'uniform', hasDynamicOffset: true },
       },
       ...spectrumEntries,
+      ...computeBufferEntries(['read-only-storage'], 2 + spectrumCount * 2),
     ],
   });
   const layout = device.createPipelineLayout({

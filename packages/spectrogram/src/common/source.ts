@@ -22,6 +22,7 @@ export type SpectrogramSource = {
   stretch: number;
   reach: number;
   position: (songFrame: number) => number;
+  transposeAt: (songFrame: number) => number;
   read: (
     target: Float32Array,
     targetOffset: number,
@@ -39,6 +40,7 @@ export const createPlainSource = (
   stretch: 1,
   reach: 1,
   position: (songFrame) => songFrame,
+  transposeAt: () => 0,
   read: (target, targetOffset, from, count) => {
     target.fill(0, targetOffset, targetOffset + count);
     copyRange({
@@ -75,6 +77,7 @@ export type SpectrogramSourcePiece = {
   songEndFrame: number;
   rawStartFrame: number;
   tempo: number;
+  transpose: number;
   getSamples: () => Float32Array;
 };
 
@@ -185,6 +188,14 @@ export const createMappedSource = (
       const raw =
         piece.rawStartFrame + (songFrame - piece.songStartFrame) / piece.tempo;
       return region.sourceStart + raw - region.rawStart;
+    },
+    transposeAt: (songFrame) => {
+      if (regions.length === 0) {
+        return 0;
+      }
+      const region =
+        regions[findRegion(regions, songFrame, (item) => item.songStart)];
+      return region.piece?.transpose ?? 0;
     },
     read: (target, targetOffset, from, count) => {
       target.fill(0, targetOffset, targetOffset + count);

@@ -42,6 +42,8 @@ export const recordingPieceSchema = z.object({
   songStartFrame: z.number(),
   frameCount: z.number(),
   tempo: z.number(),
+  transpose: z.number(),
+  octave: z.number(),
 });
 
 export namespace masterContent {

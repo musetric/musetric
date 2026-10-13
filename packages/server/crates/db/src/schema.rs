@@ -168,6 +168,8 @@ const CREATE_RECORDING_PIECE: &str = "
     songStartFrame INTEGER NOT NULL,
     frameCount INTEGER NOT NULL,
     tempo REAL NOT NULL,
+    transpose INTEGER NOT NULL,
+    octave INTEGER NOT NULL,
     FOREIGN KEY (recordingId) REFERENCES Recording(id) ON DELETE CASCADE
   );
 ";

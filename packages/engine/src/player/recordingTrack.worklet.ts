@@ -20,6 +20,8 @@ import { createVoice } from './voice.worklet.js';
 const toPiece = (piece: PlayerRecordingPiece): RecordingPiece => ({
   songStartFrame: piece.songStartFrame,
   tempo: piece.tempo,
+  transpose: piece.transpose,
+  octave: piece.octave,
   frameCount: piece.samples.length,
   samples: piece.samples,
 });
@@ -33,6 +35,8 @@ export type RecordingMix = {
   songFrame: number;
   tempoRatio: number;
   transposeSemitones: number;
+  voiceOctave: number;
+  voiceShifted: boolean;
   volume: number;
 };
 
@@ -60,7 +64,7 @@ export const createRecordingTrack = async (
   const appendToLive = (take: LiveTake, chunk: LiveTakeChunk) => {
     let run = take.runs.at(-1);
     if (!continuesRun(run, chunk)) {
-      run = createLiveRun(chunk, take.tempo);
+      run = createLiveRun(chunk, take.tempo, take.transpose, take.octave);
       take.runs.push(run);
     }
     const { piece } = run;
@@ -115,6 +119,8 @@ export const createRecordingTrack = async (
         songFrame: mix.songFrame,
         tempoRatio: mix.tempoRatio,
         transposeSemitones: mix.transposeSemitones,
+        voiceOctave: mix.voiceOctave,
+        voiceShifted: mix.voiceShifted,
       });
       if (!written) {
         return;

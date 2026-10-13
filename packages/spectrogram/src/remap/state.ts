@@ -21,7 +21,7 @@ export type StateArg = {
   texture: GPUTextureView;
   config: SpectrogramConfig;
   gainDb: number;
-  frequencyScale: number;
+  columnScale: GPUBuffer;
 };
 
 export type State = {
@@ -50,6 +50,7 @@ export const createStateCell = (
     spectra: SpectrogramBandSpectrum[];
     texture: GPUTextureView;
     params: StateParams;
+    columnScale: GPUBuffer;
     bindGroupLayout: GPUBindGroupLayout;
   };
   const bindGroupCell = createResourceCell({
@@ -76,6 +77,10 @@ export const createStateCell = (
               resource: { buffer: spectrum.columnEnergyBuffer },
             },
           ]),
+          {
+            binding: 2 + arg.spectra.length * 2,
+            resource: { buffer: arg.columnScale },
+          },
         ],
       }),
     dispose: () => undefined,
@@ -83,23 +88,19 @@ export const createStateCell = (
       current.bindGroupLayout === next.bindGroupLayout &&
       current.texture === next.texture &&
       current.params === next.params &&
+      current.columnScale === next.columnScale &&
       areSpectraBuffersEqual(current.spectra, next.spectra),
   });
 
   return {
     get: (arg) => {
-      const { spectra, texture, config, gainDb, frequencyScale, pipelines } =
-        arg;
-      const params = paramsCell.get({
-        config,
-        gainDb,
-        frequencyScale,
-        spectra,
-      });
+      const { spectra, texture, config, gainDb, columnScale, pipelines } = arg;
+      const params = paramsCell.get({ config, gainDb, spectra });
       const bindGroup = bindGroupCell.get({
         spectra,
         texture,
         params,
+        columnScale,
         bindGroupLayout: pipelines.bindGroupLayout,
       });
 

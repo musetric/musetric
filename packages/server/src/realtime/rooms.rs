@@ -67,6 +67,8 @@ pub(crate) struct RoomTake {
     pub(crate) session_id: String,
     pub(crate) recording_id: i64,
     pub(crate) tempo: f64,
+    pub(crate) transpose: i64,
+    pub(crate) octave: i64,
 }
 
 struct Room {
@@ -202,8 +204,7 @@ impl Rooms {
                 room.send_to(member, &player.sync_state());
             }
             if let Some(take) = room.take.as_ref().filter(|take| take.owner != member) {
-                let started =
-                    events::recording_started(&take.session_id, take.recording_id, take.tempo);
+                let started = events::recording_started(take);
                 room.send_to(member, &started);
             }
         });

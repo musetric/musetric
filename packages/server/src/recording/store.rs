@@ -29,6 +29,8 @@ pub(crate) struct TakeFormat {
     pub(crate) sample_rate: i64,
     pub(crate) frame_count: i64,
     pub(crate) tempo: f64,
+    pub(crate) transpose: i64,
+    pub(crate) octave: i64,
 }
 
 pub(crate) struct TakeRun {
@@ -478,6 +480,8 @@ async fn assemble_take(
             song_start_frame: plan.song_start_frame,
             frame_count: plan.frame_count,
             tempo: plan.tempo,
+            transpose: plan.transpose,
+            octave: plan.octave,
         });
         blobs.push(blob);
     }
@@ -530,6 +534,8 @@ pub(crate) async fn commit_take(
             song_start_frame: plan.song_start_frame,
             frame_count: plan.frame_count,
             tempo: plan.tempo,
+            transpose: plan.transpose,
+            octave: plan.octave,
         });
     }
     let (take_blobs, take_pieces) = assemble_take(storage, take, sample_rate).await?;
@@ -585,6 +591,8 @@ mod tests {
             song_start_frame,
             frame_count,
             tempo,
+            transpose: 0,
+            octave: 0,
         }
     }
 
@@ -637,6 +645,8 @@ mod tests {
             song_start_frame: 0,
             frame_count: 6,
             tempo: 1.0,
+            transpose: 0,
+            octave: 0,
         };
         let fresh = RecordingPiece {
             blob_id: "fresh".to_owned(),
@@ -644,6 +654,8 @@ mod tests {
             song_start_frame: 2,
             frame_count: 2,
             tempo: 1.0,
+            transpose: 0,
+            octave: 0,
         };
         let mut pcm = PcmCache::new();
         pcm.insert("base".to_owned(), vec![1; 6]);
@@ -661,6 +673,8 @@ mod tests {
             song_start_frame: 1,
             frame_count: 4,
             tempo: 0.5,
+            transpose: 0,
+            octave: 0,
         };
         let mut pcm = PcmCache::new();
         pcm.insert("slow".to_owned(), vec![1, 2, 3, 4]);

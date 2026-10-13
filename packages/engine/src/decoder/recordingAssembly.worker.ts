@@ -5,7 +5,11 @@ import {
   getRecordingPieces,
 } from '../audioRequest/audioRequest.worker.js';
 import { type PlayerRecordingPiece } from '../player/protocol.cross.js';
-import { isUnitTempo, type TakeStretch } from './takeStretch.worker.js';
+import {
+  isOriginalKey,
+  isUnitTempo,
+  type TakeStretch,
+} from './takeStretch.worker.js';
 
 export const copyPieces = (
   pieces: readonly PlayerRecordingPiece[],
@@ -23,9 +27,10 @@ export const renderPieces = (
     if (start >= frameCount) {
       continue;
     }
-    const rendered = isUnitTempo(piece.tempo)
-      ? piece.samples
-      : stretch.render(piece.samples, piece.tempo);
+    const rendered =
+      isUnitTempo(piece.tempo) && isOriginalKey(piece.transpose)
+        ? piece.samples
+        : stretch.render(piece.samples, piece.tempo, piece.transpose);
     samples.set(rendered.subarray(0, frameCount - start), start);
   }
   return samples;
@@ -39,6 +44,8 @@ const isMissing = (error: unknown): boolean =>
 type LoadedPiece = {
   songStartFrame: number;
   tempo: number;
+  transpose: number;
+  octave: number;
   blobId: string;
   samples: Float32Array<ArrayBuffer> | undefined;
 };
@@ -85,6 +92,8 @@ export const createRecordingAssembly = (
       pieces.map(async (piece) => ({
         songStartFrame: (piece.songStartFrame * sampleRate) / piece.sampleRate,
         tempo: piece.tempo,
+        transpose: piece.transpose,
+        octave: piece.octave,
         blobId: piece.blobId,
         samples: await decode(projectId, recordingId, piece.blobId),
       })),
@@ -108,6 +117,8 @@ export const createRecordingAssembly = (
       return present.map((piece) => ({
         songStartFrame: piece.songStartFrame,
         tempo: piece.tempo,
+        transpose: piece.transpose,
+        octave: piece.octave,
         samples: piece.samples,
       }));
     },

@@ -42,6 +42,7 @@ const take = (spec: TakeSpec): SpectrogramSourcePiece => {
     songEndFrame: songStartFrame + spec.raw.length * spec.tempo,
     rawStartFrame: 0,
     tempo: spec.tempo,
+    transpose: 0,
     getSamples: () => spec.raw,
   };
 };

@@ -273,6 +273,8 @@ async fn send_recording_pieces(
                 "songStartFrame": piece.song_start_frame,
                 "frameCount": piece.frame_count,
                 "tempo": piece.tempo,
+                "transpose": piece.transpose,
+                "octave": piece.octave,
             })
         })
         .collect();

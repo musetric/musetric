@@ -57,13 +57,22 @@ export const createPlayerRuntime = async (
   let outputOffsetFrameIndex = 0;
   let tempoRatio = 1;
   let transposeSemitones = 0;
-  let leadTransposeSemitones = 0;
+  let voiceOctave = 0;
+  let voiceShifted = false;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   const leadVoice = await createLeadVoice(sampleRate);
   const recordingTrack = await createRecordingTrack(sampleRate);
+
+  const getVoiceShiftSemitones = () => (voiceShifted ? 12 * voiceOctave : 0);
+
+  const applyLeadTranspose = () => {
+    leadVoice.setTransposeSemitones(
+      transposeSemitones + getVoiceShiftSemitones(),
+    );
+  };
 
   const resetTimePitch = () => {
     timePitchProcessor.reset();
@@ -220,10 +229,12 @@ export const createPlayerRuntime = async (
     setTransposeSemitones: (message) => {
       transposeSemitones = message.transposeSemitones;
       timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
+      applyLeadTranspose();
     },
-    setLeadTransposeSemitones: (message) => {
-      leadTransposeSemitones = message.transposeSemitones;
-      leadVoice.setTransposeSemitones(message.transposeSemitones);
+    setVoiceOctave: (message) => {
+      voiceOctave = message.voiceOctave;
+      voiceShifted = message.shifted;
+      applyLeadTranspose();
     },
     setTempoRatio: (message) => {
       tempoRatio = message.tempoRatio;
@@ -264,7 +275,7 @@ export const createPlayerRuntime = async (
       const currentTracks = tracks;
       const outputFrameCount = outputs[0].length;
       const currentOutputFrameIndex = getCurrentOutputFrameIndex();
-      const leadApart = leadTransposeSemitones !== transposeSemitones;
+      const leadApart = getVoiceShiftSemitones() !== 0;
       const processedFrameCount = timePitchProcessor.process(
         outputs,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
@@ -302,6 +313,8 @@ export const createPlayerRuntime = async (
           songFrame: currentOutputFrameIndex,
           tempoRatio,
           transposeSemitones,
+          voiceOctave,
+          voiceShifted,
           volume: recordingVolume,
         });
       }

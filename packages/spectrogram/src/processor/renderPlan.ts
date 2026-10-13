@@ -14,7 +14,6 @@ import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidation
 import { type SpectrogramSource } from '../common/source.js';
 import {
   allTrackKeys,
-  getLaneFrequencyScale,
   isFundamentalNeeded,
   mapTrackKeys,
   type SpectrogramConfig,
@@ -264,6 +263,13 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
       continue;
     }
     const { lane } = runtime.tracks[key];
+    if (hasVisibleWork(trackWork)) {
+      lane.writeColumnScales({
+        source: trackSamples,
+        baseColumn: plan.baseColumn,
+        transposeSemitones: runtime.config.lanes[key].transposeSemitones,
+      });
+    }
     if (plan.ranges.length > 0 && trackWork.spectrogram) {
       lane.writeSamples({
         source: trackSamples,
@@ -280,7 +286,6 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
         projection: { baseColumn: plan.baseColumn, baseSlot: plan.baseSlot },
         trackProgress,
         truncated: runtime.config.lanes[key].truncateAfterPlayhead,
-        frequencyScale: getLaneFrequencyScale(runtime.config.lanes[key]),
         invalidations: plan.invalidations,
       });
     }
