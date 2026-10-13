@@ -1,4 +1,5 @@
-import { Box, Slider, Stack, Typography } from '@mui/material';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { Box, Button, Slider, Stack, Typography } from '@mui/material';
 import { type FC, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +26,7 @@ export type ScaleSliderProps = {
   labels: ScaleSliderLabel[];
   disabled: boolean;
   onChange: (value: number) => void;
+  onReset?: () => void;
 };
 
 export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
@@ -44,6 +46,7 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
     labels,
     disabled,
     onChange,
+    onReset,
   } = props;
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,16 +62,30 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
       <Stack
         direction='row'
         justifyContent='space-between'
-        alignItems='baseline'
+        alignItems='center'
         gap={2}
       >
-        <Typography fontSize={15} fontWeight={700}>
-          {title}
-        </Typography>
-        {caption !== undefined && (
-          <Typography fontSize={12} color='text.secondary'>
-            {caption}
+        <Stack direction='row' alignItems='baseline' gap={2}>
+          <Typography fontSize={15} fontWeight={700}>
+            {title}
           </Typography>
+          {caption !== undefined && (
+            <Typography fontSize={12} color='text.secondary'>
+              {caption}
+            </Typography>
+          )}
+        </Stack>
+        {onReset !== undefined && (
+          <Button
+            size='small'
+            color='primary'
+            disabled={disabled}
+            startIcon={<RestartAltIcon fontSize='small' />}
+            onClick={onReset}
+            sx={{ my: -1, fontSize: 14 }}
+          >
+            {t('pages.project.player.controls.reset')}
+          </Button>
         )}
       </Stack>
       <Stack alignItems='center' gap={1}>

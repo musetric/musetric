@@ -69,6 +69,7 @@
   "pages.project.player.controls.play": "Play",
   "pages.project.player.controls.record": "Record into “{{name}}”",
   "pages.project.player.controls.redoTake": "Redo the last take in “{{name}}”",
+  "pages.project.player.controls.reset": "Reset",
   "pages.project.player.controls.semitoneUnit": "st",
   "pages.project.player.controls.singerVoice": "Singer's voice",
   "pages.project.player.controls.singerVoiceOriginal": "Original octave",
