@@ -79,6 +79,9 @@ opt-level = 3
 [profile.dev.package.sha2]
 opt-level = 3
 
+[profile.dev.package.rusty_mp3]
+opt-level = 3
+
 [lints]
 workspace = true
 
