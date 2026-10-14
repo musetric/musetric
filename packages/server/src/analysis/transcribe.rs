@@ -1,6 +1,6 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, path::Path, pin::Pin, sync::Arc};
 
-use musetric_db::{Analysis, PendingJob, blob_path};
+use musetric_db::{Analysis, MasterType, PendingJob, blob_path};
 use musetric_gpu::{
     ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, JobTicket, PhaseSink,
     UnitSession,
@@ -35,6 +35,7 @@ const LABEL: &str = "Headless transcription";
 const API_NAME: &str = "musetricAiTranscribeAudio";
 const OUTPUT: &str = "result";
 const DSP_VERSION: &str = "transcription-dsp-v2";
+const BACKING_WEIGHT: f32 = 0.5;
 const PASS_DECODE: &str = "decode";
 const PASS_REPAIR: &str = "repair";
 const ANSWERED_EARLY: &str = "the analysis job answered before the close";
@@ -57,24 +58,58 @@ async fn transcribe(
 ) -> Result<(), Failure> {
     ensure_files(context, report, &WHISPER.cached(&context.models_path)).await?;
     require_executor(context)?;
-    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let mut decoded = decode_reporter(report, count_frames(&source, WHISPER.sample_rate).await?);
-    let pcm = decode_mono_pcm(MonoRequest {
-        source: context.storage.pcm.as_ref(),
-        request: PcmRequest {
-            from: &source,
-            sample_rate: WHISPER.sample_rate,
-        },
-        downmix: WHISPER.downmix,
-        decoded: &mut decoded,
-    })
-    .await?;
-    let samples = decode_samples(&pcm);
+    let samples = read_voice(context, job, report).await?;
     let duration = sample_duration(samples.len(), WHISPER.sample_rate);
     let result = drive(context, job, report, samples).await?;
     check_result(Analysis::Subtitle, &result, duration)?;
     (report)(StepPhase::Saving);
     store(context, job, Analysis::Subtitle, &result).await
+}
+
+async fn read_voice(
+    context: &AnalysisContext,
+    job: &PendingJob,
+    report: &StepReport,
+) -> Result<Vec<f32>, Failure> {
+    let lead = blob_path(&context.storage.blobs_path, &job.blob_id);
+    let project_id = job.project_id;
+    let backing = read_database(&context.storage, move |reader| {
+        reader.master_blob(project_id, MasterType::Backing)
+    })
+    .await?
+    .map(|blob_id| blob_path(&context.storage.blobs_path, &blob_id));
+    let lead_frames = count_frames(&lead, WHISPER.sample_rate).await?;
+    let backing_frames = match &backing {
+        Some(path) => count_frames(path, WHISPER.sample_rate).await?,
+        None => 0,
+    };
+    let mut decoded = decode_reporter(report, lead_frames + backing_frames);
+    let mut samples = decode_samples(&decode_voice(context, &lead, &mut decoded).await?);
+    if let Some(path) = backing {
+        let mut after_lead = |frames: u64| decoded(lead_frames + frames);
+        let backing_samples = decode_samples(&decode_voice(context, &path, &mut after_lead).await?);
+        for (sample, added) in samples.iter_mut().zip(backing_samples) {
+            *sample += BACKING_WEIGHT * added;
+        }
+    }
+    Ok(samples)
+}
+
+async fn decode_voice(
+    context: &AnalysisContext,
+    from: &Path,
+    decoded: &mut (dyn FnMut(u64) + Send),
+) -> Result<Vec<u8>, Failure> {
+    Ok(decode_mono_pcm(MonoRequest {
+        source: context.storage.pcm.as_ref(),
+        request: PcmRequest {
+            from,
+            sample_rate: WHISPER.sample_rate,
+        },
+        downmix: WHISPER.downmix,
+        decoded,
+    })
+    .await?)
 }
 
 fn decode_samples(pcm: &[u8]) -> Vec<f32> {

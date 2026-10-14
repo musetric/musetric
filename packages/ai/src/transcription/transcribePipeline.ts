@@ -8,8 +8,13 @@ import {
   type Mapping,
   remapSegmentsToOriginal,
 } from './audioCompaction.js';
+import { dropBunchedWords } from './bunchedWords.js';
 import { repairCollapsedWindows } from './collapseRepair.js';
-import { filterHallucinatedSegments } from './hallucinationFilter.js';
+import {
+  dropCreditWords,
+  filterHallucinatedSegments,
+  filterSignOffSegments,
+} from './hallucinationFilter.js';
 import { splitSegmentsByLyrics } from './lyricSplitter.js';
 import { buildPayloadSegments } from './responseBuilder.js';
 import { filterSilentSegments } from './silenceFilter.js';
@@ -19,6 +24,8 @@ import {
   type TranscriptionSegment,
   type TranscriptionWord,
 } from './types.js';
+import { joinWordPieces } from './wordPieces.js';
+import { leadWordTimes } from './wordTiming.js';
 
 const defaultSegmentGapSeconds = 1.0;
 
@@ -56,6 +63,9 @@ export const groupWordsIntoSegments = (
   return segments;
 };
 
+const cleanWords = (words: TranscriptionWord[]): TranscriptionWord[] =>
+  dropCreditWords(joinWordPieces(dropBunchedWords(words)));
+
 const shiftWords = (
   words: TranscriptionWord[],
   offset: number,
@@ -66,6 +76,16 @@ const shiftWords = (
     end: word.end + offset,
   }));
 
+const rms = (audio: Float32Array): number => {
+  let sum = 0;
+  for (const value of audio) {
+    sum += value * value;
+  }
+  return audio.length > 0 ? Math.sqrt(sum / audio.length) : 0;
+};
+
+const languageWindows = 3;
+
 export type DetectLanguage = (audio: Float32Array) => Promise<string>;
 
 const resolveLanguage = async (
@@ -73,15 +93,20 @@ const resolveLanguage = async (
   chunks: Chunk[],
   detectLanguage: DetectLanguage,
 ): Promise<string> => {
-  const sampleCount = Math.min(3, chunks.length);
+  const loudest = chunks
+    .map((chunk) =>
+      compacted.subarray(
+        Math.round(chunk.start * sampleRate),
+        Math.round(chunk.end * sampleRate),
+      ),
+    )
+    .map((slice) => ({ slice, level: rms(slice) }))
+    .sort((a, b) => b.level - a.level)
+    .slice(0, languageWindows);
+  const sampleCount = loudest.length;
   const votes = new Map<string, number>();
   let leader = '';
-  for (let i = 0; i < sampleCount; i++) {
-    const chunk = chunks[Math.floor((i * chunks.length) / sampleCount)];
-    const slice = compacted.subarray(
-      Math.round(chunk.start * sampleRate),
-      Math.round(chunk.end * sampleRate),
-    );
+  for (const { slice } of loudest) {
     const language = await detectLanguage(slice);
     votes.set(language, (votes.get(language) ?? 0) + 1);
     if ((votes.get(language) ?? 0) > sampleCount / 2) {
@@ -219,9 +244,10 @@ export const finalizePass = (
     options.replaced.map((entry) => [entry.index, entry.words]),
   );
   const words = layout.chunks
-    .flatMap(
-      (chunk, index) =>
+    .flatMap((chunk, index) =>
+      cleanWords(
         repairs.get(index) ?? shiftWords(options.words[index], chunk.start),
+      ),
     )
     .sort((a, b) => a.start - b.start);
   let segments = groupWordsIntoSegments(words, defaultSegmentGapSeconds);
@@ -229,5 +255,7 @@ export const finalizePass = (
   segments = filterHallucinatedSegments(segments);
   segments = remapSegmentsToOriginal(segments, layout.mapping);
   segments = splitSegmentsByLyrics(segments);
+  segments = filterSignOffSegments(segments);
+  segments = leadWordTimes(segments);
   return buildPayloadSegments(segments);
 };
