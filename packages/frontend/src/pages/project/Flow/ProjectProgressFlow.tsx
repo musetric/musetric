@@ -24,10 +24,10 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
       heading={
         <>
           <ProjectHomeButton />
-          <Typography variant='h6' noWrap flexGrow={1}>
+          <Typography variant='h6' noWrap sx={{ flexGrow: 1 }}>
             {project.name}
           </Typography>
-          <Stack direction='row' alignItems='center' gap={1}>
+          <Stack direction='row' sx={{ alignItems: 'center', gap: 1 }}>
             <FlowPause projectId={project.id} paused={project.paused} />
             <ProcessingPause />
           </Stack>
@@ -35,35 +35,39 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
       }
     >
       <Box
-        width='100%'
-        display='flex'
-        justifyContent='center'
-        flex={1}
-        overflow='auto'
+        sx={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          flex: 1,
+          overflow: 'auto',
+        }}
       >
-        <Stack width='100%' maxWidth='34rem' gap={6} my='auto'>
-          <Stack gap={1}>
+        <Stack sx={{ width: '100%', maxWidth: '34rem', gap: 6, my: 'auto' }}>
+          <Stack sx={{ gap: 1 }}>
             <Stack
               direction='row'
-              justifyContent='space-between'
-              alignItems='baseline'
-              gap={3}
+              sx={{
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: 3,
+              }}
             >
               <Typography variant='h5'>
                 {t('pages.project.progress.trackTitle')}
               </Typography>
-              <Typography variant='subtitle1' color='text.secondary'>
+              <Typography variant='subtitle1' sx={{ color: 'text.secondary' }}>
                 {t('pages.processing.steps', {
                   done: doneCount(project),
                   total: stepOrder.length,
                 })}
               </Typography>
             </Stack>
-            <Typography variant='caption' color='text.secondary'>
+            <Typography variant='caption' sx={{ color: 'text.secondary' }}>
               {t('pages.project.progress.background')}
             </Typography>
           </Stack>
-          <Stack gap={3}>
+          <Stack sx={{ gap: 3 }}>
             <FlowStep
               projectId={project.id}
               stepName='separation'
@@ -107,12 +111,12 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
               step={project.processing.steps.voiceRange}
             />
           </Stack>
-          <Stack direction='row' gap={2} alignItems='center'>
+          <Stack direction='row' sx={{ gap: 2, alignItems: 'center' }}>
             <MemoryOutlinedIcon
               fontSize='small'
               sx={{ color: 'text.disabled' }}
             />
-            <Typography variant='caption' color='text.disabled'>
+            <Typography variant='caption' sx={{ color: 'text.disabled' }}>
               {t('pages.project.progress.local')}
             </Typography>
           </Stack>

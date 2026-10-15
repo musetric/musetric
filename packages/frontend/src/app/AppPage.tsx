@@ -14,14 +14,18 @@ export const AppPage: FC<PropsWithChildren> = (props) => {
   return (
     <Stack
       direction='column'
-      gap={4}
-      width='100%'
-      height='100dvh'
-      overflow='auto'
-      sx={(theme) => ({
-        scrollbarGutter: 'stable',
-        ...safeAreaPadding(theme, 4),
-      })}
+      sx={[
+        {
+          gap: 4,
+          width: '100%',
+          height: '100dvh',
+          overflow: 'auto',
+        },
+        (theme) => ({
+          scrollbarGutter: 'stable',
+          ...safeAreaPadding(theme, 4),
+        }),
+      ]}
     >
       {props.children}
     </Stack>

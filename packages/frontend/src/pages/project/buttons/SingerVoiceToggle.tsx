@@ -29,8 +29,8 @@ export const SingerVoiceToggle: FC = () => {
   ];
 
   return (
-    <Stack gap={1}>
-      <Typography fontSize={15} fontWeight={700}>
+    <Stack sx={{ gap: 1 }}>
+      <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
         {t('pages.project.player.controls.singerVoice')}
       </Typography>
       <RadioGroup
@@ -58,10 +58,10 @@ export const SingerVoiceToggle: FC = () => {
             }
             label={
               <Stack>
-                <Typography fontSize={14} fontWeight={600}>
+                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
                   {option.label}
                 </Typography>
-                <Typography fontSize={12} color='text.secondary'>
+                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                   {option.caption}
                 </Typography>
               </Stack>

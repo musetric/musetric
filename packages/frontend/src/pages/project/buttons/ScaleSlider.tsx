@@ -58,19 +58,17 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
   }, []);
 
   return (
-    <Stack gap={3.5}>
+    <Stack sx={{ gap: 3.5 }}>
       <Stack
         direction='row'
-        justifyContent='space-between'
-        alignItems='center'
-        gap={2}
+        sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 2 }}
       >
-        <Stack direction='row' alignItems='baseline' gap={2}>
-          <Typography fontSize={15} fontWeight={700}>
+        <Stack direction='row' sx={{ alignItems: 'baseline', gap: 2 }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
             {title}
           </Typography>
           {caption !== undefined && (
-            <Typography fontSize={12} color='text.secondary'>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
               {caption}
             </Typography>
           )}
@@ -88,25 +86,27 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
           </Button>
         )}
       </Stack>
-      <Stack alignItems='center' gap={1}>
-        <Stack direction='row' alignItems='baseline' gap={1}>
+      <Stack sx={{ alignItems: 'center', gap: 1 }}>
+        <Stack direction='row' sx={{ alignItems: 'baseline', gap: 1 }}>
           <Typography
-            fontSize={32}
-            fontWeight={700}
-            lineHeight={1}
-            color={changed ? 'primary' : 'text.primary'}
+            color={changed ? 'primary' : 'textPrimary'}
+            sx={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}
           >
             {valueText}
           </Typography>
-          <Typography fontSize={14} fontWeight={600} color='text.secondary'>
+          <Typography
+            sx={{ fontSize: 14, fontWeight: 600, color: 'text.secondary' }}
+          >
             {unit}
           </Typography>
         </Stack>
-        <Typography fontSize={13} lineHeight='16px' color='text.secondary'>
+        <Typography
+          sx={{ fontSize: 13, lineHeight: '16px', color: 'text.secondary' }}
+        >
           {info ?? blank}
         </Typography>
       </Stack>
-      <Stack gap={1}>
+      <Stack sx={{ gap: 1 }}>
         <Slider
           aria-label={title}
           getAriaValueText={() =>
@@ -137,7 +137,7 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             '@media (any-pointer: coarse)': { py: '20px' },
           }}
         />
-        <Box position='relative' height={14}>
+        <Box sx={{ position: 'relative', height: 14 }}>
           {Array.from({ length: max - min + 1 }, (_, index) => {
             const tick = min + index;
             const fromOriginal = tick - original;
@@ -172,15 +172,15 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             );
           })}
         </Box>
-        <Box position='relative' height={30}>
+        <Box sx={{ position: 'relative', height: 30 }}>
           {labels.map((label) => (
             <Typography
               key={label.value}
-              fontSize={11}
-              lineHeight='14px'
-              color='text.secondary'
               noWrap
               sx={{
+                fontSize: 11,
+                lineHeight: '14px',
+                color: 'text.secondary',
                 position: 'absolute',
                 top: 0,
                 left: getLeft(label.value),
@@ -191,8 +191,8 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             </Typography>
           ))}
           <Stack
-            alignItems='center'
             sx={{
+              alignItems: 'center',
               position: 'absolute',
               top: 0,
               left: getLeft(original),
@@ -200,18 +200,14 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             }}
           >
             <Typography
-              fontSize={11}
-              lineHeight='14px'
-              color='text.secondary'
               noWrap
+              sx={{ fontSize: 11, lineHeight: '14px', color: 'text.secondary' }}
             >
               {t('pages.project.player.controls.original')}
             </Typography>
             <Typography
-              fontSize={12}
-              lineHeight='16px'
-              color='text.primary'
               noWrap
+              sx={{ fontSize: 12, lineHeight: '16px', color: 'text.primary' }}
             >
               {changed && originalInfo !== undefined ? originalInfo : blank}
             </Typography>

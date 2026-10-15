@@ -28,7 +28,7 @@ const phoneRowSx = (theme: Theme) => ({
 });
 
 export const PlaybackPanel: FC = () => (
-  <Stack width='100%'>
+  <Stack sx={{ width: '100%' }}>
     <PlayerProgress />
     <Box
       sx={(theme) => ({
@@ -46,30 +46,30 @@ export const PlaybackPanel: FC = () => (
       })}
     >
       <Box sx={phoneRowSx}>
-        <Box gridArea='details'>
+        <Box sx={{ gridArea: 'details' }}>
           <DetailsViewToggle />
         </Box>
-        <Box gridArea='history'>
+        <Box sx={{ gridArea: 'history' }}>
           <RecordingHistoryButtons />
         </Box>
-        <Box gridArea='spectrogram'>
+        <Box sx={{ gridArea: 'spectrogram' }}>
           <SpectrogramViewToggle />
         </Box>
       </Box>
       <Box sx={phoneRowSx}>
-        <Box gridArea='click'>
+        <Box sx={{ gridArea: 'click' }}>
           <MetronomeToggleButton />
         </Box>
-        <Box gridArea='mix'>
+        <Box sx={{ gridArea: 'mix' }}>
           <MixButton />
         </Box>
-        <Box gridArea='transport'>
+        <Box sx={{ gridArea: 'transport' }}>
           <PlaybackControlsButton />
         </Box>
-        <Box gridArea='key'>
+        <Box sx={{ gridArea: 'key' }}>
           <TransposeButton />
         </Box>
-        <Box gridArea='tempo'>
+        <Box sx={{ gridArea: 'tempo' }}>
           <TempoButton />
         </Box>
       </Box>

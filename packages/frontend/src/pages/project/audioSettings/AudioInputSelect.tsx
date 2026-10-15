@@ -63,7 +63,11 @@ export const AudioInputSelect: FC = () => {
             return t('pages.project.audioSettings.inputPlaceholder');
           }
           return (
-            <Stack direction='row' alignItems='center' gap={1} component='span'>
+            <Stack
+              direction='row'
+              component='span'
+              sx={{ alignItems: 'center', gap: 1 }}
+            >
               {inputIconByKind[classifyAudioInputDevice(device)]}
               <span>
                 {device.label ||

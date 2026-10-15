@@ -90,7 +90,7 @@ export const CreateDialog: FC = () => {
     >
       <DialogTitle>{t('pages.projects.dialogs.create.title')}</DialogTitle>
       <DialogContent>
-        <Stack gap={4} pt={1}>
+        <Stack sx={{ gap: 4, pt: 1 }}>
           {!song && (
             <Controller
               name='song'
@@ -155,17 +155,17 @@ export const CreateDialog: FC = () => {
                   {t('pages.projects.fields.preview.add')}
                 </Button>
               )}
-              <Stack direction='row' gap={2} alignItems='center'>
+              <Stack direction='row' sx={{ gap: 2, alignItems: 'center' }}>
                 <MemoryOutlinedIcon
                   fontSize='small'
                   sx={{ color: 'text.disabled' }}
                 />
-                <Typography variant='caption' color='text.secondary'>
+                <Typography variant='caption' sx={{ color: 'text.secondary' }}>
                   {t('pages.projects.dialogs.create.localNotice')}
                 </Typography>
               </Stack>
               {missingBytes > 0 && (
-                <Typography variant='caption' color='text.secondary'>
+                <Typography variant='caption' sx={{ color: 'text.secondary' }}>
                   {t('pages.projects.dialogs.create.models', {
                     size: (missingBytes / 1e9).toFixed(1),
                   })}

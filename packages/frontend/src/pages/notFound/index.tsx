@@ -10,15 +10,26 @@ export const NotFoundPage: FC = () => {
   return (
     <Stack
       direction='column'
-      gap={2}
-      width='100%'
-      height='100dvh'
-      justifyContent='center'
-      alignItems='center'
-      sx={(theme) => safeAreaPadding(theme, 4)}
+      sx={[
+        {
+          gap: 2,
+          width: '100%',
+          height: '100dvh',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        (theme) => safeAreaPadding(theme, 4),
+      ]}
     >
-      <Typography textAlign='center'>{t('pages.notFound.title')}</Typography>
-      <Button variant='contained' size='large' component={routes.home.Link}>
+      <Typography sx={{ textAlign: 'center' }}>
+        {t('pages.notFound.title')}
+      </Typography>
+      <Button
+        variant='contained'
+        size='large'
+        component={routes.home.Link}
+        nativeButton={false}
+      >
         <Typography>{t('pages.notFound.goHome')}</Typography>
       </Button>
     </Stack>

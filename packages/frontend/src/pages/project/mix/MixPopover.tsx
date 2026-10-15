@@ -18,7 +18,7 @@ export const MixPopover: FC = () => {
       anchorOrigin={{ horizontal: 'center', vertical: 'top' }}
       transformOrigin={{ horizontal: 'center', vertical: 'bottom' }}
     >
-      <Stack width={260} p={4} gap={4}>
+      <Stack sx={{ width: 260, p: 4, gap: 4 }}>
         <MixSlider target={{ kind: 'recording' }} />
         {stemTypes.map((stemType) => (
           <MixSlider key={stemType} target={{ kind: 'delivery', stemType }} />

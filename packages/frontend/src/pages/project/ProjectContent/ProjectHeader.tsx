@@ -12,20 +12,14 @@ export const ProjectHeader: FC = () => {
 
   return (
     <Stack
-      gridArea='header'
       direction='row'
-      alignItems='center'
-      gap={1}
-      minWidth={0}
+      sx={{ gridArea: 'header', alignItems: 'center', gap: 1, minWidth: 0 }}
     >
       <ProjectHomeButton />
       <Typography
         variant='subtitle1'
-        lineHeight={1.5}
-        textAlign='center'
         noWrap
-        flexGrow={1}
-        minWidth={0}
+        sx={{ lineHeight: 1.5, textAlign: 'center', flexGrow: 1, minWidth: 0 }}
       >
         {project.data?.name}
       </Typography>

@@ -9,7 +9,7 @@ export const AudioSettingsHeader: FC = () => {
   const setOpen = useProjectStore((state) => state.setAudioSettingsOpen);
 
   return (
-    <Stack direction='row' alignItems='center'>
+    <Stack direction='row' sx={{ alignItems: 'center' }}>
       <Typography variant='h6' sx={{ flexGrow: 1 }}>
         {t('pages.project.audioSettings.title')}
       </Typography>

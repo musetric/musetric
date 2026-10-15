@@ -92,13 +92,7 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
   }, [theme, mode]);
 
   return (
-    <Box
-      height='16px'
-      position='relative'
-      sx={{
-        flexShrink: 0,
-      }}
-    >
+    <Box sx={{ height: '16px', position: 'relative', flexShrink: 0 }}>
       <Box
         component='canvas'
         ref={canvasRef}
@@ -110,13 +104,13 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       />
       <Box
         ref={handleRef}
-        position='absolute'
-        top={0}
-        left={0}
-        width='7px'
-        height='7px'
-        borderRadius='50%'
         sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
           backgroundColor: 'primary.main',
           pointerEvents: 'none',
           willChange: 'transform',

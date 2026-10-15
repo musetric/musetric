@@ -23,9 +23,9 @@ export const MetronomeToggleButton: FC = () => {
           });
         }}
       >
-        <Stack alignItems='center' gap={0.5}>
+        <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
           <MetronomeIcon fontSize='small' />
-          <Typography variant='caption' lineHeight={1} noWrap>
+          <Typography variant='caption' noWrap sx={{ lineHeight: 1 }}>
             {t('pages.project.detailsMode.metronomeCaption')}
           </Typography>
         </Stack>

@@ -59,13 +59,12 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
             });
           }}
         >
-          <Stack alignItems='center' gap={0.5}>
+          <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
             {icon}
             <Typography
               variant='caption'
-              lineHeight={1}
               noWrap
-              textTransform='none'
+              sx={{ lineHeight: 1, textTransform: 'none' }}
             >
               {label}
             </Typography>

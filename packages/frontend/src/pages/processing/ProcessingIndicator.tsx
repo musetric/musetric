@@ -34,6 +34,7 @@ export const ProcessingIndicator: FC = () => {
   return (
     <Button
       component={routes.processing.Link}
+      nativeButton={false}
       variant='text'
       startIcon={paused ? <PauseIcon /> : <PendingIcon />}
     >

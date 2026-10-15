@@ -16,21 +16,18 @@ export const VoiceOctaveToggle: FC = () => {
   ];
 
   return (
-    <Stack gap={2}>
-      <Stack direction='row' alignItems='baseline' gap={2}>
-        <Typography fontSize={15} fontWeight={700}>
+    <Stack sx={{ gap: 2 }}>
+      <Stack direction='row' sx={{ alignItems: 'baseline', gap: 2 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
           {t('pages.project.player.controls.voiceOctave')}
         </Typography>
-        <Typography fontSize={12} color='text.secondary'>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
           {t('pages.project.player.controls.voiceOctaveCaption')}
         </Typography>
       </Stack>
       <Stack
         direction='row'
-        gap={1}
-        p={1}
-        borderRadius='10px'
-        bgcolor='action.hover'
+        sx={{ gap: 1, p: 1, borderRadius: '10px', bgcolor: 'action.hover' }}
       >
         {options.map((option) => (
           <ToggleButton

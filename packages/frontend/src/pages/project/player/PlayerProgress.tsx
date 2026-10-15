@@ -85,13 +85,15 @@ export const PlayerProgress: FC = () => {
   }, []);
 
   return (
-    <Stack direction='row' alignItems='center' gap={2}>
+    <Stack direction='row' sx={{ alignItems: 'center', gap: 2 }}>
       <Typography
         ref={currentTimeRef}
         variant='caption'
-        color='text.secondary'
-        flexShrink={0}
-        sx={{ fontVariantNumeric: 'tabular-nums' }}
+        sx={{
+          color: 'text.secondary',
+          flexShrink: 0,
+          fontVariantNumeric: 'tabular-nums',
+        }}
       >
         {formatDuration(initialProgress * duration)}
       </Typography>
@@ -123,9 +125,11 @@ export const PlayerProgress: FC = () => {
       />
       <Typography
         variant='caption'
-        color='text.secondary'
-        flexShrink={0}
-        sx={{ fontVariantNumeric: 'tabular-nums' }}
+        sx={{
+          color: 'text.secondary',
+          flexShrink: 0,
+          fontVariantNumeric: 'tabular-nums',
+        }}
       >
         {formatDuration(duration)}
       </Typography>

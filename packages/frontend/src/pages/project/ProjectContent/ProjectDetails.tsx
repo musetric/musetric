@@ -12,7 +12,7 @@ export const ProjectDetails: FC = () => {
   }
 
   return (
-    <Box gridArea='details' minHeight={0} minWidth={0}>
+    <Box sx={{ gridArea: 'details', minHeight: 0, minWidth: 0 }}>
       {detailsView === 'text' ? <Subtitle /> : <ProjectTracksVisualization />}
     </Box>
   );

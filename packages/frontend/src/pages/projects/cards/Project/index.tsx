@@ -18,22 +18,25 @@ export const ProjectCard: FC<ProjectCardProps> = (props) => {
       component={motion.div}
       layout
       direction='row'
-      alignItems='center'
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1, transition: { duration: 0.35 } }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.25 } }}
       sx={{
+        alignItems: 'center',
         minWidth: 0,
         borderRadius: 2,
         padding: 2,
         backgroundColor: 'action.hover',
         transition: 'background-color 160ms linear',
+
         '&:hover, &:focus-within': {
           backgroundColor: 'action.selected',
         },
+
         '&:hover [data-card-menu], &:focus-within [data-card-menu]': {
           opacity: 1,
         },
+
         '@media (hover: none)': {
           '[data-card-menu]': { opacity: 1 },
         },
@@ -54,7 +57,7 @@ export const ProjectCard: FC<ProjectCardProps> = (props) => {
         }}
       >
         <ProjectCardPreview projectInfo={projectInfo} />
-        <Stack minWidth={0} flexGrow={1} gap={0.5}>
+        <Stack sx={{ minWidth: 0, flexGrow: 1, gap: 0.5 }}>
           <Typography variant='subtitle1' noWrap title={projectInfo.name}>
             {projectInfo.name}
           </Typography>

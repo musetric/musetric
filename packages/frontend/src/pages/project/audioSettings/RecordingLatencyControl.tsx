@@ -35,25 +35,25 @@ export const RecordingLatencyControl: FC = () => {
 
   return (
     <>
-      <Stack gap={0.5}>
+      <Stack sx={{ gap: 0.5 }}>
         <Typography variant='body2'>
           {t('pages.project.audioSettings.latency', { value: latencyMs })}
         </Typography>
-        <Typography variant='caption' color='text.secondary'>
+        <Typography variant='caption' sx={{ color: 'text.secondary' }}>
           {latencySourceLabels[recordingLatencySource]}
         </Typography>
-        <Typography variant='caption' color='text.secondary'>
+        <Typography variant='caption' sx={{ color: 'text.secondary' }}>
           {t('pages.project.audioSettings.inputLatency', {
             value: inputLatencyMs,
           })}
         </Typography>
         {recording && (
-          <Typography variant='caption' color='text.secondary'>
+          <Typography variant='caption' sx={{ color: 'text.secondary' }}>
             {t('pages.project.audioSettings.deviceLocked')}
           </Typography>
         )}
       </Stack>
-      <Stack gap={1}>
+      <Stack sx={{ gap: 1 }}>
         <Slider
           min={minimumRecordingLatencyMs}
           max={maximumRecordingLatencyMs}

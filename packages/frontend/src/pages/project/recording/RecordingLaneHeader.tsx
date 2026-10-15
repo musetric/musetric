@@ -14,19 +14,21 @@ export const RecordingLaneHeader: FC = () => {
 
   return (
     <>
-      <Box position='absolute' top={8} left={8} zIndex={1}>
+      <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
         <RecordingPicker variant='lane' />
       </Box>
       {empty && !recording && (
         <Typography
           variant='caption'
-          color='text.secondary'
-          position='absolute'
-          left={0}
-          right={0}
-          bottom={10}
-          textAlign='center'
-          sx={{ pointerEvents: 'none' }}
+          sx={{
+            color: 'text.secondary',
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 10,
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
         >
           {t('pages.project.recording.emptyHint')}
         </Typography>

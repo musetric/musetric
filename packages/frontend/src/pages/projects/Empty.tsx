@@ -9,21 +9,24 @@ export const ProjectsEmpty: FC = () => {
 
   return (
     <Stack
-      alignItems='center'
-      justifyContent='center'
-      flexGrow={1}
-      gap={4}
-      py={12}
+      sx={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexGrow: 1,
+        gap: 4,
+        py: 12,
+      }}
     >
       <LibraryMusicOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
-      <Stack alignItems='center' gap={2} maxWidth={420}>
+      <Stack sx={{ alignItems: 'center', gap: 2, maxWidth: 420 }}>
         <Typography variant='h5'>{t('pages.projects.empty.title')}</Typography>
-        <Typography color='text.secondary' textAlign='center'>
+        <Typography sx={{ color: 'text.secondary', textAlign: 'center' }}>
           {t('pages.projects.empty.description')}
         </Typography>
       </Stack>
       <Button
         component={routes.projectsCreate.Link}
+        nativeButton={false}
         variant='contained'
         color='primary'
         size='large'

@@ -41,11 +41,11 @@ export const ProcessingRow: FC<ProcessingRowProps> = (props) => {
 
   return (
     <Card sx={{ padding: 2, opacity: projectItem.paused ? 0.6 : 1 }}>
-      <Stack direction='row' alignItems='center' gap={2}>
+      <Stack direction='row' sx={{ alignItems: 'center', gap: 2 }}>
         {draggable && <DragIndicatorIcon sx={{ cursor: 'grab' }} />}
-        <Stack flexGrow={1} gap={0.5}>
+        <Stack sx={{ flexGrow: 1, gap: 0.5 }}>
           <Typography variant='subtitle1'>{projectItem.name}</Typography>
-          <Typography variant='body2' color='text.secondary'>
+          <Typography variant='body2' sx={{ color: 'text.secondary' }}>
             {running
               ? stepTitles(t)[running.name]
               : t('pages.processing.steps', {

@@ -10,7 +10,9 @@ export const ChordsToggleButton: FC = () => {
   const setChordsOpen = useProjectStore((state) => state.setChordsOpen);
 
   return (
-    <Box display='flex' borderRadius={1} bgcolor='background.default'>
+    <Box
+      sx={{ display: 'flex', borderRadius: 1, bgcolor: 'background.default' }}
+    >
       <ToggleButton
         size='small'
         color='primary'
@@ -21,9 +23,12 @@ export const ChordsToggleButton: FC = () => {
           setChordsOpen(!chordsOpen);
         }}
       >
-        <Stack direction='row' alignItems='center' gap={1}>
+        <Stack direction='row' sx={{ alignItems: 'center', gap: 1 }}>
           <PianoOutlinedIcon sx={{ fontSize: 14 }} />
-          <Typography variant='caption' lineHeight={1} textTransform='none'>
+          <Typography
+            variant='caption'
+            sx={{ lineHeight: 1, textTransform: 'none' }}
+          >
             {t('pages.project.chords.title')}
           </Typography>
         </Stack>

@@ -11,6 +11,7 @@ export const ProjectHomeButton: FC = () => {
     <Tooltip title={t('pages.project.progress.backHome')}>
       <IconButton
         component={routes.home.Link}
+        nativeButton={false}
         size='small'
         aria-label={t('pages.project.progress.backHome')}
         sx={{ p: 0.5 }}

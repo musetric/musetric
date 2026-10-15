@@ -26,15 +26,17 @@ export const ProjectTracksVisualization: FC = () => {
   );
 
   return (
-    <Box height='100%' overflow='auto' sx={{ userSelect: 'none' }}>
+    <Box sx={{ height: '100%', overflow: 'auto', userSelect: 'none' }}>
       <Box
         ref={ref}
-        display='grid'
-        gridTemplateRows='1fr auto'
-        height='100%'
-        position='relative'
+        sx={{
+          display: 'grid',
+          gridTemplateRows: '1fr auto',
+          height: '100%',
+          position: 'relative',
+        }}
       >
-        <Stack position='relative' gap={2}>
+        <Stack sx={{ position: 'relative', gap: 2 }}>
           <Stack>
             <Box sx={laneSx}>
               <WaveformCanvas kind='recording' />
@@ -42,15 +44,19 @@ export const ProjectTracksVisualization: FC = () => {
             {Array.from({ length: deckEdges }, (_, edge) => (
               <Box
                 key={edge}
-                height={4}
-                mx={2 * (edge + 1)}
-                sx={(theme) => ({
-                  borderRadius: '0 0 6px 6px',
-                  bgcolor: alpha(
-                    theme.palette.background.default,
-                    edge === 0 ? 0.7 : 0.45,
-                  ),
-                })}
+                sx={[
+                  {
+                    height: 4,
+                    mx: 2 * (edge + 1),
+                  },
+                  (theme) => ({
+                    borderRadius: '0 0 6px 6px',
+                    bgcolor: alpha(
+                      theme.palette.background.default,
+                      edge === 0 ? 0.7 : 0.45,
+                    ),
+                  }),
+                ]}
               />
             ))}
           </Stack>
@@ -62,13 +68,17 @@ export const ProjectTracksVisualization: FC = () => {
           <VisualizationCursor mode='tracks' />
         </Stack>
         <Box
-          position='sticky'
-          bottom={0}
-          zIndex={2}
-          sx={(theme) => ({
-            pointerEvents: 'none',
-            bgcolor: getPageBackground(theme),
-          })}
+          sx={[
+            {
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 2,
+            },
+            (theme) => ({
+              pointerEvents: 'none',
+              bgcolor: getPageBackground(theme),
+            }),
+          ]}
         >
           <VisualizationTimeline mode='tracks' />
         </Box>

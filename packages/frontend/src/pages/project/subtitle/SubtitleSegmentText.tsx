@@ -30,17 +30,17 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
   return (
     <Typography
       variant='h5'
-      fontWeight='bold'
-      lineHeight={1.18}
-      textAlign='center'
-      sx={
-        active
-          ? undefined
-          : {
-              ...getInactiveSubtitleSegmentSx(status),
-              transition: 'color 160ms linear, opacity 160ms linear',
-            }
-      }
+      sx={[
+        {
+          fontWeight: 'bold',
+          lineHeight: 1.18,
+          textAlign: 'center',
+        },
+        !active && {
+          ...getInactiveSubtitleSegmentSx(status),
+          transition: 'color 160ms linear, opacity 160ms linear',
+        },
+      ]}
     >
       {segment.words.length > 0
         ? segment.words.map((word, index) => (

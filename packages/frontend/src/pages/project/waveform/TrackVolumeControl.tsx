@@ -29,11 +29,13 @@ export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
     <Stack
       component={Paper}
       elevation={3}
-      height='100%'
-      justifyContent='center'
-      p={2.5}
-      position='relative'
-      sx={{ userSelect: 'none' }}
+      sx={{
+        height: '100%',
+        justifyContent: 'center',
+        p: 2.5,
+        position: 'relative',
+        userSelect: 'none',
+      }}
     >
       <TrackLabel {...props} />
       <Slider
@@ -52,7 +54,10 @@ export const TrackVolumeControl: FC<TrackVolumeControlProps> = (props) => {
           });
         }}
       />
-      <Typography position='absolute' top={8} right={8} variant='caption'>
+      <Typography
+        variant='caption'
+        sx={{ position: 'absolute', top: 8, right: 8 }}
+      >
         {`${volumePercent}%`}
       </Typography>
     </Stack>

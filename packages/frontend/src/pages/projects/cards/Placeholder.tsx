@@ -4,11 +4,13 @@ import { type FC } from 'react';
 export const PlaceholderCard: FC = () => (
   <Stack
     direction='row'
-    alignItems='center'
-    gap={3}
-    padding={2}
-    borderRadius={2}
-    bgcolor='action.hover'
+    sx={{
+      alignItems: 'center',
+      gap: 3,
+      padding: 2,
+      borderRadius: 2,
+      bgcolor: 'action.hover',
+    }}
   >
     <Skeleton
       variant='rectangular'
@@ -19,7 +21,7 @@ export const PlaceholderCard: FC = () => (
         flexShrink: 0,
       }}
     />
-    <Stack flexGrow={1} gap={0.5}>
+    <Stack sx={{ flexGrow: 1, gap: 0.5 }}>
       <Skeleton variant='text' width='60%' />
       <Skeleton variant='text' width='35%' />
     </Stack>

@@ -24,11 +24,11 @@ export const ProcessingQueue: FC = () => {
   const done = finished(projects);
 
   return (
-    <Stack gap={3}>
-      <Stack gap={1}>
+    <Stack sx={{ gap: 3 }}>
+      <Stack sx={{ gap: 1 }}>
         <Typography variant='h6'>{t('pages.processing.queue')}</Typography>
         {waiting.length === 0 && (
-          <Typography variant='body2' color='text.secondary'>
+          <Typography variant='body2' sx={{ color: 'text.secondary' }}>
             {t('pages.processing.queueEmpty')}
           </Typography>
         )}
@@ -54,7 +54,7 @@ export const ProcessingQueue: FC = () => {
         </Reorder.Group>
       </Stack>
       {done.length > 0 && (
-        <Stack gap={1}>
+        <Stack sx={{ gap: 1 }}>
           <Typography variant='h6'>{t('pages.processing.finished')}</Typography>
           {done.map((projectItem) => (
             <ProcessingRow

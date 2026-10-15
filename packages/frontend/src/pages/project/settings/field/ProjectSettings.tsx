@@ -21,9 +21,9 @@ export const ProjectSettings: FC = () => {
 
   return (
     <Drawer anchor='right' open={open} onClose={() => setOpen(false)}>
-      <Box width={280} p={2} role='presentation'>
-        <Stack gap={4}>
-          <Stack direction='row' alignItems='center'>
+      <Box role='presentation' sx={{ width: 280, p: 2 }}>
+        <Stack sx={{ gap: 4 }}>
+          <Stack direction='row' sx={{ alignItems: 'center' }}>
             <Typography variant='h6' sx={{ flexGrow: 1 }}>
               {t('pages.project.settings.title')}
             </Typography>

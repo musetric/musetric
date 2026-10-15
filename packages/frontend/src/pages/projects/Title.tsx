@@ -29,26 +29,25 @@ export const ProjectsTitle: FC<ProjectsTitleProps> = (props) => {
   return (
     <Stack
       direction='row'
-      flexWrap='wrap'
-      alignItems='center'
-      columnGap={3}
-      rowGap={2}
+      sx={{ flexWrap: 'wrap', alignItems: 'center', columnGap: 3, rowGap: 2 }}
     >
-      <Stack direction='row' gap={2} alignItems='baseline'>
+      <Stack direction='row' sx={{ gap: 2, alignItems: 'baseline' }}>
         <Typography variant='h4'>{t('pages.projects.title')}</Typography>
         {count > 0 && (
-          <Typography variant='subtitle1' color='text.secondary'>
+          <Typography variant='subtitle1' sx={{ color: 'text.secondary' }}>
             {count}
           </Typography>
         )}
       </Stack>
       <Stack
         direction='row'
-        gap={2}
-        alignItems='center'
-        justifyContent='flex-end'
-        flexGrow={1}
-        minWidth={0}
+        sx={{
+          gap: 2,
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          flexGrow: 1,
+          minWidth: 0,
+        }}
       >
         <ProcessingIndicator />
         {count > searchThreshold && (
@@ -77,6 +76,7 @@ export const ProjectsTitle: FC<ProjectsTitleProps> = (props) => {
         {count > 0 && (
           <Button
             component={routes.projectsCreate.Link}
+            nativeButton={false}
             variant='contained'
             color='primary'
             startIcon={<AddIcon fontSize='inherit' />}

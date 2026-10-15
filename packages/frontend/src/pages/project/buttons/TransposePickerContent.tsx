@@ -26,7 +26,7 @@ export const TransposePickerContent: FC = () => {
   const sourceKey = keyQuery.status === 'success' ? keyQuery.data : undefined;
 
   return (
-    <Stack gap={3.5}>
+    <Stack sx={{ gap: 3.5 }}>
       <ScaleSlider
         title={t('pages.project.player.controls.transposeTitle')}
         caption={t('pages.project.player.controls.transposeCaption')}

@@ -16,9 +16,9 @@ export const ProjectPreview: FC<Props> = (props) => {
   if (!url) {
     return (
       <Stack
-        justifyContent='center'
-        alignItems='center'
         sx={{
+          justifyContent: 'center',
+          alignItems: 'center',
           userSelect: 'none',
           containerType: 'inline-size',
           aspectRatio: '1 / 1',
@@ -44,7 +44,7 @@ export const ProjectPreview: FC<Props> = (props) => {
   }
 
   return (
-    <Box position='relative'>
+    <Box sx={{ position: 'relative' }}>
       <CardMedia
         component='img'
         image={url}
@@ -56,14 +56,17 @@ export const ProjectPreview: FC<Props> = (props) => {
       />
       {children && (
         <Stack
-          position='absolute'
-          top={0}
-          right={0}
-          bottom={0}
-          left={0}
-          justifyContent='center'
-          alignItems='center'
-          sx={{ borderRadius: 2, backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 2,
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          }}
         >
           {children}
         </Stack>

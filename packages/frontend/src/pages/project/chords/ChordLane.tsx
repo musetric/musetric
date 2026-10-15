@@ -109,12 +109,12 @@ export const ChordLane: FC = () => {
   return (
     <Box
       ref={laneRef}
-      position='relative'
-      height={`${chordLaneHeight}px`}
-      overflow='hidden'
-      bgcolor='background.default'
-      borderRadius={2}
       sx={{
+        position: 'relative',
+        height: `${chordLaneHeight}px`,
+        overflow: 'hidden',
+        bgcolor: 'background.default',
+        borderRadius: 2,
         flexShrink: 0,
         userSelect: 'none',
       }}
@@ -122,37 +122,41 @@ export const ChordLane: FC = () => {
       <Box
         ref={stripRef}
         aria-hidden
-        position='absolute'
-        top={0}
-        bottom={0}
-        left={0}
-        sx={{ willChange: 'transform' }}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          willChange: 'transform',
+        }}
       >
         {blocks.map((block) => (
           <Box
             key={block.start}
-            position='absolute'
-            top={`${chordBlockInset}px`}
-            bottom={`${chordBlockInset}px`}
-            display='flex'
-            alignItems='center'
-            overflow='hidden'
             style={{
               left: `${(block.start / duration) * 100}%`,
               width: `${((block.end - block.start) / duration) * 100}%`,
             }}
-            sx={(theme) => ({
-              boxSizing: 'border-box',
-              borderLeft: `1px solid ${theme.palette.default.main}`,
-            })}
+            sx={[
+              {
+                position: 'absolute',
+                top: `${chordBlockInset}px`,
+                bottom: `${chordBlockInset}px`,
+                display: 'flex',
+                alignItems: 'center',
+                overflow: 'hidden',
+              },
+              (theme) => ({
+                boxSizing: 'border-box',
+                borderLeft: `1px solid ${theme.palette.default.main}`,
+              }),
+            ]}
           >
             <Typography
               data-chord-label=''
               variant='caption'
-              fontWeight={600}
-              lineHeight={1}
               noWrap
-              px={1}
+              sx={{ fontWeight: 600, lineHeight: 1, px: 1 }}
             >
               {block.label}
             </Typography>

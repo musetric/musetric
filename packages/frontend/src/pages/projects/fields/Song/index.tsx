@@ -58,11 +58,11 @@ export const SongField: FC<SongFieldProps> = (props) => {
       onDragLeave={() => {
         setIsDragging(false);
       }}
-      height={180}
-      gap={3}
-      justifyContent='center'
-      alignItems='center'
       sx={{
+        height: 180,
+        gap: 3,
+        justifyContent: 'center',
+        alignItems: 'center',
         borderRadius: 2,
         backgroundColor: isDragging ? 'action.hover' : 'background.default',
         transition: 'background-color 160ms linear',
@@ -85,11 +85,13 @@ export const SongField: FC<SongFieldProps> = (props) => {
         }}
       />
       <AudioFileOutlinedIcon sx={{ fontSize: 36, color: 'text.disabled' }} />
-      <Stack alignItems='center' gap={2}>
+      <Stack sx={{ alignItems: 'center', gap: 2 }}>
         <Typography
           variant='body2'
-          color='text.secondary'
-          sx={{ '@media (hover: none)': { display: 'none' } }}
+          sx={{
+            color: 'text.secondary',
+            '@media (hover: none)': { display: 'none' },
+          }}
         >
           {t('pages.projects.dialogs.create.dragDrop')}
         </Typography>

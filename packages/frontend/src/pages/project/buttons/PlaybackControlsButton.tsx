@@ -14,13 +14,13 @@ export const PlaybackControlsButton: FC = () => {
 
   return (
     <Box
-      width={128}
-      height={48}
-      px={1}
-      display='flex'
-      alignItems='center'
-      borderRadius={999}
       sx={{
+        width: 128,
+        height: 48,
+        px: 1,
+        display: 'flex',
+        alignItems: 'center',
+        borderRadius: 999,
         backgroundColor: recording ? 'error.dark' : playingColor,
         opacity: frameCount ? 1 : 0.5,
         transition: 'background-color 160ms linear',

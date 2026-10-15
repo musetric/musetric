@@ -17,8 +17,8 @@ export const AudioSettings: FC = () => {
   return (
     <Drawer anchor='right' open={open} onClose={() => setOpen(false)}>
       <AudioSettingsLifecycle>
-        <Box width={340} p={2} role='presentation'>
-          <Stack gap={4}>
+        <Box role='presentation' sx={{ width: 340, p: 2 }}>
+          <Stack sx={{ gap: 4 }}>
             <AudioSettingsHeader />
             <AudioSettingsError />
             <AudioOutputSelect />

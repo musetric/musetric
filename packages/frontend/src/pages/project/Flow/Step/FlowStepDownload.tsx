@@ -62,8 +62,11 @@ export const FlowStepDownload: FC<FlowStepDownloadProps> = (props) => {
   const color = getDownloadColor(download, theme);
 
   return (
-    <Stack direction='row' alignItems='center' gap={2} flexWrap='wrap'>
-      <Typography variant='caption' color='text.secondary'>
+    <Stack
+      direction='row'
+      sx={{ alignItems: 'center', gap: 2, flexWrap: 'wrap' }}
+    >
+      <Typography variant='caption' sx={{ color: 'text.secondary' }}>
         {t('pages.project.progress.download.label', {
           name: getDownloadName(download),
         })}
