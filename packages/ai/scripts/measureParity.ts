@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { type ProvidedContext } from 'vitest';
 import { startVitest, type TestCase } from 'vitest/node';
 
 type ParityCase = {
@@ -46,9 +47,6 @@ declare module 'vitest' {
     parityRun?: ParityRunRequest;
     parityCompare?: ParityCompareRequest;
   }
-}
-
-declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     parityCompare?: string;
@@ -175,7 +173,7 @@ const parityReporter = {
   },
 };
 
-type ParityProvide = NonNullable<Parameters<typeof startVitest>[2]>['provide'];
+type ParityProvide = Partial<ProvidedContext>;
 type ParityMeta = ReturnType<TestCase['meta']>;
 
 const runParityTest = async (
@@ -183,7 +181,6 @@ const runParityTest = async (
   provide: ParityProvide,
 ): Promise<ParityMeta> => {
   const vitest = await startVitest(
-    'test',
     [file],
     {
       config: resolve(packageRoot, 'vitest.parity.config.ts'),

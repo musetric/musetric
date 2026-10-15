@@ -9,6 +9,7 @@ import {
 import { basename, dirname, extname, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { type ProvidedContext } from 'vitest';
 import { experimental_getRunnerTask, startVitest } from 'vitest/node';
 type PitchExtractRequest = {
   pcmUrl: string;
@@ -35,9 +36,6 @@ declare module 'vitest' {
     }[];
     pitchPerf?: PitchExtractRequest;
   }
-}
-
-declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     pitchExtract?: { csv: string; frames: number };
@@ -261,7 +259,7 @@ const pitchReporter = {
   },
 };
 
-type PitchProvide = NonNullable<Parameters<typeof startVitest>[2]>['provide'];
+type PitchProvide = Partial<ProvidedContext>;
 type PitchMeta = ReturnType<typeof experimental_getRunnerTask>['meta'];
 
 const runPitchTest = async (
@@ -269,7 +267,6 @@ const runPitchTest = async (
   outDir: string,
 ): Promise<PitchMeta> => {
   const vitest = await startVitest(
-    'test',
     [],
     {
       config: resolve(packageRoot, 'vitest.pitch.config.ts'),

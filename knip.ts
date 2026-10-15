@@ -9,7 +9,7 @@ const config: KnipConfig = {
     'packages/api/src/routes/preview.ts': ['exports'],
   },
   ignoreBinaries: ['xcodegen', 'ffmpeg', 'adb'],
-  ignoreUnresolved: ['vite/client', '^tsx$'],
+  ignoreUnresolved: ['vite/client'],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: [
     '**/i18next.config.ts',

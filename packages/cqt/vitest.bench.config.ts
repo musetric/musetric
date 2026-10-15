@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     ...defaultConfig.test,
     include: ['**/*.bench.ts'],
+    reporters: ['verbose'],
     testTimeout: 0,
     fileParallelism: false,
     pool: 'forks',

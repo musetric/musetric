@@ -1,6 +1,6 @@
 import { createGpuContext } from '@musetric/utils/gpu';
-import { commands } from '@vitest/browser/context';
 import { inject, it } from 'vitest';
+import { commands } from 'vitest/browser';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 import { createPitchSettings } from '../fundamentalFrequency/settings.es.js';
 import { trackPitch } from '../pitchTrack.js';

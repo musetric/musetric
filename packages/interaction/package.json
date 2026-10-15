@@ -25,6 +25,7 @@
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

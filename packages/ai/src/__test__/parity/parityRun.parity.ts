@@ -23,9 +23,6 @@ declare module 'vitest' {
   interface ProvidedContext {
     parityRun?: ParityRunRequest;
   }
-}
-
-declare module '@vitest/runner' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     parityRun?: number;
