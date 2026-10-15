@@ -29,9 +29,8 @@ runs:
         key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
         restore-keys: |
           eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
-    # Temporarily disabled: npm's Bulk Advisory API is timing out upstream.
-    # https://github.com/npm/cli/issues/9950
-    # - run: yarn check:deps:security
+    - run: yarn check:deps:security
+      shell: bash
     - run: yarn check:deps:dupe
       shell: bash
     - run: yarn check:unused
