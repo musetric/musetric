@@ -7351,6 +7351,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"supports-color@npm:^10.2.2":
+  version: 10.2.2
+  resolution: "supports-color@npm:10.2.2"
+  checksum: 10c0/fb28dd7e0cdf80afb3f2a41df5e068d60c8b4f97f7140de2eaed5b42e075d82a0e980b20a2c0efd2b6d73cfacb55555285d8cc719fa0472220715aefeaa1da7c
+  languageName: node
+  linkType: hard
+
 "supports-preserve-symlinks-flag@npm:^1.0.0":
   version: 1.0.0
   resolution: "supports-preserve-symlinks-flag@npm:1.0.0"
@@ -7516,6 +7523,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"undici@npm:^8.3.0":
+  version: 8.12.1
+  resolution: "undici@npm:8.12.1"
+  checksum: 10c0/8ba448a30f85ec9bffe0065b45b471a578dbb56eafd4162741fd7be3b955672e98fabd7a4ab0703365d5ffc6f1927f4ed1c1221f678aa67af18fb7bc3dfe283b
+  languageName: node
+  linkType: hard
+
 "unicorn-magic@npm:^0.3.0":
   version: 0.3.0
   resolution: "unicorn-magic@npm:0.3.0"
@@ -7649,15 +7663,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite-plugin-mkcert@npm:1.17.12":
-  version: 1.17.12
-  resolution: "vite-plugin-mkcert@npm:1.17.12"
+"vite-plugin-mkcert@npm:2.1.0":
+  version: 2.1.0
+  resolution: "vite-plugin-mkcert@npm:2.1.0"
   dependencies:
     debug: "npm:^4.4.3"
-    picocolors: "npm:^1.1.1"
+    supports-color: "npm:^10.2.2"
+    undici: "npm:^8.3.0"
   peerDependencies:
     vite: ">=3"
-  checksum: 10c0/81d2f63bf69160883332eb44af3047009b85da02f871c5c4616167fdbc0b353f38cafc32c73e12c38cb5b116d466ea17ef41430292bb95e126a043efc03fd659
+  checksum: 10c0/989bb8563546f5073f8d422a46413b16a167d6658a3d5cdc1f6491c55ed935bbb8ffbfdcf1ad854a6979995ede0ee135c3df8de6fc6b131f8b0d826aafae4915
   languageName: node
   linkType: hard
 
