@@ -7,6 +7,7 @@ import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
+import { MediaSessionSync } from './mediaSession/MediaSessionSync.js';
 import { MixPopover } from './mix/MixPopover.js';
 import { MixdownDialog } from './mixdown/MixdownDialog.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
@@ -51,6 +52,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <PlaybackPanel />
       </Stack>
       <RhythmMetronomeSync projectId={project.id} />
+      <MediaSessionSync title={project.name} />
       <VoiceRangeSync
         projectId={project.id}
         leadSpectrogramGainDb={
