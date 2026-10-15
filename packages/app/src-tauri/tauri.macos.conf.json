@@ -1,6 +1,7 @@
 {
   "bundle": {
     "targets": ["dmg"],
+    "icon": ["gen-assets/icon.png", "gen-assets/icon.icns", "gen/AppIcon.icon"],
     "macOS": {
       "hardenedRuntime": true,
       "minimumSystemVersion": "10.13"
