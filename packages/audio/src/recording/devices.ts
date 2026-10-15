@@ -67,10 +67,7 @@ export const isLikelyBuiltInAudioOutputDevice = (device: MediaDeviceInfo) => {
 };
 
 export type AudioInputSourceKind =
-  | 'builtIn'
-  | 'wiredHeadset'
-  | 'bluetooth'
-  | 'unknown';
+  'builtIn' | 'wiredHeadset' | 'bluetooth' | 'unknown';
 
 export const classifyAudioInputDevice = (
   device: MediaDeviceInfo,
@@ -82,10 +79,7 @@ export const classifyAudioInputDevice = (
 };
 
 export type AudioOutputSourceKind =
-  | 'builtIn'
-  | 'wiredHeadset'
-  | 'bluetooth'
-  | 'unknown';
+  'builtIn' | 'wiredHeadset' | 'bluetooth' | 'unknown';
 
 export const classifyAudioOutputDevice = (
   device: MediaDeviceInfo,

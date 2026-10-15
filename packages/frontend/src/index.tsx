@@ -1,4 +1,5 @@
 import { assertDefined } from '@musetric/utils';
+import { noop } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { endpoints } from './api/index.js';
@@ -19,7 +20,7 @@ const runApp = async () => {
   );
   await initI18next();
   await engine.boot();
-  await queryClient.prefetchQuery(endpoints.project.list());
+  await queryClient.query(endpoints.project.list()).catch(noop);
   holdScreenWhileWorking(queryClient);
 
   createRoot(rootElement).render(

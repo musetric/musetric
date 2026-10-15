@@ -9,9 +9,7 @@ import {
 } from 'estree';
 
 type WrapperFunction =
-  | ArrowFunctionExpression
-  | FunctionDeclaration
-  | FunctionExpression;
+  ArrowFunctionExpression | FunctionDeclaration | FunctionExpression;
 
 const getReturnExpression = (
   body: WrapperFunction['body'],

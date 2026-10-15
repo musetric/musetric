@@ -26,5 +26,4 @@ export type BrowserLeadBackingUnitsRequest = {
 };
 
 export type BrowserSeparateUnitsRequest =
-  | BrowserVocalsUnitsRequest
-  | BrowserLeadBackingUnitsRequest;
+  BrowserVocalsUnitsRequest | BrowserLeadBackingUnitsRequest;

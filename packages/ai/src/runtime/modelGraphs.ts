@@ -47,15 +47,7 @@ export type SkeyGraph = {
 };
 
 export type WhisperDtype =
-  | 'auto'
-  | 'bnb4'
-  | 'fp16'
-  | 'fp32'
-  | 'int8'
-  | 'q4'
-  | 'q4f16'
-  | 'q8'
-  | 'uint8';
+  'auto' | 'bnb4' | 'fp16' | 'fp32' | 'int8' | 'q4' | 'q4f16' | 'q8' | 'uint8';
 
 export type WhisperGraph = {
   dtype: Record<string, WhisperDtype>;

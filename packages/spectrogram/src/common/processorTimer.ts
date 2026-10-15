@@ -36,11 +36,7 @@ const gpuLabels: GpuLabel[] = [
 type CpuRootLabel = (typeof cpuRootLabels)[number];
 
 export type SpectrogramTimerLabel =
-  | CpuRootLabel
-  | GpuRootLabel
-  | SpectrumStage
-  | AggregateStage
-  | 'other';
+  CpuRootLabel | GpuRootLabel | SpectrumStage | AggregateStage | 'other';
 
 const createTimerLabels = (
   labels: readonly GpuLabel[],

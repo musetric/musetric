@@ -68,15 +68,16 @@ export const decodeWav = async (
 
     const channels = await collectChannels(
       new AudioSampleSink(track),
-      track.numberOfChannels,
+      await track.getNumberOfChannels(),
     );
     if (channels.length === 0) {
       return createEmptyDecodedWav();
     }
 
+    const trackSampleRate = await track.getSampleRate();
     const resampled = await Promise.all(
       channels.map(async (channel) =>
-        resampleChannel(channel, track.sampleRate, sampleRate),
+        resampleChannel(channel, trackSampleRate, sampleRate),
       ),
     );
 

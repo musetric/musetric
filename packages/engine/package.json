@@ -25,9 +25,9 @@
     "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "axios": "1.20.0",
-    "immer": "11.1.4",
-    "zod": "4.4.3",
-    "zustand": "5.0.11"
+    "immer": "11.1.21",
+    "zod": "4.6.7",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "@alexanderolsen/libsamplerate-js": "catalog:",

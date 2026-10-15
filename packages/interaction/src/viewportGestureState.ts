@@ -34,8 +34,4 @@ export type ActiveDragZoom = ActiveZoom & {
 };
 
 export type ViewportGestureMode =
-  | 'idle'
-  | 'pan'
-  | 'pan-inertia'
-  | 'pinch-zoom'
-  | 'drag-zoom';
+  'idle' | 'pan' | 'pan-inertia' | 'pinch-zoom' | 'drag-zoom';
