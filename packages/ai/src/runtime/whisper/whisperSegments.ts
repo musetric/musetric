@@ -29,6 +29,53 @@ export const spanText = (chunks: WordChunk[]): string =>
     .join('')
     .trim();
 
+const lastWordEnd = (chunks: WordChunk[]): number => {
+  const last = chunks.at(-1);
+  return last ? (last.timestamp[1] ?? last.timestamp[0]) : 0;
+};
+
+const widestGap = (chunks: WordChunk[]): number => {
+  let widest = 0;
+  for (let index = 1; index < chunks.length; index += 1) {
+    const previous = chunks[index - 1];
+    const previousEnd = previous.timestamp[1] ?? previous.timestamp[0];
+    widest = Math.max(widest, chunks[index].timestamp[0] - previousEnd);
+  }
+  return widest;
+};
+
+export type HalvesRule = {
+  minSeconds: number;
+  coverage: number;
+  maxGap: number;
+};
+
+export const needsHalves = (
+  chunks: WordChunk[],
+  duration: number,
+  rule: HalvesRule,
+): boolean =>
+  duration >= rule.minSeconds &&
+  (lastWordEnd(chunks) < rule.coverage * duration ||
+    widestGap(chunks) >= rule.maxGap);
+
+export const joinHalves = (
+  first: WordChunk[],
+  second: WordChunk[],
+  offset: number,
+): WordChunk[] => [
+  ...first,
+  ...second.map(
+    (chunk): WordChunk => ({
+      text: chunk.text,
+      timestamp: [
+        chunk.timestamp[0] + offset,
+        (chunk.timestamp[1] ?? chunk.timestamp[0]) + offset,
+      ],
+    }),
+  ),
+];
+
 export const countWords = (text: string | undefined): number =>
   (text ?? '').trim().split(/\s+/).filter(Boolean).length;
 

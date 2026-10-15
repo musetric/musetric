@@ -1,7 +1,6 @@
 import { type TranscriptionSegment } from './types.js';
 
 const silenceRmsRatio = 0.2;
-const silenceRmsMin = 0.005;
 
 const median = (values: number[]): number => {
   if (values.length === 0) {
@@ -47,7 +46,6 @@ export const filterSilentSegments = (
   const rmsValues = segments.map((segment) =>
     segmentRms(segment, audio, sampleRate),
   );
-  const medianRms = median(rmsValues);
-  const threshold = Math.max(silenceRmsMin, medianRms * silenceRmsRatio);
+  const threshold = median(rmsValues) * silenceRmsRatio;
   return segments.filter((_, index) => rmsValues[index] >= threshold);
 };

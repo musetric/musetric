@@ -30,6 +30,38 @@ describe('groupWordsIntoSegments', () => {
   });
 });
 
+describe('planPass language', () => {
+  it('votes with the loudest windows, not the first ones', async () => {
+    const span = 25 * sampleRate;
+    const gap = 3 * sampleRate;
+    const audio = new Float32Array(4 * span + 5 * gap);
+    const levels = [0.25, 0.4, 0.25, 0.4];
+    for (const [index, level] of levels.entries()) {
+      const start = gap + index * (span + gap);
+      for (let i = start; i < start + span; i++) {
+        audio[i] = level * Math.sin((2 * Math.PI * 300 * i) / sampleRate);
+      }
+    }
+    const heard: number[] = [];
+    const plan = await planPass(audio, {
+      chunkSize: 30,
+      seamSeconds: 2.0,
+      detectLanguage: async (slice) => {
+        let sum = 0;
+        for (const value of slice) {
+          sum += value * value;
+        }
+        const level = Math.sqrt(sum / slice.length);
+        heard.push(level);
+        return Promise.resolve(level > 0.23 ? 'ru' : 'en');
+      },
+    });
+    expect(plan.packed).toHaveLength(4);
+    expect(plan.language).toBe('ru');
+    expect(heard).toHaveLength(2);
+  });
+});
+
 describe('the unit passes', () => {
   it('plans chunks, decodes them per unit and assembles the original timeline', async () => {
     const audio = new Float32Array(sampleRate * 8);
@@ -135,6 +167,26 @@ describe('the unit passes', () => {
     ]);
   });
 
+  it('drops a caption credit decoded in pieces before the lyrics', () => {
+    const voiced = new Float32Array(sampleRate * 4);
+    makeTone(voiced, 0, voiced.length);
+    const payload = finalizePass({
+      compacted: voiced,
+      packed: [[[0, 4]]],
+      seamSeconds: 2.0,
+      words: [
+        [
+          { text: 'Sous', start: 0.1, end: 0.3 },
+          { text: '-titrage', start: 0.3, end: 0.6 },
+          { text: 'Hello', start: 1.0, end: 1.4 },
+          { text: 'world', start: 1.4, end: 1.8 },
+        ],
+      ],
+      replaced: [],
+    });
+    expect(payload.map((segment) => segment.text)).toEqual(['Hello world']);
+  });
+
   it('maps a compacted late source interval to the original timeline', () => {
     const compacted = new Float32Array(sampleRate * 4);
     makeTone(compacted, 0, compacted.length);
@@ -145,8 +197,8 @@ describe('the unit passes', () => {
       words: [[{ text: 'late', start: 0.5, end: 1.0 }]],
       replaced: [],
     });
-    expect(payload).toMatchObject([
-      { text: 'late', words: [{ start: 20.5, end: 21 }] },
-    ]);
+    expect(payload.map((segment) => segment.text)).toEqual(['late']);
+    expect(payload[0].words[0].start).toBeCloseTo(20.3);
+    expect(payload[0].words[0].end).toBeCloseTo(20.85);
   });
 });

@@ -24,8 +24,12 @@ import {
 import {
   countWords,
   extractWords,
+  type HalvesRule,
   isLooped,
+  joinHalves,
+  needsHalves,
   spanText,
+  type WordChunk,
 } from './whisperSegments.js';
 import {
   isFirstStep,
@@ -44,6 +48,8 @@ const guardLadder: DecodeGuard[] = [
 const collapsedWordsPerSecond = 0.25;
 const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
+const halvesRule: HalvesRule = { minSeconds: 12, coverage: 0.6, maxGap: 6 };
+const splitMinGain = 3;
 const windowsPerBatch = 4;
 export const whisperDeviceOptions = { subgroups: false };
 
@@ -290,6 +296,36 @@ export const createWhisperRuntime = async (
       outputs[index] = dropCaptionSegments(
         await preferAligned(result, audios[index]),
       );
+    }
+
+    const splitInHalves = async (
+      result: DecodeResult,
+      audio: Float32Array,
+    ): Promise<DecodeResult> => {
+      const duration = audio.length / sampleRate;
+      if (!needsHalves(result.chunks ?? [], duration, halvesRule)) {
+        return result;
+      }
+      const middle = Math.round(audio.length / 2);
+      const halves = await decodePass(
+        [audio.subarray(0, middle), audio.subarray(middle)],
+        language,
+        undefined,
+      );
+      const kept: WordChunk[][] = [];
+      for (const half of halves) {
+        const clean = dropCaptionSegments(half);
+        kept.push((await hasLoopedSegment(clean)) ? [] : (clean.chunks ?? []));
+      }
+      const joined = joinHalves(kept[0], kept[1], middle / sampleRate);
+      return countWords(spanText(joined)) >=
+        countWords(result.text) + splitMinGain
+        ? { text: spanText(joined), chunks: joined, segments: [joined] }
+        : result;
+    };
+
+    for (const [index, result] of outputs.entries()) {
+      outputs[index] = await splitInHalves(result, audios[index]);
     }
 
     return outputs.map((result) => extractWords(result.chunks ?? []));
