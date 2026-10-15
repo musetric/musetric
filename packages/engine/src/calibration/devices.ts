@@ -10,8 +10,15 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 
+const readMediaDevices = (): MediaDevices | undefined =>
+  'mediaDevices' in navigator ? navigator.mediaDevices : undefined;
+
 const enumerateAudioDevices = async () => {
-  const devices = await navigator.mediaDevices.enumerateDevices();
+  const mediaDevices = readMediaDevices();
+  if (!mediaDevices) {
+    return [];
+  }
+  const devices = await mediaDevices.enumerateDevices();
   return devices.filter(
     (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
   );
@@ -191,12 +198,13 @@ export const createCalibrationDevices = (
           console.error('Failed to refresh audio devices', error);
         });
       };
-      navigator.mediaDevices.addEventListener('devicechange', listener);
+      const mediaDevices = readMediaDevices();
+      mediaDevices?.addEventListener('devicechange', listener);
       void apply().catch((error: unknown) => {
         console.error('Failed to refresh audio devices', error);
       });
       return () => {
-        navigator.mediaDevices.removeEventListener('devicechange', listener);
+        mediaDevices?.removeEventListener('devicechange', listener);
       };
     },
   };
