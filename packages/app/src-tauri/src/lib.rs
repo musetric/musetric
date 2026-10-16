@@ -23,6 +23,8 @@ mod executor_view;
 mod lifecycle;
 #[cfg(target_os = "ios")]
 mod microphone;
+#[cfg(target_os = "ios")]
+mod share;
 #[cfg(desktop)]
 mod update;
 
@@ -64,7 +66,8 @@ fn run_app() -> tauri::Result<()> {
     #[cfg(target_os = "ios")]
     let builder = tauri::Builder::default()
         .plugin(executor_view::init())
-        .plugin(microphone::init());
+        .plugin(microphone::init())
+        .plugin(share::init());
     let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(desktop)]
