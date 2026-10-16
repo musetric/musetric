@@ -1,6 +1,6 @@
 import { assertDefined, nextNumber } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
-import { type EngineAudioSession } from '../audioSession/index.js';
+import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
 import {

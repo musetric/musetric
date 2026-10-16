@@ -1,9 +1,11 @@
 import {
-  createMicrophoneAudioConstraints,
-  mobileUserAgentPattern,
+  isMobileUserAgent,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
-import { type EngineAudioSession } from '../audioSession/index.js';
+import {
+  type EngineAudioSession,
+  type EngineMicrophone,
+} from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import { applyRecordingLatencyEstimate } from './estimate.js';
@@ -30,18 +32,18 @@ export type CalibrationPreviewOptions = {
 
 export type CalibrationPreview = {
   open: () => () => void;
-  getStream: () => MediaStream | undefined;
+  getMicrophone: () => EngineMicrophone | undefined;
 };
 
 export const createCalibrationPreview = (
   options: CalibrationPreviewOptions,
 ): CalibrationPreview => {
   const { context, audioSession, store, refreshDevices } = options;
-  let activeStream: MediaStream | undefined = undefined;
+  let activeMicrophone: EngineMicrophone | undefined = undefined;
 
   const open = () => {
     const lifecycle = { cancelled: false, generation: 0 };
-    let source: MediaStreamAudioSourceNode | undefined = undefined;
+    let source: AudioNode | undefined = undefined;
     let analyser: AnalyserNode | undefined = undefined;
     let animationFrame: number | undefined = undefined;
 
@@ -58,9 +60,9 @@ export const createCalibrationPreview = (
 
     const teardown = () => {
       stopMeter();
-      if (activeStream) {
-        audioSession.closeMicrophone(activeStream);
-        activeStream = undefined;
+      if (activeMicrophone) {
+        audioSession.closeMicrophone(activeMicrophone);
+        activeMicrophone = undefined;
       }
       store.update((draft) => {
         draft.inputLevel = 0;
@@ -78,14 +80,14 @@ export const createCalibrationPreview = (
       animationFrame = requestAnimationFrame(updateLevel);
     };
 
-    const openStream = async () => {
+    const openInput = async () => {
       const current = ++lifecycle.generation;
       const isStale = (): boolean =>
         lifecycle.cancelled || current !== lifecycle.generation;
       stopMeter();
-      if (activeStream) {
-        audioSession.closeMicrophone(activeStream);
-        activeStream = undefined;
+      if (activeMicrophone) {
+        audioSession.closeMicrophone(activeMicrophone);
+        activeMicrophone = undefined;
       }
       store.update((draft) => {
         draft.inputLevel = 0;
@@ -106,45 +108,52 @@ export const createCalibrationPreview = (
         }
         const inputDevice = resolveAudioInputDevice(devices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+          preferBuiltIn: isMobileUserAgent(navigator),
         });
-        const stream = await audioSession.openMicrophone({
-          audio: createMicrophoneAudioConstraints({
-            deviceId: inputDevice?.deviceId,
-            sampleRate: context.sampleRate,
-          }),
+        const microphone = await audioSession.openMicrophone({
+          deviceId: inputDevice?.deviceId,
         });
         if (isStale()) {
-          audioSession.closeMicrophone(stream);
+          audioSession.closeMicrophone(microphone);
           return;
         }
-        activeStream = stream;
+        activeMicrophone = microphone;
 
         const refreshedDevices = await refreshDevices();
-        if (isStale() || activeStream !== stream) {
+        if (isStale() || activeMicrophone !== microphone) {
           return;
         }
         const expectedInputDevice = resolveAudioInputDevice(refreshedDevices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+          preferBuiltIn: isMobileUserAgent(navigator),
         });
-        const [track] = stream.getAudioTracks();
-        const currentDeviceId = track.getSettings().deviceId;
+        const currentDeviceId = microphone.getSettings().deviceId;
+        let previewMicrophone = microphone;
         if (
           expectedInputDevice &&
           currentDeviceId &&
           expectedInputDevice.deviceId !== currentDeviceId
         ) {
-          audioSession.closeMicrophone(stream);
-          activeStream = undefined;
-          return;
+          audioSession.closeMicrophone(microphone);
+          activeMicrophone = undefined;
+          previewMicrophone = await audioSession.openMicrophone({
+            deviceId: expectedInputDevice.deviceId,
+          });
+          if (isStale()) {
+            audioSession.closeMicrophone(previewMicrophone);
+            return;
+          }
+          activeMicrophone = previewMicrophone;
         }
 
-        applyRecordingLatencyEstimate(store, { context, stream });
+        applyRecordingLatencyEstimate(store, {
+          context,
+          microphone: previewMicrophone,
+        });
 
         analyser = context.createAnalyser();
         analyser.fftSize = 1024;
-        source = context.createMediaStreamSource(stream);
+        source = previewMicrophone.createSource();
         source.connect(analyser);
         updateLevel();
       } catch (error) {
@@ -163,13 +172,13 @@ export const createCalibrationPreview = (
       state.audioOutputDeviceId;
 
     const unsubscribeInput = store.subscribe(trackedInputDeviceId, () => {
-      void openStream();
+      void openInput();
     });
     const unsubscribeOutput = store.subscribe(trackedOutputDeviceId, () => {
-      void openStream();
+      void openInput();
     });
 
-    void openStream();
+    void openInput();
 
     return () => {
       lifecycle.cancelled = true;
@@ -181,6 +190,6 @@ export const createCalibrationPreview = (
 
   return {
     open,
-    getStream: () => activeStream,
+    getMicrophone: () => activeMicrophone,
   };
 };

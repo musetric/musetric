@@ -1,10 +1,11 @@
 import { estimateRecordingLatency } from '@musetric/audio/recording';
+import { type EngineMicrophone } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 
 export type CalibrationEstimateOptions = {
   context: AudioContext;
-  stream: MediaStream;
+  microphone: EngineMicrophone;
 };
 
 export const applyRecordingLatencyEstimate = (
@@ -14,7 +15,8 @@ export const applyRecordingLatencyEstimate = (
   const state = store.get();
   const estimate = estimateRecordingLatency({
     context: options.context,
-    stream: options.stream,
+    microphone: options.microphone.getSettings(),
+    outputLatency: options.microphone.outputLatency,
     devices: state.audioDevices,
     outputDeviceId: state.audioOutputDeviceId,
   });

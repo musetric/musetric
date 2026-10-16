@@ -2,27 +2,14 @@ import {
   getRealAudioInputDevices,
   getRealAudioOutputDevices,
   getRecordingLatencyDevicePairKey,
-  mobileUserAgentPattern,
+  isMobileUserAgent,
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
-
-const readMediaDevices = (): MediaDevices | undefined =>
-  'mediaDevices' in navigator ? navigator.mediaDevices : undefined;
-
-const enumerateAudioDevices = async () => {
-  const mediaDevices = readMediaDevices();
-  if (!mediaDevices) {
-    return [];
-  }
-  const devices = await mediaDevices.enumerateDevices();
-  return devices.filter(
-    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
-  );
-};
 
 type DeviceAvailability = {
   inputDeviceAvailable: boolean;
@@ -70,7 +57,7 @@ const resolveNextDevices = (
       : undefined;
   const nextInputDevice = resolveAudioInputDevice(devices, {
     explicitDeviceId: nextMicrophoneDeviceId,
-    preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+    preferBuiltIn: isMobileUserAgent(navigator),
   });
   const nextOutputDevice = resolveAudioOutputDevice(devices, {
     explicitDeviceId: nextOutputDeviceId,
@@ -109,6 +96,7 @@ const resetLostDevices = async (
 export type CalibrationDevicesOptions = {
   store: Store<EngineState>;
   audioOutput: EngineAudioOutput;
+  audioSession: EngineAudioSession;
   onInitialDevicePair: (devicePairKey: string) => void;
   onDeviceLost: (devicePairKey: string) => void;
   onActiveDeviceChanged: (devicePairKey: string) => void;
@@ -125,6 +113,7 @@ export const createCalibrationDevices = (
   const {
     store,
     audioOutput,
+    audioSession,
     onInitialDevicePair,
     onDeviceLost,
     onActiveDeviceChanged,
@@ -134,7 +123,7 @@ export const createCalibrationDevices = (
   let previousOutputDeviceId: string | undefined = undefined;
 
   const apply = async (): Promise<MediaDeviceInfo[]> => {
-    const devices = await enumerateAudioDevices();
+    const devices = await audioSession.enumerateDevices();
     const state = store.get();
     const availability = getDeviceAvailability(
       state,
@@ -198,14 +187,11 @@ export const createCalibrationDevices = (
           console.error('Failed to refresh audio devices', error);
         });
       };
-      const mediaDevices = readMediaDevices();
-      mediaDevices?.addEventListener('devicechange', listener);
+      const unsubscribe = audioSession.subscribeDevices(listener);
       void apply().catch((error: unknown) => {
         console.error('Failed to refresh audio devices', error);
       });
-      return () => {
-        mediaDevices?.removeEventListener('devicechange', listener);
-      };
+      return unsubscribe;
     },
   };
 };

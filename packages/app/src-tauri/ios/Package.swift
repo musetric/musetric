@@ -3,22 +3,22 @@
 import PackageDescription
 
 let package = Package(
-  name: "musetric-executor-view",
+  name: "musetric-ios",
   platforms: [
     .iOS(.v14)
   ],
   products: [
     .library(
-      name: "musetric-executor-view",
+      name: "musetric-ios",
       type: .static,
-      targets: ["musetric-executor-view"])
+      targets: ["musetric-ios"])
   ],
   dependencies: [
     .package(name: "Tauri", path: "../.tauri/tauri-api")
   ],
   targets: [
     .target(
-      name: "musetric-executor-view",
+      name: "musetric-ios",
       dependencies: [
         .byName(name: "Tauri")
       ],
