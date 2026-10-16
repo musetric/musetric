@@ -2,12 +2,12 @@ import { Box } from '@mui/material';
 import { type TimelineMode } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
-import { useSettingsStore } from '../settings/store.js';
 import { subscribePlayheadDrag } from './subscribePlayheadDrag.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
 } from './visualizationRender.js';
+import { getVisualizationView } from './visualizationView.js';
 
 export type VisualizationCursorProps = {
   mode: TimelineMode;
@@ -36,7 +36,7 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
 
     const render = () => {
       const { frameCount, frameIndex } = engine.store.get();
-      const { playheadRatio } = useSettingsStore.getState();
+      const { playheadRatio } = getVisualizationView();
       const waveformCursorRatio = frameCount ? frameIndex / frameCount : 0;
       const cursorRatio =
         mode === 'tracks' ? waveformCursorRatio : playheadRatio;
@@ -61,7 +61,7 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
       resizeTarget: parentElement,
       onResize: resize,
       render,
-      engineKeys: ['frameCount', 'frameIndex'],
+      engineKeys: ['frameCount', 'frameIndex', 'viewWindow'],
       settingsKeys: ['playheadRatio'],
     });
 

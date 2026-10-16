@@ -7,6 +7,7 @@ import { TempoButton } from '../buttons/TempoButton.js';
 import { TransposeButton } from '../buttons/TransposeButton.js';
 import { DetailsViewToggle } from '../buttons/viewToggle/DetailsViewToggle.js';
 import { SpectrogramViewToggle } from '../buttons/viewToggle/SpectrogramViewToggle.js';
+import { LoopTries } from '../loop/LoopTries.js';
 import { MixButton } from '../mix/MixButton.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
@@ -29,6 +30,7 @@ const phoneRowSx = (theme: Theme) => ({
 
 export const PlaybackPanel: FC = () => (
   <Stack sx={{ width: '100%' }}>
+    <LoopTries />
     <PlayerProgress />
     <Box
       sx={(theme) => ({

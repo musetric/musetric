@@ -18,11 +18,17 @@ export type MetronomeConfigMessage = {
   volume: number;
 };
 
+export type MetronomeWrap = {
+  endFrame: number;
+  startFrame: number;
+};
+
 export type MetronomeProcessParams = {
   oldFrameIndex: number;
   newFrameIndex: number;
   outputs: Float32Array[];
   outputFrameCount: number;
+  wrap?: MetronomeWrap;
 };
 
 export type Metronome = {
@@ -70,13 +76,14 @@ export const createMetronome = (sampleRate: number): Metronome => {
   const triggerBeats = (
     oldFrameIndex: number,
     newFrameIndex: number,
+    outputStart: number,
     outputFrameCount: number,
   ): void => {
     if (beatsInSamples === undefined) {
       return;
     }
     const advancedFrameCount = newFrameIndex - oldFrameIndex;
-    if (advancedFrameCount <= 0) {
+    if (advancedFrameCount <= 0 || outputFrameCount <= 0) {
       return;
     }
     while (nextBeatIndex < beatsInSamples.length) {
@@ -89,13 +96,15 @@ export const createMetronome = (sampleRate: number): Metronome => {
         continue;
       }
       const beatOffset = beatFrame - oldFrameIndex;
-      const startOffset = Math.min(
-        outputFrameCount - 1,
-        Math.max(
-          0,
-          Math.floor((beatOffset / advancedFrameCount) * outputFrameCount),
-        ),
-      );
+      const startOffset =
+        outputStart +
+        Math.min(
+          outputFrameCount - 1,
+          Math.max(
+            0,
+            Math.floor((beatOffset / advancedFrameCount) * outputFrameCount),
+          ),
+        );
       const accent =
         downbeatMask !== undefined &&
         nextBeatIndex < downbeatMask.length &&
@@ -163,10 +172,31 @@ export const createMetronome = (sampleRate: number): Metronome => {
     },
     clear: clearTicks,
     process: (params) => {
-      const { oldFrameIndex, newFrameIndex, outputs, outputFrameCount } =
+      const { oldFrameIndex, newFrameIndex, outputs, outputFrameCount, wrap } =
         params;
+      if (!wrap) {
+        if (enabled) {
+          triggerBeats(oldFrameIndex, newFrameIndex, 0, outputFrameCount);
+        }
+        renderTicks(outputs, outputFrameCount);
+        return;
+      }
+      const before = wrap.endFrame - oldFrameIndex;
+      const after = newFrameIndex - wrap.startFrame;
+      const split = Math.round(
+        (outputFrameCount * before) / Math.max(1, before + after),
+      );
       if (enabled) {
-        triggerBeats(oldFrameIndex, newFrameIndex, outputFrameCount);
+        triggerBeats(oldFrameIndex, wrap.endFrame, 0, split);
+      }
+      seekBeatCursor(wrap.startFrame);
+      if (enabled) {
+        triggerBeats(
+          wrap.startFrame,
+          newFrameIndex,
+          split,
+          outputFrameCount - split,
+        );
       }
       renderTicks(outputs, outputFrameCount);
     },

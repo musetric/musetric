@@ -4,14 +4,16 @@ import { type FC } from 'react';
 
 export type SubtitleWordProps = {
   word: api.subtitle.Word;
+  index: number;
 };
 
 export const SubtitleWord: FC<SubtitleWordProps> = (props) => {
-  const { word } = props;
+  const { word, index } = props;
 
   return (
     <Box
       component='span'
+      data-subtitle-word-index={index}
       data-subtitle-word-start={word.start}
       data-subtitle-word-end={word.end}
       sx={{

@@ -1,9 +1,14 @@
 import { type api } from '@musetric/api';
 import { type RefObject, useLayoutEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
+import { moveLoopToTime } from '../loop/moveLoopToTime.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
 import { createSubtitleFollowController } from './subtitleFollowController.js';
-import { getSubtitleSeekFrameIndex } from './subtitleSeek.js';
+import {
+  getSubtitleSeekFrameIndex,
+  subtitleSeekLeadSeconds,
+} from './subtitleSeek.js';
+import { createSubtitleWordDrag } from './subtitleWordDrag.js';
 
 export const useSubtitleFollowScroll = (
   subtitle: api.subtitle.Segment[],
@@ -14,6 +19,7 @@ export const useSubtitleFollowScroll = (
     const element = subtitleListRef.current;
     if (!element) return;
 
+    const wordDrag = createSubtitleWordDrag(element, subtitle);
     const controller = createSubtitleFollowController({
       element,
       cursor: subtitleCursor,
@@ -24,15 +30,24 @@ export const useSubtitleFollowScroll = (
       getSeekFrameIndex: (playbackTime) =>
         getSubtitleSeekFrameIndex(playbackTime, engine.store.get()),
       seek: (frameIndex) => {
+        const time =
+          frameIndex / engine.context.sampleRate + subtitleSeekLeadSeconds;
+        if (moveLoopToTime(subtitle, time)) {
+          return;
+        }
         engine.player.seek(frameIndex, 'subtitle');
       },
       isIgnoredSeekOrigin: (origin) =>
+        wordDrag.isActive() ||
         origin === 'playhead' ||
         origin === 'spectrogramVisualization' ||
         origin === 'tracksVisualization',
     });
     controller.reset();
 
-    return controller.dispose;
+    return () => {
+      wordDrag.dispose();
+      controller.dispose();
+    };
   }, [subtitle, subtitleCursor, subtitleListRef]);
 };

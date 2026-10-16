@@ -1,6 +1,8 @@
+import { clampToRange } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useSettingsStore } from '../settings/store.js';
+import { getVisualizationView } from './visualizationView.js';
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Math.max(minimum, Math.min(value, maximum));
@@ -8,6 +10,7 @@ const clamp = (value: number, minimum: number, maximum: number): number =>
 type PlayheadDrag = {
   pointerId: number;
   viewStartFrame: number;
+  viewFrameCount: number;
 };
 
 export const subscribePlayheadDrag = (
@@ -17,9 +20,6 @@ export const subscribePlayheadDrag = (
   const freeze = createInteractionFreeze();
   let drag: PlayheadDrag | undefined = undefined;
 
-  const visibleFrames = () =>
-    useSettingsStore.getState().visibleTime * engine.context.sampleRate;
-
   const handlePointerDown = (event: PointerEvent) => {
     if (!event.isPrimary || event.button !== 0) return;
     const { frameIndex, frameCount } = engine.store.get();
@@ -27,10 +27,12 @@ export const subscribePlayheadDrag = (
     event.stopPropagation();
     event.preventDefault();
     handle.setPointerCapture(event.pointerId);
-    const { playheadRatio } = useSettingsStore.getState();
+    const { visibleTime, playheadRatio } = getVisualizationView();
+    const viewFrameCount = visibleTime * engine.context.sampleRate;
     drag = {
       pointerId: event.pointerId,
-      viewStartFrame: frameIndex - playheadRatio * visibleFrames(),
+      viewStartFrame: frameIndex - playheadRatio * viewFrameCount,
+      viewFrameCount,
     };
     freeze.freeze();
   };
@@ -41,18 +43,20 @@ export const subscribePlayheadDrag = (
     event.preventDefault();
     const rect = area.getBoundingClientRect();
     if (rect.width <= 0) return;
-    const frames = visibleFrames();
+    const { viewStartFrame, viewFrameCount } = drag;
+    const { frameCount = 0, range, viewWindow } = engine.store.get();
     const pointerRatio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const frameIndex = Math.round(
-      clamp(
-        drag.viewStartFrame + pointerRatio * frames,
-        0,
-        engine.store.get().frameCount ?? 0,
+      clampToRange(
+        clamp(viewStartFrame + pointerRatio * viewFrameCount, 0, frameCount),
+        range,
       ),
     );
-    useSettingsStore
-      .getState()
-      .setPlayheadRatio((frameIndex - drag.viewStartFrame) / frames);
+    if (!viewWindow) {
+      useSettingsStore
+        .getState()
+        .setPlayheadRatio((frameIndex - viewStartFrame) / viewFrameCount);
+    }
     engine.player.seek(frameIndex, 'playhead');
   };
 

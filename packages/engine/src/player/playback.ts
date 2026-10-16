@@ -27,6 +27,7 @@ export type EnginePlayback = {
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
     notificationPort: MessagePort;
+    pass?: boolean;
   }) => void;
   flushRecording: () => Promise<number>;
 };
@@ -52,6 +53,8 @@ export type CreateEnginePlaybackOptions = {
   playheadPort: MessagePort;
   playheadPorts: MessagePort[];
   onPlaybackEnded?: () => void;
+  onRecordingPassStarted?: () => void;
+  onRecordingPassEnded?: (complete: boolean) => void;
 };
 
 type PlayingWaiter = {
@@ -63,7 +66,8 @@ export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
   const { context, audioOutput, store, decoderPort, playheadPorts } = options;
-  const { onPlaybackEnded } = options;
+  const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
+    options;
   const playhead = createPlayhead(options.playheadPort);
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
@@ -109,6 +113,12 @@ export const createEnginePlayback = async (
     recordingFlushed: (message) => {
       recordingFlushPromise?.resolve(message.sequence);
       recordingFlushPromise = undefined;
+    },
+    recordingPassStarted: () => {
+      onRecordingPassStarted?.();
+    },
+    recordingPassEnded: (message) => {
+      onRecordingPassEnded?.(message.complete);
     },
     setPlaying: (message) => {
       const currentRevision = isCurrentRevision(message.revision);
@@ -217,6 +227,18 @@ export const createEnginePlayback = async (
       volume: state.metronomeVolume,
     });
   };
+  const publishRange = () => {
+    const { range, rangeRepeat, rangeStopFrame } = store.get();
+    port.methods.setRange({
+      range: range && { fromFrame: range.fromFrame, toFrame: range.toFrame },
+      repeat: rangeRepeat,
+      stopFrame: rangeStopFrame,
+    });
+  };
+  store.subscribe((state) => state.range, publishRange);
+  store.subscribe((state) => state.rangeRepeat, publishRange);
+  store.subscribe((state) => state.rangeStopFrame, publishRange);
+
   store.subscribe((state) => state.metronomeEnabled, publishMetronome);
   store.subscribe((state) => state.metronomeVolume, publishMetronome);
   store.subscribe((state) => state.metronomeBeats, publishMetronome);

@@ -2,44 +2,52 @@ import { assertDefined, nextNumber } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import { type EngineSeekOrigin, type EngineState } from '../state.js';
+import {
+  clampToRange,
+  type EngineSeekOrigin,
+  type EngineState,
+} from '../state.js';
+import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
 import {
   createEnginePlayback,
   createEngineStubPlayback,
   type EnginePlayback,
 } from './playback.js';
+import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
+import { createStartPlayback } from './startPlayback.js';
 import { encodeMonoWav } from './wav.js';
 
-export type EnginePlayer = {
-  boot: () => Promise<void>;
-  play: () => Promise<void>;
-  stop: () => Promise<void>;
-  seek: (frameIndex: number, origin: EngineSeekOrigin) => void;
-  setFrozen: (frozen: boolean) => void;
-  record: (projectId: number) => Promise<void>;
-  stopRecording: () => Promise<void>;
-  exportRecording: () => Promise<File | undefined>;
-  applyRemoteStop: () => Promise<void>;
-  applyRemoteFrameIndex: (
-    frameIndex: number,
-    frozen: boolean,
-    revision: number,
-    source: 'playback' | 'user',
-  ) => void;
-  applyRemotePlayState: (state: {
-    playing: boolean;
-    recording: boolean;
-  }) => Promise<void>;
-  applyRemoteSyncState: (state: {
-    isSlave: boolean;
-    playing: boolean;
-    recording: boolean;
-    frozen: boolean;
-    frameIndex: number;
-    revision: number;
-  }) => Promise<void>;
-};
+export type EnginePlayer = EnginePlayerLoop &
+  EnginePlayerRange & {
+    boot: () => Promise<void>;
+    play: () => Promise<void>;
+    stop: () => Promise<void>;
+    seek: (frameIndex: number, origin: EngineSeekOrigin) => void;
+    setFrozen: (frozen: boolean) => void;
+    record: (projectId: number) => Promise<void>;
+    stopRecording: () => Promise<void>;
+    exportRecording: () => Promise<File | undefined>;
+    applyRemoteStop: () => Promise<void>;
+    applyRemoteFrameIndex: (
+      frameIndex: number,
+      frozen: boolean,
+      revision: number,
+      source: 'playback' | 'user',
+    ) => void;
+    applyRemotePlayState: (state: {
+      playing: boolean;
+      recording: boolean;
+    }) => Promise<void>;
+    applyRemoteSyncState: (state: {
+      isSlave: boolean;
+      playing: boolean;
+      recording: boolean;
+      frozen: boolean;
+      frameIndex: number;
+      revision: number;
+    }) => Promise<void>;
+  };
 
 export type CreateEnginePlayerOptions = {
   context: AudioContext;
@@ -64,7 +72,13 @@ export const createEnginePlayer = (
 
   const getDecoderValue = () => getDecoder();
 
-  return {
+  const startPlayback = createStartPlayback({
+    store,
+    getDecoder,
+    getEnginePlayback: () => enginePlayback,
+  });
+
+  const ref: EnginePlayer = {
     boot: async () => {
       enginePlayback = await createEnginePlayback({
         context,
@@ -79,6 +93,12 @@ export const createEnginePlayer = (
             getDecoderValue().sendPlayerStop();
           }
         },
+        onRecordingPassStarted: () => {
+          engineRecorder?.handlePassStarted();
+        },
+        onRecordingPassEnded: (complete) => {
+          engineRecorder?.handlePassEnded(complete);
+        },
       });
       engineRecorder = createEngineRecorder({
         context,
@@ -89,33 +109,11 @@ export const createEnginePlayer = (
       await enginePlayback.boot();
     },
     play: async () => {
-      const currentState = store.get();
-      if (
-        currentState.playerCommandPending ||
-        currentState.playing ||
-        currentState.isSlave
-      ) {
-        return;
-      }
-
       store.update((draft) => {
-        draft.playing = true;
-        draft.playerCommandPending = true;
+        draft.rangeRepeat = 'cycle';
+        draft.rangeStopFrame = undefined;
       });
-      try {
-        getDecoderValue().sendPlayerPlay();
-        await enginePlayback.play();
-      } catch (error) {
-        getDecoderValue().sendPlayerStop();
-        store.update((draft) => {
-          draft.playing = false;
-        });
-        throw error;
-      } finally {
-        store.update((draft) => {
-          draft.playerCommandPending = false;
-        });
-      }
+      await startPlayback();
     },
     stop: async () => {
       if (store.get().playerCommandPending) {
@@ -141,7 +139,8 @@ export const createEnginePlayer = (
         });
       }
     },
-    seek: (frameIndex, origin) => {
+    seek: (requestedFrameIndex, origin) => {
+      const frameIndex = clampToRange(requestedFrameIndex, store.get().range);
       store.update((state) => {
         state.frameIndex = frameIndex;
         state.playerFrameIndexPending = true;
@@ -237,6 +236,24 @@ export const createEnginePlayer = (
         });
       }
     },
+    ...createEnginePlayerRange({
+      store,
+      seek: (frameIndex) => {
+        ref.seek(frameIndex, 'player');
+      },
+      startPlayback,
+    }),
+    ...createEnginePlayerLoop({
+      store,
+      getDecoder,
+      getEngineRecorder,
+      seek: (frameIndex) => {
+        ref.seek(frameIndex, 'player');
+      },
+      setRange: (range) => {
+        ref.setRange(range);
+      },
+    }),
     exportRecording: async () => {
       const samples = await getDecoderValue().exportRecording();
       if (samples.every((sample) => sample === 0)) {
@@ -329,4 +346,6 @@ export const createEnginePlayer = (
       enginePlayback.setFrozen(state.frozen);
     },
   };
+
+  return ref;
 };

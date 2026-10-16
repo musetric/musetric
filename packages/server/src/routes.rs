@@ -632,6 +632,78 @@ mod tests {
         assert_eq!(freed.status(), StatusCode::OK);
     }
 
+    fn take_form(start_frame: u32, samples: &[f32]) -> (String, Vec<u8>) {
+        let boundary = "loop-try";
+        let mut body = Vec::new();
+        let fields = [
+            ("startFrame", start_frame.to_string()),
+            ("tempo", "1".to_owned()),
+            ("transpose", "0".to_owned()),
+            ("octave", "0".to_owned()),
+            ("sampleRate", "44100".to_owned()),
+            ("frameCount", "441000".to_owned()),
+        ];
+        for (name, value) in fields {
+            body.extend_from_slice(
+                format!(
+                    "--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+                )
+                .as_bytes(),
+            );
+        }
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"samples\"; filename=\"take.f32\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+            )
+            .as_bytes(),
+        );
+        for sample in samples {
+            body.extend_from_slice(&sample.to_le_bytes());
+        }
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        (format!("multipart/form-data; boundary={boundary}"), body)
+    }
+
+    async fn send_take(router: Router, start_frame: u32, samples: &[f32]) -> Response<Body> {
+        let (content_type, body) = take_form(start_frame, samples);
+        let request = Request::builder()
+            .method("POST")
+            .uri(format!("{RECORDINGS_URL}/1/take"))
+            .header("content-type", content_type)
+            .body(Body::from(body))
+            .expect("the request should be valid");
+        router
+            .oneshot(request)
+            .await
+            .expect("the router should answer")
+    }
+
+    #[tokio::test]
+    async fn inserts_a_loop_try_as_the_fresh_take() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
+        let state = create_route_state(&workspace, workspace.create_storage()).await;
+        let saving = state.rooms.begin_edit(1).expect("the room should be free");
+        let router = create_router(state.clone());
+
+        let refused = send_take(router.clone(), 4410, &[0.5; 8]).await;
+        assert_eq!(refused.status(), StatusCode::CONFLICT);
+        state.rooms.end_session(1, saving);
+
+        let inserted = send_take(router.clone(), 4410, &[0.5; 8]).await;
+        assert_eq!(inserted.status(), StatusCode::OK);
+        let response = request(router, RECORDING_PIECES_URL).await;
+        let listed: serde_json::Value =
+            serde_json::from_str(&read_body(response).await).expect("the pieces should be json");
+        let pieces = listed["pieces"]
+            .as_array()
+            .expect("the pieces should be a list");
+        assert_eq!(pieces.len(), 1);
+        assert_eq!(pieces[0]["songStartFrame"], 4410);
+        assert_eq!(pieces[0]["frameCount"], 8);
+    }
+
     #[tokio::test]
     async fn keeps_a_recording_inside_its_own_project() {
         let workspace = Workspace::new();

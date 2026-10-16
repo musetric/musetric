@@ -8,6 +8,11 @@ import {
   type RecordingDataMethods,
 } from '../player/protocol.cross.js';
 
+export type SpectrogramViewWindow = {
+  startFrame: number;
+  frameCount: number;
+};
+
 export type SpectrogramOutboundMethods = {
   boot: (message: { dataPort: MessagePort; playheadPort: MessagePort }) => void;
   mount: (message: {
@@ -19,6 +24,7 @@ export type SpectrogramOutboundMethods = {
   setFrameCount: (message: { frameCount: number }) => void;
   setPlaying: (message: { playing: boolean }) => void;
   updateConfig: (message: { patch: Partial<SpectrogramConfig> }) => void;
+  setViewWindow: (message: { window?: SpectrogramViewWindow }) => void;
 };
 
 export type SpectrogramInboundMethods = {
@@ -42,6 +48,7 @@ export const spectrogramChannel = createMessageChannel<
       'setFrameCount',
       'setPlaying',
       'updateConfig',
+      'setViewWindow',
     ],
     transfers: {
       boot: (message) => [message.dataPort, message.playheadPort],

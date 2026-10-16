@@ -442,6 +442,57 @@ async fn change_history(rooms: &Rooms, connection: &Connection, recording_id: i6
     }
 }
 
+pub(crate) struct InsertedTake {
+    pub(crate) format: TakeFormat,
+    pub(crate) start_frame: u32,
+    pub(crate) samples: Vec<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TakeInsert {
+    Inserted,
+    Busy,
+    Inactive,
+}
+
+pub(crate) async fn insert_take(
+    rooms: &Rooms,
+    storage: &Arc<Storage>,
+    (project_id, recording_id): (i64, i64),
+    take: InsertedTake,
+) -> Result<TakeInsert, BoxedError> {
+    let Some(editor) = rooms.begin_edit(project_id) else {
+        return Ok(TakeInsert::Busy);
+    };
+    let written = write_inserted_take(storage, (project_id, recording_id), take).await;
+    rooms.end_session(project_id, editor);
+    let outcome = written?;
+    if outcome == TakeInsert::Inserted {
+        rooms.broadcast_event(project_id, &events::recording_changed(recording_id), None);
+        announce_recordings(rooms, storage, project_id).await;
+    }
+    Ok(outcome)
+}
+
+async fn write_inserted_take(
+    storage: &Arc<Storage>,
+    (project_id, recording_id): (i64, i64),
+    take: InsertedTake,
+) -> Result<TakeInsert, BoxedError> {
+    if !is_active_recording(storage, project_id, recording_id).await? {
+        return Ok(TakeInsert::Inactive);
+    }
+    let mut session =
+        session::Session::create(storage, project_id, recording_id, take.format).await?;
+    session
+        .write_chunk(take.start_frame, 0, &take.samples)
+        .await?;
+    if session.finish(storage).await?.is_some() {
+        refresh_peaks(storage, recording_id).await;
+    }
+    Ok(TakeInsert::Inserted)
+}
+
 pub(crate) async fn announce_recordings(rooms: &Rooms, storage: &Arc<Storage>, project_id: i64) {
     if let Ok(recordings) = read_recordings(storage, project_id).await {
         rooms.broadcast_event(project_id, &events::recording_list(&recordings), None);

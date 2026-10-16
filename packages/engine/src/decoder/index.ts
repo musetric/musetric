@@ -7,7 +7,7 @@ import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
-import { engineDecoderChannel } from './protocol.cross.js';
+import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
 
 const sanitizeLogMessage = (message: string) =>
   message.replace(/[\r\n\u2028\u2029]/g, ' ');
@@ -26,9 +26,15 @@ export type EngineDecoder = {
     tempo: number;
     transpose: number;
     octave: number;
+    draft: boolean;
     port: MessagePort;
   }) => void;
   finishRecordingStream: (sequence: number) => Promise<void>;
+  settleLoopTry: (keep: boolean) => Promise<SettledLoopTry | undefined>;
+  selectLoopTry: (tryId: string | undefined) => void;
+  deleteLoopTry: (tryId: string) => void;
+  discardLoopTries: () => void;
+  insertLoopTry: (projectId: number, tryId: string) => Promise<boolean>;
   exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
@@ -105,6 +111,9 @@ export const createEngineDecoder = (
   let recordingExportPromise:
     ControlledPromise<Float32Array<ArrayBuffer> | undefined> | undefined =
     undefined;
+  let loopTrySettlePromise:
+    ControlledPromise<SettledLoopTry | undefined> | undefined = undefined;
+  let loopTryInsertPromise: ControlledPromise<boolean> | undefined = undefined;
   const runtimeSampleRate = options.sampleRate;
 
   port.instance.onerror = () => {
@@ -148,6 +157,14 @@ export const createEngineDecoder = (
         state.frameCount = undefined;
         state.duration = 0;
         state.recordings = [];
+        state.range = undefined;
+        state.rangeRepeat = 'cycle';
+        state.rangeStopFrame = undefined;
+        state.loopStage = undefined;
+        state.viewWindow = undefined;
+        state.loopTries = [];
+        state.loopSelectedTryId = undefined;
+        state.loopTryPhase = undefined;
       });
     },
     recordingStreamFinished: () => {
@@ -177,6 +194,14 @@ export const createEngineDecoder = (
     recordingExportFailed: () => {
       recordingExportPromise?.resolve(undefined);
       recordingExportPromise = undefined;
+    },
+    loopTrySettled: (message) => {
+      loopTrySettlePromise?.resolve(message.loopTry);
+      loopTrySettlePromise = undefined;
+    },
+    loopTryInserted: (message) => {
+      loopTryInsertPromise?.resolve(message.inserted);
+      loopTryInsertPromise = undefined;
     },
     playerPlayRequested: onPlayerPlayRequested,
     playerRecordRequested: onPlayerRecordRequested,
@@ -227,6 +252,34 @@ export const createEngineDecoder = (
       }
       port.methods.finishRecordingStream({ sequence });
       await recordingStreamPromise.promise;
+    },
+    settleLoopTry: async (keep) => {
+      loopTrySettlePromise = createControlledPromise<
+        SettledLoopTry | undefined
+      >();
+      const { promise } = loopTrySettlePromise;
+      port.methods.settleLoopTry({ keep });
+      return await promise;
+    },
+    selectLoopTry: (tryId) => {
+      port.methods.selectLoopTry({ tryId });
+    },
+    deleteLoopTry: (tryId) => {
+      port.methods.deleteLoopTry({ tryId });
+    },
+    discardLoopTries: () => {
+      port.methods.discardLoopTries();
+    },
+    insertLoopTry: async (projectId, tryId) => {
+      loopTryInsertPromise = createControlledPromise<boolean>();
+      const { promise } = loopTryInsertPromise;
+      port.methods.insertLoopTry({
+        projectId,
+        tryId,
+        sampleRate: runtimeSampleRate,
+        frameCount: store.get().frameCount ?? 0,
+      });
+      return await promise;
     },
     exportRecording: async () => {
       recordingExportPromise ??= createControlledPromise<

@@ -1,7 +1,7 @@
 use axum::{
     Router,
     body::{Body, to_bytes},
-    extract::{Path, State},
+    extract::{DefaultBodyLimit, Multipart, Path, State},
     http::Request,
     response::Response,
     routing::{delete, get, patch, post},
@@ -10,9 +10,11 @@ use musetric_db::{BoxedError, RecordingOutcome, Writer};
 use serde_json::{Value, json};
 
 use crate::{
+    blobs::upload_area,
     failure::{Failure, finish, invalid_number},
-    realtime::{announce_recordings, recording_item},
-    recording::read_recordings,
+    form::{Field, Form, UploadTarget, read_form},
+    realtime::{InsertedTake, TakeInsert, announce_recordings, insert_take, recording_item},
+    recording::{TakeFormat, read_recordings},
     routes::{
         RouteState,
         item::{json_response, missing_message},
@@ -31,6 +33,10 @@ const LONG_NAME: &str = "body/name Too big: expected string to have <=64 charact
 const TAKEN_NAME: &str = "Another recording of this project already has this name";
 const LAST_RECORDING: &str = "A project keeps at least one recording";
 const BUSY: &str = "A take is being recorded or saved in this project";
+const INACTIVE: &str = "A take goes into the active recording only";
+const INVALID_TAKE: &str = "body Invalid take";
+const TAKE_LIMIT: usize = 256 * 1024 * 1024;
+const SAMPLES_FIELD: &str = "samples";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
@@ -51,6 +57,11 @@ pub(crate) fn create_router() -> Router<RouteState> {
             "/api/project/{projectId}/recording/{recordingId}/remove",
             delete(handle_remove),
         )
+        .route(
+            "/api/project/{projectId}/recording/{recordingId}/take",
+            post(handle_insert_take),
+        )
+        .layer(DefaultBodyLimit::max(TAKE_LIMIT))
 }
 
 pub(crate) fn read_ids(
@@ -245,4 +256,83 @@ async fn remove(
     .await?;
     settle(outcome, (project_id, recording_id), LAST_RECORDING)?;
     announced(state, project_id).await
+}
+
+async fn handle_insert_take(
+    State(state): State<RouteState>,
+    Path((raw_project_id, raw_recording_id)): Path<(String, String)>,
+    multipart: Multipart,
+) -> Response<Body> {
+    let ids = match read_ids(&raw_project_id, &raw_recording_id) {
+        Ok(ids) => ids,
+        Err(failure) => return finish(Err(failure)),
+    };
+    let area = upload_area(&state.storage.work_path);
+    let target = UploadTarget {
+        area: &area,
+        blobs_path: &state.storage.blobs_path,
+    };
+    let form = match read_form(multipart, target).await {
+        Ok(form) => form,
+        Err(failure) => return finish(Err(failure)),
+    };
+    let inserted = match read_take(&form).await {
+        Ok(take) => insert(&state, ids, take).await,
+        Err(failure) => Err(failure),
+    };
+    form.discard().await;
+    finish(inserted)
+}
+
+fn read_number<Number: std::str::FromStr>(form: &Form, name: &str) -> Result<Number, Failure> {
+    let Field::Text(text) = form.field(name) else {
+        return Err(Failure::Invalid(INVALID_TAKE.to_owned()));
+    };
+    text.trim()
+        .parse()
+        .map_err(|_| Failure::Invalid(INVALID_TAKE.to_owned()))
+}
+
+async fn read_take(form: &Form) -> Result<InsertedTake, Failure> {
+    let Field::File(file) = form.field(SAMPLES_FIELD) else {
+        return Err(Failure::Invalid(INVALID_TAKE.to_owned()));
+    };
+    let bytes = tokio::fs::read(file.staged.path())
+        .await
+        .map_err(Failure::failed)?;
+    let samples = bytes
+        .chunks_exact(4)
+        .map(|sample| f32::from_le_bytes([sample[0], sample[1], sample[2], sample[3]]))
+        .collect();
+    Ok(InsertedTake {
+        format: TakeFormat {
+            sample_rate: read_number(form, "sampleRate")?,
+            frame_count: read_number(form, "frameCount")?,
+            tempo: read_number(form, "tempo")?,
+            transpose: read_number(form, "transpose")?,
+            octave: read_number(form, "octave")?,
+        },
+        start_frame: read_number(form, "startFrame")?,
+        samples,
+    })
+}
+
+async fn insert(
+    state: &RouteState,
+    (project_id, recording_id): (i64, i64),
+    take: InsertedTake,
+) -> Result<Response<Body>, Failure> {
+    let inserted = insert_take(
+        &state.rooms,
+        &state.storage,
+        (project_id, recording_id),
+        take,
+    )
+    .await
+    .map_err(Failure::failed)?;
+    match inserted {
+        TakeInsert::Inserted => respond_with_list(state, project_id).await,
+        TakeInsert::Busy => Err(Failure::Conflict(BUSY.to_owned())),
+        TakeInsert::Inactive => Err(Failure::Conflict(INACTIVE.to_owned())),
+    }
 }

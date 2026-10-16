@@ -1,3 +1,8 @@
+export type MixTrackFrames = {
+  songFrame: (frame: number) => number;
+  gain: (songFrame: number) => number;
+};
+
 export type MixTrackIntoBuffersOptions = {
   inputBuffers: Float32Array[];
   outputFrameIndex: number;
@@ -6,6 +11,7 @@ export type MixTrackIntoBuffersOptions = {
   channelCount: number;
   track: Float32Array[] | undefined;
   volume: number;
+  frames?: MixTrackFrames;
 };
 
 export const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
@@ -17,6 +23,7 @@ export const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
     channelCount,
     track,
     volume,
+    frames,
   } = options;
   if (!track) {
     return;
@@ -32,9 +39,17 @@ export const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
     }
 
     const frameBase = outputFrameIndex + inputFrameOffset;
+    if (!frames) {
+      for (let offset = 0; offset < inputFrameCount; offset += 1) {
+        const sample = samples[frameBase + offset] ?? 0;
+        input[offset] += sample * volume;
+      }
+      continue;
+    }
     for (let offset = 0; offset < inputFrameCount; offset += 1) {
-      const sample = samples[frameBase + offset] ?? 0;
-      input[offset] += sample * volume;
+      const songFrame = frames.songFrame(frameBase + offset);
+      const sample = samples[songFrame] ?? 0;
+      input[offset] += sample * volume * frames.gain(songFrame);
     }
   }
 };

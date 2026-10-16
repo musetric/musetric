@@ -6,11 +6,11 @@ import {
 } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
-import { useSettingsStore } from '../settings/store.js';
 import {
   alignPixel,
   subscribeVisualizationRender,
 } from './visualizationRender.js';
+import { getVisualizationView } from './visualizationView.js';
 
 export type VisualizationTimelineProps = {
   mode: TimelineMode;
@@ -44,7 +44,7 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
 
     const render = () => {
       const { duration, frameIndex, frameCount } = engine.store.get();
-      const { visibleTime, playheadRatio } = useSettingsStore.getState();
+      const { visibleTime, playheadRatio } = getVisualizationView();
 
       processor.updateConfig({
         mode,
@@ -81,7 +81,7 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       resizeTarget: canvas,
       onResize: resize,
       render,
-      engineKeys: ['duration', 'frameCount', 'frameIndex'],
+      engineKeys: ['duration', 'frameCount', 'frameIndex', 'viewWindow'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 

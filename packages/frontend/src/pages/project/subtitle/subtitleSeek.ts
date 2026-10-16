@@ -1,4 +1,4 @@
-const subtitleSeekLeadSeconds = 0.15;
+export const subtitleSeekLeadSeconds = 0.15;
 
 export type SubtitleSeekState = {
   duration: number;

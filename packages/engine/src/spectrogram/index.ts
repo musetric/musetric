@@ -78,6 +78,13 @@ export const createEngineSpectrogram = (
   );
 
   store.subscribe(
+    (state) => state.viewWindow,
+    (window) => {
+      port.methods.setViewWindow({ window });
+    },
+  );
+
+  store.subscribe(
     (state) => state.frameCount,
     (frameCount) => {
       port.methods.setFrameCount({ frameCount: frameCount ?? 0 });

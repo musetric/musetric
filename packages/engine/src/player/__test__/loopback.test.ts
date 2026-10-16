@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { type LiveTakeChunk } from '../protocol.cross.js';
 import {
   blockSize,
   burstCenters,
@@ -7,48 +6,15 @@ import {
   burstSeconds,
   createHarness,
   createTakeStream,
+  nearestError,
   rate,
+  runSamples,
   settle,
   timingTolerance,
+  toRuns,
 } from './player.fixtures.js';
 
 const inputLatency = 384;
-
-const nearestError = (value: number, targets: readonly number[]): number =>
-  targets.reduce(
-    (best, target) =>
-      Math.abs(value - target) < Math.abs(best) ? value - target : best,
-    Number.POSITIVE_INFINITY,
-  );
-
-type TakeRun = {
-  startFrame: number;
-  chunks: LiveTakeChunk[];
-};
-
-const toRuns = (chunks: readonly LiveTakeChunk[]): TakeRun[] => {
-  const runs: TakeRun[] = [];
-  for (const chunk of chunks) {
-    const last = runs.at(-1);
-    if (last && chunk.offset > 0 && last.startFrame === chunk.startFrame) {
-      last.chunks.push(chunk);
-    } else {
-      runs.push({ startFrame: chunk.startFrame, chunks: [chunk] });
-    }
-  }
-  return runs;
-};
-
-const runSamples = (run: TakeRun): Float32Array => {
-  const last = run.chunks.at(-1);
-  const samples = new Float32Array(
-    last ? last.offset + last.samples.length : 0,
-  );
-  for (const chunk of run.chunks) {
-    samples.set(chunk.samples, chunk.offset);
-  }
-  return samples;
-};
 
 type Seek = {
   fromSeconds: number;

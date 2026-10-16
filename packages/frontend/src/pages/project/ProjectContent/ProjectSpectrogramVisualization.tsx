@@ -10,6 +10,9 @@ import {
   chordLaneHeight,
 } from '../chords/ChordLane.js';
 import { ChordsToggleButton } from '../chords/ChordsToggleButton.js';
+import { createLoopRangeGesture } from '../loop/createLoopRangeGesture.js';
+import { LoopOverlay } from '../loop/LoopOverlay.js';
+import { LoopPictureControls } from '../loop/LoopPictureControls.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
@@ -25,6 +28,8 @@ const leadBandTop = `calc(50% + ${stackedLaneGap / 2}px)`;
 
 const notesPickerInset = 32;
 
+const loopControlsBottom = 64;
+
 export const ProjectSpectrogramVisualization: FC = () => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -37,7 +42,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
   const spectrum = useEngineStore(
     (state) => state.spectrogramView === 'spectrum',
   );
-  useSpectrogramGesture(spectrogramAreaRef);
+  useSpectrogramGesture(spectrogramAreaRef, createLoopRangeGesture);
 
   return (
     <Box
@@ -68,6 +73,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
           sx={{ height: '100%', position: 'relative' }}
         >
           <SpectrogramCanvas />
+          <LoopOverlay />
           <SpectrogramNoteScale />
           {spectrum ? (
             <>
@@ -155,6 +161,16 @@ export const ProjectSpectrogramVisualization: FC = () => {
         }}
       >
         <ChordsToggleButton />
+      </Box>
+      <Box
+        sx={{
+          position: 'absolute',
+          right: 8,
+          bottom: loopControlsBottom,
+          zIndex: 2,
+        }}
+      >
+        <LoopPictureControls />
       </Box>
     </Box>
   );

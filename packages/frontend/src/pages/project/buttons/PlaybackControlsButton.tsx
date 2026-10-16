@@ -9,6 +9,9 @@ export const PlaybackControlsButton: FC = () => {
   const frameCount = useEngineStore((state) => state.frameCount);
   const playing = useEngineStore((state) => state.playing);
   const recording = useEngineStore((state) => state.recording);
+  const writing = useEngineStore(
+    (state) => state.recording && state.loopTryPhase !== 'armed',
+  );
   const active = playing || recording;
   const playingColor = active ? 'action.selected' : 'action.hover';
 
@@ -21,7 +24,7 @@ export const PlaybackControlsButton: FC = () => {
         display: 'flex',
         alignItems: 'center',
         borderRadius: 999,
-        backgroundColor: recording ? 'error.dark' : playingColor,
+        backgroundColor: writing ? 'error.dark' : playingColor,
         opacity: frameCount ? 1 : 0.5,
         transition: 'background-color 160ms linear',
       }}
