@@ -6,6 +6,7 @@ import {
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineAudioSession } from '../audioSession/index.js';
 import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import { type EngineState } from '../state.js';
@@ -64,6 +65,7 @@ export type EngineCalibration = {
 export type CreateEngineCalibrationOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
+  audioSession: EngineAudioSession;
   store: Store<EngineState>;
   getPlayer: () => EnginePlayer;
 };
@@ -71,7 +73,7 @@ export type CreateEngineCalibrationOptions = {
 export const createEngineCalibration = (
   options: CreateEngineCalibrationOptions,
 ): EngineCalibration => {
-  const { context, audioOutput, store, getPlayer } = options;
+  const { context, audioOutput, audioSession, store, getPlayer } = options;
   const latencyStore = createCalibrationLatencyStore();
 
   const restoreForCurrentDevices = () => {
@@ -110,6 +112,7 @@ export const createEngineCalibration = (
   const getPreview = (): CalibrationPreview => {
     preview ??= createCalibrationPreview({
       context,
+      audioSession,
       store,
       refreshDevices: async () => devices.refresh(),
     });
@@ -144,6 +147,7 @@ export const createEngineCalibration = (
       });
       const result = await measureRecordingLatency({
         context,
+        audioSession,
         outputNode: audioOutput.outputNode,
         playOutput: audioOutput.play,
         workletUrl: microphoneCalibrationWorkletUrl,

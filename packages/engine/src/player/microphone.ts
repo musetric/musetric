@@ -3,12 +3,7 @@ import {
   mobileUserAgentPattern,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
-
-export const stopMediaStream = (stream: MediaStream) => {
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-};
+import { type EngineAudioSession } from '../audioSession/index.js';
 
 export const getAudioDevices = async () => {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -17,11 +12,17 @@ export const getAudioDevices = async () => {
   );
 };
 
+export type PreferredStreamOptions = {
+  audioSession: EngineAudioSession;
+  stream: MediaStream;
+  devices: MediaDeviceInfo[];
+  sampleRate: number;
+};
+
 export const resolvePreferredStream = async (
-  stream: MediaStream,
-  devices: MediaDeviceInfo[],
-  sampleRate: number,
+  options: PreferredStreamOptions,
 ): Promise<MediaStream> => {
+  const { audioSession, stream, devices, sampleRate } = options;
   const preferredDevice = resolveAudioInputDevice(devices, {
     preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
   });
@@ -33,8 +34,8 @@ export const resolvePreferredStream = async (
   if (preferredDevice.deviceId === currentDeviceId) {
     return stream;
   }
-  stopMediaStream(stream);
-  return navigator.mediaDevices.getUserMedia({
+  audioSession.closeMicrophone(stream);
+  return audioSession.openMicrophone({
     audio: createMicrophoneAudioConstraints({
       deviceId: preferredDevice.deviceId,
       sampleRate,

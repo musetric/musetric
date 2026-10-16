@@ -4,6 +4,7 @@ import {
   createEngineAudioOutput,
   type EngineAudioOutput,
 } from './audioOutput/index.js';
+import { createEngineAudioSession } from './audioSession/index.js';
 import {
   createEngineCalibration,
   type EngineCalibration,
@@ -109,6 +110,7 @@ export type Engine = {
 };
 
 export const createEngine = (): Engine => {
+  const audioSession = createEngineAudioSession();
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
@@ -125,6 +127,7 @@ export const createEngine = (): Engine => {
     calibration: createEngineCalibration({
       context,
       audioOutput,
+      audioSession,
       store,
       getPlayer: () => ref.player,
     }),
@@ -197,6 +200,7 @@ export const createEngine = (): Engine => {
     player: createEnginePlayer({
       context,
       audioOutput,
+      audioSession,
       store,
       decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,

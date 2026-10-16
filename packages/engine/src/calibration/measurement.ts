@@ -6,15 +6,10 @@ import {
   recordingLatencyCalibrationTimeoutSeconds,
 } from '@musetric/audio/calibration';
 import { createMicrophoneAudioConstraints } from '@musetric/audio/recording';
+import { type EngineAudioSession } from '../audioSession/index.js';
 import { microphoneCalibrationChannel } from './protocol.cross.js';
 
 const workletPromises = new Map<string, Promise<void>>();
-
-const stopStream = (stream: MediaStream) => {
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-};
 
 const loadWorklet = async (
   context: AudioContext,
@@ -68,6 +63,7 @@ const waitForResult = async (
 
 export type CalibrationMeasurementOptions = {
   context: AudioContext;
+  audioSession: EngineAudioSession;
   outputNode: AudioNode;
   playOutput: () => Promise<void>;
   workletUrl: string | URL;
@@ -86,6 +82,7 @@ export const measureRecordingLatency = async (
 ): Promise<CalibrationMeasurementResult | undefined> => {
   const {
     context,
+    audioSession,
     outputNode,
     playOutput,
     workletUrl,
@@ -103,7 +100,7 @@ export const measureRecordingLatency = async (
     await loadWorklet(context, workletUrl);
     stream =
       options.stream ??
-      (await navigator.mediaDevices.getUserMedia({
+      (await audioSession.openMicrophone({
         audio: createMicrophoneAudioConstraints({
           deviceId,
           sampleRate: context.sampleRate,
@@ -163,7 +160,7 @@ export const measureRecordingLatency = async (
     calibrationNode?.port.close();
     silentGain?.disconnect();
     if (stream && !options.stream) {
-      stopStream(stream);
+      audioSession.closeMicrophone(stream);
     }
   }
 };
