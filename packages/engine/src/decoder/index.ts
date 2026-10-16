@@ -5,6 +5,7 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
+import { type TakeTarget } from '../player/takeShift.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
@@ -35,7 +36,7 @@ export type EngineDecoder = {
   deleteLoopTry: (tryId: string) => void;
   discardLoopTries: () => void;
   insertLoopTry: (projectId: number, tryId: string) => Promise<boolean>;
-  exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
+  exportRecording: (target: TakeTarget) => Promise<Float32Array<ArrayBuffer>>;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
@@ -281,12 +282,12 @@ export const createEngineDecoder = (
       });
       return await promise;
     },
-    exportRecording: async () => {
+    exportRecording: async (target) => {
       recordingExportPromise ??= createControlledPromise<
         Float32Array<ArrayBuffer> | undefined
       >();
       const { promise } = recordingExportPromise;
-      port.methods.exportRecording();
+      port.methods.exportRecording({ target });
       const samples = await promise;
       if (!samples) {
         throw new Error('Failed to export the recording');

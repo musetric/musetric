@@ -1,5 +1,6 @@
 import { Box, Drawer, Popover, useMediaQuery } from '@mui/material';
 import { type FC } from 'react';
+import { pickerPlacements } from '../pickerPlacement.js';
 import { useProjectStore } from '../store.js';
 import { TempoPickerContent } from './TempoPickerContent.js';
 
@@ -7,6 +8,7 @@ export const TempoPicker: FC = () => {
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
   const tempoAnchorEl = useProjectStore((state) => state.tempoAnchorEl);
   const setTempoAnchorEl = useProjectStore((state) => state.setTempoAnchorEl);
+  const pickerSide = useProjectStore((state) => state.pickerSide);
 
   if (isDesktop) {
     return (
@@ -16,14 +18,7 @@ export const TempoPicker: FC = () => {
         onClose={() => {
           setTempoAnchorEl(undefined);
         }}
-        anchorOrigin={{
-          horizontal: 'center',
-          vertical: 'top',
-        }}
-        transformOrigin={{
-          horizontal: 'center',
-          vertical: 'bottom',
-        }}
+        {...pickerPlacements[pickerSide]}
       >
         <Box sx={{ width: 380, p: 4 }}>
           <TempoPickerContent />

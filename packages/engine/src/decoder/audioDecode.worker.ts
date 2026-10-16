@@ -6,6 +6,7 @@ import {
   type playerDataChannel,
   type PlayerRecordingPiece,
 } from '../player/protocol.cross.js';
+import { type TakeTarget } from '../player/takeShift.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import {
   copyPieces,
@@ -31,7 +32,7 @@ export type AudioDecode = {
   patchLiveTake: (chunk: LiveTakeChunk) => void;
   clearLiveTake: (takeId: string) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
-  exportRecording: () => Promise<Float32Array<ArrayBuffer>>;
+  exportRecording: (target: TakeTarget) => Promise<Float32Array<ArrayBuffer>>;
   unmount: () => void;
 };
 
@@ -207,14 +208,14 @@ export const createAudioDecode = (
       });
     },
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
-    exportRecording: async () => {
+    exportRecording: async (target) => {
       await reloading.catch(() => undefined);
       const current = mounted;
       if (!current) {
         return new Float32Array(0);
       }
       const stretch = await getRecording(current.sampleRate).stretch;
-      return renderPieces(current.pieces, current.frameCount, stretch);
+      return renderPieces(current.pieces, current.frameCount, stretch, target);
     },
     unmount: () => {
       mounted = undefined;

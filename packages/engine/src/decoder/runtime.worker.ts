@@ -308,12 +308,12 @@ export const createDecoderWorkerRuntime = (
         }));
       port.methods.loopTryInserted({ inserted });
     },
-    exportRecording: async () => {
+    exportRecording: async (message) => {
       try {
         if (recordingStream) {
           await waitWithTimeout(recordingStream.finish, takeFinishTimeoutMs);
         }
-        const samples = await audioDecode.exportRecording();
+        const samples = await audioDecode.exportRecording(message.target);
         port.methods.recordingExported({ samples });
       } catch (error) {
         console.error('Failed to export the recording', error);
