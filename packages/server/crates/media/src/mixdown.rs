@@ -4,8 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use musetric_stretch::Stretch;
 use rusty_mp3::{Error, Mp3Encoder, Mp3EncoderConfig};
-use tokio::task::spawn_blocking;
+use tokio::task::{JoinHandle, spawn_blocking};
 
 use crate::{
     AacEncoder, BoxedError, Downmix, MonoRequest, SampleDepth, decode_mono_pcm,
@@ -17,6 +18,8 @@ use crate::{
 
 const PEAK_CEILING: f32 = 0.891_250_9;
 const KILOBIT: u32 = 1000;
+const ORIGINAL_TEMPO_PERCENT: usize = 100;
+const TOO_SHORT: &str = "The song is too short to change its tempo or key";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MixdownFormat {
@@ -32,11 +35,46 @@ pub enum MixdownChannels {
     Mono,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MixdownGroup {
+    Song,
+    Lead,
+    Ready,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MixdownChange {
+    pub tempo_percent: usize,
+    pub semitones: i32,
+    pub lead_semitones: i32,
+}
+
+impl MixdownChange {
+    pub const ORIGINAL: Self = Self {
+        tempo_percent: ORIGINAL_TEMPO_PERCENT,
+        semitones: 0,
+        lead_semitones: 0,
+    };
+
+    #[must_use]
+    pub const fn frame_count(self, source_frames: usize) -> usize {
+        (source_frames * ORIGINAL_TEMPO_PERCENT + self.tempo_percent / 2) / self.tempo_percent
+    }
+
+    const fn semitones_of(self, group: MixdownGroup) -> i32 {
+        match group {
+            MixdownGroup::Lead => self.lead_semitones,
+            MixdownGroup::Song | MixdownGroup::Ready => self.semitones,
+        }
+    }
+}
+
 pub struct MixdownTrack {
     pub from: PathBuf,
     pub gain: f32,
     pub channels: MixdownChannels,
     pub lead_in: usize,
+    pub group: MixdownGroup,
 }
 
 pub struct Mixdown {
@@ -44,20 +82,81 @@ pub struct Mixdown {
     pub frame_count: usize,
     pub tracks: Vec<MixdownTrack>,
     pub format: MixdownFormat,
+    pub change: MixdownChange,
 }
+
+type Stretching = JoinHandle<Option<Vec<Vec<f32>>>>;
 
 pub async fn write_mixdown(
     source: &dyn PcmSource,
     mixdown: Mixdown,
     to: &Path,
 ) -> Result<(), BoxedError> {
-    let mut mixed = vec![0.0_f32; mixdown.frame_count * CHANNELS];
-    for track in &mixdown.tracks {
+    let frame_count = mixdown.change.frame_count(mixdown.frame_count);
+    let mut mixed = vec![0.0_f32; frame_count * CHANNELS];
+    let mut stretching = Vec::new();
+    for group in [MixdownGroup::Song, MixdownGroup::Lead] {
+        let tracks: Vec<&MixdownTrack> = mixdown
+            .tracks
+            .iter()
+            .filter(|track| track.group == group)
+            .collect();
+        if tracks.is_empty() {
+            continue;
+        }
+        let semitones = mixdown.change.semitones_of(group);
+        if mixdown.change.tempo_percent == ORIGINAL_TEMPO_PERCENT && semitones == 0 {
+            for track in tracks {
+                add_track(source, mixdown.sample_rate, track, &mut mixed).await?;
+            }
+            continue;
+        }
+        let mut song = vec![0.0_f32; mixdown.frame_count * CHANNELS];
+        for track in tracks {
+            add_track(source, mixdown.sample_rate, track, &mut song).await?;
+        }
+        let stretch = Stretch {
+            sample_rate: mixdown.sample_rate,
+            frame_count,
+            semitones,
+            keep_formants: group == MixdownGroup::Lead,
+        };
+        stretching.push(spawn_blocking(move || stretch.apply(&deinterleave(&song))));
+    }
+    add_stretched(stretching, &mut mixed).await?;
+    for track in mixdown
+        .tracks
+        .iter()
+        .filter(|track| track.group == MixdownGroup::Ready)
+    {
         add_track(source, mixdown.sample_rate, track, &mut mixed).await?;
     }
     limit_peak(&mut mixed);
     let target = to.to_owned();
     spawn_blocking(move || encode(&mixed, mixdown.sample_rate, mixdown.format, &target)).await?
+}
+
+async fn add_stretched(stretching: Vec<Stretching>, mixed: &mut [f32]) -> Result<(), BoxedError> {
+    for task in stretching {
+        let channels = task.await?.ok_or(TOO_SHORT)?;
+        for (frame, pair) in mixed.chunks_exact_mut(CHANNELS).enumerate() {
+            pair[0] += channels[0][frame];
+            pair[1] += channels[1][frame];
+        }
+    }
+    Ok(())
+}
+
+fn deinterleave(song: &[f32]) -> Vec<Vec<f32>> {
+    (0..CHANNELS)
+        .map(|channel| {
+            song.iter()
+                .skip(channel)
+                .step_by(CHANNELS)
+                .copied()
+                .collect()
+        })
+        .collect()
 }
 
 async fn add_track(
@@ -207,7 +306,8 @@ mod tests {
     };
 
     use super::{
-        Mixdown, MixdownChannels, MixdownFormat, MixdownTrack, PEAK_CEILING, write_mixdown,
+        Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownTrack,
+        PEAK_CEILING, write_mixdown,
     };
     use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth};
 
@@ -242,6 +342,7 @@ mod tests {
             gain,
             channels: MixdownChannels::Stereo,
             lead_in: 0,
+            group: MixdownGroup::Song,
         }
     }
 
@@ -259,16 +360,32 @@ mod tests {
             .collect()
     }
 
+    struct Scene {
+        frame_count: usize,
+        tracks: Vec<MixdownTrack>,
+        change: MixdownChange,
+    }
+
     async fn mix(name: &str, fixture: &Fixture, tracks: Vec<MixdownTrack>) -> Vec<f32> {
+        let scene = Scene {
+            frame_count: 8,
+            tracks,
+            change: MixdownChange::ORIGINAL,
+        };
+        render(name, fixture, scene).await
+    }
+
+    async fn render(name: &str, fixture: &Fixture, scene: Scene) -> Vec<f32> {
         let directory =
             std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
         create_dir_all(&directory).expect("the workspace should be created");
         let to = directory.join("mix.wav");
         let mixdown = Mixdown {
             sample_rate: RATE,
-            frame_count: 8,
-            tracks,
+            frame_count: scene.frame_count,
+            tracks: scene.tracks,
             format: MixdownFormat::Wav(SampleDepth::TwentyFour),
+            change: scene.change,
         };
         write_mixdown(fixture, mixdown, &to)
             .await
@@ -296,6 +413,7 @@ mod tests {
                 gain: 2.0,
                 channels: MixdownChannels::Mono,
                 lead_in: 3,
+                group: MixdownGroup::Ready,
             },
         ];
 
@@ -335,5 +453,61 @@ mod tests {
             (mixed[1] - PEAK_CEILING * 0.25).abs() < TOLERANCE,
             "{mixed:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn stretches_the_song_and_lays_the_take_on_the_new_timeline() {
+        let song = PathBuf::from("song.flac");
+        let lead = PathBuf::from("lead.flac");
+        let take = PathBuf::from("take.wav");
+        let frames = 48_000_u16;
+        let tone: Vec<f32> = (0..frames)
+            .flat_map(|frame| {
+                let value =
+                    (std::f32::consts::TAU * 440.0 * f32::from(frame) / 48_000.0).sin() * 0.25;
+                [value, value]
+            })
+            .collect();
+        let fixture = Fixture(vec![
+            (song.clone(), tone.clone()),
+            (lead.clone(), tone),
+            (take.clone(), [0.1, 0.1].repeat(100)),
+        ]);
+        let tracks = vec![
+            stem(&song, 1.0),
+            MixdownTrack {
+                group: MixdownGroup::Lead,
+                ..stem(&lead, 1.0)
+            },
+            MixdownTrack {
+                from: take,
+                gain: 1.0,
+                channels: MixdownChannels::Mono,
+                lead_in: 0,
+                group: MixdownGroup::Ready,
+            },
+        ];
+        let change = MixdownChange {
+            tempo_percent: 50,
+            semitones: 2,
+            lead_semitones: -10,
+        };
+
+        let mixed = render(
+            "stretch",
+            &fixture,
+            Scene {
+                frame_count: usize::from(frames),
+                tracks,
+                change,
+            },
+        )
+        .await;
+
+        assert_eq!(mixed.len(), 96_000 * 2);
+        let middle = &mixed[90_000..102_000];
+        let power = middle.iter().map(|value| value * value).sum::<f32>() / 12_000.0;
+        assert!(power > 0.01, "{power}");
+        assert!(mixed[0] > 0.05, "{}", mixed[0]);
     }
 }

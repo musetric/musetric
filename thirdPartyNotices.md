@@ -241,6 +241,66 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+## Signalsmith Stretch
+
+- Source: https://github.com/Signalsmith-Audio/signalsmith-stretch
+- Usage: the time-stretch and pitch-shift algorithm, ported to Rust from the C++ release that the `signalsmith-stretch` 1.3.2 web build was made from (commit `222093b4`), including its offline `exact` processing, peak-based frequency map and formant compensation. The web build itself runs in the player.
+- Local files: `packages/server/crates/stretch/src/vocoder.rs`.
+- License: MIT.
+- License source: upstream `LICENSE.txt`.
+
+MIT License
+
+Copyright (c) 2022 Geraint Luff / Signalsmith Audio Ltd.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Signalsmith Linear
+
+- Source: https://github.com/Signalsmith-Audio/linear
+- Usage: the self-normalising STFT, the Kaiser window with its bandwidth heuristic and the half-bin-shifted real FFT of release 0.1.2, ported to Rust on top of `rustfft`.
+- Local files: `packages/server/crates/stretch/src/frames.rs`, `packages/server/crates/stretch/src/fourier.rs`, `packages/server/crates/stretch/src/window.rs`.
+- License: MIT.
+- License source: upstream `LICENSE.txt`.
+
+MIT License
+
+Copyright (c) 2025 Signalsmith Audio
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## Opus (libopus)
 
 - Source: https://opus-codec.org, built from the libopus 1.6.1 sources bundled in the `opusic-sys` crate (https://github.com/DoumanAsh/opusic-sys) and driven through `symphonia-adapter-libopus` (https://github.com/aschey/symphonia-adapters).

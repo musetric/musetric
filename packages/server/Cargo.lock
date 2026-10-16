@@ -2864,6 +2864,7 @@ dependencies = [
  "clap",
  "ebur128",
  "flacenc",
+ "musetric-stretch",
  "rubato",
  "rusty_aac",
  "rusty_mp3",
@@ -2900,6 +2901,13 @@ dependencies = [
  "tower",
  "uuid",
  "win32job",
+]
+
+[[package]]
+name = "musetric-stretch"
+version = "0.1.0"
+dependencies = [
+ "rustfft",
 ]
 
 [[package]]

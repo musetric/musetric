@@ -82,6 +82,12 @@ opt-level = 3
 [profile.dev.package.rusty_mp3]
 opt-level = 3
 
+[profile.dev.package.musetric-stretch]
+opt-level = 3
+
+[profile.dev.package.rustfft]
+opt-level = 3
+
 [lints]
 workspace = true
 
