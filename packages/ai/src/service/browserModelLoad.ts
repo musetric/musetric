@@ -41,6 +41,12 @@ export const fetchModelFiles = async (
   );
 };
 
+export const releaseModelFiles = (files: Uint8Array<ArrayBuffer>[]): void => {
+  for (const file of files) {
+    file.buffer.transfer(0);
+  }
+};
+
 export const loadModel = async <Runtime>(
   context: BrowserJobContext,
   load: (report: ReportLoading) => Promise<Runtime>,
