@@ -4,6 +4,7 @@ import { createBrowserJobApi } from './browserJob.js';
 import {
   fetchModelFiles,
   loadModel,
+  releaseModelFiles,
   type ReportLoading,
 } from './browserModelLoad.js';
 import { floatsFromBytes } from './browserShared.js';
@@ -42,6 +43,7 @@ const createVocalsStage = async (
     modelDataFile,
     modelDataPath: request.vocalsModelDataPath,
   });
+  releaseModelFiles([modelFile, modelDataFile]);
   return {
     run: async (input) => {
       const output = new Float32Array(input.length);
@@ -64,6 +66,7 @@ const createLeadBackingStage = async (
     graph: request.graph,
     modelFile,
   });
+  releaseModelFiles([modelFile]);
   return {
     run: async (input) =>
       isSilent(input)

@@ -1,3 +1,4 @@
+import { warmUpOrt } from '../runtime/ortWarmup.js';
 import { serveOrtWasmFromBundle } from '../runtime/ortWasm.js';
 import { analyzeChords } from './browserChords.js';
 import { describeLogged, startJobExecutor } from './browserExecutor.js';
@@ -17,6 +18,8 @@ import { analyzeVoiceRangeApiName } from './voiceRangeApi.js';
 
 declare const window: { location: { reload: () => void } };
 
+const ortWarmupParameter = 'ortWarmup';
+
 const apis: BrowserJobApis = {
   [separateUnitsApiName]: separateUnits,
   [transcribeAudioApiName]: transcribeAudio,
@@ -34,6 +37,16 @@ const readJobUrl = (): string => {
 
 serveOrtWasmFromBundle();
 
+const ortWarmupSeconds = Number(
+  new URLSearchParams(location.search).get(ortWarmupParameter) ?? 0,
+);
+const ortReady =
+  ortWarmupSeconds > 0
+    ? warmUpOrt(ortWarmupSeconds * 1000).catch((error: unknown) => {
+        console.warn('ONNX Runtime warm-up failed', error);
+      })
+    : undefined;
+
 const executor = startJobExecutor({
   jobUrl: readJobUrl(),
   apis,
@@ -41,6 +54,7 @@ const executor = startJobExecutor({
   restart: () => {
     window.location.reload();
   },
+  ready: ortReady,
 });
 
 const forwardConsole = (level: 'error' | 'warn'): void => {

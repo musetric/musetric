@@ -17,7 +17,7 @@ use crate::assets::TauriAssets;
 mod assets;
 #[cfg(desktop)]
 mod download;
-#[cfg(target_os = "android")]
+#[cfg(mobile)]
 mod executor_view;
 #[cfg(desktop)]
 mod lifecycle;
@@ -33,6 +33,8 @@ const EXECUTOR_WINDOW: &str = "executor";
 const EXECUTOR_TITLE: &str = "Musetric executor";
 const TITLE: &str = "Musetric";
 const APP_PREFIX: &str = "";
+#[cfg(target_os = "ios")]
+const EXECUTOR_ORT_WARMUP: &str = "?ortWarmup=90";
 #[cfg(desktop)]
 const WINDOW_HEIGHT: f64 = 800.0;
 #[cfg(desktop)]
@@ -53,9 +55,10 @@ pub fn run() {
 }
 
 fn run_app() -> tauri::Result<()> {
+    #[cfg(desktop)]
     let builder = tauri::Builder::default();
-    #[cfg(target_os = "android")]
-    let builder = builder.plugin(executor_view::init());
+    #[cfg(mobile)]
+    let builder = tauri::Builder::default().plugin(executor_view::init());
     let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(desktop)]
@@ -91,12 +94,14 @@ fn run_app() -> tauri::Result<()> {
             #[cfg(mobile)]
             let server = server_result.map_err(|error| io::Error::other(error.to_string()))?;
             let url = WebviewUrl::External(server.url().parse()?);
-            #[cfg(any(desktop, target_os = "android"))]
+            #[cfg(not(target_os = "ios"))]
             let executor_url = server.executor_url().to_owned();
+            #[cfg(target_os = "ios")]
+            let executor_url = format!("{}{EXECUTOR_ORT_WARMUP}", server.executor_url());
             app.manage(server);
             #[cfg(desktop)]
             create_executor_window(app.handle(), WebviewUrl::External(executor_url.parse()?))?;
-            #[cfg(target_os = "android")]
+            #[cfg(mobile)]
             executor_view::open(app.handle(), &executor_url)?;
             create_main_window(app.handle(), url)?;
             Ok(())

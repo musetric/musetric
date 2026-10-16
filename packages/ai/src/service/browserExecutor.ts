@@ -54,12 +54,13 @@ type ConnectionOptions = {
   signal: AbortSignal;
   logs: LogSink;
   reload: () => void;
+  ready?: Promise<void>;
 };
 
 const serveConnection = async (
   connection: ConnectionOptions,
 ): Promise<boolean> => {
-  const { socketUrl, apis, signal, logs } = connection;
+  const { socketUrl, apis, signal, logs, ready } = connection;
   const socket = new WebSocket(socketUrl);
   const send = (message: ExecutorMessage): void => {
     if (socket.readyState === WebSocket.OPEN) {
@@ -85,6 +86,7 @@ const serveConnection = async (
       if (!api) {
         throw new Error(`Browser API ${command.api} is not initialized`);
       }
+      await ready;
       const result = await api(command.request, {
         reportLoading: (progress) => {
           send({ type: 'loading', jobId: command.jobId, ...progress });
@@ -195,6 +197,7 @@ export type JobExecutorOptions = {
   apis: BrowserJobApis;
   reconnectDelayMs: number;
   restart: () => void;
+  ready?: Promise<void>;
 };
 
 export type JobExecutor = {
@@ -219,6 +222,7 @@ export const startJobExecutor = (options: JobExecutorOptions): JobExecutor => {
           signal,
           logs,
           reload: options.restart,
+          ready: options.ready,
         });
         if (failed) {
           return true;
