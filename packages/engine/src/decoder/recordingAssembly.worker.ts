@@ -5,11 +5,8 @@ import {
   getRecordingPieces,
 } from '../audioRequest/audioRequest.worker.js';
 import { type PlayerRecordingPiece } from '../player/protocol.cross.js';
-import {
-  isOriginalKey,
-  isUnitTempo,
-  type TakeStretch,
-} from './takeStretch.worker.js';
+import { getTakeShift, type TakeTarget } from '../player/takeShift.cross.js';
+import { isUnitTempo, type TakeStretch } from './takeStretch.worker.js';
 
 export const copyPieces = (
   pieces: readonly PlayerRecordingPiece[],
@@ -20,18 +17,21 @@ export const renderPieces = (
   pieces: readonly PlayerRecordingPiece[],
   frameCount: number,
   stretch: TakeStretch,
+  target: TakeTarget,
 ): Float32Array<ArrayBuffer> => {
-  const samples = new Float32Array(frameCount);
+  const length = Math.round(frameCount / target.tempoRatio);
+  const samples = new Float32Array(length);
   for (const piece of pieces) {
-    const start = Math.round(piece.songStartFrame);
-    if (start >= frameCount) {
+    const start = Math.round(piece.songStartFrame / target.tempoRatio);
+    if (start >= length) {
       continue;
     }
+    const shift = getTakeShift(target, piece);
     const rendered =
-      isUnitTempo(piece.tempo) && isOriginalKey(piece.transpose)
+      isUnitTempo(shift.ratio) && shift.semitones === 0
         ? piece.samples
-        : stretch.render(piece.samples, piece.tempo, piece.transpose);
-    samples.set(rendered.subarray(0, frameCount - start), start);
+        : stretch.render(piece.samples, shift.ratio, shift.semitones);
+    samples.set(rendered.subarray(0, length - start), start);
   }
   return samples;
 };

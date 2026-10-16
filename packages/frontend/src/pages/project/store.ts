@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { type PickerSide } from './pickerPlacement.js';
 
 export type DetailsView = 'text' | 'tracks';
 
@@ -9,6 +10,7 @@ export type ProjectState = {
   chordsOpen: boolean;
   audioSettingsOpen: boolean;
   mixdownOpen: boolean;
+  pickerSide: PickerSide;
   mixAnchorEl?: HTMLElement;
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
@@ -24,6 +26,7 @@ const initialState: ProjectState = {
   chordsOpen: false,
   audioSettingsOpen: false,
   mixdownOpen: false,
+  pickerSide: 'top',
 };
 
 export type ProjectActions = {
@@ -32,9 +35,18 @@ export type ProjectActions = {
   setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
   setMixdownOpen: (value: boolean) => void;
-  setMixAnchorEl: (anchorEl: HTMLElement | undefined) => void;
-  setTransposeAnchorEl: (anchorEl: HTMLElement | undefined) => void;
-  setTempoAnchorEl: (anchorEl: HTMLElement | undefined) => void;
+  setMixAnchorEl: (
+    anchorEl: HTMLElement | undefined,
+    side?: PickerSide,
+  ) => void;
+  setTransposeAnchorEl: (
+    anchorEl: HTMLElement | undefined,
+    side?: PickerSide,
+  ) => void;
+  setTempoAnchorEl: (
+    anchorEl: HTMLElement | undefined,
+    side?: PickerSide,
+  ) => void;
   setRecordingListAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setDeletingRecordingId: (recordingId: number | undefined) => void;
   setRenamingRecordingId: (recordingId: number | undefined) => void;
@@ -51,18 +63,18 @@ export const useProjectStore = create<State>()(
     setChordsOpen: (chordsOpen) => set({ chordsOpen }),
     setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
     setMixdownOpen: (mixdownOpen) => set({ mixdownOpen }),
-    setMixAnchorEl: (mixAnchorEl) =>
-      set({
-        mixAnchorEl,
-      }),
-    setTransposeAnchorEl: (transposeAnchorEl) =>
-      set({
-        transposeAnchorEl,
-      }),
-    setTempoAnchorEl: (tempoAnchorEl) =>
-      set({
-        tempoAnchorEl,
-      }),
+    setMixAnchorEl: (mixAnchorEl, side = 'top') =>
+      set(mixAnchorEl ? { mixAnchorEl, pickerSide: side } : { mixAnchorEl }),
+    setTransposeAnchorEl: (transposeAnchorEl, side = 'top') =>
+      set(
+        transposeAnchorEl
+          ? { transposeAnchorEl, pickerSide: side }
+          : { transposeAnchorEl },
+      ),
+    setTempoAnchorEl: (tempoAnchorEl, side = 'top') =>
+      set(
+        tempoAnchorEl ? { tempoAnchorEl, pickerSide: side } : { tempoAnchorEl },
+      ),
     setRecordingListAnchorEl: (recordingListAnchorEl) =>
       set({
         recordingListAnchorEl,

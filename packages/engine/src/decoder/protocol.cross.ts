@@ -1,5 +1,6 @@
 import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
+import { type TakeTarget } from '../player/takeShift.cross.js';
 
 export type SettledLoopTry = {
   id: string;
@@ -37,7 +38,7 @@ export type EngineDecoderOutboundMethods = {
     sampleRate: number;
     frameCount: number;
   }) => void;
-  exportRecording: () => void;
+  exportRecording: (message: { target: TakeTarget }) => void;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;

@@ -28,6 +28,12 @@ export const volumesSchema = z.object({
   recording: volumeSchema,
 });
 
+export const playbackSchema = z.object({
+  tempoRatio: z.number().min(0.2).max(2),
+  transposeSemitones: z.number().int().min(-6).max(6),
+  leadOctave: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+});
+
 export namespace create {
   export const base = createApiRoute({
     method: 'post',
@@ -36,6 +42,8 @@ export namespace create {
     requestSchema: z.object({
       format: formatSchema,
       volumes: volumesSchema,
+      playback: playbackSchema,
+      label: z.string().min(1),
       recording: z.file().optional(),
     }),
     responseSchema: z.object({ mixdownId: z.string() }),

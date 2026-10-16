@@ -9,8 +9,6 @@ const unitTempoTolerance = 1e-6;
 export const isUnitTempo = (tempo: number): boolean =>
   Math.abs(tempo - 1) < unitTempoTolerance;
 
-export const isOriginalKey = (transpose: number): boolean => transpose === 0;
-
 const stretchBlock = (
   processor: TimePitchProcessor,
   output: Float32Array<ArrayBuffer>,
@@ -27,8 +25,8 @@ const stretchBlock = (
 export type TakeStretch = {
   render: (
     samples: Float32Array,
-    tempo: number,
-    transpose: number,
+    ratio: number,
+    semitones: number,
   ) => Float32Array<ArrayBuffer>;
 };
 
@@ -38,12 +36,12 @@ export const createTakeStretch = async (
   const processor = await createTimePitchProcessor(sampleRate);
 
   return {
-    render: (samples, tempo, transpose) => {
-      const length = Math.round(samples.length * tempo);
+    render: (samples, ratio, semitones) => {
+      const length = Math.round(samples.length / ratio);
       const output = new Float32Array(length);
       processor.reset();
-      processor.setTempoRatio(1 / tempo);
-      processor.setTransposeSemitones(-transpose);
+      processor.setTempoRatio(ratio);
+      processor.setTransposeSemitones(semitones);
       let position = 0;
       for (let start = 0; start < length; start += blockFrameCount) {
         const block = output.subarray(

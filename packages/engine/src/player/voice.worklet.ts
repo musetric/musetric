@@ -4,6 +4,7 @@ import {
   type RecordingPiece,
   type RecordingSegment,
 } from './recordingPieces.cross.js';
+import { getTakeShift } from './takeShift.cross.js';
 
 const unitRatioTolerance = 1e-6;
 const continuityFrames = 4;
@@ -43,10 +44,9 @@ export const createVoice = (stretcher: TimePitchProcessor): Voice => {
   const renderSegment = (block: VoiceBlock, part: SegmentBlock): void => {
     const { piece } = part.segment;
     const { samples } = piece;
-    const ratio = block.tempoRatio / piece.tempo;
-    const octaves = block.voiceShifted ? block.voiceOctave - piece.octave : 0;
-    const transposeSemitones =
-      block.transposeSemitones - piece.transpose + 12 * octaves;
+    const shift = getTakeShift(block, piece);
+    const { ratio } = shift;
+    const transposeSemitones = shift.semitones;
     const stretched =
       Math.abs(ratio - 1) >= unitRatioTolerance || transposeSemitones !== 0;
     const continued =

@@ -16,6 +16,7 @@ import {
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { createStartPlayback } from './startPlayback.js';
+import { type TakeTarget } from './takeShift.cross.js';
 import { encodeMonoWav } from './wav.js';
 
 export type EnginePlayer = EnginePlayerLoop &
@@ -27,7 +28,7 @@ export type EnginePlayer = EnginePlayerLoop &
     setFrozen: (frozen: boolean) => void;
     record: (projectId: number) => Promise<void>;
     stopRecording: () => Promise<void>;
-    exportRecording: () => Promise<File | undefined>;
+    exportRecording: (target: TakeTarget) => Promise<File | undefined>;
     applyRemoteStop: () => Promise<void>;
     applyRemoteFrameIndex: (
       frameIndex: number,
@@ -254,8 +255,8 @@ export const createEnginePlayer = (
         ref.setRange(range);
       },
     }),
-    exportRecording: async () => {
-      const samples = await getDecoderValue().exportRecording();
+    exportRecording: async (target) => {
+      const samples = await getDecoderValue().exportRecording(target);
       if (samples.every((sample) => sample === 0)) {
         return undefined;
       }

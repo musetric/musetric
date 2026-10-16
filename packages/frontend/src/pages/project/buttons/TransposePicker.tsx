@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { type FC, useEffect, useRef } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { pickerPlacements } from '../pickerPlacement.js';
 import { useProjectStore } from '../store.js';
 import { TransposePickerContent } from './TransposePickerContent.js';
 
@@ -16,6 +17,7 @@ export const TransposePicker: FC = () => {
   const setTransposeAnchorEl = useProjectStore(
     (state) => state.setTransposeAnchorEl,
   );
+  const pickerSide = useProjectStore((state) => state.pickerSide);
   const voiceOctave = useEngineStore((state) => state.voiceOctave);
   const popoverActionsRef = useRef<PopoverActions>(null);
 
@@ -32,14 +34,7 @@ export const TransposePicker: FC = () => {
         onClose={() => {
           setTransposeAnchorEl(undefined);
         }}
-        anchorOrigin={{
-          horizontal: 'center',
-          vertical: 'top',
-        }}
-        transformOrigin={{
-          horizontal: 'center',
-          vertical: 'bottom',
-        }}
+        {...pickerPlacements[pickerSide]}
       >
         <Box sx={{ width: 380, p: 4 }}>
           <TransposePickerContent />
