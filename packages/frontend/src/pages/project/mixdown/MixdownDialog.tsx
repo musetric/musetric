@@ -67,12 +67,14 @@ export const MixdownDialog: FC = () => {
     <Dialog open={open} onClose={close} fullWidth maxWidth='sm'>
       <DialogTitle>{t('pages.project.mixdown.title')}</DialogTitle>
       <DialogContent>
-        <Stack gap={3}>
+        <Stack sx={{ gap: 3 }}>
           <Box
-            display='grid'
-            gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}
-            gridAutoRows='80px'
-            gap={1}
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gridAutoRows: '80px',
+              gap: 1,
+            }}
           >
             <TrackVolumeControl kind='recording' />
             {stemTypes.map((stemType) => (
@@ -83,7 +85,7 @@ export const MixdownDialog: FC = () => {
               />
             ))}
           </Box>
-          <Stack gap={1}>
+          <Stack sx={{ gap: 1 }}>
             <Typography variant='subtitle2'>
               {t('pages.project.mixdown.format')}
             </Typography>
@@ -105,7 +107,7 @@ export const MixdownDialog: FC = () => {
               ))}
             </ToggleButtonGroup>
           </Stack>
-          <Stack gap={1}>
+          <Stack sx={{ gap: 1 }}>
             <Typography variant='subtitle2'>
               {t('pages.project.mixdown.quality')}
             </Typography>

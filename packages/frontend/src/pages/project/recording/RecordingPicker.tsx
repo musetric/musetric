@@ -39,8 +39,7 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
       <Box
         ref={keepFromGestures}
         component='span'
-        display='inline-flex'
-        minWidth={0}
+        sx={{ display: 'inline-flex', minWidth: 0 }}
       >
         <Button
           size='small'
@@ -73,15 +72,21 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
         >
           {recording && (
             <Box
-              width={6}
-              height={6}
-              mr={0.75}
-              flexShrink={0}
-              borderRadius='50%'
-              bgcolor='error.main'
+              sx={{
+                width: 6,
+                height: 6,
+                mr: 0.75,
+                flexShrink: 0,
+                borderRadius: '50%',
+                bgcolor: 'error.main',
+              }}
             />
           )}
-          <Typography variant='caption' fontWeight={600} lineHeight={1} noWrap>
+          <Typography
+            variant='caption'
+            noWrap
+            sx={{ fontWeight: 600, lineHeight: 1 }}
+          >
             {recording
               ? t('pages.project.recording.recordingInto', {
                   name: active.name,

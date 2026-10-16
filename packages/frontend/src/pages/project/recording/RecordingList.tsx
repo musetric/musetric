@@ -83,7 +83,7 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   };
 
   return (
-    <Stack py={2} position='relative'>
+    <Stack sx={{ py: 2, position: 'relative' }}>
       <IconButton
         size='small'
         aria-label={t('pages.project.recording.close')}
@@ -92,24 +92,28 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
       >
         <CloseRoundedIcon fontSize='small' />
       </IconButton>
-      <Box position='relative'>
+      <Box sx={{ position: 'relative' }}>
         <Box
-          display='grid'
-          gridTemplateColumns={getRecordingColumns(layout)}
-          height={layout.rulerHeight}
-          px={`${layout.sidePadding}px`}
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: getRecordingColumns(layout),
+            height: layout.rulerHeight,
+            px: `${layout.sidePadding}px`,
+          }}
         >
-          <Box gridColumn={3} position='relative'>
+          <Box sx={{ gridColumn: 3, position: 'relative' }}>
             {getRulerTicks(duration).map((tick) => (
               <Typography
                 key={tick.seconds}
                 variant='caption'
-                color='text.secondary'
-                position='absolute'
-                top={2}
-                left={`${tick.ratio * 100}%`}
-                lineHeight={1.2}
-                sx={
+                sx={[
+                  {
+                    color: 'text.secondary',
+                    position: 'absolute',
+                    top: 2,
+                    left: `${tick.ratio * 100}%`,
+                    lineHeight: 1.2,
+                  },
                   tick.ratio > endTickRatio
                     ? {
                         pr: 1,
@@ -117,8 +121,8 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
                         borderColor: 'divider',
                         transform: 'translateX(-100%)',
                       }
-                    : { pl: 1, borderLeft: 1, borderColor: 'divider' }
-                }
+                    : { pl: 1, borderLeft: 1, borderColor: 'divider' },
+                ]}
               >
                 {formatDuration(tick.seconds)}
               </Typography>
@@ -136,25 +140,29 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
           />
         ))}
         <Box
-          position='absolute'
-          top={layout.rulerHeight}
-          bottom={0}
-          left={waveLeft}
-          right={layout.sidePadding}
-          sx={{ pointerEvents: 'none' }}
+          sx={{
+            position: 'absolute',
+            top: layout.rulerHeight,
+            bottom: 0,
+            left: waveLeft,
+            right: layout.sidePadding,
+            pointerEvents: 'none',
+          }}
         >
           <Box
-            position='absolute'
-            top={0}
-            bottom={0}
-            left={`${progress * 100}%`}
-            width='1px'
-            bgcolor='primary.main'
+            sx={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${progress * 100}%`,
+              width: '1px',
+              bgcolor: 'primary.main',
+            }}
           />
         </Box>
       </Box>
       <Divider sx={{ my: 2 }} />
-      <Stack direction='row' alignItems='center' gap={1} px={2}>
+      <Stack direction='row' sx={{ alignItems: 'center', gap: 1, px: 2 }}>
         {creatingRecordingId === undefined ? (
           <Button
             key='new'
@@ -192,7 +200,7 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
             {t('pages.project.recording.create')}
           </Button>
         )}
-        <Box flex={1} />
+        <Box sx={{ flex: 1 }} />
         <Button
           color='inherit'
           startIcon={<EditOutlinedIcon />}

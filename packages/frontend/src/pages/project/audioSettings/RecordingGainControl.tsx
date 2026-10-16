@@ -9,7 +9,7 @@ export const RecordingGainControl: FC = () => {
   const recordingGain = useEngineStore((state) => state.recordingGain);
 
   return (
-    <Stack gap={1}>
+    <Stack sx={{ gap: 1 }}>
       <Typography variant='body2'>
         {t('pages.project.audioSettings.gain', {
           value: Math.round(recordingGain * 100),

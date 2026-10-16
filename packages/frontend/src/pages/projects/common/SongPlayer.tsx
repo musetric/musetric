@@ -41,7 +41,7 @@ export const SongPlayer: FC<SongPlayerProps> = (props) => {
   }, [url]);
 
   return (
-    <Stack direction='row' alignItems='center' gap={2}>
+    <Stack direction='row' sx={{ alignItems: 'center', gap: 2 }}>
       <IconButton
         size='small'
         onClick={() => {
@@ -67,9 +67,7 @@ export const SongPlayer: FC<SongPlayerProps> = (props) => {
       />
       <Typography
         variant='caption'
-        color='text.secondary'
-        width={72}
-        textAlign='right'
+        sx={{ color: 'text.secondary', width: 72, textAlign: 'right' }}
       >
         {`${formatDuration(currentTime)} / ${formatDuration(duration)}`}
       </Typography>

@@ -261,8 +261,7 @@ const eventMeasures = new Set<ParityMeasure>([
 ]);
 
 export type ParityValue =
-  | { kind: 'invalid'; reason: string }
-  | { kind: 'value'; value: number };
+  { kind: 'invalid'; reason: string } | { kind: 'value'; value: number };
 
 export const measureTensors = (input: ParityMeasureInput): ParityValue => {
   const reason = eventMeasures.has(input.measure)

@@ -46,10 +46,12 @@ export const RecordingListPicker: FC = () => {
   return (
     <Drawer anchor='bottom' open={open} onClose={close}>
       <Box
-        width='100%'
-        maxWidth={460}
-        mx='auto'
-        pb='max(8px, env(safe-area-inset-bottom))'
+        sx={{
+          width: '100%',
+          maxWidth: 460,
+          mx: 'auto',
+          pb: 'max(8px, env(safe-area-inset-bottom))',
+        }}
       >
         <RecordingList compact onClose={close} />
       </Box>

@@ -45,8 +45,8 @@ export const RecordingDeleteDialog: FC = () => {
             })}
           </DialogTitle>
           <DialogContent>
-            <Stack gap={2}>
-              <Typography variant='body2' color='text.secondary'>
+            <Stack sx={{ gap: 2 }}>
+              <Typography variant='body2' sx={{ color: 'text.secondary' }}>
                 {t('pages.project.recording.deleteDialog.text')}
               </Typography>
               {removed.isError && (

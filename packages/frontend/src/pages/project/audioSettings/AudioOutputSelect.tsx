@@ -72,7 +72,11 @@ export const AudioOutputSelect: FC = () => {
               : t('pages.project.audioSettings.outputPlaceholder');
           }
           return (
-            <Stack direction='row' alignItems='center' gap={1} component='span'>
+            <Stack
+              direction='row'
+              component='span'
+              sx={{ alignItems: 'center', gap: 1 }}
+            >
               {outputIconByKind[classifyAudioOutputDevice(device)]}
               <span>
                 {device.label ||

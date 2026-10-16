@@ -35,7 +35,10 @@ export const PlaybackRecordButton: FC = () => {
 
   return (
     <Tooltip enterTouchDelay={0} title={title}>
-      <Box component='span' flex={1} alignSelf='stretch' display='flex' ml={-1}>
+      <Box
+        component='span'
+        sx={{ flex: 1, alignSelf: 'stretch', display: 'flex', ml: -1 }}
+      >
         <IconButton
           aria-label={title}
           aria-pressed={recording}

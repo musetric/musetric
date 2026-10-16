@@ -33,8 +33,8 @@ export const ProjectsContent: FC<ProjectsContentProps> = (props) => {
 
   if (visibleProjects?.length === 0) {
     return (
-      <Stack alignItems='center' py={10}>
-        <Typography color='text.secondary'>
+      <Stack sx={{ alignItems: 'center', py: 10 }}>
+        <Typography sx={{ color: 'text.secondary' }}>
           {t('pages.projects.searchEmpty')}
         </Typography>
       </Stack>

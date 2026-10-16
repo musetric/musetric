@@ -44,7 +44,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
 
   return (
     <ProjectLayout framed>
-      <Stack width='100%' flexGrow={1} minHeight={0} gap={2}>
+      <Stack sx={{ width: '100%', flexGrow: 1, minHeight: 0, gap: 2 }}>
         {realtimeFailed && (
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
         )}

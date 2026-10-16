@@ -9,10 +9,14 @@ export const ProcessingTitle: FC = () => {
   const { t } = useTranslation();
 
   return (
-    <Stack direction='row' justifyContent='space-between' alignItems='center'>
-      <Stack direction='row' gap={2} alignItems='center'>
+    <Stack
+      direction='row'
+      sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+    >
+      <Stack direction='row' sx={{ gap: 2, alignItems: 'center' }}>
         <IconButton
           component={routes.projects.Link}
+          nativeButton={false}
           aria-label={t('pages.processing.back')}
         >
           <ArrowBackIcon />

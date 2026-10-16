@@ -29,14 +29,16 @@ export const SpectrogramCanvas: FC = () => {
   }
 
   return (
-    <Box position='relative' width='100%' height='100%'>
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
       <Box
         component='canvas'
         ref={setCanvas}
         sx={{ width: '100%', height: '100%', display: 'block' }}
       />
       {decoderStatus === 'pending' && (
-        <Box position='absolute' top={0} right={0} bottom={0} left={0}>
+        <Box
+          sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+        >
           <ViewPending />
         </Box>
       )}

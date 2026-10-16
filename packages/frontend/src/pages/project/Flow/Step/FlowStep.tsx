@@ -40,7 +40,7 @@ const FlowStepIcon: FC<FlowStepIconProps> = (props) => {
   };
 
   return (
-    <Stack width={20} alignItems='center' flexShrink={0}>
+    <Stack sx={{ width: 20, alignItems: 'center', flexShrink: 0 }}>
       {renderIcon()}
     </Stack>
   );
@@ -48,12 +48,12 @@ const FlowStepIcon: FC<FlowStepIconProps> = (props) => {
 
 const getTitleColor = (status: api.project.ProcessingStepStatus): string => {
   if (status === 'pending') {
-    return 'text.disabled';
+    return 'textDisabled';
   }
   if (status === 'done') {
-    return 'text.secondary';
+    return 'textSecondary';
   }
-  return 'text.primary';
+  return 'textPrimary';
 };
 
 const getPhaseFraction = (
@@ -90,13 +90,13 @@ export const FlowStep: FC<FlowStepProps> = (props) => {
   const fraction = getPhaseFraction(step);
 
   return (
-    <Stack gap={1}>
-      <Stack direction='row' alignItems='center' gap={3}>
+    <Stack sx={{ gap: 1 }}>
+      <Stack direction='row' sx={{ alignItems: 'center', gap: 3 }}>
         <FlowStepIcon status={step.status} />
         <Typography
           variant='subtitle1'
-          flexGrow={1}
           color={getTitleColor(step.status)}
+          sx={{ flexGrow: 1 }}
         >
           {title}
         </Typography>
@@ -114,7 +114,7 @@ export const FlowStep: FC<FlowStepProps> = (props) => {
         )}
       </Stack>
       {(active || waiting || step.error) && (
-        <Stack pl={7} gap={0.5}>
+        <Stack sx={{ pl: 7, gap: 0.5 }}>
           {(active || waiting) && <FlowStepStatus step={step} />}
           {active && (
             <LinearProgress

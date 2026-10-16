@@ -39,17 +39,19 @@ export const ProjectContent: FC = () => {
 
   return (
     <Box
-      display='grid'
-      gridTemplateAreas={layout.areas}
-      gridTemplateRows={layout.rows}
-      gridTemplateColumns={layout.columns}
-      alignContent='start'
-      columnGap={2}
-      rowGap={{ xs: 2, md: 1 }}
-      width='100%'
-      flexGrow={1}
-      minHeight={0}
-      overflow='hidden'
+      sx={{
+        display: 'grid',
+        gridTemplateAreas: layout.areas,
+        gridTemplateRows: layout.rows,
+        gridTemplateColumns: layout.columns,
+        alignContent: 'start',
+        columnGap: 2,
+        rowGap: { xs: 2, md: 1 },
+        width: '100%',
+        flexGrow: 1,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
     >
       <ProjectHeader />
       <ProjectDetails />

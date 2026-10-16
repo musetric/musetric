@@ -26,16 +26,14 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
   const muted = trackVolume === 0;
 
   return (
-    <Stack gap={0.5}>
+    <Stack sx={{ gap: 0.5 }}>
       <Stack
         direction='row'
-        justifyContent='space-between'
-        alignItems='center'
-        gap={2}
+        sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 2 }}
       >
         <TrackLabel {...target} variant='inline' />
-        <Stack direction='row' alignItems='center' gap={1}>
-          <Typography variant='caption' color='text.secondary'>
+        <Stack direction='row' sx={{ alignItems: 'center', gap: 1 }}>
+          <Typography variant='caption' sx={{ color: 'text.secondary' }}>
             {`${volumePercent}%`}
           </Typography>
           <IconButton

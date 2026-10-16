@@ -1,5 +1,5 @@
 import { createGpuContext } from '@musetric/utils/gpu';
-import { afterAll, bench, describe } from 'vitest';
+import { afterAll, describe, it } from 'vitest';
 import { createCqt } from '../cell.js';
 import { getCqtFrameCount } from '../frameCount.es.js';
 import { getReferencePlan, referenceCqtConfig } from './plan.js';
@@ -53,7 +53,8 @@ afterAll(() => {
 });
 
 describe('CQT benchmarks', () => {
-  bench('warm 10 s CQT', async () => {
-    await runCqt();
+  it('warm 10 s CQT', async (context) => {
+    const { bench } = context;
+    await bench('warm 10 s CQT', runCqt).run();
   });
 });

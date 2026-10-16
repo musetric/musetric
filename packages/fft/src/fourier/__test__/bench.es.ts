@@ -75,10 +75,7 @@ const rangeBenchBaseModes: ReadonlyMap<string, FourierMode> = new Map(
 );
 
 export type FourierBenchMode =
-  | 'cufft'
-  | FourierMode
-  | IFourierMode
-  | FourierBenchRangeMode;
+  'cufft' | FourierMode | IFourierMode | FourierBenchRangeMode;
 
 const isFourierBenchRangeMode = (
   mode: FourierBenchMode,

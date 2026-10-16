@@ -76,7 +76,7 @@ export const FlowStepStatus: FC<FlowStepStatusProps> = (props) => {
   return (
     <Typography
       variant='caption'
-      color={waitingLabel === undefined ? 'text.secondary' : 'warning.main'}
+      color={waitingLabel === undefined ? 'textSecondary' : 'warning'}
     >
       {count === undefined ? label : `${label} · ${count}`}
     </Typography>

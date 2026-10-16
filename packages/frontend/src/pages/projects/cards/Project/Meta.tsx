@@ -73,7 +73,7 @@ export const ProjectCardMeta: FC<ProjectCardMetaProps> = (props) => {
   }
 
   return (
-    <Typography variant='caption' color='text.secondary' noWrap>
+    <Typography variant='caption' noWrap sx={{ color: 'text.secondary' }}>
       {parts.join(' · ')}
     </Typography>
   );

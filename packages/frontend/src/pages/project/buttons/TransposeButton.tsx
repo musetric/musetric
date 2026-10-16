@@ -73,7 +73,7 @@ export const TransposeButton: FC = () => {
             setTransposeAnchorEl(event.currentTarget);
           }}
         >
-          <Stack alignItems='center' gap={0.5}>
+          <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
             <Badge
               badgeContent={badges[voiceOctave]}
               color='primary'
@@ -90,7 +90,7 @@ export const TransposeButton: FC = () => {
             >
               <TransposeIcon fontSize='small' />
             </Badge>
-            <Typography variant='caption' lineHeight={1} noWrap>
+            <Typography variant='caption' noWrap sx={{ lineHeight: 1 }}>
               {value}
             </Typography>
           </Stack>

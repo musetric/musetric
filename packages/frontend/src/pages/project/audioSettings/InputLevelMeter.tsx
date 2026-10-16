@@ -10,7 +10,7 @@ export const InputLevelMeter: FC = () => {
   const gainedLevel = Math.min(1, level * recordingGain);
 
   return (
-    <Stack gap={1}>
+    <Stack sx={{ gap: 1 }}>
       <Typography variant='body2'>
         {t('pages.project.audioSettings.level')}
       </Typography>

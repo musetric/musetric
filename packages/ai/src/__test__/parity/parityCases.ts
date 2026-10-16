@@ -1,10 +1,5 @@
 export type ParityStep =
-  | 'vocals'
-  | 'voices'
-  | 'rhythm'
-  | 'key'
-  | 'chords'
-  | 'transcribe';
+  'vocals' | 'voices' | 'rhythm' | 'key' | 'chords' | 'transcribe';
 
 export type ParitySource = {
   url: string;

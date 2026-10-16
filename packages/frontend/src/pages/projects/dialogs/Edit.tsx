@@ -75,7 +75,7 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
       return <QueryError error={project.error} />;
     }
     return (
-      <Stack direction='column' gap={4} pt={1}>
+      <Stack direction='column' sx={{ gap: 4, pt: 1 }}>
         <Controller
           name='preview'
           control={control}

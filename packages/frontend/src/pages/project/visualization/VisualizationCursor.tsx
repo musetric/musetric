@@ -74,12 +74,12 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
   return (
     <Box
       ref={ref}
-      position='absolute'
-      top={0}
-      bottom={0}
-      left={0}
-      width='1px'
       sx={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        width: '1px',
         backgroundColor: (theme) => theme.palette.primary.main,
         pointerEvents: 'none',
         willChange: 'transform',
@@ -88,12 +88,12 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
     >
       <Box
         ref={handleRef}
-        position='absolute'
-        top={0}
-        bottom={0}
-        left='50%'
-        width={{ xs: '32px', md: '16px' }}
         sx={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: '50%',
+          width: { xs: '32px', md: '16px' },
           cursor: 'ew-resize',
           pointerEvents: 'auto',
           touchAction: 'none',

@@ -10,16 +10,18 @@ export const ViewPending: FC<ViewPendingProps> = (props) => {
 
   return (
     <Stack
-      width='100%'
-      height='100%'
-      alignItems='center'
-      justifyContent='center'
-      gap={0.5}
-      flex={1}
+      sx={{
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 0.5,
+        flex: 1,
+      }}
     >
       <CircularProgress size={24} thickness={4} />
       {message ? (
-        <Typography variant='body2' color='text.primary'>
+        <Typography variant='body2' sx={{ color: 'text.primary' }}>
           {message}
         </Typography>
       ) : undefined}

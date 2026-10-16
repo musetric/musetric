@@ -25,7 +25,7 @@ export const TempoPicker: FC = () => {
           vertical: 'bottom',
         }}
       >
-        <Box width={380} p={4}>
+        <Box sx={{ width: 380, p: 4 }}>
           <TempoPickerContent />
         </Box>
       </Popover>
@@ -41,11 +41,13 @@ export const TempoPicker: FC = () => {
       }}
     >
       <Box
-        width='100%'
-        maxWidth={460}
-        mx='auto'
-        p={4}
-        pb='max(18px, env(safe-area-inset-bottom))'
+        sx={{
+          width: '100%',
+          maxWidth: 460,
+          mx: 'auto',
+          p: 4,
+          pb: 'max(18px, env(safe-area-inset-bottom))',
+        }}
       >
         <TempoPickerContent />
       </Box>

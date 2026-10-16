@@ -19,16 +19,16 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
     <Stack
       ref={subtitleListRef}
       component='div'
-      alignItems='center'
-      width='100%'
-      height='100%'
-      minHeight={0}
-      overflow='auto'
       sx={{
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        overflow: 'auto',
         scrollbarGutter: 'stable',
       }}
     >
-      <Box height='calc(50% - 2em)' flexShrink={0} />
+      <Box sx={{ height: 'calc(50% - 2em)', flexShrink: 0 }} />
       {subtitle.map((segment, index) => (
         <SubtitleSegment
           key={`${segment.start}-${index}`}
@@ -37,7 +37,7 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
           subtitleCursor={subtitleCursor}
         />
       ))}
-      <Box height='calc(50% - 2em)' flexShrink={0} />
+      <Box sx={{ height: 'calc(50% - 2em)', flexShrink: 0 }} />
     </Stack>
   );
 };

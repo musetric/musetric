@@ -26,8 +26,7 @@ type SinglePassDispatchState = {
 };
 
 export type StockhamDispatchState =
-  | MultiPassDispatchState
-  | SinglePassDispatchState;
+  MultiPassDispatchState | SinglePassDispatchState;
 
 export const createStockhamFourier =
   <S extends StockhamDispatchState>(

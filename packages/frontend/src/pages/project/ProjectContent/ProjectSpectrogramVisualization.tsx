@@ -42,53 +42,68 @@ export const ProjectSpectrogramVisualization: FC = () => {
   return (
     <Box
       ref={ref}
-      gridArea='picture'
-      display='grid'
-      gridTemplateRows='minmax(0, 1fr) auto'
-      position='relative'
-      minHeight={0}
-      minWidth={0}
+      sx={{
+        gridArea: 'picture',
+        display: 'grid',
+        gridTemplateRows: 'minmax(0, 1fr) auto',
+        position: 'relative',
+        minHeight: 0,
+        minWidth: 0,
+      }}
     >
       <Box
-        display='grid'
-        gridTemplateRows={chordsOpen ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)'}
-        rowGap={1}
-        position='relative'
-        minHeight={0}
+        sx={{
+          display: 'grid',
+          gridTemplateRows: chordsOpen
+            ? 'auto minmax(0, 1fr)'
+            : 'minmax(0, 1fr)',
+          rowGap: 1,
+          position: 'relative',
+          minHeight: 0,
+        }}
       >
         {chordsOpen && <ChordLane />}
-        <Box ref={spectrogramAreaRef} height='100%' position='relative'>
+        <Box
+          ref={spectrogramAreaRef}
+          sx={{ height: '100%', position: 'relative' }}
+        >
           <SpectrogramCanvas />
           <SpectrogramNoteScale />
           {spectrum ? (
             <>
               <Box
-                position='absolute'
-                top={0}
-                right={0}
-                bottom={leadBandTop}
-                left={noteNamesInset}
-                sx={{ pointerEvents: 'none' }}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  bottom: leadBandTop,
+                  left: noteNamesInset,
+                  pointerEvents: 'none',
+                }}
               >
                 <Box
-                  position='absolute'
-                  top={8}
-                  left={8}
-                  zIndex={1}
-                  sx={{ pointerEvents: 'auto' }}
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                    zIndex: 1,
+                    pointerEvents: 'auto',
+                  }}
                 >
                   <RecordingPicker variant='picture' />
                 </Box>
                 {emptyRecordingName !== undefined && (
                   <Typography
                     variant='body2'
-                    color='text.secondary'
-                    position='absolute'
-                    top='50%'
-                    left={0}
-                    right={0}
-                    textAlign='center'
-                    sx={{ transform: 'translateY(-50%)' }}
+                    sx={{
+                      color: 'text.secondary',
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      textAlign: 'center',
+                      transform: 'translateY(-50%)',
+                    }}
                   >
                     {t('pages.project.recording.emptyBand', {
                       name: emptyRecordingName,
@@ -97,12 +112,14 @@ export const ProjectSpectrogramVisualization: FC = () => {
                 )}
               </Box>
               <Box
-                position='absolute'
-                top={leadBandTop}
-                right={0}
-                bottom={0}
-                left={noteNamesInset}
-                sx={{ pointerEvents: 'none' }}
+                sx={{
+                  position: 'absolute',
+                  top: leadBandTop,
+                  right: 0,
+                  bottom: 0,
+                  left: noteNamesInset,
+                  pointerEvents: 'none',
+                }}
               >
                 <TrackLabel
                   kind='delivery'
@@ -112,7 +129,14 @@ export const ProjectSpectrogramVisualization: FC = () => {
               </Box>
             </>
           ) : (
-            <Box position='absolute' top={8} left={notesPickerInset} zIndex={1}>
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 8,
+                left: notesPickerInset,
+                zIndex: 1,
+              }}
+            >
               <RecordingPicker variant='picture' />
             </Box>
           )}
@@ -121,12 +145,14 @@ export const ProjectSpectrogramVisualization: FC = () => {
       </Box>
       <VisualizationTimeline mode='spectrogram' />
       <Box
-        position='absolute'
-        top={`${chordBlockInset}px`}
-        right={`${chordBlockInset}px`}
-        height={`${chordLaneHeight - 2 * chordBlockInset}px`}
-        display='flex'
-        zIndex={1}
+        sx={{
+          position: 'absolute',
+          top: `${chordBlockInset}px`,
+          right: `${chordBlockInset}px`,
+          height: `${chordLaneHeight - 2 * chordBlockInset}px`,
+          display: 'flex',
+          zIndex: 1,
+        }}
       >
         <ChordsToggleButton />
       </Box>

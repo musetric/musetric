@@ -20,7 +20,7 @@ export const demuxTrack = async (input: Input): Promise<DemuxedTrack> => {
     'Unsupported fMP4: audio track not found',
   );
 
-  const { numberOfChannels } = audioTrack;
+  const numberOfChannels = await audioTrack.getNumberOfChannels();
   if (numberOfChannels < 1) {
     throw new Error('Unsupported fMP4: audio track has no channels');
   }
@@ -41,7 +41,7 @@ export const demuxTrack = async (input: Input): Promise<DemuxedTrack> => {
   return {
     decoderConfig,
     packets,
-    sampleRate: audioTrack.sampleRate,
+    sampleRate: await audioTrack.getSampleRate(),
     numberOfChannels,
   };
 };

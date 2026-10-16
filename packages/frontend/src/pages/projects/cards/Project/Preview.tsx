@@ -26,10 +26,15 @@ export const ProjectCardPreview: FC<ProjectCardPreviewProps> = (props) => {
   const percent = (doneCount(projectInfo) / stepOrder.length) * 100;
 
   return (
-    <Box width={{ xs: 64, sm: 80 }} flexShrink={0}>
+    <Box
+      sx={{
+        width: { xs: 64, sm: 80 },
+        flexShrink: 0,
+      }}
+    >
       <ProjectPreview url={previewUrl} name={projectInfo.name}>
         {!done && (
-          <Box position='relative' display='inline-flex'>
+          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
             <CircularProgress
               variant='determinate'
               value={100}

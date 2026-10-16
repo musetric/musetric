@@ -6,7 +6,7 @@ import { type FourierBenchSummary } from '../src/fourier/__test__/bench.es.js';
 import { runCufftBenchmark } from './benchCufft.js';
 import { writeBenchReport } from './genBenchReport.js';
 
-declare module '@vitest/runner' {
+declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     bench?: FourierBenchSummary;
@@ -35,7 +35,6 @@ const main = async (): Promise<void> => {
   };
   const cufftResults = runCufftBenchmark() ?? [];
   const vitest = await startVitest(
-    'test',
     [],
     {
       config: resolve(packageRoot, 'vitest.bench.config.ts'),

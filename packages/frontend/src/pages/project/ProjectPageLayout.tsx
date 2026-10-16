@@ -13,16 +13,23 @@ export const ProjectLayout: FC<ProjectLayoutProps> = (props) => {
 
   return (
     <Stack
-      height='100dvh'
-      position='relative'
-      gap={2}
-      sx={(theme) => ({
-        ...safeAreaPadding(theme, 2),
-        bgcolor: framed ? getPageBackground(theme) : undefined,
-      })}
+      sx={[
+        {
+          height: '100dvh',
+          position: 'relative',
+          gap: 2,
+        },
+        (theme) => ({
+          ...safeAreaPadding(theme, 2),
+          bgcolor: framed ? getPageBackground(theme) : undefined,
+        }),
+      ]}
     >
       {heading && (
-        <Stack direction='row' gap={2} alignItems='center' position='relative'>
+        <Stack
+          direction='row'
+          sx={{ gap: 2, alignItems: 'center', position: 'relative' }}
+        >
           {heading}
         </Stack>
       )}

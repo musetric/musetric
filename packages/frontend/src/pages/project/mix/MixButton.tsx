@@ -29,9 +29,9 @@ export const MixButton: FC = () => {
             setMixAnchorEl(event.currentTarget);
           }}
         >
-          <Stack alignItems='center' gap={0.5}>
+          <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
             <TuneRoundedIcon fontSize='small' />
-            <Typography variant='caption' lineHeight={1} noWrap>
+            <Typography variant='caption' noWrap sx={{ lineHeight: 1 }}>
               {label}
             </Typography>
           </Stack>

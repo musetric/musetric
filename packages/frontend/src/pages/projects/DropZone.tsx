@@ -37,9 +37,6 @@ export const ProjectsDropZone: FC<PropsWithChildren> = (props) => {
 
   return (
     <Box
-      position='relative'
-      width='100%'
-      height='100dvh'
       onDragOver={(event) => {
         event.preventDefault();
         if (!create.isPending) {
@@ -72,23 +69,28 @@ export const ProjectsDropZone: FC<PropsWithChildren> = (props) => {
             setFailed(true);
           });
       }}
+      sx={{ position: 'relative', width: '100%', height: '100dvh' }}
     >
       {children}
       {overlayVisible && (
         <Stack
-          position='absolute'
-          top={0}
-          right={0}
-          bottom={0}
-          left={0}
-          alignItems='center'
-          justifyContent='center'
-          gap={3}
-          sx={(theme) => ({
-            backgroundColor: alpha(theme.palette.background.default, 0.88),
-            pointerEvents: 'none',
-            zIndex: 10,
-          })}
+          sx={[
+            {
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+            },
+            (theme) => ({
+              backgroundColor: alpha(theme.palette.background.default, 0.88),
+              pointerEvents: 'none',
+              zIndex: 10,
+            }),
+          ]}
         >
           {create.isPending ? (
             <CircularProgress color='primary' />

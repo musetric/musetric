@@ -15,10 +15,12 @@ export const Subtitle: FC = () => {
   if (subtitleQuery.status === 'pending') {
     return (
       <Stack
-        width='100%'
-        height='100%'
-        alignItems='center'
-        justifyContent='center'
+        sx={{
+          width: '100%',
+          height: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
         {Array.from({ length: 6 }).map((_, index) => (
           <Skeleton
@@ -34,11 +36,13 @@ export const Subtitle: FC = () => {
   if (subtitleQuery.status === 'error') {
     return (
       <Stack
-        alignItems='center'
-        width='100%'
-        height='100%'
-        minHeight={0}
-        overflow='hidden'
+        sx={{
+          alignItems: 'center',
+          width: '100%',
+          height: '100%',
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
       >
         <ViewError message={t('pages.project.progress.error.lyrics')} />
       </Stack>

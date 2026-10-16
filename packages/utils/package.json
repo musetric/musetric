@@ -45,6 +45,7 @@
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

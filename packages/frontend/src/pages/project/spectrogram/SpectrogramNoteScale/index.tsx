@@ -156,12 +156,12 @@ export const SpectrogramNoteScale: FC = () => {
     <Box
       component='canvas'
       ref={canvasRef}
-      position='absolute'
-      top={0}
-      right={0}
-      bottom={0}
-      left={0}
       sx={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
         display: 'block',
         height: '100%',
         pointerEvents: 'none',

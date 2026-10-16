@@ -26,8 +26,8 @@ export const PreviewField: FC<PreviewFieldProps> = (props) => {
   );
 
   return (
-    <Stack direction='row' gap={3} alignItems='center'>
-      <Box width={88} flexShrink={0}>
+    <Stack direction='row' sx={{ gap: 3, alignItems: 'center' }}>
+      <Box sx={{ width: 88, flexShrink: 0 }}>
         <ProjectPreview url={value?.url} name={name}>
           {loading && (
             <CircularProgress size={24} sx={{ color: 'text.primary' }} />
@@ -50,7 +50,7 @@ export const PreviewField: FC<PreviewFieldProps> = (props) => {
           });
         }}
       />
-      <Stack gap={1} alignItems='flex-start'>
+      <Stack sx={{ gap: 1, alignItems: 'flex-start' }}>
         <Button
           size='small'
           startIcon={<ImageOutlinedIcon />}

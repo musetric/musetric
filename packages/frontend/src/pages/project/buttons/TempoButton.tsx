@@ -29,9 +29,9 @@ export const TempoButton: FC = () => {
             setTempoAnchorEl(event.currentTarget);
           }}
         >
-          <Stack alignItems='center' gap={0.5}>
+          <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
             <TempoIcon fontSize='small' />
-            <Typography variant='caption' lineHeight={1} noWrap>
+            <Typography variant='caption' noWrap sx={{ lineHeight: 1 }}>
               {t('pages.project.player.controls.tempoRatioValue', {
                 value: tempoRatio.toFixed(2),
               })}

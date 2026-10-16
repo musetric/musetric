@@ -65,13 +65,11 @@ describe('isSignOff', () => {
 describe('dropCreditWords', () => {
   const kept = (text: string): string =>
     dropCreditWords(
-      text.split(' ').map(
-        (word, index): TranscriptionWord => ({
-          text: word,
-          start: index,
-          end: index + 1,
-        }),
-      ),
+      text.split(' ').map((word, index): TranscriptionWord => ({
+        text: word,
+        start: index,
+        end: index + 1,
+      })),
     )
       .map((word) => word.text)
       .join(' ');

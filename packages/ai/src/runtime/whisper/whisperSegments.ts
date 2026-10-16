@@ -65,15 +65,13 @@ export const joinHalves = (
   offset: number,
 ): WordChunk[] => [
   ...first,
-  ...second.map(
-    (chunk): WordChunk => ({
-      text: chunk.text,
-      timestamp: [
-        chunk.timestamp[0] + offset,
-        (chunk.timestamp[1] ?? chunk.timestamp[0]) + offset,
-      ],
-    }),
-  ),
+  ...second.map((chunk): WordChunk => ({
+    text: chunk.text,
+    timestamp: [
+      chunk.timestamp[0] + offset,
+      (chunk.timestamp[1] ?? chunk.timestamp[0]) + offset,
+    ],
+  })),
 ];
 
 export const countWords = (text: string | undefined): number =>

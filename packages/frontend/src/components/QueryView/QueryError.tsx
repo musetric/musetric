@@ -11,10 +11,12 @@ export const QueryError: FC<QueryErrorProps> = (props) => {
   const { t } = useTranslation();
   return (
     <Stack
-      alignItems='center'
-      justifyContent='center'
-      width='100%'
-      height='100%'
+      sx={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100%',
+      }}
     >
       <ReportGmailerrorredIcon color='error' fontSize='large' />
       <Typography color='error'>{t('common.queryView.error')}</Typography>

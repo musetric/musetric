@@ -5,7 +5,7 @@ import { experimental_getRunnerTask, startVitest } from 'vitest/node';
 import { type SpectrogramBenchSummary } from '../src/__test__/bench.es.js';
 import { writeBenchReports } from './genBenchReport.js';
 
-declare module '@vitest/runner' {
+declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
     bench?: SpectrogramBenchSummary;
@@ -37,7 +37,6 @@ const benchReporter = {
 
 const runVitest = async (): Promise<SpectrogramBenchSummary[]> => {
   const vitest = await startVitest(
-    'test',
     [],
     {
       config: resolve(packageRoot, 'vitest.bench.config.ts'),

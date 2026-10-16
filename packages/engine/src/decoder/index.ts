@@ -103,8 +103,8 @@ export const createEngineDecoder = (
   let mountPromise: ControlledPromise<void> | undefined = undefined;
   let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
   let recordingExportPromise:
-    | ControlledPromise<Float32Array<ArrayBuffer> | undefined>
-    | undefined = undefined;
+    ControlledPromise<Float32Array<ArrayBuffer> | undefined> | undefined =
+    undefined;
   const runtimeSampleRate = options.sampleRate;
 
   port.instance.onerror = () => {

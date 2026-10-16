@@ -36,7 +36,7 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
 
   if (props.variant === 'inline') {
     return (
-      <Typography variant='subtitle2' color='text.primary'>
+      <Typography variant='subtitle2' sx={{ color: 'text.primary' }}>
         {label}
       </Typography>
     );
@@ -45,26 +45,30 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
   return (
     <Typography
       variant='caption'
-      fontWeight={600}
-      lineHeight={1}
-      color='text.secondary'
-      sx={(theme) => ({
-        position: 'absolute',
-        top: 12,
-        left: 8,
-        px: 0.5,
-        py: 0.25,
-        borderRadius: 1,
-        ...(props.variant === 'spectrogram'
-          ? { backgroundColor: alpha(theme.palette.common.black, 0.8) }
-          : {
-              backgroundColor: theme.palette.background.paper,
-              backgroundImage: 'var(--Paper-overlay)',
-            }),
-        zIndex: 1,
-        pointerEvents: 'none',
-        userSelect: 'none',
-      })}
+      sx={[
+        {
+          fontWeight: 600,
+          lineHeight: 1,
+          color: 'text.secondary',
+        },
+        (theme) => ({
+          position: 'absolute',
+          top: 12,
+          left: 8,
+          px: 0.5,
+          py: 0.25,
+          borderRadius: 1,
+          ...(props.variant === 'spectrogram'
+            ? { backgroundColor: alpha(theme.palette.common.black, 0.8) }
+            : {
+                backgroundColor: theme.palette.background.paper,
+                backgroundImage: 'var(--Paper-overlay)',
+              }),
+          zIndex: 1,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }),
+      ]}
     >
       {label}
     </Typography>

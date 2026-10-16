@@ -56,8 +56,8 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
     >
       <DialogTitle>{t('pages.projects.dialogs.delete.title')}</DialogTitle>
       <DialogContent>
-        <Stack direction='row' gap={3} alignItems='center' pt={1}>
-          <Box width={72} flexShrink={0}>
+        <Stack direction='row' sx={{ gap: 3, alignItems: 'center', pt: 1 }}>
+          <Box sx={{ width: 72, flexShrink: 0 }}>
             <ProjectPreview
               url={projectInfo.data?.previewUrl}
               name={projectInfo.data?.name}

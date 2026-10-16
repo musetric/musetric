@@ -43,21 +43,23 @@ export const RecordingRow: FC<RecordingRowProps> = (props) => {
 
   const cells = (
     <>
-      <Box display='flex' color='primary.main'>
+      <Box sx={{ display: 'flex', color: 'primary.main' }}>
         {recording.active && <CheckRoundedIcon fontSize='small' />}
       </Box>
       {renaming ? (
         <RecordingNameField recording={recording} otherNames={otherNames} />
       ) : (
-        <Typography variant='body2' noWrap pr={3}>
+        <Typography variant='body2' noWrap sx={{ pr: 3 }}>
           {recording.name}
         </Typography>
       )}
       <Box
-        height={layout.waveHeight}
-        borderRadius={1}
-        overflow='hidden'
-        bgcolor='background.default'
+        sx={{
+          height: layout.waveHeight,
+          borderRadius: 1,
+          overflow: 'hidden',
+          bgcolor: 'background.default',
+        }}
       >
         <RecordingWave
           recordingId={recording.id}
