@@ -23,6 +23,7 @@ class MainActivity : TauriActivity() {
     applyWebViewInsets(webView)
     shareDownloads(this, webView)
     attachMediaSession(this, webView)
+    attachSettings(this, webView)
   }
 
   private fun applyWebViewInsets(webView: WebView) {

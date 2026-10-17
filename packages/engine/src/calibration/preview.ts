@@ -1,5 +1,9 @@
 import { resolveAudioInputDevice } from '@musetric/audio/recording';
 import {
+  clearMicrophoneDenial,
+  reportMicrophoneFailure,
+} from '../audioSession/access.js';
+import {
   type EngineAudioSession,
   type EngineMicrophone,
 } from '../audioSession/engineAudioSession.js';
@@ -77,6 +81,19 @@ export const createCalibrationPreview = (
       animationFrame = requestAnimationFrame(updateLevel);
     };
 
+    const failInput = (error: unknown) => {
+      console.error('Failed to open microphone preview', error);
+      if (
+        lifecycle.cancelled ||
+        reportMicrophoneFailure(store, audioSession, error)
+      ) {
+        return;
+      }
+      store.update((draft) => {
+        draft.calibrationError = 'preview';
+      });
+    };
+
     const openInput = async () => {
       const current = ++lifecycle.generation;
       const isStale = (): boolean =>
@@ -114,6 +131,7 @@ export const createCalibrationPreview = (
           return;
         }
         activeMicrophone = microphone;
+        clearMicrophoneDenial(store);
 
         const refreshedDevices = await refreshDevices();
         if (isStale() || activeMicrophone !== microphone) {
@@ -160,12 +178,7 @@ export const createCalibrationPreview = (
         source.connect(analyser);
         updateLevel();
       } catch (error) {
-        console.error('Failed to open microphone preview', error);
-        if (!lifecycle.cancelled) {
-          store.update((draft) => {
-            draft.calibrationError = 'preview';
-          });
-        }
+        failInput(error);
       }
     };
 
@@ -180,6 +193,14 @@ export const createCalibrationPreview = (
     const unsubscribeOutput = store.subscribe(trackedOutputDeviceId, () => {
       void openInput();
     });
+    const unsubscribeDenial = store.subscribe(
+      (state) => state.microphoneDenial,
+      (denial) => {
+        if (denial === undefined && !activeMicrophone) {
+          void openInput();
+        }
+      },
+    );
 
     void openInput();
 
@@ -187,6 +208,7 @@ export const createCalibrationPreview = (
       lifecycle.cancelled = true;
       unsubscribeInput();
       unsubscribeOutput();
+      unsubscribeDenial();
       teardown();
     };
   };

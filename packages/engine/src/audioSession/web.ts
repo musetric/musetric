@@ -9,6 +9,11 @@ import {
   setAudioSessionType,
 } from './engineAudioSession.js';
 import {
+  canOpenWebMicrophoneSettings,
+  openWebMicrophoneSettings,
+  readWebMicrophoneDenial,
+} from './settings.js';
+import {
   createTimedMicrophones,
   type TimedMicrophoneSource,
 } from './timedMicrophone.js';
@@ -150,5 +155,8 @@ export const createWebAudioSession = (
         mediaDevices?.removeEventListener('devicechange', listener);
       };
     },
+    readMicrophoneDenial: readWebMicrophoneDenial,
+    canOpenMicrophoneSettings: canOpenWebMicrophoneSettings,
+    openMicrophoneSettings: openWebMicrophoneSettings,
   };
 };

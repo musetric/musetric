@@ -218,7 +218,11 @@ export const createEngineCalibration = (
     const microphone = preview?.getMicrophone();
     if (!microphone) {
       store.update((draft) => {
-        draft.calibrationError = 'calibration';
+        if (draft.microphoneDenial) {
+          draft.microphoneDenialOpen = true;
+        } else {
+          draft.calibrationError = 'calibration';
+        }
       });
       return false;
     }
