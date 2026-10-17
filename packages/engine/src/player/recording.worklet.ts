@@ -67,11 +67,17 @@ export const createRecordingRuntime = (
   let recordingSequence = 0;
   let recordingNotificationPort: RecordingStreamPort | undefined = undefined;
   let inputOffsetFrameIndex = 0;
+  let inputSkipFrameCount = 0;
   let leadInFrameCount = 0;
   let pass = false;
   let passShift = 0;
   let passState: 'waiting' | 'writing' | 'ended' = 'waiting';
   let runEndOffset = Number.POSITIVE_INFINITY;
+
+  const resetInputOffset = () => {
+    inputOffsetFrameIndex = 0;
+    inputSkipFrameCount = getInputLatencyFrameCount();
+  };
 
   const findPass = (nextFrameIndex: number) => {
     const loop = getLoop();
@@ -180,7 +186,7 @@ export const createRecordingRuntime = (
 
     const skippedFrameCount = Math.min(
       firstChannel.length,
-      Math.max(0, getInputLatencyFrameCount() - inputOffsetFrameIndex),
+      Math.max(0, inputSkipFrameCount - inputOffsetFrameIndex),
     );
     inputOffsetFrameIndex += skippedFrameCount;
 
@@ -208,7 +214,7 @@ export const createRecordingRuntime = (
       applyLatencyFrameCounts(message);
       recordingOffset = 0;
       recordingSequence = 0;
-      inputOffsetFrameIndex = 0;
+      resetInputOffset();
       pass = message.pass === true;
       passState = 'waiting';
       startRun(getPlaying() ? getFrameIndex() : message.frameIndex);
@@ -234,12 +240,10 @@ export const createRecordingRuntime = (
         return;
       }
       flushRecordingBuffer();
-      inputOffsetFrameIndex = 0;
+      resetInputOffset();
       startRun(frameIndex);
     },
-    resetInputOffset: () => {
-      inputOffsetFrameIndex = 0;
-    },
+    resetInputOffset,
     isActive: () => recordingNotificationPort !== undefined,
   };
 };

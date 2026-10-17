@@ -12,6 +12,8 @@ import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
   type EngineState,
+  getEstimatedOutputLatencyFrameCount,
+  getInputLatencyFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
 } from '../state.js';
@@ -41,6 +43,7 @@ const isSameRoute = (
 
 const clearCorrection = (state: EngineState) => {
   state.latencyCorrectionFrameCount = 0;
+  state.outputCorrectionFrameCount = 0;
   state.correctedOutputLatencyFrameCount = undefined;
   state.latencySource = 'estimated';
 };
@@ -59,6 +62,7 @@ const restoreLatencyState = (
       isSameRoute(state, stored.outputLatencyFrameCount, sampleRate)
     ) {
       state.latencyCorrectionFrameCount = stored.latencyCorrectionFrameCount;
+      state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount ?? 0;
       state.correctedOutputLatencyFrameCount = stored.outputLatencyFrameCount;
       state.latencySource = stored.source;
     } else {
@@ -109,14 +113,23 @@ export const createEngineCalibration = (
   const saveCorrection = (
     targetLatencyFrameCount: number,
     source: 'manual' | 'calibrated',
+    correctsOutput: boolean,
   ) => {
     const state = store.get();
-    const latencyCorrectionFrameCount =
-      targetLatencyFrameCount -
-      state.inputLatencyFrameCount -
-      getOutputLatencyFrameCount(state);
+    const inputLatencyFrameCount = getInputLatencyFrameCount(state);
+    const outputCorrectionFrameCount = correctsOutput
+      ? targetLatencyFrameCount -
+        inputLatencyFrameCount -
+        getEstimatedOutputLatencyFrameCount(state)
+      : state.outputCorrectionFrameCount;
+    const latencyCorrectionFrameCount = correctsOutput
+      ? 0
+      : targetLatencyFrameCount -
+        inputLatencyFrameCount -
+        getOutputLatencyFrameCount(state);
     store.update((draft) => {
       draft.latencyCorrectionFrameCount = latencyCorrectionFrameCount;
+      draft.outputCorrectionFrameCount = outputCorrectionFrameCount;
       draft.correctedOutputLatencyFrameCount = draft.outputLatencyFrameCount;
       draft.latencySource = source;
     });
@@ -124,6 +137,7 @@ export const createEngineCalibration = (
       latencyStore.set(state.latencyDevicePairKey, {
         outputLatencyFrameCount: state.outputLatencyFrameCount,
         latencyCorrectionFrameCount,
+        outputCorrectionFrameCount,
         source,
       });
     }
@@ -233,7 +247,11 @@ export const createEngineCalibration = (
       }
 
       applyInputLatencyEstimate(store, { context, microphone });
-      saveCorrection(result.latencyFrameCount, 'calibrated');
+      saveCorrection(
+        result.latencyFrameCount,
+        'calibrated',
+        microphone.exactRoundTripLatency !== undefined,
+      );
 
       return true;
     } catch (error) {
@@ -292,7 +310,7 @@ export const createEngineCalibration = (
       if (frameCount === getRecordingLatencyFrameCount(store.get())) {
         return;
       }
-      saveCorrection(frameCount, 'manual');
+      saveCorrection(frameCount, 'manual', false);
     },
     calibrate: runCalibration,
     openPreview: () => getPreview().open(),

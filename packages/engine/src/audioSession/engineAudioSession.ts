@@ -4,6 +4,7 @@ export type EngineMicrophone = {
   getSettings: () => RecordingInputSettings;
   getMeasuredInputLatency: () => number | undefined;
   whenInputLatencyMeasured: () => Promise<void>;
+  exactRoundTripLatency?: number;
   outputLatency?: number;
   createSource: () => AudioNode;
 };
