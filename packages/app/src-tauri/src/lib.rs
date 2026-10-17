@@ -23,6 +23,8 @@ mod executor_view;
 mod lifecycle;
 #[cfg(target_os = "ios")]
 mod microphone;
+#[cfg(desktop)]
+mod permission;
 #[cfg(target_os = "ios")]
 mod share;
 #[cfg(desktop)]
@@ -158,6 +160,7 @@ fn finish_main_window<R: tauri::Runtime, M: Manager<R>>(
 ) -> tauri::Result<()> {
     builder
         .on_download(|webview, event| download::handle(&webview, event))
+        .on_permission_request(|webview, kind| permission::handle(&webview, kind))
         .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .background_color(tauri::webview::Color(18, 18, 18, 255))
         .visible(false)
