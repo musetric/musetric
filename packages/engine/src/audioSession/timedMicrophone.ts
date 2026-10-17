@@ -46,6 +46,53 @@ const readMono = (data: AudioData) => {
   return samples;
 };
 
+export type CapturedChunk = {
+  startMs: number;
+  sampleRate: number;
+  samples: Float32Array;
+};
+
+const pumpChunks = async (
+  reader: ReadableStreamDefaultReader<AudioData>,
+  push: (chunk: CapturedChunk) => void,
+) => {
+  for (
+    let result = await reader.read();
+    !result.done;
+    result = await reader.read()
+  ) {
+    const data = result.value;
+    push({
+      startMs: data.timestamp / 1000,
+      sampleRate: data.sampleRate,
+      samples: readMono(data),
+    });
+    data.close();
+  }
+};
+
+export type CapturedChunkSource = (
+  push: (chunk: CapturedChunk) => void,
+) => () => void;
+
+export const readTrackChunks = (
+  track: MediaStreamTrack,
+): CapturedChunkSource | undefined => {
+  const TrackProcessorClass = readTrackProcessor();
+  if (!TrackProcessorClass) {
+    return undefined;
+  }
+  return (push) => {
+    const reader = new TrackProcessorClass({ track }).readable.getReader();
+    void pumpChunks(reader, push).catch((error: unknown) => {
+      console.error('Failed to read the microphone', error);
+    });
+    return () => {
+      void reader.cancel();
+    };
+  };
+};
+
 type TimedMicrophonePort = ReturnType<
   typeof timedMicrophoneChannel.outbound<MessagePort>
 >;
@@ -63,10 +110,10 @@ const createChunkPusher = (options: CreateChunkPusherOptions) => {
   let endMs: number | undefined = undefined;
   let roundTripFrameCount: number | undefined = undefined;
 
-  const push = (data: AudioData) => {
-    const startMs = data.timestamp / 1000;
+  const push = (chunk: CapturedChunk) => {
+    const { startMs, sampleRate, samples } = chunk;
     if (endMs !== undefined && startMs - endMs > gapMs) {
-      frame += Math.round(((startMs - endMs) * data.sampleRate) / 1000);
+      frame += Math.round(((startMs - endMs) * sampleRate) / 1000);
     }
     const reading = isSettled() ? outputClock.read() : undefined;
     if (reading) {
@@ -78,29 +125,15 @@ const createChunkPusher = (options: CreateChunkPusherOptions) => {
       port.methods.push({
         frame,
         at: heardTime * context.sampleRate + roundTripFrameCount,
-        sampleRate: data.sampleRate,
-        samples: readMono(data),
+        sampleRate,
+        samples,
       });
     }
-    frame += data.numberOfFrames;
-    endMs = startMs + (data.numberOfFrames / data.sampleRate) * 1000;
-    data.close();
+    frame += samples.length;
+    endMs = startMs + (samples.length / sampleRate) * 1000;
   };
 
   return { push, getRoundTripFrameCount: () => roundTripFrameCount };
-};
-
-const pumpChunks = async (
-  reader: ReadableStreamDefaultReader<AudioData>,
-  push: (data: AudioData) => void,
-) => {
-  for (
-    let result = await reader.read();
-    !result.done;
-    result = await reader.read()
-  ) {
-    push(result.value);
-  }
 };
 
 const waitForReady = async (port: TimedMicrophonePort) =>
@@ -123,17 +156,13 @@ export type TimedMicrophoneSource = {
 };
 
 export type TimedMicrophones = {
-  open: (track: MediaStreamTrack) => Promise<TimedMicrophoneSource>;
+  open: (source: CapturedChunkSource) => Promise<TimedMicrophoneSource>;
 };
 
 export const createTimedMicrophones = (
   context: AudioContext,
   outputClock: EngineOutputClock,
-): TimedMicrophones | undefined => {
-  const TrackProcessorClass = readTrackProcessor();
-  if (!TrackProcessorClass) {
-    return undefined;
-  }
+): TimedMicrophones => {
   let modulePromise: Promise<void> | undefined = undefined;
 
   const loadModule = async () => {
@@ -147,7 +176,7 @@ export const createTimedMicrophones = (
   };
 
   return {
-    open: async (track) => {
+    open: async (source) => {
       await loadModule();
       const node = new AudioWorkletNode(context, timedMicrophoneProcessorName, {
         numberOfInputs: 0,
@@ -170,16 +199,13 @@ export const createTimedMicrophones = (
         port,
         isSettled: () => settled,
       });
-      const reader = new TrackProcessorClass({ track }).readable.getReader();
+      const unsubscribe = source(pusher.push);
       const close = () => {
-        void reader.cancel();
+        unsubscribe();
         node.disconnect();
         keepAlive.disconnect();
         node.port.close();
       };
-      void pumpChunks(reader, pusher.push).catch((error: unknown) => {
-        console.error('Failed to read the microphone', error);
-      });
 
       const roundTripFrameCount = (await ready)
         ? pusher.getRoundTripFrameCount()
