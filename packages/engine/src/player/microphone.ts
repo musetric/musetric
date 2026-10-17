@@ -1,44 +1,45 @@
 import {
-  createMicrophoneAudioConstraints,
-  mobileUserAgentPattern,
+  isMobileUserAgent,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
-import { type EngineAudioSession } from '../audioSession/index.js';
+import {
+  type EngineAudioSession,
+  type EngineMicrophone,
+} from '../audioSession/engineAudioSession.js';
 
-export const getAudioDevices = async () => {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter(
-    (device) => device.kind === 'audioinput' || device.kind === 'audiooutput',
-  );
+export const openKnownMicrophone = async (
+  audioSession: EngineAudioSession,
+  microphoneDeviceId: string | undefined,
+): Promise<EngineMicrophone> => {
+  const devices = await audioSession.enumerateDevices();
+  const device = resolveAudioInputDevice(devices, {
+    explicitDeviceId: microphoneDeviceId,
+    preferBuiltIn: isMobileUserAgent(navigator),
+  });
+  return audioSession.openMicrophone({
+    deviceId: device?.deviceId || microphoneDeviceId,
+  });
 };
 
-export type PreferredStreamOptions = {
+export type PreferredMicrophoneOptions = {
   audioSession: EngineAudioSession;
-  stream: MediaStream;
+  microphone: EngineMicrophone;
   devices: MediaDeviceInfo[];
-  sampleRate: number;
 };
 
-export const resolvePreferredStream = async (
-  options: PreferredStreamOptions,
-): Promise<MediaStream> => {
-  const { audioSession, stream, devices, sampleRate } = options;
+export const resolvePreferredMicrophone = async (
+  options: PreferredMicrophoneOptions,
+): Promise<EngineMicrophone> => {
+  const { audioSession, microphone, devices } = options;
   const preferredDevice = resolveAudioInputDevice(devices, {
-    preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+    preferBuiltIn: isMobileUserAgent(navigator),
   });
   if (!preferredDevice) {
-    return stream;
+    return microphone;
   }
-  const [currentTrack] = stream.getAudioTracks();
-  const currentDeviceId = currentTrack.getSettings().deviceId;
-  if (preferredDevice.deviceId === currentDeviceId) {
-    return stream;
+  if (preferredDevice.deviceId === microphone.getSettings().deviceId) {
+    return microphone;
   }
-  audioSession.closeMicrophone(stream);
-  return audioSession.openMicrophone({
-    audio: createMicrophoneAudioConstraints({
-      deviceId: preferredDevice.deviceId,
-      sampleRate,
-    }),
-  });
+  audioSession.closeMicrophone(microphone);
+  return audioSession.openMicrophone({ deviceId: preferredDevice.deviceId });
 };

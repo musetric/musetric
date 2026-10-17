@@ -1,13 +1,16 @@
+import { estimateRecordingLatency } from '@musetric/audio/recording';
 import {
-  createMicrophoneAudioConstraints,
-  estimateRecordingLatency,
-} from '@musetric/audio/recording';
-import { type EngineAudioSession } from '../audioSession/index.js';
+  type EngineAudioSession,
+  type EngineMicrophone,
+} from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineState } from '../state.js';
 import { settleLoopTry } from './loopTry.js';
-import { getAudioDevices, resolvePreferredStream } from './microphone.js';
+import {
+  openKnownMicrophone,
+  resolvePreferredMicrophone,
+} from './microphone.js';
 import { type EnginePlayback } from './playback.js';
 
 type RecordingSession = {
@@ -22,7 +25,7 @@ type RecordingSession = {
   decoderStreamStarted: boolean;
   decoderStreamClosed: boolean;
   playerStreamStarted: boolean;
-  stream?: MediaStream;
+  microphone?: EngineMicrophone;
   disconnectPlayerInput?: () => void;
   unsubscribeRecordingGain?: () => void;
   unsubscribePlayback?: () => void;
@@ -84,9 +87,9 @@ export const createEngineRecorder = (
     session.unsubscribeRecordingGain = undefined;
     session.unsubscribePlayback?.();
     session.unsubscribePlayback = undefined;
-    if (session.stream) {
-      audioSession.closeMicrophone(session.stream);
-      session.stream = undefined;
+    if (session.microphone) {
+      audioSession.closeMicrophone(session.microphone);
+      session.microphone = undefined;
     }
   };
 
@@ -188,26 +191,24 @@ export const createEngineRecorder = (
         return;
       }
 
-      let stream = await audioSession.openMicrophone({
-        audio: createMicrophoneAudioConstraints({
-          deviceId: store.get().microphoneDeviceId,
-          sampleRate: context.sampleRate,
-        }),
-      });
-      session.stream = stream;
+      const { microphoneDeviceId } = store.get();
+      let microphone = await openKnownMicrophone(
+        audioSession,
+        microphoneDeviceId,
+      );
+      session.microphone = microphone;
       if (isStopRequested(session)) {
         return;
       }
 
-      const devices = await getAudioDevices();
-      if (store.get().microphoneDeviceId === undefined) {
-        stream = await resolvePreferredStream({
+      const devices = await audioSession.enumerateDevices();
+      if (microphoneDeviceId === undefined) {
+        microphone = await resolvePreferredMicrophone({
           audioSession,
-          stream,
+          microphone,
           devices,
-          sampleRate: context.sampleRate,
         });
-        session.stream = stream;
+        session.microphone = microphone;
         if (isStopRequested(session)) {
           return;
         }
@@ -215,7 +216,8 @@ export const createEngineRecorder = (
 
       const estimate = estimateRecordingLatency({
         context,
-        stream,
+        microphone: microphone.getSettings(),
+        outputLatency: microphone.outputLatency,
         devices,
         outputDeviceId: store.get().audioOutputDeviceId,
       });
@@ -241,7 +243,7 @@ export const createEngineRecorder = (
 
       const startFrameIndex = store.get().frameIndex;
       const frameCount = store.get().frameCount ?? 0;
-      const source = context.createMediaStreamSource(stream);
+      const source = microphone.createSource();
       const gain = context.createGain();
       gain.gain.value = store.get().recordingGain;
       source.connect(gain);

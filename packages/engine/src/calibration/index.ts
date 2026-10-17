@@ -1,12 +1,12 @@
 import { clampRecordingLatencyFrameCount } from '@musetric/audio/calibration';
 import {
   getRecordingLatencyDevicePairKey,
-  mobileUserAgentPattern,
+  isMobileUserAgent,
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
-import { type EngineAudioSession } from '../audioSession/index.js';
+import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import { type EngineState } from '../state.js';
@@ -80,7 +80,7 @@ export const createEngineCalibration = (
     const state = store.get();
     const inputDevice = resolveAudioInputDevice(state.audioDevices, {
       explicitDeviceId: state.microphoneDeviceId,
-      preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+      preferBuiltIn: isMobileUserAgent(navigator),
     });
     const outputDevice = resolveAudioOutputDevice(state.audioDevices, {
       explicitDeviceId: state.audioOutputDeviceId,
@@ -95,6 +95,7 @@ export const createEngineCalibration = (
   const devices = createCalibrationDevices({
     store,
     audioOutput,
+    audioSession,
     onInitialDevicePair: (devicePairKey) => {
       restoreLatencyState(store, latencyStore, devicePairKey);
     },
@@ -120,9 +121,9 @@ export const createEngineCalibration = (
   };
 
   const runCalibration = async (): Promise<boolean> => {
-    const stream = preview?.getStream();
-    const estimate = stream
-      ? applyRecordingLatencyEstimate(store, { context, stream })
+    const microphone = preview?.getMicrophone();
+    const estimate = microphone
+      ? applyRecordingLatencyEstimate(store, { context, microphone })
       : undefined;
     if (!estimate) {
       store.update((draft) => {
@@ -143,7 +144,7 @@ export const createEngineCalibration = (
 
       const inputDevice = resolveAudioInputDevice(store.get().audioDevices, {
         explicitDeviceId: store.get().microphoneDeviceId,
-        preferBuiltIn: mobileUserAgentPattern.test(navigator.userAgent),
+        preferBuiltIn: isMobileUserAgent(navigator),
       });
       const result = await measureRecordingLatency({
         context,
@@ -153,7 +154,7 @@ export const createEngineCalibration = (
         workletUrl: microphoneCalibrationWorkletUrl,
         processorName: microphoneCalibrationProcessorName,
         deviceId: inputDevice?.deviceId,
-        stream,
+        microphone,
       });
 
       if (!result) {

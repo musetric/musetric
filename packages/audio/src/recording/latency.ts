@@ -23,38 +23,30 @@ const outputLatencyPresetSecondsByKind: Record<AudioOutputSourceKind, number> =
     unknown: 0.04,
   };
 
-const resolveStreamInputDevice = (
-  stream: MediaStream,
+export type RecordingInputSettings = {
+  deviceId?: string;
+  groupId?: string;
+  latency?: number;
+};
+
+const resolveInputDevice = (
+  settings: RecordingInputSettings,
   devices: MediaDeviceInfo[],
 ): MediaDeviceInfo | undefined => {
-  const [track] = stream.getAudioTracks();
-  const settings = track.getSettings();
-  const trackDeviceId = settings.deviceId;
   const real = getRealAudioInputDevices(devices);
-  if (trackDeviceId) {
-    const direct = real.find((device) => device.deviceId === trackDeviceId);
+  if (settings.deviceId) {
+    const direct = real.find((device) => device.deviceId === settings.deviceId);
     if (direct) {
       return direct;
     }
   }
-  const trackGroupId = settings.groupId;
-  if (trackGroupId) {
-    const byGroup = real.find((device) => device.groupId === trackGroupId);
+  if (settings.groupId) {
+    const byGroup = real.find((device) => device.groupId === settings.groupId);
     if (byGroup) {
       return byGroup;
     }
   }
   return resolveDefaultAudioInputDevice(devices);
-};
-
-type AudioTrackSettingsWithLatency = MediaTrackSettings & {
-  latency?: number;
-};
-
-const getTrackLatencySeconds = (stream: MediaStream) => {
-  const [track] = stream.getAudioTracks();
-  const settings: AudioTrackSettingsWithLatency = track.getSettings();
-  return typeof settings.latency === 'number' ? settings.latency : 0;
 };
 
 type AudioContextWithOutputLatency = AudioContext & {
@@ -82,7 +74,8 @@ export const getRecordingLatencyDevicePairKey = (
 
 export type RecordingLatencyEstimateInput = {
   context: AudioContext;
-  stream: MediaStream;
+  microphone: RecordingInputSettings;
+  outputLatency?: number;
   devices: MediaDeviceInfo[];
   outputDeviceId?: string;
 };
@@ -102,8 +95,8 @@ export type RecordingLatencyEstimate = {
 export const estimateRecordingLatency = (
   input: RecordingLatencyEstimateInput,
 ): RecordingLatencyEstimate => {
-  const { context, stream, devices } = input;
-  const inputDevice = resolveStreamInputDevice(stream, devices);
+  const { context, devices } = input;
+  const inputDevice = resolveInputDevice(input.microphone, devices);
   const outputDevice = resolveAudioOutputDevice(devices, {
     explicitDeviceId: input.outputDeviceId,
   });
@@ -115,11 +108,11 @@ export const estimateRecordingLatency = (
     : 'unknown';
 
   const inputLatencySeconds = Math.max(
-    getTrackLatencySeconds(stream),
+    input.microphone.latency ?? 0,
     inputLatencyPresetSecondsByKind[inputKind],
   );
   const outputLatencySeconds = Math.max(
-    getContextOutputLatencySeconds(context),
+    input.outputLatency ?? getContextOutputLatencySeconds(context),
     outputLatencyPresetSecondsByKind[outputKind],
   );
   const baseLatencySeconds = context.baseLatency || 0;

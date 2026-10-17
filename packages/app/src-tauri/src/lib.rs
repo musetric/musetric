@@ -21,6 +21,8 @@ mod download;
 mod executor_view;
 #[cfg(desktop)]
 mod lifecycle;
+#[cfg(target_os = "ios")]
+mod microphone;
 #[cfg(desktop)]
 mod update;
 
@@ -57,8 +59,12 @@ pub fn run() {
 fn run_app() -> tauri::Result<()> {
     #[cfg(desktop)]
     let builder = tauri::Builder::default();
-    #[cfg(mobile)]
+    #[cfg(target_os = "android")]
     let builder = tauri::Builder::default().plugin(executor_view::init());
+    #[cfg(target_os = "ios")]
+    let builder = tauri::Builder::default()
+        .plugin(executor_view::init())
+        .plugin(microphone::init());
     let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(desktop)]

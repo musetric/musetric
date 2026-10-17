@@ -5,8 +5,10 @@ import {
   getRecordingLatencyFrameCount,
   recordingLatencyCalibrationTimeoutSeconds,
 } from '@musetric/audio/calibration';
-import { createMicrophoneAudioConstraints } from '@musetric/audio/recording';
-import { type EngineAudioSession } from '../audioSession/index.js';
+import {
+  type EngineAudioSession,
+  type EngineMicrophone,
+} from '../audioSession/engineAudioSession.js';
 import { microphoneCalibrationChannel } from './protocol.cross.js';
 
 const workletPromises = new Map<string, Promise<void>>();
@@ -69,7 +71,7 @@ export type CalibrationMeasurementOptions = {
   workletUrl: string | URL;
   processorName: string;
   deviceId?: string;
-  stream?: MediaStream;
+  microphone?: EngineMicrophone;
 };
 
 export type CalibrationMeasurementResult = {
@@ -89,8 +91,8 @@ export const measureRecordingLatency = async (
     processorName,
     deviceId,
   } = options;
-  let stream: MediaStream | undefined = undefined;
-  let source: MediaStreamAudioSourceNode | undefined = undefined;
+  let microphone: EngineMicrophone | undefined = undefined;
+  let source: AudioNode | undefined = undefined;
   let calibrationNode: AudioWorkletNode | undefined = undefined;
   let silentGain: GainNode | undefined = undefined;
   const clickSources: AudioBufferSourceNode[] = [];
@@ -98,17 +100,11 @@ export const measureRecordingLatency = async (
   try {
     await playOutput();
     await loadWorklet(context, workletUrl);
-    stream =
-      options.stream ??
-      (await audioSession.openMicrophone({
-        audio: createMicrophoneAudioConstraints({
-          deviceId,
-          sampleRate: context.sampleRate,
-        }),
-      }));
+    microphone =
+      options.microphone ?? (await audioSession.openMicrophone({ deviceId }));
 
     const schedule = createRecordingLatencyCalibrationSchedule({ context });
-    source = context.createMediaStreamSource(stream);
+    source = microphone.createSource();
     calibrationNode = new AudioWorkletNode(context, processorName, {
       numberOfInputs: 1,
       numberOfOutputs: 1,
@@ -159,8 +155,8 @@ export const measureRecordingLatency = async (
     calibrationNode?.disconnect();
     calibrationNode?.port.close();
     silentGain?.disconnect();
-    if (stream && !options.stream) {
-      audioSession.closeMicrophone(stream);
+    if (microphone && !options.microphone) {
+      audioSession.closeMicrophone(microphone);
     }
   }
 };

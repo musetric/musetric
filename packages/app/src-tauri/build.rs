@@ -2,7 +2,7 @@ use std::{env, error::Error};
 
 fn main() -> Result<(), Box<dyn Error>> {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
-        ios::link_executor_view()?;
+        ios::link_ios_plugins()?;
     }
     tauri_build::try_build(tauri_build::Attributes::new())?;
     Ok(())
@@ -17,12 +17,12 @@ mod ios {
         path::{Path, PathBuf},
     };
 
-    const LIBRARY: &str = "musetric-executor-view";
+    const LIBRARY: &str = "musetric-ios";
     const PACKAGE: &str = "ios";
     const TAURI_API: &str = ".tauri/tauri-api";
     const SKIPPED: [&str; 3] = [".build", "Package.resolved", "Tests"];
 
-    pub(crate) fn link_executor_view() -> Result<(), Box<dyn Error>> {
+    pub(crate) fn link_ios_plugins() -> Result<(), Box<dyn Error>> {
         let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
         let tauri_api = PathBuf::from(env::var("DEP_TAURI_IOS_LIBRARY_PATH")?);
         let copy = manifest.join(TAURI_API);
@@ -59,7 +59,7 @@ mod ios {
 mod ios {
     use std::error::Error;
 
-    pub(crate) fn link_executor_view() -> Result<(), Box<dyn Error>> {
+    pub(crate) fn link_ios_plugins() -> Result<(), Box<dyn Error>> {
         Err("iOS builds need a macOS host".into())
     }
 }

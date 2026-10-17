@@ -1,7 +1,17 @@
 export const isPseudoDefaultDeviceId = (deviceId: string) =>
   deviceId === 'default' || deviceId === 'communications';
 
-export const mobileUserAgentPattern = /Android|iPhone|iPad|iPod|Mobile/i;
+const mobileUserAgentPattern = /Android|iPhone|iPad|iPod|Mobile/i;
+const macUserAgentPattern = /Macintosh/;
+
+export type UserAgentInfo = {
+  userAgent: string;
+  maxTouchPoints: number;
+};
+
+export const isMobileUserAgent = (info: UserAgentInfo) =>
+  mobileUserAgentPattern.test(info.userAgent) ||
+  (macUserAgentPattern.test(info.userAgent) && info.maxTouchPoints > 1);
 
 export const isLikelyBluetoothAudioDevice = (device: MediaDeviceInfo) => {
   const label = device.label.toLowerCase();
@@ -43,6 +53,9 @@ export const isLikelyBuiltInMicrophoneDevice = (device: MediaDeviceInfo) => {
     label.includes('built-in') ||
     label.includes('built in') ||
     label.includes('internal') ||
+    label === 'iphone microphone' ||
+    label === 'ipad microphone' ||
+    label === 'ipod microphone' ||
     label === 'microphone' ||
     label.startsWith('microphone ') ||
     label.startsWith('microphone(')

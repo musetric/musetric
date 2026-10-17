@@ -110,8 +110,8 @@ export type Engine = {
 };
 
 export const createEngine = (): Engine => {
-  const audioSession = createEngineAudioSession();
   const context = new AudioContext({ sampleRate: defaultSampleRate });
+  const audioSession = createEngineAudioSession(context);
   const audioOutput = createEngineAudioOutput(context);
   const store = createStore(initialState);
   const playerChannel = new MessageChannel();
