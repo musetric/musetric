@@ -22,6 +22,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { getMixdownLabel } from './mixdownLabel.js';
 import { MixdownTiles } from './MixdownTiles.js';
+import { saveMixdown } from './saveMixdown.js';
 
 type FormatName = api.mixdown.Format['format'];
 
@@ -34,13 +35,6 @@ const formatLabels: Record<FormatName, string> = {
 };
 const bitrates: api.mixdown.Bitrate[] = [128, 192, 256];
 const bitDepths: api.mixdown.BitDepth[] = [16, 24];
-
-const downloadFile = (href: string) => {
-  const link = document.createElement('a');
-  link.href = href;
-  link.download = '';
-  link.click();
-};
 
 export type MixdownContentProps = {
   sideAnchor?: HTMLElement;
@@ -257,11 +251,13 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               },
               {
                 onSuccess: (created) => {
-                  downloadFile(
+                  void saveMixdown(
                     api.mixdown.content.base.endpoint({
                       mixdownId: created.mixdownId,
                     }),
-                  );
+                  ).catch((error: unknown) => {
+                    console.error('Failed to save the mixdown', error);
+                  });
                   setOpen(false);
                 },
               },
