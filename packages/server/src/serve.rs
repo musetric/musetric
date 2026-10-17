@@ -169,7 +169,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         processing: options.processing,
     })
     .await?;
-    let socket = bind(&options.listen)?;
+    let socket = bind_preferred(&options.listen)?;
     let address = socket.local_addr()?;
     let listener = TcpListener::from_std(socket)?;
     let (shutdown, closed) = oneshot::channel();
@@ -293,6 +293,14 @@ fn create_storage(
 fn bind(listen: &str) -> Result<StdTcpListener, BoxedError> {
     let listener =
         StdTcpListener::bind(listen).map_err(|error| report_bind_failure(listen, error))?;
+    listener.set_nonblocking(true)?;
+    Ok(listener)
+}
+
+fn bind_preferred(listen: &str) -> Result<StdTcpListener, BoxedError> {
+    let address: SocketAddr = listen.parse()?;
+    let listener = StdTcpListener::bind(address)
+        .or_else(|_| StdTcpListener::bind(SocketAddr::new(address.ip(), 0)))?;
     listener.set_nonblocking(true)?;
     Ok(listener)
 }
@@ -446,6 +454,47 @@ mod tests {
 
         assert!(workspace.root.join("storage/db/app.db").is_file());
         assert_eq!(shell, "<!doctype html><title>Musetric</title>");
+        assert_eq!(projects, "[]");
+        server.close();
+    }
+
+    #[tokio::test]
+    async fn keeps_the_preferred_port_when_it_is_free() {
+        let workspace = Workspace::new();
+        let listen = std::net::TcpListener::bind("127.0.0.1:0")
+            .expect("the port should bind")
+            .local_addr()
+            .expect("the port should have an address")
+            .to_string();
+        let server = start_embedded(EmbeddedServerOptions {
+            listen: listen.clone(),
+            ..workspace.options()
+        })
+        .await
+        .expect("the embedded server should start");
+
+        assert_eq!(server.url(), format!("http://{listen}"));
+        server.close();
+    }
+
+    #[tokio::test]
+    async fn moves_to_a_free_port_when_the_preferred_one_is_taken() {
+        let workspace = Workspace::new();
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("the port should bind");
+        let listen = taken
+            .local_addr()
+            .expect("the port should have an address")
+            .to_string();
+        let server = start_embedded(EmbeddedServerOptions {
+            listen: listen.clone(),
+            ..workspace.options()
+        })
+        .await
+        .expect("the embedded server should start");
+
+        let projects = read(&format!("{}/api/project/list", server.url())).await;
+
+        assert_ne!(server.url(), format!("http://{listen}"));
         assert_eq!(projects, "[]");
         server.close();
     }

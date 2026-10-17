@@ -124,10 +124,10 @@ describe('timed microphone runtime', () => {
     expect(largestError(played, 2)).toBeLessThan(rate / 1000);
   });
 
-  it('jumps to capture times that move by more than its steering range', () => {
+  it('jumps to an output clock re-estimated by 10 ms', () => {
     const played = simulate({
       seconds: 4,
-      shift: { from: 2 * rate, frames: 0.05 * rate },
+      shift: { from: 2 * rate, frames: 0.01 * rate },
     });
     expect(largestError(played, 2.5)).toBeLessThan(0.05);
   });

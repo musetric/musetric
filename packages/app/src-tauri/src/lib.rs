@@ -31,6 +31,7 @@ mod update;
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
 const MAIN_WINDOW: &str = "main";
+const SERVER_LISTEN: &str = "127.0.0.1:47205";
 #[cfg(desktop)]
 const EXECUTOR_WINDOW: &str = "executor";
 #[cfg(desktop)]
@@ -77,7 +78,7 @@ fn run_app() -> tauri::Result<()> {
             let storage = root.join("storage");
             let server_result =
                 tauri::async_runtime::block_on(start_embedded(EmbeddedServerOptions {
-                    listen: "127.0.0.1:0".to_owned(),
+                    listen: SERVER_LISTEN.to_owned(),
                     database: storage.join("db/app.db"),
                     blobs: storage.join("blobs"),
                     work: storage.join("work"),

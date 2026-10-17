@@ -4,7 +4,7 @@ import { createSampleRing } from './sampleRing.worklet.js';
 const anchorCount = 15;
 const steerSeconds = 4;
 const maxCorrection = 0.002;
-const resyncSeconds = 0.02;
+const resyncSeconds = 0.005;
 
 const median = (values: readonly number[]) => {
   const sorted = values.toSorted((left, right) => left - right);

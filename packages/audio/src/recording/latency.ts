@@ -48,15 +48,18 @@ const resolveInputDevice = (
   return resolveDefaultAudioInputDevice(devices);
 };
 
+const getDeviceKey = (device: MediaDeviceInfo) =>
+  `${device.kind}:${device.label || device.deviceId}`;
+
 export const getRecordingLatencyDevicePairKey = (
   inputDevice: MediaDeviceInfo | undefined,
   outputDevice: MediaDeviceInfo | undefined,
 ) => {
   const inputKey = inputDevice
-    ? `${inputDevice.kind}:${inputDevice.deviceId}`
+    ? getDeviceKey(inputDevice)
     : 'audioinput:unknown';
   const outputKey = outputDevice
-    ? `${outputDevice.kind}:${outputDevice.deviceId}`
+    ? getDeviceKey(outputDevice)
     : 'audiooutput:unknown';
   return `${inputKey}|${outputKey}`;
 };

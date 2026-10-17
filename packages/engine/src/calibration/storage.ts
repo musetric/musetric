@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { findLatencyRoute, putLatencyRoute } from './latencyRoutes.cross.js';
 
 const storageKey = 'musetric.calibration.latencyByDevicePair';
+const lastDevicePairStorageKey = 'musetric.calibration.lastDevicePair';
+const maxRouteCount = 4;
 
 const storedLatencySchema = z.object({
   outputLatencyFrameCount: z.number(),
@@ -9,11 +12,16 @@ const storedLatencySchema = z.object({
   source: z.union([z.literal('manual'), z.literal('calibrated')]),
 });
 
-const storedLatencyMapSchema = z.record(z.string(), storedLatencySchema);
+const storedRoutesSchema = z.union([
+  z.array(storedLatencySchema),
+  storedLatencySchema.transform((value) => [value]),
+]);
+
+const storedLatencyMapSchema = z.record(z.string(), storedRoutesSchema);
 
 export type StoredLatency = z.infer<typeof storedLatencySchema>;
 
-const load = (): Record<string, StoredLatency> => {
+const load = (): Partial<Record<string, StoredLatency[]>> => {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) {
@@ -27,27 +35,61 @@ const load = (): Record<string, StoredLatency> => {
   }
 };
 
-export type CalibrationLatencyStore = {
-  get: (devicePairKey: string) => StoredLatency | undefined;
-  set: (devicePairKey: string, value: StoredLatency) => void;
+const loadLastDevicePairKey = (): string | undefined => {
+  try {
+    return localStorage.getItem(lastDevicePairStorageKey) ?? undefined;
+  } catch (error) {
+    console.error('Failed to load the last calibrated device pair', error);
+    return undefined;
+  }
 };
 
-export const createCalibrationLatencyStore = (): CalibrationLatencyStore => {
+export type CalibrationLatencyStore = {
+  find: (
+    devicePairKey: string,
+    outputLatencyFrameCount: number,
+  ) => StoredLatency | undefined;
+  set: (devicePairKey: string, value: StoredLatency) => void;
+  getLastDevicePairKey: () => string | undefined;
+};
+
+export const createCalibrationLatencyStore = (
+  routeToleranceFrameCount: number,
+): CalibrationLatencyStore => {
   const entries = load();
+  let lastDevicePairKey = loadLastDevicePairKey();
+  const routeOptions = {
+    toleranceFrameCount: routeToleranceFrameCount,
+    maxCount: maxRouteCount,
+  };
 
   const persist = () => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(entries));
+      if (lastDevicePairKey !== undefined) {
+        localStorage.setItem(lastDevicePairStorageKey, lastDevicePairKey);
+      }
     } catch (error) {
       console.error('Failed to persist calibration latency store', error);
     }
   };
 
   return {
-    get: (devicePairKey) => entries[devicePairKey],
+    find: (devicePairKey, outputLatencyFrameCount) =>
+      findLatencyRoute(
+        entries[devicePairKey] ?? [],
+        outputLatencyFrameCount,
+        routeOptions,
+      ),
     set: (devicePairKey, value) => {
-      entries[devicePairKey] = value;
+      entries[devicePairKey] = putLatencyRoute(
+        entries[devicePairKey] ?? [],
+        value,
+        routeOptions,
+      );
+      lastDevicePairKey = devicePairKey;
       persist();
     },
+    getLastDevicePairKey: () => lastDevicePairKey,
   };
 };

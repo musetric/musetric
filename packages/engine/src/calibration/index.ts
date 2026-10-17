@@ -52,15 +52,14 @@ const restoreLatencyState = (
   store: Store<EngineState>,
   latencyStore: CalibrationLatencyStore,
   devicePairKey: string,
-  sampleRate: number,
 ) => {
-  const stored = latencyStore.get(devicePairKey);
+  const stored = latencyStore.find(
+    devicePairKey,
+    store.get().outputLatencyFrameCount,
+  );
   store.update((state) => {
     state.latencyDevicePairKey = devicePairKey;
-    if (
-      stored &&
-      isSameRoute(state, stored.outputLatencyFrameCount, sampleRate)
-    ) {
+    if (stored) {
       state.latencyCorrectionFrameCount = stored.latencyCorrectionFrameCount;
       state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount ?? 0;
       state.correctedOutputLatencyFrameCount = stored.outputLatencyFrameCount;
@@ -70,6 +69,11 @@ const restoreLatencyState = (
     }
   });
 };
+
+const hasHiddenInputs = (devices: MediaDeviceInfo[]) =>
+  devices.some(
+    (device) => device.kind === 'audioinput' && device.deviceId === '',
+  );
 
 const stopActivePlayback = async (
   store: Store<EngineState>,
@@ -104,10 +108,19 @@ export const createEngineCalibration = (
   const { context, audioOutput, outputClock, audioSession, store } = options;
   const { getPlayer } = options;
   const { sampleRate } = context;
-  const latencyStore = createCalibrationLatencyStore();
+  const latencyStore = createCalibrationLatencyStore(
+    Math.round(routeToleranceSeconds * sampleRate),
+  );
 
   const restore = (devicePairKey: string) => {
-    restoreLatencyState(store, latencyStore, devicePairKey, sampleRate);
+    const lastDevicePairKey = hasHiddenInputs(store.get().audioDevices)
+      ? latencyStore.getLastDevicePairKey()
+      : undefined;
+    restoreLatencyState(
+      store,
+      latencyStore,
+      lastDevicePairKey ?? devicePairKey,
+    );
   };
 
   const saveCorrection = (
