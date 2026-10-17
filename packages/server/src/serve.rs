@@ -318,7 +318,7 @@ fn report_bind_failure(listen: &str, error: io::Error) -> io::Error {
 async fn self_signed_config() -> Result<RustlsConfig, BoxedError> {
     let certified = generate_simple_self_signed(vec!["localhost".to_owned()])?;
     let certificate = certified.cert.pem().into_bytes();
-    let key = certified.key_pair.serialize_pem().into_bytes();
+    let key = certified.signing_key.serialize_pem().into_bytes();
     Ok(RustlsConfig::from_pem(certificate, key).await?)
 }
 

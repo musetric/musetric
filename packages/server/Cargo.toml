@@ -12,7 +12,7 @@ repository = "https://github.com/musetric/musetric"
 axum = { version = "=0.8.9", features = ["multipart", "ws"] }
 axum-server = { version = "=0.8.0", features = ["tls-rustls"] }
 bytemuck = "=1.25.2"
-clap = { version = "=4.6.6", features = ["derive"] }
+clap = { version = "=4.6.7", features = ["derive"] }
 futures-util = "=0.3.34"
 http-body-util = "=0.1.5"
 md5 = "=0.8.1"
@@ -20,13 +20,13 @@ musetric-db = { path = "crates/db" }
 musetric-gpu = { path = "crates/gpu" }
 musetric-jobs = { path = "crates/jobs" }
 musetric-media = { path = "crates/media" }
-rcgen = "=0.13.2"
-reqwest = { version = "=0.13.4", default-features = false, features = ["rustls"] }
+rcgen = "=0.14.10"
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls"] }
 serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
-sha2 = "=0.11.0"
+serde_json = "=1.0.154"
+sha2 = "=0.11.1"
 time = { version = "=0.3.55", features = ["formatting", "macros"] }
-tokio = { version = "=1.53.1", features = [
+tokio = { version = "=1.53.3", features = [
   "fs",
   "io-util",
   "macros",
@@ -37,14 +37,14 @@ tokio = { version = "=1.53.1", features = [
   "sync",
   "time",
 ] }
-tokio-util = { version = "=0.7.19", features = ["io"] }
-uuid = { version = "=1.26.0", features = ["v4"] }
+tokio-util = { version = "=0.7.20", features = ["io"] }
+uuid = { version = "=1.28.0", features = ["v4"] }
 
 [target.'cfg(windows)'.dependencies]
 win32job = "=2.0.3"
 
 [dev-dependencies]
-tokio-tungstenite = "=0.29.0"
+tokio-tungstenite = "=0.30.0"
 tower = { version = "=0.5.3", features = ["util"] }
 
 [profile.release]
