@@ -60,7 +60,7 @@ export const createRecordingLatencyCalibrationSchedule = (
 
 export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
-  peakFrame: number;
+  onsetFrame: number;
   peakValue: number;
 };
 
@@ -69,7 +69,7 @@ export const getRecordingLatencyCalibrationFrameCounts = (
 ) =>
   peaks
     .filter((peak) => peak.peakValue >= peakThreshold)
-    .map((peak) => Math.max(0, peak.peakFrame - peak.clickFrame));
+    .map((peak) => Math.max(0, peak.onsetFrame - peak.clickFrame));
 
 export const getMedianFrameCount = (frameCounts: number[]) => {
   const sortedFrameCounts = [...frameCounts].sort(

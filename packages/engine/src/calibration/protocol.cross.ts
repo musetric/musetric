@@ -2,7 +2,7 @@ import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
-  peakFrame: number;
+  onsetFrame: number;
   peakValue: number;
 };
 
