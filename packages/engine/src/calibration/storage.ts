@@ -3,8 +3,8 @@ import { z } from 'zod';
 const storageKey = 'musetric.calibration.latencyByDevicePair';
 
 const storedLatencySchema = z.object({
-  latencyFrameCount: z.number(),
-  inputLatencyFrameCount: z.number(),
+  outputLatencyFrameCount: z.number(),
+  latencyCorrectionFrameCount: z.number(),
   source: z.union([z.literal('manual'), z.literal('calibrated')]),
 });
 

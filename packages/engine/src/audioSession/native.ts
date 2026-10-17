@@ -204,6 +204,8 @@ export const createNativeAudioSession = (
         const created: AudioNode[] = [];
         const microphone: EngineMicrophone = {
           getSettings: () => settings,
+          getMeasuredInputLatency: () => undefined,
+          whenInputLatencyMeasured: async () => Promise.resolve(),
           outputLatency: reply.outputLatency,
           createSource: () => {
             const source = context.createGain();

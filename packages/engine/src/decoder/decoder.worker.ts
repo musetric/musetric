@@ -18,7 +18,7 @@ port.bindBoot((message) => {
     port,
     playerPort: playerDataChannel.outbound(message.playerPort),
     spectrogramPort: spectrogramDataChannel.outbound(message.spectrogramPort),
-    playhead: createPlayhead(message.playheadPort),
+    playhead: createPlayhead(message.playheadPort, message.sampleRate),
   });
   port.methods.booted();
 });

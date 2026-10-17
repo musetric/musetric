@@ -6,8 +6,14 @@ import {
 } from '@musetric/utils';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type Store } from '../common/store.js';
-import { type EngineState } from '../state.js';
+import {
+  type EngineState,
+  getInputShareFrameCount,
+  getOutputLatencyFrameCount,
+  getRecordingLatencyFrameCount,
+} from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
@@ -48,6 +54,7 @@ const dbToGain = (db: number) => 10 ** (db / 20);
 export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
+  outputClock: EngineOutputClock;
   store: Store<EngineState>;
   decoderPort: MessagePort;
   playheadPort: MessagePort;
@@ -65,10 +72,11 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, store, decoderPort, playheadPorts } = options;
+  const { context, audioOutput, outputClock, store, decoderPort } = options;
+  const { playheadPorts } = options;
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
-  const playhead = createPlayhead(options.playheadPort);
+  const playhead = createPlayhead(options.playheadPort, context.sampleRate);
   await context.audioWorklet.addModule(playerWorkletUrl);
   const node = new AudioWorkletNode(context, playerProcessorName, {
     numberOfInputs: 1,
@@ -87,7 +95,8 @@ export const createEnginePlayback = async (
   let lastPumpedFrameIndex = -1;
 
   const frameIndexPump = createAnimationFrameLoop(() => {
-    const { frameIndex, revision } = playhead.read();
+    const { revision } = playhead.read();
+    const frameIndex = playhead.readFrameIndex();
     if (!isCurrentRevision(revision) || frameIndex === lastPumpedFrameIndex) {
       return;
     }
@@ -210,6 +219,35 @@ export const createEnginePlayback = async (
     },
   );
 
+  const getLatencyFrameCounts = () => {
+    const state = store.get();
+    return {
+      latencyFrameCount: getRecordingLatencyFrameCount(state),
+      inputLatencyFrameCount: getInputShareFrameCount(state),
+    };
+  };
+  store.subscribe(getRecordingLatencyFrameCount, () => {
+    port.methods.setLatency(getLatencyFrameCounts());
+  });
+  store.subscribe(getInputShareFrameCount, () => {
+    port.methods.setLatency(getLatencyFrameCounts());
+  });
+
+  const publishOutputClock = () => {
+    const reading = outputClock.read();
+    if (!reading) {
+      return;
+    }
+    const state = store.get();
+    const addedFrameCount =
+      getOutputLatencyFrameCount(state) - state.outputLatencyFrameCount;
+    port.methods.setOutputClock({
+      clockOffset: reading.clockOffset - addedFrameCount / context.sampleRate,
+    });
+  };
+  outputClock.subscribe(publishOutputClock);
+  store.subscribe(getOutputLatencyFrameCount, publishOutputClock);
+
   const publishMetronome = () => {
     const state = store.get();
     const beatsInSamples = new Int32Array(state.metronomeBeats.length);
@@ -267,15 +305,9 @@ export const createEnginePlayback = async (
         await context.resume();
       }
       await audioOutput.play();
-      const { seekEvent, latencyFrameCount, inputLatencyFrameCount } =
-        store.get();
-      const { revision } = seekEvent;
+      const { revision } = store.get().seekEvent;
       const playingPromise = createPlayingPromise(revision);
-      port.methods.play({
-        revision,
-        latencyFrameCount,
-        inputLatencyFrameCount,
-      });
+      port.methods.play({ revision, ...getLatencyFrameCounts() });
       await playingPromise;
     },
     stop: async () => {

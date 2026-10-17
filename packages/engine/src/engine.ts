@@ -4,6 +4,7 @@ import {
   createEngineAudioOutput,
   type EngineAudioOutput,
 } from './audioOutput/index.js';
+import { createEngineOutputClock } from './audioOutput/outputClock.js';
 import { createEngineAudioSession } from './audioSession/index.js';
 import {
   createEngineCalibration,
@@ -75,7 +76,9 @@ const initialState: EngineState = {
   singerVoice: 'original',
   tempoRatio: 1,
   audioDevices: [],
-  latencyFrameCount: 0,
+  outputLatencyFrameCount: 0,
+  outputLatencyFloorFrameCount: 0,
+  latencyCorrectionFrameCount: 0,
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
@@ -113,7 +116,16 @@ export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioSession = createEngineAudioSession(context);
   const audioOutput = createEngineAudioOutput(context);
+  const outputClock = createEngineOutputClock(context);
   const store = createStore(initialState);
+  outputClock.subscribe((reading) => {
+    const frameCount = Math.round(reading.renderAhead * context.sampleRate);
+    if (frameCount !== store.get().outputLatencyFrameCount) {
+      store.update((state) => {
+        state.outputLatencyFrameCount = frameCount;
+      });
+    }
+  });
   const playerChannel = new MessageChannel();
   const spectrogramChannel = new MessageChannel();
   const playerPlayheadChannel = new MessageChannel();
@@ -127,6 +139,7 @@ export const createEngine = (): Engine => {
     calibration: createEngineCalibration({
       context,
       audioOutput,
+      outputClock,
       audioSession,
       store,
       getPlayer: () => ref.player,
@@ -200,6 +213,7 @@ export const createEngine = (): Engine => {
     player: createEnginePlayer({
       context,
       audioOutput,
+      outputClock,
       audioSession,
       store,
       decoderPort: playerChannel.port2,

@@ -162,12 +162,11 @@ type ViewAt = {
 };
 
 const columnAt = (view: ViewAt, seconds: number): number => {
-  const { visibleTime, playheadRatio, viewSize, windowSize } = view.config;
+  const { visibleTime, playheadRatio, viewSize } = view.config;
   const step = (visibleTime * sampleRate) / (viewSize.width - 1);
   const anchor =
     view.playheadSeconds * sampleRate -
-    visibleTime * playheadRatio * sampleRate -
-    windowSize / 2;
+    visibleTime * playheadRatio * sampleRate;
   return Math.round((seconds * sampleRate) / step - Math.round(anchor / step));
 };
 

@@ -8,7 +8,7 @@ import {
 } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
-import { applyRecordingLatencyEstimate } from './estimate.js';
+import { applyInputLatencyEstimate } from './estimate.js';
 
 const meterScale = 8;
 
@@ -146,9 +146,17 @@ export const createCalibrationPreview = (
           activeMicrophone = previewMicrophone;
         }
 
-        applyRecordingLatencyEstimate(store, {
+        applyInputLatencyEstimate(store, {
           context,
           microphone: previewMicrophone,
+        });
+        void previewMicrophone.whenInputLatencyMeasured().then(() => {
+          if (!isStale()) {
+            applyInputLatencyEstimate(store, {
+              context,
+              microphone: previewMicrophone,
+            });
+          }
         });
 
         analyser = context.createAnalyser();

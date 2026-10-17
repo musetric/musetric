@@ -13,6 +13,7 @@ export type EngineDecoderOutboundMethods = {
     playerPort: MessagePort;
     spectrogramPort: MessagePort;
     playheadPort: MessagePort;
+    sampleRate: number;
   }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;

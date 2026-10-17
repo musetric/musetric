@@ -12,13 +12,11 @@ export const createPlayheadPublisher = (
   getCurrentTime: () => number,
 ): PlayheadPublisher => {
   const subscribers = ports.map(playheadChannel.outbound);
-  let publishedFrameIndex = -1;
-  let publishedRevision = -1;
+  let published: PlayheadValue | undefined = undefined;
   let publishedTime = -publishIntervalSeconds;
 
   const publishNow = (value: PlayheadValue) => {
-    publishedFrameIndex = value.frameIndex;
-    publishedRevision = value.revision;
+    published = value;
     publishedTime = getCurrentTime();
     for (const subscriber of subscribers) {
       subscriber.methods.publish(value);
@@ -28,8 +26,11 @@ export const createPlayheadPublisher = (
   return {
     publish: (value) => {
       const unchanged =
-        value.frameIndex === publishedFrameIndex &&
-        value.revision === publishedRevision;
+        published !== undefined &&
+        value.frameIndex === published.frameIndex &&
+        value.revision === published.revision &&
+        value.rate === published.rate &&
+        value.clockOffset === published.clockOffset;
       if (unchanged) {
         return;
       }

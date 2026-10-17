@@ -18,7 +18,7 @@ export const createPlayerFrameIndexStream = (
   let lastFrameIndex = -1;
 
   const loop = createAnimationFrameLoop(() => {
-    const { frameIndex } = playhead.read();
+    const frameIndex = playhead.readFrameIndex();
     if (frameIndex === lastFrameIndex) {
       return;
     }

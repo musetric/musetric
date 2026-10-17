@@ -1,5 +1,6 @@
 import { assertDefined, nextNumber } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
@@ -54,6 +55,7 @@ export type EnginePlayer = EnginePlayerLoop &
 export type CreateEnginePlayerOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
+  outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   decoderPort: MessagePort;
@@ -65,7 +67,8 @@ export type CreateEnginePlayerOptions = {
 export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
-  const { context, audioOutput, store, decoderPort, getDecoder } = options;
+  const { context, audioOutput, outputClock, store, decoderPort, getDecoder } =
+    options;
   const { playheadPort, playheadPorts } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
@@ -86,6 +89,7 @@ export const createEnginePlayer = (
       enginePlayback = await createEnginePlayback({
         context,
         audioOutput,
+        outputClock,
         store,
         decoderPort,
         playheadPort,
@@ -105,6 +109,7 @@ export const createEnginePlayer = (
       });
       engineRecorder = createEngineRecorder({
         context,
+        outputClock,
         audioSession: options.audioSession,
         store,
         getDecoder,

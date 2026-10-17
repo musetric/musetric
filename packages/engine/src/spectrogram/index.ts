@@ -106,6 +106,7 @@ export const createEngineSpectrogram = (
       port.methods.boot({
         dataPort: decoderPort,
         playheadPort,
+        sampleRate,
       });
 
       await bootPromise.promise;

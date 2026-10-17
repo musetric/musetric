@@ -79,7 +79,7 @@ export const trackPitch = async (
   try {
     for (let offset = 0; offset < values.length; offset += columns) {
       const baseColumn = firstFrame + offset;
-      const progress = (baseColumn * hop + windowSize / 2) / samples.length;
+      const progress = (baseColumn * hop) / samples.length;
       await renderUntilComplete(processor, samples, progress);
       const frames = await processor.readFundamentalFrames(
         'lead',

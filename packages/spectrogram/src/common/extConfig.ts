@@ -30,8 +30,7 @@ export const computeBaseColumn = (
 ): number => {
   const beforePlayhead =
     config.visibleTime * config.playheadRatio * config.sampleRate;
-  const anchor =
-    trackProgress * sampleLength - beforePlayhead - config.windowSize / 2;
+  const anchor = trackProgress * sampleLength - beforePlayhead;
   return Math.round(anchor / config.columnStep);
 };
 

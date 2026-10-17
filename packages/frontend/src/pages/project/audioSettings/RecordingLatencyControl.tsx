@@ -3,7 +3,12 @@ import {
   maximumRecordingLatencyMs,
   minimumRecordingLatencyMs,
 } from '@musetric/audio/calibration';
-import { type RecordingLatencySource } from '@musetric/engine';
+import {
+  getInputShareFrameCount,
+  getOutputLatencyFrameCount,
+  getRecordingLatencyFrameCount,
+  type RecordingLatencySource,
+} from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
@@ -17,12 +22,11 @@ export const RecordingLatencyControl: FC = () => {
     manual: t('pages.project.audioSettings.latencySource.manual'),
   };
   const recordingLatencyFrameCount = useEngineStore(
-    (state) => state.latencyFrameCount,
+    getRecordingLatencyFrameCount,
   );
+  const outputLatencyFrameCount = useEngineStore(getOutputLatencyFrameCount);
   const recordingLatencySource = useEngineStore((state) => state.latencySource);
-  const inputLatencyFrameCount = useEngineStore(
-    (state) => state.inputLatencyFrameCount,
-  );
+  const inputLatencyFrameCount = useEngineStore(getInputShareFrameCount);
   const recording = useEngineStore((state) => state.recording);
   const calibrating = useEngineStore((state) => state.calibrating);
   const calibrationError = useEngineStore((state) => state.calibrationError);
@@ -31,6 +35,9 @@ export const RecordingLatencyControl: FC = () => {
   );
   const inputLatencyMs = Math.round(
     (inputLatencyFrameCount / engine.context.sampleRate) * 1000,
+  );
+  const outputLatencyMs = Math.round(
+    (outputLatencyFrameCount / engine.context.sampleRate) * 1000,
   );
 
   return (
@@ -41,6 +48,11 @@ export const RecordingLatencyControl: FC = () => {
         </Typography>
         <Typography variant='caption' sx={{ color: 'text.secondary' }}>
           {latencySourceLabels[recordingLatencySource]}
+        </Typography>
+        <Typography variant='caption' sx={{ color: 'text.secondary' }}>
+          {t('pages.project.audioSettings.outputLatency', {
+            value: outputLatencyMs,
+          })}
         </Typography>
         <Typography variant='caption' sx={{ color: 'text.secondary' }}>
           {t('pages.project.audioSettings.inputLatency', {

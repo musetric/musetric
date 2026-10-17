@@ -107,9 +107,7 @@ export const createStateSamplesCell = (device: GPUDevice) =>
           const { windowSize, sampleRate, visibleTime, columnStep } = config;
           const baseCenter = baseColumn * columnStep;
           const playheadSong =
-            baseCenter +
-            visibleTime * playheadRatio * sampleRate +
-            windowSize / 2;
+            baseCenter + visibleTime * playheadRatio * sampleRate;
           const windowStart = Math.round(
             source.position(baseCenter) - windowSize / 2,
           );
