@@ -3,6 +3,31 @@ import {
   type RecordingLatencyCalibrationPeak,
 } from './protocol.cross.js';
 
+const onsetRatio = 0.5;
+
+type ClickWindow = {
+  clickFrame: number;
+  levels: Float32Array;
+  peakOffset: number;
+  peakValue: number;
+};
+
+const toPeak = (click: ClickWindow): RecordingLatencyCalibrationPeak => {
+  const threshold = click.peakValue * onsetRatio;
+  let onsetOffset = click.peakOffset;
+  for (let offset = 0; offset < click.peakOffset; offset += 1) {
+    if (click.levels[offset] >= threshold) {
+      onsetOffset = offset;
+      break;
+    }
+  }
+  return {
+    clickFrame: click.clickFrame,
+    onsetFrame: click.clickFrame + onsetOffset,
+    peakValue: click.peakValue,
+  };
+};
+
 export type MicrophoneCalibrationRuntime = {
   handleStart: (message: { clickFrames: number[]; endFrame: number }) => void;
   process: (
@@ -24,20 +49,19 @@ export const createMicrophoneCalibrationRuntime = (
   let clickIndex = 0;
   let collecting = false;
   let endFrame = 0;
-  let peaks: RecordingLatencyCalibrationPeak[] = [];
+  let windows: ClickWindow[] = [];
+
+  const getSearchEndFrame = (index: number) =>
+    index + 1 >= clickFrames.length ? endFrame : clickFrames[index + 1];
 
   const finish = () => {
     collecting = false;
-    port.methods.done({ peaks });
+    port.methods.done({ peaks: windows.map(toPeak) });
   };
 
   const advanceClickIndex = (frame: number) => {
     while (clickIndex < clickFrames.length) {
-      const searchEndFrame =
-        clickIndex + 1 >= clickFrames.length
-          ? endFrame
-          : clickFrames[clickIndex + 1];
-      if (frame < searchEndFrame) {
+      if (frame < getSearchEndFrame(clickIndex)) {
         return;
       }
 
@@ -49,13 +73,13 @@ export const createMicrophoneCalibrationRuntime = (
     for (let index = 0; index < input.length; index += 1) {
       const frame = currentFrame + index;
       advanceClickIndex(frame);
-      if (clickIndex >= peaks.length) {
+      if (clickIndex >= windows.length) {
         finish();
         return;
       }
 
-      const peak = peaks[clickIndex];
-      if (frame < peak.clickFrame) {
+      const click = windows[clickIndex];
+      if (frame < click.clickFrame) {
         continue;
       }
 
@@ -64,10 +88,12 @@ export const createMicrophoneCalibrationRuntime = (
         return;
       }
 
+      const offset = frame - click.clickFrame;
       const value = Math.abs(input[index]);
-      if (value > peak.peakValue) {
-        peak.peakFrame = frame;
-        peak.peakValue = value;
+      click.levels[offset] = value;
+      if (value > click.peakValue) {
+        click.peakOffset = offset;
+        click.peakValue = value;
       }
     }
 
@@ -81,9 +107,12 @@ export const createMicrophoneCalibrationRuntime = (
       clickFrames = message.clickFrames;
       clickIndex = 0;
       endFrame = message.endFrame;
-      peaks = message.clickFrames.map((clickFrame) => ({
+      windows = message.clickFrames.map((clickFrame, index) => ({
         clickFrame,
-        peakFrame: clickFrame,
+        levels: new Float32Array(
+          Math.max(0, getSearchEndFrame(index) - clickFrame),
+        ),
+        peakOffset: 0,
         peakValue: 0,
       }));
       collecting = true;

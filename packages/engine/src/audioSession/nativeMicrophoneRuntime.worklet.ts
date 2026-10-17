@@ -1,7 +1,6 @@
 import { nativeMicrophoneDelaySeconds } from './protocol.cross.js';
+import { createSampleRing } from './sampleRing.worklet.js';
 
-const capacity = 1 << 17;
-const mask = capacity - 1;
 const bucketSeconds = 0.5;
 const windowSeconds = 3;
 const warmupSeconds = 0.4;
@@ -24,7 +23,7 @@ export const createNativeMicrophoneRuntime = (
   sampleRate: number,
   onReady: () => void,
 ): NativeMicrophoneRuntime => {
-  const ring = new Float32Array(capacity);
+  const ring = createSampleRing();
   const delay = Math.round(nativeMicrophoneDelaySeconds * sampleRate);
   const bucketFrames = Math.round(bucketSeconds * sampleRate);
   const windowFrames = Math.round(windowSeconds * sampleRate);
@@ -33,54 +32,10 @@ export const createNativeMicrophoneRuntime = (
   const steerFrames = steerSeconds * sampleRate;
   let buckets: LatenessBucket[] = [];
   let clock = 0;
-  let end: number | undefined = undefined;
   let position: number | undefined = undefined;
   let startClock = 0;
   let ready = false;
   let ratio = 1;
-
-  const read = (frame: number) =>
-    end !== undefined && frame < end && frame >= end - capacity
-      ? ring[frame & mask]
-      : 0;
-
-  const sampleAt = (at: number) => {
-    const index = Math.floor(at);
-    const offset = at - index;
-    const before = read(index - 1);
-    const current = read(index);
-    const next = read(index + 1);
-    const after = read(index + 2);
-    return (
-      current +
-      0.5 *
-        offset *
-        (next -
-          before +
-          offset *
-            (2 * before -
-              5 * current +
-              4 * next -
-              after +
-              offset * (3 * (current - next) + after - before)))
-    );
-  };
-
-  const write = (frame: number, samples: Float32Array) => {
-    const previousEnd = end ?? frame;
-    const nextEnd = Math.max(previousEnd, frame + samples.length);
-    const oldest = nextEnd - capacity;
-    for (let gap = Math.max(previousEnd, oldest); gap < frame; gap += 1) {
-      ring[gap & mask] = 0;
-    }
-    for (let index = 0; index < samples.length; index += 1) {
-      const target = frame + index;
-      if (target >= oldest) {
-        ring[target & mask] = samples[index];
-      }
-    }
-    end = nextEnd;
-  };
 
   const trackLateness = (lateness: number) => {
     const last = buckets.at(-1);
@@ -114,14 +69,13 @@ export const createNativeMicrophoneRuntime = (
       if (samples.length === 0) {
         return;
       }
-      write(frame, samples);
+      ring.write(frame, samples);
       const lowest = trackLateness(clock - frame - samples.length);
       steer(clock - lowest - delay);
     },
     reset: () => {
-      ring.fill(0);
+      ring.clear();
       buckets = [];
-      end = undefined;
       position = undefined;
       ready = false;
       ratio = 1;
@@ -134,7 +88,7 @@ export const createNativeMicrophoneRuntime = (
       }
       let at = position;
       for (let index = 0; index < output.length; index += 1) {
-        output[index] = sampleAt(at);
+        output[index] = ring.sampleAt(at);
         at += ratio;
       }
       position = at;

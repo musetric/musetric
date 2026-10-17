@@ -103,8 +103,10 @@ export type EngineState = {
   outputLatencyFrameCount: number;
   outputLatencyFloorFrameCount: number;
   latencyCorrectionFrameCount: number;
+  outputCorrectionFrameCount: number;
   correctedOutputLatencyFrameCount?: number;
   inputLatencyFrameCount: number;
+  timedRoundTripFrameCount?: number;
   latencySource: RecordingLatencySource;
   latencyDevicePairKey?: string;
   calibrating: boolean;
@@ -134,10 +136,12 @@ type LatencyState = Pick<
   | 'outputLatencyFrameCount'
   | 'outputLatencyFloorFrameCount'
   | 'latencyCorrectionFrameCount'
+  | 'outputCorrectionFrameCount'
   | 'inputLatencyFrameCount'
+  | 'timedRoundTripFrameCount'
 >;
 
-export const getOutputLatencyFrameCount = (
+export const getEstimatedOutputLatencyFrameCount = (
   state: Pick<
     LatencyState,
     'outputLatencyFrameCount' | 'outputLatencyFloorFrameCount'
@@ -145,8 +149,30 @@ export const getOutputLatencyFrameCount = (
 ): number =>
   Math.max(state.outputLatencyFrameCount, state.outputLatencyFloorFrameCount);
 
+export const getOutputLatencyFrameCount = (
+  state: Pick<
+    LatencyState,
+    | 'outputLatencyFrameCount'
+    | 'outputLatencyFloorFrameCount'
+    | 'outputCorrectionFrameCount'
+  >,
+): number =>
+  Math.max(
+    0,
+    getEstimatedOutputLatencyFrameCount(state) +
+      state.outputCorrectionFrameCount,
+  );
+
+export const getInputLatencyFrameCount = (state: LatencyState): number =>
+  state.timedRoundTripFrameCount === undefined
+    ? state.inputLatencyFrameCount
+    : state.timedRoundTripFrameCount - state.outputLatencyFrameCount;
+
 export const getInputShareFrameCount = (state: LatencyState): number =>
-  Math.max(0, state.inputLatencyFrameCount + state.latencyCorrectionFrameCount);
+  Math.max(
+    0,
+    getInputLatencyFrameCount(state) + state.latencyCorrectionFrameCount,
+  );
 
 export const getRecordingLatencyFrameCount = (state: LatencyState): number =>
   getOutputLatencyFrameCount(state) + getInputShareFrameCount(state);

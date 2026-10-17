@@ -31,6 +31,10 @@ export const applyInputLatencyEstimate = (
   const inputLatencyFrameCount = Math.round(
     estimate.inputLatencySeconds * context.sampleRate,
   );
+  const timedRoundTripFrameCount =
+    microphone.exactRoundTripLatency === undefined
+      ? undefined
+      : Math.round(microphone.exactRoundTripLatency * context.sampleRate);
   const outputLatencyFloorFrameCount = Math.round(
     Math.max(
       estimate.outputLatencyFloorSeconds,
@@ -40,6 +44,7 @@ export const applyInputLatencyEstimate = (
 
   store.update((draft) => {
     draft.inputLatencyFrameCount = inputLatencyFrameCount;
+    draft.timedRoundTripFrameCount = timedRoundTripFrameCount;
     draft.outputLatencyFloorFrameCount = outputLatencyFloorFrameCount;
     draft.latencyDevicePairKey = estimate.devicePairKey;
   });

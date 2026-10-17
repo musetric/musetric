@@ -2,11 +2,16 @@ import {
   createMicrophoneAudioConstraints,
   type RecordingInputSettings,
 } from '@musetric/audio/recording';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
   setAudioSessionType,
 } from './engineAudioSession.js';
+import {
+  createTimedMicrophones,
+  type TimedMicrophoneSource,
+} from './timedMicrophone.js';
 
 type TrackStats = {
   totalFrames: number;
@@ -52,8 +57,11 @@ const readMediaDevices = (): MediaDevices | undefined =>
 
 export const createWebAudioSession = (
   context: AudioContext,
+  outputClock: EngineOutputClock,
 ): EngineAudioSession => {
   const streams = new Map<EngineMicrophone, MediaStream>();
+  const timedSources = new Map<EngineMicrophone, TimedMicrophoneSource>();
+  const timedMicrophones = createTimedMicrophones(context, outputClock);
   let openingStreams = 0;
 
   const apply = () => {
@@ -76,17 +84,35 @@ export const createWebAudioSession = (
             sampleRate: context.sampleRate,
           }),
         });
+        const [track] = stream.getAudioTracks();
+        const timed = await timedMicrophones
+          ?.open(track)
+          .catch((error: unknown) => {
+            console.error('Failed to time the microphone', error);
+            return undefined;
+          });
         const microphone: EngineMicrophone = {
           getSettings: () => {
-            const [track] = stream.getAudioTracks();
             const settings: RecordingInputSettings = track.getSettings();
             return settings;
           },
           getMeasuredInputLatency: () => readMeasuredInputLatency(stream),
-          whenInputLatencyMeasured: async () => waitForInputLatency(stream),
-          createSource: () => context.createMediaStreamSource(stream),
+          whenInputLatencyMeasured: async () =>
+            timed ? undefined : waitForInputLatency(stream),
+          exactRoundTripLatency: timed?.roundTripLatency,
+          createSource: () => {
+            if (!timed) {
+              return context.createMediaStreamSource(stream);
+            }
+            const source = context.createGain();
+            timed.node.connect(source);
+            return source;
+          },
         };
         streams.set(microphone, stream);
+        if (timed) {
+          timedSources.set(microphone, timed);
+        }
         return microphone;
       } finally {
         openingStreams -= 1;
@@ -98,6 +124,8 @@ export const createWebAudioSession = (
       if (!stream) {
         return;
       }
+      timedSources.get(microphone)?.close();
+      timedSources.delete(microphone);
       for (const track of stream.getTracks()) {
         track.stop();
       }

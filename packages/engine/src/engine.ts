@@ -79,6 +79,7 @@ const initialState: EngineState = {
   outputLatencyFrameCount: 0,
   outputLatencyFloorFrameCount: 0,
   latencyCorrectionFrameCount: 0,
+  outputCorrectionFrameCount: 0,
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
@@ -114,9 +115,9 @@ export type Engine = {
 
 export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
-  const audioSession = createEngineAudioSession(context);
   const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
+  const audioSession = createEngineAudioSession(context, outputClock);
   const store = createStore(initialState);
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);

@@ -32,7 +32,7 @@ const loadWorklet = async (
 };
 
 type WorkletResult = {
-  peaks: { clickFrame: number; peakFrame: number; peakValue: number }[];
+  peaks: { clickFrame: number; onsetFrame: number; peakValue: number }[];
 };
 
 const waitForResult = async (
