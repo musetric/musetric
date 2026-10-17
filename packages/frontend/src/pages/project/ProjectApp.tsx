@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
+import { MicrophoneAccessDialog } from './audioSettings/MicrophoneAccessDialog.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
 import { MediaSessionSync } from './mediaSession/MediaSessionSync.js';
@@ -67,6 +68,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       <MixdownDialog />
       <RecordingListPicker />
       <RecordingDeleteDialog />
+      <MicrophoneAccessDialog />
     </ProjectLayout>
   );
 };

@@ -12,6 +12,7 @@ import {
 } from './protocol.cross.js';
 
 const deviceChangeDelayMs = 500;
+const accessDenied = 'microphone-access-denied';
 const readyTimeoutMs = 2000;
 const bluetoothPortTypes = [
   'BluetoothA2DPOutput',
@@ -39,7 +40,8 @@ const captureSchema = z.object({
 type NativeMicrophoneCommand =
   | { type: 'devices' }
   | { type: 'start'; deviceId?: string; sampleRate: number }
-  | { type: 'stop' };
+  | { type: 'stop' }
+  | { type: 'openSettings' };
 
 export type NativeMicrophoneHandler = {
   postMessage: (command: NativeMicrophoneCommand) => Promise<unknown>;
@@ -246,6 +248,18 @@ export const createNativeAudioSession = (
       return () => {
         listeners.delete(listener);
       };
+    },
+    readMicrophoneDenial: (error) =>
+      error instanceof Error && error.message === accessDenied
+        ? 'app'
+        : undefined,
+    canOpenMicrophoneSettings: (denial) => denial === 'app',
+    openMicrophoneSettings: () => {
+      void handler
+        .postMessage({ type: 'openSettings' })
+        .catch((error: unknown) => {
+          console.error('Failed to open the microphone settings', error);
+        });
     },
   };
 };

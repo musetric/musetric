@@ -5,6 +5,10 @@ import {
   type EngineAudioOutput,
 } from './audioOutput/index.js';
 import { createEngineOutputClock } from './audioOutput/outputClock.js';
+import {
+  createEngineMicrophoneAccess,
+  type EngineMicrophoneAccess,
+} from './audioSession/access.js';
 import { createEngineAudioSession } from './audioSession/index.js';
 import {
   createEngineCalibration,
@@ -82,6 +86,7 @@ const initialState: EngineState = {
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
+  microphoneDenialOpen: false,
   inputLevel: 0,
   recordingGain: 1,
   sourceGainDb: 0,
@@ -105,6 +110,7 @@ export type Engine = {
   audioOutput: EngineAudioOutput;
   store: Store<EngineState>;
   calibration: EngineCalibration;
+  microphoneAccess: EngineMicrophoneAccess;
   decoder: EngineDecoder;
   spectrogram: EngineSpectrogram;
   waveform: EngineWaveform;
@@ -136,6 +142,7 @@ export const createEngine = (): Engine => {
     context,
     audioOutput,
     store,
+    microphoneAccess: createEngineMicrophoneAccess({ store, audioSession }),
     calibration: createEngineCalibration({
       context,
       audioOutput,

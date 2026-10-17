@@ -4,6 +4,7 @@ import WebKit
 
 private let handlerName = "musetricMicrophone"
 private let receiver = "globalThis.musetricMicrophone"
+private let accessDenied = "microphone-access-denied"
 
 class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
   private weak var page: WKWebView?
@@ -38,12 +39,19 @@ class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
         switch result {
         case .success(let description):
           replyHandler(description, nil)
+        case .failure(let error) where (error as? MicrophoneError) == .permissionDenied:
+          replyHandler(nil, accessDenied)
         case .failure(let error):
           replyHandler(nil, error.localizedDescription)
         }
       }
     case "stop":
       capture.stop()
+      replyHandler(true, nil)
+    case "openSettings":
+      if let settings = URL(string: UIApplication.openSettingsURLString) {
+        UIApplication.shared.open(settings)
+      }
       replyHandler(true, nil)
     default:
       replyHandler(nil, "Unsupported microphone message")

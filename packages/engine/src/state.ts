@@ -6,6 +6,8 @@ export type PortStatus = 'pending' | 'success' | 'error';
 
 export type CalibrationErrorCode = 'preview' | 'output' | 'calibration';
 
+export type MicrophoneDenial = 'app' | 'system' | 'page';
+
 export type WaveformStatuses = Record<StemType, PortStatus> & {
   recording: PortStatus;
 };
@@ -111,6 +113,8 @@ export type EngineState = {
   latencyDevicePairKey?: string;
   calibrating: boolean;
   calibrationError?: CalibrationErrorCode;
+  microphoneDenial?: MicrophoneDenial;
+  microphoneDenialOpen: boolean;
   inputLevel: number;
   recordingGain: number;
   sourceGainDb: number;

@@ -1,5 +1,9 @@
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
+  clearMicrophoneDenial,
+  reportMicrophoneFailure,
+} from '../audioSession/access.js';
+import {
   type EngineAudioSession,
   type EngineMicrophone,
 } from '../audioSession/engineAudioSession.js';
@@ -203,6 +207,7 @@ export const createEngineRecorder = (
         microphoneDeviceId,
       );
       session.microphone = microphone;
+      clearMicrophoneDenial(store);
       if (isStopRequested(session)) {
         return;
       }
@@ -290,6 +295,7 @@ export const createEngineRecorder = (
 
       await getEnginePlayback().play();
     } catch (error) {
+      reportMicrophoneFailure(store, audioSession, error);
       failSession(session);
       throw error;
     }
