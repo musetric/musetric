@@ -1,7 +1,4 @@
-import {
-  isMobileUserAgent,
-  resolveAudioInputDevice,
-} from '@musetric/audio/recording';
+import { resolveAudioInputDevice } from '@musetric/audio/recording';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
@@ -108,7 +105,6 @@ export const createCalibrationPreview = (
         }
         const inputDevice = resolveAudioInputDevice(devices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: isMobileUserAgent(navigator),
         });
         const microphone = await audioSession.openMicrophone({
           deviceId: inputDevice?.deviceId,
@@ -125,7 +121,6 @@ export const createCalibrationPreview = (
         }
         const expectedInputDevice = resolveAudioInputDevice(refreshedDevices, {
           explicitDeviceId: store.get().microphoneDeviceId,
-          preferBuiltIn: isMobileUserAgent(navigator),
         });
         const currentDeviceId = microphone.getSettings().deviceId;
         let previewMicrophone = microphone;

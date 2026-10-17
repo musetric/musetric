@@ -1,18 +1,6 @@
 export const isPseudoDefaultDeviceId = (deviceId: string) =>
   deviceId === 'default' || deviceId === 'communications';
 
-const mobileUserAgentPattern = /Android|iPhone|iPad|iPod|Mobile/i;
-const macUserAgentPattern = /Macintosh/;
-
-export type UserAgentInfo = {
-  userAgent: string;
-  maxTouchPoints: number;
-};
-
-export const isMobileUserAgent = (info: UserAgentInfo) =>
-  mobileUserAgentPattern.test(info.userAgent) ||
-  (macUserAgentPattern.test(info.userAgent) && info.maxTouchPoints > 1);
-
 export const isLikelyBluetoothAudioDevice = (device: MediaDeviceInfo) => {
   const label = device.label.toLowerCase();
   return (
@@ -32,9 +20,7 @@ export const isLikelyWiredHeadsetAudioDevice = (device: MediaDeviceInfo) => {
     return false;
   }
   return (
-    label.includes('headset earpiece') ||
-    label.includes('wired headset') ||
-    label.includes('wired headphone') ||
+    label.includes('headset') ||
     label.includes('earphone') ||
     label.includes('headphone')
   );
@@ -162,9 +148,12 @@ export const resolveDefaultAudioOutputDevice = (
   );
 };
 
+const isLikelyHeadphoneMicrophone = (device: MediaDeviceInfo) =>
+  isLikelyBluetoothAudioDevice(device) ||
+  isLikelyWiredHeadsetAudioDevice(device);
+
 export type ResolveAudioInputDeviceOptions = {
   explicitDeviceId?: string;
-  preferBuiltIn: boolean;
 };
 
 export const resolveAudioInputDevice = (
@@ -182,17 +171,17 @@ export const resolveAudioInputDevice = (
     );
   }
 
-  if (options.preferBuiltIn) {
-    const builtInDevice = realDevices.find(isLikelyBuiltInMicrophoneDevice);
-    if (builtInDevice) return builtInDevice;
-
-    const nonBluetoothDevice = realDevices.find(
-      (device) => !isLikelyBluetoothAudioDevice(device),
-    );
-    if (nonBluetoothDevice) return nonBluetoothDevice;
+  const defaultDevice = resolveDefaultAudioInputDevice(devices);
+  if (defaultDevice && !isLikelyHeadphoneMicrophone(defaultDevice)) {
+    return defaultDevice;
   }
 
-  return resolveDefaultAudioInputDevice(devices) ?? realDevices[0];
+  return (
+    realDevices.find(isLikelyBuiltInMicrophoneDevice) ??
+    realDevices.find((device) => !isLikelyHeadphoneMicrophone(device)) ??
+    defaultDevice ??
+    realDevices[0]
+  );
 };
 
 export type ResolveAudioOutputDeviceOptions = {

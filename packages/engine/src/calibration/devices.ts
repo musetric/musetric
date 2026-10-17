@@ -2,7 +2,6 @@ import {
   getRealAudioInputDevices,
   getRealAudioOutputDevices,
   getRecordingLatencyDevicePairKey,
-  isMobileUserAgent,
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
@@ -57,7 +56,6 @@ const resolveNextDevices = (
       : undefined;
   const nextInputDevice = resolveAudioInputDevice(devices, {
     explicitDeviceId: nextMicrophoneDeviceId,
-    preferBuiltIn: isMobileUserAgent(navigator),
   });
   const nextOutputDevice = resolveAudioOutputDevice(devices, {
     explicitDeviceId: nextOutputDeviceId,

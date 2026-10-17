@@ -1,7 +1,4 @@
-import {
-  isMobileUserAgent,
-  resolveAudioInputDevice,
-} from '@musetric/audio/recording';
+import { resolveAudioInputDevice } from '@musetric/audio/recording';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
@@ -14,7 +11,6 @@ export const openKnownMicrophone = async (
   const devices = await audioSession.enumerateDevices();
   const device = resolveAudioInputDevice(devices, {
     explicitDeviceId: microphoneDeviceId,
-    preferBuiltIn: isMobileUserAgent(navigator),
   });
   return audioSession.openMicrophone({
     deviceId: device?.deviceId || microphoneDeviceId,
@@ -31,9 +27,7 @@ export const resolvePreferredMicrophone = async (
   options: PreferredMicrophoneOptions,
 ): Promise<EngineMicrophone> => {
   const { audioSession, microphone, devices } = options;
-  const preferredDevice = resolveAudioInputDevice(devices, {
-    preferBuiltIn: isMobileUserAgent(navigator),
-  });
+  const preferredDevice = resolveAudioInputDevice(devices, {});
   if (!preferredDevice) {
     return microphone;
   }
