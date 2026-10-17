@@ -24,6 +24,11 @@ export type PlayerOutboundMethods = {
   stop: (message: { revision: number }) => void;
   setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number; revision: number }) => void;
+  setLatency: (message: {
+    latencyFrameCount: number;
+    inputLatencyFrameCount: number;
+  }) => void;
+  setOutputClock: (message: { clockOffset: number }) => void;
   setTransposeSemitones: (message: { transposeSemitones: number }) => void;
   setVoiceOctave: (message: { voiceOctave: number; shifted: boolean }) => void;
   setTempoRatio: (message: { tempoRatio: number }) => void;
@@ -82,6 +87,8 @@ export const playerChannel = createMessageChannel<
       'boot',
       'play',
       'seek',
+      'setLatency',
+      'setOutputClock',
       'stop',
       'setFrozen',
       'setTransposeSemitones',

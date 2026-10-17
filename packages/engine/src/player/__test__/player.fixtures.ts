@@ -155,15 +155,18 @@ export type Harness = TakeStream & {
 
 export const createHarness = async (
   recording: PlayerRecordingPiece[],
+  playheadPorts: MessagePort[] = [],
 ): Promise<Harness> => {
   const control = new MessageChannel();
+  let contextFrame = 0;
   const data = new MessageChannel();
   const runtime = await createPlayerRuntime({
     port: playerChannel.inbound(control.port1),
     dataPort: playerDataChannel.inbound(data.port1),
-    playheadPorts: [],
+    playheadPorts,
     sampleRate: rate,
-    getCurrentTime: () => 0,
+    getCurrentTime: () => contextFrame / rate,
+    getCurrentFrame: () => contextFrame,
   });
   const take = createTakeStream();
   const frameCount = songSeconds * rate;
@@ -185,6 +188,7 @@ export const createHarness = async (
         new Float32Array(blockSize),
       ];
       runtime.process([[input]], outputs);
+      contextFrame += blockSize;
       return outputs[0];
     },
     player: playerChannel.outbound(control.port2),

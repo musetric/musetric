@@ -1,37 +1,48 @@
-import { estimateRecordingLatency } from '@musetric/audio/recording';
+import {
+  estimateInputLatency,
+  type InputLatencyEstimate,
+} from '@musetric/audio/recording';
 import { type EngineMicrophone } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
 
-export type CalibrationEstimateOptions = {
+export type InputLatencyEstimateOptions = {
   context: AudioContext;
   microphone: EngineMicrophone;
+  devices?: MediaDeviceInfo[];
 };
 
-export const applyRecordingLatencyEstimate = (
+export type AppliedInputLatencyEstimate = InputLatencyEstimate & {
+  inputLatencyFrameCount: number;
+};
+
+export const applyInputLatencyEstimate = (
   store: Store<EngineState>,
-  options: CalibrationEstimateOptions,
-): ReturnType<typeof estimateRecordingLatency> => {
+  options: InputLatencyEstimateOptions,
+): AppliedInputLatencyEstimate => {
+  const { context, microphone } = options;
   const state = store.get();
-  const estimate = estimateRecordingLatency({
-    context: options.context,
-    microphone: options.microphone.getSettings(),
-    outputLatency: options.microphone.outputLatency,
-    devices: state.audioDevices,
+  const estimate = estimateInputLatency({
+    microphone: microphone.getSettings(),
+    measuredInputLatency: microphone.getMeasuredInputLatency(),
+    devices: options.devices ?? state.audioDevices,
     outputDeviceId: state.audioOutputDeviceId,
   });
+  const inputLatencyFrameCount = Math.round(
+    estimate.inputLatencySeconds * context.sampleRate,
+  );
+  const outputLatencyFloorFrameCount = Math.round(
+    Math.max(
+      estimate.outputLatencyFloorSeconds,
+      microphone.outputLatency ?? 0,
+    ) * context.sampleRate,
+  );
 
   store.update((draft) => {
-    if (
-      draft.latencySource === 'estimated' ||
-      draft.latencyDevicePairKey !== estimate.devicePairKey
-    ) {
-      draft.latencyFrameCount = estimate.frameCount;
-      draft.latencySource = 'estimated';
-      draft.latencyDevicePairKey = estimate.devicePairKey;
-    }
-    draft.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
+    draft.inputLatencyFrameCount = inputLatencyFrameCount;
+    draft.outputLatencyFloorFrameCount = outputLatencyFloorFrameCount;
+    draft.latencyDevicePairKey = estimate.devicePairKey;
   });
 
-  return estimate;
+  return { ...estimate, inputLatencyFrameCount };
 };

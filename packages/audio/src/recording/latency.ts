@@ -15,13 +15,12 @@ const inputLatencyPresetSecondsByKind: Record<AudioInputSourceKind, number> = {
   unknown: 0.04,
 };
 
-const outputLatencyPresetSecondsByKind: Record<AudioOutputSourceKind, number> =
-  {
-    builtIn: 0.03,
-    wiredHeadset: 0.025,
-    bluetooth: 0.18,
-    unknown: 0.04,
-  };
+const outputLatencyFloorSecondsByKind: Record<AudioOutputSourceKind, number> = {
+  builtIn: 0,
+  wiredHeadset: 0,
+  bluetooth: 0.18,
+  unknown: 0,
+};
 
 export type RecordingInputSettings = {
   deviceId?: string;
@@ -49,16 +48,6 @@ const resolveInputDevice = (
   return resolveDefaultAudioInputDevice(devices);
 };
 
-type AudioContextWithOutputLatency = AudioContext & {
-  outputLatency?: number;
-};
-
-const getContextOutputLatencySeconds = (context: AudioContext) => {
-  const contextWithOutputLatency: AudioContextWithOutputLatency = context;
-  const rawOutputLatency = contextWithOutputLatency.outputLatency;
-  return typeof rawOutputLatency === 'number' ? rawOutputLatency : 0;
-};
-
 export const getRecordingLatencyDevicePairKey = (
   inputDevice: MediaDeviceInfo | undefined,
   outputDevice: MediaDeviceInfo | undefined,
@@ -72,31 +61,26 @@ export const getRecordingLatencyDevicePairKey = (
   return `${inputKey}|${outputKey}`;
 };
 
-export type RecordingLatencyEstimateInput = {
-  context: AudioContext;
+export type InputLatencyEstimateInput = {
   microphone: RecordingInputSettings;
-  outputLatency?: number;
+  measuredInputLatency?: number;
   devices: MediaDeviceInfo[];
   outputDeviceId?: string;
 };
 
-export type RecordingLatencyEstimate = {
-  latencySeconds: number;
-  frameCount: number;
+export type InputLatencyEstimate = {
   inputKind: AudioInputSourceKind;
   inputLatencySeconds: number;
-  inputLatencyFrameCount: number;
   outputKind: AudioOutputSourceKind;
-  outputLatencySeconds: number;
-  outputLatencyFrameCount: number;
+  outputLatencyFloorSeconds: number;
   devicePairKey: string;
 };
 
-export const estimateRecordingLatency = (
-  input: RecordingLatencyEstimateInput,
-): RecordingLatencyEstimate => {
-  const { context, devices } = input;
-  const inputDevice = resolveInputDevice(input.microphone, devices);
+export const estimateInputLatency = (
+  input: InputLatencyEstimateInput,
+): InputLatencyEstimate => {
+  const { devices, microphone } = input;
+  const inputDevice = resolveInputDevice(microphone, devices);
   const outputDevice = resolveAudioOutputDevice(devices, {
     explicitDeviceId: input.outputDeviceId,
   });
@@ -106,32 +90,17 @@ export const estimateRecordingLatency = (
   const outputKind: AudioOutputSourceKind = outputDevice
     ? classifyAudioOutputDevice(outputDevice)
     : 'unknown';
+  const chunkSeconds = microphone.latency ?? 0;
+  const inputLatencySeconds =
+    input.measuredInputLatency === undefined
+      ? Math.max(chunkSeconds, inputLatencyPresetSecondsByKind[inputKind])
+      : input.measuredInputLatency + chunkSeconds;
 
-  const inputLatencySeconds = Math.max(
-    input.microphone.latency ?? 0,
-    inputLatencyPresetSecondsByKind[inputKind],
-  );
-  const outputLatencySeconds = Math.max(
-    input.outputLatency ?? getContextOutputLatencySeconds(context),
-    outputLatencyPresetSecondsByKind[outputKind],
-  );
-  const baseLatencySeconds = context.baseLatency || 0;
-
-  const latencySeconds =
-    baseLatencySeconds + inputLatencySeconds + outputLatencySeconds;
   return {
-    latencySeconds,
-    frameCount: Math.round(latencySeconds * context.sampleRate),
     inputKind,
     inputLatencySeconds,
-    inputLatencyFrameCount: Math.round(
-      inputLatencySeconds * context.sampleRate,
-    ),
     outputKind,
-    outputLatencySeconds,
-    outputLatencyFrameCount: Math.round(
-      outputLatencySeconds * context.sampleRate,
-    ),
+    outputLatencyFloorSeconds: outputLatencyFloorSecondsByKind[outputKind],
     devicePairKey: getRecordingLatencyDevicePairKey(inputDevice, outputDevice),
   };
 };

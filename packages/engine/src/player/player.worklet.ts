@@ -20,6 +20,7 @@ export class PlayerProcessor
         playheadPorts: message.playheadPorts,
         sampleRate,
         getCurrentTime: () => currentTime,
+        getCurrentFrame: () => currentFrame,
       });
       this.handleProcess = (
         inputs: Float32Array[][],

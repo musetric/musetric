@@ -100,7 +100,10 @@ export type EngineState = {
   microphoneDeviceId?: string;
   audioOutputDeviceId?: string;
   audioDevices: MediaDeviceInfo[];
-  latencyFrameCount: number;
+  outputLatencyFrameCount: number;
+  outputLatencyFloorFrameCount: number;
+  outputCorrectionFrameCount: number;
+  correctedOutputLatencyFrameCount?: number;
   inputLatencyFrameCount: number;
   latencySource: RecordingLatencySource;
   latencyDevicePairKey?: string;
@@ -125,6 +128,32 @@ export type EngineState = {
   loopSelectedTryId?: string;
   loopTryPhase?: LoopTryPhase;
 };
+
+type LatencyState = Pick<
+  EngineState,
+  | 'outputLatencyFrameCount'
+  | 'outputLatencyFloorFrameCount'
+  | 'outputCorrectionFrameCount'
+  | 'inputLatencyFrameCount'
+>;
+
+export const getReportedOutputLatencyFrameCount = (
+  state: Omit<
+    LatencyState,
+    'outputCorrectionFrameCount' | 'inputLatencyFrameCount'
+  >,
+): number =>
+  Math.max(state.outputLatencyFrameCount, state.outputLatencyFloorFrameCount);
+
+export const getOutputLatencyFrameCount = (state: LatencyState): number =>
+  Math.max(
+    0,
+    getReportedOutputLatencyFrameCount(state) +
+      state.outputCorrectionFrameCount,
+  );
+
+export const getRecordingLatencyFrameCount = (state: LatencyState): number =>
+  getOutputLatencyFrameCount(state) + state.inputLatencyFrameCount;
 
 export const getActiveRecording = (
   state: Pick<EngineState, 'recordings'>,

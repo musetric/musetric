@@ -228,6 +228,7 @@ export const createEngineDecoder = (
         playerPort,
         spectrogramPort,
         playheadPort,
+        sampleRate: runtimeSampleRate,
       });
 
       return bootPromise.promise;

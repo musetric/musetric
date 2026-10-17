@@ -20,12 +20,14 @@ const settle = async (): Promise<void> => {
 const createPlayer = async () => {
   const control = new MessageChannel();
   const data = new MessageChannel();
+  let contextFrame = 0;
   const runtime = await createPlayerRuntime({
     port: playerChannel.inbound(control.port1),
     dataPort: playerDataChannel.inbound(data.port1),
     playheadPorts: [],
     sampleRate: rate,
-    getCurrentTime: () => 0,
+    getCurrentTime: () => contextFrame / rate,
+    getCurrentFrame: () => contextFrame,
   });
   const silence = () => [new Float32Array(2 * rate)];
   playerDataChannel.outbound(data.port2).methods.mount({
@@ -57,6 +59,7 @@ const createPlayer = async () => {
         new Float32Array(blockSize),
       ];
       runtime.process([[new Float32Array(blockSize)]], outputs);
+      contextFrame += blockSize;
       played.set(outputs[0], offset);
     }
     return played.findIndex((value) => Math.abs(value) > 0.01) - 1;

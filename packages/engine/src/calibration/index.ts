@@ -6,12 +6,17 @@ import {
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
-import { type EngineState } from '../state.js';
+import {
+  type EngineState,
+  getRecordingLatencyFrameCount,
+  getReportedOutputLatencyFrameCount,
+} from '../state.js';
 import { createCalibrationDevices } from './devices.js';
-import { applyRecordingLatencyEstimate } from './estimate.js';
+import { applyInputLatencyEstimate } from './estimate.js';
 import { measureRecordingLatency } from './measurement.js';
 import microphoneCalibrationWorkletUrl from './microphone.worklet.ts?worker&url';
 import {
@@ -24,22 +29,40 @@ import {
   createCalibrationLatencyStore,
 } from './storage.js';
 
+const routeToleranceSeconds = 0.03;
+
+const isSameRoute = (
+  state: EngineState,
+  outputLatencyFrameCount: number,
+  sampleRate: number,
+) =>
+  Math.abs(state.outputLatencyFrameCount - outputLatencyFrameCount) <=
+  routeToleranceSeconds * sampleRate;
+
+const clearCorrection = (state: EngineState) => {
+  state.outputCorrectionFrameCount = 0;
+  state.correctedOutputLatencyFrameCount = undefined;
+  state.latencySource = 'estimated';
+};
+
 const restoreLatencyState = (
   store: Store<EngineState>,
   latencyStore: CalibrationLatencyStore,
   devicePairKey: string,
+  sampleRate: number,
 ) => {
   const stored = latencyStore.get(devicePairKey);
   store.update((state) => {
-    if (stored) {
-      state.latencyFrameCount = stored.latencyFrameCount;
-      state.inputLatencyFrameCount = stored.inputLatencyFrameCount;
+    state.latencyDevicePairKey = devicePairKey;
+    if (
+      stored &&
+      isSameRoute(state, stored.outputLatencyFrameCount, sampleRate)
+    ) {
+      state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount;
+      state.correctedOutputLatencyFrameCount = stored.outputLatencyFrameCount;
       state.latencySource = stored.source;
-      state.latencyDevicePairKey = devicePairKey;
     } else {
-      state.latencySource = 'estimated';
-      state.latencyDevicePairKey = undefined;
-      state.inputLatencyFrameCount = 0;
+      clearCorrection(state);
     }
   });
 };
@@ -65,6 +88,7 @@ export type EngineCalibration = {
 export type CreateEngineCalibrationOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
+  outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   getPlayer: () => EnginePlayer;
@@ -73,8 +97,62 @@ export type CreateEngineCalibrationOptions = {
 export const createEngineCalibration = (
   options: CreateEngineCalibrationOptions,
 ): EngineCalibration => {
-  const { context, audioOutput, audioSession, store, getPlayer } = options;
+  const { context, audioOutput, outputClock, audioSession, store } = options;
+  const { getPlayer } = options;
+  const { sampleRate } = context;
   const latencyStore = createCalibrationLatencyStore();
+
+  const restore = (devicePairKey: string) => {
+    restoreLatencyState(store, latencyStore, devicePairKey, sampleRate);
+  };
+
+  const saveCorrection = (
+    targetLatencyFrameCount: number,
+    source: 'manual' | 'calibrated',
+  ) => {
+    const state = store.get();
+    const outputCorrectionFrameCount =
+      targetLatencyFrameCount -
+      state.inputLatencyFrameCount -
+      getReportedOutputLatencyFrameCount(state);
+    store.update((draft) => {
+      draft.outputCorrectionFrameCount = outputCorrectionFrameCount;
+      draft.correctedOutputLatencyFrameCount = draft.outputLatencyFrameCount;
+      draft.latencySource = source;
+    });
+    if (state.latencyDevicePairKey !== undefined) {
+      latencyStore.set(state.latencyDevicePairKey, {
+        outputLatencyFrameCount: state.outputLatencyFrameCount,
+        outputCorrectionFrameCount,
+        source,
+      });
+    }
+  };
+
+  store.subscribe(
+    (state) => state.latencyDevicePairKey,
+    (devicePairKey) => {
+      if (devicePairKey !== undefined) {
+        restore(devicePairKey);
+      }
+    },
+  );
+  store.subscribe(
+    (state) => state.outputLatencyFrameCount,
+    () => {
+      const state = store.get();
+      const corrected = state.correctedOutputLatencyFrameCount;
+      if (corrected === undefined) {
+        if (state.latencyDevicePairKey !== undefined) {
+          restore(state.latencyDevicePairKey);
+        }
+        return;
+      }
+      if (!isSameRoute(state, corrected, sampleRate)) {
+        store.update(clearCorrection);
+      }
+    },
+  );
 
   const restoreForCurrentDevices = () => {
     const state = store.get();
@@ -85,26 +163,18 @@ export const createEngineCalibration = (
     const outputDevice = resolveAudioOutputDevice(state.audioDevices, {
       explicitDeviceId: state.audioOutputDeviceId,
     });
-    restoreLatencyState(
-      store,
-      latencyStore,
-      getRecordingLatencyDevicePairKey(inputDevice, outputDevice),
-    );
+    restore(getRecordingLatencyDevicePairKey(inputDevice, outputDevice));
   };
 
   const devices = createCalibrationDevices({
     store,
     audioOutput,
     audioSession,
-    onInitialDevicePair: (devicePairKey) => {
-      restoreLatencyState(store, latencyStore, devicePairKey);
-    },
-    onDeviceLost: (devicePairKey) => {
-      restoreLatencyState(store, latencyStore, devicePairKey);
-    },
+    onInitialDevicePair: restore,
+    onDeviceLost: restore,
     onActiveDeviceChanged: (devicePairKey) => {
       void stopActivePlayback(store, getPlayer());
-      restoreLatencyState(store, latencyStore, devicePairKey);
+      restore(devicePairKey);
     },
   });
   devices.start();
@@ -122,10 +192,7 @@ export const createEngineCalibration = (
 
   const runCalibration = async (): Promise<boolean> => {
     const microphone = preview?.getMicrophone();
-    const estimate = microphone
-      ? applyRecordingLatencyEstimate(store, { context, microphone })
-      : undefined;
-    if (!estimate) {
+    if (!microphone) {
       store.update((draft) => {
         draft.calibrationError = 'calibration';
       });
@@ -141,6 +208,7 @@ export const createEngineCalibration = (
       if (context.state === 'suspended') {
         await context.resume();
       }
+      await outputClock.whenSettled();
 
       const inputDevice = resolveAudioInputDevice(store.get().audioDevices, {
         explicitDeviceId: store.get().microphoneDeviceId,
@@ -164,18 +232,8 @@ export const createEngineCalibration = (
         return false;
       }
 
-      latencyStore.set(estimate.devicePairKey, {
-        latencyFrameCount: result.latencyFrameCount,
-        inputLatencyFrameCount: estimate.inputLatencyFrameCount,
-        source: 'calibrated',
-      });
-
-      store.update((draft) => {
-        draft.latencyFrameCount = result.latencyFrameCount;
-        draft.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
-        draft.latencySource = 'calibrated';
-        draft.latencyDevicePairKey = estimate.devicePairKey;
-      });
+      applyInputLatencyEstimate(store, { context, microphone });
+      saveCorrection(result.latencyFrameCount, 'calibrated');
 
       return true;
     } catch (error) {
@@ -228,24 +286,13 @@ export const createEngineCalibration = (
     },
     setManualLatencyMs: (latencyMs) => {
       const frameCount = clampRecordingLatencyFrameCount(
-        Math.round((latencyMs / 1000) * context.sampleRate),
-        context.sampleRate,
+        Math.round((latencyMs / 1000) * sampleRate),
+        sampleRate,
       );
-      store.update((draft) => {
-        draft.latencyFrameCount = frameCount;
-        draft.latencySource = 'manual';
-        if (draft.latencyDevicePairKey === undefined) {
-          draft.inputLatencyFrameCount = 0;
-        }
-      });
-      const state = store.get();
-      if (state.latencyDevicePairKey !== undefined) {
-        latencyStore.set(state.latencyDevicePairKey, {
-          latencyFrameCount: state.latencyFrameCount,
-          inputLatencyFrameCount: state.inputLatencyFrameCount,
-          source: 'manual',
-        });
+      if (frameCount === getRecordingLatencyFrameCount(store.get())) {
+        return;
       }
+      saveCorrection(frameCount, 'manual');
     },
     calibrate: runCalibration,
     openPreview: () => getPreview().open(),

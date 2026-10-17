@@ -81,8 +81,7 @@ export const createSpectrogramRuntime = async (
     if (frameCount <= 0) {
       return trackProgress;
     }
-    const { frameIndex } = playhead.read();
-    return Math.min(1, Math.max(0, frameIndex / frameCount));
+    return Math.min(1, Math.max(0, playhead.readFrameIndex() / frameCount));
   };
 
   const renderFromPlayhead = async () => {

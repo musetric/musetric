@@ -1,11 +1,12 @@
-import { estimateRecordingLatency } from '@musetric/audio/recording';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
 } from '../audioSession/engineAudioSession.js';
+import { applyInputLatencyEstimate } from '../calibration/estimate.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import { type EngineState } from '../state.js';
+import { type EngineState, getRecordingLatencyFrameCount } from '../state.js';
 import { settleLoopTry } from './loopTry.js';
 import {
   openKnownMicrophone,
@@ -45,6 +46,7 @@ export type EngineRecorder = {
 
 export type CreateEngineRecorderOptions = {
   context: AudioContext;
+  outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   getDecoder: () => EngineDecoder;
@@ -54,8 +56,8 @@ export type CreateEngineRecorderOptions = {
 export const createEngineRecorder = (
   options: CreateEngineRecorderOptions,
 ): EngineRecorder => {
-  const { context, audioSession, store, getDecoder, getEnginePlayback } =
-    options;
+  const { context, outputClock, audioSession, store, getDecoder } = options;
+  const { getEnginePlayback } = options;
   let currentSession: RecordingSession | undefined = undefined;
 
   const setRecording = (recording: boolean) => {
@@ -214,29 +216,11 @@ export const createEngineRecorder = (
         }
       }
 
-      const estimate = estimateRecordingLatency({
-        context,
-        microphone: microphone.getSettings(),
-        outputLatency: microphone.outputLatency,
-        devices,
-        outputDeviceId: store.get().audioOutputDeviceId,
-      });
-      const latencyState = store.get();
-      if (
-        latencyState.latencySource === 'estimated' ||
-        latencyState.latencyDevicePairKey !== estimate.devicePairKey
-      ) {
-        store.update((state) => {
-          state.latencyFrameCount = estimate.frameCount;
-          state.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
-          state.latencySource = 'estimated';
-          state.latencyDevicePairKey = estimate.devicePairKey;
-        });
-      } else {
-        store.update((state) => {
-          state.inputLatencyFrameCount = estimate.inputLatencyFrameCount;
-        });
+      await outputClock.whenSettled();
+      if (isStopRequested(session)) {
+        return;
       }
+      applyInputLatencyEstimate(store, { context, microphone, devices });
       if (isStopRequested(session)) {
         return;
       }
@@ -256,12 +240,12 @@ export const createEngineRecorder = (
       };
       const recordingStreamChannel = new MessageChannel();
       const {
-        latencyFrameCount,
         inputLatencyFrameCount,
         tempoRatio,
         transposeSemitones,
         voiceOctave,
       } = store.get();
+      const latencyFrameCount = getRecordingLatencyFrameCount(store.get());
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,

@@ -2,6 +2,7 @@ import { type RecordingInputSettings } from '@musetric/audio/recording';
 
 export type EngineMicrophone = {
   getSettings: () => RecordingInputSettings;
+  getMeasuredInputLatency: () => number | undefined;
   outputLatency?: number;
   createSource: () => AudioNode;
 };

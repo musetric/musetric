@@ -14,7 +14,11 @@ export type SpectrogramViewWindow = {
 };
 
 export type SpectrogramOutboundMethods = {
-  boot: (message: { dataPort: MessagePort; playheadPort: MessagePort }) => void;
+  boot: (message: {
+    dataPort: MessagePort;
+    playheadPort: MessagePort;
+    sampleRate: number;
+  }) => void;
   mount: (message: {
     config: Partial<SpectrogramConfig>;
     trackProgress: number;
