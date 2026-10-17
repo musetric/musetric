@@ -11,7 +11,6 @@ import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
   type EngineState,
-  getEstimatedOutputLatencyFrameCount,
   getInputLatencyFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
@@ -42,7 +41,7 @@ const isSameRoute = (
 
 const clearCorrection = (state: EngineState) => {
   state.latencyCorrectionFrameCount = 0;
-  state.outputCorrectionFrameCount = 0;
+  state.outputCorrectionFrameCount = undefined;
   state.correctedOutputLatencyFrameCount = undefined;
   state.latencySource = 'estimated';
 };
@@ -60,7 +59,7 @@ const restoreLatencyState = (
     state.latencyDevicePairKey = devicePairKey;
     if (stored) {
       state.latencyCorrectionFrameCount = stored.latencyCorrectionFrameCount;
-      state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount ?? 0;
+      state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount;
       state.correctedOutputLatencyFrameCount = stored.outputLatencyFrameCount;
       state.latencySource = stored.source;
     } else {
@@ -132,7 +131,7 @@ export const createEngineCalibration = (
     const outputCorrectionFrameCount = correctsOutput
       ? targetLatencyFrameCount -
         inputLatencyFrameCount -
-        getEstimatedOutputLatencyFrameCount(state)
+        state.outputLatencyFrameCount
       : state.outputCorrectionFrameCount;
     const latencyCorrectionFrameCount = correctsOutput
       ? 0
