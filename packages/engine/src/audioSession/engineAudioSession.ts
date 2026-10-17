@@ -21,10 +21,13 @@ export type EngineAudioSession = {
   closeMicrophone: (microphone: EngineMicrophone) => void;
   enumerateDevices: () => Promise<MediaDeviceInfo[]>;
   subscribeDevices: (listener: () => void) => () => void;
+  checkMicrophoneAccess?: () => Promise<boolean>;
   readMicrophoneDenial: (error: unknown) => MicrophoneDenial | undefined;
   canOpenMicrophoneSettings: (denial: MicrophoneDenial) => boolean;
   openMicrophoneSettings: (denial: MicrophoneDenial) => void;
 };
+
+export const microphoneAccessDenied = 'microphone-access-denied';
 
 type AudioSessionType = 'auto' | 'playback';
 

@@ -24,6 +24,7 @@ class MainActivity : TauriActivity() {
     shareDownloads(this, webView)
     attachMediaSession(this, webView)
     attachSettings(this, webView)
+    attachMicrophone(this, webView)
   }
 
   private fun applyWebViewInsets(webView: WebView) {

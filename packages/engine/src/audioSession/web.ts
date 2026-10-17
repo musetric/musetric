@@ -15,6 +15,7 @@ import {
 } from './settings.js';
 import {
   createTimedMicrophones,
+  readTrackChunks,
   type TimedMicrophoneSource,
 } from './timedMicrophone.js';
 
@@ -90,12 +91,13 @@ export const createWebAudioSession = (
           }),
         });
         const [track] = stream.getAudioTracks();
-        const timed = await timedMicrophones
-          ?.open(track)
-          .catch((error: unknown) => {
-            console.error('Failed to time the microphone', error);
-            return undefined;
-          });
+        const chunks = readTrackChunks(track);
+        const timed = chunks
+          ? await timedMicrophones.open(chunks).catch((error: unknown) => {
+              console.error('Failed to time the microphone', error);
+              return undefined;
+            })
+          : undefined;
         const microphone: EngineMicrophone = {
           getSettings: () => {
             const settings: RecordingInputSettings = track.getSettings();
