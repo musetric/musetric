@@ -27,6 +27,26 @@ const readMeasuredInputLatency = (stream: MediaStream) => {
   return stats.averageLatency / 1000;
 };
 
+const measureWaitMs = 1000;
+const measurePollMs = 50;
+
+const waitForInputLatency = async (stream: MediaStream) => {
+  const [track] = stream.getAudioTracks();
+  const trackWithStats: TrackWithStats = track;
+  if (!trackWithStats.stats) {
+    return;
+  }
+  for (
+    let waitedMs = 0;
+    waitedMs < measureWaitMs && readMeasuredInputLatency(stream) === undefined;
+    waitedMs += measurePollMs
+  ) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, measurePollMs);
+    });
+  }
+};
+
 const readMediaDevices = (): MediaDevices | undefined =>
   'mediaDevices' in navigator ? navigator.mediaDevices : undefined;
 
@@ -63,6 +83,7 @@ export const createWebAudioSession = (
             return settings;
           },
           getMeasuredInputLatency: () => readMeasuredInputLatency(stream),
+          whenInputLatencyMeasured: async () => waitForInputLatency(stream),
           createSource: () => context.createMediaStreamSource(stream),
         };
         streams.set(microphone, stream);

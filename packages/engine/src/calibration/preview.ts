@@ -150,6 +150,14 @@ export const createCalibrationPreview = (
           context,
           microphone: previewMicrophone,
         });
+        void previewMicrophone.whenInputLatencyMeasured().then(() => {
+          if (!isStale()) {
+            applyInputLatencyEstimate(store, {
+              context,
+              microphone: previewMicrophone,
+            });
+          }
+        });
 
         analyser = context.createAnalyser();
         analyser.fftSize = 1024;

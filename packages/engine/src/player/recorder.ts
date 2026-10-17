@@ -217,6 +217,7 @@ export const createEngineRecorder = (
       }
 
       await outputClock.whenSettled();
+      await microphone.whenInputLatencyMeasured();
       if (isStopRequested(session)) {
         return;
       }
