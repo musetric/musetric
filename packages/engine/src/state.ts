@@ -102,7 +102,7 @@ export type EngineState = {
   audioDevices: MediaDeviceInfo[];
   outputLatencyFrameCount: number;
   outputLatencyFloorFrameCount: number;
-  outputCorrectionFrameCount: number;
+  latencyCorrectionFrameCount: number;
   correctedOutputLatencyFrameCount?: number;
   inputLatencyFrameCount: number;
   latencySource: RecordingLatencySource;
@@ -133,27 +133,23 @@ type LatencyState = Pick<
   EngineState,
   | 'outputLatencyFrameCount'
   | 'outputLatencyFloorFrameCount'
-  | 'outputCorrectionFrameCount'
+  | 'latencyCorrectionFrameCount'
   | 'inputLatencyFrameCount'
 >;
 
-export const getReportedOutputLatencyFrameCount = (
-  state: Omit<
+export const getOutputLatencyFrameCount = (
+  state: Pick<
     LatencyState,
-    'outputCorrectionFrameCount' | 'inputLatencyFrameCount'
+    'outputLatencyFrameCount' | 'outputLatencyFloorFrameCount'
   >,
 ): number =>
   Math.max(state.outputLatencyFrameCount, state.outputLatencyFloorFrameCount);
 
-export const getOutputLatencyFrameCount = (state: LatencyState): number =>
-  Math.max(
-    0,
-    getReportedOutputLatencyFrameCount(state) +
-      state.outputCorrectionFrameCount,
-  );
+export const getInputShareFrameCount = (state: LatencyState): number =>
+  Math.max(0, state.inputLatencyFrameCount + state.latencyCorrectionFrameCount);
 
 export const getRecordingLatencyFrameCount = (state: LatencyState): number =>
-  getOutputLatencyFrameCount(state) + state.inputLatencyFrameCount;
+  getOutputLatencyFrameCount(state) + getInputShareFrameCount(state);
 
 export const getActiveRecording = (
   state: Pick<EngineState, 'recordings'>,

@@ -10,6 +10,7 @@ import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type Store } from '../common/store.js';
 import {
   type EngineState,
+  getInputShareFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
 } from '../state.js';
@@ -222,18 +223,15 @@ export const createEnginePlayback = async (
     const state = store.get();
     return {
       latencyFrameCount: getRecordingLatencyFrameCount(state),
-      inputLatencyFrameCount: state.inputLatencyFrameCount,
+      inputLatencyFrameCount: getInputShareFrameCount(state),
     };
   };
   store.subscribe(getRecordingLatencyFrameCount, () => {
     port.methods.setLatency(getLatencyFrameCounts());
   });
-  store.subscribe(
-    (state) => state.inputLatencyFrameCount,
-    () => {
-      port.methods.setLatency(getLatencyFrameCounts());
-    },
-  );
+  store.subscribe(getInputShareFrameCount, () => {
+    port.methods.setLatency(getLatencyFrameCounts());
+  });
 
   const publishOutputClock = () => {
     const reading = outputClock.read();

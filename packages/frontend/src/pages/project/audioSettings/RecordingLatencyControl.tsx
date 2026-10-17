@@ -4,6 +4,7 @@ import {
   minimumRecordingLatencyMs,
 } from '@musetric/audio/calibration';
 import {
+  getInputShareFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
   type RecordingLatencySource,
@@ -25,9 +26,7 @@ export const RecordingLatencyControl: FC = () => {
   );
   const outputLatencyFrameCount = useEngineStore(getOutputLatencyFrameCount);
   const recordingLatencySource = useEngineStore((state) => state.latencySource);
-  const inputLatencyFrameCount = useEngineStore(
-    (state) => state.inputLatencyFrameCount,
-  );
+  const inputLatencyFrameCount = useEngineStore(getInputShareFrameCount);
   const recording = useEngineStore((state) => state.recording);
   const calibrating = useEngineStore((state) => state.calibrating);
   const calibrationError = useEngineStore((state) => state.calibrationError);

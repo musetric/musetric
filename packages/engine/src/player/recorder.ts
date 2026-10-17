@@ -6,7 +6,11 @@ import {
 import { applyInputLatencyEstimate } from '../calibration/estimate.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import { type EngineState, getRecordingLatencyFrameCount } from '../state.js';
+import {
+  type EngineState,
+  getInputShareFrameCount,
+  getRecordingLatencyFrameCount,
+} from '../state.js';
 import { settleLoopTry } from './loopTry.js';
 import {
   openKnownMicrophone,
@@ -240,13 +244,9 @@ export const createEngineRecorder = (
         gain.disconnect();
       };
       const recordingStreamChannel = new MessageChannel();
-      const {
-        inputLatencyFrameCount,
-        tempoRatio,
-        transposeSemitones,
-        voiceOctave,
-      } = store.get();
+      const { tempoRatio, transposeSemitones, voiceOctave } = store.get();
       const latencyFrameCount = getRecordingLatencyFrameCount(store.get());
+      const inputLatencyFrameCount = getInputShareFrameCount(store.get());
       getDecoder().startRecordingStream({
         projectId: session.projectId,
         sampleRate: context.sampleRate,

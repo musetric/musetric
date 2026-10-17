@@ -12,8 +12,8 @@ import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
   type EngineState,
+  getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
-  getReportedOutputLatencyFrameCount,
 } from '../state.js';
 import { createCalibrationDevices } from './devices.js';
 import { applyInputLatencyEstimate } from './estimate.js';
@@ -40,7 +40,7 @@ const isSameRoute = (
   routeToleranceSeconds * sampleRate;
 
 const clearCorrection = (state: EngineState) => {
-  state.outputCorrectionFrameCount = 0;
+  state.latencyCorrectionFrameCount = 0;
   state.correctedOutputLatencyFrameCount = undefined;
   state.latencySource = 'estimated';
 };
@@ -58,7 +58,7 @@ const restoreLatencyState = (
       stored &&
       isSameRoute(state, stored.outputLatencyFrameCount, sampleRate)
     ) {
-      state.outputCorrectionFrameCount = stored.outputCorrectionFrameCount;
+      state.latencyCorrectionFrameCount = stored.latencyCorrectionFrameCount;
       state.correctedOutputLatencyFrameCount = stored.outputLatencyFrameCount;
       state.latencySource = stored.source;
     } else {
@@ -111,19 +111,19 @@ export const createEngineCalibration = (
     source: 'manual' | 'calibrated',
   ) => {
     const state = store.get();
-    const outputCorrectionFrameCount =
+    const latencyCorrectionFrameCount =
       targetLatencyFrameCount -
       state.inputLatencyFrameCount -
-      getReportedOutputLatencyFrameCount(state);
+      getOutputLatencyFrameCount(state);
     store.update((draft) => {
-      draft.outputCorrectionFrameCount = outputCorrectionFrameCount;
+      draft.latencyCorrectionFrameCount = latencyCorrectionFrameCount;
       draft.correctedOutputLatencyFrameCount = draft.outputLatencyFrameCount;
       draft.latencySource = source;
     });
     if (state.latencyDevicePairKey !== undefined) {
       latencyStore.set(state.latencyDevicePairKey, {
         outputLatencyFrameCount: state.outputLatencyFrameCount,
-        outputCorrectionFrameCount,
+        latencyCorrectionFrameCount,
         source,
       });
     }

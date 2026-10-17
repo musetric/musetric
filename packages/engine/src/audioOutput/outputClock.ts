@@ -19,12 +19,13 @@ const readHeard = (context: AudioContext, nowMs: number) => {
     performanceTime > 0 &&
     nowMs - performanceTime < staleTimestampMs
   ) {
-    return { contextTime, performanceMs: performanceTime };
+    return { contextTime, performanceMs: performanceTime, reported: true };
   }
   return {
     contextTime:
       context.currentTime - (context.outputLatency || 0) - context.baseLatency,
     performanceMs: nowMs,
+    reported: false,
   };
 };
 
@@ -46,6 +47,7 @@ export const createEngineOutputClock = (
   const clockOffsets: number[] = [];
   const listeners = new Set<(reading: OutputClockReading) => void>();
   let published: OutputClockReading | undefined = undefined;
+  let reported = true;
   let runningSinceMs =
     context.state === 'running' ? performance.now() : undefined;
 
@@ -55,6 +57,11 @@ export const createEngineOutputClock = (
     }
     const nowMs = performance.now();
     const heard = readHeard(context, nowMs);
+    if (heard.reported !== reported) {
+      reported = heard.reported;
+      renderAheads.length = 0;
+      clockOffsets.length = 0;
+    }
     renderAheads.push(
       context.currentTime -
         (heard.contextTime + (nowMs - heard.performanceMs) / 1000),

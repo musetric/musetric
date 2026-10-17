@@ -4,7 +4,7 @@ const storageKey = 'musetric.calibration.latencyByDevicePair';
 
 const storedLatencySchema = z.object({
   outputLatencyFrameCount: z.number(),
-  outputCorrectionFrameCount: z.number(),
+  latencyCorrectionFrameCount: z.number(),
   source: z.union([z.literal('manual'), z.literal('calibrated')]),
 });
 

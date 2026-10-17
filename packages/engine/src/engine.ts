@@ -78,7 +78,7 @@ const initialState: EngineState = {
   audioDevices: [],
   outputLatencyFrameCount: 0,
   outputLatencyFloorFrameCount: 0,
-  outputCorrectionFrameCount: 0,
+  latencyCorrectionFrameCount: 0,
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
