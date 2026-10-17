@@ -309,7 +309,7 @@ mod tests {
         Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownTrack,
         PEAK_CEILING, write_mixdown,
     };
-    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth};
+    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth, SymphoniaPcm};
 
     const RATE: u32 = 48_000;
     const WAV_HEADER_BYTES: usize = 44;
@@ -393,6 +393,79 @@ mod tests {
         let mixed = read_wav(&to);
         remove_dir_all(&directory).expect("the workspace should be removed");
         mixed
+    }
+
+    const TONE_FRAMES: usize = 96_000;
+    const TONE_AMPLITUDE: f32 = 0.5;
+
+    async fn export_tone(name: &str, format: MixdownFormat, file: &str) -> Vec<f32> {
+        let song = PathBuf::from("song.flac");
+        let step = std::f32::consts::TAU * 1_000.0 / 48_000.0;
+        let tone: Vec<f32> = (0..TONE_FRAMES)
+            .scan(0.0_f32, |phase, _| {
+                let value = phase.sin() * TONE_AMPLITUDE;
+                *phase += step;
+                Some([value, value])
+            })
+            .flatten()
+            .collect();
+        let fixture = Fixture(vec![(song.clone(), tone)]);
+        let directory =
+            std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let to = directory.join(file);
+        let mixdown = Mixdown {
+            sample_rate: RATE,
+            frame_count: TONE_FRAMES,
+            tracks: vec![stem(&song, 1.0)],
+            format,
+            change: MixdownChange::ORIGINAL,
+        };
+        write_mixdown(&fixture, mixdown, &to)
+            .await
+            .expect("the export should be written");
+        let mut decoded = Vec::new();
+        SymphoniaPcm
+            .read_pcm(
+                PcmRequest {
+                    from: &to,
+                    sample_rate: RATE,
+                },
+                &mut |samples| decoded.extend_from_slice(samples),
+            )
+            .await
+            .expect("the export should decode");
+        remove_dir_all(&directory).expect("the workspace should be removed");
+        decoded
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a test signal has far fewer samples than the f32 mantissa holds"
+    )]
+    fn rms(samples: &[f32]) -> f32 {
+        (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt()
+    }
+
+    #[tokio::test]
+    async fn exports_a_tone_that_decodes_back_from_mp3_and_m4a() {
+        let formats = [
+            ("mp3", MixdownFormat::Mp3 { bitrate: 192_000 }, "mix.mp3"),
+            ("m4a", MixdownFormat::M4a { bitrate: 192_000 }, "mix.m4a"),
+        ];
+        for (name, format, file) in formats {
+            let decoded = export_tone(name, format, file).await;
+            let frames = decoded.len() / 2;
+            assert!(
+                frames.abs_diff(TONE_FRAMES) < 2_400,
+                "{name} decodes to {frames} frames"
+            );
+            let level = rms(&decoded[19_200..decoded.len() - 19_200]);
+            assert!(
+                (level - TONE_AMPLITUDE * FRAC_1_SQRT_2).abs() < 0.02,
+                "{name} decodes at an rms of {level}"
+            );
+        }
     }
 
     #[tokio::test]
