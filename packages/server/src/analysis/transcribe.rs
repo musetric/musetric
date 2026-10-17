@@ -113,8 +113,9 @@ async fn decode_voice(
 }
 
 fn decode_samples(pcm: &[u8]) -> Vec<f32> {
-    pcm.chunks_exact(4)
-        .filter_map(|raw| raw.first_chunk::<4>())
+    pcm.as_chunks::<4>()
+        .0
+        .iter()
         .map(|raw| f32::from_le_bytes(*raw))
         .collect()
 }

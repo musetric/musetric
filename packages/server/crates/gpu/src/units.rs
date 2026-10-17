@@ -313,7 +313,7 @@ async fn write_samples(
     bytes: &[u8],
     written: &mut u64,
 ) -> Result<(), OutputFailure> {
-    for value in bytes.chunks_exact(FLOAT_BYTES) {
+    for value in bytes.as_chunks::<FLOAT_BYTES>().0 {
         if let Some(raw) = value.first_chunk::<4>()
             && !f32::from_le_bytes(*raw).is_finite()
         {

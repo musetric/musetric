@@ -164,11 +164,10 @@ fn decode_samples(bytes: &[u8]) -> Option<Vec<f32>> {
     }
     Some(
         bytes
-            .chunks_exact(4)
-            .filter_map(|raw| {
-                raw.first_chunk::<4>()
-                    .map(|value| f32::from_le_bytes(*value))
-            })
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|value| f32::from_le_bytes(*value))
             .collect(),
     )
 }

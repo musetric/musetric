@@ -47,8 +47,8 @@ async fn collect_peaks(
     let mut last_segment = None;
     let mut frame_index = 0_u64;
     let mut sink = |chunk: &[f32]| {
-        for frame in chunk.chunks_exact(CHANNELS) {
-            let value = (f64::from(frame[0]) + f64::from(frame[1])) * 0.5;
+        for frame in chunk.as_chunks::<CHANNELS>().0 {
+            let value = f64::midpoint(f64::from(frame[0]), f64::from(frame[1]));
             let segment = (frame_index as f64 / segment_step).floor();
             frame_index += 1;
             if segment.is_nan() || segment >= peak_count {

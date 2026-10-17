@@ -87,8 +87,10 @@ async fn serves_exactly_the_declared_window() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body.len(), EXPECTED);
     let found: Vec<f32> = body
-        .chunks_exact(4)
-        .map(|raw| f32::from_le_bytes(raw.try_into().expect("four bytes")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|raw| f32::from_le_bytes(*raw))
         .collect();
     assert_eq!(&found[0..4], &[1.0, 2.0, 3.0, 4.0]);
     assert_eq!(&found[4..8], &[7.0, 8.0, 9.0, 10.0]);

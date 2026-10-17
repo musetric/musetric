@@ -226,7 +226,12 @@ fn seek_table(
     let spacing = seek_spacing(total_frames, sample_rate)?;
     let count = total_frames.div_ceil(spacing);
     let mut table = vec![0_u8; SEEK_POINTS * SEEK_POINT_BYTES];
-    for (index, point) in table.chunks_exact_mut(SEEK_POINT_BYTES).enumerate() {
+    for (index, point) in table
+        .as_chunks_mut::<SEEK_POINT_BYTES>()
+        .0
+        .iter_mut()
+        .enumerate()
+    {
         let sample = match u64::try_from(index) {
             Ok(value) if value < count => value * spacing,
             _ => SEEK_PLACEHOLDER,
@@ -430,12 +435,14 @@ mod tests {
     #[test]
     fn fills_a_placeholder_table_when_nothing_was_encoded() {
         let table = seek_table(&[], u64::MAX, RATE).expect("the table should be built");
-        let points = table.chunks_exact(SEEK_POINT_BYTES).count();
+        let points = table.as_chunks::<SEEK_POINT_BYTES>().0.len();
 
         assert_eq!(points, SEEK_POINTS);
         assert!(
             table
-                .chunks_exact(SEEK_POINT_BYTES)
+                .as_chunks::<SEEK_POINT_BYTES>()
+                .0
+                .iter()
                 .all(|point| Point(point).is_placeholder())
         );
     }
@@ -448,8 +455,10 @@ mod tests {
         let table = seek_table(&positions, 960_000, RATE).expect("the table should be built");
 
         let points: Vec<_> = table
-            .chunks_exact(SEEK_POINT_BYTES)
-            .map(Point)
+            .as_chunks::<SEEK_POINT_BYTES>()
+            .0
+            .iter()
+            .map(|point| Point(point.as_slice()))
             .take_while(|point| !point.is_placeholder())
             .collect();
         assert_eq!(spacing, 96_000);

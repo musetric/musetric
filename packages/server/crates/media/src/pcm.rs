@@ -60,7 +60,7 @@ impl Frames {
         self.samples.clear();
         self.carry.extend_from_slice(bytes);
         let aligned = self.carry.len() - self.carry.len() % BYTES_PER_FRAME;
-        for value in self.carry[..aligned].chunks_exact(size_of::<f32>()) {
+        for value in self.carry[..aligned].as_chunks::<{ size_of::<f32>() }>().0 {
             self.samples.push(read_float(value));
         }
         self.carry.drain(..aligned);
@@ -93,7 +93,7 @@ async fn read_into(
 ) -> Result<(), BoxedError> {
     let mut frames = 0_u64;
     let mut sink = |chunk: &[f32]| {
-        for frame in chunk.chunks_exact(CHANNELS) {
+        for frame in chunk.as_chunks::<CHANNELS>().0 {
             for sample in frame {
                 collected.extend_from_slice(&sample.to_le_bytes());
             }

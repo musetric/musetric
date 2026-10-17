@@ -139,7 +139,7 @@ pub async fn write_mixdown(
 async fn add_stretched(stretching: Vec<Stretching>, mixed: &mut [f32]) -> Result<(), BoxedError> {
     for task in stretching {
         let channels = task.await?.ok_or(TOO_SHORT)?;
-        for (frame, pair) in mixed.chunks_exact_mut(CHANNELS).enumerate() {
+        for (frame, pair) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().enumerate() {
             pair[0] += channels[0][frame];
             pair[1] += channels[1][frame];
         }
@@ -183,7 +183,7 @@ async fn add_stereo(
 ) -> Result<(), BoxedError> {
     let mut frame = 0_usize;
     let mut sink = |chunk: &[f32]| {
-        for pair in chunk.chunks_exact(CHANNELS) {
+        for pair in chunk.as_chunks::<CHANNELS>().0 {
             add_frame(mixed, frame, track, [pair[0], pair[1]]);
             frame += 1;
         }
@@ -204,8 +204,13 @@ async fn add_mono(
         decoded: &mut |_| {},
     })
     .await?;
-    for (frame, value) in bytes.chunks_exact(size_of::<f32>()).enumerate() {
-        let sample = <[u8; 4]>::try_from(value).map_or(0.0, f32::from_le_bytes);
+    for (frame, value) in bytes
+        .as_chunks::<{ size_of::<f32>() }>()
+        .0
+        .iter()
+        .enumerate()
+    {
+        let sample = f32::from_le_bytes(*value);
         add_frame(mixed, frame, track, [sample, sample]);
     }
     Ok(())
@@ -246,14 +251,14 @@ fn encode(
         MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, sample_rate, bitrate, to),
         MixdownFormat::Flac(depth) => {
             let mut writer = FlacWriter::create(to, sample_rate, depth)?;
-            for pair in mixed.chunks_exact(CHANNELS) {
+            for pair in mixed.as_chunks::<CHANNELS>().0 {
                 writer.push(pair[0], pair[1]);
             }
             writer.finish()
         }
         MixdownFormat::Wav(depth) => {
             let mut writer = WavWriter::create(to, sample_rate, depth, mixed.len() / CHANNELS)?;
-            for pair in mixed.chunks_exact(CHANNELS) {
+            for pair in mixed.as_chunks::<CHANNELS>().0 {
                 writer.push(pair[0], pair[1])?;
             }
             writer.finish()
@@ -309,7 +314,7 @@ mod tests {
         Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownTrack,
         PEAK_CEILING, write_mixdown,
     };
-    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth};
+    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth, SymphoniaPcm};
 
     const RATE: u32 = 48_000;
     const WAV_HEADER_BYTES: usize = 44;
@@ -353,7 +358,9 @@ mod tests {
     fn read_wav(path: &Path) -> Vec<f32> {
         let bytes = read(path).expect("the mixdown should be written");
         bytes[WAV_HEADER_BYTES..]
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|sample| {
                 (i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8) as f32 / 8_388_608.0
             })
@@ -395,6 +402,79 @@ mod tests {
         mixed
     }
 
+    const TONE_FRAMES: usize = 96_000;
+    const TONE_AMPLITUDE: f32 = 0.5;
+
+    async fn export_tone(name: &str, format: MixdownFormat, file: &str) -> Vec<f32> {
+        let song = PathBuf::from("song.flac");
+        let step = std::f32::consts::TAU * 1_000.0 / 48_000.0;
+        let tone: Vec<f32> = (0..TONE_FRAMES)
+            .scan(0.0_f32, |phase, _| {
+                let value = phase.sin() * TONE_AMPLITUDE;
+                *phase += step;
+                Some([value, value])
+            })
+            .flatten()
+            .collect();
+        let fixture = Fixture(vec![(song.clone(), tone)]);
+        let directory =
+            std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let to = directory.join(file);
+        let mixdown = Mixdown {
+            sample_rate: RATE,
+            frame_count: TONE_FRAMES,
+            tracks: vec![stem(&song, 1.0)],
+            format,
+            change: MixdownChange::ORIGINAL,
+        };
+        write_mixdown(&fixture, mixdown, &to)
+            .await
+            .expect("the export should be written");
+        let mut decoded = Vec::new();
+        SymphoniaPcm
+            .read_pcm(
+                PcmRequest {
+                    from: &to,
+                    sample_rate: RATE,
+                },
+                &mut |samples| decoded.extend_from_slice(samples),
+            )
+            .await
+            .expect("the export should decode");
+        remove_dir_all(&directory).expect("the workspace should be removed");
+        decoded
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a test signal has far fewer samples than the f32 mantissa holds"
+    )]
+    fn rms(samples: &[f32]) -> f32 {
+        (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt()
+    }
+
+    #[tokio::test]
+    async fn exports_a_tone_that_decodes_back_from_mp3_and_m4a() {
+        let formats = [
+            ("mp3", MixdownFormat::Mp3 { bitrate: 192_000 }, "mix.mp3"),
+            ("m4a", MixdownFormat::M4a { bitrate: 192_000 }, "mix.m4a"),
+        ];
+        for (name, format, file) in formats {
+            let decoded = export_tone(name, format, file).await;
+            let frames = decoded.len() / 2;
+            assert!(
+                frames.abs_diff(TONE_FRAMES) < 2_400,
+                "{name} decodes to {frames} frames"
+            );
+            let level = rms(&decoded[19_200..decoded.len() - 19_200]);
+            assert!(
+                (level - TONE_AMPLITUDE * FRAC_1_SQRT_2).abs() < 0.02,
+                "{name} decodes at an rms of {level}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn mixes_the_stems_and_the_take_on_the_heard_timeline() {
         let instrumental = PathBuf::from("instrumental.flac");
@@ -419,7 +499,7 @@ mod tests {
 
         let mixed = mix("timeline", &fixture, tracks).await;
 
-        for (frame, pair) in (0..8_u16).zip(mixed.chunks_exact(2)) {
+        for (frame, pair) in (0..8_u16).zip(mixed.as_chunks::<2>().0) {
             let sung = 0.02 * f32::from(frame + 3);
             assert!(
                 (pair[0] - (0.05 + sung)).abs() < TOLERANCE,

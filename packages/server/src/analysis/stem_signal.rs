@@ -42,7 +42,7 @@ pub(crate) fn subtract_planar(left: &[f32], right: &[f32]) -> Vec<f32> {
 pub(crate) fn planar_from_interleaved(interleaved: &[f32]) -> Vec<f32> {
     let frames = interleaved.len() / CHANNELS;
     let mut planar = vec![0.0; interleaved.len()];
-    for (index, frame) in interleaved.chunks_exact(CHANNELS).enumerate() {
+    for (index, frame) in interleaved.as_chunks::<CHANNELS>().0.iter().enumerate() {
         for (channel, sample) in frame.iter().enumerate() {
             planar[channel * frames + index] = *sample;
         }
@@ -63,11 +63,10 @@ pub(crate) fn interleaved_from_planar(planar: &[f32]) -> Vec<u8> {
 
 pub(crate) fn deinterleave(bytes: &[u8]) -> Vec<f32> {
     bytes
-        .chunks_exact(4)
-        .filter_map(|raw| {
-            raw.first_chunk::<4>()
-                .map(|value| f32::from_le_bytes(*value))
-        })
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|value| f32::from_le_bytes(*value))
         .collect()
 }
 

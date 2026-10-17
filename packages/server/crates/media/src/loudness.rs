@@ -95,7 +95,7 @@ async fn measure(
     meter: &mut Meter,
 ) -> Result<(), BoxedError> {
     let mut sink = |chunk: &[f32]| {
-        for frame in chunk.chunks_exact(CHANNELS) {
+        for frame in chunk.as_chunks::<CHANNELS>().0 {
             meter.push(frame[0], frame[1]);
         }
     };
@@ -142,9 +142,9 @@ async fn measure_lead(
     let mut next_window_start = 0_u64;
     let mut frame_index = 0_u64;
     let mut sink = |chunk: &[f32]| {
-        for frame in chunk.chunks_exact(CHANNELS) {
+        for frame in chunk.as_chunks::<CHANNELS>().0 {
             meter.push(frame[0], frame[1]);
-            window[write_index] = ((f64::from(frame[0]) + f64::from(frame[1])) * 0.5) as f32;
+            window[write_index] = f64::midpoint(f64::from(frame[0]), f64::from(frame[1])) as f32;
             write_index = (write_index + 1) % window_frames;
             filled_frames = filled_frames.saturating_add(1).min(window_frames);
             let window_end = next_window_start + window_frames as u64 - 1;

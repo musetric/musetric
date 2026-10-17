@@ -25,8 +25,10 @@ pub(crate) fn parse(packet: &[u8]) -> Result<StreamPacket, BoxedError> {
         return Err("Recording packet has invalid byte length".into());
     }
     let samples = packet[HEADER_BYTE_LENGTH..]
-        .chunks_exact(SAMPLE_BYTE_LENGTH)
-        .map(read_f32)
+        .as_chunks::<SAMPLE_BYTE_LENGTH>()
+        .0
+        .iter()
+        .map(|value| f32::from_le_bytes(*value))
         .collect();
     Ok(StreamPacket {
         start_frame,
@@ -55,10 +57,4 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     let mut value = [0_u8; 4];
     value.copy_from_slice(&bytes[offset..offset + 4]);
     u32::from_le_bytes(value)
-}
-
-fn read_f32(bytes: &[u8]) -> f32 {
-    let mut value = [0_u8; 4];
-    value.copy_from_slice(bytes);
-    f32::from_le_bytes(value)
 }

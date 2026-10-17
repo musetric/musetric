@@ -395,8 +395,7 @@ impl Queue {
     fn project_cancelled(&self, project_id: i64) -> bool {
         self.cancelled
             .lock()
-            .ok()
-            .is_some_and(|guard| guard.contains(&project_id))
+            .is_ok_and(|guard| guard.contains(&project_id))
     }
 
     fn idle_for(&self) -> Option<Duration> {

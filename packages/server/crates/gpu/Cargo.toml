@@ -3,7 +3,7 @@ name = "musetric-gpu"
 description = "Musetric gpu executor: the page it serves and the job protocol it speaks"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.1"
 license = "MIT"
 authors = ["Musetric <musetric@gmail.com>"]
 repository = "https://github.com/musetric/musetric"
@@ -13,20 +13,20 @@ axum = { version = "=0.8.9", features = ["ws"] }
 fs4 = "=1.1.0"
 http-body-util = "=0.1.5"
 log = "=0.4.34"
-reqwest = { version = "=0.13.4", default-features = false, features = ["rustls"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls"] }
 webpki-root-certs = "=1.0.9"
-serde_json = "=1.0.151"
-sha2 = "=0.11.0"
-tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "rt", "sync", "time"] }
-tokio-util = { version = "=0.7.19", features = ["io"] }
-uuid = { version = "=1.26.0", features = ["v4"] }
+serde_json = "=1.0.154"
+sha2 = "=0.11.1"
+tokio = { version = "=1.53.3", features = ["fs", "io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-util = { version = "=0.7.20", features = ["io"] }
+uuid = { version = "=1.28.0", features = ["v4"] }
 
 [dev-dependencies]
 futures-util = "=0.3.34"
-hyper = { version = "=1.11.1", features = ["client", "http1"] }
-hyper-util = { version = "=0.1.20", features = ["client-legacy", "http1", "tokio"] }
-tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
-tokio-tungstenite = "=0.29.0"
+hyper = { version = "=1.12.0", features = ["client", "http1"] }
+hyper-util = { version = "=0.1.21", features = ["client-legacy", "http1", "tokio"] }
+tokio = { version = "=1.53.3", features = ["rt-multi-thread"] }
+tokio-tungstenite = "=0.30.0"
 
 [lints]
 workspace = true

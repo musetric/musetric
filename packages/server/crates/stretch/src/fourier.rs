@@ -78,9 +78,9 @@ impl HalfBinFft {
             .buffer
             .iter_mut()
             .zip(&self.twists)
-            .zip(time.chunks_exact(2))
+            .zip(time.as_chunks::<2>().0)
         {
-            let (real, imag) = (pair[0], pair[1]);
+            let [real, imag] = *pair;
             *value = Complex32::new(
                 real * twist.re - imag * twist.im,
                 imag * twist.re + real * twist.im,
@@ -125,7 +125,7 @@ impl HalfBinFft {
             .buffer
             .iter()
             .zip(&self.twists)
-            .zip(time.chunks_exact_mut(2))
+            .zip(time.as_chunks_mut::<2>().0)
         {
             pair[0] = value.re * twist.re + value.im * twist.im;
             pair[1] = value.im * twist.re - value.re * twist.im;

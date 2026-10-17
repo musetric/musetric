@@ -135,8 +135,10 @@ async fn read_pcm(path: &Path) -> Result<Option<Vec<i16>>, BoxedError> {
         bytes
             .get(HEADER_BYTE_LENGTH..)
             .unwrap_or_default()
-            .chunks_exact(2)
-            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| i16::from_le_bytes(*pair))
             .collect(),
     ))
 }
