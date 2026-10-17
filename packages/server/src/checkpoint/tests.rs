@@ -167,12 +167,12 @@ async fn drops_prefix_bytes_that_no_checkpoint_confirmed() {
         vec![1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
     );
     assert!(store.read_prefix(11).await.is_err());
-    assert!(
+    assert_eq!(
         store
             .read_prefix(0)
             .await
-            .expect("an empty prefix should load")
-            .is_empty()
+            .expect("an empty prefix should load"),
+        Vec::<u8>::new()
     );
 }
 

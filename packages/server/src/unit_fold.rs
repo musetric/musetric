@@ -97,13 +97,15 @@ impl FoldAccumulator {
         for (offset, record) in bytes.chunks_exact(self.record_bytes()).enumerate() {
             let frame = start + offset;
             let mut values = record
-                .chunks_exact(VALUE_BYTES)
-                .map(|raw| raw.try_into().ok().map(f32::from_le_bytes));
+                .as_chunks::<VALUE_BYTES>()
+                .0
+                .iter()
+                .map(|raw| f32::from_le_bytes(*raw));
             for channel in 0..channels {
-                self.target[channel * self.frames + frame] = values.next()??;
+                self.target[channel * self.frames + frame] = values.next()?;
             }
             for channel in 0..channels {
-                self.counter[channel * self.frames + frame] = values.next()??;
+                self.counter[channel * self.frames + frame] = values.next()?;
             }
         }
         Some(())

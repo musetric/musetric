@@ -62,8 +62,10 @@ fn container_parts(body: &[u8]) -> (Value, Vec<f32>) {
     let length = u32::from_le_bytes(body[0..4].try_into().expect("four bytes")) as usize;
     let meta = serde_json::from_slice(&body[4..4 + length]).expect("the meta should parse");
     let payload = body[4 + length..]
-        .chunks_exact(4)
-        .map(|raw| f32::from_le_bytes(raw.try_into().expect("four bytes")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|raw| f32::from_le_bytes(*raw))
         .collect();
     (meta, payload)
 }

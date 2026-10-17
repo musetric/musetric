@@ -105,7 +105,7 @@ jobs:
       - if: matrix.platform == 'Linux'
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
           targets: ${{ matrix.rustTarget }}
       - if: matrix.platform != 'Linux'
         run: rustup toolchain install --no-self-update

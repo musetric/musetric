@@ -49,7 +49,7 @@ async fn read_mono(mono: MonoRequest<'_>, collected: &mut Vec<u8>) -> Result<(),
     let weight = downmix.weight();
     let mut frames = 0_u64;
     let mut sink = |chunk: &[f32]| {
-        for frame in chunk.chunks_exact(CHANNELS) {
+        for frame in chunk.as_chunks::<CHANNELS>().0 {
             let value = (frame[0] + frame[1]) * weight;
             collected.extend_from_slice(&value.to_le_bytes());
             frames += 1;

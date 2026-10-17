@@ -104,7 +104,7 @@ impl Conversion {
     }
 
     fn keep(&mut self) {
-        for frame in self.produced.chunks_exact(CHANNELS) {
+        for frame in self.produced.as_chunks::<CHANNELS>().0 {
             if self.dropped_frames < self.delay_frames {
                 self.dropped_frames += 1;
             } else if self

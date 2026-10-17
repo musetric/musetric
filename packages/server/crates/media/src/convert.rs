@@ -124,7 +124,7 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedErr
 }
 
 fn write_frames(writer: &mut FlacWriter, frames: &[f32]) {
-    for frame in frames.chunks_exact(CHANNELS) {
+    for frame in frames.as_chunks::<CHANNELS>().0 {
         writer.push(frame[0], frame[1]);
     }
 }

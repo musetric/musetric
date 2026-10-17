@@ -139,7 +139,7 @@ pub async fn write_mixdown(
 async fn add_stretched(stretching: Vec<Stretching>, mixed: &mut [f32]) -> Result<(), BoxedError> {
     for task in stretching {
         let channels = task.await?.ok_or(TOO_SHORT)?;
-        for (frame, pair) in mixed.chunks_exact_mut(CHANNELS).enumerate() {
+        for (frame, pair) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().enumerate() {
             pair[0] += channels[0][frame];
             pair[1] += channels[1][frame];
         }
@@ -183,7 +183,7 @@ async fn add_stereo(
 ) -> Result<(), BoxedError> {
     let mut frame = 0_usize;
     let mut sink = |chunk: &[f32]| {
-        for pair in chunk.chunks_exact(CHANNELS) {
+        for pair in chunk.as_chunks::<CHANNELS>().0 {
             add_frame(mixed, frame, track, [pair[0], pair[1]]);
             frame += 1;
         }
@@ -204,8 +204,13 @@ async fn add_mono(
         decoded: &mut |_| {},
     })
     .await?;
-    for (frame, value) in bytes.chunks_exact(size_of::<f32>()).enumerate() {
-        let sample = <[u8; 4]>::try_from(value).map_or(0.0, f32::from_le_bytes);
+    for (frame, value) in bytes
+        .as_chunks::<{ size_of::<f32>() }>()
+        .0
+        .iter()
+        .enumerate()
+    {
+        let sample = f32::from_le_bytes(*value);
         add_frame(mixed, frame, track, [sample, sample]);
     }
     Ok(())
@@ -246,14 +251,14 @@ fn encode(
         MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, sample_rate, bitrate, to),
         MixdownFormat::Flac(depth) => {
             let mut writer = FlacWriter::create(to, sample_rate, depth)?;
-            for pair in mixed.chunks_exact(CHANNELS) {
+            for pair in mixed.as_chunks::<CHANNELS>().0 {
                 writer.push(pair[0], pair[1]);
             }
             writer.finish()
         }
         MixdownFormat::Wav(depth) => {
             let mut writer = WavWriter::create(to, sample_rate, depth, mixed.len() / CHANNELS)?;
-            for pair in mixed.chunks_exact(CHANNELS) {
+            for pair in mixed.as_chunks::<CHANNELS>().0 {
                 writer.push(pair[0], pair[1])?;
             }
             writer.finish()
@@ -353,7 +358,9 @@ mod tests {
     fn read_wav(path: &Path) -> Vec<f32> {
         let bytes = read(path).expect("the mixdown should be written");
         bytes[WAV_HEADER_BYTES..]
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|sample| {
                 (i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8) as f32 / 8_388_608.0
             })
@@ -492,7 +499,7 @@ mod tests {
 
         let mixed = mix("timeline", &fixture, tracks).await;
 
-        for (frame, pair) in (0..8_u16).zip(mixed.chunks_exact(2)) {
+        for (frame, pair) in (0..8_u16).zip(mixed.as_chunks::<2>().0) {
             let sung = 0.02 * f32::from(frame + 3);
             assert!(
                 (pair[0] - (0.05 + sung)).abs() < TOLERANCE,

@@ -827,8 +827,10 @@ mod tests {
     fn read_samples(storage: &Storage, blob_id: &str) -> Vec<i16> {
         std::fs::read(musetric_db::blob_path(&storage.blobs_path, blob_id))
             .expect("the recording piece should exist")[44..]
-            .chunks_exact(2)
-            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| i16::from_le_bytes(*pair))
             .collect()
     }
 

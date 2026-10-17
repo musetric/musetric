@@ -163,7 +163,7 @@ fn creates_a_fresh_database_with_the_expected_physical_schema() {
     assert_eq!(report.backup_path, None);
     assert_eq!(user_version(&path), MIGRATIONS.len());
     assert_eq!(journal_mode(&path), "wal");
-    assert!(workspace.backups().is_empty());
+    assert_eq!(workspace.backups(), Vec::<String>::new());
 
     let expected: Vec<String> = serde_json::from_str(EXPECTED_FINGERPRINT).unwrap();
     assert_eq!(fingerprint(&path), expected);
@@ -178,7 +178,7 @@ fn does_nothing_on_a_database_that_is_already_up_to_date() {
 
     assert_eq!(report.from_version, MIGRATIONS.len());
     assert_eq!(report.to_version, MIGRATIONS.len());
-    assert!(workspace.backups().is_empty());
+    assert_eq!(workspace.backups(), Vec::<String>::new());
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn refuses_a_database_newer_than_the_catalog_without_touching_it() {
 
     assert_eq!(failed.backup_path(), None);
     assert_eq!(user_version(&workspace.database_path()), 2);
-    assert!(workspace.backups().is_empty());
+    assert_eq!(workspace.backups(), Vec::<String>::new());
 }
 
 #[test]
@@ -515,7 +515,7 @@ fn hands_the_active_role_to_a_neighbour_of_a_removed_recording() {
             ("Recording 3".to_owned(), false),
         ]
     );
-    assert!(reader.recording_pieces(second).unwrap().is_empty());
+    assert_eq!(reader.recording_pieces(second).unwrap(), []);
     assert_eq!(reader.referenced_blob_ids().unwrap(), ["song"]);
 
     writer

@@ -122,8 +122,10 @@ fn pads_the_window_with_silence_after_the_useful_input() {
     }
     let bytes = plan.window_bytes(&input, 0);
     let window: Vec<f32> = bytes
-        .chunks_exact(4)
-        .map(|raw| f32::from_le_bytes(raw.try_into().expect("four bytes")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|raw| f32::from_le_bytes(*raw))
         .collect();
     assert_eq!(window.len(), 16);
     for channel in 0..2 {

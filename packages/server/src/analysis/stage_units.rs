@@ -275,11 +275,10 @@ impl StageUnits {
                 .await
                 .map_err(|error| error.to_string())?;
             let samples: Vec<f32> = bytes
-                .chunks_exact(4)
-                .filter_map(|raw| {
-                    raw.first_chunk::<4>()
-                        .map(|value| f32::from_le_bytes(*value))
-                })
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|value| f32::from_le_bytes(*value))
                 .collect();
             if samples.len() * 4 != bytes.len() {
                 return Err("the accepted unit output is not frame aligned".to_owned());
