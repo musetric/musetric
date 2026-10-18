@@ -7,6 +7,7 @@ import {
   createControlledPromise,
 } from '@musetric/utils';
 import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
+import { type CapturedChunk } from '../audioSession/timedChunkPusher.cross.js';
 import { type Store } from '../common/store.js';
 import {
   type EngineState,
@@ -14,6 +15,7 @@ import {
   getNoteShiftSemitones,
   getTrackProgress,
 } from '../state.js';
+import { toContextRate } from './livePreview.cross.js';
 import { spectrogramChannel } from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
 
@@ -27,6 +29,7 @@ export type EngineSpectrogram = {
     config: Partial<SpectrogramConfig>,
   ) => Unmount;
   setConfig: (patch: Partial<SpectrogramConfig>) => void;
+  previewLiveTake: (chunk: CapturedChunk) => void;
 };
 
 export type CreateEngineSpectrogramOptions = {
@@ -188,6 +191,15 @@ export const createEngineSpectrogram = (
     setConfig: (patch) => {
       port.methods.updateConfig({
         patch,
+      });
+    },
+    previewLiveTake: (chunk) => {
+      if (!store.get().recording) {
+        return;
+      }
+      port.methods.previewLiveTake({
+        capturedAt: performance.timeOrigin + chunk.startMs,
+        samples: toContextRate(chunk.samples, chunk.sampleRate, sampleRate),
       });
     },
   };

@@ -46,6 +46,32 @@ type RunPlanner = {
   plan: PitchPlan;
   spanEnd: number;
   position: (songFrame: number) => number;
+  edge: number | undefined;
+};
+
+const latestOffset = (
+  planner: RunPlanner,
+  sampleStart: number,
+): number | undefined => {
+  const { support, windowOffset } = planner.settings;
+  if (planner.edge === undefined) {
+    return undefined;
+  }
+  const latest = planner.edge - sampleStart - 2 * support;
+  return latest >= -2 * windowOffset ? latest : undefined;
+};
+
+const predecessorOf = (
+  previous: PitchSlot | undefined,
+  slotIndex: number,
+  spanOffset: number,
+): number => {
+  if (!previous) {
+    return -1;
+  }
+  return previous.spanOffset === spanOffset
+    ? previous.predecessor
+    : slotIndex - 1;
 };
 
 const addRun = (
@@ -72,6 +98,11 @@ const addRun = (
   }
   const { taken, sampleStart, length } = span;
   const spanOffset = planner.spanEnd;
+  const latest = latestOffset(planner, sampleStart);
+  const offsetOf = (frame: number) =>
+    latest === undefined
+      ? span.offsetOf(frame)
+      : Math.min(span.offsetOf(frame), latest);
   plan.spans.push({ sampleStart, spanOffset, length });
   planner.spanEnd += length;
   if (hasPredecessor) {
@@ -85,10 +116,13 @@ const addRun = (
   for (let index = 0; index < taken; index += 1) {
     const frame = first + index;
     const slotIndex = plan.slots.length;
+    const frameOffset = spanOffset + offsetOf(frame);
+    const previous =
+      index > 0 || hasPredecessor ? plan.slots.at(-1) : undefined;
     plan.slots.push({
       frame,
-      spanOffset: spanOffset + span.offsetOf(frame),
-      predecessor: index > 0 || hasPredecessor ? slotIndex - 1 : -1,
+      spanOffset: frameOffset,
+      predecessor: predecessorOf(previous, slotIndex, frameOffset),
       observe: true,
     });
   }
@@ -198,6 +232,9 @@ const planObservations = (
     plan,
     spanEnd: 0,
     position: input.position,
+    edge: input.truncated
+      ? Math.round(input.position(input.availableSamples))
+      : undefined,
   };
   const collected = collectRuns(
     state,

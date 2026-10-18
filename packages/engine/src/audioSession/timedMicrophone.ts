@@ -113,9 +113,12 @@ export type TimedMicrophones = {
   open: (source: CapturedChunkSource) => Promise<TimedMicrophoneSource>;
 };
 
+export type CapturedChunkListener = (chunk: CapturedChunk) => void;
+
 export const createTimedMicrophones = (
   context: AudioContext,
   outputClock: EngineOutputClock,
+  onCaptured: CapturedChunkListener,
 ): TimedMicrophones => {
   let modulePromise: Promise<void> | undefined = undefined;
 
@@ -154,7 +157,10 @@ export const createTimedMicrophones = (
         isSettled: () => settled,
         now: () => performance.now(),
       });
-      const unsubscribe = source(pusher.push);
+      const unsubscribe = source((chunk) => {
+        onCaptured(chunk);
+        pusher.push(chunk);
+      });
       const close = () => {
         unsubscribe();
         node.disconnect();

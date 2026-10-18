@@ -190,4 +190,81 @@ describe('recording source', () => {
       100, 101, 1, 2, 3, 4, 106, 107, 108, 109, 110, 111, 50, 51,
     ]);
   });
+
+  it('draws captured audio ahead of the take until the take reaches it', () => {
+    const recording = createRecordingSource();
+    recording.get(20);
+    expect(
+      recording.previewLiveTake({ songFrame: 0, samples: ramp(4, 50) }),
+    ).toBeUndefined();
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+      octave: 0,
+    });
+    recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
+    const ahead = recording.previewLiveTake({
+      songFrame: 6,
+      samples: ramp(4, 50),
+    });
+    recording.previewLiveTake({ songFrame: 11, samples: ramp(4, 60) });
+    expect(ahead).toEqual({ frameIndex: 6, frameCount: 5 });
+    expect(read(recording.get(20), 0, 14)).toEqual([
+      1, 2, 3, 4, 0, 0, 50, 51, 52, 53, 60, 61, 62, 63,
+    ]);
+    recording.appendLiveTake(chunk(0, 4, ramp(8, 5)));
+    expect(
+      recording.previewLiveTake({ songFrame: 2, samples: ramp(4, 70) }),
+    ).toBeUndefined();
+    expect(read(recording.get(20), 0, 14)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 62, 63,
+    ]);
+  });
+
+  it('places captured audio of a slow take by its raw samples', () => {
+    const recording = createRecordingSource();
+    recording.get(20);
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 0.5,
+      transpose: 0,
+      octave: 0,
+    });
+    recording.appendLiveTake(chunk(4, 0, ramp(4, 1)));
+    const ahead = recording.previewLiveTake({
+      songFrame: 6,
+      samples: ramp(4, 50),
+    });
+    expect(ahead).toEqual({ frameIndex: 6, frameCount: 3 });
+    expect(read(recording.get(20), 4, 8)).toEqual([1, 2, 3, 4, 50, 51, 52, 53]);
+  });
+
+  it('drops captured audio the take never reached once a seek starts a new run', () => {
+    const recording = createRecordingSource();
+    recording.setPieces({
+      pieces: [
+        {
+          songStartFrame: 0,
+          tempo: 1,
+          transpose: 0,
+          octave: 0,
+          samples: ramp(20, 100),
+        },
+      ],
+    });
+    recording.get(20);
+    recording.beginLiveTake({
+      takeId: 'take',
+      tempo: 1,
+      transpose: 0,
+      octave: 0,
+    });
+    recording.appendLiveTake(chunk(2, 0, ramp(4, 1)));
+    recording.previewLiveTake({ songFrame: 6, samples: ramp(4, 50) });
+    recording.appendLiveTake(chunk(12, 0, ramp(2, 70)));
+    expect(read(recording.get(20), 0, 14)).toEqual([
+      100, 101, 1, 2, 3, 4, 106, 107, 108, 109, 110, 111, 70, 71,
+    ]);
+  });
 });

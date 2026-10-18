@@ -29,6 +29,10 @@ export type SpectrogramOutboundMethods = {
   setPlaying: (message: { playing: boolean }) => void;
   updateConfig: (message: { patch: Partial<SpectrogramConfig> }) => void;
   setViewWindow: (message: { window?: SpectrogramViewWindow }) => void;
+  previewLiveTake: (message: {
+    capturedAt: number;
+    samples: Float32Array<ArrayBuffer>;
+  }) => void;
 };
 
 export type SpectrogramInboundMethods = {
@@ -53,9 +57,11 @@ export const spectrogramChannel = createMessageChannel<
       'setPlaying',
       'updateConfig',
       'setViewWindow',
+      'previewLiveTake',
     ],
     transfers: {
       boot: (message) => [message.dataPort, message.playheadPort],
+      previewLiveTake: (message) => [message.samples.buffer],
       mount: (message) =>
         message.config.canvas ? [message.config.canvas] : [],
     },

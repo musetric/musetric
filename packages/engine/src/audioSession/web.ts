@@ -14,6 +14,7 @@ import {
   readWebMicrophoneDenial,
 } from './settings.js';
 import {
+  type CapturedChunkListener,
   createTimedMicrophones,
   readTrackChunks,
   type TimedMicrophoneSource,
@@ -64,10 +65,15 @@ const readMediaDevices = (): MediaDevices | undefined =>
 export const createWebAudioSession = (
   context: AudioContext,
   outputClock: EngineOutputClock,
+  onCaptured: CapturedChunkListener,
 ): EngineAudioSession => {
   const streams = new Map<EngineMicrophone, MediaStream>();
   const timedSources = new Map<EngineMicrophone, TimedMicrophoneSource>();
-  const timedMicrophones = createTimedMicrophones(context, outputClock);
+  const timedMicrophones = createTimedMicrophones(
+    context,
+    outputClock,
+    onCaptured,
+  );
   let openingStreams = 0;
 
   const apply = () => {

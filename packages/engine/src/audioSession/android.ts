@@ -7,6 +7,7 @@ import {
 } from './engineAudioSession.js';
 import { type CapturedChunk } from './timedChunkPusher.cross.js';
 import {
+  type CapturedChunkListener,
   createTimedMicrophones,
   type TimedMicrophoneSource,
 } from './timedMicrophone.js';
@@ -132,13 +133,18 @@ export const createAndroidAudioSession = (
   context: AudioContext,
   outputClock: EngineOutputClock,
   android: AndroidMicrophone,
+  onCaptured: CapturedChunkListener,
 ): EngineAudioSession => {
   const { bridge, clock } = android;
   const listeners = new Set<() => void>();
   const pending = new Map<number, PendingRequest>();
   const consumers = new Set<(chunk: CapturedChunk) => void>();
   const sources = new Map<EngineMicrophone, TimedMicrophoneSource>();
-  const timedMicrophones = createTimedMicrophones(context, outputClock);
+  const timedMicrophones = createTimedMicrophones(
+    context,
+    outputClock,
+    onCaptured,
+  );
   let nextRequestId = 0;
   let session: number | undefined = undefined;
   let opening = 0;
