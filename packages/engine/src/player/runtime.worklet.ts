@@ -271,7 +271,7 @@ export const createPlayerRuntime = async (
       recordingRuntime.start(message);
     },
     flushRecording: () => {
-      recordingRuntime.flush();
+      recordingRuntime.drain();
     },
   });
 
@@ -283,6 +283,7 @@ export const createPlayerRuntime = async (
       }
 
       if (!tracks || !playing) {
+        recordingRuntime.processDrain(inputs);
         return;
       }
 
@@ -292,6 +293,7 @@ export const createPlayerRuntime = async (
         position.getValue({ revision, clockOffset, frameCount });
 
       if (frozen) {
+        recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
         playhead.publish(getValue());
         return;
