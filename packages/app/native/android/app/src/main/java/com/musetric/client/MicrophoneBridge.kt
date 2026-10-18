@@ -330,7 +330,7 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
     val record =
       runCatching {
           AudioRecord.Builder()
-            .setAudioSource(audioSource())
+            .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
             .setAudioFormat(format)
             .setBufferSizeInBytes(bufferBytes)
             .build()
@@ -341,19 +341,6 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
       return null
     }
     return record
-  }
-
-  private fun audioSource(): Int {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      return MediaRecorder.AudioSource.VOICE_PERFORMANCE
-    }
-    val unprocessed =
-      audioManager.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
-    return if (unprocessed == "true") {
-      MediaRecorder.AudioSource.UNPROCESSED
-    } else {
-      MediaRecorder.AudioSource.VOICE_RECOGNITION
-    }
   }
 
   private fun stopCapture() {
