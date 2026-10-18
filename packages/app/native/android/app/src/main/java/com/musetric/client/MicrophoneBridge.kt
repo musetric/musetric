@@ -48,7 +48,7 @@ private const val ACCESS_DENIED = "microphone-access-denied"
 private const val UNAVAILABLE = "microphone-unavailable"
 private const val CHUNKS_PER_SECOND = 50
 private const val BUFFER_SECONDS = 0.5
-private const val HEADER_BYTES = 24
+private const val HEADER_BYTES = 32
 private const val NANOS_PER_SECOND = 1_000_000_000L
 private const val NANOS_PER_MILLI = 1_000_000.0
 private const val BUILT_IN_GAIN = 3.16f
@@ -206,18 +206,24 @@ private class Capture(
         record.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) == AudioRecord.SUCCESS
       if (read > 0 && timed) {
         val offset = (position - timestamp.framePosition) * NANOS_PER_SECOND / sampleRate
-        send(encode(timestamp.nanoTime + offset, samples, read))
+        send(encode(timestamp.nanoTime + offset, position, samples, read))
       }
       position += read
     }
   }
 
-  private fun encode(captureNanos: Long, samples: FloatArray, count: Int): ByteArray {
+  private fun encode(
+    captureNanos: Long,
+    frame: Long,
+    samples: FloatArray,
+    count: Int,
+  ): ByteArray {
     val buffer =
       ByteBuffer.allocate(HEADER_BYTES + count * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
     buffer.putDouble(session.toDouble())
     buffer.putDouble(captureNanos / NANOS_PER_MILLI)
     buffer.putDouble(sampleRate.toDouble())
+    buffer.putDouble(frame.toDouble())
     val processed = builtIn
     for (index in 0 until count) {
       val sample = samples[index]
