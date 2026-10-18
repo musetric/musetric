@@ -251,10 +251,12 @@ export type WriteTrackSamplesOptions = {
   plans: Record<TrackKey, TrackRenderPlan>;
   work: Record<TrackKey, SpectrogramLaneWork>;
   trackProgress: number;
+  recordedEnds: Partial<Record<TrackKey, number>> | undefined;
 };
 
 export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
-  const { runtime, samples, plans, work, trackProgress } = options;
+  const { runtime, samples, plans, work, trackProgress, recordedEnds } =
+    options;
   for (const key of allTrackKeys) {
     const trackSamples = samples[key];
     const trackWork = work[key];
@@ -286,6 +288,7 @@ export const writeTrackSamples = (options: WriteTrackSamplesOptions): void => {
         projection: { baseColumn: plan.baseColumn, baseSlot: plan.baseSlot },
         trackProgress,
         truncated: runtime.config.lanes[key].truncateAfterPlayhead,
+        recordedEnd: recordedEnds?.[key],
         invalidations: plan.invalidations,
       });
     }
