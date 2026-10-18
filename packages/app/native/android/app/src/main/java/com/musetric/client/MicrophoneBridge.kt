@@ -33,8 +33,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -56,6 +59,12 @@ private const val COMPRESSOR_RELEASE_SECONDS = 1.0
 private const val DETECTOR_CUTOFF_HZ = 100.0
 private const val LIMIT = 0.891f
 private const val LIMIT_RELEASE_SECONDS = 0.05
+private const val TREBLE_SHELF_HZ = 3000.0
+private const val TREBLE_SHELF_DB = -7.0
+private const val TREBLE_SHELF_Q = 0.707
+private const val TREBLE_CUTOFF_HZ = 6500.0
+private const val TREBLE_CUTOFF_FIRST_Q = 0.541196
+private const val TREBLE_CUTOFF_SECOND_Q = 1.306563
 
 private class MicrophoneClock {
   @JavascriptInterface
@@ -65,9 +74,59 @@ private class MicrophoneClock {
 private fun smoothing(seconds: Double, sampleRate: Int): Float =
   exp(-1.0 / (seconds * sampleRate)).toFloat()
 
-// The raw built-in microphone is about 10 dB below the MIC source the WebView records from,
-// whose processing also compresses loud singing; this brings takes to the same level.
+private class Biquad(
+  private val b0: Float,
+  private val b1: Float,
+  private val b2: Float,
+  private val a1: Float,
+  private val a2: Float,
+) {
+  private var first = 0f
+  private var second = 0f
+
+  fun process(sample: Float): Float {
+    val output = b0 * sample + first
+    first = b1 * sample - a1 * output + second
+    second = b2 * sample - a2 * output
+    return output
+  }
+}
+
+private fun biquad(b0: Double, b1: Double, b2: Double, a0: Double, a1: Double, a2: Double) =
+  Biquad(
+    (b0 / a0).toFloat(),
+    (b1 / a0).toFloat(),
+    (b2 / a0).toFloat(),
+    (a1 / a0).toFloat(),
+    (a2 / a0).toFloat(),
+  )
+
+private fun lowPass(frequency: Double, q: Double, sampleRate: Int): Biquad {
+  val omega = 2 * PI * frequency / sampleRate
+  val alpha = sin(omega) / (2 * q)
+  val cosine = cos(omega)
+  return biquad((1 - cosine) / 2, 1 - cosine, (1 - cosine) / 2, 1 + alpha, -2 * cosine, 1 - alpha)
+}
+
+private fun highShelf(frequency: Double, gainDb: Double, q: Double, sampleRate: Int): Biquad {
+  val amplitude = 10.0.pow(gainDb / 40)
+  val omega = 2 * PI * frequency / sampleRate
+  val slope = 2 * sqrt(amplitude) * sin(omega) / (2 * q)
+  val cosine = cos(omega)
+  return biquad(
+    amplitude * ((amplitude + 1) + (amplitude - 1) * cosine + slope),
+    -2 * amplitude * ((amplitude - 1) + (amplitude + 1) * cosine),
+    amplitude * ((amplitude + 1) + (amplitude - 1) * cosine - slope),
+    (amplitude + 1) - (amplitude - 1) * cosine + slope,
+    2 * ((amplitude - 1) - (amplitude + 1) * cosine),
+    (amplitude + 1) - (amplitude - 1) * cosine - slope,
+  )
+}
+
 private class BuiltInProcessing(sampleRate: Int) {
+  private val shelf = highShelf(TREBLE_SHELF_HZ, TREBLE_SHELF_DB, TREBLE_SHELF_Q, sampleRate)
+  private val firstCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_FIRST_Q, sampleRate)
+  private val secondCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_SECOND_Q, sampleRate)
   private val threshold = 10.0.pow(COMPRESSOR_THRESHOLD_DB / 10).toFloat()
   private val exponent = ((1 - 1 / COMPRESSOR_RATIO) / 2).toFloat()
   private val attack = smoothing(COMPRESSOR_ATTACK_SECONDS, sampleRate)
@@ -80,7 +139,8 @@ private class BuiltInProcessing(sampleRate: Int) {
   private var limiterGain = 1f
 
   fun process(sample: Float): Float {
-    val gained = sample * BUILT_IN_GAIN
+    val filtered = secondCutoff.process(firstCutoff.process(shelf.process(sample)))
+    val gained = filtered * BUILT_IN_GAIN
     detector = highPass * (detector + gained - input)
     input = gained
     val level = detector * detector
