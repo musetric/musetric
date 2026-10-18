@@ -113,10 +113,13 @@ export type SpectrogramFundamentalFrames = {
   confidence: Float32Array;
 };
 
+export type SpectrogramRecordedEnds = Partial<Record<TrackKey, number>>;
+
 export type SpectrogramProcessor = {
   render: (
     samples: SpectrogramSamples,
     trackProgress: number,
+    recordedEnds?: SpectrogramRecordedEnds,
   ) => Promise<boolean>;
 
   readFundamentalLine: (
@@ -188,6 +191,7 @@ export const createSpectrogramProcessor = (
     async (
       inputs: SpectrogramSamples,
       trackProgress: number,
+      recordedEnds: SpectrogramRecordedEnds | undefined,
     ): Promise<RenderResult> => {
       const samples = toTrackSources(inputs);
       const runtime = configurator.configure();
@@ -224,7 +228,14 @@ export const createSpectrogramProcessor = (
       ) {
         return { ok: true };
       }
-      writeBuffers({ runtime, samples, plans, work, trackProgress });
+      writeBuffers({
+        runtime,
+        samples,
+        plans,
+        work,
+        trackProgress,
+        recordedEnds,
+      });
       const command = createCommand(runtime, plans, work);
       await submitCommand(command);
       commitResidentPlans(residents, samples, plans, work);
@@ -238,8 +249,12 @@ export const createSpectrogramProcessor = (
   );
 
   const renderLatest = createCallLatest(
-    async (samples: SpectrogramSamples, trackProgress: number) => {
-      const result = await runRender(samples, trackProgress);
+    async (
+      samples: SpectrogramSamples,
+      trackProgress: number,
+      recordedEnds?: SpectrogramRecordedEnds,
+    ) => {
+      const result = await runRender(samples, trackProgress, recordedEnds);
       if (!result.ok) {
         return false;
       }

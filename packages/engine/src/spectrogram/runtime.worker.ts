@@ -70,7 +70,12 @@ export const createSpectrogramRuntime = async (
     if (view) {
       processor.updateConfig(view);
     }
-    const ok = await processor.render(samples, trackProgress);
+    const liveEnd = recording.liveEnd();
+    const ok = await processor.render(
+      samples,
+      trackProgress,
+      liveEnd === undefined ? {} : { recording: liveEnd },
+    );
     if (!ok || !lead) {
       return;
     }

@@ -289,4 +289,36 @@ describe('pitch frames', () => {
     expect(after.length).toBeGreaterThan(0);
     expect(Array.from(after.filter((value) => value > 0))).toEqual([]);
   });
+
+  it('ends the line of a live take where its newest full window ends', async () => {
+    const config = pitchConfig('recording', 700, 2.5);
+    const progress = 4.2 / durationSeconds;
+    const playhead = progress * lead.length;
+    const recordedEnd = Math.round(playhead - 0.03 * sampleRate);
+    const take = Float32Array.from(lead);
+    take.fill(0, recordedEnd);
+    const line = await withProcessor({ device, config }, async (processor) => {
+      for (let render = 0; render < 30; render += 1) {
+        await processor.render({ recording: take }, progress, {
+          recording: recordedEnd,
+        });
+      }
+      return processor.readFundamentalLine('recording');
+    });
+    if (!line) {
+      throw new Error('the pitch line was not drawn');
+    }
+    const timeAt = (index: number): number =>
+      (line.baseColumn + index) * line.columnStep;
+    const voiced = line.values
+      .map((value, index) => (value > 0 ? timeAt(index) : -1))
+      .filter((time) => time >= 0);
+    expect(voiced.length).toBeGreaterThan(0);
+    expect(Math.max(...voiced)).toBeLessThanOrEqual(
+      recordedEnd - settings.support + settings.hop / 2,
+    );
+    expect(Math.max(...voiced)).toBeGreaterThan(
+      recordedEnd - settings.support - 0.01 * sampleRate,
+    );
+  });
 });

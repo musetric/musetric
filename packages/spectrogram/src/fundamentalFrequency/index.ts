@@ -34,6 +34,7 @@ export type PitchPrepareInput = {
   projection: PitchProjection;
   trackProgress: number;
   truncated: boolean;
+  recordedEnd: number | undefined;
   invalidations: readonly PitchSampleRange[];
 };
 
@@ -285,8 +286,11 @@ export const createSpectrogramFundamentalFrequencyCell = (
           identity.source = source;
           identity.length = source.length;
           const trackFrames = frameCountOf(settings, source.songLength);
+          const playheadSamples = Math.round(
+            input.trackProgress * source.songLength,
+          );
           const availableSamples = input.truncated
-            ? Math.round(input.trackProgress * source.songLength)
+            ? Math.min(playheadSamples, input.recordedEnd ?? playheadSamples)
             : source.songLength;
           const reach = Math.ceil(settings.support * (source.reach - 1));
           const firstTime = projection.baseColumn * arg.columnStep;
@@ -314,7 +318,9 @@ export const createSpectrogramFundamentalFrequencyCell = (
           const shownFrames = input.truncated
             ? Math.min(
                 trackFrames,
-                Math.floor(availableSamples / settings.hop) + 1,
+                Math.floor(
+                  (availableSamples - settings.support) / settings.hop,
+                ) + 1,
               )
             : trackFrames;
           pending = { plan, trackFrames, shownFrames, projection };

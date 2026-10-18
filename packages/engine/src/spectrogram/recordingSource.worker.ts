@@ -88,6 +88,7 @@ export type RecordingSource = {
   beginLiveTake: (take: LiveTakeStart) => void;
   appendLiveTake: (chunk: LiveTakeChunk) => SongRange | undefined;
   previewLiveTake: (preview: LiveTakePreview) => SongRange | undefined;
+  liveEnd: () => number | undefined;
   get: (songLength: number) => SpectrogramSource;
   clear: () => void;
 };
@@ -184,6 +185,14 @@ export const createRecordingSource = (): RecordingSource => {
       const end = writePiece(piece, offset, samples.subarray(offset - start));
       run.previewEnd = start + samples.length;
       return toSongRange(piece, offset, end - offset, take.tempo);
+    },
+    liveEnd: () => {
+      const run = live?.runs.at(-1);
+      if (!live || !run) {
+        return undefined;
+      }
+      const end = Math.max(run.writtenFrameCount, run.previewEnd);
+      return Math.floor(run.piece.songStartFrame + end * live.tempo);
     },
     get: (songLength) => {
       knownSongLength = songLength;
