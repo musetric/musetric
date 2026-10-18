@@ -5,8 +5,8 @@ import {
   type EngineMicrophone,
   microphoneAccessDenied,
 } from './engineAudioSession.js';
+import { type CapturedChunk } from './timedChunkPusher.cross.js';
 import {
-  type CapturedChunk,
   createTimedMicrophones,
   type TimedMicrophoneSource,
 } from './timedMicrophone.js';
