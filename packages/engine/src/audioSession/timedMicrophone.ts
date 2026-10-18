@@ -152,6 +152,7 @@ export const createTimedMicrophones = (
         outputClock,
         port,
         isSettled: () => settled,
+        now: () => performance.now(),
       });
       const unsubscribe = source(pusher.push);
       const close = () => {
