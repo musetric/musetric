@@ -14,7 +14,7 @@ import {
 
 const deviceChangeDelayMs = 500;
 const clockProbeCount = 9;
-const headerValueCount = 3;
+const headerValueCount = 4;
 const headerBytes = headerValueCount * Float64Array.BYTES_PER_ELEMENT;
 
 const portSchema = z.object({
@@ -159,7 +159,7 @@ export const createAndroidAudioSession = (
     });
 
   const receiveChunk = (buffer: ArrayBuffer) => {
-    const [chunkSession, captureMs, sampleRate] = new Float64Array(
+    const [chunkSession, captureMs, sampleRate, frame] = new Float64Array(
       buffer,
       0,
       headerValueCount,
@@ -171,6 +171,7 @@ export const createAndroidAudioSession = (
     for (const consumer of consumers) {
       consumer({
         startMs: captureMs - clockOffsetMs,
+        frame,
         sampleRate,
         samples: samples.slice(),
       });

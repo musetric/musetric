@@ -16,7 +16,17 @@ const settle = async (): Promise<void> => {
   }
 };
 
-const pushChunks = async (startTimes: readonly number[], arrivalMs = 1) => {
+type PushOptions = {
+  arrivalMs?: number;
+  size?: number;
+  frames?: readonly number[];
+};
+
+const pushChunks = async (
+  startTimes: readonly number[],
+  options: PushOptions = {},
+) => {
+  const { arrivalMs = 1, size = chunkSize, frames: captureFrames } = options;
   const channel = new MessageChannel();
   const frames: number[] = [];
   timedMicrophoneChannel.inbound(channel.port2).bindHandlers({
@@ -34,12 +44,13 @@ const pushChunks = async (startTimes: readonly number[], arrivalMs = 1) => {
     isSettled: () => true,
     now: () => nowMs,
   });
-  for (const startMs of startTimes) {
-    nowMs = startMs + chunkMs + arrivalMs;
+  for (const [index, startMs] of startTimes.entries()) {
+    nowMs = startMs + (size / rate) * 1000 + arrivalMs;
     pusher.push({
       startMs,
+      frame: captureFrames?.[index],
       sampleRate: rate,
-      samples: new Float32Array(chunkSize),
+      samples: new Float32Array(size),
     });
   }
   await settle();
@@ -66,13 +77,37 @@ describe('createChunkPusher', () => {
     expect(frames).toEqual([14400, 15360, 17280]);
   });
 
+  it('leaves room for a short chunk that never arrived', async () => {
+    const shortWarmup = Array.from({ length: 30 }, (_, index) => index * 10);
+    const { frames } = await pushChunks([...shortWarmup, 300, 310, 330], {
+      size: 480,
+    });
+    expect(frames).toEqual([14400, 14880, 15840]);
+  });
+
+  it('counts frames from the capture when it reports them', async () => {
+    const startTimes = [...warmup, 300, 332, 340, 380];
+    const { frames } = await pushChunks(startTimes, {
+      frames: [
+        ...warmup.map((_, index) => 1000 + index * chunkSize),
+        1000 + 15 * chunkSize,
+        1000 + 16 * chunkSize,
+        1000 + 17 * chunkSize,
+        1000 + 19 * chunkSize,
+      ],
+    });
+    expect(frames).toEqual([14400, 15360, 16320, 18240]);
+  });
+
   it('sets the delivery margin from how late chunks arrived', async () => {
-    const { roundTrip } = await pushChunks([...warmup, 300], 3);
-    expect(roundTrip).toBe(Math.round((renderAhead + 0.073) * rate));
+    const { roundTrip } = await pushChunks([...warmup, 300], { arrivalMs: 3 });
+    expect(roundTrip).toBe(Math.round((renderAhead + 0.173) * rate));
   });
 
   it('caps the delivery margin for chunks that arrive very late', async () => {
-    const { roundTrip } = await pushChunks([...warmup, 300], 400);
-    expect(roundTrip).toBe(Math.round((renderAhead + 0.25) * rate));
+    const { roundTrip } = await pushChunks([...warmup, 300], {
+      arrivalMs: 400,
+    });
+    expect(roundTrip).toBe(Math.round((renderAhead + 0.4) * rate));
   });
 });
