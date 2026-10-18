@@ -85,6 +85,7 @@ export const readEpochMs = (): number =>
 export type Playhead = {
   read: () => PlayheadValue;
   readFrameIndex: () => number;
+  readFrameIndexAt: (epochMs: number) => number;
   writeFrameIndex: (frameIndex: number) => void;
 };
 
@@ -102,6 +103,8 @@ export const createPlayhead = (
   return {
     read: () => value,
     readFrameIndex: () => extrapolatePlayhead(value, readEpochMs(), sampleRate),
+    readFrameIndexAt: (epochMs) =>
+      extrapolatePlayhead(value, epochMs, sampleRate),
     writeFrameIndex: (frameIndex) => {
       value = createHeldPlayheadValue(frameIndex, value.revision);
     },

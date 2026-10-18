@@ -214,5 +214,14 @@ export const createSpectrogramRuntime = async (
         renderPaused();
       }
     },
+    previewLiveTake: (message) => {
+      const range = recording.previewLiveTake({
+        songFrame: playhead.readFrameIndexAt(message.capturedAt),
+        samples: message.samples,
+      });
+      if (range) {
+        processor.invalidateSamples([{ trackKey: 'recording', ...range }]);
+      }
+    },
   });
 };

@@ -46,12 +46,21 @@ const buildSource = (
     songLength,
   );
 
-type SourceRun = LiveRun & {
-  writtenFrameCount: number;
-};
-
-type LiveTake = LiveTakeStart & {
-  runs: SourceRun[];
+const writePiece = (
+  piece: RecordingPiece,
+  offset: number,
+  samples: Float32Array,
+): number => {
+  const end = Math.min(piece.frameCount, offset + samples.length);
+  if (end > piece.samples.length) {
+    const grown = new Float32Array(
+      Math.min(piece.frameCount, Math.max(end, piece.samples.length * 2)),
+    );
+    grown.set(piece.samples);
+    piece.samples = grown;
+  }
+  piece.samples.set(samples.subarray(0, end - offset), offset);
+  return end;
 };
 
 export type SongRange = {
@@ -59,12 +68,37 @@ export type SongRange = {
   frameCount: number;
 };
 
+const toSongRange = (
+  piece: RecordingPiece,
+  offset: number,
+  frameCount: number,
+  tempo: number,
+): SongRange => ({
+  frameIndex: Math.floor(piece.songStartFrame + offset * tempo),
+  frameCount: Math.ceil(frameCount * tempo) + 1,
+});
+
+export type LiveTakePreview = {
+  songFrame: number;
+  samples: Float32Array;
+};
+
 export type RecordingSource = {
   setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
   appendLiveTake: (chunk: LiveTakeChunk) => SongRange | undefined;
+  previewLiveTake: (preview: LiveTakePreview) => SongRange | undefined;
   get: (songLength: number) => SpectrogramSource;
   clear: () => void;
+};
+
+type SourceRun = LiveRun & {
+  writtenFrameCount: number;
+  previewEnd: number;
+};
+
+type LiveTake = LiveTakeStart & {
+  runs: SourceRun[];
 };
 
 export const createRecordingSource = (): RecordingSource => {
@@ -86,6 +120,7 @@ export const createRecordingSource = (): RecordingSource => {
     const run: SourceRun = {
       ...createLiveRun(chunk, take.tempo, take.transpose, take.octave),
       writtenFrameCount: 0,
+      previewEnd: 0,
     };
     run.piece.frameCount = Math.max(
       0,
@@ -123,20 +158,32 @@ export const createRecordingSource = (): RecordingSource => {
       if (offset >= piece.frameCount) {
         return undefined;
       }
-      const end = Math.min(piece.frameCount, offset + chunk.samples.length);
-      if (end > piece.samples.length) {
-        const grown = new Float32Array(
-          Math.min(piece.frameCount, Math.max(end, piece.samples.length * 2)),
-        );
-        grown.set(piece.samples);
-        piece.samples = grown;
-      }
-      piece.samples.set(chunk.samples.subarray(0, end - offset), offset);
+      const end = writePiece(piece, offset, chunk.samples);
       run.writtenFrameCount = Math.max(run.writtenFrameCount, end);
-      return {
-        frameIndex: Math.floor(piece.songStartFrame + offset * take.tempo),
-        frameCount: Math.ceil(chunk.samples.length * take.tempo) + 1,
-      };
+      return toSongRange(piece, offset, chunk.samples.length, take.tempo);
+    },
+    previewLiveTake: (preview) => {
+      const take = live;
+      const run = take?.runs.at(-1);
+      if (!take || !run) {
+        return undefined;
+      }
+      const { piece } = run;
+      const { samples } = preview;
+      const placed = Math.round(
+        (preview.songFrame - piece.songStartFrame) / take.tempo,
+      );
+      const start =
+        Math.abs(placed - run.previewEnd) <= samples.length / 2
+          ? run.previewEnd
+          : placed;
+      const offset = Math.max(start, run.writtenFrameCount);
+      if (offset >= Math.min(piece.frameCount, start + samples.length)) {
+        return undefined;
+      }
+      const end = writePiece(piece, offset, samples.subarray(offset - start));
+      run.previewEnd = start + samples.length;
+      return toSongRange(piece, offset, end - offset, take.tempo);
     },
     get: (songLength) => {
       knownSongLength = songLength;

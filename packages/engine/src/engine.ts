@@ -122,8 +122,20 @@ export const createEngine = (): Engine => {
   const context = new AudioContext({ sampleRate: defaultSampleRate });
   const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
-  const audioSession = createEngineAudioSession(context, outputClock);
   const store = createStore(initialState);
+  const spectrogramChannel = new MessageChannel();
+  const spectrogramPlayheadChannel = new MessageChannel();
+  const spectrogram = createEngineSpectrogram({
+    store,
+    sampleRate: context.sampleRate,
+    decoderPort: spectrogramChannel.port2,
+    playheadPort: spectrogramPlayheadChannel.port2,
+  });
+  const audioSession = createEngineAudioSession(
+    context,
+    outputClock,
+    spectrogram.previewLiveTake,
+  );
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);
     if (frameCount !== store.get().outputLatencyFrameCount) {
@@ -133,10 +145,8 @@ export const createEngine = (): Engine => {
     }
   });
   const playerChannel = new MessageChannel();
-  const spectrogramChannel = new MessageChannel();
   const playerPlayheadChannel = new MessageChannel();
   const decoderPlayheadChannel = new MessageChannel();
-  const spectrogramPlayheadChannel = new MessageChannel();
 
   const ref: Engine = {
     context,
@@ -151,12 +161,7 @@ export const createEngine = (): Engine => {
       store,
       getPlayer: () => ref.player,
     }),
-    spectrogram: createEngineSpectrogram({
-      store,
-      sampleRate: context.sampleRate,
-      decoderPort: spectrogramChannel.port2,
-      playheadPort: spectrogramPlayheadChannel.port2,
-    }),
+    spectrogram,
     waveform: createEngineWaveform(store),
     decoder: createEngineDecoder({
       store,
