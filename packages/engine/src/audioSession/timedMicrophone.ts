@@ -3,11 +3,14 @@ import {
   timedMicrophoneChannel,
   timedMicrophoneProcessorName,
 } from './protocol.cross.js';
+import {
+  type CapturedChunk,
+  createChunkPusher,
+  type TimedMicrophonePort,
+} from './timedChunkPusher.cross.js';
 import timedMicrophoneWorkletUrl from './timedMicrophone.worklet.ts?worker&url';
 
 const readyTimeoutMs = 3000;
-const gapMs = 10;
-const deliverySeconds = 0.25;
 
 type TrackProcessor = {
   readable: ReadableStream<AudioData>;
@@ -44,12 +47,6 @@ const readMono = (data: AudioData) => {
     }
   }
   return samples;
-};
-
-export type CapturedChunk = {
-  startMs: number;
-  sampleRate: number;
-  samples: Float32Array;
 };
 
 const pumpChunks = async (
@@ -91,49 +88,6 @@ export const readTrackChunks = (
       void reader.cancel();
     };
   };
-};
-
-type TimedMicrophonePort = ReturnType<
-  typeof timedMicrophoneChannel.outbound<MessagePort>
->;
-
-type CreateChunkPusherOptions = {
-  context: AudioContext;
-  outputClock: EngineOutputClock;
-  port: TimedMicrophonePort;
-  isSettled: () => boolean;
-};
-
-const createChunkPusher = (options: CreateChunkPusherOptions) => {
-  const { context, outputClock, port, isSettled } = options;
-  let frame = 0;
-  let endMs: number | undefined = undefined;
-  let roundTripFrameCount: number | undefined = undefined;
-
-  const push = (chunk: CapturedChunk) => {
-    const { startMs, sampleRate, samples } = chunk;
-    if (endMs !== undefined && startMs - endMs > gapMs) {
-      frame += Math.round(((startMs - endMs) * sampleRate) / 1000);
-    }
-    const reading = isSettled() ? outputClock.read() : undefined;
-    if (reading) {
-      roundTripFrameCount ??= Math.round(
-        (reading.renderAhead + deliverySeconds) * context.sampleRate,
-      );
-      const heardTime =
-        (performance.timeOrigin + startMs) / 1000 + reading.clockOffset;
-      port.methods.push({
-        frame,
-        at: heardTime * context.sampleRate + roundTripFrameCount,
-        sampleRate,
-        samples,
-      });
-    }
-    frame += samples.length;
-    endMs = startMs + (samples.length / sampleRate) * 1000;
-  };
-
-  return { push, getRoundTripFrameCount: () => roundTripFrameCount };
 };
 
 const waitForReady = async (port: TimedMicrophonePort) =>
@@ -194,7 +148,7 @@ export const createTimedMicrophones = (
         settled = true;
       });
       const pusher = createChunkPusher({
-        context,
+        contextSampleRate: context.sampleRate,
         outputClock,
         port,
         isSettled: () => settled,
