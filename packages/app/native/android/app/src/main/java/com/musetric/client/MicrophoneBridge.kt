@@ -48,7 +48,7 @@ private const val ACCESS_DENIED = "microphone-access-denied"
 private const val UNAVAILABLE = "microphone-unavailable"
 private const val CHUNKS_PER_SECOND = 50
 private const val BUFFER_SECONDS = 0.5
-private const val HEADER_BYTES = 24
+private const val HEADER_BYTES = 32
 private const val NANOS_PER_SECOND = 1_000_000_000L
 private const val NANOS_PER_MILLI = 1_000_000.0
 private const val BUILT_IN_GAIN = 3.16f
@@ -56,6 +56,10 @@ private const val COMPRESSOR_THRESHOLD_DB = -23.0
 private const val COMPRESSOR_RATIO = 1.3
 private const val COMPRESSOR_ATTACK_SECONDS = 0.05
 private const val COMPRESSOR_RELEASE_SECONDS = 1.0
+private const val LEVELER_THRESHOLD_DB = -14.0
+private const val LEVELER_RATIO = 3.0
+private const val LEVELER_ATTACK_SECONDS = 0.005
+private const val LEVELER_RELEASE_SECONDS = 0.15
 private const val DETECTOR_CUTOFF_HZ = 100.0
 private const val LIMIT = 0.891f
 private const val LIMIT_RELEASE_SECONDS = 0.05
@@ -123,29 +127,57 @@ private fun highShelf(frequency: Double, gainDb: Double, q: Double, sampleRate: 
   )
 }
 
-private class BuiltInProcessing(sampleRate: Int) {
-  private val shelf = highShelf(TREBLE_SHELF_HZ, TREBLE_SHELF_DB, TREBLE_SHELF_Q, sampleRate)
-  private val firstCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_FIRST_Q, sampleRate)
-  private val secondCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_SECOND_Q, sampleRate)
-  private val threshold = 10.0.pow(COMPRESSOR_THRESHOLD_DB / 10).toFloat()
-  private val exponent = ((1 - 1 / COMPRESSOR_RATIO) / 2).toFloat()
-  private val attack = smoothing(COMPRESSOR_ATTACK_SECONDS, sampleRate)
-  private val release = smoothing(COMPRESSOR_RELEASE_SECONDS, sampleRate)
-  private val limitRelease = smoothing(LIMIT_RELEASE_SECONDS, sampleRate)
+private class Compressor(
+  thresholdDb: Double,
+  ratio: Double,
+  attackSeconds: Double,
+  releaseSeconds: Double,
+  sampleRate: Int,
+) {
+  private val threshold = 10.0.pow(thresholdDb / 10).toFloat()
+  private val exponent = ((1 - 1 / ratio) / 2).toFloat()
+  private val attack = smoothing(attackSeconds, sampleRate)
+  private val release = smoothing(releaseSeconds, sampleRate)
   private val highPass = (1 / (1 + 2 * PI * DETECTOR_CUTOFF_HZ / sampleRate)).toFloat()
   private var input = 0f
   private var detector = 0f
   private var power = 0f
+
+  fun process(sample: Float): Float {
+    detector = highPass * (detector + sample - input)
+    input = sample
+    val level = detector * detector
+    power = level + (power - level) * if (level > power) attack else release
+    return if (power > threshold) sample * (threshold / power).pow(exponent) else sample
+  }
+}
+
+private class BuiltInProcessing(sampleRate: Int) {
+  private val shelf = highShelf(TREBLE_SHELF_HZ, TREBLE_SHELF_DB, TREBLE_SHELF_Q, sampleRate)
+  private val firstCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_FIRST_Q, sampleRate)
+  private val secondCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_SECOND_Q, sampleRate)
+  private val compressor =
+    Compressor(
+      COMPRESSOR_THRESHOLD_DB,
+      COMPRESSOR_RATIO,
+      COMPRESSOR_ATTACK_SECONDS,
+      COMPRESSOR_RELEASE_SECONDS,
+      sampleRate,
+    )
+  private val leveler =
+    Compressor(
+      LEVELER_THRESHOLD_DB,
+      LEVELER_RATIO,
+      LEVELER_ATTACK_SECONDS,
+      LEVELER_RELEASE_SECONDS,
+      sampleRate,
+    )
+  private val limitRelease = smoothing(LIMIT_RELEASE_SECONDS, sampleRate)
   private var limiterGain = 1f
 
   fun process(sample: Float): Float {
     val filtered = secondCutoff.process(firstCutoff.process(shelf.process(sample)))
-    val gained = filtered * BUILT_IN_GAIN
-    detector = highPass * (detector + gained - input)
-    input = gained
-    val level = detector * detector
-    power = level + (power - level) * if (level > power) attack else release
-    val compressed = if (power > threshold) gained * (threshold / power).pow(exponent) else gained
+    val compressed = leveler.process(compressor.process(filtered * BUILT_IN_GAIN))
     val peak = abs(compressed)
     val target = if (peak > LIMIT) LIMIT / peak else 1f
     limiterGain =
@@ -206,18 +238,24 @@ private class Capture(
         record.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) == AudioRecord.SUCCESS
       if (read > 0 && timed) {
         val offset = (position - timestamp.framePosition) * NANOS_PER_SECOND / sampleRate
-        send(encode(timestamp.nanoTime + offset, samples, read))
+        send(encode(timestamp.nanoTime + offset, position, samples, read))
       }
       position += read
     }
   }
 
-  private fun encode(captureNanos: Long, samples: FloatArray, count: Int): ByteArray {
+  private fun encode(
+    captureNanos: Long,
+    frame: Long,
+    samples: FloatArray,
+    count: Int,
+  ): ByteArray {
     val buffer =
       ByteBuffer.allocate(HEADER_BYTES + count * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
     buffer.putDouble(session.toDouble())
     buffer.putDouble(captureNanos / NANOS_PER_MILLI)
     buffer.putDouble(sampleRate.toDouble())
+    buffer.putDouble(frame.toDouble())
     val processed = builtIn
     for (index in 0 until count) {
       val sample = samples[index]

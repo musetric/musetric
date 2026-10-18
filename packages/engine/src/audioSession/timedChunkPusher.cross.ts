@@ -1,12 +1,12 @@
 import { type timedMicrophoneChannel } from './protocol.cross.js';
 
-const gapMs = 10;
 const warmupMs = 300;
-const headroomMs = 50;
-const maximumDeliveryMs = 250;
+const headroomMs = 150;
+const maximumDeliveryMs = 400;
 
 export type CapturedChunk = {
   startMs: number;
+  frame?: number;
   sampleRate: number;
   samples: Float32Array;
 };
@@ -31,6 +31,7 @@ type CreateChunkPusherOptions = {
 export const createChunkPusher = (options: CreateChunkPusherOptions) => {
   const { contextSampleRate, outputClock, port, isSettled, now } = options;
   let frame = 0;
+  let firstFrame: number | undefined = undefined;
   let endMs: number | undefined = undefined;
   let warmupEndMs: number | undefined = undefined;
   let deliveryMs = 0;
@@ -39,11 +40,15 @@ export const createChunkPusher = (options: CreateChunkPusherOptions) => {
   const push = (chunk: CapturedChunk) => {
     const { startMs, sampleRate, samples } = chunk;
     const frameCount = samples.length;
+    const durationMs = (frameCount / sampleRate) * 1000;
     warmupEndMs ??= startMs + warmupMs;
     if (roundTripFrameCount === undefined) {
       deliveryMs = Math.max(deliveryMs, now() - startMs);
     }
-    if (endMs !== undefined && startMs - endMs > gapMs) {
+    if (chunk.frame !== undefined) {
+      firstFrame ??= chunk.frame;
+      frame = chunk.frame - firstFrame;
+    } else if (endMs !== undefined && startMs - endMs > durationMs / 2) {
       frame += Math.round(((startMs - endMs) * sampleRate) / 1000);
     }
     const reading =
@@ -64,7 +69,7 @@ export const createChunkPusher = (options: CreateChunkPusherOptions) => {
       });
     }
     frame += frameCount;
-    endMs = startMs + (frameCount / sampleRate) * 1000;
+    endMs = startMs + durationMs;
   };
 
   return { push, getRoundTripFrameCount: () => roundTripFrameCount };

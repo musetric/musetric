@@ -157,7 +157,63 @@ const songCenters = burstSeconds.map(
   (second) => second * rate + (burstLength - 1) / 2,
 );
 
+const recordUntilHeard = async (heardSeconds: number) => {
+  const outputLatency = 512;
+  const slowInput = 2048;
+  const roundTrip = outputLatency + slowInput;
+  const harness = await createHarness([]);
+  const startFrame = Math.round(0.75 * rate);
+  harness.player.methods.seek({ frameIndex: startFrame, revision: 1 });
+  harness.player.methods.startRecording({
+    frameIndex: startFrame,
+    revision: 1,
+    latencyFrameCount: roundTrip,
+    inputLatencyFrameCount: slowInput,
+    notificationPort: harness.notification,
+  });
+  harness.player.methods.play({
+    revision: 1,
+    latencyFrameCount: roundTrip,
+    inputLatencyFrameCount: slowInput,
+  });
+  await settle();
+  const played: number[] = [];
+  const loopBack = (block: number) => {
+    const input = new Float32Array(blockSize);
+    for (let index = 0; index < blockSize; index += 1) {
+      input[index] = played[block * blockSize + index - roundTrip] ?? 0;
+    }
+    return input;
+  };
+  const heardBlocks = Math.ceil(
+    ((heardSeconds - 0.75) * rate + outputLatency) / blockSize,
+  );
+  for (let block = 0; block < heardBlocks; block += 1) {
+    played.push(...harness.process(loopBack(block)));
+  }
+  harness.player.methods.stop({ revision: 2 });
+  harness.player.methods.flushRecording();
+  await settle();
+  for (let block = heardBlocks; block < heardBlocks + 24; block += 1) {
+    played.push(...harness.process(loopBack(block)));
+  }
+  await settle();
+  return toRuns(harness.chunks).flatMap((run) =>
+    burstCenters(runSamples(run)).map((center) => run.startFrame + center),
+  );
+};
+
 describe('player recording loopback', () => {
+  it('keeps what was sung right before the take stops', async () => {
+    const centers = await recordUntilHeard(2 + (2 * burstLength + 240) / rate);
+    expect(toHalfSeconds(centers)).toEqual([1, 1.5, 2]);
+    for (const center of centers) {
+      expect(Math.abs(nearestError(center, songCenters))).toBeLessThan(
+        timingTolerance,
+      );
+    }
+  });
+
   it('places a take recorded at the original tempo on the song', async () => {
     const centers = await recordThroughLoopback({
       tempo: 1,
