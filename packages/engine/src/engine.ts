@@ -30,6 +30,7 @@ import {
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const notesMaxFrequency = 1100;
+const androidOutputBufferSeconds = 0.02;
 
 export const defaultFrequencyRanges: Record<
   SpectrogramViewMode,
@@ -119,7 +120,12 @@ export type Engine = {
 };
 
 export const createEngine = (): Engine => {
-  const context = new AudioContext({ sampleRate: defaultSampleRate });
+  const context = new AudioContext({
+    sampleRate: defaultSampleRate,
+    latencyHint: navigator.userAgent.includes('Android')
+      ? androidOutputBufferSeconds
+      : 'interactive',
+  });
   const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
   const store = createStore(initialState);
