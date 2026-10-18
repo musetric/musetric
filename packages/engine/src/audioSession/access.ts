@@ -49,6 +49,12 @@ export const createEngineMicrophoneAccess = (
   let checking: Promise<void> | undefined = undefined;
 
   const check = async () => {
+    if (audioSession.checkMicrophoneAccess) {
+      if (await audioSession.checkMicrophoneAccess()) {
+        clearMicrophoneDenial(store);
+      }
+      return;
+    }
     try {
       const microphone = await openKnownMicrophone(
         audioSession,

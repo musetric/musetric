@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
+  microphoneAccessDenied,
   setAudioSessionType,
 } from './engineAudioSession.js';
 import nativeMicrophoneWorkletUrl from './nativeMicrophone.worklet.ts?worker&url';
@@ -12,7 +13,6 @@ import {
 } from './protocol.cross.js';
 
 const deviceChangeDelayMs = 500;
-const accessDenied = 'microphone-access-denied';
 const readyTimeoutMs = 2000;
 const bluetoothPortTypes = [
   'BluetoothA2DPOutput',
@@ -250,7 +250,7 @@ export const createNativeAudioSession = (
       };
     },
     readMicrophoneDenial: (error) =>
-      error instanceof Error && error.message === accessDenied
+      error instanceof Error && error.message === microphoneAccessDenied
         ? 'app'
         : undefined,
     canOpenMicrophoneSettings: (denial) => denial === 'app',
