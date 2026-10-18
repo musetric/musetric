@@ -9,6 +9,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioRouting
 import android.media.AudioTimestamp
 import android.media.MediaRecorder
 import android.net.Uri
@@ -30,6 +31,10 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.pow
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -43,10 +48,50 @@ private const val BUFFER_SECONDS = 0.5
 private const val HEADER_BYTES = 24
 private const val NANOS_PER_SECOND = 1_000_000_000L
 private const val NANOS_PER_MILLI = 1_000_000.0
+private const val BUILT_IN_GAIN = 3.16f
+private const val COMPRESSOR_THRESHOLD_DB = -23.0
+private const val COMPRESSOR_RATIO = 1.3
+private const val COMPRESSOR_ATTACK_SECONDS = 0.05
+private const val COMPRESSOR_RELEASE_SECONDS = 1.0
+private const val DETECTOR_CUTOFF_HZ = 100.0
+private const val LIMIT = 0.891f
+private const val LIMIT_RELEASE_SECONDS = 0.05
 
 private class MicrophoneClock {
   @JavascriptInterface
   fun now(): Double = System.nanoTime() / NANOS_PER_MILLI
+}
+
+private fun smoothing(seconds: Double, sampleRate: Int): Float =
+  exp(-1.0 / (seconds * sampleRate)).toFloat()
+
+// The raw built-in microphone is about 10 dB below the MIC source the WebView records from,
+// whose processing also compresses loud singing; this brings takes to the same level.
+private class BuiltInProcessing(sampleRate: Int) {
+  private val threshold = 10.0.pow(COMPRESSOR_THRESHOLD_DB / 10).toFloat()
+  private val exponent = ((1 - 1 / COMPRESSOR_RATIO) / 2).toFloat()
+  private val attack = smoothing(COMPRESSOR_ATTACK_SECONDS, sampleRate)
+  private val release = smoothing(COMPRESSOR_RELEASE_SECONDS, sampleRate)
+  private val limitRelease = smoothing(LIMIT_RELEASE_SECONDS, sampleRate)
+  private val highPass = (1 / (1 + 2 * PI * DETECTOR_CUTOFF_HZ / sampleRate)).toFloat()
+  private var input = 0f
+  private var detector = 0f
+  private var power = 0f
+  private var limiterGain = 1f
+
+  fun process(sample: Float): Float {
+    val gained = sample * BUILT_IN_GAIN
+    detector = highPass * (detector + gained - input)
+    input = gained
+    val level = detector * detector
+    power = level + (power - level) * if (level > power) attack else release
+    val compressed = if (power > threshold) gained * (threshold / power).pow(exponent) else gained
+    val peak = abs(compressed)
+    val target = if (peak > LIMIT) LIMIT / peak else 1f
+    limiterGain =
+      if (target < limiterGain) target else target + (limiterGain - target) * limitRelease
+    return compressed * limiterGain
+  }
 }
 
 private class Capture(
@@ -57,19 +102,29 @@ private class Capture(
   private val send: (ByteArray) -> Unit,
 ) {
   @Volatile private var running = true
+  @Volatile private var builtIn = false
+  private val processing = BuiltInProcessing(sampleRate)
   private val thread = Thread({ pump() }, "musetric-microphone")
+  private val routing = AudioRouting.OnRoutingChangedListener { updateRoute() }
 
   fun start(): Boolean {
     record.startRecording()
     if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
       return false
     }
+    updateRoute()
+    record.addOnRoutingChangedListener(routing, null)
     thread.start()
     return true
   }
 
+  private fun updateRoute() {
+    builtIn = record.routedDevice?.type == AudioDeviceInfo.TYPE_BUILTIN_MIC
+  }
+
   fun stop() {
     running = false
+    record.removeOnRoutingChangedListener(routing)
     record.stop()
     if (thread.isAlive) {
       thread.join()
@@ -103,7 +158,11 @@ private class Capture(
     buffer.putDouble(session.toDouble())
     buffer.putDouble(captureNanos / NANOS_PER_MILLI)
     buffer.putDouble(sampleRate.toDouble())
-    buffer.asFloatBuffer().put(samples, 0, count)
+    val processed = builtIn
+    for (index in 0 until count) {
+      val sample = samples[index]
+      buffer.putFloat(if (processed) processing.process(sample) else sample)
+    }
     return buffer.array()
   }
 }
