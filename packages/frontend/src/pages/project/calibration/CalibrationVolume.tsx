@@ -3,7 +3,7 @@ import { alpha, Box, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const loudEnoughVolume = 0.5;
+const loudEnoughVolume = 1 / 3;
 
 export type CalibrationVolumeProps = {
   volume: number;
