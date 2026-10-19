@@ -3,6 +3,7 @@ import {
   createRecordingLatencyCalibrationSchedule,
   getRecordingLatencyCalibrationOutcome,
   getRecordingLatencyFrameCount,
+  recordingLatencyCalibrationClickFrequencyHz,
   recordingLatencyCalibrationTimeoutSeconds,
 } from '@musetric/audio/calibration';
 import {
@@ -152,6 +153,8 @@ export const measureRecordingLatency = async (
         (clickFrame) => clickFrame + searchOffsetFrameCount,
       ),
       endFrame: schedule.endFrame + searchOffsetFrameCount,
+      clickFrequency: recordingLatencyCalibrationClickFrequencyHz,
+      sampleRate: context.sampleRate,
     });
     for (const clickFrame of schedule.clickFrames) {
       const clickSource = context.createBufferSource();

@@ -7,13 +7,20 @@ export type RecordingLatencyCalibrationPeak = {
   noiseValue: number;
 };
 
+export type RecordingLatencyCalibrationStart = {
+  clickFrames: number[];
+  endFrame: number;
+  clickFrequency: number;
+  sampleRate: number;
+};
+
 export type RecordingLatencyCalibrationInboundMethods = {
   progress: (message: { clickCount: number }) => void;
   done: (message: { peaks: RecordingLatencyCalibrationPeak[] }) => void;
 };
 
 export type RecordingLatencyCalibrationOutboundMethods = {
-  start: (message: { clickFrames: number[]; endFrame: number }) => void;
+  start: (message: RecordingLatencyCalibrationStart) => void;
 };
 
 export const microphoneCalibrationChannel = createMessageChannel<

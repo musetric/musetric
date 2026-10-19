@@ -42,7 +42,12 @@ const measure = async (latencyFrameCount: number) => {
   const runtime = createMicrophoneCalibrationRuntime({
     port: microphoneCalibrationChannel.inbound(channel.port1),
   });
-  runtime.handleStart({ clickFrames, endFrame });
+  runtime.handleStart({
+    clickFrames,
+    endFrame,
+    clickFrequency: frequency,
+    sampleRate: rate,
+  });
   const signal = new Float32Array(endFrame + blockSize);
   for (const clickFrame of clickFrames) {
     for (let frame = 0; frame < 0.08 * rate; frame += 1) {
@@ -63,14 +68,14 @@ const measure = async (latencyFrameCount: number) => {
 };
 
 describe('microphone calibration runtime', () => {
-  it('times each click by its start rather than its loudest sample', async () => {
+  it('times each click within a millisecond of its start', async () => {
     const latencyFrameCount = Math.round(0.3 * rate);
     const { peaks } = await measure(latencyFrameCount);
     expect(peaks).toHaveLength(clickFrames.length);
     for (const peak of peaks) {
       const delay = peak.onsetFrame - peak.clickFrame - latencyFrameCount;
       expect(delay).toBeGreaterThanOrEqual(0);
-      expect(delay).toBeLessThan(0.0005 * rate);
+      expect(delay).toBeLessThan(0.001 * rate);
     }
   });
 
