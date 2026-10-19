@@ -19,7 +19,6 @@ import {
   useCalibrationTexts,
 } from './calibrationTexts.js';
 import { useCalibrationFlow } from './useCalibrationFlow.js';
-import { useOutputVolume } from './useOutputVolume.js';
 
 export type CalibrationContentProps = {
   prompt: CalibrationPrompt;
@@ -42,7 +41,6 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
   const place = getCalibrationPlace(kind, output?.label ?? '');
   const device = getCalibrationDevice();
   const texts = useCalibrationTexts(place, device);
-  const volume = useOutputVolume(phase !== 'measuring' && phase !== 'done');
   const outputLabel =
     output?.label || t('pages.project.calibration.thisOutput');
   const headphones = place === 'headphones';
@@ -65,7 +63,6 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
           handheld={device === 'phone'}
           headphones={headphones}
           texts={texts}
-          volume={volume}
           gutter={gutter}
         />
       )}
@@ -78,12 +75,7 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         />
       )}
       {phase !== 'ask' && phase !== 'measuring' && phase !== 'done' && (
-        <CalibrationFailureNote
-          failure={phase}
-          texts={texts}
-          volume={volume}
-          gutter={gutter}
-        />
+        <CalibrationFailureNote failure={phase} texts={texts} gutter={gutter} />
       )}
       <CalibrationActions
         primary={flow.primary}

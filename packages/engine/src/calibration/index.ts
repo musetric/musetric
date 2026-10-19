@@ -10,6 +10,7 @@ import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
+  type EngineOutputVolume,
   type EngineState,
   getInputLatencyFrameCount,
   getOutputLatencyFrameCount,
@@ -88,7 +89,10 @@ export type EngineCalibration = {
   setManualLatencyMs: (latencyMs: number) => void;
   calibrate: () => Promise<boolean>;
   skip: () => void;
-  readOutputVolume: () => Promise<number | undefined>;
+  readOutputVolume: () => Promise<EngineOutputVolume | undefined>;
+  writeOutputVolume: (
+    volume: number,
+  ) => Promise<EngineOutputVolume | undefined>;
   openPreview: () => () => void;
   isOutputSelectionSupported: () => boolean;
 };
@@ -345,6 +349,8 @@ export const createEngineCalibration = (
     },
     readOutputVolume: async () =>
       audioSession.readOutputVolume?.() ?? Promise.resolve(undefined),
+    writeOutputVolume: async (volume) =>
+      audioSession.writeOutputVolume?.(volume) ?? Promise.resolve(undefined),
     openPreview: () => getPreview().open(),
     isOutputSelectionSupported: () => audioOutput.supportsDeviceSelection,
   };

@@ -8,14 +8,13 @@ import { type CalibrationFailure } from './useCalibrationFlow.js';
 export type CalibrationFailureNoteProps = {
   failure: CalibrationFailure;
   texts: CalibrationTexts;
-  volume: number | undefined;
   gutter: number;
 };
 
 export const CalibrationFailureNote: FC<CalibrationFailureNoteProps> = (
   props,
 ) => {
-  const { failure, texts, volume, gutter } = props;
+  const { failure, texts, gutter } = props;
   const { t } = useTranslation();
   const titles: Record<CalibrationFailure, string> = {
     noisy: t('pages.project.calibration.noisy.title'),
@@ -37,9 +36,7 @@ export const CalibrationFailureNote: FC<CalibrationFailureNoteProps> = (
       <Typography variant='body2' sx={{ color: 'text.secondary' }}>
         {notes[failure]}
       </Typography>
-      {volume !== undefined && failure === 'quiet' && (
-        <CalibrationVolume volume={volume} />
-      )}
+      {failure === 'quiet' && <CalibrationVolume />}
     </Stack>
   );
 };

@@ -1,61 +1,43 @@
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import { alpha, Box, Stack, Typography } from '@mui/material';
+import { Slider, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useOutputVolume } from './useOutputVolume.js';
 
 const loudEnoughVolume = 1 / 3;
 
-export type CalibrationVolumeProps = {
-  volume: number;
-};
-
-export const CalibrationVolume: FC<CalibrationVolumeProps> = (props) => {
-  const { volume } = props;
+export const CalibrationVolume: FC = () => {
   const { t } = useTranslation();
+  const { outputVolume, setVolume } = useOutputVolume();
+  if (!outputVolume) {
+    return undefined;
+  }
+  const { volume, steps } = outputVolume;
   const low = volume < loudEnoughVolume;
-  const percent = Math.round(volume * 100);
   return (
-    <Stack sx={{ gap: 1.5 }}>
-      <Stack direction='row' sx={{ gap: 2.5, alignItems: 'center' }}>
+    <Stack sx={{ gap: 0.5 }}>
+      <Stack direction='row' sx={{ gap: 3, alignItems: 'center' }}>
         <VolumeUpIcon fontSize='small' sx={{ color: 'text.secondary' }} />
-        <Box
-          role='meter'
+        <Slider
           aria-label={t('pages.project.calibration.volume.label')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          sx={(theme) => ({
-            position: 'relative',
-            flex: 1,
-            height: 6,
-            borderRadius: 1.5,
-            bgcolor: alpha(theme.palette.text.primary, 0.14),
-          })}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${percent}%`,
-              borderRadius: 1.5,
-              bgcolor: low ? 'warning.main' : 'primary.main',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              left: `${loudEnoughVolume * 100}%`,
-              top: -3,
-              width: 2,
-              height: 12,
-              bgcolor: 'text.secondary',
-            }}
-          />
-        </Box>
+          min={0}
+          max={steps}
+          step={1}
+          value={Math.round(volume * steps)}
+          marks={[{ value: steps * loudEnoughVolume }]}
+          color={low ? 'warning' : 'primary'}
+          onChange={(_, value) => {
+            if (Array.isArray(value)) {
+              return;
+            }
+            setVolume(value / steps);
+          }}
+          sx={{ flex: 1 }}
+        />
         <Typography variant='body2' sx={{ width: 36, textAlign: 'right' }}>
-          {t('pages.project.calibration.volume.value', { value: percent })}
+          {t('pages.project.calibration.volume.value', {
+            value: Math.round(volume * 100),
+          })}
         </Typography>
       </Stack>
       <Typography

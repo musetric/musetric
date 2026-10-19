@@ -10,12 +10,11 @@ export type CalibrationStepsProps = {
   handheld: boolean;
   headphones: boolean;
   texts: CalibrationTexts;
-  volume: number | undefined;
   gutter: number;
 };
 
 export const CalibrationSteps: FC<CalibrationStepsProps> = (props) => {
-  const { bluetooth, handheld, headphones, texts, volume, gutter } = props;
+  const { bluetooth, handheld, headphones, texts, gutter } = props;
   const { t } = useTranslation();
   return (
     <Stack sx={{ px: gutter, pt: 4, gap: 4 }}>
@@ -57,7 +56,7 @@ export const CalibrationSteps: FC<CalibrationStepsProps> = (props) => {
           </Typography>
         </Box>
       </Stack>
-      {volume !== undefined && <CalibrationVolume volume={volume} />}
+      <CalibrationVolume />
     </Stack>
   );
 };

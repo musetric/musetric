@@ -9,6 +9,11 @@ export type CalibrationErrorCode =
 
 export type MicrophoneDenial = 'app' | 'system' | 'page';
 
+export type EngineOutputVolume = {
+  volume: number;
+  steps: number;
+};
+
 export type WaveformStatuses = Record<StemType, PortStatus> & {
   recording: PortStatus;
 };

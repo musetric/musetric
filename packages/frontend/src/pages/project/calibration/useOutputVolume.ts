@@ -1,20 +1,23 @@
+import { type EngineOutputVolume } from '@musetric/engine';
 import { useEffect, useState } from 'react';
 import { engine } from '../../../engine/engine.js';
 
 const pollMs = 500;
 
-export const useOutputVolume = (active: boolean): number | undefined => {
-  const [volume, setVolume] = useState<number>();
+export type OutputVolumeControl = {
+  outputVolume?: EngineOutputVolume;
+  setVolume: (volume: number) => void;
+};
+
+export const useOutputVolume = (): OutputVolumeControl => {
+  const [outputVolume, setOutputVolume] = useState<EngineOutputVolume>();
 
   useEffect(() => {
-    if (!active) {
-      return undefined;
-    }
     let cancelled = false;
     const read = async () => {
       const next = await engine.calibration.readOutputVolume();
       if (!cancelled) {
-        setVolume(next);
+        setOutputVolume(next);
       }
     };
     void read();
@@ -25,7 +28,16 @@ export const useOutputVolume = (active: boolean): number | undefined => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [active]);
+  }, []);
 
-  return volume;
+  const setVolume = (volume: number) => {
+    setOutputVolume((current) => current && { ...current, volume });
+    void engine.calibration.writeOutputVolume(volume).then((next) => {
+      if (next) {
+        setOutputVolume(next);
+      }
+    });
+  };
+
+  return { outputVolume, setVolume };
 };
