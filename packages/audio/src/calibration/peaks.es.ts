@@ -1,5 +1,6 @@
-const peakThreshold = 0.02;
-const faintPeakThreshold = 0.004;
+const clearClickRatio = 10;
+const faintClickRatio = 7;
+const noisyRoomLevel = 0.01;
 const clickSpreadSeconds = 0.01;
 const minimumClickCount = 3;
 
@@ -7,19 +8,16 @@ export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
   onsetFrame: number;
   peakValue: number;
+  noiseValue: number;
 };
 
-const getOnsetFrameCounts = (
+const getClickFrameCounts = (
   peaks: RecordingLatencyCalibrationPeak[],
-  threshold: number,
+  ratio: number,
 ) =>
   peaks
-    .filter((peak) => peak.peakValue >= threshold)
+    .filter((peak) => peak.peakValue >= peak.noiseValue * ratio)
     .map((peak) => Math.max(0, peak.onsetFrame - peak.clickFrame));
-
-export const getRecordingLatencyCalibrationFrameCounts = (
-  peaks: RecordingLatencyCalibrationPeak[],
-) => getOnsetFrameCounts(peaks, peakThreshold);
 
 export const getMedianFrameCount = (frameCounts: number[]) => {
   const sortedFrameCounts = [...frameCounts].sort(
@@ -49,22 +47,23 @@ export const getRecordingLatencyCalibrationOutcome = (
   peaks: RecordingLatencyCalibrationPeak[],
   sampleRate: number,
 ): RecordingLatencyCalibrationOutcome => {
-  const loudFrameCounts = getRecordingLatencyCalibrationFrameCounts(peaks);
   const measuredLatencyFrameCounts = getAgreeingFrameCounts(
-    loudFrameCounts,
+    getClickFrameCounts(peaks, clearClickRatio),
     sampleRate,
   );
   if (measuredLatencyFrameCounts.length >= minimumClickCount) {
     return { kind: 'measured', measuredLatencyFrameCounts };
   }
-  if (loudFrameCounts.length >= minimumClickCount) {
-    return { kind: 'noisy' };
-  }
   const faintFrameCounts = getAgreeingFrameCounts(
-    getOnsetFrameCounts(peaks, faintPeakThreshold),
+    getClickFrameCounts(peaks, faintClickRatio),
     sampleRate,
   );
-  return faintFrameCounts.length >= minimumClickCount
-    ? { kind: 'quiet' }
+  if (faintFrameCounts.length >= minimumClickCount) {
+    return { kind: 'quiet' };
+  }
+  const noiseValues = peaks.map((peak) => peak.noiseValue);
+  return noiseValues.length > 0 &&
+    getMedianFrameCount(noiseValues) >= noisyRoomLevel
+    ? { kind: 'noisy' }
     : { kind: 'silent' };
 };

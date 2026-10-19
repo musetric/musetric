@@ -4,6 +4,7 @@ export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
   onsetFrame: number;
   peakValue: number;
+  noiseValue: number;
 };
 
 export type RecordingLatencyCalibrationInboundMethods = {

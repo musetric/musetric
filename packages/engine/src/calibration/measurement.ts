@@ -9,7 +9,10 @@ import {
   type EngineAudioSession,
   type EngineMicrophone,
 } from '../audioSession/engineAudioSession.js';
-import { microphoneCalibrationChannel } from './protocol.cross.js';
+import {
+  microphoneCalibrationChannel,
+  type RecordingLatencyCalibrationPeak,
+} from './protocol.cross.js';
 
 const searchLeadSeconds = 0.05;
 
@@ -34,7 +37,7 @@ const loadWorklet = async (
 };
 
 type WorkletResult = {
-  peaks: { clickFrame: number; onsetFrame: number; peakValue: number }[];
+  peaks: RecordingLatencyCalibrationPeak[];
 };
 
 const waitForResult = async (

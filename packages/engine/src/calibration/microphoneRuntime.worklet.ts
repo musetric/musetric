@@ -5,6 +5,14 @@ import {
 
 const onsetRatio = 0.5;
 
+const getMeanLevel = (levels: Float32Array) => {
+  let sum = 0;
+  for (const level of levels) {
+    sum += level;
+  }
+  return levels.length > 0 ? sum / levels.length : 0;
+};
+
 type ClickWindow = {
   clickFrame: number;
   levels: Float32Array;
@@ -25,6 +33,7 @@ const toPeak = (click: ClickWindow): RecordingLatencyCalibrationPeak => {
     clickFrame: click.clickFrame,
     onsetFrame: click.clickFrame + onsetOffset,
     peakValue: click.peakValue,
+    noiseValue: getMeanLevel(click.levels),
   };
 };
 
