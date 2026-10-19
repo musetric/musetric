@@ -182,7 +182,7 @@ const drawings: Record<CalibrationSpot, Drawing> = {
       </>
     ),
     microphone: { x: 58, y: 10 },
-    earCup: { x: 40, y: 30, band: 'M20 30C8 30 6 48 12 60' },
+    earCup: { x: 34, y: 18, band: 'M14 18C4 18 2 36 8 48' },
   },
 };
 
