@@ -1,4 +1,4 @@
-import { Box, Drawer, Stack } from '@mui/material';
+import { Box, Drawer, Stack, useMediaQuery } from '@mui/material';
 import { type FC } from 'react';
 import { useProjectStore } from '../store.js';
 import { AudioInputSelect } from './AudioInputSelect.js';
@@ -11,13 +11,32 @@ import { RecordingGainControl } from './RecordingGainControl.js';
 import { RecordingLatencyControl } from './RecordingLatencyControl.js';
 
 export const AudioSettings: FC = () => {
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
   const open = useProjectStore((state) => state.audioSettingsOpen);
   const setOpen = useProjectStore((state) => state.setAudioSettingsOpen);
 
   return (
-    <Drawer anchor='right' open={open} onClose={() => setOpen(false)}>
+    <Drawer
+      anchor={isDesktop ? 'right' : 'bottom'}
+      open={open}
+      onClose={() => setOpen(false)}
+    >
       <AudioSettingsLifecycle>
-        <Box role='presentation' sx={{ width: 340, p: 2 }}>
+        <Box
+          role='presentation'
+          sx={
+            isDesktop
+              ? { width: 340, p: 2 }
+              : {
+                  width: '100%',
+                  maxWidth: 460,
+                  mx: 'auto',
+                  boxSizing: 'border-box',
+                  p: 4,
+                  pb: 'max(18px, env(safe-area-inset-bottom))',
+                }
+          }
+        >
           <Stack sx={{ gap: 4 }}>
             <AudioSettingsHeader />
             <AudioSettingsError />
