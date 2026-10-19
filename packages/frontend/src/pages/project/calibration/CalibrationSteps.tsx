@@ -2,19 +2,22 @@ import { Box, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CalibrationFigure } from './CalibrationFigure.js';
-import { type CalibrationTexts } from './calibrationTexts.js';
+import {
+  type CalibrationSpot,
+  type CalibrationTexts,
+} from './calibrationTexts.js';
 import { CalibrationVolume } from './CalibrationVolume.js';
 
 export type CalibrationStepsProps = {
   bluetooth: boolean;
-  handheld: boolean;
+  spot: CalibrationSpot;
   headphones: boolean;
   texts: CalibrationTexts;
   gutter: number;
 };
 
 export const CalibrationSteps: FC<CalibrationStepsProps> = (props) => {
-  const { bluetooth, handheld, headphones, texts, gutter } = props;
+  const { bluetooth, spot, headphones, texts, gutter } = props;
   const { t } = useTranslation();
   return (
     <Stack sx={{ px: gutter, pt: 4, gap: 4 }}>
@@ -34,7 +37,7 @@ export const CalibrationSteps: FC<CalibrationStepsProps> = (props) => {
         }}
       >
         <CalibrationFigure
-          handheld={handheld}
+          spot={spot}
           headphones={headphones}
           label={texts.figure}
         />

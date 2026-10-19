@@ -9,6 +9,9 @@ export const CalibrationDialog: FC = () => {
   const prompt = useProjectStore((state) => state.calibrationPrompt);
   const setPrompt = useProjectStore((state) => state.setCalibrationPrompt);
   const audioSettingsOpen = useProjectStore((state) => state.audioSettingsOpen);
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
+  );
   const open = prompt !== undefined;
 
   useEffect(() => {
@@ -20,6 +23,9 @@ export const CalibrationDialog: FC = () => {
 
   const close = () => {
     setPrompt(undefined);
+    if (prompt === 'settings') {
+      setAudioSettingsOpen(true);
+    }
   };
 
   if (isDesktop) {

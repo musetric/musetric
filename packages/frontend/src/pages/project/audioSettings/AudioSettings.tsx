@@ -1,4 +1,4 @@
-import { Box, Drawer, Stack, useMediaQuery } from '@mui/material';
+import { Box, Divider, Drawer, Stack, useMediaQuery } from '@mui/material';
 import { type FC } from 'react';
 import { useProjectStore } from '../store.js';
 import { AudioInputSelect } from './AudioInputSelect.js';
@@ -8,7 +8,7 @@ import { AudioSettingsHeader } from './AudioSettingsHeader.js';
 import { AudioSettingsLifecycle } from './AudioSettingsLifecycle.js';
 import { InputLevelMeter } from './InputLevelMeter.js';
 import { RecordingGainControl } from './RecordingGainControl.js';
-import { RecordingLatencyControl } from './RecordingLatencyControl.js';
+import { TimingRow } from './TimingRow.js';
 
 export const AudioSettings: FC = () => {
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
@@ -44,7 +44,8 @@ export const AudioSettings: FC = () => {
             <AudioInputSelect />
             <InputLevelMeter />
             <RecordingGainControl />
-            <RecordingLatencyControl />
+            <Divider />
+            <TimingRow />
           </Stack>
         </Box>
       </AudioSettingsLifecycle>
