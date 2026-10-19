@@ -32,7 +32,14 @@ export const CalibrationVolume: FC = () => {
             }
             setVolume(value / steps);
           }}
-          sx={{ flex: 1 }}
+          sx={{
+            flex: 1,
+            '& .MuiSlider-mark': {
+              width: 2,
+              height: 12,
+              bgcolor: 'text.secondary',
+            },
+          }}
         />
         <Typography variant='body2' sx={{ width: 36, textAlign: 'right' }}>
           {t('pages.project.calibration.volume.value', {
