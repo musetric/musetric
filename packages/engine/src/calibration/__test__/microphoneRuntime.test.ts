@@ -30,7 +30,11 @@ const heardClick = (frame: number) => {
 const measure = async (latencyFrameCount: number) => {
   const channel = new MessageChannel();
   let peaks: RecordingLatencyCalibrationPeak[] = [];
+  const clickCounts: number[] = [];
   microphoneCalibrationChannel.outbound(channel.port2).bindHandlers({
+    progress: (message) => {
+      clickCounts.push(message.clickCount);
+    },
     done: (message) => {
       peaks = message.peaks;
     },
@@ -55,18 +59,23 @@ const measure = async (latencyFrameCount: number) => {
   await settle();
   channel.port1.close();
   channel.port2.close();
-  return peaks;
+  return { peaks, clickCounts };
 };
 
 describe('microphone calibration runtime', () => {
   it('times each click by its start rather than its loudest sample', async () => {
     const latencyFrameCount = Math.round(0.3 * rate);
-    const peaks = await measure(latencyFrameCount);
+    const { peaks } = await measure(latencyFrameCount);
     expect(peaks).toHaveLength(clickFrames.length);
     for (const peak of peaks) {
       const delay = peak.onsetFrame - peak.clickFrame - latencyFrameCount;
       expect(delay).toBeGreaterThanOrEqual(0);
       expect(delay).toBeLessThan(0.0005 * rate);
     }
+  });
+
+  it('reports each click once its window has been heard', async () => {
+    const { clickCounts } = await measure(Math.round(0.3 * rate));
+    expect(clickCounts).toEqual([1, 2, 3]);
   });
 });

@@ -4,7 +4,8 @@ import { type SpectrogramColors } from '@musetric/spectrogram';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
-export type CalibrationErrorCode = 'preview' | 'output' | 'calibration';
+export type CalibrationErrorCode =
+  'preview' | 'output' | 'calibration' | 'noisy' | 'quiet' | 'silent';
 
 export type MicrophoneDenial = 'app' | 'system' | 'page';
 
@@ -112,7 +113,9 @@ export type EngineState = {
   latencySource: RecordingLatencySource;
   latencyDevicePairKey?: string;
   calibrating: boolean;
+  calibrationClickCount: number;
   calibrationError?: CalibrationErrorCode;
+  calibrationSkippedPairKeys: string[];
   microphoneDenial?: MicrophoneDenial;
   microphoneDenialOpen: boolean;
   inputLevel: number;
@@ -181,6 +184,16 @@ export const getInputShareFrameCount = (state: LatencyState): number =>
 
 export const getRecordingLatencyFrameCount = (state: LatencyState): number =>
   getOutputLatencyFrameCount(state) + getInputShareFrameCount(state);
+
+export const getCalibrationNeeded = (
+  state: Pick<
+    EngineState,
+    'latencySource' | 'latencyDevicePairKey' | 'calibrationSkippedPairKeys'
+  >,
+): boolean =>
+  state.latencySource === 'estimated' &&
+  (state.latencyDevicePairKey === undefined ||
+    !state.calibrationSkippedPairKeys.includes(state.latencyDevicePairKey));
 
 export const getActiveRecording = (
   state: Pick<EngineState, 'recordings'>,

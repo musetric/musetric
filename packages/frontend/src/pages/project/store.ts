@@ -4,12 +4,15 @@ import { type PickerSide } from './pickerPlacement.js';
 
 export type DetailsView = 'text' | 'tracks';
 
+export type CalibrationPrompt = 'record' | 'recordTry' | 'settings';
+
 export type ProjectState = {
   detailsView?: DetailsView;
   spectrogramOpen: boolean;
   chordsOpen: boolean;
   audioSettingsOpen: boolean;
   mixdownOpen: boolean;
+  calibrationPrompt?: CalibrationPrompt;
   pickerSide: PickerSide;
   mixAnchorEl?: HTMLElement;
   transposeAnchorEl?: HTMLElement;
@@ -35,6 +38,7 @@ export type ProjectActions = {
   setChordsOpen: (value: boolean) => void;
   setAudioSettingsOpen: (value: boolean) => void;
   setMixdownOpen: (value: boolean) => void;
+  setCalibrationPrompt: (value: CalibrationPrompt | undefined) => void;
   setMixAnchorEl: (
     anchorEl: HTMLElement | undefined,
     side?: PickerSide,
@@ -63,6 +67,7 @@ export const useProjectStore = create<State>()(
     setChordsOpen: (chordsOpen) => set({ chordsOpen }),
     setAudioSettingsOpen: (audioSettingsOpen) => set({ audioSettingsOpen }),
     setMixdownOpen: (mixdownOpen) => set({ mixdownOpen }),
+    setCalibrationPrompt: (calibrationPrompt) => set({ calibrationPrompt }),
     setMixAnchorEl: (mixAnchorEl, side = 'top') =>
       set(mixAnchorEl ? { mixAnchorEl, pickerSide: side } : { mixAnchorEl }),
     setTransposeAnchorEl: (transposeAnchorEl, side = 'top') =>

@@ -22,6 +22,7 @@ export type EngineAudioSession = {
   enumerateDevices: () => Promise<MediaDeviceInfo[]>;
   subscribeDevices: (listener: () => void) => () => void;
   checkMicrophoneAccess?: () => Promise<boolean>;
+  readOutputVolume?: () => Promise<number>;
   readMicrophoneDenial: (error: unknown) => MicrophoneDenial | undefined;
   canOpenMicrophoneSettings: (denial: MicrophoneDenial) => boolean;
   openMicrophoneSettings: (denial: MicrophoneDenial) => void;

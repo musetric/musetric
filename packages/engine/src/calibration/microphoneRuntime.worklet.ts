@@ -66,6 +66,7 @@ export const createMicrophoneCalibrationRuntime = (
       }
 
       clickIndex += 1;
+      port.methods.progress({ clickCount: clickIndex });
     }
   };
 

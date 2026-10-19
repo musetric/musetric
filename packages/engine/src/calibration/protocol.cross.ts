@@ -7,6 +7,7 @@ export type RecordingLatencyCalibrationPeak = {
 };
 
 export type RecordingLatencyCalibrationInboundMethods = {
+  progress: (message: { clickCount: number }) => void;
   done: (message: { peaks: RecordingLatencyCalibrationPeak[] }) => void;
 };
 
@@ -19,7 +20,7 @@ export const microphoneCalibrationChannel = createMessageChannel<
   RecordingLatencyCalibrationOutboundMethods
 >({
   inbound: {
-    keys: ['done'],
+    keys: ['progress', 'done'],
   },
   outbound: {
     keys: ['start'],

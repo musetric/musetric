@@ -87,6 +87,8 @@ const initialState: EngineState = {
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
+  calibrationClickCount: 0,
+  calibrationSkippedPairKeys: [],
   microphoneDenialOpen: false,
   inputLevel: 0,
   recordingGain: 1,

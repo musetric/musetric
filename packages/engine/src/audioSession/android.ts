@@ -117,9 +117,14 @@ const accessSchema = z.object({
   granted: z.boolean(),
 });
 
+const volumeSchema = z.object({
+  volume: z.number(),
+});
+
 type AndroidMicrophoneCommand =
   | { type: 'devices' }
   | { type: 'access' }
+  | { type: 'volume' }
   | { type: 'start'; deviceId?: string; sampleRate: number }
   | { type: 'stop' }
   | { type: 'openSettings' };
@@ -287,6 +292,8 @@ export const createAndroidAudioSession = (
     },
     checkMicrophoneAccess: async () =>
       accessSchema.parse(await request({ type: 'access' })).granted,
+    readOutputVolume: async () =>
+      volumeSchema.parse(await request({ type: 'volume' })).volume,
     readMicrophoneDenial: (error) =>
       error instanceof Error && error.message === microphoneAccessDenied
         ? 'app'

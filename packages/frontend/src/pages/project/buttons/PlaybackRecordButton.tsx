@@ -1,12 +1,12 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import { Badge, Box, IconButton, Tooltip } from '@mui/material';
-import { getActiveRecording } from '@musetric/engine';
+import { getActiveRecording, getCalibrationNeeded } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { lockLoop } from '../loop/loopActions.js';
+import { requestTake } from '../calibration/takeActions.js';
 import { getBeatsToFrom } from '../loop/loopCountdown.js';
 
 export const PlaybackRecordButton: FC = () => {
@@ -29,6 +29,7 @@ export const PlaybackRecordButton: FC = () => {
       ? getBeatsToFrom(state, engine.context.sampleRate)
       : undefined,
   );
+  const calibrationNeeded = useEngineStore(getCalibrationNeeded);
   const recordingName = useEngineStore(
     (state) => getActiveRecording(state)?.name,
   );
@@ -52,15 +53,34 @@ export const PlaybackRecordButton: FC = () => {
   const title = getTitle();
   const pressed = looping ? phase !== undefined : recording;
   const writing = recording && phase !== 'armed';
+  const calibrationHint =
+    calibrationNeeded && !pressed
+      ? t('pages.project.calibration.recordHint')
+      : undefined;
 
   return (
-    <Tooltip enterTouchDelay={0} title={title}>
+    <Tooltip
+      enterTouchDelay={0}
+      title={
+        calibrationHint ? (
+          <Box
+            component='span'
+            sx={{ display: 'flex', flexDirection: 'column' }}
+          >
+            <span>{title}</span>
+            <span>{calibrationHint}</span>
+          </Box>
+        ) : (
+          title
+        )
+      }
+    >
       <Box
         component='span'
         sx={{ flex: 1, alignSelf: 'stretch', display: 'flex', ml: -1 }}
       >
         <IconButton
-          aria-label={title}
+          aria-label={calibrationHint ? `${title}. ${calibrationHint}` : title}
           aria-pressed={pressed}
           color={writing ? 'inherit' : 'error'}
           disabled={disabled}
@@ -70,17 +90,14 @@ export const PlaybackRecordButton: FC = () => {
                 void engine.player.cancelTry();
                 return;
               }
-              if (stage === 'range') {
-                lockLoop();
-              }
-              void engine.player.recordTry(projectId);
+              requestTake('recordTry', projectId);
               return;
             }
             if (recording) {
               void engine.player.stopRecording();
               return;
             }
-            void engine.player.record(projectId);
+            requestTake('record', projectId);
           }}
           sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}
         >
@@ -106,7 +123,13 @@ export const PlaybackRecordButton: FC = () => {
               </Box>
             </Badge>
           ) : (
-            <MicRoundedIcon />
+            <Badge
+              variant='dot'
+              color='warning'
+              invisible={calibrationHint === undefined}
+            >
+              <MicRoundedIcon />
+            </Badge>
           )}
         </IconButton>
       </Box>
