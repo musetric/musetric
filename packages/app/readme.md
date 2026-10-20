@@ -43,8 +43,10 @@ writes `gen/AppIcon.icon`, an Icon Composer icon of the same background and
 glyph: the macOS bundler compiles it into `Assets.car` with `actool` from
 Xcode 26 or later and keeps `icon.icns` as the fallback for older macOS
 releases. Without Xcode 26 the bundler logs an error and ships only
-`icon.icns`, which macOS 26 draws on a light plate at 16 and 32 px. Tauri's
-`android` and `ios` development and build commands run that step
+`icon.icns`, which macOS 26 draws on a light plate at 16 and 32 px. The
+`actool` of Xcode 26.5 and 26.6 crashes on any `.icon` input, so bundle with
+an Xcode from 26.0 to 26.4.1 selected through `xcode-select`, as CI does.
+Tauri's `android` and `ios` development and build commands run that step
 automatically; the same script also refreshes the Android splash screen
 images under `gen/android`. The Vite build renders the page's favicons and
 web manifest from the same file.
