@@ -1,4 +1,5 @@
 import { createPlayhead } from '../player/playhead.cross.js';
+import { createEdgeProbe } from './edgeProbe.worker.js';
 import {
   spectrogramChannel,
   spectrogramDataChannel,
@@ -23,9 +24,8 @@ port.bindBoot(async (message) => {
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
     playhead: createPlayhead(message.playheadPort, message.sampleRate),
-    sampleRate: message.sampleRate,
     profiling,
-    measure,
+    probeEdges: measure ? createEdgeProbe(message.sampleRate) : undefined,
   });
   port.methods.booted();
 });

@@ -70,9 +70,14 @@ export type EdgeProbeFrame = {
   writtenEnd: number;
 };
 
-export const createEdgeProbe = (sampleRate: number) => {
+export type EdgeProbe = (
+  processor: SpectrogramProcessor,
+  frame: EdgeProbeFrame,
+) => Promise<void>;
+
+export const createEdgeProbe = (sampleRate: number): EdgeProbe => {
   let renderCount = 0;
-  return async (processor: SpectrogramProcessor, frame: EdgeProbeFrame) => {
+  return async (processor, frame) => {
     renderCount += 1;
     if (renderCount % probeEvery !== 0) {
       return;
