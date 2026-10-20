@@ -92,7 +92,7 @@ const formatComparison = (
   return `${Math.abs(difference).toFixed(1)} dB ${difference >= 0 ? more : less}`;
 };
 
-export const formatSoundReport = (sound: SoundResult, holes: HoleResult) => {
+export const formatSoundReport = (sound: SoundResult) => {
   const { app, browser } = sound;
   return [
     `| Band | ${bandCenters.map(formatBand).join(' | ')} |`,
@@ -102,7 +102,9 @@ export const formatSoundReport = (sound: SoundResult, holes: HoleResult) => {
     `- Bursts against the vowel: ${formatComparison(app.sibilantOverVowel, browser.sibilantOverVowel, 'louder', 'quieter')} than in the browser path.`,
     `- Peak: ${formatNumber(app.peak, 1)} dBFS against ${formatNumber(browser.peak, 1)}; samples at the limiter: ${app.limiterCount} against ${browser.limiterCount}.`,
     `- Noise in the pauses: ${formatNumber(app.pauseNoise, 1)} dBFS against ${formatNumber(browser.pauseNoise, 1)}, ${formatComparison(app.pauseNoise, browser.pauseNoise, 'more', 'less')} than in the browser path.`,
-    `- Take: ${holes.holeCount} gaps of exact zeros of 1 ms or longer, longest ${holes.longestMs.toFixed(2)} ms, level ${formatNumber(holes.rms, 1)} dBFS.`,
     `- Alignment with the played file: correlation ${app.correlation.toFixed(2)} in the app, ${browser.correlation.toFixed(2)} in the browser path.`,
   ].join('\n');
 };
+
+export const formatHoles = (holes: HoleResult, seconds: number) =>
+  `Take with the song, ${seconds} s: ${holes.holeCount} gaps of exact zeros of 1 ms or longer, longest ${holes.longestMs.toFixed(2)} ms, level ${formatNumber(holes.rms, 1)} dBFS.`;

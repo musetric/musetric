@@ -32,6 +32,7 @@ export type MeasureRequest = {
   outDir: string;
   reanalyze: boolean;
   calibrate: boolean;
+  takeOnly: boolean;
   seconds: number;
   tempos: number[];
   startSeconds: number;

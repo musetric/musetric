@@ -40,3 +40,9 @@ drawn edges after each third frame.
 Open a project before running a command. `measure:delay` and `measure:sound`
 play their file from this computer with `ffplay`, which must be on `PATH`:
 put the speaker next to the device's microphone.
+
+On Android the file comparison of `measure:sound` needs Bluetooth off: with a
+headset connected the WebView records the headset microphone and keeps the
+call route until the app restarts, so the command refuses it on a Bluetooth
+output. `--take-only` records just the long take with the song, which is the
+part to run on Bluetooth.

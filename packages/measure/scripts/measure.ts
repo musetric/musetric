@@ -15,6 +15,7 @@ type MeasureRequest = {
   outDir: string;
   reanalyze: boolean;
   calibrate: boolean;
+  takeOnly: boolean;
   seconds: number;
   tempos: number[];
   startSeconds: number;
@@ -47,6 +48,7 @@ options
   --tempos <a,b>                     timing tempos (default: 1)
   --start <seconds>                  where delay and sound takes start in the song (default: 30)
   --take-seconds <n>                 the sound take with the song (default: 60)
+  --take-only                        sound: only the take with the song, without the file comparison
   --volume <dB>                      gain of the file the PC plays (default: 0)
   --signal <wav>                     a file to play instead of the generated one`;
 
@@ -72,6 +74,7 @@ const parseOptions = (argv: string[]) => {
         out: { type: 'string' },
         reanalyze: { type: 'boolean', default: false },
         'keep-calibration': { type: 'boolean', default: false },
+        'take-only': { type: 'boolean', default: false },
         seconds: { type: 'string', default: '20' },
         tempos: { type: 'string', default: '1' },
         start: { type: 'string', default: '30' },
@@ -103,6 +106,7 @@ const readRequest = (argv: string[]): MeasureRequest => {
     outDir: resolve(values.out ?? resolve(packageRoot, 'tmp/measure', command)),
     reanalyze: values.reanalyze,
     calibrate: !values['keep-calibration'],
+    takeOnly: values['take-only'],
     seconds: Number(values.seconds),
     tempos: values.tempos.split(',').map(Number),
     startSeconds: Number(values.start),

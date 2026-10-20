@@ -1,8 +1,16 @@
-import { analyzeHoles, analyzeSound } from './analysis/sound.es.js';
+import {
+  analyzeHoles,
+  analyzeSound,
+  type SoundSignal,
+} from './analysis/sound.es.js';
 import { playFile, readWav, writeWav } from './audioFiles.node.js';
 import { type MeasurePage } from './page.node.js';
-import { formatSoundReport } from './report.es.js';
-import { browserCaptureSchema, soundTakeSchema } from './runs.es.js';
+import { formatHoles, formatSoundReport } from './report.es.js';
+import {
+  browserCaptureSchema,
+  calibrationSchema,
+  soundTakeSchema,
+} from './runs.es.js';
 import {
   createOutput,
   formatSetup,
@@ -43,41 +51,59 @@ const captureWhilePlaying = async (capture: PlayedCapture) => {
   return pending;
 };
 
-const recordRuns = async (request: MeasureRequest, output: MeasureOutput) => {
+const recordFileRuns = async (
+  request: MeasureRequest,
+  output: MeasureOutput,
+  page: MeasurePage,
+) => {
+  const latency = calibrationSchema.shape.latency.parse(
+    JSON.parse(await page.callText('latency', {})),
+  );
+  if (request.device.kind === 'android' && latency.outputKind === 'bluetooth') {
+    throw new Error(
+      'Turn Bluetooth off for the file comparison: with a headset connected the WebView records the headset microphone and keeps the call route. Use --take-only to record only the long take',
+    );
+  }
   const reference = readReference(request);
   const file = output.path('signal.wav');
   writeWav(file, reference.samples, reference.sampleRate, 'float32');
   const seconds =
     reference.samples.length / reference.sampleRate + captureMarginSeconds;
+  console.log('Capturing the played file through the browser path');
+  output.write(
+    'browser.json',
+    await captureWhilePlaying({
+      page,
+      procedure: 'browserCapture',
+      options: { seconds },
+      file,
+      volumeDb: request.volumeDb,
+    }),
+  );
+  console.log('Recording the played file into a temporary take');
+  output.write(
+    'app.json',
+    await captureWhilePlaying({
+      page,
+      procedure: 'take',
+      options: {
+        projectId: page.projectId,
+        seconds,
+        startSeconds: request.startSeconds,
+        songVolume: 0,
+      },
+      file,
+      volumeDb: request.volumeDb,
+    }),
+  );
+};
+
+const recordRuns = async (request: MeasureRequest, output: MeasureOutput) => {
   const page = await openCalibratedPage(request);
   try {
-    console.log('Capturing the played file through the browser path');
-    output.write(
-      'browser.json',
-      await captureWhilePlaying({
-        page,
-        procedure: 'browserCapture',
-        options: { seconds },
-        file,
-        volumeDb: request.volumeDb,
-      }),
-    );
-    console.log('Recording the played file into a temporary take');
-    output.write(
-      'app.json',
-      await captureWhilePlaying({
-        page,
-        procedure: 'take',
-        options: {
-          projectId: page.projectId,
-          seconds,
-          startSeconds: request.startSeconds,
-          songVolume: 0,
-        },
-        file,
-        volumeDb: request.volumeDb,
-      }),
-    );
+    if (!request.takeOnly) {
+      await recordFileRuns(request, output, page);
+    }
     console.log(`Recording a ${request.takeSeconds} s take with the song`);
     output.write(
       'holes.json',
@@ -93,36 +119,45 @@ const recordRuns = async (request: MeasureRequest, output: MeasureOutput) => {
   }
 };
 
+const writeListening = (
+  output: MeasureOutput,
+  name: string,
+  signal: SoundSignal,
+) => {
+  writeWav(
+    output.path(`${name}.wav`),
+    signal.samples,
+    signal.sampleRate,
+    'float32',
+  );
+};
+
+const reportFileRuns = (request: MeasureRequest, output: MeasureOutput) => {
+  const browser = browserCaptureSchema.parse(
+    JSON.parse(output.read('browser.json')),
+  );
+  const app = soundTakeSchema.parse(JSON.parse(output.read('app.json')));
+  writeListening(output, 'browser', browser);
+  writeListening(output, 'app', app);
+  return [
+    formatSoundReport(analyzeSound(readReference(request), browser, app)),
+    '',
+    `Browser path: ${browser.label || 'default'}, ${JSON.stringify(browser.settings)}.`,
+  ];
+};
+
 export const runSound = async (request: MeasureRequest) => {
   const output = createOutput(request.outDir);
   if (!request.reanalyze) {
     await recordRuns(request, output);
   }
-  const browser = browserCaptureSchema.parse(
-    JSON.parse(output.read('browser.json')),
-  );
-  const app = soundTakeSchema.parse(JSON.parse(output.read('app.json')));
   const holes = soundTakeSchema.parse(JSON.parse(output.read('holes.json')));
-  for (const [name, signal] of [
-    ['browser', browser],
-    ['app', app],
-    ['holes', holes],
-  ] as const) {
-    writeWav(
-      output.path(`${name}.wav`),
-      signal.samples,
-      signal.sampleRate,
-      'float32',
-    );
-  }
+  writeListening(output, 'holes', holes);
   const report = [
-    formatSoundReport(
-      analyzeSound(readReference(request), browser, app),
-      analyzeHoles(holes),
-    ),
+    ...(request.takeOnly ? [] : reportFileRuns(request, output)),
+    formatHoles(analyzeHoles(holes), request.takeSeconds),
     '',
-    `Browser path: ${browser.label}, ${JSON.stringify(browser.settings)}.`,
-    formatSetup(app.latency),
+    formatSetup(holes.latency),
   ].join('\n');
   output.write('report.md', `${report}\n`);
   console.log(report);
