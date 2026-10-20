@@ -18,10 +18,6 @@ const insetSvg = svg
 const insetIcon = new Resvg(insetSvg, { fitTo: { mode: 'width', value: 1024 } })
   .render()
   .asPng();
-const glyphSvg = svg.replace(/<rect\b[^>]*\/>/, '');
-const glyphIcon = new Resvg(glyphSvg, { fitTo: { mode: 'width', value: 1024 } })
-  .render()
-  .asPng();
 
 const genDir = join(packageDir, 'src-tauri', 'gen');
 await mkdir(genDir, { recursive: true });
@@ -34,38 +30,6 @@ await writeFile(
       default: 'icon.png',
       android_fg: 'iconForeground.png',
       bg_color: '#111111',
-    },
-    undefined,
-    2,
-  )}\n`,
-);
-
-const appIconDir = join(genDir, 'AppIcon.icon');
-await mkdir(join(appIconDir, 'Assets'), { recursive: true });
-await writeFile(
-  join(appIconDir, 'Assets', 'glyph.png'),
-  Buffer.from(glyphIcon),
-);
-await writeFile(
-  join(appIconDir, 'icon.json'),
-  `${JSON.stringify(
-    {
-      fill: {
-        'linear-gradient': [
-          'srgb:0.16471,0.16471,0.16471,1.00000',
-          'srgb:0.06667,0.06667,0.06667,1.00000',
-        ],
-        orientation: {
-          start: { x: 0.5, y: 0 },
-          stop: { x: 0.5, y: 1 },
-        },
-      },
-      groups: [
-        {
-          layers: [{ glass: false, 'image-name': 'glyph.png', name: 'glyph' }],
-        },
-      ],
-      'supported-platforms': { squares: ['macOS'] },
     },
     undefined,
     2,

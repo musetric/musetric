@@ -123,9 +123,6 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-${{ matrix.arch }}-
       - run: rm -rf packages/server/target/*/release/bundle packages/server/target/release/bundle 2>/dev/null
         shell: bash
-      # actool from Xcode 26.5 and 26.6 crashes on any Icon Composer .icon input
-      - if: matrix.platform == 'macOS'
-        run: sudo xcode-select -s /Applications/Xcode_26.4.1.app
       - run: yarn workspace @musetric/app pack:installer -- --target ${{ matrix.rustTarget }} --version ${{ needs.prepare.outputs.version }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
