@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 export type WavFormat = 'pcm16' | 'float32';
@@ -107,6 +107,12 @@ export const playFile = (path: string, options: PlaybackOptions): Playback => {
   return {
     finished,
     stop: () => {
+      if (process.platform === 'win32' && child.pid !== undefined) {
+        spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+          stdio: 'ignore',
+        });
+        return;
+      }
       child.kill();
     },
   };
