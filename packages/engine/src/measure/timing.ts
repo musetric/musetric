@@ -78,7 +78,7 @@ export const measureTimingTake = async (
       const unsubscribeCaptured = tap.listen((chunk) => {
         capturedRate = chunk.sampleRate;
         chunks.push([capturedLength, performance.timeOrigin + chunk.startMs]);
-        parts.push(chunk.samples);
+        parts.push(chunk.samples.slice());
         capturedLength += chunk.samples.length;
       });
       const latencyTimeout = setTimeout(() => {
