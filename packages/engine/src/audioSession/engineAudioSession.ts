@@ -1,5 +1,5 @@
 import { type RecordingInputSettings } from '@musetric/audio/recording';
-import { type MicrophoneDenial } from '../state.js';
+import { type EngineOutputVolume, type MicrophoneDenial } from '../state.js';
 
 export type EngineMicrophone = {
   getSettings: () => RecordingInputSettings;
@@ -22,6 +22,8 @@ export type EngineAudioSession = {
   enumerateDevices: () => Promise<MediaDeviceInfo[]>;
   subscribeDevices: (listener: () => void) => () => void;
   checkMicrophoneAccess?: () => Promise<boolean>;
+  readOutputVolume?: () => Promise<EngineOutputVolume>;
+  writeOutputVolume?: (volume: number) => Promise<EngineOutputVolume>;
   readMicrophoneDenial: (error: unknown) => MicrophoneDenial | undefined;
   canOpenMicrophoneSettings: (denial: MicrophoneDenial) => boolean;
   openMicrophoneSettings: (denial: MicrophoneDenial) => void;

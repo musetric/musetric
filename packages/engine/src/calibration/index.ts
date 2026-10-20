@@ -10,6 +10,7 @@ import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
+  type EngineOutputVolume,
   type EngineState,
   getInputLatencyFrameCount,
   getOutputLatencyFrameCount,
@@ -87,6 +88,11 @@ export type EngineCalibration = {
   selectOutputDevice: (deviceId: string) => Promise<void>;
   setManualLatencyMs: (latencyMs: number) => void;
   calibrate: () => Promise<boolean>;
+  skip: () => void;
+  readOutputVolume: () => Promise<EngineOutputVolume | undefined>;
+  writeOutputVolume: (
+    volume: number,
+  ) => Promise<EngineOutputVolume | undefined>;
   openPreview: () => () => void;
   isOutputSelectionSupported: () => boolean;
 };
@@ -229,6 +235,7 @@ export const createEngineCalibration = (
 
     store.update((draft) => {
       draft.calibrating = true;
+      draft.calibrationClickCount = 0;
       draft.calibrationError = undefined;
     });
 
@@ -250,11 +257,16 @@ export const createEngineCalibration = (
         processorName: microphoneCalibrationProcessorName,
         deviceId: inputDevice?.deviceId,
         microphone,
+        onProgress: (clickCount) => {
+          store.update((draft) => {
+            draft.calibrationClickCount = clickCount;
+          });
+        },
       });
 
-      if (!result) {
+      if (result.kind !== 'measured') {
         store.update((draft) => {
-          draft.calibrationError = 'calibration';
+          draft.calibrationError = result.kind;
         });
         return false;
       }
@@ -326,6 +338,19 @@ export const createEngineCalibration = (
       saveCorrection(frameCount, 'manual', false);
     },
     calibrate: runCalibration,
+    skip: () => {
+      const { latencyDevicePairKey } = store.get();
+      if (latencyDevicePairKey === undefined) {
+        return;
+      }
+      store.update((draft) => {
+        draft.calibrationSkippedPairKeys.push(latencyDevicePairKey);
+      });
+    },
+    readOutputVolume: async () =>
+      audioSession.readOutputVolume?.() ?? Promise.resolve(undefined),
+    writeOutputVolume: async (volume) =>
+      audioSession.writeOutputVolume?.(volume) ?? Promise.resolve(undefined),
     openPreview: () => getPreview().open(),
     isOutputSelectionSupported: () => audioOutput.supportsDeviceSelection,
   };

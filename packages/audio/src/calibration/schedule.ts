@@ -1,11 +1,12 @@
+import { getMedianFrameCount } from './peaks.es.js';
+
 const clickDelaySeconds = 0.25;
 const clickCount = 5;
 const clickIntervalSeconds = 1;
 const clickTailSeconds = 1.1;
 const clickDurationSeconds = 0.08;
-const clickFrequencyHz = 1800;
-const peakThreshold = 0.02;
 
+export const recordingLatencyCalibrationClickFrequencyHz = 1800;
 export const recordingLatencyCalibrationTimeoutSeconds = 6.2;
 export const minimumRecordingLatencyMs = 0;
 export const maximumRecordingLatencyMs = 1000;
@@ -21,7 +22,10 @@ export const createRecordingLatencyCalibrationClick = (
     const time = index / context.sampleRate;
     const progress = index / channel.length;
     const envelope = (1 - progress) * (1 - progress);
-    channel[index] = Math.sin(time * Math.PI * 2 * clickFrequencyHz) * envelope;
+    channel[index] =
+      Math.sin(
+        time * Math.PI * 2 * recordingLatencyCalibrationClickFrequencyHz,
+      ) * envelope;
   }
 
   return buffer;
@@ -56,26 +60,6 @@ export const createRecordingLatencyCalibrationSchedule = (
     clickFrames,
     endFrame,
   };
-};
-
-export type RecordingLatencyCalibrationPeak = {
-  clickFrame: number;
-  onsetFrame: number;
-  peakValue: number;
-};
-
-export const getRecordingLatencyCalibrationFrameCounts = (
-  peaks: RecordingLatencyCalibrationPeak[],
-) =>
-  peaks
-    .filter((peak) => peak.peakValue >= peakThreshold)
-    .map((peak) => Math.max(0, peak.onsetFrame - peak.clickFrame));
-
-export const getMedianFrameCount = (frameCounts: number[]) => {
-  const sortedFrameCounts = [...frameCounts].sort(
-    (left, right) => left - right,
-  );
-  return sortedFrameCounts[Math.floor(sortedFrameCounts.length / 2)];
 };
 
 export const clampRecordingLatencyFrameCount = (

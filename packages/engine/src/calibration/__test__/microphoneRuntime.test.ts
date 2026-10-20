@@ -30,7 +30,11 @@ const heardClick = (frame: number) => {
 const measure = async (latencyFrameCount: number) => {
   const channel = new MessageChannel();
   let peaks: RecordingLatencyCalibrationPeak[] = [];
+  const clickCounts: number[] = [];
   microphoneCalibrationChannel.outbound(channel.port2).bindHandlers({
+    progress: (message) => {
+      clickCounts.push(message.clickCount);
+    },
     done: (message) => {
       peaks = message.peaks;
     },
@@ -38,7 +42,12 @@ const measure = async (latencyFrameCount: number) => {
   const runtime = createMicrophoneCalibrationRuntime({
     port: microphoneCalibrationChannel.inbound(channel.port1),
   });
-  runtime.handleStart({ clickFrames, endFrame });
+  runtime.handleStart({
+    clickFrames,
+    endFrame,
+    clickFrequency: frequency,
+    sampleRate: rate,
+  });
   const signal = new Float32Array(endFrame + blockSize);
   for (const clickFrame of clickFrames) {
     for (let frame = 0; frame < 0.08 * rate; frame += 1) {
@@ -55,18 +64,23 @@ const measure = async (latencyFrameCount: number) => {
   await settle();
   channel.port1.close();
   channel.port2.close();
-  return peaks;
+  return { peaks, clickCounts };
 };
 
 describe('microphone calibration runtime', () => {
-  it('times each click by its start rather than its loudest sample', async () => {
+  it('times each click within a millisecond of its start', async () => {
     const latencyFrameCount = Math.round(0.3 * rate);
-    const peaks = await measure(latencyFrameCount);
+    const { peaks } = await measure(latencyFrameCount);
     expect(peaks).toHaveLength(clickFrames.length);
     for (const peak of peaks) {
       const delay = peak.onsetFrame - peak.clickFrame - latencyFrameCount;
       expect(delay).toBeGreaterThanOrEqual(0);
-      expect(delay).toBeLessThan(0.0005 * rate);
+      expect(delay).toBeLessThan(0.001 * rate);
     }
+  });
+
+  it('reports each click once its window has been heard', async () => {
+    const { clickCounts } = await measure(Math.round(0.3 * rate));
+    expect(clickCounts).toEqual([1, 2, 3]);
   });
 });

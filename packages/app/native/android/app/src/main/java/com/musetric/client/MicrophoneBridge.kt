@@ -388,6 +388,11 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
     when (command.getString("type")) {
       "devices" -> reply(replyProxy, id, devices())
       "access" -> reply(replyProxy, id, JSONObject().put("granted", hasAccess()))
+      "volume" -> reply(replyProxy, id, musicVolume())
+      "setVolume" -> {
+        setMusicVolume(command.getDouble("volume"))
+        reply(replyProxy, id, musicVolume())
+      }
       "start" -> requestStart(PendingStart(id, command, replyProxy))
       "stop" -> {
         stopCapture()
@@ -544,6 +549,18 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
 
   private fun notifyDevices() {
     deviceProxy?.postMessage(JSONObject().put("type", "devicechange").toString())
+  }
+
+  private fun musicVolume(): JSONObject {
+    val steps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    return JSONObject()
+      .put("volume", audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toDouble() / steps)
+      .put("steps", steps)
+  }
+
+  private fun setMusicVolume(volume: Double) {
+    val steps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(volume * steps).toInt(), 0)
   }
 
   private fun reply(proxy: JavaScriptReplyProxy, id: Int, result: JSONObject) {

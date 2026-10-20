@@ -1,9 +1,40 @@
 import {
   type microphoneCalibrationChannel,
   type RecordingLatencyCalibrationPeak,
+  type RecordingLatencyCalibrationStart,
 } from './protocol.cross.js';
 
 const onsetRatio = 0.5;
+const bandQuality = 3;
+
+const createBandPass = (frequency: number, sampleRate: number) => {
+  const w0 = (2 * Math.PI * frequency) / sampleRate;
+  const alpha = Math.sin(w0) / (2 * bandQuality);
+  const a0 = 1 + alpha;
+  const b0 = alpha / a0;
+  const a1 = (-2 * Math.cos(w0)) / a0;
+  const a2 = (1 - alpha) / a0;
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  return (x: number) => {
+    const y = b0 * (x - x2) - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = x;
+    y2 = y1;
+    y1 = y;
+    return y;
+  };
+};
+
+const getMeanLevel = (levels: Float32Array) => {
+  let sum = 0;
+  for (const level of levels) {
+    sum += level;
+  }
+  return levels.length > 0 ? sum / levels.length : 0;
+};
 
 type ClickWindow = {
   clickFrame: number;
@@ -25,11 +56,12 @@ const toPeak = (click: ClickWindow): RecordingLatencyCalibrationPeak => {
     clickFrame: click.clickFrame,
     onsetFrame: click.clickFrame + onsetOffset,
     peakValue: click.peakValue,
+    noiseValue: getMeanLevel(click.levels),
   };
 };
 
 export type MicrophoneCalibrationRuntime = {
-  handleStart: (message: { clickFrames: number[]; endFrame: number }) => void;
+  handleStart: (message: RecordingLatencyCalibrationStart) => void;
   process: (
     inputs: (Float32Array[] | undefined)[],
     outputs: Float32Array[][],
@@ -50,6 +82,7 @@ export const createMicrophoneCalibrationRuntime = (
   let collecting = false;
   let endFrame = 0;
   let windows: ClickWindow[] = [];
+  let bandPass = (value: number) => value;
 
   const getSearchEndFrame = (index: number) =>
     index + 1 >= clickFrames.length ? endFrame : clickFrames[index + 1];
@@ -66,12 +99,14 @@ export const createMicrophoneCalibrationRuntime = (
       }
 
       clickIndex += 1;
+      port.methods.progress({ clickCount: clickIndex });
     }
   };
 
   const processInput = (input: Float32Array, currentFrame: number) => {
     for (let index = 0; index < input.length; index += 1) {
       const frame = currentFrame + index;
+      const value = Math.abs(bandPass(input[index]));
       advanceClickIndex(frame);
       if (clickIndex >= windows.length) {
         finish();
@@ -89,7 +124,6 @@ export const createMicrophoneCalibrationRuntime = (
       }
 
       const offset = frame - click.clickFrame;
-      const value = Math.abs(input[index]);
       click.levels[offset] = value;
       if (value > click.peakValue) {
         click.peakOffset = offset;
@@ -107,6 +141,7 @@ export const createMicrophoneCalibrationRuntime = (
       clickFrames = message.clickFrames;
       clickIndex = 0;
       endFrame = message.endFrame;
+      bandPass = createBandPass(message.clickFrequency, message.sampleRate);
       windows = message.clickFrames.map((clickFrame, index) => ({
         clickFrame,
         levels: new Float32Array(

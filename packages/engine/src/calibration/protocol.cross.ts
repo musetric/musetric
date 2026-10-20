@@ -4,14 +4,23 @@ export type RecordingLatencyCalibrationPeak = {
   clickFrame: number;
   onsetFrame: number;
   peakValue: number;
+  noiseValue: number;
+};
+
+export type RecordingLatencyCalibrationStart = {
+  clickFrames: number[];
+  endFrame: number;
+  clickFrequency: number;
+  sampleRate: number;
 };
 
 export type RecordingLatencyCalibrationInboundMethods = {
+  progress: (message: { clickCount: number }) => void;
   done: (message: { peaks: RecordingLatencyCalibrationPeak[] }) => void;
 };
 
 export type RecordingLatencyCalibrationOutboundMethods = {
-  start: (message: { clickFrames: number[]; endFrame: number }) => void;
+  start: (message: RecordingLatencyCalibrationStart) => void;
 };
 
 export const microphoneCalibrationChannel = createMessageChannel<
@@ -19,7 +28,7 @@ export const microphoneCalibrationChannel = createMessageChannel<
   RecordingLatencyCalibrationOutboundMethods
 >({
   inbound: {
-    keys: ['done'],
+    keys: ['progress', 'done'],
   },
   outbound: {
     keys: ['start'],

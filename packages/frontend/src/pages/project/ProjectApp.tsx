@@ -8,6 +8,7 @@ import { AudioSettings } from './audioSettings/AudioSettings.js';
 import { MicrophoneAccessDialog } from './audioSettings/MicrophoneAccessDialog.js';
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
+import { CalibrationDialog } from './calibration/CalibrationDialog.js';
 import { MediaSessionSync } from './mediaSession/MediaSessionSync.js';
 import { MixPopover } from './mix/MixPopover.js';
 import { MixdownDialog } from './mixdown/MixdownDialog.js';
@@ -68,6 +69,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       <MixdownDialog />
       <RecordingListPicker />
       <RecordingDeleteDialog />
+      <CalibrationDialog />
       <MicrophoneAccessDialog />
     </ProjectLayout>
   );

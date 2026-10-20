@@ -1,15 +1,21 @@
 import {
   createRecordingLatencyCalibrationClick,
   createRecordingLatencyCalibrationSchedule,
-  getRecordingLatencyCalibrationFrameCounts,
+  getRecordingLatencyCalibrationOutcome,
   getRecordingLatencyFrameCount,
+  recordingLatencyCalibrationClickFrequencyHz,
   recordingLatencyCalibrationTimeoutSeconds,
 } from '@musetric/audio/calibration';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
 } from '../audioSession/engineAudioSession.js';
-import { microphoneCalibrationChannel } from './protocol.cross.js';
+import {
+  microphoneCalibrationChannel,
+  type RecordingLatencyCalibrationPeak,
+} from './protocol.cross.js';
+
+const searchLeadSeconds = 0.05;
 
 const workletPromises = new Map<string, Promise<void>>();
 
@@ -32,11 +38,13 @@ const loadWorklet = async (
 };
 
 type WorkletResult = {
-  peaks: { clickFrame: number; onsetFrame: number; peakValue: number }[];
+  peaks: RecordingLatencyCalibrationPeak[];
 };
 
 const waitForResult = async (
   port: ReturnType<typeof microphoneCalibrationChannel.outbound<MessagePort>>,
+  onProgress: ((clickCount: number) => void) | undefined,
+  timeoutSeconds: number,
 ): Promise<WorkletResult | undefined> =>
   new Promise<WorkletResult | undefined>((resolve) => {
     let settled = false;
@@ -48,10 +56,15 @@ const waitForResult = async (
         settled = true;
         resolve(undefined);
       },
-      Math.round(recordingLatencyCalibrationTimeoutSeconds * 1000),
+      Math.round(timeoutSeconds * 1000),
     );
 
     port.bindHandlers({
+      progress: (message) => {
+        if (!settled) {
+          onProgress?.(message.clickCount);
+        }
+      },
       done: (message) => {
         if (settled) {
           return;
@@ -72,16 +85,22 @@ export type CalibrationMeasurementOptions = {
   processorName: string;
   deviceId?: string;
   microphone?: EngineMicrophone;
+  onProgress?: (clickCount: number) => void;
 };
 
-export type CalibrationMeasurementResult = {
-  latencyFrameCount: number;
-  measuredLatencyFrameCounts: number[];
-};
+export type CalibrationMeasurementResult =
+  | {
+      kind: 'measured';
+      latencyFrameCount: number;
+      measuredLatencyFrameCounts: number[];
+    }
+  | { kind: 'noisy' }
+  | { kind: 'quiet' }
+  | { kind: 'silent' };
 
 export const measureRecordingLatency = async (
   options: CalibrationMeasurementOptions,
-): Promise<CalibrationMeasurementResult | undefined> => {
+): Promise<CalibrationMeasurementResult> => {
   const {
     context,
     audioSession,
@@ -104,6 +123,13 @@ export const measureRecordingLatency = async (
       options.microphone ?? (await audioSession.openMicrophone({ deviceId }));
 
     const schedule = createRecordingLatencyCalibrationSchedule({ context });
+    const searchOffsetSeconds =
+      microphone.exactRoundTripLatency === undefined
+        ? 0
+        : Math.max(0, microphone.exactRoundTripLatency - searchLeadSeconds);
+    const searchOffsetFrameCount = Math.round(
+      searchOffsetSeconds * context.sampleRate,
+    );
     source = microphone.createSource();
     calibrationNode = new AudioWorkletNode(context, processorName, {
       numberOfInputs: 1,
@@ -117,10 +143,18 @@ export const measureRecordingLatency = async (
     silentGain.connect(outputNode);
 
     const port = microphoneCalibrationChannel.outbound(calibrationNode.port);
-    const resultPromise = waitForResult(port);
+    const resultPromise = waitForResult(
+      port,
+      options.onProgress,
+      recordingLatencyCalibrationTimeoutSeconds + searchOffsetSeconds,
+    );
     port.methods.start({
-      clickFrames: schedule.clickFrames,
-      endFrame: schedule.endFrame,
+      clickFrames: schedule.clickFrames.map(
+        (clickFrame) => clickFrame + searchOffsetFrameCount,
+      ),
+      endFrame: schedule.endFrame + searchOffsetFrameCount,
+      clickFrequency: recordingLatencyCalibrationClickFrequencyHz,
+      sampleRate: context.sampleRate,
     });
     for (const clickFrame of schedule.clickFrames) {
       const clickSource = context.createBufferSource();
@@ -131,21 +165,25 @@ export const measureRecordingLatency = async (
     }
 
     const workletResult = await resultPromise;
-    const measuredLatencyFrameCounts =
-      workletResult === undefined
-        ? []
-        : getRecordingLatencyCalibrationFrameCounts(workletResult.peaks);
-
-    if (measuredLatencyFrameCounts.length < 3) {
-      return undefined;
+    const peaks = (workletResult?.peaks ?? []).map((peak) => ({
+      ...peak,
+      clickFrame: peak.clickFrame - searchOffsetFrameCount,
+    }));
+    const outcome = getRecordingLatencyCalibrationOutcome(
+      peaks,
+      context.sampleRate,
+    );
+    if (outcome.kind !== 'measured') {
+      return outcome;
     }
 
     return {
+      kind: 'measured',
       latencyFrameCount: getRecordingLatencyFrameCount({
-        measuredLatencyFrameCounts,
+        measuredLatencyFrameCounts: outcome.measuredLatencyFrameCounts,
         sampleRate: context.sampleRate,
       }),
-      measuredLatencyFrameCounts,
+      measuredLatencyFrameCounts: outcome.measuredLatencyFrameCounts,
     };
   } finally {
     for (const clickSource of clickSources) {
