@@ -151,8 +151,13 @@ export const analyzeSound = (
   };
 };
 
-const edgeSeconds = 1;
 const holeSeconds = 0.001;
+
+const getRecordedPart = (samples: Float32Array) => {
+  const first = samples.findIndex((value) => value !== 0);
+  const last = samples.findLastIndex((value) => value !== 0);
+  return first < 0 ? samples.subarray(0, 0) : samples.subarray(first, last + 1);
+};
 
 export type HoleResult = {
   holeCount: number;
@@ -161,10 +166,7 @@ export type HoleResult = {
 };
 
 export const analyzeHoles = (take: SoundSignal): HoleResult => {
-  const samples = take.samples.subarray(
-    Math.round(edgeSeconds * take.sampleRate),
-    take.samples.length - Math.round(edgeSeconds * take.sampleRate),
-  );
+  const samples = getRecordedPart(take.samples);
   const minimum = Math.round(holeSeconds * take.sampleRate);
   let holeCount = 0;
   let longest = 0;

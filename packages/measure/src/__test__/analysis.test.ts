@@ -188,6 +188,8 @@ describe('sound analysis', () => {
 
   it('counts gaps of exact zeros', () => {
     const take = new Float32Array(10 * sampleRate).fill(0.01);
+    take.fill(0, 0, sampleRate / 2);
+    take.fill(0, 9 * sampleRate);
     take.fill(0, 3 * sampleRate, 3 * sampleRate + 96);
     take.fill(0, 5 * sampleRate, 5 * sampleRate + 10);
     const result = analyzeHoles({ sampleRate, samples: take });
