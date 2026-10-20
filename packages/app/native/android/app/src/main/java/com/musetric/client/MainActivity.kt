@@ -10,7 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    if (BuildConfig.DEBUG) {
+    if (BuildConfig.DEBUG || BuildConfig.MEASURE) {
       WebView.setWebContentsDebuggingEnabled(true)
     }
     installSplashScreen()

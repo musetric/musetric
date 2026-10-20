@@ -16,6 +16,7 @@ import {
 } from './calibration/index.js';
 import { createStore, type Store } from './common/store.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
+import { createCapturedTap } from './measure/capturedTap.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
   createEngineSpectrogram,
@@ -31,6 +32,7 @@ import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const notesMaxFrequency = 1100;
 const androidOutputBufferSeconds = 0.02;
+const measure = import.meta.env.frontendMeasure === 'true';
 
 export const defaultFrequencyRanges: Record<
   SpectrogramViewMode,
@@ -139,10 +141,14 @@ export const createEngine = (): Engine => {
     decoderPort: spectrogramChannel.port2,
     playheadPort: spectrogramPlayheadChannel.port2,
   });
+  const capturedTap = measure ? createCapturedTap() : undefined;
   const audioSession = createEngineAudioSession(
     context,
     outputClock,
-    spectrogram.previewLiveTake,
+    (chunk) => {
+      spectrogram.previewLiveTake(chunk);
+      capturedTap?.push(chunk);
+    },
   );
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);
@@ -254,6 +260,12 @@ export const createEngine = (): Engine => {
       ]);
     },
   };
+
+  if (capturedTap) {
+    void import('./measure/index.js').then((measureModule) => {
+      measureModule.exposeEngineMeasure(ref, capturedTap);
+    });
+  }
 
   return ref;
 };

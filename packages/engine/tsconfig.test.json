@@ -4,5 +4,8 @@
     { "path": "./tsconfig.cross.json" },
     { "path": "./tsconfig.worklet.json" },
     { "path": "./tsconfig.worker.json" }
-  ]
+  ],
+  "compilerOptions": {
+    "types": ["@webgpu/types"]
+  }
 }

@@ -7,6 +7,7 @@ import {
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { type Playhead } from '../player/playhead.cross.js';
+import { createEdgeProbe } from './edgeProbe.worker.js';
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
@@ -20,13 +21,15 @@ export type CreateSpectrogramRuntimeOptions = {
   >;
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
   playhead: Playhead;
+  sampleRate: number;
   profiling?: boolean;
+  measure?: boolean;
 };
 
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
-  const { port, dataPort, playhead, profiling } = options;
+  const { port, dataPort, playhead, sampleRate, profiling, measure } = options;
 
   let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
   const setStatus = (status: 'pending' | 'error' | 'success') => {
@@ -63,6 +66,7 @@ export const createSpectrogramRuntime = async (
   let playing = false;
   let rendering = false;
   const viewWindow = createViewWindowState();
+  const probeEdges = measure ? createEdgeProbe(sampleRate) : undefined;
 
   const render = async () => {
     const samples = lead ? { lead, recording: recording.get(lead.length) } : {};
@@ -96,7 +100,16 @@ export const createSpectrogramRuntime = async (
     rendering = true;
     try {
       trackProgress = playheadTrackProgress();
+      const startedAt = performance.timeOrigin + performance.now();
+      const writtenEnd = recording.liveEnd();
       await render();
+      if (probeEdges && playing && writtenEnd !== undefined) {
+        await probeEdges(processor, {
+          startedAt,
+          playheadFrame: trackProgress * frameCount,
+          writtenEnd,
+        });
+      }
     } finally {
       rendering = false;
     }

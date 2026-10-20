@@ -6,6 +6,7 @@ import {
 import { createSpectrogramRuntime } from './runtime.worker.js';
 
 const profiling = import.meta.env.frontendSpectrogramProfiling === 'true';
+const measure = import.meta.env.frontendMeasure === 'true';
 const port = spectrogramChannel.inbound(self);
 
 const reportError = () => {
@@ -22,7 +23,9 @@ port.bindBoot(async (message) => {
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
     playhead: createPlayhead(message.playheadPort, message.sampleRate),
+    sampleRate: message.sampleRate,
     profiling,
+    measure,
   });
   port.methods.booted();
 });

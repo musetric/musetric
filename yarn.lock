@@ -2019,6 +2019,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/measure@workspace:packages/measure":
+  version: 0.0.0-use.local
+  resolution: "@musetric/measure@workspace:packages/measure"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@types/node": "catalog:"
+    "@typescript/native": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+    vite: "catalog:"
+    vitest: "catalog:"
+    zod: "catalog:"
+  languageName: unknown
+  linkType: soft
+
 "@musetric/monorepo@workspace:.":
   version: 0.0.0-use.local
   resolution: "@musetric/monorepo@workspace:."

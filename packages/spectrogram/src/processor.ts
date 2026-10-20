@@ -100,7 +100,7 @@ const toTrackSources = (samples: SpectrogramSamples): TrackSources =>
     return input === undefined ? undefined : toSpectrogramSource(input);
   });
 
-export type SpectrogramFundamentalLine = {
+export type SpectrogramColumnValues = {
   baseColumn: number;
   columnStep: number;
   values: Float32Array;
@@ -124,7 +124,12 @@ export type SpectrogramProcessor = {
 
   readFundamentalLine: (
     trackKey: TrackKey,
-  ) => Promise<SpectrogramFundamentalLine | undefined>;
+  ) => Promise<SpectrogramColumnValues | undefined>;
+
+  readColumnEnergy: (
+    trackKey: TrackKey,
+    frequency: number,
+  ) => Promise<SpectrogramColumnValues | undefined>;
 
   readFundamentalFrames: (
     trackKey: TrackKey,
@@ -263,34 +268,53 @@ export const createSpectrogramProcessor = (
     },
   );
 
+  const readColumns = async (
+    trackKey: TrackKey,
+    selectBuffer: (runtime: SpectrogramRuntime) => GPUBuffer | undefined,
+  ): Promise<SpectrogramColumnValues | undefined> => {
+    if (!lastRuntime || !lastPlans) {
+      return undefined;
+    }
+    const buffer = selectBuffer(lastRuntime);
+    if (!buffer) {
+      return undefined;
+    }
+    const { windowCount, columnStep } = lastRuntime.config;
+    const { baseColumn, baseSlot } = lastPlans[trackKey];
+    const reader = createGpuBufferReader({
+      device,
+      typeSize: Float32Array.BYTES_PER_ELEMENT,
+      size: windowCount,
+    });
+    try {
+      const ring = new Float32Array(await reader.read(buffer));
+      const values = new Float32Array(windowCount);
+      for (let index = 0; index < windowCount; index += 1) {
+        values[index] = ring[(baseSlot + index) % windowCount];
+      }
+      return { baseColumn, columnStep, values };
+    } finally {
+      reader.destroy();
+    }
+  };
+
   return {
     render: renderLatest,
-    readFundamentalLine: async (trackKey) => {
-      if (!lastRuntime || !lastPlans) {
-        return undefined;
-      }
-      const { windowCount, columnStep } = lastRuntime.config;
-      const { baseColumn, baseSlot } = lastPlans[trackKey];
-      const reader = createGpuBufferReader({
-        device,
-        typeSize: Float32Array.BYTES_PER_ELEMENT,
-        size: windowCount,
-      });
-      try {
-        const ring = new Float32Array(
-          await reader.read(
-            lastRuntime.tracks[trackKey].lane.fundamentalLineBuffer,
-          ),
-        );
-        const values = new Float32Array(windowCount);
-        for (let index = 0; index < windowCount; index += 1) {
-          values[index] = ring[(baseSlot + index) % windowCount];
-        }
-        return { baseColumn, columnStep, values };
-      } finally {
-        reader.destroy();
-      }
-    },
+    readFundamentalLine: async (trackKey) =>
+      readColumns(
+        trackKey,
+        (runtime) => runtime.tracks[trackKey].lane.fundamentalLineBuffer,
+      ),
+    readColumnEnergy: async (trackKey, frequency) =>
+      readColumns(
+        trackKey,
+        (runtime) =>
+          runtime.tracks[trackKey].lane.bandSpectra.find(
+            (spectrum) =>
+              spectrum.band.fullMinFrequency <= frequency &&
+              frequency < spectrum.band.fullMaxFrequency,
+          )?.columnEnergyBuffer,
+      ),
     readFundamentalFrames: async (trackKey, firstFrame, frameCount) => {
       if (!lastRuntime) {
         return undefined;

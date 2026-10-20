@@ -8,7 +8,7 @@ const config: KnipConfig = {
     'packages/api/src/routes/audio.ts': ['exports'],
     'packages/api/src/routes/preview.ts': ['exports'],
   },
-  ignoreBinaries: ['xcodegen', 'ffmpeg', 'adb'],
+  ignoreBinaries: ['xcodegen', 'ffmpeg', 'ffplay', 'adb'],
   ignoreUnresolved: ['vite/client'],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: [
@@ -16,6 +16,7 @@ const config: KnipConfig = {
     '**/vitest.bench.config.ts',
     '**/vitest.pitch.config.ts',
     '**/vitest.parity.config.ts',
+    '**/vitest.measure.config.ts',
   ],
   workspaces: {
     'packages/ai': {
@@ -33,6 +34,9 @@ const config: KnipConfig = {
     },
     'packages/app': {
       entry: ['scripts/**/*.ts'],
+    },
+    'packages/measure': {
+      entry: ['scripts/**/*.ts', 'src/**/*.measure.ts'],
     },
     'packages/script': {
       entry: ['src/**/*.ts'],

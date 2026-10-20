@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfigs/tsconfig.test.json",
+  "references": [
+    { "path": "./tsconfig.es.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}
