@@ -38,12 +38,7 @@ from scratch.
 ## Icons
 
 `src/favicon.svg` is the only checked-in icon source. `yarn build:icons`
-renders it and lets `tauri icon` produce every platform raster asset. It also
-writes `gen/AppIcon.icon`, an Icon Composer icon of the same background and
-glyph: the macOS bundler compiles it into `Assets.car` with `actool` from
-Xcode 26 or later and keeps `icon.icns` as the fallback for older macOS
-releases. Without Xcode 26 the bundler logs an error and ships only
-`icon.icns`, which macOS 26 draws on a light plate at 16 and 32 px. Tauri's
+renders it and lets `tauri icon` produce every platform raster asset. Tauri's
 `android` and `ios` development and build commands run that step
 automatically; the same script also refreshes the Android splash screen
 images under `gen/android`. The Vite build renders the page's favicons and
