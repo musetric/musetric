@@ -3,11 +3,11 @@ import {
   resolveAudioInputDevice,
   resolveAudioOutputDevice,
 } from '@musetric/audio/recording';
-import { type Engine } from '../engine.js';
 import {
+  type Engine,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
-} from '../state.js';
+} from '@musetric/engine';
 import { wait } from './samples.js';
 
 const previewSettleMs = 3000;

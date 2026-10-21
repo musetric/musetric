@@ -1,13 +1,13 @@
-import { analyzeTiming } from './analysis/timing.es.js';
-import { formatTimingTable } from './report.es.js';
-import { timingRunSchema } from './runs.es.js';
+import { analyzeTiming } from '../analysis/timing.js';
+import { formatTimingTable } from '../report.js';
+import { timingRunSchema } from '../runs.js';
 import {
   createOutput,
   formatSetup,
   type MeasureOutput,
   type MeasureRequest,
   openCalibratedPage,
-} from './session.node.js';
+} from './session.js';
 
 const getRunName = (tempo: number) => `timing-${tempo}.json`;
 

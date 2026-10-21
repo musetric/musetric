@@ -1,20 +1,19 @@
-import {
-  type SpectrogramColumnValues,
-  type SpectrogramProcessor,
-} from '@musetric/spectrogram/gpu';
-
-const probeEvery = 3;
-const energyFrequency = 1000;
 const referenceStartSeconds = 1.2;
 const referenceEndSeconds = 0.4;
 const levelShare = 0.5;
 
-const getMedian = (values: number[]) => {
+const getMedianOrZero = (values: number[]) => {
   if (values.length === 0) {
     return 0;
   }
   const sorted = values.toSorted((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
+};
+
+export type ColumnValues = {
+  baseColumn: number;
+  columnStep: number;
+  values: Float32Array;
 };
 
 export type DrawnEdges = {
@@ -24,8 +23,8 @@ export type DrawnEdges = {
 };
 
 export const findDrawnEdges = (
-  line: SpectrogramColumnValues,
-  energy: SpectrogramColumnValues | undefined,
+  line: ColumnValues,
+  energy: ColumnValues | undefined,
   playheadFrame: number,
   sampleRate: number,
 ): DrawnEdges => {
@@ -48,7 +47,7 @@ export const findDrawnEdges = (
       reference.push(energy.values[index]);
     }
   }
-  const level = getMedian(reference);
+  const level = getMedianOrZero(reference);
   let energyEdge = -1;
   if (energy && level > 0) {
     for (
@@ -62,46 +61,4 @@ export const findDrawnEdges = (
     }
   }
   return { pitchEdge, energyEdge, level };
-};
-
-export type EdgeProbeFrame = {
-  startedAt: number;
-  playheadFrame: number;
-  writtenEnd: number;
-};
-
-export type EdgeProbe = (
-  processor: SpectrogramProcessor,
-  frame: EdgeProbeFrame,
-) => Promise<void>;
-
-export const createEdgeProbe = (sampleRate: number): EdgeProbe => {
-  let renderCount = 0;
-  return async (processor, frame) => {
-    renderCount += 1;
-    if (renderCount % probeEvery !== 0) {
-      return;
-    }
-    const renderedAt = performance.timeOrigin + performance.now();
-    const line = await processor.readFundamentalLine('recording');
-    if (!line) {
-      return;
-    }
-    const energy = await processor.readColumnEnergy(
-      'recording',
-      energyFrequency,
-    );
-    const edges = findDrawnEdges(line, energy, frame.playheadFrame, sampleRate);
-    console.info(
-      '[measure]',
-      'edge',
-      frame.startedAt,
-      frame.playheadFrame,
-      renderedAt,
-      edges.pitchEdge,
-      edges.energyEdge,
-      frame.writtenEnd,
-      edges.level,
-    );
-  };
 };

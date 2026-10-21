@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDrawnEdges } from '../edgeProbe.worker.js';
+import { findDrawnEdges } from './analysis/edges.js';
 
 const sampleRate = 48000;
 const columnStep = 480;

@@ -1,6 +1,5 @@
-import { type Engine } from '../engine.js';
-import { type SpectrogramViewMode } from '../state.js';
-import { type CapturedTap } from './capturedTap.js';
+import { type SpectrogramViewMode } from '@musetric/engine';
+import { type PageHooks } from './hooks.js';
 import { type MeasureLatency, readMeasureLatency } from './latency.js';
 import { epochNow } from './samples.js';
 import { recordTemporaryTake } from './temporaryTake.js';
@@ -30,10 +29,10 @@ export type DelayRun = {
 };
 
 export const measureDelayTake = async (
-  engine: Engine,
-  tap: CapturedTap,
+  hooks: PageHooks,
   options: DelayOptions,
 ): Promise<DelayRun> => {
+  const { engine } = hooks;
   const { sampleRate } = engine.context;
   const latency = readMeasureLatency(engine);
   const arrivals: DelayRun['arrivals'] = [];
@@ -54,7 +53,7 @@ export const measureDelayTake = async (
     },
     () => {
       startedAt = epochNow();
-      const unsubscribe = tap.listen((chunk) => {
+      const unsubscribe = hooks.listenCaptured((chunk) => {
         arrivals.push([
           performance.timeOrigin + chunk.startMs,
           epochNow(),

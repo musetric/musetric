@@ -2,23 +2,23 @@ import {
   analyzeHoles,
   analyzeSound,
   type SoundSignal,
-} from './analysis/sound.es.js';
-import { playFile, readWav, writeWav } from './audioFiles.node.js';
-import { type MeasurePage } from './page.node.js';
-import { formatHoles, formatSoundReport } from './report.es.js';
+} from '../analysis/sound.js';
+import { formatHoles, formatSoundReport } from '../report.js';
 import {
   browserCaptureSchema,
   calibrationSchema,
   soundTakeSchema,
-} from './runs.es.js';
+} from '../runs.js';
+import { createSibilantTest } from '../signals.js';
+import { playFile, readWav, writeWav } from './audioFiles.js';
+import { type MeasurePage } from './page.js';
 import {
   createOutput,
   formatSetup,
   type MeasureOutput,
   type MeasureRequest,
   openCalibratedPage,
-} from './session.node.js';
-import { createSibilantTest } from './signals.es.js';
+} from './session.js';
 
 const signalSampleRate = 48000;
 const captureMarginSeconds = 4;

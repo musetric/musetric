@@ -1,5 +1,5 @@
-import { getPercentile, getSpread, type Spread } from '../dsp/stats.es.js';
-import { type DelayRun, type EdgeLog } from '../runs.es.js';
+import { getPercentile, getSpread, type Spread } from '../dsp/stats.js';
+import { type DelayRun, type EdgeLog } from '../runs.js';
 
 const settleMs = 2000;
 const tailMs = 500;

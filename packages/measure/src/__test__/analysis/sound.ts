@@ -2,13 +2,10 @@ import {
   clampEnvelope,
   findEnvelopeOffset,
   getLevelEnvelope,
-} from '../dsp/envelope.es.js';
-import {
-  designButterworthBandPass,
-  filterSections,
-} from '../dsp/filters.es.js';
-import { getThirdOctaveLevels, getWelchDensity } from '../dsp/spectrum.es.js';
-import { getMaximum, getPeak, getRms, toDecibels } from '../dsp/stats.es.js';
+} from '../dsp/envelope.js';
+import { designButterworthBandPass, filterSections } from '../dsp/filters.js';
+import { getThirdOctaveLevels, getWelchDensity } from '../dsp/spectrum.js';
+import { getMaximum, getPeak, getRms, toDecibels } from '../dsp/stats.js';
 
 export const bandCenters = [
   125, 250, 500, 1000, 2000, 3150, 4000, 5000, 6300, 8000, 10000, 12500,

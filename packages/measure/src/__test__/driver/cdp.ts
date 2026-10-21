@@ -53,7 +53,15 @@ export type CdpPage = {
   close: () => void;
 };
 
-export const connectPage = async (url: string): Promise<CdpPage> => {
+export type WorkerScript = {
+  urlPart: string;
+  code: string;
+};
+
+export const connectPage = async (
+  url: string,
+  workerScript: WorkerScript,
+): Promise<CdpPage> => {
   const socket = new WebSocket(url);
   await new Promise<void>((resolve, reject) => {
     socket.addEventListener('open', () => {
@@ -78,6 +86,26 @@ export const connectPage = async (url: string): Promise<CdpPage> => {
       socket.send(JSON.stringify({ id: nextId, method, params, sessionId }));
     });
 
+  const evaluate = async (expression: string, sessionId?: string) => {
+    const evaluation = evaluationSchema.parse(
+      await send(
+        'Runtime.evaluate',
+        {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+          userGesture: true,
+        },
+        sessionId,
+      ),
+    );
+    if (evaluation.exceptionDetails) {
+      const { exception, text } = evaluation.exceptionDetails;
+      throw new Error(exception?.description ?? text);
+    }
+    return evaluation.result.value;
+  };
+
   const watchTarget = async (sessionId?: string) => {
     await send('Runtime.enable', {}, sessionId);
     await send(
@@ -90,7 +118,15 @@ export const connectPage = async (url: string): Promise<CdpPage> => {
   const receive = (message: CdpMessage) => {
     if (message.method === 'Target.attachedToTarget') {
       const attached = attachedSchema.parse(message.params);
-      void watchTarget(attached.sessionId);
+      void watchTarget(attached.sessionId)
+        .then(async () => {
+          if (attached.targetInfo.url.includes(workerScript.urlPart)) {
+            await evaluate(workerScript.code, attached.sessionId);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to prepare a worker for measuring', error);
+        });
       return;
     }
     if (message.method !== 'Runtime.consoleAPICalled') {
@@ -122,21 +158,7 @@ export const connectPage = async (url: string): Promise<CdpPage> => {
   await watchTarget();
 
   return {
-    evaluate: async (expression) => {
-      const evaluation = evaluationSchema.parse(
-        await send('Runtime.evaluate', {
-          expression,
-          awaitPromise: true,
-          returnByValue: true,
-          userGesture: true,
-        }),
-      );
-      if (evaluation.exceptionDetails) {
-        const { exception, text } = evaluation.exceptionDetails;
-        throw new Error(exception?.description ?? text);
-      }
-      return evaluation.result.value;
-    },
+    evaluate,
     logs,
     close: () => {
       socket.close();

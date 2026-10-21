@@ -262,8 +262,9 @@ export const createEngine = (): Engine => {
   };
 
   if (capturedTap) {
-    void import('./measure/index.js').then((measureModule) => {
-      measureModule.exposeEngineMeasure(ref, capturedTap);
+    // eslint-disable-next-line musetric/no-global-state -- the measure build gives the external driver one entry point
+    Object.assign(globalThis, {
+      musetricMeasureHooks: { engine: ref, listenCaptured: capturedTap.listen },
     });
   }
 

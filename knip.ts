@@ -36,7 +36,12 @@ const config: KnipConfig = {
       entry: ['scripts/**/*.ts'],
     },
     'packages/measure': {
-      entry: ['scripts/**/*.ts', 'src/**/*.measure.ts'],
+      entry: [
+        'scripts/**/*.ts',
+        'src/**/*.measure.ts',
+        'src/__test__/injected/page.ts',
+        'src/__test__/injected/spectrogramWorker.ts',
+      ],
     },
     'packages/script': {
       entry: ['src/**/*.ts'],

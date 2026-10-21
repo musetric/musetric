@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeDelay, type DelayTake } from '../analysis/delay.es.js';
-import { analyzeHoles, analyzeSound } from '../analysis/sound.es.js';
-import { analyzeTiming } from '../analysis/timing.es.js';
-import { decodeSamples, type PageLatency, type TimingRun } from '../runs.es.js';
-import { createSibilantTest } from '../signals.es.js';
+import { analyzeDelay, type DelayTake } from './analysis/delay.js';
+import { analyzeHoles, analyzeSound } from './analysis/sound.js';
+import { analyzeTiming } from './analysis/timing.js';
+import { decodeSamples, type PageLatency, type TimingRun } from './runs.js';
+import { createSibilantTest } from './signals.js';
 
 const sampleRate = 48000;
 const beatSeconds = 0.5;

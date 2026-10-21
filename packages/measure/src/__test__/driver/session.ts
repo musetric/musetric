@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { type MeasureDevice } from './device.node.js';
-import { openMeasurePage } from './page.node.js';
-import { formatLatency } from './report.es.js';
-import { calibrationSchema, type PageLatency } from './runs.es.js';
+import { formatLatency } from '../report.js';
+import { calibrationSchema, type PageLatency } from '../runs.js';
+import { type MeasureDevice } from './device.js';
+import { openMeasurePage } from './page.js';
 
 export type MeasureOutput = {
   path: (name: string) => string;

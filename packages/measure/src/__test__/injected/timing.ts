@@ -1,5 +1,4 @@
-import { type Engine } from '../engine.js';
-import { type CapturedTap } from './capturedTap.js';
+import { type PageHooks } from './hooks.js';
 import { type MeasureLatency, readMeasureLatency } from './latency.js';
 import { encodeSamples, epochNow, joinSamples } from './samples.js';
 import { recordTemporaryTake } from './temporaryTake.js';
@@ -39,10 +38,10 @@ export type TimingRun = {
 };
 
 export const measureTimingTake = async (
-  engine: Engine,
-  tap: CapturedTap,
+  hooks: PageHooks,
   options: TimingOptions,
 ): Promise<TimingRun> => {
+  const { engine } = hooks;
   const { sampleRate } = engine.context;
   const beats = engine.store.get().metronomeBeats;
   const startFrame = getStartFrame(beats, sampleRate);
@@ -75,7 +74,7 @@ export const measureTimingTake = async (
           ]);
         },
       );
-      const unsubscribeCaptured = tap.listen((chunk) => {
+      const unsubscribeCaptured = hooks.listenCaptured((chunk) => {
         capturedRate = chunk.sampleRate;
         chunks.push([capturedLength, performance.timeOrigin + chunk.startMs]);
         parts.push(chunk.samples.slice());

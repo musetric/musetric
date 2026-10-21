@@ -50,6 +50,7 @@ Applies to everything published from this repository: code, tests, comments, com
 
 - Keep files domain-specific and self-contained: do not create catch-all files like `types.ts` or `utils.ts`; keep an entity's types and functions together, and move broadly reusable sub-entities into their own domain files.
 - If a file contains several small domain entities, do not interleave them; keep each entity grouped, and place the more foundational entity with its types, variables, and functions before the next one.
+- Keep product `src` to product code. Scripts and their helpers, tests, test fixtures and test helpers, benchmarks and measurement code live in `scripts/` or in `__test__` folders, and product code never imports from them. A measurement point stays in product code only as the smallest hook a measure build needs, behind its build flag; whatever drives or reads that hook lives in `__test__`.
 
 **Imports And Exports**
 

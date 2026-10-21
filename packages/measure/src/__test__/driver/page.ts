@@ -1,7 +1,8 @@
 import { setTimeout } from 'node:timers/promises';
 import { z } from 'zod';
-import { connectPage, type MeasureLog } from './cdp.node.js';
-import { type MeasureDevice, openDevicePage } from './device.node.js';
+import { bundleInjectedScript } from './bundle.js';
+import { connectPage, type MeasureLog } from './cdp.js';
+import { type MeasureDevice, openDevicePage } from './device.js';
 
 const readStep = 1_000_000;
 const logPollMs = 50;
@@ -17,16 +18,24 @@ export type MeasurePage = {
 export const openMeasurePage = async (
   device: MeasureDevice,
 ): Promise<MeasurePage> => {
+  const [pageScript, workerScript] = await Promise.all([
+    bundleInjectedScript('page'),
+    bundleInjectedScript('spectrogramWorker'),
+  ]);
   const target = await openDevicePage(device);
-  const page = await connectPage(target.webSocketUrl);
-  const ready = await page.evaluate("typeof musetricMeasure === 'object'");
+  const page = await connectPage(target.webSocketUrl, {
+    urlPart: 'spectrogram.worker',
+    code: workerScript,
+  });
+  const ready = await page.evaluate("typeof musetricMeasureHooks === 'object'");
   if (ready !== true) {
     page.close();
     target.close();
     throw new Error(
-      'The page has no measure entry: build Musetric with frontendMeasure=true',
+      'The page has no measure hooks: build Musetric with frontendMeasure=true',
     );
   }
+  await page.evaluate(pageScript);
   return {
     projectId: target.projectId,
     callText: async (procedure, options) => {

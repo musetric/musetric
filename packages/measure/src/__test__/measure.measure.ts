@@ -1,11 +1,8 @@
 import { inject, it } from 'vitest';
-import { runDelay } from '../../delay.node.js';
-import {
-  type MeasureCommand,
-  type MeasureRequest,
-} from '../../session.node.js';
-import { runSound } from '../../sound.node.js';
-import { runTiming } from '../../timing.node.js';
+import { runDelay } from './driver/measureDelay.js';
+import { runSound } from './driver/measureSound.js';
+import { runTiming } from './driver/measureTiming.js';
+import { type MeasureCommand, type MeasureRequest } from './driver/session.js';
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions

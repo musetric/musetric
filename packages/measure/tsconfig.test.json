@@ -1,10 +1,7 @@
 {
   "extends": "../../tsconfigs/tsconfig.test.json",
-  "references": [
-    { "path": "./tsconfig.es.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
     "types": ["node"]
-  }
+  },
+  "exclude": ["${configDir}/src/__test__/injected/**/*"]
 }

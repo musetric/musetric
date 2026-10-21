@@ -1,4 +1,4 @@
-import { getMaximum } from './stats.es.js';
+import { getMaximum } from './stats.js';
 
 const clickFrequencies = [880, 1320];
 const clickSeconds = 0.05;

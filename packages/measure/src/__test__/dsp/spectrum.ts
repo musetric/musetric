@@ -1,4 +1,4 @@
-import { transformInPlace } from './fft.es.js';
+import { transformInPlace } from './fft.js';
 
 const createHannWindow = (size: number) =>
   Float64Array.from(

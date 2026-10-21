@@ -1,6 +1,6 @@
-import { transformInPlace } from './dsp/fft.es.js';
-import { designButterworthBandPass, filterSections } from './dsp/filters.es.js';
-import { getRms } from './dsp/stats.es.js';
+import { transformInPlace } from './dsp/fft.js';
+import { designButterworthBandPass, filterSections } from './dsp/filters.js';
+import { getRms } from './dsp/stats.js';
 
 const vowelNotes = [
   220, 246.94, 261.63, 293.66, 329.63, 293.66, 261.63, 246.94,

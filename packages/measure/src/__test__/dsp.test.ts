@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { getClickScore } from '../dsp/clicks.es.js';
-import { findEnvelopeOffset } from '../dsp/envelope.es.js';
-import { transformInPlace } from '../dsp/fft.es.js';
+import { getClickScore } from './dsp/clicks.js';
+import { findEnvelopeOffset } from './dsp/envelope.js';
+import { transformInPlace } from './dsp/fft.js';
 import {
   designButterworthBandPass,
   filterSections,
   getSectionsResponse,
-} from '../dsp/filters.es.js';
-import { getThirdOctaveLevels, getWelchDensity } from '../dsp/spectrum.es.js';
-import { getPercentile, getRms } from '../dsp/stats.es.js';
+} from './dsp/filters.js';
+import { getThirdOctaveLevels, getWelchDensity } from './dsp/spectrum.js';
+import { getPercentile, getRms } from './dsp/stats.js';
 
 const sampleRate = 48000;
 

@@ -1,12 +1,12 @@
-import { type DelayResult } from './analysis/delay.es.js';
+import { type DelayResult } from './analysis/delay.js';
 import {
   bandCenters,
   type HoleResult,
   type SoundResult,
-} from './analysis/sound.es.js';
-import { type TimingResult } from './analysis/timing.es.js';
-import { type Spread } from './dsp/stats.es.js';
-import { type PageLatency } from './runs.es.js';
+} from './analysis/sound.js';
+import { type TimingResult } from './analysis/timing.js';
+import { type Spread } from './dsp/stats.js';
+import { type PageLatency } from './runs.js';
 
 const minus = '−';
 

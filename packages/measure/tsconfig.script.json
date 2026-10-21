@@ -1,7 +1,3 @@
 {
-  "extends": "../../tsconfigs/tsconfig.script.json",
-  "references": [
-    { "path": "./tsconfig.es.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "extends": "../../tsconfigs/tsconfig.script.json"
 }

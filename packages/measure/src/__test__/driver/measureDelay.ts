@@ -1,16 +1,16 @@
 import { z } from 'zod';
-import { analyzeDelay, type DelayTake } from './analysis/delay.es.js';
-import { playFile, writeWav } from './audioFiles.node.js';
-import { formatDelayTable } from './report.es.js';
-import { delayRunSchema, parseEdgeLog } from './runs.es.js';
+import { analyzeDelay, type DelayTake } from '../analysis/delay.js';
+import { formatDelayTable } from '../report.js';
+import { delayRunSchema, parseEdgeLog } from '../runs.js';
+import { createVowelTone } from '../signals.js';
+import { playFile, writeWav } from './audioFiles.js';
 import {
   createOutput,
   formatSetup,
   type MeasureOutput,
   type MeasureRequest,
   openCalibratedPage,
-} from './session.node.js';
-import { createVowelTone } from './signals.es.js';
+} from './session.js';
 
 const views = ['notes', 'spectrum'] as const;
 const signalSampleRate = 48000;

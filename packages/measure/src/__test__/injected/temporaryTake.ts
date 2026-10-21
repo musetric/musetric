@@ -1,9 +1,12 @@
 import { api } from '@musetric/api';
 import { requestWithAxios } from '@musetric/api/dom';
+import {
+  type Engine,
+  type EngineState,
+  getActiveRecording,
+  type SpectrogramViewMode,
+} from '@musetric/engine';
 import axios from 'axios';
-import { type Engine } from '../engine.js';
-import { type TakeTarget } from '../player/takeShift.cross.js';
-import { getActiveRecording, type SpectrogramViewMode } from '../state.js';
 import { epochNow, wait } from './samples.js';
 
 const activePollMs = 100;
@@ -13,7 +16,7 @@ const streamSettleMs = 2500;
 const sliceLeadSeconds = 0.5;
 const sliceTailSeconds = 1;
 
-const exportTarget: TakeTarget = {
+const exportTarget: Parameters<Engine['decoder']['exportRecording']>[0] = {
   tempoRatio: 1,
   transposeSemitones: 0,
   voiceOctave: 0,
@@ -21,7 +24,7 @@ const exportTarget: TakeTarget = {
 };
 
 type SavedSettings = Pick<
-  ReturnType<Engine['store']['get']>,
+  EngineState,
   | 'trackVolumes'
   | 'metronomeEnabled'
   | 'metronomeVolume'

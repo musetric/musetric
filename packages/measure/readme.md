@@ -22,10 +22,14 @@ An unknown command or option prints the usage.
 
 ## Measure build
 
-The measure points live in the engine and are compiled in only when the
-frontend is built with `frontendMeasure=true`: the page then gets the
-`musetricMeasure` entry the commands call, and the spectrogram worker logs the
-drawn edges after each third frame.
+The engine carries only measure points, compiled in when the frontend is
+built with `frontendMeasure=true`: on the page, the engine and the microphone
+chunks it captures; in the spectrogram worker, a listener slot called after
+each frame. Everything that uses them lives in this package under
+`src/__test__`: each command bundles `injected/page.ts` and
+`injected/spectrogramWorker.ts` with Vite and evaluates them in the page and
+in the worker over the DevTools protocol, so the procedures follow this
+checkout, not the build.
 
 - Android: `frontendMeasure=true yarn build:android` also turns on WebView
   debugging in the release APK. The command forwards the WebView's DevTools

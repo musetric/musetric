@@ -1,6 +1,6 @@
-import { findClicks } from '../dsp/clicks.es.js';
-import { getMedian, getSpread, type Spread } from '../dsp/stats.es.js';
-import { type TimingRun } from '../runs.es.js';
+import { findClicks } from '../dsp/clicks.js';
+import { getMedian, getSpread, type Spread } from '../dsp/stats.js';
+import { type TimingRun } from '../runs.js';
 
 const matchShare = 0.25;
 
