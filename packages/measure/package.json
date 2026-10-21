@@ -19,6 +19,7 @@
     "@musetric/audio": "workspace:*",
     "@musetric/engine": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
@@ -26,11 +27,13 @@
     "@webgpu/types": "catalog:",
     "axios": "catalog:",
     "eslint": "catalog:",
+    "immer": "catalog:",
     "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zustand": "catalog:"
   }
 }
