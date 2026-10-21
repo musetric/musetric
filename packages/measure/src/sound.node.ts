@@ -51,11 +51,16 @@ const captureWhilePlaying = async (capture: PlayedCapture) => {
   return pending;
 };
 
-const recordFileRuns = async (
+type FileRun = {
+  file: string;
+  seconds: number;
+};
+
+const prepareFileRun = async (
   request: MeasureRequest,
   output: MeasureOutput,
   page: MeasurePage,
-) => {
+): Promise<FileRun> => {
   const latency = calibrationSchema.shape.latency.parse(
     JSON.parse(await page.callText('latency', {})),
   );
@@ -67,42 +72,36 @@ const recordFileRuns = async (
   const reference = readReference(request);
   const file = output.path('signal.wav');
   writeWav(file, reference.samples, reference.sampleRate, 'float32');
-  const seconds =
-    reference.samples.length / reference.sampleRate + captureMarginSeconds;
-  console.log('Capturing the played file through the browser path');
-  output.write(
-    'browser.json',
-    await captureWhilePlaying({
-      page,
-      procedure: 'browserCapture',
-      options: { seconds },
-      file,
-      volumeDb: request.volumeDb,
-    }),
-  );
-  console.log('Recording the played file into a temporary take');
-  output.write(
-    'app.json',
-    await captureWhilePlaying({
-      page,
-      procedure: 'take',
-      options: {
-        projectId: page.projectId,
-        seconds,
-        startSeconds: request.startSeconds,
-        songVolume: 0,
-      },
-      file,
-      volumeDb: request.volumeDb,
-    }),
-  );
+  return {
+    file,
+    seconds:
+      reference.samples.length / reference.sampleRate + captureMarginSeconds,
+  };
 };
 
 const recordRuns = async (request: MeasureRequest, output: MeasureOutput) => {
   const page = await openCalibratedPage(request);
   try {
-    if (!request.takeOnly) {
-      await recordFileRuns(request, output, page);
+    const fileRun = request.takeOnly
+      ? undefined
+      : await prepareFileRun(request, output, page);
+    if (fileRun) {
+      console.log('Recording the played file into a temporary take');
+      output.write(
+        'app.json',
+        await captureWhilePlaying({
+          page,
+          procedure: 'take',
+          options: {
+            projectId: page.projectId,
+            seconds: fileRun.seconds,
+            startSeconds: request.startSeconds,
+            songVolume: 0,
+          },
+          file: fileRun.file,
+          volumeDb: request.volumeDb,
+        }),
+      );
     }
     console.log(`Recording a ${request.takeSeconds} s take with the song`);
     output.write(
@@ -114,6 +113,24 @@ const recordRuns = async (request: MeasureRequest, output: MeasureOutput) => {
         songVolume: 1,
       }),
     );
+    if (fileRun) {
+      console.log('Capturing the played file through the browser path');
+      output.write(
+        'browser.json',
+        await captureWhilePlaying({
+          page,
+          procedure: 'browserCapture',
+          options: { seconds: fileRun.seconds },
+          file: fileRun.file,
+          volumeDb: request.volumeDb,
+        }),
+      );
+      if (request.device.kind === 'android') {
+        console.log(
+          'The WebView keeps the call route after the browser path: restart the app before the next measurement',
+        );
+      }
+    }
   } finally {
     page.close();
   }

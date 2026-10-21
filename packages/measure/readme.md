@@ -45,4 +45,6 @@ On Android the file comparison of `measure:sound` needs Bluetooth off: with a
 headset connected the WebView records the headset microphone and keeps the
 call route until the app restarts, so the command refuses it on a Bluetooth
 output. `--take-only` records just the long take with the song, which is the
-part to run on Bluetooth.
+part to run on Bluetooth. The WebView holds the call route after any browser
+capture, so the command records the browser path last: restart the app before
+the next measurement.
