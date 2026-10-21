@@ -1,0 +1,39 @@
+{
+  "name": "@musetric/measure",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content",
+    "test": "vitest run",
+    "measure:timing": "node ./scripts/measure.ts timing",
+    "measure:delay": "node ./scripts/measure.ts delay",
+    "measure:sound": "node ./scripts/measure.ts sound"
+  },
+  "devDependencies": {
+    "@alexanderolsen/libsamplerate-js": "catalog:",
+    "@musetric/api": "workspace:*",
+    "@musetric/audio": "workspace:*",
+    "@musetric/engine": "workspace:*",
+    "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
+    "@musetric/utils": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
+    "@webgpu/types": "catalog:",
+    "axios": "catalog:",
+    "eslint": "catalog:",
+    "immer": "catalog:",
+    "mediabunny": "catalog:",
+    "signalsmith-stretch": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  }
+}

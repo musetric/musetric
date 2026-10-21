@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfigs/tsconfig.test.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "exclude": ["${configDir}/src/__test__/injected/**/*"]
+}

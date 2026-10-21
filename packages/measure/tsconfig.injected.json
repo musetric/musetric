@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfigs/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "types": ["vite/client", "@webgpu/types"],
+    "noEmit": true,
+    "tsBuildInfoFile": "${configDir}/.tsbuildinfo/injected.tsbuildinfo"
+  },
+  "include": [
+    "${configDir}/src/__test__/injected/**/*.ts",
+    "${configDir}/src/__test__/analysis/edges.ts"
+  ],
+  "exclude": []
+}

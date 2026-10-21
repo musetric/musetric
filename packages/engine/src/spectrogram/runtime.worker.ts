@@ -12,6 +12,7 @@ import {
   type spectrogramDataChannel,
 } from './protocol.cross.js';
 import { createRecordingSource } from './recordingSource.worker.js';
+import { type RenderListener } from './renderHook.worker.js';
 import { createViewWindowState } from './viewWindow.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
@@ -21,12 +22,13 @@ export type CreateSpectrogramRuntimeOptions = {
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
   playhead: Playhead;
   profiling?: boolean;
+  onRendered?: RenderListener;
 };
 
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
-  const { port, dataPort, playhead, profiling } = options;
+  const { port, dataPort, playhead, profiling, onRendered } = options;
 
   let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
   const setStatus = (status: 'pending' | 'error' | 'success') => {
@@ -96,7 +98,17 @@ export const createSpectrogramRuntime = async (
     rendering = true;
     try {
       trackProgress = playheadTrackProgress();
+      const startedAt = performance.timeOrigin + performance.now();
+      const writtenEnd = recording.liveEnd();
       await render();
+      if (onRendered && playing && writtenEnd !== undefined) {
+        await onRendered({
+          processor,
+          startedAt,
+          playheadFrame: trackProgress * frameCount,
+          writtenEnd,
+        });
+      }
     } finally {
       rendering = false;
     }
