@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The MIT License above does not grant any rights in the Musetric name or logo.
+The logo files (every `favicon.svg` in this repository and every image derived
+from them) are not part of the "Software" and are not licensed under it. The
+reserved rights and permitted uses are set out in [trademark.md](trademark.md).
