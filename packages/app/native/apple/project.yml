@@ -2,7 +2,7 @@ name: musetric-app
 options:
   bundleIdPrefix: com.musetric
   deploymentTarget:
-    iOS: 14.0
+    iOS: 26.0
 fileGroups: [../../src]
 configs:
   debug: debug

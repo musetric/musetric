@@ -59,9 +59,7 @@ class ExecutorViewPlugin: Plugin {
     let created = WKWebView(
       frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: configuration)
     #if DEBUG
-      if #available(iOS 16.4, *) {
-        created.isInspectable = true
-      }
+      created.isInspectable = true
     #endif
     root.insertSubview(created, at: 0)
     created.load(URLRequest(url: address))
