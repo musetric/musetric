@@ -290,11 +290,7 @@ final class MicrophoneCapture: NSObject {
   }
 
   private func requestPermission(_ completion: @escaping (Bool) -> Void) {
-    if #available(iOS 17.0, *) {
-      AVAudioApplication.requestRecordPermission(completionHandler: completion)
-    } else {
-      AVAudioSession.sharedInstance().requestRecordPermission(completion)
-    }
+    AVAudioApplication.requestRecordPermission(completionHandler: completion)
   }
 
   @objc private func routeChanged() {
