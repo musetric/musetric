@@ -40,6 +40,12 @@ const ortFeatures: GPUFeatureName[] = [
   'timestamp-query',
 ];
 
+const provideAdapterInfo = (device: GPUDevice, info: GPUAdapterInfo): void => {
+  if (!('adapterInfo' in device)) {
+    Object.defineProperty(device, 'adapterInfo', { value: info });
+  }
+};
+
 export type MusetricWebGpuDevice = {
   device: GPUDevice;
   maxStorageBuffersPerShaderStage: number;
@@ -75,6 +81,7 @@ const createMusetricWebGpuDevice = async (
     requiredFeatures: features,
     requiredLimits,
   });
+  provideAdapterInfo(device, adapter.info);
   return {
     device,
     maxStorageBuffersPerShaderStage:
