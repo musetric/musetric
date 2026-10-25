@@ -27,14 +27,20 @@ Applies to everything published from this repository: code, tests, comments, com
 - Musetric is split into a web app, a Rust host, audio-processing modules, and shared infrastructure packages.
 - `packages/frontend`: the main React application.
 - `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView.
-- `packages/audio`: browser-side audio, waveform, spectrogram, workers, and worklets.
+- `packages/engine`: the audio engine the frontend drives: decoding, playback, recording sessions, calibration and the spectrogram, orchestrated in one state.
+- `packages/audio`: browser-side audio: decoding, playback, recording, calibration, timeline and waveform, with workers and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
+- `packages/fft`: the WebGPU FFT, its inverse and window functions.
+- `packages/spectrogram`: the frequency spectrogram and the pitch line on WebGPU.
 - `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.
+- `packages/interaction`: pointer and viewport gestures: drag, inertia, pinch, seek and follow scrolling.
 - `packages/api`: shared API contracts and client/server integration helpers.
 - `packages/utils`: low-level shared utilities used across packages.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
+- `packages/measure`: measurements of recording on a real device (timing, delay, sound) over the Chrome DevTools protocol.
+- `packages/script`: build tooling shared by the packages, such as the favicons plugin.
 - `packages/server`: the Rust host: http api, storage, processing queue and gpu executor, a self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Ground Rules
@@ -59,6 +65,28 @@ Applies to everything published from this repository: code, tests, comments, com
 - Import entities without renaming them; rename an import only when there is a real local name conflict and it cannot be avoided by another reasonable import approach.
 - When importing from a folder that has an `index` entrypoint, prefer the folder entrypoint over importing an internal file through the folder boundary.
 - Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`; a script that `node` runs directly therefore stays in one file.
+- A type import is not free: with `verbatimModuleSyntax`, `import { type X } from './y.js'` still loads `y.js` at runtime. Put a type shared with heavy code into a small module without dependencies, and load heavy code with a dynamic `import()` where it is needed; knip does not see uses through a dynamic `import()`, so such exports need `ignoreIssues` in `knip.ts`.
+
+**Contracts**
+
+- A TypeScript type is the contract. Do not check in a function what its type already guarantees, and never coerce an invalid value into a valid default, such as `Math.max(0, count)` or `?? fallback` for a required value: a value that breaks the contract fails at the caller.
+- Validate only at real boundaries: the API schemas between frontend and server, user input in its own handler, the output of external processes. Name such values `raw…` and keep them inside the component or store that receives them. An invariant across several values may throw.
+- When a contract changes, change it everywhere at once: no optional fields, defaults or wrappers kept for backward compatibility. Only a top-level public API may keep its old form, and only after asking.
+- Test effort follows algorithmic complexity and business criticality: FFT and spectrogram code needs unit tests and benchmarks; moving fields around and what the types already guarantee need no tests.
+
+**State And Dependencies**
+
+- No global mutable state: neither a module-level `let` nor one hidden in a factory closure to pass the linter. Pass a dependency explicitly from where the application is assembled. A once-guard or a memo without an outside mutator may stay in a closure.
+- Do not solve a problem by patching a dependency: no Yarn `patch:` protocol, no edits in `node_modules`, no edits of a dependency's build output. Look for a way in our own code or an upstream fix, or ask.
+- `packages/ai` does not depend on `packages/api`: its result types are declared in `ai`, next to the code that builds them. A package of algorithms takes no contract layer.
+
+**Shaders**
+
+- Do not bake values into WGSL text, neither as literals nor through template interpolation: values come in through the uniform `params`. The only exception is the size of a fixed-size array, which WGSL needs as a compile-time constant.
+
+**Server**
+
+- A change to a step's unit plan (stride, overlap, windows per unit) bumps that step's `DSP_VERSION`; otherwise an interrupted run resumes its checkpoint with the new layout.
 
 **Types**
 
@@ -87,6 +115,12 @@ Applies to everything published from this repository: code, tests, comments, com
 
 - Do not add `minHeight` or `minWidth` without extreme necessity.
 
+**Interface**
+
+- One value, one control: a value has one way to be changed, and what is only information is shown as text, not as another control.
+- An approved mockup is the requirement, over the preference for stock Material UI styles too: before calling an interface done, put a screenshot of it next to the mockup.
+- A styling request changes only the component's look, using the state that already exists; it does not rework the component.
+
 ## Runtime Boundaries
 
 - Runtime boundaries are defined by `tsconfigs/` and each package `tsconfig.*.json`.
@@ -112,3 +146,9 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
 - `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
+
+Beyond these scripts:
+
+- jscpd and editorconfig-checker run only in `.github/actions/baseQuality`, which pins their versions; run the same binaries locally before a pull request.
+- The local lint uses a cache and can pass where CI fails: lint the changed files once without it.
+- The vitest configs resolve sibling `@musetric/*` packages from their `dist`: after changing a package another one depends on, rebuild its `dist` (`yarn workspace @musetric/<name> build:project`) before running the other package's tests.
