@@ -49,8 +49,6 @@ Applies to everything published from this repository: code, tests, comments, com
 
 - Follow the existing ESLint and TypeScript config. Do not fight it.
 - Use `camelCase` for directories and non-component files, and use `PascalCase` for every React component, including both the component identifier and the file that defines it.
-- Do not use `null`, except `useRef(null)`. Use `undefined`, explicit state objects, or another project-native shape everywhere else.
-- Do not use classes, `this`, `switch`, method syntax in object literals, non-null assertions, or inline destructuring of function parameters.
 
 **Files**
 
@@ -60,9 +58,7 @@ Applies to everything published from this repository: code, tests, comments, com
 
 **Imports And Exports**
 
-- Export values and types inline at declaration, and do not use default exports except in tool config scripts that require them.
 - Re-export only when an `index` file is needed as a module entrypoint; use `export * from ...` for flat entrypoints or `export * as namespace from ...` for intentional conceptual isolation, and do not re-export from any other files.
-- Import entities without renaming them; rename an import only when there is a real local name conflict and it cannot be avoided by another reasonable import approach.
 - When importing from a folder that has an `index` entrypoint, prefer the folder entrypoint over importing an internal file through the folder boundary.
 - Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`; a script that `node` runs directly therefore stays in one file.
 - A type import still loads its module under `verbatimModuleSyntax`: keep a type shared with heavy code in a small module without dependencies.
@@ -98,6 +94,10 @@ Applies to everything published from this repository: code, tests, comments, com
 **Component Layout**
 
 - Do not add `minHeight` or `minWidth` without extreme necessity.
+
+**Shaders**
+
+- A value that a caller may change reaches a shader through its `params` uniform, never through the shader's text. An interpolation in a WGSL template carries only what the compiler needs before the shader runs: shared WGSL code, binding indices, array sizes, and the counts that unroll code.
 
 ## Runtime Boundaries
 
