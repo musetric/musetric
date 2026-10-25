@@ -6,13 +6,13 @@ runs:
   steps:
     - uses: actions/setup-node@v5
       with:
-        node-version: 26.2.0
+        node-version-file: .node-version
         package-manager-cache: false
     - run: npm install -g corepack@latest
       shell: bash
     - run: corepack enable
       shell: bash
-    - run: corepack prepare yarn@4.17.1 --activate
+    - run: corepack install
       shell: bash
     - uses: actions/cache@v5
       with:
