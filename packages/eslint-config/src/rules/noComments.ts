@@ -19,8 +19,12 @@ export const noCommentsRule: Rule.RuleModule = {
   create: (context) => ({
     Program: () => {
       const comments = context.sourceCode.getAllComments();
+      const hasHashbang = context.sourceCode.text.startsWith('#!');
       for (const comment of comments) {
         if (isAllowedComment(comment.value.trim())) {
+          continue;
+        }
+        if (hasHashbang && comment.range?.[0] === 0) {
           continue;
         }
         if (!comment.loc) {

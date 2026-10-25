@@ -10,6 +10,7 @@ on:
         default: '@musetric/eslint-config'
         options:
           - '@musetric/eslint-config'
+          - '@musetric/checks'
       mode:
         description: 'dev publishes with --tag dev (testing); release is a normal publish'
         type: choice

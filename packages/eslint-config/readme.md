@@ -12,4 +12,4 @@ export default config();
 
 ## License
 
-[MIT](./license.md)
+[MIT](https://github.com/musetric/musetric/blob/main/license.md)
