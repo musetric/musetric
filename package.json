@@ -24,6 +24,8 @@
     "check:deps:security": "yarn npm audit --all --recursive --severity high",
     "check:deps:dupe": "yarn constraints && yarn dedupe --check",
     "fix:deps:dupe": "yarn constraints --fix && yarn && yarn dedupe",
+    "check:dupe": "jscpd packages --config .jscpd.json",
+    "check:editorconfig": "editorconfig-checker",
     "check:unused": "knip",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
