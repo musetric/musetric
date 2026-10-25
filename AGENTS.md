@@ -67,11 +67,10 @@ Applies to everything published from this repository: code, tests, comments, com
 - Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`; a script that `node` runs directly therefore stays in one file.
 - A type import still loads its module under `verbatimModuleSyntax`: keep a type shared with heavy code in a small module without dependencies.
 
-**Contracts And State**
+**Contracts**
 
-- A type is the contract: do not re-check what it guarantees, and never coerce an invalid value into a valid default. Validate only at real boundaries: API schemas, user input in its own handler, the output of external processes.
+- Never coerce an invalid value into a valid default, such as `Math.max(0, count)` or `?? fallback` for a required value.
 - A changed contract changes everywhere at once, without fallbacks kept for compatibility.
-- No global mutable state, also not hidden in a closure to pass the linter: pass the dependency explicitly.
 
 **Types**
 
