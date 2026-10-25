@@ -18,33 +18,45 @@ const pins: ModelPin[] = [
   ),
 ].map((match) => ({ modelId: match[1], revision: match[2] }));
 
-const readHead = async (modelId: string): Promise<string> => {
+const readHeads = async (): Promise<Map<string, string>> => {
   const response = await fetch(
-    `https://huggingface.co/api/models/${modelId}/revision/main`,
+    'https://huggingface.co/api/models?author=musetric&expand%5B%5D=sha&limit=1000',
     { signal: AbortSignal.timeout(15_000) },
   );
   if (!response.ok) {
-    throw new Error(`${modelId}: Hugging Face answered ${response.status}`);
+    throw new Error(`Hugging Face answered ${response.status}`);
   }
   const raw: unknown = await response.json();
-  if (
-    typeof raw !== 'object' ||
-    !raw ||
-    !('sha' in raw) ||
-    typeof raw.sha !== 'string'
-  ) {
-    throw new Error(`${modelId}: Hugging Face sent no revision of main`);
+  if (!Array.isArray(raw)) {
+    throw new Error('Hugging Face sent no list of models');
   }
-  return raw.sha;
+  const models: unknown[] = raw;
+  const heads = new Map<string, string>();
+  for (const model of models) {
+    if (
+      typeof model === 'object' &&
+      model &&
+      'id' in model &&
+      'sha' in model &&
+      typeof model.id === 'string' &&
+      typeof model.sha === 'string'
+    ) {
+      heads.set(model.id, model.sha);
+    }
+  }
+  return heads;
 };
+
+const heads = await readHeads();
 
 type PinVerdict = ModelPin & {
-  head: string;
+  head: string | undefined;
 };
 
-const verdicts: PinVerdict[] = await Promise.all(
-  pins.map(async (pin) => ({ ...pin, head: await readHead(pin.modelId) })),
-);
+const verdicts: PinVerdict[] = pins.map((pin) => ({
+  ...pin,
+  head: heads.get(pin.modelId),
+}));
 
 const stale = verdicts.filter((verdict) => verdict.head !== verdict.revision);
 for (const verdict of verdicts) {
@@ -54,7 +66,9 @@ for (const verdict of verdicts) {
 }
 for (const verdict of stale) {
   console.log(
-    `${verdict.modelId}: models.rs pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`,
+    verdict.head
+      ? `${verdict.modelId}: models.rs pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`
+      : `${verdict.modelId}: the organization on Hugging Face has no repository of that name.`,
   );
 }
 if (pins.length === 0) {
