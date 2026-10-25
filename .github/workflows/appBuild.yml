@@ -82,13 +82,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - run: npm install -g corepack@latest --force
-      - run: corepack enable
-      - run: corepack install
+      - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
           path: ${{ runner.os == 'Windows' && '~/AppData/Local/Yarn/Berry/cache' || '~/.yarn/berry/cache' }}
@@ -102,10 +96,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+      # The channel that rust-toolchain.toml of the app pins; on Linux the action
+      # also brings rustup.
+      - if: matrix.platform == 'Linux'
+        id: rust
+        run: echo "channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' packages/app/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
       - if: matrix.platform == 'Linux'
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.99.1
+          toolchain: ${{ steps.rust.outputs.channel }}
           targets: ${{ matrix.rustTarget }}
       - if: matrix.platform != 'Linux'
         run: rustup toolchain install --no-self-update
@@ -166,13 +165,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - run: npm install -g corepack@latest --force
-      - run: corepack enable
-      - run: corepack install
+      - uses: ./.github/actions/setupYarn
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -223,13 +216,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - run: npm install -g corepack@latest --force
-      - run: corepack enable
-      - run: corepack install
+      - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
           path: ~/.yarn/berry/cache
