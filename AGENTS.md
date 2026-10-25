@@ -124,5 +124,6 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
 - `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
+- `yarn check:dupe` and `yarn check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.
 
-CI also runs jscpd and editorconfig-checker, at the versions `.github/actions/baseQuality` pins, and lints without a cache; run them the same way before a pull request.
+The local lint keeps a cache that CI does not have: lint the changed files once without it before a pull request.
