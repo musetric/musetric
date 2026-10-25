@@ -39,7 +39,7 @@ by hand when a model, its pin or `onnxruntime-web` changes, never in CI.
 
 - `prepare` downloads the pinned models and the cases of
   `scripts/parityCases.json`, and writes each case's reference with
-  `musetric-parity` from musetric-toolkit.
+  `musetric-parity` from [musetric/lab](https://github.com/musetric/lab).
 - `run --devices pc,<name>=<adb serial>` opens a page on the desktop Chrome and
   on each phone over `adb reverse`; it runs the models on wasm and WebGPU and
   the executor's own runtime, and saves every stage boundary.
