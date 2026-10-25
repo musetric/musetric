@@ -1,0 +1,34 @@
+{
+  "name": "@musetric/checks",
+  "version": "0.1.0",
+  "description": "Repository checks shared by the Musetric repositories.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/musetric/musetric.git",
+    "directory": "packages/checks"
+  },
+  "bin": {
+    "musetric-checks": "./dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build:project": "tsc --build",
+    "check:ts": "tsc --build",
+    "check:lint": "eslint . --cache --cache-strategy content",
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
+  },
+  "devDependencies": {
+    "@musetric/eslint-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

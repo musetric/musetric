@@ -61,6 +61,7 @@ scopes:
   - format # Prettier formatting and editorconfig
   - github # repo & GitHub Actions settings (workflows, templates)
   - lint # ESLint rules / packages/eslint-config
+  - checks # packages/checks: repository checks shared with the other repositories
   - rust # Rust toolchain & cargo workspace (crates, clippy, fmt)
   - ts # TypeScript config & strictness (tsconfig, types)
   - unused # unused code & dependency analysis (Knip)

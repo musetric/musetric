@@ -1854,6 +1854,20 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@musetric/checks@workspace:packages/checks":
+  version: 0.0.0-use.local
+  resolution: "@musetric/checks@workspace:packages/checks"
+  dependencies:
+    "@musetric/eslint-config": "workspace:*"
+    "@types/node": "catalog:"
+    "@typescript/native": "catalog:"
+    eslint: "catalog:"
+    typescript: "catalog:"
+  bin:
+    musetric-checks: ./dist/cli.js
+  languageName: unknown
+  linkType: soft
+
 "@musetric/cqt@workspace:*, @musetric/cqt@workspace:packages/cqt":
   version: 0.0.0-use.local
   resolution: "@musetric/cqt@workspace:packages/cqt"

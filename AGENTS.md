@@ -38,6 +38,7 @@ Applies to everything published from this repository: code, tests, comments, com
 - `packages/utils`: low-level shared utilities used across packages.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
+- `packages/checks`: repository checks published to npm for the other repositories of the organization: English letters only, the paths of the notices, and markdown links.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
 - `packages/measure`: measurements of recording on a real device (timing, delay, sound) over the Chrome DevTools protocol.
 - `packages/script`: build tooling shared by the packages, such as the favicons plugin.
@@ -124,6 +125,7 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
 - `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
+- `yarn check:english`, `yarn check:notices` and `yarn check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
 - `yarn check:dupe` and `yarn check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.
 
 The local lint keeps a cache that CI does not have: lint the changed files once without it before a pull request.

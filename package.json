@@ -23,6 +23,9 @@
     "fix:deps:dupe": "yarn constraints --fix && yarn && yarn dedupe",
     "check:dupe": "jscpd packages --config .jscpd.json",
     "check:editorconfig": "editorconfig-checker",
+    "check:english": "node packages/checks/src/cli.ts english",
+    "check:notices": "node packages/checks/src/cli.ts notices",
+    "check:links": "node packages/checks/src/cli.ts links",
     "check:unused": "knip",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
@@ -44,5 +47,15 @@
     "filelist": "2.0.2",
     "onnxruntime-web": "1.30.0",
     "tar": "7.5.21"
+  },
+  "checks": {
+    "english": {
+      "except": [
+        "packages/ai/src/transcription/hallucinationFilter.ts",
+        "packages/ai/src/transcription/__test__/filters.test.ts",
+        "packages/ai/src/transcription/__test__/wordPieces.test.ts",
+        "packages/server/src/cached_file.rs"
+      ]
+    }
   }
 }
