@@ -26,3 +26,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/baseQuality
+  check-model-pins:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      # The command of `yarn workspace @musetric/server check:models`, run
+      # without a Yarn install: the script uses Node's built-in modules only.
+      - working-directory: packages/server
+        run: bash -c "$(jq -r '.scripts["check:models"]' package.json)"
