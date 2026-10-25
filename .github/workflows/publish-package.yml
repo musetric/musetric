@@ -30,13 +30,7 @@ jobs:
       publish-version: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - run: npm install -g corepack@latest --force
-      - run: corepack enable
-      - run: corepack install
+      - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
           path: ~/.yarn/berry/cache
@@ -96,13 +90,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - run: npm install -g corepack@latest --force
-      - run: corepack enable
-      - run: corepack install
+      - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
           path: ~/.yarn/berry/cache
