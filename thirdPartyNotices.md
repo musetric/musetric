@@ -69,7 +69,7 @@ specific language governing permissions and limitations under the License.
 - Local files: `packages/ai/src/chords/chordVocab.ts`, `packages/ai/src/models/chordNetModel.ts`, `packages/ai/src/runtime/chords/chordNetGpuRuntime.ts`, `packages/ai/src/service/browserChords.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
-- Vendoring details: the inference subset is vendored in `musetric-toolkit`; see its `thirdPartyNotices.md` and `musetric_toolkit/chords_audio/chordmini/NOTICE.md`.
+- Vendoring details: the inference subset is vendored in `musetric/lab`; see its `thirdPartyNotices.md` and `musetric_toolkit/chords_audio/chordmini/NOTICE.md`.
 
 MIT License
 
@@ -138,7 +138,7 @@ follows the source the weights are downloaded from.
 - Local files: `packages/ai/src/key/keyMap.ts`, `packages/ai/src/key/types.ts`, `packages/ai/src/models/skeyModel.ts`, `packages/ai/src/runtime/key/skeyRuntime.ts`, `packages/ai/src/service/browserKey.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
-- Vendoring details: the inference subset is vendored in `musetric-toolkit`; see its `thirdPartyNotices.md`.
+- Vendoring details: the inference subset is vendored in `musetric/lab`; see its `thirdPartyNotices.md`.
 
 MIT License
 

@@ -57,7 +57,7 @@ declare module 'vitest' {
 const usage = `usage: yarn workspace @musetric/ai measure:parity <stage> [options]
 
 stages
-  prepare   download the pinned models and case audio, write each case's reference with the toolkit
+  prepare   download the pinned models and case audio, write each case's reference with the lab
   run       run every case in a page on each device: wasm, WebGPU and the product's own runtime
   compare   score every boundary against its declared threshold and write report.md
   all       the three stages in order
@@ -66,7 +66,7 @@ options
   --cases <a,b|all>             cases from scripts/parityCases.json (default: all)
   --devices <pc,name=serial>    the desktop and phones over adb (default: pc)
   --out <dir>                   output root (default: tmp/parity)
-  --reference-command <cmd>     toolkit reference command (default: musetric-parity)
+  --reference-command <cmd>     lab reference command (default: musetric-parity)
   --chrome <path>               desktop Chrome (default: its standard install path)
   --port <n>                    page server port (default: 8131)
   --timeout-minutes <n>         per device (default: 20)`;
