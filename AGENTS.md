@@ -2,7 +2,7 @@
 
 ## Context
 
-- This repository is a Yarn monorepo. Use `yarn@4.17.1`.
+- This repository is a Yarn monorepo. Node comes from `.node-version` and Yarn from `packageManager` in `package.json`, through corepack.
 - Prefer existing Yarn scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
 
 ## Commits & PR Titles
