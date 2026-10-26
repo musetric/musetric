@@ -65,3 +65,13 @@ export PATH="$ndk:$PATH"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ndk/clang.exe"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="-Clink-arg=--target=aarch64-linux-android24"
 ```
+
+## Decisions it follows
+
+The owner's decisions this package carries out, kept in
+[headquarters](https://github.com/musetric/headquarters/tree/main/decisions):
+
+- Phones process only while the app is on screen ([R-3](https://github.com/musetric/headquarters/blob/main/decisions/r03-phones-process-on-screen.md)).
+- The executor is a hidden WebView of the app on every platform, `ExecutorViewPlugin` ([R-4](https://github.com/musetric/headquarters/blob/main/decisions/r04-executor-connects-itself.md)).
+- Linux is built but not supported yet ([R-6](https://github.com/musetric/headquarters/blob/main/decisions/r06-linux-not-supported-yet.md)).
+- Pull requests do not build the app; a release run checks the installed app ([R-12](https://github.com/musetric/headquarters/blob/main/decisions/r12-app-checked-at-release.md)).

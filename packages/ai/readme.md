@@ -35,6 +35,25 @@ The package does not depend on `@musetric/api`: the types of its results are
 declared here, next to the code that builds them, and the API contract stays
 out of the algorithms.
 
+## Decisions it follows
+
+The owner's decisions behind the executor, kept in
+[headquarters](https://github.com/musetric/headquarters/tree/main/decisions):
+
+- Every model runs in this page, never natively
+  ([R-8](https://github.com/musetric/headquarters/blob/main/decisions/r08-models-run-in-the-page.md)).
+- A GPU defect is fixed by rewriting the graph, not by a CPU fallback; S-KEY is
+  the one model on wasm
+  ([R-9](https://github.com/musetric/headquarters/blob/main/decisions/r09-no-cpu-fallback.md)).
+- One inference at a time: the executor page holds the Web Lock
+  `musetric-executor` (`src/service/browserExecutor.ts`)
+  ([R-20](https://github.com/musetric/headquarters/blob/main/decisions/r20-one-inference-at-a-time.md)).
+- The WebGPU device is created here and handed to `onnxruntime-web`, and
+  `src/runtime/gpuPacer.ts` paces its queue
+  ([R-24](https://github.com/musetric/headquarters/blob/main/decisions/r24-own-webgpu-device.md)).
+- Transcription runs on `@huggingface/transformers`
+  ([R-26](https://github.com/musetric/headquarters/blob/main/decisions/r26-whisper-on-transformers-js.md)).
+
 ## Parity run
 
 `yarn workspace @musetric/ai measure:parity <prepare|run|compare|all>` follows
