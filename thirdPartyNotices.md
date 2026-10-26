@@ -106,8 +106,8 @@ SOFTWARE.
 - Source: https://huggingface.co/openai/whisper-large-v3-turbo
 - Usage: base speech-to-text weights behind lyric transcription. The `musetric/whisper-large-v3-turbo-onnx` export is an inference-only re-export of these weights with no fine-tuning.
 - Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/runtime/whisper/whisperRuntime.ts`, `packages/ai/src/service/browserTranscribe.ts`.
-- License: Apache-2.0. Full text: https://www.apache.org/licenses/LICENSE-2.0
-- License source: Hugging Face model card metadata of the repository the weights are downloaded from.
+- License: MIT.
+- License source: the Hugging Face model card metadata of the repository the weights are downloaded from, and the `LICENSE` of https://github.com/openai/whisper.
 
 This notice covers the **weights only**. The local files above are this project's
 own MIT code: they fetch the weights and drive them through
@@ -117,19 +117,35 @@ splitting around them are independent implementations carrying no upstream code.
 Word timestamps come from Whisper's own cross-attention heads, so no third-party
 forced aligner is involved.
 
-Upstream is inconsistent about this and it is worth knowing: the
-https://github.com/openai/whisper repository states that "Whisper's code and
-model weights are released under the MIT License", while the Hugging Face model
-card the weights are actually fetched from declares `apache-2.0`. This notice
-follows the source the weights are downloaded from.
+MIT License
+
+Copyright (c) 2022 OpenAI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## Musetric Whisper large-v3-turbo ONNX
 
 - Source: https://huggingface.co/musetric/whisper-large-v3-turbo-onnx
 - Usage: word-timestamped q4 ONNX export of Whisper large-v3-turbo in the transformers.js layout, downloaded at runtime.
 - Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserTranscribe.ts`.
-- License: Apache-2.0, inherited from the base weights; conversion to ONNX does not change the weight license.
-- License source: Hugging Face model card metadata.
+- License: MIT, inherited from the base weights; conversion to ONNX does not change the weight license.
+- License source: the license of the base weights above.
 
 ## S-KEY
 
