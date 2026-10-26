@@ -6,7 +6,8 @@ model/runtime code it loads.
 The executor bundle (`src/service`, entry `browserEntry.ts`) runs on a hidden
 executor page hosted by the rust core: it connects to the core over the job
 websocket, fetches model files from the core's http host, runs the ONNX models
-on WebGPU (`onnxruntime-web`), reports progress, and uploads results back.
+with `onnxruntime-web`, on WebGPU except the key model, which runs on its wasm
+provider, reports progress, and uploads results back.
 
 The analyses it serves:
 
@@ -15,7 +16,10 @@ The analyses it serves:
 - **Transcription** — word-timestamped lyric segments (Whisper large-v3 turbo,
   a q4 encoder and an fp16 decoder, via `@huggingface/transformers`, which runs
   on `onnxruntime-web`).
-- **Chords, key, rhythm** — the smaller webgpu analyses.
+- **Chords, rhythm** — the smaller analyses on WebGPU.
+- **Key** — S-KEY on the wasm provider of `onnxruntime-web`, the one model off
+  the GPU (decision
+  [R-9](https://github.com/musetric/headquarters/blob/main/decisions/r09-no-cpu-fallback.md)).
 - **Voice range** — the pitch range of the lead and the level of its upper
   bands, which the notes and spectrum views open on (the pitch tracker of
   `@musetric/spectrogram` on WebGPU, no model).
