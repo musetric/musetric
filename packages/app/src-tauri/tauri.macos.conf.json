@@ -3,7 +3,7 @@
     "targets": ["dmg"],
     "macOS": {
       "hardenedRuntime": true,
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "26.0"
     }
   }
 }
