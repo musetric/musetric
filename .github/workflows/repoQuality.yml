@@ -39,6 +39,6 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       # The command of `yarn workspace @musetric/server check:models`, run
-      # without a Yarn install: the script uses Node's built-in modules only.
+      # without a Yarn install.
       - working-directory: packages/server
         run: bash -c "$(jq -r '.scripts["check:models"]' package.json)"

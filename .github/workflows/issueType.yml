@@ -19,7 +19,6 @@ jobs:
   require-issue-type:
     runs-on: ubuntu-latest
     steps:
-      # The event can be stale by the time a queued run starts, so the live type decides.
       - name: Ask for a type while the issue has none
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

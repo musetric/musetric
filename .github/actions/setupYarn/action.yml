@@ -1,8 +1,6 @@
 name: Setup Yarn
 description: Node from .node-version, and Yarn from packageManager through corepack
 
-# Node 25 and later ship without corepack, so it is installed here, at the one
-# version every workflow of the repository uses.
 runs:
   using: composite
   steps:
