@@ -1,6 +1,6 @@
 {
   "name": "@musetric/checks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Repository checks shared by the Musetric repositories.",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,9 @@
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
+  },
+  "dependencies": {
+    "@ast-grep/cli": "catalog:"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",

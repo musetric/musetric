@@ -34,7 +34,8 @@ runs:
       shell: bash
     - run: yarn check:lint
       shell: bash
-    # The toolchain and components that rust-toolchain.toml of the server pins.
+    - run: yarn check:comments
+      shell: bash
     - run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server

@@ -26,6 +26,7 @@
     "check:english": "node packages/checks/src/cli.ts english",
     "check:notices": "node packages/checks/src/cli.ts notices",
     "check:links": "node packages/checks/src/cli.ts links",
+    "check:comments": "node packages/checks/src/cli.ts comments",
     "check:unused": "knip",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",
