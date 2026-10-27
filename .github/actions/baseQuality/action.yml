@@ -1,11 +1,8 @@
 name: Base Quality
 description: Duplicate-code, EditorConfig, English, notices and link checks
 
-# jscpd and editorconfig-checker are standalone binaries, installed on PATH as
-# on a developer's machine; the other checks are @musetric/checks, run from
-# its source with Node's built-in modules only. Each step runs the command of
-# its root script from package.json, without a Yarn install, so CI and
-# `yarn check:<name>` run the same thing.
+# Each step runs the command of its root script from package.json, without a
+# Yarn install.
 runs:
   using: composite
   steps:

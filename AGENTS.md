@@ -4,10 +4,8 @@
 
 - This repository is a Yarn monorepo. Node comes from `.node-version` and Yarn from `packageManager` in `package.json`, through corepack.
 - Prefer existing Yarn scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
-
-## Commits & PR Titles
-
 - All commit and PR titles must comply with `.github/prTitle.config.yml`.
+- Follow the existing ESLint and TypeScript config. Do not fight it.
 
 ## Test Material
 
@@ -17,7 +15,7 @@ Applies to everything published from this repository: code, tests, comments, com
 - Name an openly licensed track by artist, title, source link and license, and give the attribution its license requires. Its lyrics, excerpt positions, durations and results may be quoted.
 - A track under a non-commercial or no-derivatives license (NC, ND) may be used for measurements and named with its license, but do not publish its audio, stems, excerpts or lyrics.
 - Never mention any other audio: no titles, artists, albums, lyrics, quoted transcriptions, file names, and no hashed or otherwise encoded forms of them.
-- Do not describe material that cannot be shared. No duration, tempo, key, excerpt position or similar detail of an unnamed track: a claim nobody can check is not evidence.
+- Do not describe material that cannot be shared: no duration, tempo, key, excerpt position or similar detail of an unnamed track.
 - Name a property of such input only when it is the subject of the problem, and state it abstractly: "fails on tracks shorter than one chord window", "runs out of GPU memory on tracks longer than about 4 minutes".
 - Otherwise report the observation without the input: "the step fails on Android; the cause is under investigation".
 - Checkable evidence uses synthetic signals, openly licensed tracks or inputs committed with the change. A run on any other material may be reported only as its outcome, such as "matches desktop" or "still differs".
@@ -46,13 +44,9 @@ Applies to everything published from this repository: code, tests, comments, com
 
 ## Ground Rules
 
-**Syntax**
-
-- Follow the existing ESLint and TypeScript config. Do not fight it.
-- Use `camelCase` for directories and non-component files, and use `PascalCase` for every React component, including both the component identifier and the file that defines it.
-
 **Files**
 
+- Use `camelCase` for directories and non-component files, and use `PascalCase` for every React component, including both the component identifier and the file that defines it.
 - Keep files domain-specific and self-contained: do not create catch-all files like `types.ts` or `utils.ts`; keep an entity's types and functions together, and move broadly reusable sub-entities into their own domain files.
 - If a file contains several small domain entities, do not interleave them; keep each entity grouped, and place the more foundational entity with its types, variables, and functions before the next one.
 - Keep product `src` to product code. Scripts and their helpers, tests, test fixtures and test helpers, benchmarks and measurement code live in `scripts/` or in `__test__` folders, and product code never imports from them. A measurement point stays in product code only as the smallest hook a measure build needs, behind its build flag; whatever drives or reads that hook lives in `__test__`.
@@ -61,8 +55,8 @@ Applies to everything published from this repository: code, tests, comments, com
 
 - Re-export only when an `index` file is needed as a module entrypoint; use `export * from ...` for flat entrypoints or `export * as namespace from ...` for intentional conceptual isolation, and do not re-export from any other files.
 - When importing from a folder that has an `index` entrypoint, prefer the folder entrypoint over importing an internal file through the folder boundary.
-- Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`; a script that `node` runs directly therefore stays in one file.
-- A type import still loads its module under `verbatimModuleSyntax`: keep a type shared with heavy code in a small module without dependencies.
+- Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`. A script that `node` runs directly stays in one file.
+- Keep a type shared with heavy code in a small module without dependencies, also when it is imported only as a type.
 
 **Contracts**
 
@@ -84,22 +78,16 @@ Applies to everything published from this repository: code, tests, comments, com
 
 - Do not add component layers: a new component must own real state, logic, or a domain entity, not just forward props to another component.
 - Keep a component in the folder of the feature that renders it; do not lift it into shared folders such as `components/` or build a generic abstraction for one concrete use.
-
-**MUI**
-
 - Build markup from Material UI components. Do not write raw DOM elements such as `div`, `span`, or `p` in JSX; use a plain React DOM element only in extreme necessity, when no Material UI component can do the job.
 - Use Material UI components directly where they are rendered. Do not wrap them in project components or shared `sx` and prop presets, such as a custom button or a captioned icon button.
 - Do not introduce unnecessary Material UI customization. Prefer the built-in variants, spacing, and visual design by default, but preserve existing behavior and established UI output when custom styling is already serving a real purpose.
 - When a Material UI component already exposes a dedicated prop for a layout or visual option, prefer that prop over `sx` only if the result stays behaviorally and visually equivalent; use `sx` whenever it is needed to preserve the current result or to express styling that the component props do not cover.
-
-**Component Layout**
-
 - Do not add `minHeight` or `minWidth` without extreme necessity.
 
 **Shaders**
 
 - A value that a caller may change reaches a shader through its `params` uniform, never through the shader's text. An interpolation in a WGSL template carries only what the compiler needs before the shader runs: shared WGSL code, binding indices, array sizes, and the counts that unroll code.
-- Every dispatch in one submit reads its own `params` slot, through a dynamic offset (`dynamic-uniform` in `packages/spectrogram/src/common/computeBufferEntries.ts`) or a bind group per slot (`packages/fft/src/fourier/slotCache.ts`): every `queue.writeBuffer` lands before the submit, so dispatches sharing one offset all read the last write.
+- Every dispatch in one submit reads its own `params` slot, through a dynamic offset (`dynamic-uniform` in `packages/spectrogram/src/common/computeBufferEntries.ts`) or a bind group per slot (`packages/fft/src/fourier/slotCache.ts`).
 
 ## Runtime Boundaries
 
@@ -122,11 +110,9 @@ If code was changed, run the relevant repository-root scripts before finishing.
 
 - `yarn check:unused`: detect unused files, dependencies, and exports.
 - `yarn check:ts`: TypeScript checks across the monorepo.
-- `yarn fix:lint`: lint checks with automatic fixes.
+- `yarn fix:lint`: lint checks with automatic fixes; before a pull request, lint the changed files once without the cache.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
 - `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
 - `yarn check:english`, `yarn check:notices` and `yarn check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
 - `yarn check:dupe` and `yarn check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.
-
-The local lint keeps a cache that CI does not have: lint the changed files once without it before a pull request.

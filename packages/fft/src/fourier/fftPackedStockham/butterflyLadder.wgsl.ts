@@ -26,8 +26,6 @@ fn getFactor(stage: u32) -> u32 {
   return 5u;
 }
 
-// The even and odd stage buffers are the two halves of one array: the AMD
-// GCN-5 driver miscompiles the code DXC builds for two separate arrays.
 fn stageOffset(even: bool) -> u32 {
   return select(packedWindowSize, 0u, even);
 }
