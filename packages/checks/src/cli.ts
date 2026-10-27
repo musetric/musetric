@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, matchesGlob } from 'node:path';
 
 type Section = {
@@ -138,6 +139,204 @@ const checkLinks = (files: string[], section: Section): Finding[] =>
       ),
     );
 
+const scriptDirective =
+  '^(//|/\\*)\\s*(eslint-|global\\s|globals\\s|exported\\s|@ts-(expect-error|ignore|nocheck|check)|/\\s*<reference|@(see|todo|fixme)(\\s|$))';
+
+const pythonDirective =
+  '^#(!|\\s*(noqa|type:|fmt:|isort:|pragma|pyright:|mypy:))';
+
+const comment = ['comment'];
+
+type AstGrepRule = {
+  id: string;
+  language: string;
+  rule: Record<string, unknown>;
+  files?: string[];
+};
+
+const commentRule = (
+  language: string,
+  kinds: string[],
+  allowed?: string,
+): AstGrepRule => ({
+  id: 'comment',
+  language,
+  rule: {
+    any: kinds.map((kind) => ({ kind })),
+    ...(allowed === undefined ? {} : { not: { regex: allowed } }),
+  },
+});
+
+const astGrepRules: AstGrepRule[] = [
+  commentRule('TypeScript', comment, scriptDirective),
+  commentRule('Tsx', comment, scriptDirective),
+  commentRule('JavaScript', comment, scriptDirective),
+  commentRule('Rust', ['line_comment', 'block_comment']),
+  commentRule('Python', comment, pythonDirective),
+  commentRule('Yaml', comment),
+  commentRule('Kotlin', ['line_comment', 'multiline_comment']),
+  commentRule('Swift', ['comment', 'multiline_comment'], '^//\\s*swift-tools'),
+  commentRule('Bash', comment, '^#(!|\\s*shellcheck\\s)'),
+  commentRule('Css', comment),
+  commentRule('Html', comment),
+  commentRule('Json', comment),
+  {
+    id: 'wgsl-comment',
+    language: 'TypeScript',
+    files: ['**/*.wgsl.ts'],
+    rule: {
+      kind: 'string_fragment',
+      inside: { kind: 'template_string' },
+      regex: '//|/\\*',
+    },
+  },
+  {
+    id: 'docstring',
+    language: 'Python',
+    rule: {
+      kind: 'string',
+      inside: {
+        kind: 'expression_statement',
+        nthChild: { position: 1, ofRule: { not: { kind: 'comment' } } },
+        inside: { any: [{ kind: 'module' }, { kind: 'block' }] },
+      },
+    },
+  },
+];
+
+const inlineRules = astGrepRules
+  .map((entry) =>
+    JSON.stringify({
+      ...entry,
+      id: `${entry.id}-${entry.language.toLowerCase()}`,
+      severity: 'warning',
+      message: entry.id,
+    }),
+  )
+  .join('\n---\n');
+
+const astGrepBinary = (): string =>
+  join(
+    dirname(
+      createRequire(import.meta.url).resolve('@ast-grep/cli/package.json'),
+    ),
+    process.platform === 'win32' ? 'ast-grep.exe' : 'ast-grep',
+  );
+
+const chunkPaths = (paths: string[], limit: number): string[][] =>
+  paths.reduce<string[][]>((chunks, path) => {
+    const last = chunks.at(-1);
+    if (last && last.join(' ').length + path.length < limit) {
+      last.push(path);
+      return chunks;
+    }
+    return [...chunks, [path]];
+  }, []);
+
+const readStartLine = (range: unknown): number => {
+  if (
+    typeof range !== 'object' ||
+    !range ||
+    !('start' in range) ||
+    typeof range.start !== 'object' ||
+    !range.start ||
+    !('line' in range.start) ||
+    typeof range.start.line !== 'number'
+  ) {
+    throw new Error('ast-grep printed a finding without its start line');
+  }
+  return range.start.line;
+};
+
+const linesBeforeComment = (text: string): number =>
+  text.slice(0, text.search(/\/\/|\/\*/)).split('\n').length - 1;
+
+const readAstGrepFinding = (line: string): Finding => {
+  const raw: unknown = JSON.parse(line);
+  if (
+    typeof raw !== 'object' ||
+    !raw ||
+    !('file' in raw) ||
+    typeof raw.file !== 'string' ||
+    !('ruleId' in raw) ||
+    typeof raw.ruleId !== 'string' ||
+    !('text' in raw) ||
+    typeof raw.text !== 'string' ||
+    !('range' in raw)
+  ) {
+    throw new Error(`ast-grep printed an unexpected finding: ${line}`);
+  }
+  const offset = raw.ruleId.startsWith('wgsl')
+    ? linesBeforeComment(raw.text)
+    : 0;
+  return {
+    file: raw.file.replaceAll('\\', '/'),
+    line: readStartLine(raw.range) + 1 + offset,
+    message: raw.ruleId.startsWith('docstring') ? 'a docstring' : 'a comment',
+  };
+};
+
+const scanWithAstGrep = (files: string[]): Finding[] =>
+  chunkPaths(files, 20_000).flatMap((chunk) => {
+    const result = spawnSync(
+      astGrepBinary(),
+      ['scan', '--inline-rules', inlineRules, '--json=stream', ...chunk],
+      { encoding: 'utf8', maxBuffer: 1 << 28 },
+    );
+    if (result.error || result.stderr.trim() !== '') {
+      throw new Error(`ast-grep failed: ${result.error ?? result.stderr}`);
+    }
+    return result.stdout
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .map(readAstGrepFinding);
+  });
+
+const tomlString =
+  /"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\\n]|\\.)*"|'[^'\n]*'/g;
+
+type LineFormat = {
+  file: RegExp;
+  comment: RegExp;
+  strings?: RegExp;
+};
+
+const lineFormats: LineFormat[] = [
+  { file: /\.toml$/, comment: /#/, strings: tomlString },
+  {
+    file: /(^|\/)(\.gitignore|\.gitattributes|\.prettierignore|\.npmignore|\.dockerignore|CODEOWNERS)$/,
+    comment: /^\s*#/,
+  },
+  { file: /(^|\/)requirements[^/]*\.txt$/, comment: /(^|\s)#/ },
+  { file: /(^|\/)\.editorconfig$/, comment: /^\s*[#;]/ },
+  { file: /\.(svg|xml|storyboard|xib|plist)$/, comment: /<!--/ },
+];
+
+const blankStrings = (text: string, strings: RegExp | undefined): string =>
+  strings === undefined
+    ? text
+    : text.replace(strings, (match) => match.replace(/[^\n]/g, ' '));
+
+const scanLineFormats = (files: string[]): Finding[] =>
+  files.flatMap((file) => {
+    const format = lineFormats.find((entry) => entry.file.test(file));
+    if (format === undefined) {
+      return [];
+    }
+    return blankStrings(readLines(file).join('\n'), format.strings)
+      .split('\n')
+      .flatMap((text, index) =>
+        format.comment.test(text)
+          ? [{ file, line: index + 1, message: 'a comment' }]
+          : [],
+      );
+  });
+
+const checkComments = (files: string[], section: Section): Finding[] => {
+  const scanned = files.filter((file) => !isExcepted(file, section));
+  return [...scanWithAstGrep(scanned), ...scanLineFormats(scanned)];
+};
+
 type Check = {
   run: (files: string[]) => Finding[];
   advice: string;
@@ -166,6 +365,15 @@ const createChecks = (rawChecks: unknown): Map<string, Check> =>
         run: (files) => checkLinks(files, readSection(rawChecks, 'links')),
         advice:
           'Point the link at a file of the repository, or list a page whose links are not files of the repository in checks.links.except of package.json.',
+      },
+    ],
+    [
+      'comments',
+      {
+        run: (files) =>
+          checkComments(files, readSection(rawChecks, 'comments')),
+        advice:
+          'Say it with names and types, or in the pull request, its issue or the commit message; a tool directive may stay. List third-party code in checks.comments.except of package.json.',
       },
     ],
   ]);

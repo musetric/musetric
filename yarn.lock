@@ -1858,6 +1858,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@musetric/checks@workspace:packages/checks"
   dependencies:
+    "@ast-grep/cli": "catalog:"
     "@musetric/eslint-config": "workspace:*"
     "@types/node": "catalog:"
     "@typescript/native": "catalog:"

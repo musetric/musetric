@@ -2,7 +2,6 @@ import { noAliasConstantsRule } from './noAliasConstants.js';
 import { noAliasedReexportsRule } from './noAliasedReexports.js';
 import { noAliasTypesRule } from './noAliasTypes.js';
 import { noClassesRule } from './noClasses.js';
-import { noCommentsRule } from './noComments.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
 import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
 import { noDynamicTranslationKeysRule } from './noDynamicTranslationKeys.js';
@@ -35,7 +34,6 @@ export const musetricRules = {
   'no-alias-types': noAliasTypesRule,
   'no-aliased-reexports': noAliasedReexportsRule,
   'no-classes': noClassesRule,
-  'no-comments': noCommentsRule,
   'no-component-spacing-prop': noComponentSpacingPropRule,
   'no-defensive-throw-guards': noDefensiveThrowGuardsRule,
   'no-dynamic-translation-keys': noDynamicTranslationKeysRule,

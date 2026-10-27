@@ -15,7 +15,6 @@ runs:
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
         ONNXRUNTIME_NODE_INSTALL: skip
-    # The toolchain and components that rust-toolchain.toml of the server pins.
     - run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server
