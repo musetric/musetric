@@ -299,27 +299,27 @@ pub(crate) fn whisper_graph() -> Value {
     })
 }
 
-pub(crate) const VOCALS_MODEL: &str = "duality_core_t1100.onnx";
-pub(crate) const VOCALS_MODEL_DATA: &str = "duality_core_t1100.onnx.data";
+pub(crate) const VOCALS_MODEL: &str = "duality_student_core_t1100.onnx";
+pub(crate) const VOCALS_MODEL_DATA: &str = "duality_student_core_t1100.onnx.data";
 
 pub(crate) const VOCALS: ModelBundle = ModelBundle {
     label: "Vocals separation model",
-    model_id: "musetric/aname-mel-band-roformer-duality-onnx",
-    revision: "d5f619c91e5fec8647309e34ccc4a8ba7f235580",
-    directory: "aname-mel-band-roformer-duality-onnx",
+    model_id: "musetric/mel-band-roformer-duality-student-onnx",
+    revision: "0e04989195c31669276cdf05f5f840f8cf2f7e6f",
+    directory: "mel-band-roformer-duality-student-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
     layout: CacheLayout::Flat,
     files: &[
         (
             VOCALS_MODEL,
-            "1ae7a97c87d854cc27259a5be5115adfe8e44d046390819a6b2fe259465f5a77",
-            7_306_315,
+            "0198c50e408bf040522aa1b12042628e3218c61c958f06fdc9bb1aad9465a594",
+            5_539_495,
         ),
         (
             VOCALS_MODEL_DATA,
-            "ba2a1daacde1608a57564c7bb24a3efe2f50388b2168143044019a6cbe3f21c6",
-            456_274_828,
+            "d7bea7fae93748cbc210208b8b9728dc274e1cc9e0bdad852ad08294ee1c335b",
+            213_244_940,
         ),
     ],
 };
