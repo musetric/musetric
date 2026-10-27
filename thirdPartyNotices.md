@@ -43,10 +43,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Mel-Band RoFormer Duality ONNX
+## Mel-Band RoFormer Duality student ONNX
 
-- Source: https://huggingface.co/musetric/aname-mel-band-roformer-duality-onnx
-- Usage: WebGPU-ready ONNX vocal separation model and external data file, converted from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT).
+- Source: https://huggingface.co/musetric/mel-band-roformer-duality-student-onnx
+- Usage: WebGPU-ready ONNX vocal separation model and external data file, exported from `musetric/mel-band-roformer-duality-student` (https://huggingface.co/musetric/mel-band-roformer-duality-student), a model distilled from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality, Apache-2.0), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT).
 - Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserEntry.ts`, `packages/ai/src/service/browserSeparation.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`.
 - License: Apache-2.0.
 - License source: Hugging Face model card metadata.
