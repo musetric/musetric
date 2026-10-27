@@ -143,7 +143,7 @@ const scriptDirective =
   '^(//|/\\*)\\s*(eslint-|global\\s|globals\\s|exported\\s|@ts-(expect-error|ignore|nocheck|check)|/\\s*<reference|@(see|todo|fixme)(\\s|$))';
 
 const pythonDirective =
-  '^#(!|\\s*(noqa|type:|fmt:|isort:|pragma|pyright:|mypy:))';
+  '^#(!|\\s*(noqa|ruff:|type:|fmt:|isort:|pragma|pyright:|mypy:))';
 
 const comment = ['comment'];
 
