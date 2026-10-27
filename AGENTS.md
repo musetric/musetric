@@ -99,6 +99,7 @@ Applies to everything published from this repository: code, tests, comments, com
 **Shaders**
 
 - A value that a caller may change reaches a shader through its `params` uniform, never through the shader's text. An interpolation in a WGSL template carries only what the compiler needs before the shader runs: shared WGSL code, binding indices, array sizes, and the counts that unroll code.
+- Every dispatch in one submit reads its own `params` slot, through a dynamic offset (`dynamic-uniform` in `packages/spectrogram/src/common/computeBufferEntries.ts`) or a bind group per slot (`packages/fft/src/fourier/slotCache.ts`): every `queue.writeBuffer` lands before the submit, so dispatches sharing one offset all read the last write.
 
 ## Runtime Boundaries
 

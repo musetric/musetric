@@ -35,6 +35,56 @@ The package does not depend on `@musetric/api`: the types of its results are
 declared here, next to the code that builds them, and the API contract stays
 out of the algorithms.
 
+## Runtime
+
+- Each `onnxruntime-web` session picks its storage buffer cache. The models of
+  fixed shapes, separation (`src/runtime/stftInference.ts`) and Beat This!
+  (`src/runtime/rhythm/beatThisGpuRuntime.ts`), ask for `simple`, which reuses
+  a released buffer only for a request of the same size and so holds less GPU
+  memory than size buckets. Whisper keeps the default `bucket`: its key-value
+  cache grows on every step, and under `simple` the buffers of each step would
+  be new sizes that are never reused.
+- There is one `GPUDevice` per value of the `subgroups` feature
+  (`getMusetricWebGpuDevice` in `src/runtime/webgpuDevice.ts`). Whisper asks
+  for its device without subgroups (`whisperDeviceOptions`), the other models
+  with them, so sessions whose tensors meet, such as Whisper's `cross_kv`
+  graph and its decoder, pass the same flag.
+- The host sends no COOP and COEP headers, so the executor page is not
+  cross-origin isolated, and `onnxruntime-web` runs its wasm provider on one
+  thread: the key model, and the nodes a WebGPU session keeps on the CPU. The
+  parity server sends them (`src/__test__/parity/parityServer.ts`).
+- Whatever serves model files to the executor sends `content-length`, as the
+  host and the parity server do: without it, transformers.js grows its receive
+  buffer by a copy on every chunk (`readResponse` of
+  `@huggingface/transformers`).
+
+## Transcription
+
+`src/runtime/whisper` drives transformers.js below its pipeline:
+
+- It calls `model.generate` on windows the package cuts itself, up to four in
+  one batch (`windowsPerBatch` in `whisperRuntime.ts`), never on the
+  pipeline's own long-form chunking.
+- The language is chosen once per track, by a vote of `detectLanguage` over
+  the logits after `<|startoftranscript|>` on its loudest windows
+  (`resolveLanguage` in `src/transcription/transcribePipeline.ts`), and passed
+  to every call: without it, transformers.js falls back to English.
+- `max_new_tokens` follows the window's length, 12 tokens a second plus 32 and
+  at most 400 (`whisperDecoder.ts`), so a decode that repeats itself stops
+  near what the window can hold.
+- Word times come from `return_token_timestamps`. The main pass also asks for
+  timestamp tokens (`return_timestamps: true`); when its text collapses or is
+  a known hallucination, a pass without them (`decodeAligned`,
+  `return_timestamps: false`) is tried, and kept only when it finds more words
+  and is neither a hallucination nor a loop.
+- A batch of windows needs two overrides of transformers.js internals and a
+  logits processor (`whisperBatch.ts`):
+  `_prepare_encoder_decoder_kwargs_for_generation` runs the encoder once per
+  window and stacks the outputs; `_extract_token_timestamps`, which in
+  transformers.js 4 handles one row only, runs per row with that row's
+  `num_frames`; and `holdFinished` keeps a row that has reached the end token
+  on it while the other rows decode.
+
 ## Decisions it follows
 
 The owner's decisions behind the executor, kept in

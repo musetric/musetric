@@ -15,6 +15,55 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 - `src/analysis/models.rs` pins every model at the head of `main` of its
   repository on Hugging Face. `yarn workspace @musetric/server check:models`
   checks that, and CI runs it on every pull request.
+- A model file counts as cached only next to its manifest `<file>.verified`,
+  one line `size=<bytes> modified=<mtime in ns since the epoch> sha256=<hex>`
+  without a newline (`crates/gpu/src/cache.rs`). Without the manifest, the
+  host deletes the file and downloads it again, even when its hash matches the
+  pin; a manifest whose size or time no longer match makes the host hash the
+  file again and rewrite the manifest when the hash matches.
+- A revision not yet published to Hugging Face is checked on a device without
+  publishing it. Point the pin at it, with the sha256 and size of every
+  changed file, in a local build only: `check:models` rejects such a pin. Then
+  put the files with their manifests at the paths `ModelBundle::cached` gives
+  under the app's `models` folder before the step starts, since the host
+  cannot download a revision Hugging Face does not have. On Android the folder
+  is reached with `adb shell run-as com.musetric.client`, which only a debug
+  APK allows; the folders are in the app's [readme](../app/readme.md#data).
+
+## Takes
+
+- A recording is a set of `RecordingPiece` rows, each a mono 16-bit WAV blob
+  placed on the song by `songStartFrame` and `tempo`, in one of two layers
+  (`crates/db/src/schema.rs`). `base` holds the takes already merged, pieces
+  that do not overlap, with touching neighbours of the same tempo, key and
+  octave joined into one; `fresh` holds the last take.
+- `Recording.freshApplied` says whether the fresh layer sounds over the base.
+  Undo and redo flip it and touch no file, so a recording keeps one step of
+  history (`set_fresh_applied` in `src/recording/store.rs`). The next take
+  first merges an applied fresh layer into the base, or drops an undone one,
+  and then becomes the fresh layer itself (`commit_take` in the same file,
+  `merge_fresh` in `src/recording/plan.rs`).
+- A take is every run between the seeks of one recording. A packet whose
+  `offset` is 0, or whose `startFrame` differs from the run before, opens a
+  new run (`write_chunk` in `src/realtime/session.rs`), and a later run lies
+  over the earlier ones where they overlap (`plan_take` in `plan.rs`). The
+  player and the spectrogram split the live take by the same rule,
+  `continuesRun` of `packages/engine/src/player/liveTake.cross.ts`: a change
+  to one is a change to both.
+
+## A second server
+
+A server started next to the one of `yarn dev`, which keeps its data in
+`storage/`, takes its own `--database`, `--blobs` and `--work`. The storage
+lock refuses a second server on the same database (`src/serve.rs`), and every
+five minutes `src/garbage.rs` deletes the blobs older than five minutes that
+its own database does not reference, so a server pointed at another one's
+`--blobs` deletes that one's audio. `--processing false` starts no browser and
+runs no step. From `packages/server`:
+
+```sh
+cargo run --locked -- --listen 127.0.0.1:<port> --database <dir>/db/app.db --blobs <dir>/blobs --work <dir>/work --models storage/models --browser-bundle dist-browser --public <frontend build> --processing false
+```
 
 ## Decisions it follows
 
