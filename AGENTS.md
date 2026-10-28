@@ -114,6 +114,8 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `yarn fix:translations`: update translation extraction results.
 - `yarn fix:format`: apply repository formatting.
 - `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
+- `yarn test`: the tests of every package.
+- `yarn check:deps:dupe` and `yarn check:deps:security`, when dependencies changed: Yarn constraints and duplicate versions in the lockfile, which `yarn fix:deps:dupe` fixes, and advisories of high severity.
 - `yarn check:english`, `yarn check:notices` and `yarn check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
 - `yarn check:comments`: comments and docstrings in any language, beyond tool directives and `@see`, `@todo` and `@fixme`; third-party code goes to `checks.comments.except` of the root `package.json`.
 - `yarn check:dupe` and `yarn check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.
