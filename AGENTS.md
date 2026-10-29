@@ -4,21 +4,8 @@
 
 - This repository is a Yarn monorepo. Node comes from `.node-version` and Yarn from `packageManager` in `package.json`, through corepack.
 - Prefer existing Yarn scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
-- All commit and PR titles must comply with `.github/prTitle.config.yml`.
 - Follow the existing ESLint and TypeScript config. Do not fight it.
-
-## Test Material
-
-Applies to everything published from this repository: code, tests, comments, commits, PRs, issues, documentation and model cards.
-
-- Prefer material anyone can obtain: synthetic signals, public domain audio, and tracks under an open license such as CC0, CC BY or CC BY-SA, including tracks from public datasets.
-- Name an openly licensed track by artist, title, source link and license, and give the attribution its license requires. Its lyrics, excerpt positions, durations and results may be quoted.
-- A track under a non-commercial or no-derivatives license (NC, ND) may be used for measurements and named with its license, but do not publish its audio, stems, excerpts or lyrics.
-- Never mention any other audio: no titles, artists, albums, lyrics, quoted transcriptions, file names, and no hashed or otherwise encoded forms of them.
-- Do not describe material that cannot be shared: no duration, tempo, key, excerpt position or similar detail of an unnamed track.
-- Name a property of such input only when it is the subject of the problem, and state it abstractly: "fails on tracks shorter than one chord window", "runs out of GPU memory on tracks longer than about 4 minutes".
-- Otherwise report the observation without the input: "the step fails on Android; the cause is under investigation".
-- Checkable evidence uses synthetic signals, openly licensed tracks or inputs committed with the change. A run on any other material may be reported only as its outcome, such as "matches desktop" or "still differs".
+- The rules of the organization apply here and are not repeated: the [code](https://github.com/musetric/headquarters/blob/main/practices/code.md) of every repository, [what may be said about audio](https://github.com/musetric/headquarters/blob/main/practices/public-texts.md#material) and the other [practices](https://github.com/musetric/headquarters/blob/main/AGENTS.md#map). The rules below are this repository's own.
 
 ## Repository Map
 
@@ -47,8 +34,6 @@ Applies to everything published from this repository: code, tests, comments, com
 **Files**
 
 - Use `camelCase` for directories and non-component files, and use `PascalCase` for every React component, including both the component identifier and the file that defines it.
-- Keep files domain-specific and self-contained: do not create catch-all files like `types.ts` or `utils.ts`; keep an entity's types and functions together, and move broadly reusable sub-entities into their own domain files.
-- If a file contains several small domain entities, do not interleave them; keep each entity grouped, and place the more foundational entity with its types, variables, and functions before the next one.
 - Keep product `src` to product code. Scripts and their helpers, tests, test fixtures and test helpers, benchmarks and measurement code live in `scripts/` or in `__test__` folders, and product code never imports from them. A measurement point stays in product code only as the smallest hook a measure build needs, behind its build flag; whatever drives or reads that hook lives in `__test__`.
 
 **Imports And Exports**
@@ -57,11 +42,6 @@ Applies to everything published from this repository: code, tests, comments, com
 - When importing from a folder that has an `index` entrypoint, prefer the folder entrypoint over importing an internal file through the folder boundary.
 - Import local modules with the `.js` extension, never `.ts`, and do not enable `allowImportingTsExtensions`. A script that `node` runs directly stays in one file.
 - Keep a type shared with heavy code in a small module without dependencies, also when it is imported only as a type.
-
-**Contracts**
-
-- Never coerce an invalid value into a valid default, such as `Math.max(0, count)` or `?? fallback` for a required value.
-- A changed contract changes everywhere at once, without fallbacks kept for compatibility.
 
 **Types**
 

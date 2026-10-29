@@ -25,6 +25,13 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - Both windows load from the embedded host over the loopback address
   (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
 - `src/favicon.svg` is the only icon source, of the app and of the page.
+- It is the shell of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built) on
+  [every platform it supports](https://github.com/musetric/headquarters/blob/main/product.md#where-it-runs): the hidden
+  executor WebView is `ExecutorViewPlugin`, `minimumSystemVersion` of
+  `tauri.macos.conf.json` and `tauri.ios.conf.json` holds Apple systems at
+  version 26, and the Linux build is not offered.
+- Pull requests do not build the app (`.github/workflows/appBuild.yml`); the
+  installed app is checked by a [release run](https://github.com/musetric/headquarters/blob/main/practices/release.md).
 
 ## Data
 
@@ -50,11 +57,3 @@ installed app's folder; one process holds a folder at a time.
   `aarch64-linux-android` with `-Clink-arg=--target=aarch64-linux-android24`.
 - iOS: Xcode, the `aarch64-apple-ios` Rust target, XcodeGen and an Apple team
   id in `DEVELOPMENT_TEAM`.
-
-## Decisions it follows
-
-- Phones process only while the app is on screen ([R-3](https://github.com/musetric/headquarters/blob/main/decisions/r03-phones-process-on-screen.md)).
-- The executor is a hidden WebView of the app on every platform, `ExecutorViewPlugin` ([R-4](https://github.com/musetric/headquarters/blob/main/decisions/r04-executor-connects-itself.md)).
-- Linux is built but not supported yet ([R-6](https://github.com/musetric/headquarters/blob/main/decisions/r06-linux-not-supported-yet.md)).
-- macOS and iOS from version 26: `minimumSystemVersion` of `tauri.macos.conf.json` and `tauri.ios.conf.json` ([R-40](https://github.com/musetric/headquarters/blob/main/decisions/r40-apple-from-version-26.md)).
-- Pull requests do not build the app; a release run checks the installed app ([R-12](https://github.com/musetric/headquarters/blob/main/decisions/r12-app-checked-at-release.md)).
