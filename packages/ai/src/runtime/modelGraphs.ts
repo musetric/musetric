@@ -9,13 +9,8 @@ export type ChunkGeometry = {
 export type VocalsGraph = ChunkGeometry & {
   inputName: string;
   outputName: string;
+  masks: number;
   minStorageBuffersPerShaderStage: number;
-};
-
-export type LeadBackingGraph = ChunkGeometry & {
-  inputName: string;
-  outputName: string;
-  dimF: number;
 };
 
 export type BeatThisGraph = {

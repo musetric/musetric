@@ -27,7 +27,7 @@ const SEED: &str = "
   VALUES (1, 'Fixture project', 48000, 480000);
   INSERT INTO AudioMaster (projectId, type, blobId) VALUES (1, 'source', 'source-blob');
   INSERT INTO ProcessingStep (projectId, step, status)
-  VALUES (1, 'separation', 'pending'), (1, 'voices', 'pending'),
+  VALUES (1, 'separation', 'pending'),
          (1, 'transcription', 'pending'), (1, 'rhythm', 'pending'),
          (1, 'key', 'pending'), (1, 'chords', 'pending'),
          (1, 'voiceRange', 'pending');
@@ -101,11 +101,8 @@ fn result_statements(step: ProcessingStep) -> &'static str {
     match step {
         ProcessingStep::Separation => {
             "INSERT INTO AudioMaster (projectId, type, blobId)
-             VALUES (1, 'vocals', 'vocals-blob'), (1, 'instrumental', 'instrumental-blob');"
-        }
-        ProcessingStep::Voices => {
-            "INSERT INTO AudioMaster (projectId, type, blobId)
-             VALUES (1, 'lead', 'lead-blob'), (1, 'backing', 'backing-blob');"
+             VALUES (1, 'vocals', 'vocals-blob'), (1, 'instrumental', 'instrumental-blob'),
+                    (1, 'lead', 'lead-blob'), (1, 'backing', 'backing-blob');"
         }
         ProcessingStep::Transcription => {
             "INSERT INTO Subtitle (projectId, blobId) VALUES (1, 'subtitle-blob');"
@@ -269,7 +266,6 @@ async fn runs_every_pending_step_once() {
         runner.seen(),
         vec![
             "separation",
-            "voices",
             "transcription",
             "voiceRange",
             "rhythm",
@@ -588,7 +584,7 @@ async fn holds_a_finished_step_until_its_status_is_written() {
         .await
         .expect("the drain should finish once writes succeed");
 
-    assert_eq!(runner.seen().len(), 7);
+    assert_eq!(runner.seen().len(), 6);
     let processing = queue
         .processing(1)
         .await

@@ -2,7 +2,6 @@ import {
   type BeatThisGraph,
   type ChordNetGraph,
   type ChunkGeometry,
-  type LeadBackingGraph,
   type SkeyGraph,
   type VocalsGraph,
   type WhisperDtype,
@@ -49,18 +48,11 @@ const geometry = (graph: ParityGraphFields): ChunkGeometry => ({
 export const vocalsGraph = (graph: ParityGraphFields): VocalsGraph => ({
   ...geometry(graph),
   ...modelIo(graph),
+  masks: numberField(graph, 'masks'),
   minStorageBuffersPerShaderStage: numberField(
     graph,
     'minStorageBuffersPerShaderStage',
   ),
-});
-
-export const leadBackingGraph = (
-  graph: ParityGraphFields,
-): LeadBackingGraph => ({
-  ...geometry(graph),
-  ...modelIo(graph),
-  dimF: numberField(graph, 'dimF'),
 });
 
 export const beatThisGraph = (graph: ParityGraphFields): BeatThisGraph => ({

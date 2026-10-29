@@ -11,7 +11,7 @@ import {
   type ParityOutput,
   type ParityTask,
 } from './parityJob.js';
-import { runVocalsTask, runVoicesTask } from './paritySeparation.js';
+import { runVocalsTask } from './paritySeparation.js';
 import { runWhisperModelTask, runWhisperTask } from './parityWhisper.js';
 
 const runId = new URLSearchParams(location.search).get('run') ?? '';
@@ -118,9 +118,6 @@ const runTask = async (task: ParityTask): Promise<ParityOutput[]> => {
   }
   if (task.kind === 'vocals') {
     return await runVocalsTask(task);
-  }
-  if (task.kind === 'voices') {
-    return await runVoicesTask(task);
   }
   if (task.kind === 'rhythm') {
     return await runRhythmTask(task);

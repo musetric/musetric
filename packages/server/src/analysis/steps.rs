@@ -61,7 +61,7 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             serve: Serve::Files,
             build: build_voice_range,
         }),
-        ProcessingStep::Separation | ProcessingStep::Voices | ProcessingStep::Transcription => None,
+        ProcessingStep::Separation | ProcessingStep::Transcription => None,
     }
 }
 

@@ -26,10 +26,9 @@ use crate::summary::{
 
 const EVENT_CAPACITY: usize = 64;
 const ATTACH_LIMIT: u32 = 5;
-const QUEUE_ORDER: [ProcessingStep; 7] = [
+const QUEUE_ORDER: [ProcessingStep; 6] = [
     ProcessingStep::Transcription,
     ProcessingStep::VoiceRange,
-    ProcessingStep::Voices,
     ProcessingStep::Rhythm,
     ProcessingStep::Key,
     ProcessingStep::Chords,

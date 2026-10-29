@@ -1,7 +1,6 @@
 import {
   type BeatThisGraph,
   type ChordNetGraph,
-  type LeadBackingGraph,
   type SkeyGraph,
   type VocalsGraph,
   type WhisperGraph,
@@ -46,14 +45,6 @@ export type ParityVocalsTask = {
   graph: VocalsGraph;
   modelUrl: string;
   modelData: ParityExternalData;
-  unitInput: ParityTensorRef;
-};
-
-export type ParityVoicesTask = {
-  kind: 'voices';
-  caseName: string;
-  graph: LeadBackingGraph;
-  modelUrl: string;
   unitInput: ParityTensorRef;
 };
 
@@ -111,7 +102,6 @@ export type ParityWhisperTask = {
 export type ParityTask =
   | ParityModelTask
   | ParityVocalsTask
-  | ParityVoicesTask
   | ParityRhythmTask
   | ParityKeyTask
   | ParityChordsTask

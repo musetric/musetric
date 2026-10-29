@@ -1,18 +1,20 @@
 use std::collections::BTreeMap;
 
-use crate::analysis::models::{LEAD_BACKING_GEOMETRY, VOCALS_GEOMETRY};
+use crate::analysis::models::{VOCALS_GEOMETRY, VOCALS_MASKS};
 
 const TAU: f64 = 2.0 * std::f64::consts::PI;
 
 const VOCALS_STEP_SECONDS: u32 = 8;
 
-const LEAD_BACKING_OVERLAP: f64 = 0.25;
-pub(crate) const LEAD_BACKING_COMPENSATE: f64 = 1.065;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PlanRules {
     VocalsV1,
-    LeadBackingV1,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PlanChannels {
+    pub(crate) input: u32,
+    pub(crate) output: u32,
 }
 
 pub(crate) struct PlanUnit {
@@ -22,21 +24,16 @@ pub(crate) struct PlanUnit {
 
 pub(crate) struct UnitPlan {
     pub(crate) rules: PlanRules,
-    pub(crate) channels: u32,
+    pub(crate) channels: PlanChannels,
     pub(crate) chunk_samples: u32,
     units: Vec<PlanUnit>,
     tables: BTreeMap<u32, Vec<f32>>,
 }
 
-pub(crate) struct LeadBackingLayout {
-    pub(crate) trim: u32,
-    pub(crate) mixture_samples: u64,
-}
-
 impl UnitPlan {
     pub(crate) fn create(
         rules: PlanRules,
-        channels: u32,
+        channels: PlanChannels,
         chunk_samples: u32,
         units: Vec<PlanUnit>,
     ) -> Self {
@@ -68,17 +65,6 @@ impl UnitPlan {
                         as f32
                 })
                 .collect(),
-            PlanRules::LeadBackingV1 => {
-                if length == 1 {
-                    return vec![1.0];
-                }
-                (0..length)
-                    .map(|position| {
-                        (0.5 - 0.5 * (TAU * f64::from(position) / f64::from(length - 1)).cos())
-                            as f32
-                    })
-                    .collect()
-            }
         }
     }
 
@@ -113,45 +99,12 @@ impl UnitPlan {
         }
         Self::create(
             PlanRules::VocalsV1,
-            VOCALS_GEOMETRY.channels,
+            PlanChannels {
+                input: VOCALS_GEOMETRY.channels,
+                output: VOCALS_GEOMETRY.channels * VOCALS_MASKS,
+            },
             chunk_samples,
             units,
-        )
-    }
-
-    #[expect(
-        clippy::cast_sign_loss,
-        clippy::cast_possible_truncation,
-        reason = "the traversal mirrors the browser loop over non-negative offsets"
-    )]
-    pub(crate) fn lead_backing(samples: u64) -> (Self, LeadBackingLayout) {
-        let chunk_samples = LEAD_BACKING_GEOMETRY.chunk_samples;
-        let trim = LEAD_BACKING_GEOMETRY.n_fft / 2;
-        let gen_samples = chunk_samples - 2 * trim;
-        let mixture_samples = 2 * u64::from(trim) + samples + u64::from(gen_samples)
-            - samples % u64::from(gen_samples);
-        let step = ((1.0 - LEAD_BACKING_OVERLAP) * f64::from(chunk_samples)) as u64;
-        let mut units = Vec::new();
-        let mut start = 0_u64;
-        while start < mixture_samples {
-            let length = u64::from(chunk_samples).min(mixture_samples - start);
-            units.push(PlanUnit {
-                start,
-                length: length as u32,
-            });
-            start += step;
-        }
-        (
-            Self::create(
-                PlanRules::LeadBackingV1,
-                LEAD_BACKING_GEOMETRY.channels,
-                chunk_samples,
-                units,
-            ),
-            LeadBackingLayout {
-                trim,
-                mixture_samples,
-            },
         )
     }
 
@@ -195,7 +148,7 @@ impl UnitPlan {
     pub(crate) fn window_bytes(&self, input: &[f32], index: usize) -> Vec<u8> {
         let unit = &self.units[index];
         let frames = self.chunk_samples as usize;
-        let channels = self.channels as usize;
+        let channels = self.channels.input as usize;
         let input_frames = input.len() / channels;
         let mut chunk = vec![0_f32; channels * frames];
         for channel in 0..channels {
@@ -205,6 +158,10 @@ impl UnitPlan {
                 .copy_from_slice(&input[source..source + unit.length as usize]);
         }
         chunk.iter().copied().flat_map(f32::to_le_bytes).collect()
+    }
+
+    pub(crate) fn output_bytes(&self) -> u64 {
+        u64::from(self.chunk_samples) * u64::from(self.channels.output) * 4
     }
 }
 

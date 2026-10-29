@@ -7,7 +7,7 @@ use std::{
 
 use super::{CheckpointDir, computation_id, digest_of};
 use crate::unit_fold::FoldAccumulator;
-use crate::unit_plan::{PlanRules, PlanUnit, UnitPlan};
+use crate::unit_plan::{PlanChannels, PlanRules, PlanUnit, UnitPlan};
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -41,8 +41,11 @@ impl Drop for Workspace {
 
 fn plan() -> UnitPlan {
     UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        PlanChannels {
+            input: 2,
+            output: 2,
+        },
         4,
         vec![
             PlanUnit {

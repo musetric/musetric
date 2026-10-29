@@ -5,9 +5,7 @@ This project includes or adapts portions of the following third-party works.
 ## Ultimate Vocal Remover GUI / MDX-Net
 
 - Source: https://github.com/Anjok07/ultimatevocalremovergui
-- Usage: UVR MDX-Net karaoke model, model parameters, tensor layout, and demix overlap-add behavior reimplemented in the Rust host and TypeScript/WebGPU.
-- Model: `UVR_MDXNET_KARA_2.onnx` from the UVR model release https://github.com/TRvlvr/model_repo/releases/tag/all_public_uvr_models, republished with unchanged weights and the time axis folded into bands of the batch axis at https://huggingface.co/musetric/uvr-mdxnet-kara2-onnx.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/leadBacking/leadBackingRuntime.ts`, `packages/ai/src/runtime/leadBacking/pack.wgsl.ts`, `packages/ai/src/runtime/leadBacking/unpack.wgsl.ts`.
+- Usage: UVR MDX-Net karaoke model `UVR_MDXNET_KARA_2.onnx` from the UVR model release https://github.com/TRvlvr/model_repo/releases/tag/all_public_uvr_models, the teacher the lead/backing split of the separation model below is distilled from.
 - License: MIT, as stated in the upstream README.
 - Credit: Ultimate Vocal Remover GUI / UVR developers, including Anjok07 and aufr33; original MDX-Net AI code credited upstream to Kuielab and Woosung Choi.
 
@@ -43,10 +41,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Mel-Band RoFormer Duality student ONNX
+## Mel-Band RoFormer Duality and KARA 2 student ONNX
 
-- Source: https://huggingface.co/musetric/mel-band-roformer-duality-student-onnx
-- Usage: WebGPU-ready ONNX vocal separation model and external data file, exported from `musetric/mel-band-roformer-duality-student` (https://huggingface.co/musetric/mel-band-roformer-duality-student), a model distilled from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality, Apache-2.0), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT).
+- Source: https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student-onnx
+- Usage: WebGPU-ready ONNX separation model and external data file that give the vocals and the backing vocals of a song in one pass, exported from `musetric/mel-band-roformer-duality-kara2-student` (https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student, Apache-2.0). Its vocals come from `musetric/mel-band-roformer-duality-student` (https://huggingface.co/musetric/mel-band-roformer-duality-student), a model distilled from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality, Apache-2.0), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT). Its lead/backing split is distilled from UVR MDX-Net KARA 2 of Ultimate Vocal Remover (MIT), with credit to UVR and its developers.
 - Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserEntry.ts`, `packages/ai/src/service/browserSeparation.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`.
 - License: Apache-2.0.
 - License source: Hugging Face model card metadata.

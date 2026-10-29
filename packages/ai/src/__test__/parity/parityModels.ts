@@ -62,12 +62,27 @@ const readBundles = (
     files: readFiles(match[2], names),
   }));
 
+const readCounts = (source: string): Map<string, number> =>
+  new Map(
+    [...source.matchAll(/const ([A-Z_]+): u32 = ([\d_]+);/g)].map((match) => [
+      match[1],
+      Number(match[2].replaceAll('_', '')),
+    ]),
+  );
+
 export type ParityGraphValue = string | number;
 
-const readValue = (raw: string): ParityGraphValue => {
+const readValue = (
+  raw: string,
+  counts: Map<string, number>,
+): ParityGraphValue => {
   const text = raw.trim();
   if (text.startsWith('"')) {
     return text.slice(1, -1);
+  }
+  const count = counts.get(text);
+  if (count !== undefined) {
+    return count;
   }
   const [numerator, ...divisors] = text.split('/').map(Number);
   return divisors.reduce((quotient, divisor) => quotient / divisor, numerator);
@@ -91,6 +106,7 @@ export type ParityModels = {
 
 const readGraphs = (source: string): ParityModels['graphs'] => {
   const graphs: ParityModels['graphs'] = {};
+  const counts = readCounts(source);
   for (const match of source.matchAll(graphHeader)) {
     const start = match.index + match[0].length;
     const body = source.slice(start, source.indexOf('\n}', start));
@@ -98,7 +114,7 @@ const readGraphs = (source: string): ParityModels['graphs'] => {
     const fields = Object.fromEntries(
       [...body.matchAll(/"(\w+)": ([^,\n{]+),/g)].map((field) => [
         field[1],
-        readValue(field[2]),
+        readValue(field[2], counts),
       ]),
     );
     graphs[match[1]] = {

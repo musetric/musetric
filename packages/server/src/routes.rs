@@ -181,9 +181,9 @@ mod tests {
              VALUES (1, 'First', 44100, 441000), (2, 'Second', 44100, 882000),
                     (3, 'Third', 48000, 480000);
              INSERT INTO ProcessingStep (projectId, step, status, error)
-             VALUES (1, 'separation', 'done', NULL), (1, 'voices', 'failed', 'the voices failed'),
-                    (2, 'separation', 'done', NULL), (2, 'voices', 'done', NULL),
-                    (2, 'transcription', 'pending', NULL), (3, 'separation', 'pending', NULL);
+             VALUES (1, 'separation', 'failed', 'the separation failed'),
+                    (2, 'separation', 'done', NULL), (2, 'transcription', 'pending', NULL),
+                    (3, 'separation', 'pending', NULL);
              INSERT INTO StemLoudness (projectId, stemType, integratedLufs, truePeakDb, p95RmsDb)
              VALUES (2, 'source', -9.0, -0.5, -12.0), (2, 'instrumental', -11.0, -1.0, -14.0),
                     (2, 'lead', -15.0, -2.0, -18.0), (2, 'backing', -21.0, -4.0, -25.0),

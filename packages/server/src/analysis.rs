@@ -12,7 +12,6 @@ mod stem_signal;
 mod steps;
 mod transcribe;
 mod transcribe_units;
-mod voices;
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -56,9 +55,6 @@ impl StepRunner for AnalysisRunner {
                     Some(analysis) => Box::pin(async move {
                         browser::run(&self.context, job, report, &analysis).await
                     }),
-                    None if job.step == ProcessingStep::Voices => {
-                        Box::pin(voices::run(&self.context, job, report))
-                    }
                     None => Box::pin(separation::run(&self.context, job, report)),
                 }
             }

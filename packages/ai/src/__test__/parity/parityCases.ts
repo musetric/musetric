@@ -1,5 +1,4 @@
-export type ParityStep =
-  'vocals' | 'voices' | 'rhythm' | 'key' | 'chords' | 'transcribe';
+export type ParityStep = 'vocals' | 'rhythm' | 'key' | 'chords' | 'transcribe';
 
 export type ParitySource = {
   url: string;
@@ -49,14 +48,6 @@ export const parityStepModels: Record<ParityStep, ParityStepModel> = {
     bundle: 'VOCALS',
     graph: 'vocals',
     wasm: 'none',
-    webgpu: true,
-    simpleBufferCache: true,
-    outputs: { outputName: 'model.output' },
-  },
-  voices: {
-    bundle: 'LEAD_BACKING',
-    graph: 'lead_backing',
-    wasm: 'desktop',
     webgpu: true,
     simpleBufferCache: true,
     outputs: { outputName: 'model.output' },

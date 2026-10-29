@@ -1,7 +1,7 @@
 use musetric_db::{PROCESSING_STEPS, ProcessingStep, StepState, StepStatus};
 use serde_json::Value;
 
-pub const STEP_ORDER: [ProcessingStep; 7] = PROCESSING_STEPS;
+pub const STEP_ORDER: [ProcessingStep; 6] = PROCESSING_STEPS;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StepPass {
@@ -94,7 +94,7 @@ pub struct StepView {
 #[derive(Clone, Debug)]
 pub struct Processing {
     pub done: bool,
-    pub steps: [StepView; 7],
+    pub steps: [StepView; 6],
 }
 
 impl Processing {
@@ -150,11 +150,10 @@ fn build_step(
 fn step_index(step: ProcessingStep) -> usize {
     match step {
         ProcessingStep::Separation => 0,
-        ProcessingStep::Voices => 1,
-        ProcessingStep::Transcription => 2,
-        ProcessingStep::Rhythm => 3,
-        ProcessingStep::Key => 4,
-        ProcessingStep::Chords => 5,
-        ProcessingStep::VoiceRange => 6,
+        ProcessingStep::Transcription => 1,
+        ProcessingStep::Rhythm => 2,
+        ProcessingStep::Key => 3,
+        ProcessingStep::Chords => 4,
+        ProcessingStep::VoiceRange => 5,
     }
 }

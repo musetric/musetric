@@ -57,7 +57,7 @@ export type StftInferenceCore = {
   modelInput: GPUBuffer;
   modelOutput: GPUBuffer;
   analysis: StftStage;
-  synthesis: StftStage;
+  syntheses: readonly StftStage[];
   release: () => void;
 };
 
@@ -146,9 +146,11 @@ export const createStftInferenceRuntime = async (
     windowCount * nFft * Float32Array.BYTES_PER_ELEMENT,
   );
   const outputAudio = createStorageBuffer(device, chunkBytes);
-  const readback = createReadbackBuffer(device, chunkBytes);
 
   const core = createCore({ device, wave, spectrum });
+  const stems = core.syntheses.length;
+  const outputFloats = stems * chunkFloats;
+  const readback = createReadbackBuffer(device, stems * chunkBytes);
 
   const frameStage: StftStage = {
     pipeline: framePipeline,
@@ -212,11 +214,11 @@ export const createStftInferenceRuntime = async (
     input: Float32Array<ArrayBuffer>,
     output?: Float32Array<ArrayBuffer>,
   ): Promise<Float32Array<ArrayBuffer>> => {
-    if (
-      input.length !== chunkFloats ||
-      (output && output.length !== chunkFloats)
-    ) {
+    if (input.length !== chunkFloats) {
       throw new Error(`${label} chunk must contain ${chunkFloats} floats`);
+    }
+    if (output && output.length !== outputFloats) {
+      throw new Error(`${label} output must hold ${outputFloats} floats`);
     }
     await yieldGpuToCompositor();
     device.queue.writeBuffer(rawAudio, 0, input);
@@ -235,17 +237,25 @@ export const createStftInferenceRuntime = async (
     });
 
     const istftEncoder = device.createCommandEncoder();
-    runStage(istftEncoder, core.synthesis);
-    ifft.run(istftEncoder);
-    const overlapAddPass = istftEncoder.beginComputePass();
-    dispatch1d(
-      overlapAddPass,
-      overlapAddPipeline,
-      overlapAddBindGroup,
-      chunkFloats,
-    );
-    overlapAddPass.end();
-    istftEncoder.copyBufferToBuffer(outputAudio, 0, readback, 0, chunkBytes);
+    for (const [stem, synthesis] of core.syntheses.entries()) {
+      runStage(istftEncoder, synthesis);
+      ifft.run(istftEncoder);
+      const overlapAddPass = istftEncoder.beginComputePass();
+      dispatch1d(
+        overlapAddPass,
+        overlapAddPipeline,
+        overlapAddBindGroup,
+        chunkFloats,
+      );
+      overlapAddPass.end();
+      istftEncoder.copyBufferToBuffer(
+        outputAudio,
+        0,
+        readback,
+        stem * chunkBytes,
+        chunkBytes,
+      );
+    }
     device.queue.submit([istftEncoder.finish()]);
 
     await readback.mapAsync(GPUMapMode.READ);

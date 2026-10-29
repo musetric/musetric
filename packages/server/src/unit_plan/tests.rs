@@ -1,15 +1,29 @@
-use super::{PlanRules, PlanUnit, UnitPlan};
+use super::{PlanChannels, PlanRules, PlanUnit, UnitPlan};
 
 const CHUNK: u32 = 484_659;
 const STEP: u64 = 352_800;
 const SAMPLE_RATE: u32 = 44_100;
+const STEREO_STEMS: PlanChannels = PlanChannels {
+    input: 2,
+    output: 4,
+};
 
 #[test]
 fn keeps_the_declared_rules_version() {
     let plan = UnitPlan::vocals(SAMPLE_RATE, STEP);
     assert_eq!(plan.rules, PlanRules::VocalsV1);
-    assert_eq!(plan.channels, 2);
+    assert_eq!(plan.channels, STEREO_STEMS);
     assert_eq!(plan.chunk_samples, CHUNK);
+}
+
+#[test]
+fn takes_a_stereo_window_and_expects_the_vocals_and_the_backing_back() {
+    let plan = UnitPlan::vocals(SAMPLE_RATE, STEP);
+    assert_eq!(
+        plan.window_bytes(&vec![0.0; 2 * 352_800], 0).len(),
+        2 * 4 * 484_659
+    );
+    assert_eq!(plan.output_bytes(), 4 * 4 * u64::from(CHUNK));
 }
 
 #[test]
@@ -108,7 +122,7 @@ fn weighs_a_short_window_by_the_full_period() {
 fn pads_the_window_with_silence_after_the_useful_input() {
     let plan = UnitPlan::create(
         PlanRules::VocalsV1,
-        2,
+        STEREO_STEMS,
         8,
         vec![PlanUnit {
             start: 4,
@@ -138,76 +152,11 @@ fn pads_the_window_with_silence_after_the_useful_input() {
     }
 }
 
-const KARA_CHUNK: u32 = 261_120;
-const KARA_STEP: u64 = 195_840;
-const KARA_TRIM: u32 = 2_560;
-const KARA_GEN: u64 = 256_000;
-
-#[test]
-fn keeps_the_lead_backing_rules_version() {
-    let (plan, _) = UnitPlan::lead_backing(KARA_GEN);
-    assert_eq!(plan.rules, PlanRules::LeadBackingV1);
-    assert_eq!(plan.channels, 2);
-    assert_eq!(plan.chunk_samples, KARA_CHUNK);
-}
-
-#[test]
-fn pads_the_mixture_by_the_declared_geometry() {
-    let samples = KARA_GEN;
-    let (plan, layout) = UnitPlan::lead_backing(samples);
-    assert_eq!(layout.trim, KARA_TRIM);
-    assert_eq!(
-        layout.mixture_samples,
-        2 * u64::from(KARA_TRIM) + samples + KARA_GEN - samples % KARA_GEN
-    );
-    assert_eq!(plan.chunk_samples, KARA_CHUNK);
-
-    let shorter = 100_000_u64;
-    let (_, short_layout) = UnitPlan::lead_backing(shorter);
-    assert_eq!(
-        short_layout.mixture_samples,
-        2 * u64::from(KARA_TRIM) + shorter + KARA_GEN - shorter % KARA_GEN
-    );
-}
-
-#[test]
-#[expect(clippy::cast_possible_truncation, reason = "the tail fits u32")]
-fn gives_the_last_lead_backing_window_a_shorter_tail() {
-    let samples = KARA_GEN;
-    let (plan, layout) = UnitPlan::lead_backing(samples);
-    assert_eq!(plan.units().len(), 3);
-    assert_eq!(plan.units()[0].start, 0);
-    assert_eq!(plan.units()[0].length, KARA_CHUNK);
-    assert_eq!(plan.units()[1].start, KARA_STEP);
-    assert_eq!(plan.units()[2].start, 2 * KARA_STEP);
-    let tail = layout.mixture_samples - 2 * KARA_STEP;
-    assert_eq!(plan.units()[2].length, tail as u32);
-    assert_eq!(
-        u64::from(plan.unit_count()),
-        layout.mixture_samples.div_ceil(KARA_STEP)
-    );
-}
-
-#[test]
-fn weighs_the_lead_backing_window_symmetrically() {
-    let samples = KARA_GEN;
-    let (plan, layout) = UnitPlan::lead_backing(samples);
-    let last = plan.units().len() - 1;
-    assert!(plan.weight(0, 0).abs() < 1e-7);
-    assert!(plan.weight(0, KARA_CHUNK - 1).abs() < 1e-6);
-    let tail = plan.units()[last].length;
-    let first_tail = f64::from(plan.weight(last, 1));
-    let expected = 0.5 - 0.5 * (std::f64::consts::TAU / f64::from(tail - 1)).cos();
-    assert!((first_tail - expected).abs() < 1e-6);
-    assert!(f64::from(plan.weight(last, 0)).abs() < 1e-7);
-    let _ = layout;
-}
-
 #[test]
 fn settles_the_frames_no_remaining_window_can_touch() {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO_STEMS,
         5,
         [0, 3, 6, 9, 7]
             .into_iter()
