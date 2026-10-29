@@ -26,14 +26,21 @@ tracker of `@musetric/spectrogram`, without a model.
   `windowsPerBatch` at a time, never on the pipeline's long-form chunking, and
   with the language `resolveLanguage` picks once per track
   (`src/transcription/transcribePipeline.ts`).
-
-## Decisions it follows
-
-- Every model runs in this page, never natively ([R-8](https://github.com/musetric/headquarters/blob/main/decisions/r08-models-run-in-the-page.md)).
-- A GPU defect is fixed by rewriting the graph, not by a CPU fallback; S-KEY is the one model on wasm ([R-9](https://github.com/musetric/headquarters/blob/main/decisions/r09-no-cpu-fallback.md)).
-- One inference at a time: the executor page holds the Web Lock `musetric-executor` (`src/service/browserExecutor.ts`) ([R-20](https://github.com/musetric/headquarters/blob/main/decisions/r20-one-inference-at-a-time.md)).
-- The WebGPU device is created here and handed to `onnxruntime-web`, and `src/runtime/gpuPacer.ts` paces its queue ([R-24](https://github.com/musetric/headquarters/blob/main/decisions/r24-own-webgpu-device.md)).
-- Transcription runs on `@huggingface/transformers` ([R-26](https://github.com/musetric/headquarters/blob/main/decisions/r26-whisper-on-transformers-js.md)).
+- It is the executor of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built): the Web
+  Lock `musetric-executor` (`src/service/browserExecutor.ts`) keeps one
+  network running at a time, and S-KEY is its one model on wasm.
+- A GPU defect is fixed by rewriting the graph, never by a CPU fallback
+  ([principles](https://github.com/musetric/headquarters/blob/main/principles.md)).
+- The WebGPU device is created here and handed to `onnxruntime-web`, and
+  `src/runtime/gpuPacer.ts` paces its queue, so that a long queue of GPU work
+  does not freeze a phone; `onnxruntime-web` is not patched for it.
+- The vocal separation core runs as one graph, not in stages: its heavy
+  projections, split into rows at export, keep the phone responsive with an
+  identical output ([#957](https://github.com/musetric/musetric/issues/957) H7).
+- Transcription stays on `@huggingface/transformers` and is not rewritten onto
+  `onnxruntime-web`: the library holds the code that reached today's quality,
+  from the tokenizer to the word times. Its price is its cache layout, reaching
+  into its internals for the pacer, and a pinned version.
 
 ## Parity run
 

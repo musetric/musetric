@@ -7,9 +7,9 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 - A change to a step's unit plan (stride, overlap, windows per unit) bumps
   that step's `DSP_VERSION`.
-- `src/analysis/models.rs` pins every model at the head of `main` of its
-  Hugging Face repository ([pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins));
-  `yarn workspace @musetric/server check:models` checks it.
+- `src/analysis/models.rs` holds the
+  [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models;
+  `yarn workspace @musetric/server check:models` checks them.
 - A model file counts as cached only next to its manifest `<file>.verified`
   (`crates/gpu/src/cache.rs`); the host deletes a file without one and
   downloads it again.
@@ -23,6 +23,22 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 - The host (`write_chunk` in `src/realtime/session.rs`) and the engine
   (`continuesRun` in `packages/engine/src/player/liveTake.cross.ts`) split a
   take into runs by the same rule: a change to one is a change to both.
+- It is the host of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built): the units
+  and checkpoints of a step are in `src/analysis/stage_attempt.rs`.
+- `crates/media` decodes and encodes all audio, and the import of
+  `src/routes/project.rs` refuses a format it cannot read with a message that
+  says so.
+- A silent stem goes to the absolute gate of BS.1770 instead of failing, as
+  the test `puts_silence_on_the_absolute_gate_instead_of_failing` of
+  `crates/media/src/loudness.rs` checks.
+- The database has one migration, `V001_INITIAL` of `crates/db/src/schema.rs`,
+  edited in place until the app has users: nobody has data to keep yet, and a
+  migration written now would be carried forever. A local database of an
+  older schema is deleted, not migrated. This is revisited before the first
+  release ([#1099](https://github.com/musetric/musetric/issues/1099)).
+- The export is stretched by `crates/stretch`, the host's own Rust port of
+  Signalsmith Stretch, which keeps it free of unsafe code and of a C++
+  toolchain on every target.
 
 ## A second server
 
@@ -33,12 +49,3 @@ no browser and runs no step. From `packages/server`:
 ```sh
 cargo run --locked -- --listen 127.0.0.1:<port> --database <dir>/db/app.db --blobs <dir>/blobs --work <dir>/work --models storage/models --browser-bundle dist-browser --public <frontend build> --processing false
 ```
-
-## Decisions it follows
-
-- The host owns the processing: units, checkpoints, HTTP for data and a WebSocket for commands ([R-10](https://github.com/musetric/headquarters/blob/main/decisions/r10-host-owns-processing.md)).
-- Audio is decoded and encoded by `crates/media`, without ffmpeg ([R-14](https://github.com/musetric/headquarters/blob/main/decisions/r14-media-without-ffmpeg.md)).
-- A silent stem goes to the absolute gate of BS.1770 instead of failing, as the test `puts_silence_on_the_absolute_gate_instead_of_failing` of `crates/media/src/loudness.rs` checks ([R-17](https://github.com/musetric/headquarters/blob/main/decisions/readme.md#decisions-that-became-rules)).
-- A format the decoder cannot read is refused with a clear message ([R-18](https://github.com/musetric/headquarters/blob/main/decisions/r18-unreadable-format-refused.md)).
-- One database migration, `V001_INITIAL`, edited in place until the app has users ([R-33](https://github.com/musetric/headquarters/blob/main/decisions/r33-one-migration-until-users.md)).
-- The export carries the mix, key and tempo the user hears, stretched by `crates/stretch` ([R-38](https://github.com/musetric/headquarters/blob/main/decisions/r38-export-what-you-hear.md)).
