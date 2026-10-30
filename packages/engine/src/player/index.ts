@@ -62,6 +62,7 @@ export type CreateEnginePlayerOptions = {
   getDecoder: () => EngineDecoder;
   playheadPort: MessagePort;
   playheadPorts: MessagePort[];
+  fundamentalPort: MessagePort;
 };
 
 export const createEnginePlayer = (
@@ -69,7 +70,7 @@ export const createEnginePlayer = (
 ): EnginePlayer => {
   const { context, audioOutput, outputClock, store, decoderPort, getDecoder } =
     options;
-  const { playheadPort, playheadPorts } = options;
+  const { playheadPort, playheadPorts, fundamentalPort } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
 
@@ -94,6 +95,7 @@ export const createEnginePlayer = (
         decoderPort,
         playheadPort,
         playheadPorts,
+        fundamentalPort,
         onPlaybackEnded: () => {
           const state = store.get();
           if (!state.isSlave) {

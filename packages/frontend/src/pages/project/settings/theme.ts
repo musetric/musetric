@@ -18,6 +18,10 @@ export const useThemeSpectrogramColors = () => {
       recordingClose: defaultSpectrogramConfig.colors.recordingClose,
       recordingMiss: theme.palette.error.main,
       recordingTimingMiss: defaultSpectrogramConfig.colors.recordingTimingMiss,
+      harmonic: theme.palette.primary.main,
+      harmonicQuieter: theme.palette.info.main,
+      harmonicLouder: theme.palette.warning.main,
+      stencil: defaultSpectrogramConfig.colors.stencil,
     };
     engine.store.update((state) => {
       state.colors = colors;

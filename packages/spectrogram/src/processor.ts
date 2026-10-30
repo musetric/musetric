@@ -17,8 +17,11 @@ import {
 import {
   allTrackKeys,
   mapTrackKeys,
-  type SpectrogramConfig,
   type TrackKey,
+} from './common/trackKeys.es.js';
+import {
+  type SpectrogramConfig,
+  type SpectrogramCursorHarmonics,
 } from './config.cross.js';
 import {
   createSpectrogramConfigurator,
@@ -29,6 +32,12 @@ import {
   type ComputeMarkers,
   dispatchCompute,
 } from './processor/computeDispatch.js';
+import { createCursorHarmonicsReader } from './processor/cursorHarmonics.js';
+import {
+  fundamentalSpanFrames,
+  readLaneFundamentalFrames,
+  type SpectrogramFundamentalFrames,
+} from './processor/fundamentalFrames.js';
 import {
   commitResidentPlans,
   createConfigInvalidationScope,
@@ -100,20 +109,13 @@ const toTrackSources = (samples: SpectrogramSamples): TrackSources =>
     return input === undefined ? undefined : toSpectrogramSource(input);
   });
 
+export type SpectrogramRecordedEnds = Partial<Record<TrackKey, number>>;
+
 export type SpectrogramColumnValues = {
   baseColumn: number;
   columnStep: number;
   values: Float32Array;
 };
-
-export type SpectrogramFundamentalFrames = {
-  hopSeconds: number;
-  firstFrame: number;
-  values: Float32Array;
-  confidence: Float32Array;
-};
-
-export type SpectrogramRecordedEnds = Partial<Record<TrackKey, number>>;
 
 export type SpectrogramProcessor = {
   render: (
@@ -136,6 +138,14 @@ export type SpectrogramProcessor = {
     firstFrame: number,
     frameCount: number,
   ) => Promise<SpectrogramFundamentalFrames | undefined>;
+
+  readFundamentalSpan: (
+    trackKey: TrackKey,
+    startSample: number,
+    sampleCount: number,
+  ) => Promise<SpectrogramFundamentalFrames | undefined>;
+
+  readCursorHarmonics: () => Promise<SpectrogramCursorHarmonics | undefined>;
 
   hasPendingWork: () => boolean;
 
@@ -184,6 +194,7 @@ export const createSpectrogramProcessor = (
   let lastPlans: Record<TrackKey, TrackRenderPlan> | undefined = undefined;
   let lastWork: Record<TrackKey, SpectrogramLaneWork> | undefined = undefined;
   let pendingInvalidations: SpectrogramSampleInvalidation[] = [];
+  const cursorHarmonics = createCursorHarmonicsReader(device);
 
   const ensureColumns = (windowCount: number): boolean[] => {
     if (reusableColumns.length !== windowCount) {
@@ -268,6 +279,17 @@ export const createSpectrogramProcessor = (
     },
   );
 
+  const readFundamentalFrames: SpectrogramProcessor['readFundamentalFrames'] =
+    async (trackKey, firstFrame, frameCount) =>
+      lastRuntime &&
+      readLaneFundamentalFrames({
+        device,
+        runtime: lastRuntime,
+        trackKey,
+        firstFrame,
+        frameCount,
+      });
+
   const readColumns = async (
     trackKey: TrackKey,
     selectBuffer: (runtime: SpectrogramRuntime) => GPUBuffer | undefined,
@@ -315,35 +337,24 @@ export const createSpectrogramProcessor = (
               frequency < spectrum.band.fullMaxFrequency,
           )?.columnEnergyBuffer,
       ),
-    readFundamentalFrames: async (trackKey, firstFrame, frameCount) => {
-      if (!lastRuntime) {
+    readFundamentalFrames,
+    readFundamentalSpan: async (trackKey, startSample, sampleCount) => {
+      const settings = lastRuntime?.tracks[trackKey].lane.pitchSettings;
+      if (!settings) {
         return undefined;
       }
-      const { lane } = lastRuntime.tracks[trackKey];
-      const { ringFrames, hop, sampleRate } = lane.pitchSettings;
-      const reader = createGpuBufferReader({
-        device,
-        typeSize: Int32Array.BYTES_PER_ELEMENT,
-        size: ringFrames * 4,
-      });
-      try {
-        const bytes = await reader.read(lane.fundamentalDecodedBuffer);
-        const floats = new Float32Array(bytes);
-        const ints = new Int32Array(bytes);
-        const values = new Float32Array(frameCount);
-        const confidence = new Float32Array(frameCount);
-        for (let index = 0; index < frameCount; index += 1) {
-          const frame = firstFrame + index;
-          const slot = ((frame % ringFrames) + ringFrames) % ringFrames;
-          if (ints[slot * 4 + 2] === frame) {
-            values[index] = floats[slot * 4];
-            confidence[index] = floats[slot * 4 + 1];
-          }
-        }
-        return { hopSeconds: hop / sampleRate, firstFrame, values, confidence };
-      } finally {
-        reader.destroy();
+      const { firstFrame, frameCount } = fundamentalSpanFrames(
+        settings.hop,
+        startSample,
+        sampleCount,
+      );
+      return readFundamentalFrames(trackKey, firstFrame, frameCount);
+    },
+    readCursorHarmonics: async () => {
+      if (!lastRuntime || !lastPlans) {
+        return undefined;
       }
+      return cursorHarmonics.read(lastRuntime, lastPlans);
     },
     hasPendingWork: () =>
       lastRuntime !== undefined &&
@@ -361,6 +372,7 @@ export const createSpectrogramProcessor = (
     dispose: () => {
       timer.dispose();
       configurator.dispose();
+      cursorHarmonics.dispose();
     },
   };
 };

@@ -11,7 +11,7 @@ export const isNaturalMidi = (midi: number): boolean =>
 
 export const isOctaveMidi = (midi: number): boolean => midi % 12 === 0;
 
-const getFrequencyYRatio = (
+export const getFrequencyYRatio = (
   frequency: number,
   minFrequency: number,
   maxFrequency: number,

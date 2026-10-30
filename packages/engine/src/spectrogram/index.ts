@@ -1,6 +1,7 @@
 import {
   defaultSpectrogramConfig,
   type SpectrogramConfig,
+  type TakeVersion,
 } from '@musetric/spectrogram';
 import {
   type ControlledPromise,
@@ -30,6 +31,11 @@ export type EngineSpectrogram = {
   ) => Unmount;
   setConfig: (patch: Partial<SpectrogramConfig>) => void;
   previewLiveTake: (chunk: CapturedChunk) => void;
+  renderTakeVersion: (
+    start: number,
+    end: number,
+    version: TakeVersion,
+  ) => Promise<Float32Array | undefined>;
 };
 
 export type CreateEngineSpectrogramOptions = {
@@ -37,15 +43,22 @@ export type CreateEngineSpectrogramOptions = {
   sampleRate: number;
   decoderPort: MessagePort;
   playheadPort: MessagePort;
+  fundamentalPort: MessagePort;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, playheadPort } = options;
+  const { store, sampleRate, decoderPort, playheadPort, fundamentalPort } =
+    options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
+  const takeVersionRequests = new Map<
+    number,
+    (samples: Float32Array | undefined) => void
+  >();
+  let takeVersionRequestId = 0;
   port.instance.onerror = () => {
     store.update((state) => {
       state.statuses.spectrogram = 'error';
@@ -59,6 +72,21 @@ export const createEngineSpectrogram = (
     setState: (message) => {
       store.update((state) => {
         state.statuses.spectrogram = message.status;
+      });
+    },
+    setCursorHarmonics: (message) => {
+      store.update((state) => {
+        state.cursorHarmonics = message.harmonics;
+      });
+    },
+    setTakeVersion: (message) => {
+      takeVersionRequests.get(message.requestId)?.(message.samples);
+      takeVersionRequests.delete(message.requestId);
+    },
+    setVocalMarks: (message) => {
+      store.update((state) => {
+        state.vocalCoachStatus = message.status;
+        state.vocalMarks = message.marks;
       });
     },
   });
@@ -95,6 +123,22 @@ export const createEngineSpectrogram = (
   );
 
   store.subscribe(
+    (state) => state.selectedHarmonics.join(','),
+    () => {
+      port.methods.setHarmonicFilter({
+        harmonics: store.get().selectedHarmonics,
+      });
+    },
+  );
+
+  store.subscribe(
+    (state) => state.vocalCoachEnabled,
+    (enabled) => {
+      port.methods.setVocalCoach({ enabled });
+    },
+  );
+
+  store.subscribe(
     (state) => state.colors,
     (colors) => {
       port.methods.updateConfig({
@@ -105,15 +149,24 @@ export const createEngineSpectrogram = (
 
   return {
     port,
+    renderTakeVersion: async (start, end, version) =>
+      new Promise((resolve) => {
+        takeVersionRequestId += 1;
+        const requestId = takeVersionRequestId;
+        takeVersionRequests.set(requestId, resolve);
+        port.methods.renderTakeVersion({ requestId, start, end, version });
+      }),
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
         playheadPort,
         sampleRate,
+        fundamentalPort,
       });
 
       await bootPromise.promise;
       port.methods.setFrameCount({ frameCount: store.get().frameCount ?? 0 });
+      port.methods.setVocalCoach({ enabled: store.get().vocalCoachEnabled });
     },
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);
@@ -185,6 +238,8 @@ export const createEngineSpectrogram = (
         port.methods.unmount();
         store.update((state) => {
           state.statuses.spectrogram = 'pending';
+          state.cursorHarmonics = undefined;
+          state.selectedHarmonics = [];
         });
       };
     },

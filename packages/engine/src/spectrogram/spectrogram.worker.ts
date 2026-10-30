@@ -1,3 +1,4 @@
+import { fundamentalChannel } from '../common/fundamentalChannel.cross.js';
 import { createPlayhead } from '../player/playhead.cross.js';
 import {
   spectrogramChannel,
@@ -31,6 +32,7 @@ port.bindBoot(async (message) => {
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
     playhead: createPlayhead(message.playheadPort, message.sampleRate),
+    fundamentalPort: fundamentalChannel.outbound(message.fundamentalPort),
     profiling,
     onRendered: renderHook?.notify,
   });

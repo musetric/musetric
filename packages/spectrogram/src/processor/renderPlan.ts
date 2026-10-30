@@ -14,10 +14,12 @@ import { type SpectrogramSampleInvalidation } from '../common/sampleInvalidation
 import { type SpectrogramSource } from '../common/source.js';
 import {
   allTrackKeys,
-  isFundamentalNeeded,
   mapTrackKeys,
-  type SpectrogramConfig,
   type TrackKey,
+} from '../common/trackKeys.es.js';
+import {
+  isFundamentalNeeded,
+  type SpectrogramConfig,
 } from '../config.cross.js';
 import { type SpectrogramRuntime } from '../configurator.js';
 import { type SpectrogramLaneWork } from '../lane/index.js';

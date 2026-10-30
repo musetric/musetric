@@ -1,15 +1,26 @@
 import { type ResourceCell } from '@musetric/utils';
 import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
+import { allTrackKeys, type TrackKey } from '../common/trackKeys.es.js';
 import {
-  allTrackKeys,
+  areHarmonicsShown,
+  isHarmonicComparisonShown,
   type SpectrogramConfig,
-  type TrackKey,
 } from '../config.cross.js';
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';
 import { createColorsCell, drawRingSlotsByteOffset } from './colors.js';
+import {
+  createComparisonPipeline,
+  createDominantHarmonicsCell,
+  createHarmonicDifferencesCell,
+  createHarmonicsBindGroupCell,
+  createHarmonicsPipeline,
+  dispatchHarmonics,
+  harmonicsLayerCount,
+} from './harmonics.js';
 
 export type SpectrogramDraw = {
+  dominantHarmonics: GPUBuffer;
   run: (
     encoder: GPUCommandEncoder,
     baseSlots: Record<TrackKey, number>,
@@ -35,6 +46,18 @@ export const createSpectrogramDrawCell = (
     minFilter: 'nearest',
   });
   const bindGroupCell = createBindGroupCell(device, sampler);
+  const harmonicsPipeline = createHarmonicsPipeline(device);
+  const dominantHarmonicsCell = createDominantHarmonicsCell(device);
+  const harmonicsBindGroupCell = createHarmonicsBindGroupCell(
+    device,
+    harmonicsPipeline,
+  );
+  const comparisonPipeline = createComparisonPipeline(device);
+  const harmonicDifferencesCell = createHarmonicDifferencesCell(device);
+  const comparisonBindGroupCell = createHarmonicsBindGroupCell(
+    device,
+    comparisonPipeline,
+  );
   const ringSlotsScratch = new Uint32Array(4);
 
   return {
@@ -44,16 +67,39 @@ export const createSpectrogramDrawCell = (
       const canvas = canvasCell.get(config.canvas);
       setOffscreenCanvasSize(config.canvas, config.viewSize);
       const colors = colorsCell.get(config);
+      const windowCount = config.viewSize.width;
+      const dominantHarmonics = dominantHarmonicsCell.get(windowCount);
+      const harmonicDifferences = harmonicDifferencesCell.get({
+        windowCount,
+        maxHarmonics: config.harmonicComparison.maxHarmonics,
+      });
       const bindGroup = bindGroupCell.get({
         arrayView,
         referenceLine: fundamentalLines[reference],
         targetLine: fundamentalLines[target],
         verdict,
+        dominantHarmonics,
+        harmonicDifferences,
         colors: colors.buffer,
         layout: canvas.pipeline.getBindGroupLayout(0),
       });
+      const harmonicsBindGroup = harmonicsBindGroupCell.get({
+        arrayView,
+        referenceLine: fundamentalLines[reference],
+        targetLine: fundamentalLines[target],
+        output: dominantHarmonics,
+        colors: colors.buffer,
+      });
+      const comparisonBindGroup = comparisonBindGroupCell.get({
+        arrayView,
+        referenceLine: fundamentalLines[reference],
+        targetLine: fundamentalLines[target],
+        output: harmonicDifferences,
+        colors: colors.buffer,
+      });
 
       return {
+        dominantHarmonics,
         run: (encoder, baseSlots) => {
           ringSlotsScratch[0] = baseSlots[allTrackKeys[0]];
           ringSlotsScratch[1] = baseSlots[allTrackKeys[1]];
@@ -64,6 +110,20 @@ export const createSpectrogramDrawCell = (
             drawRingSlotsByteOffset,
             ringSlotsScratch,
           );
+          if (areHarmonicsShown(config)) {
+            dispatchHarmonics(encoder, harmonicsPipeline, harmonicsBindGroup, {
+              windowCount,
+              layers: harmonicsLayerCount,
+            });
+          }
+          if (isHarmonicComparisonShown(config)) {
+            dispatchHarmonics(
+              encoder,
+              comparisonPipeline,
+              comparisonBindGroup,
+              { windowCount, layers: 1 },
+            );
+          }
           const targetView = canvas.context.getCurrentTexture().createView({
             label: 'draw-view',
           });
@@ -89,6 +149,10 @@ export const createSpectrogramDrawCell = (
     dispose: () => {
       canvasCell.dispose();
       bindGroupCell.dispose();
+      harmonicsBindGroupCell.dispose();
+      dominantHarmonicsCell.dispose();
+      comparisonBindGroupCell.dispose();
+      harmonicDifferencesCell.dispose();
       colorsCell.dispose();
     },
   };

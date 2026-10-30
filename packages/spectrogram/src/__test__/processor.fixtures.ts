@@ -1,7 +1,8 @@
 import { createGpuContext } from '@musetric/utils/gpu';
 import { expect } from 'vitest';
 import { stackedLaneGap } from '../common/stackedLanes.es.js';
-import { allTrackKeys, type SpectrogramConfig } from '../config.cross.js';
+import { allTrackKeys } from '../common/trackKeys.es.js';
+import { type SpectrogramConfig } from '../config.cross.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
 import {
   createSpectrogramProcessor,

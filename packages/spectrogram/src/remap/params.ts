@@ -8,6 +8,8 @@ const headerByteLength = 64;
 const bandByteLength = 32;
 export const slotOffsetByteOffset = 52;
 export const columnCountByteOffset = 56;
+const levelScaleByteOffset = 60;
+export const remapLevelScale = 0.5;
 
 export type RemapBandParams = {
   windowSize: number;
@@ -146,7 +148,7 @@ export const createParamsCell = (device: GPUDevice) =>
               true,
             );
             view.setUint32(columnCountByteOffset, columnCount, true);
-            view.setUint32(60, 0, true);
+            view.setFloat32(levelScaleByteOffset, remapLevelScale, true);
             value.bands.forEach((band, index) => {
               const offset = headerByteLength + index * bandByteLength;
               view.setFloat32(offset, band.windowSize, true);

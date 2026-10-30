@@ -1,4 +1,4 @@
-import { type TrackKey } from '../config.cross.js';
+import { type TrackKey } from '../common/trackKeys.es.js';
 import { type SpectrogramSampleRange } from './extConfig.js';
 
 export type SpectrogramSampleInvalidation = SpectrogramSampleRange & {

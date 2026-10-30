@@ -9,6 +9,8 @@ import {
 const { sampleRate } = defaultSpectrogramConfig;
 const defaultColumns = 4096;
 
+export const pitchTrackHop = createPitchSettings(sampleRate).hop;
+
 const renderUntilComplete = async (
   processor: SpectrogramProcessor,
   samples: Float32Array,
@@ -41,7 +43,7 @@ export const trackPitch = async (
   options: PitchTrackOptions,
 ): Promise<PitchTrack> => {
   const { device, samples } = options;
-  const { hop } = createPitchSettings(sampleRate);
+  const hop = pitchTrackHop;
   const firstFrame = options.firstFrame ?? 0;
   const frameCount =
     options.frameCount ?? Math.floor(samples.length / hop) - firstFrame;

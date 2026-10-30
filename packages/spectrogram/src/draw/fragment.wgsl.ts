@@ -1,23 +1,8 @@
 import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
+import { drawParamsStruct } from './params.wgsl.js';
 
 export const fragmentShader = `
-struct DrawParams {
-  foreground : vec4f,
-  background : vec4f,
-  primary : vec4f,
-  frequencyMap : vec4f,
-  recordingMatchColor : vec4f,
-  recordingCloseColor : vec4f,
-  recordingMissColor : vec4f,
-  recordingTimingMissColor : vec4f,
-  comparisonThresholds : vec4f,
-  lineWidths : vec4f,
-  overlayTuning : vec4f,
-  laneLayout : vec4f,
-  visibility : vec4u,
-  noteVisibility : vec4u,
-  ringSlots : vec4u,
-};
+${drawParamsStruct}
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
 @group(0) @binding(1) var valueSampler : sampler;
@@ -25,6 +10,8 @@ struct DrawParams {
 @group(0) @binding(3) var<storage, read> referenceLine : array<f32>;
 @group(0) @binding(4) var<storage, read> targetLine : array<f32>;
 @group(0) @binding(5) var<storage, read> targetVerdicts : array<vec2f>;
+@group(0) @binding(6) var<storage, read> dominantHarmonics : array<u32>;
+@group(0) @binding(7) var<storage, read> harmonicDifferences : array<vec2f>;
 
 fn midiAtFrequency(frequency: f32) -> f32 {
   return 69.0 + 12.0 * log2(frequency / 440.0);
@@ -222,6 +209,36 @@ fn lineDistanceAtPixel(
   return distance;
 }
 
+fn stencilMask(
+  point: vec2f,
+  width: u32,
+  height: f32,
+  x: u32,
+  center: f32,
+  previous: f32,
+  next: f32,
+) -> f32 {
+  var mask = 0.0;
+  var weight = 1.0;
+  let count = u32(drawParams.stencilTuning.y);
+  let halfWidth = 0.5 * drawParams.stencilTuning.z;
+  for (var harmonic = 1u; harmonic <= count; harmonic += 1u) {
+    let scale = f32(harmonic) * drawParams.stencilShape.x;
+    let distance = lineDistanceAtPixel(
+      point,
+      width,
+      height,
+      x,
+      center * scale,
+      previous * scale,
+      next * scale,
+    );
+    mask = max(mask, weight * stripeCoverage(distance, halfWidth));
+    weight *= drawParams.stencilTuning.w;
+  }
+  return mask * drawParams.stencilTuning.x;
+}
+
 fn cornerCoverage(point: vec2f, center: vec2f, radius: f32) -> f32 {
   return clamp(radius - distance(point, center) + 0.5, 0.0, 1.0);
 }
@@ -247,6 +264,103 @@ fn bandCornerCoverage(point: vec2f, top: f32, bottom: f32, width: f32) -> f32 {
 
 fn stripeCoverage(distance: f32, halfWidth: f32) -> f32 {
   return 1.0 - smoothstep(halfWidth - 0.5, halfWidth + 0.5, distance);
+}
+
+fn dominantHarmonicWeight(
+  pixelFrequency: f32,
+  fundamental: f32,
+  layer: u32,
+  baseSlot: u32,
+  x: u32,
+  width: u32,
+) -> f32 {
+  if (fundamental <= 0.0) {
+    return 0.0;
+  }
+  let harmonic = round(pixelFrequency / fundamental);
+  if (harmonic < 1.0) {
+    return 0.0;
+  }
+  let halfWidth = drawParams.harmonicShape.x;
+  let distance = centsDistance(pixelFrequency, harmonic * fundamental);
+  let proximity = 1.0 - smoothstep(0.5 * halfWidth, halfWidth, distance);
+  if (proximity <= 0.0) {
+    return 0.0;
+  }
+  let radius = i32(drawParams.harmonicShape.y);
+  var agreeing = 0.0;
+  var counted = 0.0;
+  for (var offset = -radius; offset <= radius; offset += 1) {
+    let column = i32(x) + offset;
+    if (column < 0 || column >= i32(width)) {
+      continue;
+    }
+    let slot = slotForScreenX(baseSlot, u32(column), width);
+    counted += 1.0;
+    if (dominantHarmonics[layer * width + slot] == u32(harmonic)) {
+      agreeing += 1.0;
+    }
+  }
+  return proximity * agreeing / max(counted, 1.0);
+}
+
+struct ComparisonTint {
+  color: vec3f,
+  missing: f32,
+};
+
+fn harmonicComparisonTint(
+  pixelFrequency: f32,
+  fundamental: f32,
+  x: u32,
+  width: u32,
+) -> ComparisonTint {
+  var tint = ComparisonTint(drawParams.foreground.xyz, 0.0);
+  if (fundamental <= 0.0) {
+    return tint;
+  }
+  let harmonic = round(pixelFrequency / fundamental);
+  let stride = u32(drawParams.comparisonLevels.z);
+  if (harmonic < 1.0 || harmonic > f32(stride)) {
+    return tint;
+  }
+  let halfWidth = drawParams.harmonicShape.x;
+  let distance = centsDistance(pixelFrequency, harmonic * fundamental);
+  let proximity = 1.0 - smoothstep(0.5 * halfWidth, halfWidth, distance);
+  if (proximity <= 0.0) {
+    return tint;
+  }
+  let index = u32(harmonic) - 1u;
+  let radius = i32(drawParams.harmonicShape.y);
+  var sum = 0.0;
+  var valid = 0.0;
+  var counted = 0.0;
+  for (var offset = -radius; offset <= radius; offset += 1) {
+    let column = i32(x) + offset;
+    if (column < 0 || column >= i32(width)) {
+      continue;
+    }
+    let difference = harmonicDifferences[u32(column) * stride + index];
+    counted += 1.0;
+    sum += difference.x * difference.y;
+    valid += difference.y;
+  }
+  if (valid <= 0.0) {
+    return tint;
+  }
+  let average = sum / valid;
+  let coverage = proximity * valid / max(counted, 1.0);
+  let neutral = drawParams.comparisonTuning.z;
+  let full = drawParams.comparisonTuning.w;
+  let quieter = smoothstep(neutral, full, -average) * coverage;
+  let louder = smoothstep(neutral, full, average) * coverage;
+  tint.color = mix(
+    mix(drawParams.foreground.xyz, drawParams.harmonicQuieterColor.xyz, quieter),
+    drawParams.harmonicLouderColor.xyz,
+    louder,
+  );
+  tint.missing = quieter;
+  return tint;
 }
 
 fn slotForScreenX(baseSlot: u32, screenX: u32, width: u32) -> u32 {
@@ -335,21 +449,91 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     recordingShown,
   );
   if (laneVisible != 0u) {
+    let laneSlot = select(layer0Slot, layer1Slot, recordingShown);
+    let layer = select(0u, 1u, recordingShown);
+    let harmonicsShown = drawParams.harmonicTuning.x != 0.0;
+    let inRingBand =
+      pixelFrequency >= drawParams.ringBand.x &&
+      pixelFrequency <= drawParams.ringBand.y;
+    if (harmonicsShown && inRingBand) {
+      color = mix(color, drawParams.foreground.xyz, drawParams.ringBand.z);
+    }
     let intensity = sampleBandSpectrogram(
-      select(layer0Slot, layer1Slot, recordingShown),
+      laneSlot,
       bandY,
       bandHeight,
-      select(0u, 1u, recordingShown),
+      layer,
       width,
       textureHeight,
     );
-    color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));
+    let comparisonShown =
+      drawParams.comparisonTuning.x != 0.0 && recordingShown;
+    var intensityColor = drawParams.foreground.xyz;
+    var missing = 0.0;
+    if (comparisonShown) {
+      let tint = harmonicComparisonTint(
+        pixelFrequency,
+        targetFrequency,
+        x,
+        width,
+      );
+      intensityColor = tint.color;
+      missing = tint.missing * drawParams.comparisonLevels.w;
+    } else if (harmonicsShown) {
+      let harmonicWeight = dominantHarmonicWeight(
+        pixelFrequency,
+        select(referenceFrequency, targetFrequency, recordingShown),
+        layer,
+        select(drawParams.ringSlots.x, drawParams.ringSlots.y, recordingShown),
+        x,
+        width,
+      );
+      intensityColor = mix(
+        drawParams.foreground.xyz,
+        drawParams.harmonicColor.xyz,
+        harmonicWeight,
+      );
+    }
+    color = min(
+      color +
+        intensityColor * intensity +
+        drawParams.harmonicQuieterColor.xyz * missing,
+      vec3f(1.0),
+    );
   }
 
   let referenceLineWidthCents = drawParams.lineWidths.y;
   let targetLineWidthCents = drawParams.lineWidths.x;
   let bandPoint = vec2f(position.x, position.y - f32(bandTop));
   let bandPixelHeight = f32(bandHeight);
+
+  if (recordingBand && drawParams.stencilTuning.x > 0.0) {
+    var stencilPrev = 0.0;
+    if (x > 0u) {
+      stencilPrev = referenceLine[
+        slotForScreenX(drawParams.ringSlots.z, x - 1u, width)
+      ];
+    }
+    var stencilNext = 0.0;
+    if (x + 1u < width) {
+      stencilNext = referenceLine[
+        slotForScreenX(drawParams.ringSlots.z, x + 1u, width)
+      ];
+    }
+    color = mix(
+      color,
+      drawParams.stencilColor.xyz,
+      stencilMask(
+        bandPoint,
+        width,
+        bandPixelHeight,
+        x,
+        referenceFrequency,
+        stencilPrev,
+        stencilNext,
+      ),
+    );
+  }
 
   var referenceMask = 0.0;
   let referenceVisible = !recordingBand && drawParams.visibility.z != 0u;

@@ -1,9 +1,11 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { createTimePitchProcessor } from '@musetric/audio/player';
+import { type fundamentalChannel } from '../common/fundamentalChannel.cross.js';
+import { createHarmonicSource } from './harmonicSource.worklet.js';
 import { createHeardPosition } from './heardPosition.worklet.js';
 import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
-import { mixTrackIntoBuffers } from './mixTrack.worklet.js';
+import { mixSourceTrack } from './mixSource.worklet.js';
 import {
   createRangeFrames,
   processRangeMetronome,
@@ -37,6 +39,7 @@ export type CreatePlayerRuntimeOptions = {
   sampleRate: number;
   getCurrentTime: () => number;
   getCurrentFrame: () => number;
+  fundamentalPort: ReturnType<typeof fundamentalChannel.inbound<MessagePort>>;
 };
 
 export type PlayerRuntime = {
@@ -47,7 +50,7 @@ export type PlayerRuntime = {
 export const createPlayerRuntime = async (
   options: CreatePlayerRuntimeOptions,
 ): Promise<PlayerRuntime> => {
-  const { port, dataPort, sampleRate } = options;
+  const { port, dataPort, sampleRate, fundamentalPort } = options;
   const playhead: PlayheadPublisher = createPlayheadPublisher(
     options.playheadPorts,
     options.getCurrentTime,
@@ -71,7 +74,11 @@ export const createPlayerRuntime = async (
   const metronome = createMetronome(sampleRate);
   const timePitchProcessor = await createTimePitchProcessor(sampleRate);
   const leadVoice = await createLeadVoice(sampleRate);
-  const recordingTrack = await createRecordingTrack(sampleRate);
+  const harmonicSource = createHarmonicSource(sampleRate);
+  fundamentalPort.bindHandlers({
+    setFundamentalFrames: harmonicSource.setFundamentalFrames,
+  });
+  const recordingTrack = await createRecordingTrack(sampleRate, harmonicSource);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
 
@@ -169,6 +176,7 @@ export const createPlayerRuntime = async (
       position.begin(0);
       playing = false;
       recordingRuntime.resetInputOffset();
+      harmonicSource.reset();
       publishHeld();
       setPlaying();
     },
@@ -189,6 +197,7 @@ export const createPlayerRuntime = async (
       playing = false;
       recordingRuntime.resetInputOffset();
       resetTimePitch();
+      harmonicSource.reset();
       publishHeld();
       setPlaying();
     },
@@ -227,6 +236,7 @@ export const createPlayerRuntime = async (
         recordingRuntime.handleSeek(message.frameIndex);
       }
       resetTimePitch();
+      harmonicSource.reset();
       metronome.reset(message.frameIndex);
       metronome.clear();
       publishHeld();
@@ -272,6 +282,9 @@ export const createPlayerRuntime = async (
     },
     flushRecording: () => {
       recordingRuntime.drain();
+    },
+    setHarmonics: (message) => {
+      harmonicSource.setHarmonics(message.harmonics);
     },
   });
 
@@ -319,8 +332,9 @@ export const createPlayerRuntime = async (
           for (const stemType of leadApart
             ? accompanimentStemTypes
             : stemTypes) {
-            mixTrackIntoBuffers({
+            mixSourceTrack(harmonicSource, {
               ...baseOptions,
+              trackKey: stemType === 'lead' ? 'lead' : undefined,
               track: currentTracks[stemType],
               volume: trackVolumes[stemType] ?? 1,
               frames: range,

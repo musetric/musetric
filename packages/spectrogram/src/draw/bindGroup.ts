@@ -5,6 +5,8 @@ export type DrawBindGroupArg = {
   referenceLine: GPUBuffer;
   targetLine: GPUBuffer;
   verdict: GPUBuffer;
+  dominantHarmonics: GPUBuffer;
+  harmonicDifferences: GPUBuffer;
   colors: GPUBuffer;
   layout: GPUBindGroupLayout;
 };
@@ -22,6 +24,8 @@ export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
           { binding: 3, resource: { buffer: arg.referenceLine } },
           { binding: 4, resource: { buffer: arg.targetLine } },
           { binding: 5, resource: { buffer: arg.verdict } },
+          { binding: 6, resource: { buffer: arg.dominantHarmonics } },
+          { binding: 7, resource: { buffer: arg.harmonicDifferences } },
         ],
       }),
     dispose: () => undefined,
@@ -30,6 +34,8 @@ export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
       current.referenceLine === next.referenceLine &&
       current.targetLine === next.targetLine &&
       current.verdict === next.verdict &&
+      current.dominantHarmonics === next.dominantHarmonics &&
+      current.harmonicDifferences === next.harmonicDifferences &&
       current.colors === next.colors &&
       current.layout === next.layout,
   });

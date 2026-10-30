@@ -1,3 +1,4 @@
+import { fundamentalChannel } from '../../common/fundamentalChannel.cross.js';
 import { createRecordingStream } from '../../decoder/recordingStream.worker.js';
 import {
   type LiveTakeChunk,
@@ -167,6 +168,7 @@ export const createHarness = async (
     sampleRate: rate,
     getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
+    fundamentalPort: fundamentalChannel.inbound(new MessageChannel().port1),
   });
   const take = createTakeStream();
   const frameCount = songSeconds * rate;

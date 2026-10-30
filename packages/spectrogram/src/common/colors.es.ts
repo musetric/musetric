@@ -6,4 +6,8 @@ export type SpectrogramColors = {
   recordingClose: string;
   recordingMiss: string;
   recordingTimingMiss: string;
+  harmonic: string;
+  harmonicQuieter: string;
+  harmonicLouder: string;
+  stencil: string;
 };

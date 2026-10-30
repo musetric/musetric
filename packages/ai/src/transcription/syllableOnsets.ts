@@ -1,4 +1,5 @@
-import { fftInPlace, hanningWindow, sampleRate } from './spectralChunker.js';
+import { fftInPlace } from '@musetric/fft';
+import { hanningWindow, sampleRate } from './spectralChunker.js';
 
 const onsetBandHz: [number, number] = [100, 4000];
 const onsetMinFrames = 5;

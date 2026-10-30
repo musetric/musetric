@@ -4,11 +4,14 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../store.js';
 import { FourierModeField } from './FourierModeField.js';
+import { HarmonicsField } from './HarmonicsField.js';
 import { MaxFrequencyField } from './MaxFrequencyField.js';
 import { MinDecibelField } from './MinDecibelField.js';
 import { MinFrequencyField } from './MinFrequencyField.js';
 import { PlayheadRatioField } from './PlayheadRatioField.js';
+import { StencilField } from './StencilField.js';
 import { VisibleTimeField } from './VisibleTimeField.js';
+import { VocalCoachField } from './VocalCoachField.js';
 import { WindowNameField } from './WindowNameField.js';
 import { WindowSizeField } from './WindowSizeField.js';
 import { ZeroPaddingFactorField } from './ZeroPaddingFactorField.js';
@@ -31,6 +34,9 @@ export const ProjectSettings: FC = () => {
               <CloseIcon />
             </IconButton>
           </Stack>
+          <HarmonicsField />
+          <StencilField />
+          <VocalCoachField />
           <FourierModeField />
           <WindowNameField />
           <WindowSizeField />

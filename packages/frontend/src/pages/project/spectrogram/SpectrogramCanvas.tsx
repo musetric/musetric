@@ -1,12 +1,11 @@
 import { Box } from '@mui/material';
-import { extractSpectrogramConfig } from '@musetric/spectrogram';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { useSettingsStore } from '../settings/store.js';
+import { spectrogramSettingsConfig } from '../settings/store.js';
 
 export const SpectrogramCanvas: FC = () => {
   const { t } = useTranslation();
@@ -18,10 +17,7 @@ export const SpectrogramCanvas: FC = () => {
 
   useEffect(() => {
     if (!canvas) return;
-    return engine.spectrogram.mount(
-      canvas,
-      extractSpectrogramConfig(useSettingsStore.getState()),
-    );
+    return engine.spectrogram.mount(canvas, spectrogramSettingsConfig());
   }, [canvas]);
 
   if (decoderStatus === 'error' || spectrogramStatus === 'error') {

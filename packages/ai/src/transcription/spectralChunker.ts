@@ -1,3 +1,5 @@
+import { fftInPlace } from '@musetric/fft';
+
 export const sampleRate = 16000;
 
 const hop = 256;
@@ -12,49 +14,6 @@ const minVoiceSeconds = 0.4;
 const regionBreakSeconds = 1.2;
 const defaultMaxMinRatio = 0.5;
 const silenceMajority = 0.5;
-
-const reverseBits = (value: number, bits: number): number => {
-  let result = 0;
-  for (let i = 0; i < bits; i++) {
-    result = (result << 1) | ((value >> i) & 1);
-  }
-  return result;
-};
-
-export const fftInPlace = (re: Float64Array, im: Float64Array): void => {
-  const n = re.length;
-  const bits = Math.log2(n);
-  for (let i = 0; i < n; i++) {
-    const j = reverseBits(i, bits);
-    if (j > i) {
-      const tr = re[i];
-      re[i] = re[j];
-      re[j] = tr;
-      const ti = im[i];
-      im[i] = im[j];
-      im[j] = ti;
-    }
-  }
-  for (let size = 2; size <= n; size <<= 1) {
-    const half = size >> 1;
-    const step = (-2 * Math.PI) / size;
-    for (let start = 0; start < n; start += size) {
-      for (let k = 0; k < half; k++) {
-        const angle = step * k;
-        const wr = Math.cos(angle);
-        const wi = Math.sin(angle);
-        const a = start + k;
-        const b = a + half;
-        const tr = wr * re[b] - wi * im[b];
-        const ti = wr * im[b] + wi * re[b];
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
-      }
-    }
-  }
-};
 
 export const hanningWindow = (size: number): Float64Array => {
   const window = new Float64Array(size);

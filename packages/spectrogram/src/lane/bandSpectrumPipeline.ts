@@ -6,10 +6,8 @@ import {
   type SpectrogramSampleRange,
 } from '../common/extConfig.js';
 import { type SpectrogramSource } from '../common/source.js';
-import {
-  type SpectrogramSpectralBand,
-  type TrackKey,
-} from '../config.cross.js';
+import { type TrackKey } from '../common/trackKeys.es.js';
+import { type SpectrogramSpectralBand } from '../config.cross.js';
 import {
   type BandPipelineCells,
   createBandPipelineCells,

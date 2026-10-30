@@ -26,12 +26,13 @@ const createSpectrumSampling = (spectrumCount: number) =>
   let lowerMagnitude${index} = rawMagnitude${index}[offset${index} + lowerIndex${index}];
   let upperMagnitude${index} = rawMagnitude${index}[offset${index} + upperIndex${index}];
   let magnitudeSq${index} = mix(lowerMagnitude${index}, upperMagnitude${index}, blend${index});
-  let intensity${index} = displayIntensity(
+  let level${index} = decibelLevel(
     magnitudeSq${index},
-    columnEnergy${index}[x],
     referenceScale${index},
     decibelFactor,
   );
+  let intensity${index} =
+    level${index} * energyGate(columnEnergy${index}[x], referenceScale${index});
   let weight${index} = bandWeight(
     frequency,
     band${index}a.z,
@@ -40,6 +41,7 @@ const createSpectrumSampling = (spectrumCount: number) =>
     band${index}b.y,
   );
   weightedIntensity += intensity${index} * weight${index};
+  weightedLevel += level${index} * weight${index};
   totalWeight += weight${index};
 `;
   }).join('\n');
@@ -61,7 +63,7 @@ struct RemapParams {
   displayGamma: f32,
   slotOffset: u32,
   columnCount: u32,
-  padding2: f32,
+  levelScale: f32,
   bands: array<vec4f, ${spectrumCount * 2}>,
 };
 
@@ -119,43 +121,51 @@ fn bandWeight(
     fallingWeight(frequency, fullMaxFrequency, maxFrequency);
 }
 
-fn displayIntensity(
+fn decibelLevel(
   magnitudeSq: f32,
-  energy: f32,
   referenceScale: f32,
   decibelFactor: f32,
 ) -> f32 {
   let epsilon = 1e-12;
   let refScaleSq = referenceScale * referenceScale;
-  let halfDecibelFactor = decibelFactor * 0.5;
   let normalizedMagnitudeSq = magnitudeSq * refScaleSq + epsilon;
+  return max(log(normalizedMagnitudeSq) * decibelFactor * 0.5 + 1.0, 0.0);
+}
+
+fn energyGate(energy: f32, referenceScale: f32) -> f32 {
+  let epsilon = 1e-12;
   let normalizedEnergy = energy * referenceScale + epsilon;
   let energyDb = log(normalizedEnergy) * 8.685889638;
-  let gate = clamp(
+  return clamp(
     (energyDb - params.gateFloorDb) / params.gateRangeDb,
     0.0,
     1.0,
   );
-  let decibel = max(log(normalizedMagnitudeSq) * halfDecibelFactor + 1.0, 0.0);
-  return decibel * gate;
 }
 
-fn baseDisplayIntensity(
+struct DisplayValues {
+  intensity: f32,
+  level: f32,
+};
+
+fn baseDisplayValues(
   x: u32,
   frequency: f32,
   sampleRate: f32,
   gain: f32,
   decibelFactor: f32,
-) -> f32 {
+) -> DisplayValues {
   var weightedIntensity = 0.0;
+  var weightedLevel = 0.0;
   var totalWeight = 0.0;
 ${createSpectrumSampling(spectrumCount)}
-  let mixedDisplayIntensity = weightedIntensity / max(totalWeight, 1e-6);
-  return clamp(
-    mixedDisplayIntensity * displayFrequencyTilt(frequency),
+  let weightSum = max(totalWeight, 1e-6);
+  let intensity = clamp(
+    weightedIntensity / weightSum * displayFrequencyTilt(frequency),
     0.0,
     1.0,
   );
+  return DisplayValues(intensity, weightedLevel / weightSum);
 }
 
 @compute @workgroup_size(16, 16)
@@ -169,14 +179,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
   let x = (params.slotOffset + localX) % width;
   let frequency = frequencyAtRow(y);
-  let intensity = baseDisplayIntensity(
+  let values = baseDisplayValues(
     x,
     frequency / columnScale[x],
     params.sampleRate,
     params.gain,
     params.decibelFactor,
   );
-  let finalIntensity = pow(intensity, max(params.displayGamma, 0.001));
-  textureStore(texture, vec2u(x, y), vec4f(finalIntensity, 0.0, 0.0, 1.0));
+  let finalIntensity = pow(values.intensity, max(params.displayGamma, 0.001));
+  let level = clamp(values.level * params.levelScale, 0.0, 1.0);
+  textureStore(texture, vec2u(x, y), vec4f(finalIntensity, level, 0.0, 1.0));
 }
 `;

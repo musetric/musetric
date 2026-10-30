@@ -6,7 +6,7 @@ import {
   type SpectrumStage,
   spectrumStages,
 } from '../common/processorTimer.js';
-import { allTrackKeys, type TrackKey } from '../config.cross.js';
+import { allTrackKeys, type TrackKey } from '../common/trackKeys.es.js';
 import { type SpectrogramRuntime } from '../configurator.js';
 import { type SpectrogramLane } from '../lane/index.js';
 import { type TrackRenderPlan } from './renderPlan.js';

@@ -14,12 +14,16 @@ import { createLoopRangeGesture } from '../loop/createLoopRangeGesture.js';
 import { LoopOverlay } from '../loop/LoopOverlay.js';
 import { LoopPictureControls } from '../loop/LoopPictureControls.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
+import { HarmonicComparisonLegend } from '../spectrogram/HarmonicComparisonLegend.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
+import { SpectrogramHarmonicLabels } from '../spectrogram/SpectrogramHarmonicLabels.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
 import { useSpectrogramGesture } from '../spectrogram/useSpectrogramGesture.js';
 import { useProjectStore } from '../store.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
+import { VocalMarks } from '../vocal/VocalMarks.js';
+import { VocalPractice } from '../vocal/VocalPractice.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
 
 const noteNamesInset = 16;
@@ -75,8 +79,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
           <SpectrogramCanvas />
           <LoopOverlay />
           <SpectrogramNoteScale />
+          <SpectrogramHarmonicLabels />
           {spectrum ? (
             <>
+              <VocalMarks />
               <Box
                 sx={{
                   position: 'absolute',
@@ -98,6 +104,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
                 >
                   <RecordingPicker variant='picture' />
                 </Box>
+                <HarmonicComparisonLegend />
                 {emptyRecordingName !== undefined && (
                   <Typography
                     variant='body2'
@@ -172,6 +179,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
       >
         <LoopPictureControls />
       </Box>
+      {spectrum && <VocalPractice />}
     </Box>
   );
 };

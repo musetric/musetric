@@ -2,20 +2,17 @@ import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import { createObjectKeys, type ViewSize } from '@musetric/utils';
 import { type SpectrogramColors } from './common/colors.es.js';
 import { extractConfig } from './common/config.es.js';
+import { allTrackKeys, type TrackKey } from './common/trackKeys.es.js';
 
-export const allTrackKeys = ['lead', 'recording'] as const;
-export type TrackKey = (typeof allTrackKeys)[number];
-
-export const mapTrackKeys = <Value>(
-  fn: (key: TrackKey, index: number) => Value,
-): Record<TrackKey, Value> => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const result = {} as Record<TrackKey, Value>;
-  allTrackKeys.forEach((key, index) => {
-    result[key] = fn(key, index);
-  });
-  return result;
+export type SpectrogramCursorHarmonic = {
+  fundamental: number;
+  dominant: number;
 };
+
+export type SpectrogramCursorHarmonics = Record<
+  TrackKey,
+  SpectrogramCursorHarmonic
+>;
 
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
@@ -48,6 +45,37 @@ export type SpectrogramVisualConfig = {
   displayGamma: number;
 };
 
+export type SpectrogramHarmonicsConfig = {
+  enabled: boolean;
+  dominantMaxFrequency: number;
+  dominantSearchCents: number;
+  dominantMarginDb: number;
+  ridgeHalfWidthCents: number;
+  smoothingColumns: number;
+  ringMinFrequency: number;
+  ringMaxFrequency: number;
+  ringAmount: number;
+};
+
+export type SpectrogramStencilConfig = {
+  enabled: boolean;
+  opacity: number;
+  harmonicCount: number;
+  lineWidthPixels: number;
+  overtoneFade: number;
+  octaveShift: number;
+};
+
+export type SpectrogramHarmonicComparisonConfig = {
+  enabled: boolean;
+  pitchToleranceCents: number;
+  neutralDb: number;
+  fullDb: number;
+  floorDb: number;
+  maxHarmonics: number;
+  missingAmount: number;
+};
+
 export type SpectrogramComparison = {
   reference: TrackKey;
   target: TrackKey;
@@ -77,6 +105,9 @@ export type SpectrogramConfig = {
   colors: SpectrogramColors;
   lanes: Record<TrackKey, SpectrogramLaneConfig>;
   comparison: SpectrogramComparison;
+  harmonics: SpectrogramHarmonicsConfig;
+  harmonicComparison: SpectrogramHarmonicComparisonConfig;
+  stencil: SpectrogramStencilConfig;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'canvas',
@@ -96,6 +127,9 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'colors',
   'lanes',
   'comparison',
+  'harmonics',
+  'harmonicComparison',
+  'stencil',
 ]);
 
 export const extractSpectrogramConfig = (config: Partial<SpectrogramConfig>) =>
@@ -111,6 +145,25 @@ export const isFundamentalNeeded = (
   isFundamentalShown(config.lanes[key]) ||
   (key === config.comparison.reference &&
     isFundamentalShown(config.lanes[config.comparison.target]));
+
+export const areHarmonicsShown = (
+  config: Pick<SpectrogramConfig, 'harmonics' | 'lanes'>,
+): boolean =>
+  config.harmonics.enabled &&
+  allTrackKeys.some((key) => config.lanes[key].showSpectrogram);
+
+export const isStencilShown = (
+  config: Pick<SpectrogramConfig, 'stencil' | 'lanes'>,
+): boolean =>
+  config.stencil.enabled &&
+  config.stencil.opacity > 0 &&
+  allTrackKeys.every((key) => config.lanes[key].showSpectrogram);
+
+export const isHarmonicComparisonShown = (
+  config: Pick<SpectrogramConfig, 'harmonicComparison' | 'lanes'>,
+): boolean =>
+  config.harmonicComparison.enabled &&
+  allTrackKeys.every((key) => config.lanes[key].showSpectrogram);
 
 const isConfigComplete = (
   config: Partial<SpectrogramConfig>,
