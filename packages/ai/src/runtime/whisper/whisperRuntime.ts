@@ -1,10 +1,15 @@
 import {
-  type AutomaticSpeechRecognitionPipeline,
+  AutoConfig,
+  AutomaticSpeechRecognitionPipeline,
+  AutoProcessor,
+  AutoTokenizer,
   env,
-  pipeline,
+  type PretrainedConfig,
   Tensor,
+  WhisperForConditionalGeneration,
 } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web/webgpu';
+import { loadModelFilesInTurn } from '../../service/browserModelLoad.js';
 import { fetchOk } from '../../service/browserShared.js';
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
@@ -50,8 +55,24 @@ const collapsedMinSeconds = 12;
 const alignedWordsPerSecond = 0.8;
 const halvesRule: HalvesRule = { minSeconds: 12, coverage: 0.6, maxGap: 6 };
 const splitMinGain = 3;
-const windowsPerBatch = 4;
 export const whisperDeviceOptions = { subgroups: false };
+
+const presentOnGpu = (
+  config: PretrainedConfig,
+): Record<string, ort.Tensor.DataLocation> => {
+  if (
+    !('decoder_layers' in config) ||
+    typeof config.decoder_layers !== 'number'
+  ) {
+    throw new Error('the whisper config names no decoder layers');
+  }
+  const names = Array.from({ length: config.decoder_layers }, (_, layer) =>
+    ['decoder', 'encoder'].flatMap((part) =>
+      ['key', 'value'].map((kind) => `present.${layer}.${part}.${kind}`),
+    ),
+  ).flat();
+  return Object.fromEntries(names.map((name) => [name, 'gpu-buffer']));
+};
 
 export type WhisperRuntimeOptions = {
   graph: WhisperGraph;
@@ -85,52 +106,60 @@ export const createWhisperRuntime = async (
   env.useBrowserCache = false;
   env.remoteHost = options.modelHost;
   env.remotePathTemplate = `{model}/resolve/${options.revision}/`;
+  const pretrained = { revision: options.revision };
+  const fileUrl = (file: string): string =>
+    `${options.modelHost}/${options.modelId}/resolve/${options.revision}/${file}`;
 
-  const transcriber: AutomaticSpeechRecognitionPipeline = await pipeline(
-    'automatic-speech-recognition',
-    options.modelId,
+  const [config, tokenizer, processor, generation] = await Promise.all([
+    AutoConfig.from_pretrained(options.modelId, pretrained),
+    AutoTokenizer.from_pretrained(options.modelId, pretrained),
+    AutoProcessor.from_pretrained(options.modelId, pretrained),
+    fetchOk(
+      fileUrl('generation_config.json'),
+      'the whisper generation config',
+    ).then(async (response): Promise<unknown> => response.json()),
+  ]);
+  const { dtype } = options.graph;
+  const graphs = [
+    { file: `encoder_model_${dtype.encoder_model}.onnx`, outputs: {} },
     {
-      revision: options.revision,
-      subfolder: '',
-      device: 'webgpu',
-      dtype: { ...options.graph.dtype },
-
-      session_options: {
-        executionProviders: [
-          await musetricWebGpuProvider(whisperDeviceOptions),
-        ],
-      },
-      progress_callback: (info) => {
-        if (info.status === 'progress_total') {
-          options.onLoading(info.loaded, info.total);
-        }
-      },
+      file: `decoder_model_merged_${dtype.decoder_model_merged}.onnx`,
+      outputs: { preferredOutputLocation: presentOnGpu(config) },
+    },
+    {
+      file: `cross_kv_${dtype.decoder_model_merged}.onnx`,
+      outputs: { preferredOutputLocation: 'gpu-buffer' as const },
+    },
+  ];
+  const provider = await musetricWebGpuProvider(whisperDeviceOptions);
+  const [encoderSession, decoderSession, cross] = await loadModelFilesInTurn(
+    graphs.map((graph) => [fileUrl(graph.file), fileUrl(`${graph.file}_data`)]),
+    options.onLoading,
+    async (files, index) => {
+      const [graph, data] = files;
+      return ort.InferenceSession.create(graph, {
+        ...graphs[index].outputs,
+        executionProviders: [provider],
+        externalData: [{ path: `${graphs[index].file}_data`, data }],
+      });
     },
   );
+
+  const transcriber = new AutomaticSpeechRecognitionPipeline({
+    task: 'automatic-speech-recognition',
+    model: new WhisperForConditionalGeneration(
+      config,
+      { model: encoderSession, decoder_model_merged: decoderSession },
+      { generation_config: generation },
+    ),
+    tokenizer,
+    processor,
+  });
 
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const internals = transcriber as unknown as WhisperPipelineInternals;
 
   const step: StepSession = internals.model.sessions.decoder_model_merged;
-  const cross = isFlatStep(step)
-    ? await ort.InferenceSession.create(
-        new Uint8Array(
-          await (
-            await fetchOk(
-              `${options.modelHost}/${options.modelId}/resolve/${options.revision}/cross_kv_${options.graph.dtype.decoder_model_merged}.onnx`,
-              'the whisper cross projection',
-            )
-          ).arrayBuffer(),
-        ),
-        {
-          executionProviders: [
-            await musetricWebGpuProvider(whisperDeviceOptions),
-          ],
-          preferredOutputLocation: 'gpu-buffer',
-        },
-      )
-    : undefined;
-
   const { device } = await getMusetricWebGpuDevice(whisperDeviceOptions);
   const pacer = createGpuPacer(device);
   const encoder = internals.model.sessions.model;
@@ -140,7 +169,7 @@ export const createWhisperRuntime = async (
     internals,
     options.inspect,
   );
-  if (cross) {
+  if (isFlatStep(step)) {
     routeFirstStep(step, { cross, device });
   }
   const runStep = step.run.bind(step);
@@ -187,8 +216,12 @@ export const createWhisperRuntime = async (
     const pending = audios.flatMap((audio, index) =>
       audio.length === 0 ? [] : [index],
     );
-    for (let from = 0; from < pending.length; from += windowsPerBatch) {
-      const group = pending.slice(from, from + windowsPerBatch);
+    for (
+      let from = 0;
+      from < pending.length;
+      from += options.graph.windowsPerBatch
+    ) {
+      const group = pending.slice(from, from + options.graph.windowsPerBatch);
       const decoded = await decodeTimestampedBatch(
         group.map((index) => audios[index]),
         language,
@@ -341,7 +374,7 @@ export const createWhisperRuntime = async (
 
   const release = async (): Promise<void> => {
     await pacer.release();
-    await cross?.release();
+    await cross.release();
     await transcriber.dispose();
   };
 

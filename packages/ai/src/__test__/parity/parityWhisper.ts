@@ -44,12 +44,19 @@ const download = async (tensor: Downloadable): Promise<Float32Array> => {
 
 const sessionOptions = async (
   provider: ParityWhisperModelTask['provider'],
+  graphUrl: string,
 ): Promise<ort.InferenceSession.SessionOptions> => ({
   executionProviders:
     provider === 'wasm'
       ? ['wasm']
       : [await musetricWebGpuProvider(whisperDeviceOptions)],
   graphOptimizationLevel: 'all',
+  externalData: [
+    {
+      path: `${graphUrl.slice(graphUrl.lastIndexOf('/') + 1)}_data`,
+      data: `${graphUrl}_data`,
+    },
+  ],
 });
 
 const runEncoder = async (
@@ -57,7 +64,7 @@ const runEncoder = async (
 ): Promise<ParityOutput> => {
   const session = await ort.InferenceSession.create(
     task.encoderUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.encoderUrl),
   );
   try {
     const features = Float32Array.from(await fetchTensor(task.features));
@@ -109,7 +116,7 @@ const projectCross = async (
 ): Promise<Record<string, ort.Tensor>> => {
   const cross = await ort.InferenceSession.create(
     task.crossUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.crossUrl),
   );
   try {
     const outputs = await cross.run({ encoder_hidden_states: states });
@@ -145,7 +152,7 @@ const runTeacherForced = async (
 ): Promise<ParityOutput> => {
   const session = await ort.InferenceSession.create(
     task.decoderUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.decoderUrl),
   );
   try {
     const tokens = Array.from(await fetchTensor(task.tokens), Number);

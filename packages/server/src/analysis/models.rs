@@ -216,7 +216,7 @@ pub(crate) fn skey_graph() -> Value {
 pub(crate) const WHISPER: ModelBundle = ModelBundle {
     label: "Whisper transcription model",
     model_id: "musetric/whisper-large-v3-turbo-onnx",
-    revision: "c6114a37183486a67ae4a688174600c230cd791f",
+    revision: "689f3dbfd22b7cc75aeb0923c86ec992588562f4",
     directory: "whisper-onnx-hf-cache",
     sample_rate: 16000,
     downmix: Downmix::Power,
@@ -274,24 +274,45 @@ pub(crate) const WHISPER: ModelBundle = ModelBundle {
         ),
         (
             "encoder_model_q4.onnx",
-            "d27943f0f3ee4fdfc33241a64d68fffd40ce0f2344ee21f73d37abac9ebd1a43",
-            432_766_809,
+            "8814e622cee0736d725a5ad587e24909fe3cefefc91bf3f125c513387e907a52",
+            627_006,
+        ),
+        (
+            "encoder_model_q4.onnx_data",
+            "565aec56b45d4247ad729724eee548e680b97aa3124f809bcf601b1596c2f8d6",
+            432_189_440,
         ),
         (
             "decoder_model_merged_fp16.onnx",
-            "e2a1a41955518f5b57d4710a4bdb7c93f5efd3d77e81e055ec8ec80126d8fdb8",
-            317_745_737,
+            "933a4f8e4358414a281750448e20f2249b3981880b9bfeb5327ca18a71638ee9",
+            159_565,
+        ),
+        (
+            "decoder_model_merged_fp16.onnx_data",
+            "7835ed241ab19116dae6faf12c173d6f3f0c6bfa230cbe6b60b13085eaaf5651",
+            317_593_600,
         ),
         (
             "cross_kv_fp16.onnx",
-            "45b5271bd4f69e16a6e59a624698de9db2c065d38fd55ce67f69271414d9ef84",
-            26_228_595,
+            "86d4ad47d781ae6fa8c08a55dbbaa8e5b8dc8adb5cf0b17f2d4aa59d24e21b7d",
+            4790,
+        ),
+        (
+            "cross_kv_fp16.onnx_data",
+            "f7e1cc8c070895800ecca27e1fcca0dbed0bd94623abbcc89c84de2dbd812ddd",
+            26_224_640,
         ),
     ],
 };
 
+#[cfg(target_os = "ios")]
+const WHISPER_WINDOWS_PER_BATCH: u32 = 1;
+#[cfg(not(target_os = "ios"))]
+const WHISPER_WINDOWS_PER_BATCH: u32 = 4;
+
 pub(crate) fn whisper_graph() -> Value {
     json!({
+        "windowsPerBatch": WHISPER_WINDOWS_PER_BATCH,
         "dtype": {
             "encoder_model": "q4",
             "decoder_model_merged": "fp16",

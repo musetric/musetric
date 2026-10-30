@@ -105,6 +105,7 @@ const whisperDtype = (graph: ParityGraphFields, key: string): WhisperDtype => {
 };
 
 export const whisperGraph = (graph: ParityGraphFields): WhisperGraph => ({
+  windowsPerBatch: numberField(graph, 'windowsPerBatch'),
   dtype: {
     encoder_model: whisperDtype(graph, 'encoder_model'),
     decoder_model_merged: whisperDtype(graph, 'decoder_model_merged'),
