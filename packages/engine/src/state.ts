@@ -1,6 +1,10 @@
 import { type api } from '@musetric/api';
 import { type StemType } from '@musetric/audio';
-import { type SpectrogramColors } from '@musetric/spectrogram';
+import {
+  type SpectrogramColors,
+  type VocalLessonPhrase,
+} from '@musetric/spectrogram';
+import { type VocalLessonStatus } from './spectrogram/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -88,6 +92,9 @@ export type EngineState = {
   frameCount?: number;
   colors: SpectrogramColors;
   spectrogramView: SpectrogramViewMode;
+  vocalLessonEnabled: boolean;
+  vocalLessonStatus: VocalLessonStatus;
+  vocalLessonPhrases: VocalLessonPhrase[];
   frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
   viewWindow?: EngineViewWindow;
   duration: number;

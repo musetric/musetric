@@ -1,17 +1,14 @@
 import { Box, Typography } from '@mui/material';
 import { type api } from '@musetric/api';
-import { getTrackProgress } from '@musetric/engine';
 import { useQuery } from '@tanstack/react-query';
 import { type FC, useEffect, useMemo, useRef } from 'react';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
-import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import {
-  alignPixel,
+  placeTimeStrip,
   subscribeVisualizationRender,
 } from '../visualization/visualizationRender.js';
-import { getVisualizationView } from '../visualization/visualizationView.js';
 import { findChordBlockIndex, getChordBlocks } from './chordBlocks.js';
 
 export const chordLaneHeight = 28;
@@ -46,29 +43,13 @@ export const ChordLane: FC = () => {
       strip.querySelectorAll<HTMLElement>('[data-chord-label]'),
     );
     const view = {
-      laneWidth: lane.getBoundingClientRect().width,
+      width: lane.getBoundingClientRect().width,
       stripWidth: -1,
       pinned: -1,
     };
 
     const render = () => {
-      const state = engine.store.get();
-      const { visibleTime, playheadRatio } = getVisualizationView();
-      const pixelsPerSecond = view.laneWidth / visibleTime;
-      const stripWidth = state.duration * pixelsPerSecond;
-
-      if (stripWidth !== view.stripWidth) {
-        view.stripWidth = stripWidth;
-        strip.style.width = `${stripWidth}px`;
-      }
-
-      const time = state.duration * getTrackProgress(state);
-      const start = time - visibleTime * playheadRatio;
-      const stripX = alignPixel(
-        -start * pixelsPerSecond,
-        window.devicePixelRatio,
-      );
-      strip.style.transform = `translateX(${stripX}px)`;
+      const { pixelsPerSecond, start, stripX } = placeTimeStrip(strip, view);
 
       const index = findChordBlockIndex(blocks, start);
 
@@ -84,7 +65,7 @@ export const ChordLane: FC = () => {
     };
 
     const resize = () => {
-      view.laneWidth = lane.getBoundingClientRect().width;
+      view.width = lane.getBoundingClientRect().width;
       render();
     };
 

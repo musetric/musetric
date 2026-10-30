@@ -4,6 +4,7 @@ import {
   getGpuDevice,
   type SpectrogramProcessorMetrics,
 } from '@musetric/spectrogram/gpu';
+import { defaultSampleRate } from '@musetric/utils';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { type Playhead } from '../player/playhead.cross.js';
@@ -14,6 +15,7 @@ import {
 import { createRecordingSource } from './recordingSource.worker.js';
 import { type RenderListener } from './renderHook.worker.js';
 import { createViewWindowState } from './viewWindow.worker.js';
+import { createVocalLesson } from './vocalLesson.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
   port: ReturnType<
@@ -60,6 +62,18 @@ export const createSpectrogramRuntime = async (
   let processor = createProcessor();
   let lead: Float32Array | undefined = undefined;
   const recording = createRecordingSource();
+  const vocalLesson = createVocalLesson({
+    device,
+    sampleRate: defaultSampleRate,
+    publish: (update) => {
+      port.methods.setVocalLesson(update);
+    },
+  });
+  const refreshLessonTake = () => {
+    if (lead) {
+      vocalLesson.setTake(recording.get(lead.length));
+    }
+  };
   let trackProgress = 0;
   let frameCount = 0;
   let playing = false;
@@ -135,16 +149,20 @@ export const createSpectrogramRuntime = async (
       lead = message.lead;
       recording.clear();
       recording.setPieces({ pieces: message.recording });
+      vocalLesson.setLead(lead);
+      refreshLessonTake();
       await render();
     },
     unmount: async () => {
       lead = undefined;
       recording.clear();
+      vocalLesson.setLead(undefined);
       setStatus('pending');
       await render();
     },
     setRecordingPieces: (message) => {
       recording.setPieces(message);
+      refreshLessonTake();
       if (!playing) {
         renderPaused();
       }
@@ -165,6 +183,9 @@ export const createSpectrogramRuntime = async (
   });
 
   port.bindHandlers({
+    setVocalLesson: (message) => {
+      vocalLesson.setEnabled(message.enabled);
+    },
     mount: async (message) => {
       try {
         trackProgress = message.trackProgress;

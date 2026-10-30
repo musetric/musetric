@@ -61,6 +61,12 @@ export const createEngineSpectrogram = (
         state.statuses.spectrogram = message.status;
       });
     },
+    setVocalLesson: (message) => {
+      store.update((state) => {
+        state.vocalLessonStatus = message.status;
+        state.vocalLessonPhrases = message.phrases ?? state.vocalLessonPhrases;
+      });
+    },
   });
 
   store.subscribe(getTrackProgress, (trackProgress) => {
@@ -95,6 +101,13 @@ export const createEngineSpectrogram = (
   );
 
   store.subscribe(
+    (state) => state.vocalLessonEnabled,
+    (enabled) => {
+      port.methods.setVocalLesson({ enabled });
+    },
+  );
+
+  store.subscribe(
     (state) => state.colors,
     (colors) => {
       port.methods.updateConfig({
@@ -114,6 +127,7 @@ export const createEngineSpectrogram = (
 
       await bootPromise.promise;
       port.methods.setFrameCount({ frameCount: store.get().frameCount ?? 0 });
+      port.methods.setVocalLesson({ enabled: store.get().vocalLessonEnabled });
     },
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);

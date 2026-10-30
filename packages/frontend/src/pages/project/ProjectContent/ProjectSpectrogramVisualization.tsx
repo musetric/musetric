@@ -10,6 +10,8 @@ import {
   chordLaneHeight,
 } from '../chords/ChordLane.js';
 import { ChordsToggleButton } from '../chords/ChordsToggleButton.js';
+import { LessonHighlight } from '../lesson/LessonHighlight.js';
+import { LessonPanel } from '../lesson/LessonPanel.js';
 import { createLoopRangeGesture } from '../loop/createLoopRangeGesture.js';
 import { LoopOverlay } from '../loop/LoopOverlay.js';
 import { LoopPictureControls } from '../loop/LoopPictureControls.js';
@@ -77,6 +79,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
           <SpectrogramNoteScale />
           {spectrum ? (
             <>
+              <LessonHighlight />
               <Box
                 sx={{
                   position: 'absolute',
@@ -172,6 +175,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
       >
         <LoopPictureControls />
       </Box>
+      <LessonPanel />
     </Box>
   );
 };
