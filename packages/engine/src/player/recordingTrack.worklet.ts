@@ -40,6 +40,15 @@ export type RecordingMix = {
   volume: number;
 };
 
+export type RecordingVoiceFilter = {
+  isActive: () => boolean;
+  filterVoice: (
+    samples: Float32Array,
+    songFrame: number,
+    tempoRatio: number,
+  ) => void;
+};
+
 export type RecordingTrack = {
   setPieces: (update: RecordingPiecesUpdate) => void;
   beginLiveTake: (take: LiveTakeStart) => void;
@@ -50,6 +59,7 @@ export type RecordingTrack = {
 
 export const createRecordingTrack = async (
   sampleRate: number,
+  voiceFilter: RecordingVoiceFilter,
 ): Promise<RecordingTrack> => {
   const voice = createVoice(await createTimePitchProcessor(sampleRate));
   let pieces: RecordingPiece[] = [];
@@ -124,6 +134,9 @@ export const createRecordingTrack = async (
       });
       if (!written) {
         return;
+      }
+      if (voiceFilter.isActive()) {
+        voiceFilter.filterVoice(output, mix.songFrame, mix.tempoRatio);
       }
       for (const channel of mix.outputs) {
         for (let index = 0; index < frameCount; index += 1) {

@@ -62,6 +62,10 @@ const initialState: EngineState = {
   },
   colors: defaultSpectrogramConfig.colors,
   spectrogramView: 'notes',
+  selectedHarmonics: [],
+  vocalCoachEnabled: false,
+  vocalCoachStatus: 'idle',
+  vocalMarks: [],
   frequencyRanges: defaultFrequencyRanges,
   duration: 0,
   playing: false,
@@ -135,11 +139,13 @@ export const createEngine = (): Engine => {
   const store = createStore(initialState);
   const spectrogramChannel = new MessageChannel();
   const spectrogramPlayheadChannel = new MessageChannel();
+  const fundamentalFramesChannel = new MessageChannel();
   const spectrogram = createEngineSpectrogram({
     store,
     sampleRate: context.sampleRate,
     decoderPort: spectrogramChannel.port2,
     playheadPort: spectrogramPlayheadChannel.port2,
+    fundamentalPort: fundamentalFramesChannel.port1,
   });
   const capturedTap = measure ? createCapturedTap() : undefined;
   const audioSession = createEngineAudioSession(
@@ -245,6 +251,7 @@ export const createEngine = (): Engine => {
       decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,
       playheadPort: playerPlayheadChannel.port2,
+      fundamentalPort: fundamentalFramesChannel.port2,
       playheadPorts: [
         playerPlayheadChannel.port1,
         decoderPlayheadChannel.port1,

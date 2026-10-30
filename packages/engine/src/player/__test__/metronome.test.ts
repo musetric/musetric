@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fundamentalChannel } from '../../common/fundamentalChannel.cross.js';
 import { playerChannel, playerDataChannel } from '../protocol.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
 
@@ -28,6 +29,7 @@ const createPlayer = async () => {
     sampleRate: rate,
     getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
+    fundamentalPort: fundamentalChannel.inbound(new MessageChannel().port1),
   });
   const silence = () => [new Float32Array(2 * rate)];
   playerDataChannel.outbound(data.port2).methods.mount({

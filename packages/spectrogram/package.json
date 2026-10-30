@@ -12,6 +12,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./es": {
+      "monorepo": "./src/index.es.ts",
+      "types": "./dist/index.es.d.ts",
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
+    },
     "./gpu": {
       "monorepo": "./src/gpu.ts",
       "types": "./dist/gpu.d.ts",

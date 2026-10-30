@@ -1,5 +1,4 @@
-import { windowFunctions } from '@musetric/fft';
-import { fftInPlace } from '../transcription/spectralChunker.js';
+import { fftInPlace, windowFunctions } from '@musetric/fft';
 
 const pitchCoverage = 0.995;
 const bandWindowSize = 1024;

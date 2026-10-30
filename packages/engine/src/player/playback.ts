@@ -59,6 +59,7 @@ export type CreateEnginePlaybackOptions = {
   decoderPort: MessagePort;
   playheadPort: MessagePort;
   playheadPorts: MessagePort[];
+  fundamentalPort: MessagePort;
   onPlaybackEnded?: () => void;
   onRecordingPassStarted?: () => void;
   onRecordingPassEnded?: (complete: boolean) => void;
@@ -74,6 +75,7 @@ export const createEnginePlayback = async (
 ): Promise<EnginePlayback> => {
   const { context, audioOutput, outputClock, store, decoderPort } = options;
   const { playheadPorts } = options;
+  const { fundamentalPort } = options;
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
   const playhead = createPlayhead(options.playheadPort, context.sampleRate);
@@ -182,6 +184,12 @@ export const createEnginePlayback = async (
       for (const stemType of stemTypes) {
         publishTrackVolume(stemType);
       }
+    },
+  );
+  store.subscribe(
+    (state) => state.selectedHarmonics.join(','),
+    () => {
+      port.methods.setHarmonics({ harmonics: store.get().selectedHarmonics });
     },
   );
   store.subscribe(
@@ -296,6 +304,7 @@ export const createEnginePlayback = async (
       port.methods.boot({
         dataPort: decoderPort,
         playheadPorts,
+        fundamentalPort,
       });
 
       return bootPromise.promise;

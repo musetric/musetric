@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildConfig } from '../../__test__/common.js';
 import { device, withProcessor } from '../../__test__/processor.fixtures.js';
-import { type SpectrogramConfig, type TrackKey } from '../../config.cross.js';
+import { type TrackKey } from '../../common/trackKeys.es.js';
+import { type SpectrogramConfig } from '../../config.cross.js';
 import { defaultSpectrogramConfig } from '../../defaultConfig.cross.js';
 import {
   type SpectrogramProcessor,

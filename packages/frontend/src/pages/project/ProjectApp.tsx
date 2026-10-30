@@ -21,6 +21,7 @@ import { RhythmMetronomeSync } from './rhythm/RhythmMetronomeSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
 import { VoiceRangeSync } from './spectrogram/VoiceRangeSync.js';
+import { VocalCoachSync } from './vocal/VocalCoachSync.js';
 
 export type ProjectAppProps = {
   project: api.project.Item;
@@ -55,6 +56,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       </Stack>
       <RhythmMetronomeSync projectId={project.id} />
       <MediaSessionSync title={project.name} />
+      <VocalCoachSync />
       <VoiceRangeSync
         projectId={project.id}
         leadSpectrogramGainDb={

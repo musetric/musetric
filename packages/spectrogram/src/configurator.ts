@@ -6,15 +6,17 @@ import {
 } from './common/extConfig.js';
 import { type SpectrogramMarkers } from './common/processorTimer.js';
 import {
+  allTrackKeys,
+  mapTrackKeys,
+  type TrackKey,
+} from './common/trackKeys.es.js';
+import {
   createSpectrogramComparisonColorCell,
   type SpectrogramComparisonColor,
 } from './comparison/index.js';
 import {
-  allTrackKeys,
   buildSpectrogramConfig,
-  mapTrackKeys,
   type SpectrogramConfig,
-  type TrackKey,
 } from './config.cross.js';
 import {
   createSpectrogramDrawCell,

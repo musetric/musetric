@@ -4,13 +4,19 @@ import { getFrequencyRange } from '@musetric/engine';
 import { stackedLaneGap, stackedLaneRadius } from '@musetric/spectrogram';
 import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type FC, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { engine } from '../../../../engine/engine.js';
+import { useSettingsStore } from '../../settings/store.js';
 import {
+  getFrequencyYRatio,
   getNoteMarkers,
   isNaturalMidi,
   isOctaveMidi,
   type NoteMarker,
 } from './noteMarker.js';
+
+const noteLabelX = 6;
+const ringLabelOffset = 6;
 
 const alignPixel = (value: number, pixelRatio: number) =>
   Math.round(value * pixelRatio) / pixelRatio;
@@ -18,6 +24,7 @@ const alignPixel = (value: number, pixelRatio: number) =>
 export const SpectrogramNoteScale: FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,8 +67,7 @@ export const SpectrogramNoteScale: FC = () => {
       }
     };
 
-    const drawLabel = (y: number, label: string, color: string) => {
-      const x = 6;
+    const drawLabel = (x: number, y: number, label: string, color: string) => {
       const metrics = context.measureText(label);
       const inkOffset =
         (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) /
@@ -71,6 +77,48 @@ export const SpectrogramNoteScale: FC = () => {
       context.fillRect(x - 2, y - 6, metrics.width + 4, 12);
       context.fillStyle = color;
       context.fillText(label, x, y + inkOffset);
+    };
+
+    const drawRingLabels = (
+      bandHeight: number,
+      bandGap: number,
+      minFrequency: number,
+      maxFrequency: number,
+    ) => {
+      const { harmonics } = useSettingsStore.getState();
+      const ringTop = getFrequencyYRatio(
+        harmonics.ringMaxFrequency,
+        minFrequency,
+        maxFrequency,
+      );
+      const ringBottom = getFrequencyYRatio(
+        harmonics.ringMinFrequency,
+        minFrequency,
+        maxFrequency,
+      );
+      if (
+        !harmonics.enabled ||
+        ringTop === undefined ||
+        ringBottom === undefined ||
+        ringBottom <= 0 ||
+        ringTop >= 1
+      ) {
+        return;
+      }
+      const label = t('pages.project.spectrogram.ring', {
+        min: harmonics.ringMinFrequency / 1000,
+        max: harmonics.ringMaxFrequency / 1000,
+      });
+      const ringLabelY = Math.min(ringBottom, 1) * bandHeight - ringLabelOffset;
+      const labelWidth = context.measureText(label).width;
+      for (const top of [0, bandHeight + bandGap]) {
+        drawLabel(
+          width - labelWidth - noteLabelX,
+          alignPixel(top + ringLabelY, pixelRatio),
+          label,
+          noteLabelColor,
+        );
+      }
     };
 
     const render = () => {
@@ -98,7 +146,7 @@ export const SpectrogramNoteScale: FC = () => {
 
         if (notesMode) {
           if (octave || (withNaturalLabels && isNaturalMidi(marker.midi))) {
-            drawLabel(y, marker.label, noteLabelColor);
+            drawLabel(noteLabelX, y, marker.label, noteLabelColor);
           }
           return;
         }
@@ -110,7 +158,7 @@ export const SpectrogramNoteScale: FC = () => {
         context.stroke();
 
         if (octave) {
-          drawLabel(y, marker.label, noteLabelColor);
+          drawLabel(noteLabelX, y, marker.label, noteLabelColor);
         }
       };
 
@@ -130,6 +178,9 @@ export const SpectrogramNoteScale: FC = () => {
         context.restore();
       }
 
+      if (!notesMode) {
+        drawRingLabels(bandHeight, bandGap, minFrequency, maxFrequency);
+      }
       context.restore();
     };
 
@@ -145,12 +196,17 @@ export const SpectrogramNoteScale: FC = () => {
       const range = getFrequencyRange(state);
       return `${state.spectrogramView}:${range.minFrequency}:${range.maxFrequency}`;
     }, render);
+    const unsubscribeSettings = useSettingsStore.subscribe(
+      (state) => state.harmonics.enabled,
+      render,
+    );
 
     return () => {
       unsubscribeResize();
       unsubscribeView();
+      unsubscribeSettings();
     };
-  }, [theme]);
+  }, [theme, t]);
 
   return (
     <Box

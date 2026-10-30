@@ -15,6 +15,7 @@ export type PlayerOutboundMethods = {
   boot: (message: {
     dataPort: MessagePort;
     playheadPorts: MessagePort[];
+    fundamentalPort: MessagePort;
   }) => void;
   play: (message: {
     revision: number;
@@ -54,6 +55,7 @@ export type PlayerOutboundMethods = {
     pass?: boolean;
   }) => void;
   flushRecording: () => void;
+  setHarmonics: (message: { harmonics: number[] }) => void;
 };
 
 export type PlayerInboundMethods = {
@@ -100,9 +102,14 @@ export const playerChannel = createMessageChannel<
       'setRange',
       'startRecording',
       'flushRecording',
+      'setHarmonics',
     ],
     transfers: {
-      boot: (message) => [message.dataPort, ...message.playheadPorts],
+      boot: (message) => [
+        message.dataPort,
+        ...message.playheadPorts,
+        message.fundamentalPort,
+      ],
       startRecording: (message) => [message.notificationPort],
     },
   },

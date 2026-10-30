@@ -1,4 +1,5 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
+import { fundamentalChannel } from '../common/fundamentalChannel.cross.js';
 import {
   playerChannel,
   playerDataChannel,
@@ -21,6 +22,7 @@ export class PlayerProcessor
         sampleRate,
         getCurrentTime: () => currentTime,
         getCurrentFrame: () => currentFrame,
+        fundamentalPort: fundamentalChannel.inbound(message.fundamentalPort),
       });
       this.handleProcess = (
         inputs: Float32Array[][],

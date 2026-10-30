@@ -2,12 +2,15 @@ import { type FourierMode, type WindowFunctionName } from '@musetric/fft';
 import {
   defaultSpectrogramConfig,
   extractSpectrogramConfig,
+  mapVocalMarkKinds,
   type SpectrogramConfig,
   type SpectrogramZeroPaddingFactor,
+  type VocalMarkKind,
 } from '@musetric/spectrogram';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { engine } from '../../../engine/engine.js';
+import { stencilFadeOf, usePracticeStore } from '../vocal/practiceStore.js';
 
 export type SettingsState = Pick<
   SpectrogramConfig,
@@ -20,7 +23,11 @@ export type SettingsState = Pick<
   | 'windowName'
   | 'minDecibel'
   | 'visual'
+  | 'harmonics'
+  | 'harmonicComparison'
+  | 'stencil'
 > & {
+  vocalCoach: Record<VocalMarkKind, boolean>;
   open: boolean;
 };
 
@@ -34,6 +41,13 @@ const initialState: SettingsState = {
   windowName: defaultSpectrogramConfig.windowName,
   minDecibel: defaultSpectrogramConfig.minDecibel,
   visual: defaultSpectrogramConfig.visual,
+  harmonics: { ...defaultSpectrogramConfig.harmonics, enabled: true },
+  harmonicComparison: {
+    ...defaultSpectrogramConfig.harmonicComparison,
+    enabled: true,
+  },
+  stencil: { ...defaultSpectrogramConfig.stencil, enabled: true },
+  vocalCoach: mapVocalMarkKinds(() => true),
   open: false,
 };
 
@@ -45,6 +59,12 @@ export type SettingsActions = {
   setVisibleTime: (value: number) => void;
   setPlayheadRatio: (value: number) => void;
   setZeroPaddingFactor: (value: SpectrogramZeroPaddingFactor) => void;
+  setHarmonicsEnabled: (value: boolean) => void;
+  setHarmonicComparisonEnabled: (value: boolean) => void;
+  setVocalCoachKind: (kind: VocalMarkKind, enabled: boolean) => void;
+  setStencilEnabled: (value: boolean) => void;
+  setStencilOpacity: (value: number) => void;
+  setStencilOctaveShift: (value: number) => void;
   setOpen: (value: boolean) => void;
 };
 
@@ -59,14 +79,46 @@ export const useSettingsStore = create<State>()(
     setVisibleTime: (visibleTime) => set({ visibleTime }),
     setPlayheadRatio: (playheadRatio) => set({ playheadRatio }),
     setZeroPaddingFactor: (zeroPaddingFactor) => set({ zeroPaddingFactor }),
+    setHarmonicsEnabled: (enabled) =>
+      set((state) => ({ harmonics: { ...state.harmonics, enabled } })),
+    setHarmonicComparisonEnabled: (enabled) =>
+      set((state) => ({
+        harmonicComparison: { ...state.harmonicComparison, enabled },
+      })),
+    setVocalCoachKind: (kind, enabled) =>
+      set((state) => ({
+        vocalCoach: { ...state.vocalCoach, [kind]: enabled },
+      })),
+    setStencilEnabled: (enabled) =>
+      set((state) => ({ stencil: { ...state.stencil, enabled } })),
+    setStencilOpacity: (opacity) =>
+      set((state) => ({ stencil: { ...state.stencil, opacity } })),
+    setStencilOctaveShift: (octaveShift) =>
+      set((state) => ({ stencil: { ...state.stencil, octaveShift } })),
     setOpen: (open) => set({ open }),
   })),
 );
 
-export const subscribeSettingsStore = () =>
-  useSettingsStore.subscribe(
+export const spectrogramSettingsConfig = () => {
+  const state = useSettingsStore.getState();
+  const fade = stencilFadeOf(usePracticeStore.getState());
+  return extractSpectrogramConfig({
+    ...state,
+    stencil: { ...state.stencil, opacity: state.stencil.opacity * fade },
+  });
+};
+
+export const subscribeSettingsStore = () => {
+  const push = () => {
+    engine.spectrogram.setConfig(spectrogramSettingsConfig());
+  };
+  const unsubscribeSettings = useSettingsStore.subscribe(
     (state) => state,
-    (state) => {
-      engine.spectrogram.setConfig(extractSpectrogramConfig(state));
-    },
+    push,
   );
+  const unsubscribePractice = usePracticeStore.subscribe(stencilFadeOf, push);
+  return () => {
+    unsubscribeSettings();
+    unsubscribePractice();
+  };
+};
