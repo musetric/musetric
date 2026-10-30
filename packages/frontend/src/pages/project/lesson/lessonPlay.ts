@@ -1,6 +1,7 @@
 import { stemTypes } from '@musetric/audio';
 import { type EngineRange } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
+import { recordRangeOnce } from '../loop/recordRangeOnce.js';
 import { type LessonSpan } from './lessonPhrase.js';
 
 const listenMarginSeconds = 0.2;
@@ -142,23 +143,6 @@ export const createLessonPlayer = (): LessonPlayer => {
     });
   };
 
-  const singOnce = async (options: LessonSingOptions) => {
-    const tries = engine.store.get().loopTries.length;
-    engine.player.openLoop(rangeOf(options.singStart, options.singEnd));
-    engine.player.lockLoop();
-    await engine.player.recordTry(options.projectId);
-    await waitForEngine({
-      select: (state) =>
-        state.loopTries.length > tries || state.loopStage === undefined,
-      done: (settled) => settled,
-    });
-    await stopPlayback();
-    const { loopSelectedTryId } = engine.store.get();
-    if (loopSelectedTryId !== undefined) {
-      await engine.player.insertTry(options.projectId, loopSelectedTryId);
-    }
-  };
-
   return {
     listen: async (span) => {
       const current = await begin();
@@ -177,7 +161,10 @@ export const createLessonPlayer = (): LessonPlayer => {
       }
       applyVolumes({ ...saved, lead: 0, recording: 0 });
       try {
-        await singOnce(options);
+        await recordRangeOnce(
+          options.projectId,
+          rangeOf(options.singStart, options.singEnd),
+        );
       } finally {
         if (current === run) {
           await leave();
