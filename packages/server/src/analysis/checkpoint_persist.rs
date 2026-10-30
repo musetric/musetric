@@ -93,7 +93,7 @@ mod tests {
         storage::Storage,
         test_workspace::Workspace,
         unit_fold::FoldAccumulator,
-        unit_plan::{PlanRules, PlanUnit, UnitPlan},
+        unit_plan::{PlanChannels, PlanRules, PlanUnit, UnitPlan},
     };
 
     const FRAMES: u64 = 10;
@@ -139,8 +139,11 @@ mod tests {
         let storage = workspace.create_storage();
         let store = CheckpointDir::create(workspace.work_path().join("checkpoint"));
         let plan = UnitPlan::create(
-            PlanRules::LeadBackingV1,
-            2,
+            PlanRules::VocalsV1,
+            PlanChannels {
+                input: 2,
+                output: 2,
+            },
             4,
             [0, 2, 4, 6]
                 .into_iter()

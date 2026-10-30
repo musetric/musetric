@@ -15,7 +15,7 @@ const CREATE_PROCESSING_STEP: &str = "
   CREATE TABLE ProcessingStep (
     projectId INTEGER NOT NULL,
     step TEXT NOT NULL CHECK (
-      step IN ('separation', 'voices', 'transcription', 'rhythm', 'key', 'chords', 'voiceRange')
+      step IN ('separation', 'transcription', 'rhythm', 'key', 'chords', 'voiceRange')
     ),
     status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'failed')),
     error TEXT,

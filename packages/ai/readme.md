@@ -9,10 +9,11 @@ websocket, fetches model files from the core's model cache over http, runs
 them with `onnxruntime-web` and uploads the results. The models are pinned in
 `packages/server/src/analysis/models.rs`.
 
-It serves separation (Mel-Band RoFormer and MDX cores), transcription (Whisper
-large-v3 turbo through `@huggingface/transformers`), chords, rhythm and key
-(S-KEY), all on WebGPU except the key, and the voice range from the pitch
-tracker of `@musetric/spectrogram`, without a model.
+It serves separation (a Mel-Band RoFormer core whose two masks give the vocals
+and the backing vocals in one pass), transcription (Whisper large-v3 turbo
+through `@huggingface/transformers`), chords, rhythm and key (S-KEY), all on
+WebGPU except the key, and the voice range from the pitch tracker of
+`@musetric/spectrogram`, without a model.
 
 ## Rules
 

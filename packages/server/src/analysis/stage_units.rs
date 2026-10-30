@@ -76,13 +76,13 @@ impl StageUnits {
                 "the stage registration does not match the plan rules".to_owned(),
             ));
         }
-        let frames = u64::try_from(registration.input.len() / registration.plan.channels as usize)
-            .unwrap_or(0);
+        let channels = registration.plan.channels;
+        let frames = u64::try_from(registration.input.len() / channels.input as usize).unwrap_or(0);
         let resume = registration.resume;
         let next_unit = resume.as_ref().map_or(0, |value| value.next_unit);
         let fold = match resume {
             Some(value) => value.fold,
-            None => FoldAccumulator::create(frames, registration.plan.channels),
+            None => FoldAccumulator::create(frames, channels.output),
         };
         let mut senders = HashMap::new();
         let mut receivers = HashMap::new();
@@ -243,10 +243,6 @@ impl StageUnits {
         self.unit_dir(attempt, unit).join(output)
     }
 
-    fn expected(stage: &Stage) -> u64 {
-        u64::from(stage.plan.chunk_samples) * u64::from(stage.plan.channels) * 4
-    }
-
     fn mark_accepted(stage: &Stage, unit: u32, output: &str) -> Result<bool, String> {
         let mut guard =
             Self::lock_state(stage).map_err(|_| "the attempt state is poisoned".to_owned())?;
@@ -338,7 +334,7 @@ impl UnitSession for StageUnits {
         Ok(UnitTarget::Write(UnitWrite::create(
             self.part_path(attempt, unit, output),
             self.ready_path(attempt, unit, output),
-            Self::expected(&stage),
+            stage.plan.output_bytes(),
             UnitPayload::Floats,
         )))
     }

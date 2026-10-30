@@ -2,7 +2,6 @@ import { type api } from '@musetric/api';
 
 export const stepOrder: api.project.ProcessingStepName[] = [
   'separation',
-  'voices',
   'transcription',
   'rhythm',
   'key',

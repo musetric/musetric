@@ -1,29 +1,13 @@
-import {
-  type LeadBackingGraph,
-  type VocalsGraph,
-} from '../runtime/modelGraphs.js';
+import { type VocalsGraph } from '../runtime/modelGraphs.js';
 
 export const separateUnitsApiName = 'musetricAiSeparateUnits';
 
-export type BrowserVocalsUnitsRequest = {
+export type BrowserSeparateUnitsRequest = {
   attemptId: string;
   attemptUrl: string;
-  stage: 'vocals';
   outputs: string[];
   graph: VocalsGraph;
   vocalsModelUrl: string;
   vocalsModelDataUrl: string;
   vocalsModelDataPath: string;
 };
-
-export type BrowserLeadBackingUnitsRequest = {
-  attemptId: string;
-  attemptUrl: string;
-  stage: 'leadBacking';
-  outputs: string[];
-  graph: LeadBackingGraph;
-  leadBackingModelUrl: string;
-};
-
-export type BrowserSeparateUnitsRequest =
-  BrowserVocalsUnitsRequest | BrowserLeadBackingUnitsRequest;

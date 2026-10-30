@@ -2,6 +2,7 @@ export const vocalsApplyMasksShader = `
 override nFft: u32;
 override frames: u32;
 override packedBins: u32;
+override chainedMasks: u32;
 
 @group(0) @binding(0) var<storage, read> stft: array<f32>;
 @group(0) @binding(1) var<storage, read> masks: array<f32>;
@@ -15,12 +16,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     return;
   }
   let offset = (packed * frames + frame) * 2u;
-  let stftRe = stft[offset];
-  let stftIm = stft[offset + 1u];
-  let maskRe = masks[offset];
-  let maskIm = masks[offset + 1u];
-  let outRe = stftRe * maskRe - stftIm * maskIm;
-  let outIm = stftRe * maskIm + stftIm * maskRe;
+  let plane = packedBins * frames * 2u;
+  var outRe = stft[offset];
+  var outIm = stft[offset + 1u];
+  for (var mask = 0u; mask < chainedMasks; mask = mask + 1u) {
+    let maskRe = masks[mask * plane + offset];
+    let maskIm = masks[mask * plane + offset + 1u];
+    let re = outRe * maskRe - outIm * maskIm;
+    outIm = outRe * maskIm + outIm * maskRe;
+    outRe = re;
+  }
 
   let freq = packed / 2u;
   let channel = packed % 2u;

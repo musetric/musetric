@@ -1,4 +1,3 @@
-import { createLeadBackingGpuRuntime } from '../../runtime/leadBacking/leadBackingRuntime.js';
 import { type StftInferenceTap } from '../../runtime/stftInference.js';
 import { createVocalsGpuRuntime } from '../../runtime/vocals/vocalsRuntime.js';
 import { fetchBytes } from '../../service/browserShared.js';
@@ -7,7 +6,6 @@ import {
   fetchTensor,
   type ParityOutput,
   type ParityVocalsTask,
-  type ParityVoicesTask,
 } from './parityJob.js';
 
 type ModelTaps = {
@@ -36,40 +34,6 @@ const createTapReader = (): TapReader => {
   };
 };
 
-type StageOutputs = {
-  modelShape: number[];
-  unitShape: number[];
-  taps: ModelTaps;
-  unitOutput: Float32Array;
-};
-
-const stageOutputs = (outputs: StageOutputs): ParityOutput[] => [
-  {
-    boundary: 'model.input',
-    source: 'product',
-    dtype: 'float32',
-    shape: outputs.modelShape,
-    values: outputs.taps.input,
-  },
-  {
-    boundary: 'model.output',
-    source: 'product',
-    dtype: 'float32',
-    shape: outputs.modelShape,
-    values: outputs.taps.output,
-  },
-  {
-    boundary: 'unit.output',
-    source: 'product',
-    dtype: 'float32',
-    shape: outputs.unitShape,
-    values: outputs.unitOutput,
-  },
-];
-
-const fetchAudio = async (task: ParityVocalsTask | ParityVoicesTask) =>
-  Float32Array.from(await fetchTensor(task.unitInput));
-
 export const runVocalsTask = async (
   task: ParityVocalsTask,
 ): Promise<ParityOutput[]> => {
@@ -82,42 +46,36 @@ export const runVocalsTask = async (
     inspect: reader.inspect,
   });
   try {
-    const input = await fetchAudio(task);
-    const output = new Float32Array(input.length);
+    const { graph } = task;
+    const input = Float32Array.from(await fetchTensor(task.unitInput));
+    const output = new Float32Array(input.length * graph.masks);
     await runtime.processChunk({ input, output });
-    return stageOutputs({
-      modelShape: [1, (task.graph.nFft / 2 + 1) * 2, task.graph.frames, 2],
-      unitShape: task.unitInput.shape,
-      taps: reader.taps(),
-      unitOutput: output,
-    });
-  } finally {
-    await runtime.release();
-  }
-};
-
-export const runVoicesTask = async (
-  task: ParityVoicesTask,
-): Promise<ParityOutput[]> => {
-  const reader = createTapReader();
-  const runtime = await createLeadBackingGpuRuntime({
-    graph: task.graph,
-    modelFile: await fetchBytes(task.modelUrl, 'the model'),
-    inspect: reader.inspect,
-  });
-  try {
-    const output = await runtime.processChunk(await fetchAudio(task));
-    return stageOutputs({
-      modelShape: [
-        1,
-        2 * task.graph.channels,
-        task.graph.dimF,
-        task.graph.frames,
-      ],
-      unitShape: task.unitInput.shape,
-      taps: reader.taps(),
-      unitOutput: output,
-    });
+    const taps = reader.taps();
+    const plane = [(graph.nFft / 2 + 1) * 2, graph.frames, 2];
+    const [channels, ...samples] = task.unitInput.shape;
+    return [
+      {
+        boundary: 'model.input',
+        source: 'product',
+        dtype: 'float32',
+        shape: [1, ...plane],
+        values: taps.input,
+      },
+      {
+        boundary: 'model.output',
+        source: 'product',
+        dtype: 'float32',
+        shape: [graph.masks, ...plane],
+        values: taps.output,
+      },
+      {
+        boundary: 'unit.output',
+        source: 'product',
+        dtype: 'float32',
+        shape: [graph.masks * channels, ...samples],
+        values: output,
+      },
+    ];
   } finally {
     await runtime.release();
   }

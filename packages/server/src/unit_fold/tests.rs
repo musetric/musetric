@@ -1,5 +1,10 @@
 use super::FoldAccumulator;
-use crate::unit_plan::{PlanRules, PlanUnit, UnitPlan};
+use crate::unit_plan::{PlanChannels, PlanRules, PlanUnit, UnitPlan};
+
+const STEREO: PlanChannels = PlanChannels {
+    input: 2,
+    output: 2,
+};
 
 fn stereo(chunk: &[f32]) -> Vec<f32> {
     let channel: Vec<f32> = chunk.to_vec();
@@ -10,11 +15,15 @@ fn is_close(found: f32, expected: f64) -> bool {
     (f64::from(found) - expected).abs() < 1e-6
 }
 
+fn hamming(position: u32, chunk_samples: u32) -> f64 {
+    0.54 - 0.46 * (std::f64::consts::TAU * f64::from(position) / f64::from(chunk_samples)).cos()
+}
+
 #[test]
 fn divides_the_sum_by_the_window_counter() {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO,
         4,
         vec![PlanUnit {
             start: 0,
@@ -25,10 +34,10 @@ fn divides_the_sum_by_the_window_counter() {
     fold.add(&plan, 0, &stereo(&[1.0, 0.5, -0.25, 2.0]));
 
     let finalized = fold.finalize();
-    assert!(is_close(finalized[0], 0.0));
+    assert!(is_close(finalized[0], 1.0));
     assert!(is_close(finalized[1], 0.5));
     assert!(is_close(finalized[2], -0.25));
-    assert!(is_close(finalized[3], 0.0));
+    assert!(is_close(finalized[3], 2.0));
     assert!(is_close(finalized[4], finalized[0].into()));
     assert!(is_close(finalized[5], finalized[1].into()));
 }
@@ -36,8 +45,8 @@ fn divides_the_sum_by_the_window_counter() {
 #[test]
 fn sums_overlapping_windows_once_each() {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO,
         4,
         vec![
             PlanUnit {
@@ -55,19 +64,22 @@ fn sums_overlapping_windows_once_each() {
     fold.add(&plan, 1, &stereo(&[0.5, 0.5, 0.5, 0.5]));
 
     let finalized = fold.finalize();
-    assert!(is_close(finalized[0], 0.0));
+    let overlap = |first: u32, second: u32| {
+        (hamming(first, 4) + 0.5 * hamming(second, 4)) / (hamming(first, 4) + hamming(second, 4))
+    };
+    assert!(is_close(finalized[0], 1.0));
     assert!(is_close(finalized[1], 1.0));
-    assert!(is_close(finalized[2], 1.0));
-    assert!(is_close(finalized[3], 0.5));
+    assert!(is_close(finalized[2], overlap(2, 0)));
+    assert!(is_close(finalized[3], overlap(3, 1)));
     assert!(is_close(finalized[4], 0.5));
-    assert!(is_close(finalized[5], 0.0));
+    assert!(is_close(finalized[5], 0.5));
 }
 
 #[test]
 fn treats_positions_outside_every_window_as_silence() {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO,
         2,
         vec![PlanUnit {
             start: 0,
@@ -78,16 +90,44 @@ fn treats_positions_outside_every_window_as_silence() {
     fold.add(&plan, 0, &stereo(&[3.0, 4.0]));
 
     let finalized = fold.finalize();
+    assert!(is_close(finalized[0], 3.0));
+    assert!(is_close(finalized[1], 4.0));
     assert!(is_close(finalized[2], 0.0));
     assert!(is_close(finalized[3], 0.0));
-    assert!(is_close(finalized[0], 0.0));
+    assert!(is_close(finalized[6], 0.0));
+    assert!(is_close(finalized[7], 0.0));
+}
+
+#[test]
+fn keeps_each_stem_of_a_unit_in_its_own_channels() {
+    let plan = UnitPlan::create(
+        PlanRules::VocalsV1,
+        PlanChannels {
+            input: 2,
+            output: 4,
+        },
+        2,
+        vec![PlanUnit {
+            start: 1,
+            length: 2,
+        }],
+    );
+    let mut fold = FoldAccumulator::create(3, plan.channels.output);
+    fold.add(&plan, 0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+
+    let finalized = fold.finalize();
+    let expected = [0.0, 1.0, 2.0, 0.0, 3.0, 4.0, 0.0, 5.0, 6.0, 0.0, 7.0, 8.0];
+    assert_eq!(finalized.len(), expected.len());
+    for (found, value) in finalized.iter().zip(expected) {
+        assert!(is_close(*found, value));
+    }
 }
 
 #[test]
 fn repeats_the_same_summation_for_the_same_input() {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO,
         4,
         vec![PlanUnit {
             start: 0,
@@ -125,8 +165,8 @@ fn chunk_for(unit: usize, frames: u32) -> Vec<f32> {
 
 fn plan_with(starts: &[u64], length: u32) -> UnitPlan {
     UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        STEREO,
         length,
         starts
             .iter()

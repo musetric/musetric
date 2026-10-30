@@ -10,7 +10,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 use super::{StageRegistration, StageUnits};
 use crate::{
     test_workspace::{UnitHost, Workspace, get_unit_window},
-    unit_plan::{PlanRules, PlanUnit, UnitPlan},
+    unit_plan::{PlanChannels, PlanRules, PlanUnit, UnitPlan},
 };
 
 const ANSWER: Duration = Duration::from_secs(5);
@@ -28,9 +28,20 @@ async fn start_units(workspace: &Workspace) -> (UnitHost, Arc<StageUnits>) {
 }
 
 fn registration(attempt: &str, outputs: &[&str]) -> StageRegistration {
+    registration_of(
+        attempt,
+        outputs,
+        PlanChannels {
+            input: 2,
+            output: 2,
+        },
+    )
+}
+
+fn registration_of(attempt: &str, outputs: &[&str], channels: PlanChannels) -> StageRegistration {
     let plan = UnitPlan::create(
-        PlanRules::LeadBackingV1,
-        2,
+        PlanRules::VocalsV1,
+        channels,
         4,
         vec![
             PlanUnit {
@@ -50,7 +61,7 @@ fn registration(attempt: &str, outputs: &[&str]) -> StageRegistration {
             1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
         ]),
         outputs: outputs.iter().map(|name| (*name).to_owned()).collect(),
-        rules: PlanRules::LeadBackingV1,
+        rules: PlanRules::VocalsV1,
         resume: None,
     }
 }
@@ -153,12 +164,60 @@ async fn folds_a_unit_once_its_output_is_complete() {
         .expect("the fold should not hang")
         .expect("the last unit should fold");
     let finalized = units.finalize(ATTEMPT).expect("the stage should finalize");
-    let expected = [0.0_f32, 0.5, -0.25, 0.5, 0.5, 0.0];
+    let expected = [1.0, 0.5, (-0.25 + 0.5 * 0.08) / 1.08, 1.25, 0.5, 0.5];
     assert_eq!(finalized.len(), 12);
     for channel in 0..2 {
         for (position, value) in expected.iter().enumerate() {
             let found = f64::from(finalized[channel * 6 + position]);
-            assert!((found - f64::from(*value)).abs() < 1e-6);
+            assert!((found - value).abs() < 1e-6);
+        }
+    }
+    host.close().await;
+}
+
+#[tokio::test]
+async fn folds_the_vocals_and_the_backing_of_a_stereo_window() {
+    let workspace = Workspace::new();
+    let (host, units) = start_units(&workspace).await;
+    let channels = PlanChannels {
+        input: 2,
+        output: 4,
+    };
+    units
+        .register(registration_of(ATTEMPT, &["a"], channels))
+        .expect("the stage should register");
+    let base = host.base_url().to_owned();
+
+    let (status, window) = get_unit_window(&base, ATTEMPT, 0).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(window.len(), EXPECTED);
+
+    let stereo_only = put_output(
+        output_url(&base, ATTEMPT, 0, "a"),
+        samples([1.0, 1.0, 1.0, 1.0]),
+    )
+    .await;
+    assert_eq!(stereo_only, StatusCode::BAD_REQUEST);
+
+    let stems = [
+        samples([1.0, 1.0, 1.0, 1.0]),
+        samples([0.25, 0.25, 0.25, 0.25]),
+    ]
+    .concat();
+    for unit in 0..2 {
+        let stored = put_output(output_url(&base, ATTEMPT, unit, "a"), stems.clone()).await;
+        assert_eq!(stored, StatusCode::NO_CONTENT);
+        timeout(ANSWER, units.folded(ATTEMPT, unit))
+            .await
+            .expect("the fold should not hang")
+            .expect("the unit should fold");
+    }
+    let finalized = units.finalize(ATTEMPT).expect("the stage should finalize");
+    assert_eq!(finalized.len(), 4 * 6);
+    for (channel, level) in [1.0, 1.0, 0.25, 0.25].into_iter().enumerate() {
+        for position in 0..6 {
+            let found = f64::from(finalized[channel * 6 + position]);
+            assert!((found - level).abs() < 1e-6);
         }
     }
     host.close().await;

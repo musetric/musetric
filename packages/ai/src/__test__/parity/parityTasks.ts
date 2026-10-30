@@ -10,7 +10,6 @@ import { type ParityManifest, readManifest } from './parityFiles.js';
 import {
   beatThisGraph,
   chordNetGraph,
-  leadBackingGraph,
   type ParityGraphFields,
   skeyGraph,
   stringField,
@@ -146,13 +145,6 @@ const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
     graph: vocalsGraph(model.graph),
     modelUrl: model.modelUrl,
     modelData: model.externalData[0],
-    unitInput: model.tensor('unit.input@reference'),
-  }),
-  voices: (model) => ({
-    kind: 'voices',
-    caseName: model.caseName,
-    graph: leadBackingGraph(model.graph),
-    modelUrl: model.modelUrl,
     unitInput: model.tensor('unit.input@reference'),
   }),
   rhythm: (model) => ({

@@ -5,7 +5,7 @@ use std::{
 
 use musetric_db::{MasterType, NewStems, PendingJob, blob_path};
 use musetric_jobs::{StepAnswer, StepPhase, StepReport};
-use musetric_media::{Loudness, SampleRates, analyze_loudness};
+use musetric_media::{Loudness, SampleRates, analyze_lead_visual_loudness, analyze_loudness};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -13,7 +13,7 @@ use crate::{
     analysis::{
         AnalysisContext,
         browser::Failure,
-        gains::plain_loudness,
+        gains::{lead_loudness, plain_loudness},
         models::{VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA, vocals_graph},
         stage_attempt::{
             StageAttempt, StageInput, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model,
@@ -32,13 +32,16 @@ use crate::{
     unit_plan::{PlanRules, UnitPlan},
 };
 
-const LABEL: &str = "Headless vocals separation";
+const LABEL: &str = "Headless stem separation";
 const PASS: &str = "vocals";
-const DSP_VERSION: &str = "separation-dsp-v1";
+const DSP_VERSION: &str = "separation-dsp-v2";
+const UNSPLIT_FOLD: &str = "the folded units do not hold the vocals and the backing";
 
 struct Separated {
     vocals: StemFiles,
     instrumental: StemFiles,
+    lead: StemFiles,
+    backing: StemFiles,
 }
 
 impl StepStems for Separated {
@@ -46,11 +49,19 @@ impl StepStems for Separated {
         Self {
             vocals: StemFiles::master(area, blobs_path, MasterType::Vocals),
             instrumental: StemFiles::delivered(area, blobs_path, MasterType::Instrumental),
+            lead: StemFiles::delivered(area, blobs_path, MasterType::Lead),
+            backing: StemFiles::delivered(area, blobs_path, MasterType::Backing),
         }
     }
 
     fn staged(&self) -> Vec<&StagedBlob> {
-        [self.vocals.staged(), self.instrumental.staged()].concat()
+        [
+            self.vocals.staged(),
+            self.instrumental.staged(),
+            self.lead.staged(),
+            self.backing.staged(),
+        ]
+        .concat()
     }
 }
 
@@ -86,26 +97,31 @@ async fn process_stems(
     stems: &Separated,
     sample_rate: u32,
 ) -> Result<(), Failure> {
-    separate_vocals(running, job, stems).await?;
+    separate_stems(running, job, stems).await?;
     (running.report)(StepPhase::Saving);
+    let delivered = SampleRates {
+        input: VOCALS.sample_rate,
+        output: sample_rate,
+    };
     tokio::try_join!(
         stems.vocals.encode(SampleRates {
             input: VOCALS.sample_rate,
             output: VOCALS.sample_rate,
         }),
-        stems.instrumental.encode(SampleRates {
-            input: VOCALS.sample_rate,
-            output: sample_rate,
-        }),
+        stems.instrumental.encode(delivered),
+        stems.lead.encode(delivered),
+        stems.backing.encode(delivered),
     )?;
-    stems
-        .instrumental
-        .deliver(running.context.storage.pcm.as_ref(), sample_rate)
-        .await?;
+    let pcm = running.context.storage.pcm.as_ref();
+    tokio::try_join!(
+        stems.instrumental.deliver(pcm, sample_rate),
+        stems.lead.deliver(pcm, sample_rate),
+        stems.backing.deliver(pcm, sample_rate),
+    )?;
     Ok(())
 }
 
-async fn separate_vocals(
+async fn separate_stems(
     running: &StageRun<'_>,
     job: &PendingJob,
     stems: &Separated,
@@ -135,12 +151,20 @@ async fn separate_vocals(
     .await?;
     let outcome = produce(&mut attempt, &mixture, samples, &models).await;
     attempt.close();
-    let raw_vocals = outcome?;
-    let vocals = normalize_peak(&raw_vocals, MAX_PEAK);
-    let instrumental = normalize_peak(&subtract_planar(&mixture, &raw_vocals), MAX_PEAK);
+    let folded = outcome?;
+    let (raw_vocals, raw_backing) = folded
+        .split_at_checked(mixture.len())
+        .filter(|(_, rest)| rest.len() == mixture.len())
+        .ok_or_else(|| Failure::Refused(UNSPLIT_FOLD.to_owned()))?;
+    let vocals = normalize_peak(raw_vocals, MAX_PEAK);
+    let instrumental = normalize_peak(&subtract_planar(&mixture, raw_vocals), MAX_PEAK);
+    let lead = normalize_peak(&subtract_planar(raw_vocals, raw_backing), MAX_PEAK);
+    let backing = normalize_peak(raw_backing, MAX_PEAK);
     tokio::try_join!(
         stems.vocals.write_raw(&vocals),
         stems.instrumental.write_raw(&instrumental),
+        stems.lead.write_raw(&lead),
+        stems.backing.write_raw(&backing),
     )?;
     Ok(())
 }
@@ -162,19 +186,19 @@ async fn produce(
     let request = json!({
         "attemptId": attempt_id,
         "attemptUrl": attempt.attempt_url(&attempt_id),
-        "stage": "vocals",
         "outputs": [UNIT_OUTPUT],
         "vocalsModelUrl": model,
         "vocalsModelDataUrl": model_data,
         "vocalsModelDataPath": VOCALS_MODEL_DATA,
         "graph": vocals_graph(),
     });
-    let resume = attempt.resume(samples, 2).await?;
+    let plan = UnitPlan::vocals(VOCALS.sample_rate, samples);
+    let resume = attempt.resume(samples, plan.channels.output).await?;
     attempt
         .run(
             StageRegistration {
                 attempt: attempt_id,
-                plan: UnitPlan::vocals(VOCALS.sample_rate, samples),
+                plan,
                 input: Arc::clone(mixture),
                 outputs: vec![UNIT_OUTPUT.to_owned()],
                 rules: PlanRules::VocalsV1,
@@ -192,18 +216,26 @@ async fn store(
     source_loudness: Loudness,
 ) -> Result<(), Failure> {
     let context = running.context;
-    let instrumental = analyze_loudness(
-        context.storage.pcm.as_ref(),
-        read_at(stems.instrumental.master_path(), sample_rate),
-    )
-    .await?;
+    let pcm = context.storage.pcm.as_ref();
+    let (instrumental, lead, backing) = tokio::try_join!(
+        analyze_loudness(pcm, read_at(stems.instrumental.master_path(), sample_rate)),
+        analyze_lead_visual_loudness(pcm, read_at(stems.lead.master_path(), sample_rate)),
+        analyze_loudness(pcm, read_at(stems.backing.master_path(), sample_rate)),
+    )?;
     let separated = NewStems {
         project_id: running.project_id,
         loudness: vec![
             plain_loudness(MasterType::Source, source_loudness),
             plain_loudness(MasterType::Instrumental, instrumental),
+            lead_loudness(&lead),
+            plain_loudness(MasterType::Backing, backing),
         ],
-        stems: vec![stems.vocals.recorded(), stems.instrumental.recorded()],
+        stems: vec![
+            stems.vocals.recorded(),
+            stems.instrumental.recorded(),
+            stems.lead.recorded(),
+            stems.backing.recorded(),
+        ],
     };
     publish(&context.storage, &stems.staged(), move |writer| {
         writer.apply_stems_result(&separated)

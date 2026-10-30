@@ -77,7 +77,7 @@ export const snrDb = (
   let signal = 0;
   let noise = 0;
   for (let index = 0; index < reference.length; index += 1) {
-    const weight = weights ? weights[index] : 1;
+    const weight = weights ? weights[index % weights.length] : 1;
     const difference = reference[index] - candidate[index];
     signal += reference[index] * reference[index] * weight;
     noise += difference * difference * weight;
@@ -272,11 +272,12 @@ export const measureTensors = (input: ParityMeasureInput): ParityValue => {
   }
   if (
     input.weights &&
-    input.weights.values.length !== input.reference.values.length
+    (input.weights.values.length === 0 ||
+      input.reference.values.length % input.weights.values.length !== 0)
   ) {
     return {
       kind: 'invalid',
-      reason: `weights hold ${input.weights.values.length} values instead of ${input.reference.values.length}`,
+      reason: `weights hold ${input.weights.values.length} values, which do not tile ${input.reference.values.length}`,
     };
   }
   return { kind: 'value', value: measures[input.measure](input) };

@@ -108,16 +108,33 @@ describe('parity measures', () => {
     expect(value).toEqual({ kind: 'value', value: Infinity });
   });
 
-  it('rejects weights of another length', () => {
+  it('repeats the weights over every mask the reference stacks', () => {
+    const plane = size / 2;
+    const silentPair = new Float32Array(plane);
+    silentPair.fill(1);
+    silentPair[100] = 0;
+    silentPair[101] = 0;
+    const candidate = withValue(100, 10);
+    candidate[plane + 101] = -10;
+    const value = measureTensors({
+      measure: 'weightedSnr',
+      reference,
+      candidate: tensor(candidate),
+      weights: tensor(silentPair, [1, plane]),
+    });
+    expect(value).toEqual({ kind: 'value', value: Infinity });
+  });
+
+  it('rejects weights that do not tile the reference', () => {
     const value = measureTensors({
       measure: 'weightedSnr',
       reference,
       candidate: tensor(Float32Array.from(referenceValues)),
-      weights: tensor(new Float32Array(size / 2), [size / 2]),
+      weights: tensor(new Float32Array(1000), [1000]),
     });
     expect(value).toEqual({
       kind: 'invalid',
-      reason: `weights hold ${size / 2} values instead of ${size}`,
+      reason: `weights hold 1000 values, which do not tile ${size}`,
     });
   });
 

@@ -5,8 +5,8 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Rules
 
-- A change to a step's unit plan (stride, overlap, windows per unit) bumps
-  that step's `DSP_VERSION`.
+- A change to a step's unit plan (stride, overlap, windows per unit, channels
+  in or out) bumps that step's `DSP_VERSION`.
 - `src/analysis/models.rs` holds the
   [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models;
   `yarn workspace @musetric/server check:models` checks them.

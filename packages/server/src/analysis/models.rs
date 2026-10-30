@@ -299,32 +299,33 @@ pub(crate) fn whisper_graph() -> Value {
     })
 }
 
-pub(crate) const VOCALS_MODEL: &str = "duality_student_core_t1100.onnx";
-pub(crate) const VOCALS_MODEL_DATA: &str = "duality_student_core_t1100.onnx.data";
+pub(crate) const VOCALS_MODEL: &str = "duality_kara2_student_core_t1100.onnx";
+pub(crate) const VOCALS_MODEL_DATA: &str = "duality_kara2_student_core_t1100.onnx.data";
 
 pub(crate) const VOCALS: ModelBundle = ModelBundle {
-    label: "Vocals separation model",
-    model_id: "musetric/mel-band-roformer-duality-student-onnx",
-    revision: "0e04989195c31669276cdf05f5f840f8cf2f7e6f",
-    directory: "mel-band-roformer-duality-student-onnx",
+    label: "Stem separation model",
+    model_id: "musetric/mel-band-roformer-duality-kara2-student-onnx",
+    revision: "0555bb123f4620f29a507dfa7d3afa3f875f15ad",
+    directory: "mel-band-roformer-duality-kara2-student-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
     layout: CacheLayout::Flat,
     files: &[
         (
             VOCALS_MODEL,
-            "0198c50e408bf040522aa1b12042628e3218c61c958f06fdc9bb1aad9465a594",
-            5_539_495,
+            "9fb5110d320b7f047996fb74ed71afa3365aa03058e6e30d91ee8528e4966872",
+            5_942_087,
         ),
         (
             VOCALS_MODEL_DATA,
-            "d7bea7fae93748cbc210208b8b9728dc274e1cc9e0bdad852ad08294ee1c335b",
-            213_244_940,
+            "7a939dbe8f2a57108523d4722f0ea5f13a05975cb8104d127f90a9a50fa9d4a4",
+            272_952_332,
         ),
     ],
 };
 
 pub(crate) const VOCALS_GEOMETRY: ChunkGeometry = geometry(2048, 441, 1100, 2);
+pub(crate) const VOCALS_MASKS: u32 = 2;
 
 pub(crate) fn vocals_graph() -> Value {
     merge(
@@ -332,49 +333,13 @@ pub(crate) fn vocals_graph() -> Value {
         json!({
             "inputName": "stft_repr",
             "outputName": "masks",
+            "masks": VOCALS_MASKS,
             "minStorageBuffersPerShaderStage": 9,
         }),
     )
 }
 
-pub(crate) const LEAD_BACKING_MODEL: &str = "kara2.onnx";
-
-pub(crate) const LEAD_BACKING: ModelBundle = ModelBundle {
-    label: "Lead/backing separation model",
-    model_id: "musetric/uvr-mdxnet-kara2-onnx",
-    revision: "e53029c556d3db1386c6b919a1e2e1f1ac750457",
-    directory: "uvr-mdxnet-kara2-onnx",
-    sample_rate: 44100,
-    downmix: Downmix::Power,
-    layout: CacheLayout::Flat,
-    files: &[(
-        LEAD_BACKING_MODEL,
-        "f90e997ad60af6bf25bac77ad02f5e127a564d363a2b60ecb41100cd83e4ba12",
-        52_832_612,
-    )],
-};
-
-pub(crate) const LEAD_BACKING_GEOMETRY: ChunkGeometry = geometry(5120, 1024, 256, 2);
-
-pub(crate) fn lead_backing_graph() -> Value {
-    merge(
-        LEAD_BACKING_GEOMETRY.fields(),
-        json!({
-            "inputName": "input",
-            "outputName": "output",
-            "dimF": 2048,
-        }),
-    )
-}
-
-const BUNDLES: [&ModelBundle; 6] = [
-    &VOCALS,
-    &LEAD_BACKING,
-    &WHISPER,
-    &BEAT_THIS,
-    &CHORD_NET,
-    &SKEY,
-];
+const BUNDLES: [&ModelBundle; 5] = [&VOCALS, &WHISPER, &BEAT_THIS, &CHORD_NET, &SKEY];
 
 pub(crate) struct DownloadSize {
     pub(crate) total_bytes: u64,
