@@ -7,14 +7,15 @@ import { TempoButton } from '../buttons/TempoButton.js';
 import { TransposeButton } from '../buttons/TransposeButton.js';
 import { DetailsViewToggle } from '../buttons/viewToggle/DetailsViewToggle.js';
 import { SpectrogramViewToggle } from '../buttons/viewToggle/SpectrogramViewToggle.js';
+import { LessonButton } from '../lesson/LessonButton.js';
 import { LoopTries } from '../loop/LoopTries.js';
 import { MixButton } from '../mix/MixButton.js';
 import { PlayerProgress } from './PlayerProgress.js';
 
 const desktopAreas =
-  '"details history . click mix transport key tempo . spectrogram"';
+  '"details history . click mix transport key tempo . learn spectrogram"';
 
-const desktopColumns = 'auto auto 1fr auto auto auto auto auto 1fr auto';
+const desktopColumns = 'auto auto 1fr auto auto auto auto auto 1fr auto auto';
 
 const singleRowMinWidth = 680;
 
@@ -53,6 +54,9 @@ export const PlaybackPanel: FC = () => (
         </Box>
         <Box sx={{ gridArea: 'history' }}>
           <RecordingHistoryButtons />
+        </Box>
+        <Box sx={{ gridArea: 'learn' }}>
+          <LessonButton />
         </Box>
         <Box sx={{ gridArea: 'spectrogram' }}>
           <SpectrogramViewToggle />

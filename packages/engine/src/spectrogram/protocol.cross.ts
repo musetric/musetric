@@ -1,4 +1,7 @@
-import { type SpectrogramConfig } from '@musetric/spectrogram';
+import {
+  type SpectrogramConfig,
+  type VocalLessonPhrase,
+} from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 import {
@@ -11,6 +14,13 @@ import {
 export type SpectrogramViewWindow = {
   startFrame: number;
   frameCount: number;
+};
+
+export type VocalLessonStatus = 'idle' | 'analyzing' | 'ready';
+
+export type VocalLessonUpdate = {
+  status: VocalLessonStatus;
+  phrases?: VocalLessonPhrase[];
 };
 
 export type SpectrogramOutboundMethods = {
@@ -33,11 +43,13 @@ export type SpectrogramOutboundMethods = {
     capturedAt: number;
     samples: Float32Array<ArrayBuffer>;
   }) => void;
+  setVocalLesson: (message: { enabled: boolean }) => void;
 };
 
 export type SpectrogramInboundMethods = {
   booted: () => void;
   setState: (message: { status: 'pending' | 'error' | 'success' }) => void;
+  setVocalLesson: (message: VocalLessonUpdate) => void;
 };
 
 export const spectrogramChannel = createMessageChannel<
@@ -45,7 +57,7 @@ export const spectrogramChannel = createMessageChannel<
   SpectrogramOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setState'],
+    keys: ['booted', 'setState', 'setVocalLesson'],
   },
   outbound: {
     keys: [
@@ -58,6 +70,7 @@ export const spectrogramChannel = createMessageChannel<
       'updateConfig',
       'setViewWindow',
       'previewLiveTake',
+      'setVocalLesson',
     ],
     transfers: {
       boot: (message) => [message.dataPort, message.playheadPort],
