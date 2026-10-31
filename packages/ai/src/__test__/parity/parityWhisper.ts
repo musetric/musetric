@@ -267,7 +267,7 @@ export const runWhisperTask = async (
     modelHost: `${location.origin}${task.modelPath}`,
     modelId: task.modelId,
     revision: task.revision,
-    onLoading: () => undefined,
+    report: { loading: () => undefined, building: () => undefined },
     inspect: async (tap) => {
       if (captures.length > 0) {
         return;

@@ -9,7 +9,10 @@ import {
   WhisperForConditionalGeneration,
 } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web/webgpu';
-import { loadModelFilesInTurn } from '../../service/browserModelLoad.js';
+import {
+  loadModelFilesInTurn,
+  type ModelLoadReport,
+} from '../../service/browserModelLoad.js';
 import { fetchOk } from '../../service/browserShared.js';
 import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
@@ -79,7 +82,7 @@ export type WhisperRuntimeOptions = {
   modelId: string;
   revision: string;
 
-  onLoading: (loaded: number, total: number) => void;
+  report: ModelLoadReport;
   inspect?: WhisperDecodeInspect;
 };
 
@@ -132,7 +135,7 @@ export const createWhisperRuntime = async (
   const provider = await musetricWebGpuProvider(whisperDeviceOptions);
   const [encoderSession, decoderSession, cross] = await loadModelFilesInTurn(
     graphs.map((graph) => [fileUrl(graph.file), fileUrl(`${graph.file}_data`)]),
-    options.onLoading,
+    options.report,
     async (files, index) => {
       const [graph, data] = files;
       return ort.InferenceSession.create(graph, {

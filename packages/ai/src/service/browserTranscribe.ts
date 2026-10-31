@@ -145,7 +145,7 @@ export const transcribeAudio = createBrowserJobApi<BrowserTranscribeRequest>(
           modelHost: request.modelHost,
           modelId: request.modelId,
           revision: request.revision,
-          onLoading: report,
+          report,
         }),
       );
       holder.runtime = created;
