@@ -216,7 +216,7 @@ pub(crate) fn skey_graph() -> Value {
 pub(crate) const WHISPER: ModelBundle = ModelBundle {
     label: "Whisper transcription model",
     model_id: "musetric/whisper-large-v3-turbo-onnx",
-    revision: "689f3dbfd22b7cc75aeb0923c86ec992588562f4",
+    revision: "2c3af36696f93c4989ecfe8da4b0f525bd86c9bb",
     directory: "whisper-onnx-hf-cache",
     sample_rate: 16000,
     downmix: Downmix::Power,
