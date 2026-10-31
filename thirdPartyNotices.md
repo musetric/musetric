@@ -140,7 +140,7 @@ SOFTWARE.
 ## Musetric Whisper large-v3-turbo ONNX
 
 - Source: https://huggingface.co/musetric/whisper-large-v3-turbo-onnx
-- Usage: word-timestamped q4 ONNX export of Whisper large-v3-turbo in the transformers.js layout, downloaded at runtime.
+- Usage: word-timestamped ONNX export of Whisper large-v3-turbo, a q4 encoder and a float16 decoder, in the transformers.js layout, downloaded at runtime.
 - Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserTranscribe.ts`.
 - License: MIT, inherited from the base weights; conversion to ONNX does not change the weight license.
 - License source: the license of the base weights above.

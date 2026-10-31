@@ -313,10 +313,6 @@ const WHISPER_WINDOWS_PER_BATCH: u32 = 4;
 pub(crate) fn whisper_graph() -> Value {
     json!({
         "windowsPerBatch": WHISPER_WINDOWS_PER_BATCH,
-        "dtype": {
-            "encoder_model": "q4",
-            "decoder_model_merged": "fp16",
-        },
     })
 }
 

@@ -38,7 +38,6 @@ import {
 } from './whisperSegments.js';
 import {
   isFirstStep,
-  isFlatStep,
   routeFirstStep,
   type StepSession,
 } from './whisperStep.js';
@@ -119,15 +118,14 @@ export const createWhisperRuntime = async (
       'the whisper generation config',
     ).then(async (response): Promise<unknown> => response.json()),
   ]);
-  const { dtype } = options.graph;
   const graphs = [
-    { file: `encoder_model_${dtype.encoder_model}.onnx`, outputs: {} },
+    { file: 'encoder_model_q4.onnx', outputs: {} },
     {
-      file: `decoder_model_merged_${dtype.decoder_model_merged}.onnx`,
+      file: 'decoder_model_merged_fp16.onnx',
       outputs: { preferredOutputLocation: presentOnGpu(config) },
     },
     {
-      file: `cross_kv_${dtype.decoder_model_merged}.onnx`,
+      file: 'cross_kv_fp16.onnx',
       outputs: { preferredOutputLocation: 'gpu-buffer' as const },
     },
   ];
@@ -169,9 +167,7 @@ export const createWhisperRuntime = async (
     internals,
     options.inspect,
   );
-  if (isFlatStep(step)) {
-    routeFirstStep(step, { cross, device });
-  }
+  routeFirstStep(step, { cross, device });
   const runStep = step.run.bind(step);
   step.run = async (feeds, ...rest) =>
     isFirstStep(feeds)

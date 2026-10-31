@@ -85,7 +85,6 @@ export type ParityWhisperModelTask = {
   features: ParityTensorRef;
   encoderStates: ParityTensorRef;
   tokens: ParityTensorRef;
-  promptLength: number;
 };
 
 export type ParityWhisperTask = {
