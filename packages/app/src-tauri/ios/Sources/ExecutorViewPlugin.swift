@@ -6,7 +6,9 @@ struct OpenExecutorArgs: Decodable {
   let url: String
 }
 
-class ExecutorViewPlugin: Plugin {
+private let reloadDelay: TimeInterval = 1
+
+class ExecutorViewPlugin: Plugin, WKNavigationDelegate {
   private var url: URL?
   private var shown = false
   private var view: WKWebView?
@@ -61,6 +63,7 @@ class ExecutorViewPlugin: Plugin {
     #if DEBUG
       created.isInspectable = true
     #endif
+    created.navigationDelegate = self
     root.insertSubview(created, at: 0)
     created.load(URLRequest(url: address))
     view = created
@@ -73,6 +76,21 @@ class ExecutorViewPlugin: Plugin {
     view = nil
     attached.stopLoading()
     attached.removeFromSuperview()
+  }
+
+  func webView(
+    _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+    withError error: Error
+  ) {
+    guard webView === view, let address = url else {
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + reloadDelay) {
+      guard webView === self.view else {
+        return
+      }
+      webView.load(URLRequest(url: address))
+    }
   }
 }
 

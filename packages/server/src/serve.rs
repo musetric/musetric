@@ -12,7 +12,7 @@ use axum_server::{Handle, tls_rustls::RustlsConfig};
 use musetric_db::{
     BoxedError, MigrationFailure, MigrationReport, Reader, Writer, init_database, lock_storage,
 };
-use musetric_gpu::{Bundle, ExecutorHost, create_client};
+use musetric_gpu::{Bundle, ExecutorHost, ListenerReviver, RevivingListener, create_client};
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use rcgen::generate_simple_self_signed;
@@ -67,6 +67,8 @@ pub struct EmbeddedServerOptions {
 pub struct EmbeddedServer {
     url: String,
     executor_url: String,
+    reviver: ListenerReviver,
+    executor: Arc<ExecutorHost>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -79,6 +81,12 @@ impl EmbeddedServer {
     #[must_use]
     pub fn executor_url(&self) -> &str {
         &self.executor_url
+    }
+
+    pub async fn revive(&self) -> io::Result<()> {
+        let page = self.reviver.revive().await;
+        let executor = self.executor.revive().await;
+        page.and(executor)
     }
 
     pub fn close(&self) {
@@ -114,6 +122,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let CreatedApp {
         router: app,
         executor_url,
+        ..
     } = create_app(AppOptions {
         storage,
         models: options.models,
@@ -171,11 +180,12 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
     .await?;
     let socket = bind_preferred(&options.listen)?;
     let address = socket.local_addr()?;
-    let listener = TcpListener::from_std(socket)?;
+    let (listener, reviver) = RevivingListener::wrap(TcpListener::from_std(socket)?)?;
     let (shutdown, closed) = oneshot::channel();
     let CreatedApp {
         router,
         executor_url,
+        executor,
     } = app;
     tokio::spawn(async move {
         let _ = axum::serve(listener, router)
@@ -187,6 +197,8 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
     Ok(EmbeddedServer {
         url: format!("http://{address}"),
         executor_url,
+        reviver,
+        executor,
         shutdown: Mutex::new(Some(shutdown)),
     })
 }
@@ -202,6 +214,7 @@ struct AppOptions {
 struct CreatedApp {
     router: Router,
     executor_url: String,
+    executor: Arc<ExecutorHost>,
 }
 
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
@@ -225,6 +238,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         wake_on_arrival(&host, &queue);
     }
     let executor_url = host.base_url().to_owned();
+    let executor = Arc::clone(&host);
     let router = create_router(RouterOptions {
         frontend: options.frontend,
         storage,
@@ -235,6 +249,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     Ok(CreatedApp {
         router,
         executor_url,
+        executor,
     })
 }
 

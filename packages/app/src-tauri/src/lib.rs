@@ -72,7 +72,8 @@ fn run_app() -> tauri::Result<()> {
     let builder = tauri::Builder::default()
         .plugin(executor_view::init())
         .plugin(microphone::init())
-        .plugin(share::init());
+        .plugin(share::init())
+        .on_web_content_process_terminate(reload_main_view);
     let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(desktop)]
@@ -305,6 +306,12 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             has_visible_windows: false,
             ..
         } => open_main_window(app),
+        #[cfg(target_os = "ios")]
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Resumed,
+            ..
+        } if label == MAIN_WINDOW => revive_server(app),
         #[cfg(all(desktop, not(target_os = "macos")))]
         tauri::RunEvent::WindowEvent {
             label,
@@ -312,5 +319,29 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             ..
         } if label == MAIN_WINDOW => app.exit(0),
         _ => {}
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn revive_server(app: &tauri::AppHandle) {
+    if let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() {
+        let _ = tauri::async_runtime::block_on(server.revive());
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn reload_main_view(webview: &tauri::Webview) {
+    let app = webview.app_handle();
+    revive_server(app);
+    let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() else {
+        return;
+    };
+    let target = webview
+        .url()
+        .ok()
+        .filter(|url| url.as_str().starts_with(server.url()))
+        .or_else(|| server.url().parse().ok());
+    if let Some(url) = target {
+        let _ = webview.navigate(url);
     }
 }
