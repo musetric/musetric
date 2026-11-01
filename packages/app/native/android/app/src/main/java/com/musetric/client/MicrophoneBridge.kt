@@ -282,7 +282,7 @@ private fun inputLabel(device: AudioDeviceInfo): String? =
   }
 
 private fun builtInLabel(device: AudioDeviceInfo): String {
-  val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) device.address else ""
+  val address = device.address
   return if (address.isBlank()) "Built-in microphone" else "Built-in microphone ($address)"
 }
 

@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -21,13 +20,12 @@ class MediaPlaybackService : Service() {
       stopSelf()
       return START_NOT_STICKY
     }
-    val type =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-      } else {
-        0
-      }
-    ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+    ServiceCompat.startForeground(
+      this,
+      NOTIFICATION_ID,
+      notification,
+      ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+    )
     return START_NOT_STICKY
   }
 
