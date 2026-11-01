@@ -116,7 +116,6 @@ const whisperModelTask = (
   features: model.tensor('model.input@reference'),
   encoderStates: model.tensor('encoder.output@onnx-cpu'),
   tokens: model.tensor('decoder.tokens@reference'),
-  promptLength: Number(metaValue(model, 'promptLength')),
 });
 
 const providerTask = (

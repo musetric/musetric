@@ -1,22 +1,11 @@
 import * as ort from 'onnxruntime-web/webgpu';
 import { type CrossProjection, projectCrossByWindow } from './whisperCross.js';
 
-const branchSelector = 'use_cache_branch';
 const encoderStates = 'encoder_hidden_states';
 const firstPast = 'past_key_values.0.decoder.key';
 const crossAttentionPrefix = 'cross_attentions.';
 
 type StepFeeds = Record<string, ort.Tensor>;
-
-type StepOutputs = Record<string, ort.Tensor>;
-
-export type StepSession = {
-  run: (feeds: StepFeeds, ...rest: unknown[]) => Promise<StepOutputs>;
-  inputNames: readonly string[];
-};
-
-export const isFlatStep = (session: StepSession): boolean =>
-  !session.inputNames.includes(branchSelector);
 
 export const isFirstStep = (feeds: StepFeeds): boolean =>
   feeds[firstPast].dims[2] === 0;
@@ -69,6 +58,12 @@ const release = (
       tensor.dispose();
     }
   }
+};
+
+type StepOutputs = Record<string, ort.Tensor>;
+
+export type StepSession = {
+  run: (feeds: StepFeeds, ...rest: unknown[]) => Promise<StepOutputs>;
 };
 
 export const routeFirstStep = (

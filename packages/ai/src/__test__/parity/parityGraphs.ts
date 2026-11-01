@@ -4,7 +4,6 @@ import {
   type ChunkGeometry,
   type SkeyGraph,
   type VocalsGraph,
-  type WhisperDtype,
   type WhisperGraph,
 } from '../../runtime/modelGraphs.js';
 import { type ParityGraphValue } from './parityModels.js';
@@ -81,32 +80,6 @@ export const skeyGraph = (graph: ParityGraphFields): SkeyGraph => ({
   ...modelIo(graph),
 });
 
-const whisperDtypes = [
-  'auto',
-  'bnb4',
-  'fp16',
-  'fp32',
-  'int8',
-  'q4',
-  'q4f16',
-  'q8',
-  'uint8',
-] as const;
-
-const isWhisperDtype = (value: string): value is WhisperDtype =>
-  whisperDtypes.some((dtype) => dtype === value);
-
-const whisperDtype = (graph: ParityGraphFields, key: string): WhisperDtype => {
-  const value = stringField(graph, key);
-  if (!isWhisperDtype(value)) {
-    throw new Error(`graph field ${key} is not a whisper dtype: ${value}`);
-  }
-  return value;
-};
-
 export const whisperGraph = (graph: ParityGraphFields): WhisperGraph => ({
-  dtype: {
-    encoder_model: whisperDtype(graph, 'encoder_model'),
-    decoder_model_merged: whisperDtype(graph, 'decoder_model_merged'),
-  },
+  windowsPerBatch: numberField(graph, 'windowsPerBatch'),
 });

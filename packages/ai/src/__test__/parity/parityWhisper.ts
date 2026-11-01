@@ -44,12 +44,19 @@ const download = async (tensor: Downloadable): Promise<Float32Array> => {
 
 const sessionOptions = async (
   provider: ParityWhisperModelTask['provider'],
+  graphUrl: string,
 ): Promise<ort.InferenceSession.SessionOptions> => ({
   executionProviders:
     provider === 'wasm'
       ? ['wasm']
       : [await musetricWebGpuProvider(whisperDeviceOptions)],
   graphOptimizationLevel: 'all',
+  externalData: [
+    {
+      path: `${graphUrl.slice(graphUrl.lastIndexOf('/') + 1)}_data`,
+      data: `${graphUrl}_data`,
+    },
+  ],
 });
 
 const runEncoder = async (
@@ -57,7 +64,7 @@ const runEncoder = async (
 ): Promise<ParityOutput> => {
   const session = await ort.InferenceSession.create(
     task.encoderUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.encoderUrl),
   );
   try {
     const features = Float32Array.from(await fetchTensor(task.features));
@@ -101,15 +108,13 @@ const emptyPast = (
 const presentOf = (past: string): string =>
   past.replace(pastPrefix, 'present.');
 
-const branchSelector = 'use_cache_branch';
-
 const projectCross = async (
   task: ParityWhisperModelTask,
   states: ort.Tensor,
 ): Promise<Record<string, ort.Tensor>> => {
   const cross = await ort.InferenceSession.create(
     task.crossUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.crossUrl),
   );
   try {
     const outputs = await cross.run({ encoder_hidden_states: states });
@@ -135,17 +140,12 @@ const keepDecoderPast = (
   }
 };
 
-type DecoderStep = {
-  ids: number[];
-  useCache: boolean;
-};
-
 const runTeacherForced = async (
   task: ParityWhisperModelTask,
 ): Promise<ParityOutput> => {
   const session = await ort.InferenceSession.create(
     task.decoderUrl,
-    await sessionOptions(task.provider),
+    await sessionOptions(task.provider, task.decoderUrl),
   );
   try {
     const tokens = Array.from(await fetchTensor(task.tokens), Number);
@@ -154,57 +154,25 @@ const runTeacherForced = async (
       Float32Array.from(await fetchTensor(task.encoderStates)),
       task.encoderStates.shape,
     );
-    let past = emptyPast(session);
-    const pastNames = Object.keys(past);
-    const merged = session.inputNames.includes(branchSelector);
-    const fetches = ['logits', ...pastNames.map(presentOf)];
+    const empty = emptyPast(session);
+    const fetches = ['logits', ...Object.keys(empty).map(presentOf)];
+    const past = { ...empty, ...(await projectCross(task, states)) };
     const logits: Float32Array[] = [];
-    const step = async (
-      decoderStep: DecoderStep,
-    ): Promise<ort.InferenceSession.ReturnType> => {
-      const feeds: Record<string, ort.Tensor> = {
-        ...past,
-        input_ids: new ort.Tensor(
-          'int64',
-          BigInt64Array.from(decoderStep.ids, BigInt),
-          [1, decoderStep.ids.length],
-        ),
-        encoder_hidden_states: states,
-      };
-      if (merged) {
-        feeds[branchSelector] = new ort.Tensor(
-          'bool',
-          Uint8Array.of(decoderStep.useCache ? 1 : 0),
-          [1],
-        );
-      }
-      const outputs = await session.run(feeds, fetches);
+    for (const id of tokens.slice(0, -1)) {
+      const outputs = await session.run(
+        {
+          ...past,
+          input_ids: new ort.Tensor(
+            'int64',
+            BigInt64Array.of(BigInt(id)),
+            [1, 1],
+          ),
+          encoder_hidden_states: states,
+        },
+        fetches,
+      );
       logits.push(await download(outputs.logits));
-      return outputs;
-    };
-    if (merged) {
-      const first = await step({
-        ids: tokens.slice(0, task.promptLength),
-        useCache: false,
-      });
-      past = Object.fromEntries(
-        pastNames.map((name) => [name, first[presentOf(name)]]),
-      );
-    } else {
-      past = { ...past, ...(await projectCross(task, states)) };
-      for (const id of tokens.slice(0, task.promptLength)) {
-        keepDecoderPast(past, await step({ ids: [id], useCache: true }));
-      }
-    }
-    for (
-      let position = task.promptLength;
-      position < tokens.length - 1;
-      position += 1
-    ) {
-      keepDecoderPast(
-        past,
-        await step({ ids: [tokens[position]], useCache: true }),
-      );
+      keepDecoderPast(past, outputs);
     }
     const values = new Float32Array(
       logits.reduce((total, part) => total + part.length, 0),
@@ -299,7 +267,7 @@ export const runWhisperTask = async (
     modelHost: `${location.origin}${task.modelPath}`,
     modelId: task.modelId,
     revision: task.revision,
-    onLoading: () => undefined,
+    report: { loading: () => undefined, building: () => undefined },
     inspect: async (tap) => {
       if (captures.length > 0) {
         return;
