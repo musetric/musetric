@@ -2,6 +2,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { Box, Button, Slider, Stack, Typography } from '@mui/material';
 import { type FC, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { playCrossedTick, playHaptic } from '../haptics.js';
 
 const blank = ' ';
 
@@ -79,7 +80,10 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
             color='primary'
             disabled={disabled}
             startIcon={<RestartAltIcon fontSize='small' />}
-            onClick={onReset}
+            onClick={() => {
+              playHaptic('detent');
+              onReset();
+            }}
             sx={{ my: -1, fontSize: 14 }}
           >
             {t('pages.project.player.controls.reset')}
@@ -122,6 +126,12 @@ export const ScaleSlider: FC<ScaleSliderProps> = (props) => {
           value={value}
           slotProps={{ input: { ref: inputRef } }}
           onChange={(_, nextValue) => {
+            playCrossedTick(
+              value,
+              nextValue,
+              1,
+              (tick) => (tick - original) % largeTickEvery === 0,
+            );
             onChange(nextValue);
           }}
           sx={{

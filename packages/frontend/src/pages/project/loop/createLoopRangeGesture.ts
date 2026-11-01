@@ -4,6 +4,7 @@ import {
   type ViewportCustomPan,
 } from '@musetric/interaction';
 import { engine } from '../../../engine/engine.js';
+import { playHaptic } from '../haptics.js';
 import { moveLoop } from './loopActions.js';
 import { createLoopEdgePush } from './loopEdgePush.js';
 import { getLoopPointerFrame } from './loopPointer.js';
@@ -24,11 +25,18 @@ const startMove = (
 ): ViewportCustomPan => {
   const grab = getLoopPointerFrame(area, startClientX);
   let clientX = startClientX;
+  let pinned = false;
   const shift = (x: number) => {
-    engine.player.setRange(
-      shiftRange(range, getLoopPointerFrame(area, x) - grab),
-    );
+    const offset = getLoopPointerFrame(area, x) - grab;
+    const moved = shiftRange(range, offset);
+    const reached = moved.fromFrame !== Math.round(range.fromFrame + offset);
+    if (reached && !pinned) {
+      playHaptic('detent');
+    }
+    pinned = reached;
+    engine.player.setRange(moved);
   };
+  playHaptic('grab');
   const push = createLoopEdgePush(area, 'scroll', shift);
   return {
     update: (delta) => {

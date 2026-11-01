@@ -3,6 +3,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { playCrossedTick } from '../haptics.js';
 
 export const RecordingGainControl: FC = () => {
   const { t } = useTranslation();
@@ -24,6 +25,12 @@ export const RecordingGainControl: FC = () => {
           if (Array.isArray(value)) {
             return;
           }
+          playCrossedTick(
+            Math.round(recordingGain * 100),
+            value,
+            5,
+            (tick) => tick === 100,
+          );
           engine.store.update((state) => {
             state.recordingGain = value / 100;
           });

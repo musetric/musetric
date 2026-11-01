@@ -7,6 +7,7 @@ import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
+import { playHaptic } from '../haptics.js';
 import { setLoopViewWindow } from '../loop/loopView.js';
 import { useSettingsStore } from '../settings/store.js';
 import {
@@ -77,6 +78,9 @@ export const useSpectrogramGesture = (
         if (freeze.freeze()) {
           requestedFrameIndex = Math.round(engine.store.get().frameIndex);
         }
+      },
+      onLimit: () => {
+        playHaptic('detent');
       },
     };
 

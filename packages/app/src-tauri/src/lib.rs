@@ -19,6 +19,8 @@ mod assets;
 mod download;
 #[cfg(mobile)]
 mod executor_view;
+#[cfg(target_os = "ios")]
+mod haptics;
 #[cfg(desktop)]
 mod lifecycle;
 #[cfg(target_os = "ios")]
@@ -71,6 +73,7 @@ fn run_app() -> tauri::Result<()> {
     #[cfg(target_os = "ios")]
     let builder = tauri::Builder::default()
         .plugin(executor_view::init())
+        .plugin(haptics::init())
         .plugin(microphone::init())
         .plugin(share::init())
         .on_web_content_process_terminate(reload_main_view);

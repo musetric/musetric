@@ -1,5 +1,6 @@
 import { type api } from '@musetric/api';
 import { engine } from '../../../engine/engine.js';
+import { playHaptic } from '../haptics.js';
 import { moveLoop, previewLoop } from '../loop/loopActions.js';
 import {
   getLoopForWords,
@@ -120,6 +121,7 @@ export const createSubtitleWordDrag = (
     };
     if (locked) {
       element.style.overflow = 'hidden';
+      playHaptic('grab');
     }
     previewLoop(getRange(drag));
   };
