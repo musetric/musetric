@@ -322,7 +322,7 @@ pub(crate) const VOCALS_MODEL_DATA: &str = "duality_kara2_student_core_t1100.onn
 pub(crate) const VOCALS: ModelBundle = ModelBundle {
     label: "Stem separation model",
     model_id: "musetric/mel-band-roformer-duality-kara2-student-onnx",
-    revision: "0555bb123f4620f29a507dfa7d3afa3f875f15ad",
+    revision: "48a53200678a45f88e21dc1af957f1e4b55ba5ae",
     directory: "mel-band-roformer-duality-kara2-student-onnx",
     sample_rate: 44100,
     downmix: Downmix::Power,
@@ -330,13 +330,13 @@ pub(crate) const VOCALS: ModelBundle = ModelBundle {
     files: &[
         (
             VOCALS_MODEL,
-            "9fb5110d320b7f047996fb74ed71afa3365aa03058e6e30d91ee8528e4966872",
-            5_942_087,
+            "86a884e0225233a7d77f88e60d9a7e2febdb0d386d19ddc9476fcf51ed858228",
+            6_230_015,
         ),
         (
             VOCALS_MODEL_DATA,
-            "7a939dbe8f2a57108523d4722f0ea5f13a05975cb8104d127f90a9a50fa9d4a4",
-            272_952_332,
+            "176673d2446d8578976dd1a17ebca5fa0651dd23446967ff44fad5bf22c45d5c",
+            235_400_588,
         ),
     ],
 };
