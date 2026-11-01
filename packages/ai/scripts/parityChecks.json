@@ -428,6 +428,24 @@
         "measure": "timeOffset",
         "atMost": 0.1
       }
+    ],
+    "lines": [
+      {
+        "row": 7,
+        "boundary": "lines.words",
+        "reference": "reference",
+        "candidate": "product",
+        "measure": "tokenErrorRate",
+        "atMost": 0.15
+      },
+      {
+        "row": 7,
+        "boundary": "lines.breaks",
+        "reference": "reference",
+        "candidate": "product",
+        "measure": "tokenErrorRate",
+        "atMost": 0.35
+      }
     ]
   }
 }

@@ -4,6 +4,12 @@
       "url": "https://raw.githubusercontent.com/f90/jamendolyrics/master/mp3/Rxbyn_-_Bad_Side.mp3",
       "sha256": "24090af9ca4886bb0551f7c1896c249af3311cce1c585092054ed5c428834d44",
       "credit": "Rxbyn, \"Bad Side\", https://www.jamendo.com/track/1556580/bad-side, CC BY 3.0, from the JamendoLyrics dataset"
+    },
+    "admiral-bob-aupres-de-ma-blonde": {
+      "url": "https://ccmixter.org/content/admiralbob77/admiralbob77_-_Aupr_s_de_ma_blonde_3.mp3",
+      "sha256": "a2989cc434e2c7eb76204387ece88176c89ae2a39ec739efd6e6fef9ac74808f",
+      "credit": "Admiral Bob, \"Aupres de ma blonde\", https://ccmixter.org/files/admiralbob77/32320, CC BY 3.0, words in the public domain",
+      "referer": "https://ccmixter.org/files/admiralbob77/32320"
     }
   },
   "cases": [
@@ -35,6 +41,12 @@
       "source": "rxbyn-bad-side"
     },
     {
+      "name": "vocals-admiral-bob",
+      "step": "vocals",
+      "source": "admiral-bob-aupres-de-ma-blonde",
+      "from": 11
+    },
+    {
       "name": "transcribe-bad-side-60",
       "step": "transcribe",
       "input": { "case": "vocals-bad-side-60", "stem": "step.lead" },
@@ -56,6 +68,24 @@
       "to": 30,
       "gain": 0,
       "language": "en"
+    },
+    {
+      "name": "lines-bad-side",
+      "step": "lines",
+      "input": {
+        "case": "vocals-bad-side-full",
+        "stem": "step.lead",
+        "backing": "step.backing"
+      }
+    },
+    {
+      "name": "lines-admiral-bob",
+      "step": "lines",
+      "input": {
+        "case": "vocals-admiral-bob",
+        "stem": "step.lead",
+        "backing": "step.backing"
+      }
     },
     {
       "name": "rhythm-bad-side",

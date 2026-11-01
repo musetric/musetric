@@ -20,13 +20,19 @@ export type PinnedDownload = {
   url: string;
   sha256: string;
   target: string;
+  referer?: string;
 };
 
 const fetchPinned = async (download: PinnedDownload): Promise<Uint8Array> => {
   let failure = '';
   for (let attempt = 1; attempt <= downloadAttempts; attempt += 1) {
     console.log(`download ${download.url}`);
-    const response = await fetch(download.url);
+    const response = await fetch(
+      download.url,
+      download.referer === undefined
+        ? undefined
+        : { headers: { Referer: download.referer } },
+    );
     if (!response.ok) {
       throw new Error(
         `Failed to download ${download.url}: HTTP ${response.status}`,

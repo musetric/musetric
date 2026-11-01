@@ -59,3 +59,7 @@ it by hand when a model, its pin or `onnxruntime-web` changes, never in CI.
   `scripts/parityCases.json`.
 - Each boundary is scored against `scripts/parityChecks.json`; a phone must
   stay within `marginDb` of the desktop.
+- The `lines` cases run the whole transcription step on one voice in the lab
+  and in the app and compare the words and the line breaks, ignoring case and
+  punctuation; `lines.text` holds the app's lines as code points. They differ
+  where the app's quantized encoder hears otherwise than the original one.
