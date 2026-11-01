@@ -11,6 +11,7 @@ import {
   type ParityOutput,
   type ParityTask,
 } from './parityJob.js';
+import { runLinesTask } from './parityLines.js';
 import { runVocalsTask } from './paritySeparation.js';
 import { runWhisperModelTask, runWhisperTask } from './parityWhisper.js';
 
@@ -130,6 +131,9 @@ const runTask = async (task: ParityTask): Promise<ParityOutput[]> => {
   }
   if (task.kind === 'whisper') {
     return await runWhisperTask(task);
+  }
+  if (task.kind === 'lines') {
+    return await runLinesTask(task);
   }
   return await runChordsTask(task);
 };

@@ -98,6 +98,16 @@ export type ParityWhisperTask = {
   unitInput: ParityTensorRef;
 };
 
+export type ParityLinesTask = {
+  kind: 'lines';
+  caseName: string;
+  graph: WhisperGraph;
+  modelPath: string;
+  modelId: string;
+  revision: string;
+  voice: ParityTensorRef;
+};
+
 export type ParityTask =
   | ParityModelTask
   | ParityVocalsTask
@@ -105,7 +115,8 @@ export type ParityTask =
   | ParityKeyTask
   | ParityChordsTask
   | ParityWhisperModelTask
-  | ParityWhisperTask;
+  | ParityWhisperTask
+  | ParityLinesTask;
 
 export type ParityJob = {
   tasks: ParityTask[];

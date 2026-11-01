@@ -6,7 +6,6 @@ import {
   type ParityCaseFile,
   paritySourceChannels,
   paritySourceRate,
-  type ParityStem,
   parityStepModels,
 } from './parityCases.js';
 import {
@@ -53,19 +52,20 @@ const ensureBundle = async (
 
 type StemInput = {
   outDir: string;
-  input: ParityStem;
+  caseName: string;
+  stem: string;
   testCase: ParityCase;
   target: string;
 };
 
 const writeStemInput = (stem: StemInput): void => {
-  const { input, testCase } = stem;
-  const inputDir = resolve(stem.outDir, 'cases', input.case);
+  const { caseName, testCase } = stem;
+  const inputDir = resolve(stem.outDir, 'cases', caseName);
   const manifest = readManifest(resolve(inputDir, 'manifest.json'));
-  const tensor = manifest.tensors[`${input.stem}@reference`];
+  const tensor = manifest.tensors[`${stem.stem}@reference`];
   const { sampleRate } = manifest.meta;
   if (typeof sampleRate !== 'number') {
-    throw new Error(`${input.case} does not record its sample rate`);
+    throw new Error(`${caseName} does not record its sample rate`);
   }
   const values = readTensorValues(resolve(inputDir, tensor.file), tensor);
   const [channels, frames] = tensor.shape;
@@ -98,6 +98,7 @@ const writeSourceInput = async (
     url: source.url,
     sha256: source.sha256,
     target: sourcePath,
+    referer: source.referer,
   });
   const sampleRate = testCase.sampleRate ?? paritySourceRate;
   const channels = decodePlanar({
@@ -140,15 +141,26 @@ it('prepares the parity cases', async (context) => {
   for (const testCase of request.cases) {
     const caseDir = resolve(request.outDir, 'cases', testCase.name);
     const audio = resolve(caseDir, 'audio.wav');
+    const backing = resolve(caseDir, 'backing.wav');
     if (testCase.input === undefined) {
       await writeSourceInput(request, testCase, audio);
     } else {
       writeStemInput({
         outDir: request.outDir,
-        input: testCase.input,
+        caseName: testCase.input.case,
+        stem: testCase.input.stem,
         testCase,
         target: audio,
       });
+      if (testCase.input.backing !== undefined) {
+        writeStemInput({
+          outDir: request.outDir,
+          caseName: testCase.input.case,
+          stem: testCase.input.backing,
+          testCase,
+          target: backing,
+        });
+      }
     }
     const bundle = findBundle(models, parityStepModels[testCase.step].bundle);
     await ensureBundle(request.outDir, bundle);
@@ -156,6 +168,9 @@ it('prepares the parity cases', async (context) => {
     runReference(request.referenceCommand, [
       `--step ${testCase.step}`,
       `--audio-path "${audio}"`,
+      ...(testCase.input?.backing === undefined
+        ? []
+        : [`--backing-path "${backing}"`]),
       `--onnx "${resolve(request.outDir, 'models', bundle.directory, onnx?.name ?? '')}"`,
       `--case-path "${caseDir}"`,
       ...(testCase.language === undefined

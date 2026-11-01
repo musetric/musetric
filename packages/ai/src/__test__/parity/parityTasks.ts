@@ -138,6 +138,15 @@ const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
     language: String(metaValue(model, 'language')),
     unitInput: model.tensor('unit.input@reference'),
   }),
+  lines: (model) => ({
+    kind: 'lines',
+    caseName: model.caseName,
+    graph: whisperGraph(model.graph),
+    modelPath: '/hf',
+    modelId: model.modelId,
+    revision: model.revision,
+    voice: model.tensor('voice@reference'),
+  }),
   vocals: (model) => ({
     kind: 'vocals',
     caseName: model.caseName,

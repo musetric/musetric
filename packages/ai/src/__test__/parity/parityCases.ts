@@ -1,14 +1,17 @@
-export type ParityStep = 'vocals' | 'rhythm' | 'key' | 'chords' | 'transcribe';
+export type ParityStep =
+  'vocals' | 'rhythm' | 'key' | 'chords' | 'transcribe' | 'lines';
 
 export type ParitySource = {
   url: string;
   sha256: string;
   credit: string;
+  referer?: string;
 };
 
 export type ParityStem = {
   case: string;
   stem: string;
+  backing?: string;
 };
 
 export type ParityCase = {
@@ -84,6 +87,14 @@ export const parityStepModels: Record<ParityStep, ParityStepModel> = {
     graph: 'whisper',
     wasm: 'desktop',
     webgpu: true,
+    simpleBufferCache: false,
+    outputs: {},
+  },
+  lines: {
+    bundle: 'WHISPER',
+    graph: 'whisper',
+    wasm: 'none',
+    webgpu: false,
     simpleBufferCache: false,
     outputs: {},
   },
