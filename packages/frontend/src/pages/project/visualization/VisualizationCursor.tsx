@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import { alpha, Box } from '@mui/material';
 import { type TimelineMode } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
@@ -56,7 +56,13 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
 
     render();
 
-    const unsubscribeDrag = subscribePlayheadDrag(handle, parentElement);
+    const unsubscribeDrag = subscribePlayheadDrag(
+      handle,
+      parentElement,
+      (active) => {
+        element.toggleAttribute('data-active', active);
+      },
+    );
     const unsubscribeRender = subscribeVisualizationRender({
       resizeTarget: parentElement,
       onResize: resize,
@@ -74,17 +80,20 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
   return (
     <Box
       ref={ref}
-      sx={{
+      sx={(theme) => ({
         position: 'absolute',
         top: 0,
         bottom: 0,
         left: 0,
         width: '1px',
-        backgroundColor: (theme) => theme.palette.primary.main,
+        backgroundColor: theme.palette.primary.main,
         pointerEvents: 'none',
         willChange: 'transform',
         zIndex: 0,
-      }}
+        '&[data-active]': {
+          boxShadow: `0 0 0 1px ${theme.palette.primary.main}, 0 0 12px 3px ${alpha(theme.palette.primary.main, 0.7)}`,
+        },
+      })}
     >
       <Box
         ref={handleRef}
@@ -95,9 +104,12 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
           left: '50%',
           width: { xs: '32px', md: '16px' },
           cursor: 'ew-resize',
-          pointerEvents: 'auto',
+          pointerEvents: 'none',
           touchAction: 'none',
           transform: 'translateX(-50%)',
+          '@media (pointer: fine)': {
+            pointerEvents: 'auto',
+          },
         }}
       />
     </Box>

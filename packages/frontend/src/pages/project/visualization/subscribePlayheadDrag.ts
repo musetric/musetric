@@ -4,8 +4,22 @@ import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useSettingsStore } from '../settings/store.js';
 import { getVisualizationView } from './visualizationView.js';
 
+const longPressMs = 350;
+const pressSlop = 6;
+
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Math.max(minimum, Math.min(value, maximum));
+
+const isInside = (element: HTMLElement, event: PointerEvent): boolean => {
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.width > 0 &&
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
+};
 
 type PlayheadDrag = {
   pointerId: number;
@@ -13,37 +27,58 @@ type PlayheadDrag = {
   viewFrameCount: number;
 };
 
+type PlayheadPress = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  timer: ReturnType<typeof setTimeout>;
+};
+
 export const subscribePlayheadDrag = (
   handle: HTMLElement,
   area: HTMLElement,
+  onActiveChange: (active: boolean) => void,
 ): (() => void) => {
   const freeze = createInteractionFreeze();
   let drag: PlayheadDrag | undefined = undefined;
+  let press: PlayheadPress | undefined = undefined;
+  let listening: AbortController | undefined = undefined;
 
-  const handlePointerDown = (event: PointerEvent) => {
-    if (!event.isPrimary || event.button !== 0) return;
+  const begin = (pointerId: number): boolean => {
     const { frameIndex, frameCount } = engine.store.get();
-    if (!frameCount) return;
-    event.stopPropagation();
-    event.preventDefault();
-    handle.setPointerCapture(event.pointerId);
+    if (!frameCount) return false;
     const { visibleTime, playheadRatio } = getVisualizationView();
     const viewFrameCount = visibleTime * engine.context.sampleRate;
     drag = {
-      pointerId: event.pointerId,
+      pointerId,
       viewStartFrame: frameIndex - playheadRatio * viewFrameCount,
       viewFrameCount,
     };
     freeze.freeze();
+    onActiveChange(true);
+    return true;
   };
 
-  const handlePointerMove = (event: PointerEvent) => {
-    if (drag?.pointerId !== event.pointerId) return;
-    event.stopPropagation();
-    event.preventDefault();
+  const finish = () => {
+    if (press) {
+      clearTimeout(press.timer);
+      press = undefined;
+    }
+    listening?.abort();
+    listening = undefined;
+    if (!drag) return;
+    if (handle.hasPointerCapture(drag.pointerId)) {
+      handle.releasePointerCapture(drag.pointerId);
+    }
+    drag = undefined;
+    freeze.release();
+    onActiveChange(false);
+  };
+
+  const seekTo = (event: PointerEvent, active: PlayheadDrag) => {
     const rect = area.getBoundingClientRect();
     if (rect.width <= 0) return;
-    const { viewStartFrame, viewFrameCount } = drag;
+    const { viewStartFrame, viewFrameCount } = active;
     const { frameCount = 0, range, viewWindow } = engine.store.get();
     const pointerRatio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const frameIndex = Math.round(
@@ -60,25 +95,74 @@ export const subscribePlayheadDrag = (
     engine.player.seek(frameIndex, 'playhead');
   };
 
-  const handlePointerEnd = (event: PointerEvent) => {
-    if (drag?.pointerId !== event.pointerId) return;
-    if (handle.hasPointerCapture(event.pointerId)) {
-      handle.releasePointerCapture(event.pointerId);
+  const handlePointerMove = (event: PointerEvent) => {
+    if (drag?.pointerId === event.pointerId) {
+      event.stopPropagation();
+      event.preventDefault();
+      seekTo(event, drag);
+      return;
     }
-    drag = undefined;
-    freeze.release();
+    if (press?.pointerId !== event.pointerId) return;
+    const moved = Math.hypot(
+      event.clientX - press.clientX,
+      event.clientY - press.clientY,
+    );
+    if (moved >= pressSlop) {
+      finish();
+    }
   };
 
-  handle.addEventListener('pointerdown', handlePointerDown);
-  handle.addEventListener('pointermove', handlePointerMove);
-  handle.addEventListener('pointerup', handlePointerEnd);
-  handle.addEventListener('pointercancel', handlePointerEnd);
+  const handlePointerEnd = (event: PointerEvent) => {
+    if (
+      drag?.pointerId === event.pointerId ||
+      press?.pointerId === event.pointerId
+    ) {
+      finish();
+    }
+  };
+
+  const listen = () => {
+    listening = new AbortController();
+    const options = { capture: true, signal: listening.signal };
+    window.addEventListener('pointermove', handlePointerMove, options);
+    window.addEventListener('pointerup', handlePointerEnd, options);
+    window.addEventListener('pointercancel', handlePointerEnd, options);
+  };
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (!event.isPrimary || event.button !== 0 || !isInside(handle, event)) {
+      return;
+    }
+    finish();
+    if (event.pointerType === 'mouse') {
+      if (!begin(event.pointerId)) return;
+      event.stopPropagation();
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      listen();
+      return;
+    }
+    const { pointerId, clientX, clientY } = event;
+    press = {
+      pointerId,
+      clientX,
+      clientY,
+      timer: setTimeout(() => {
+        press = undefined;
+        if (!begin(pointerId)) {
+          finish();
+        }
+      }, longPressMs),
+    };
+    listen();
+  };
+
+  area.addEventListener('pointerdown', handlePointerDown, { capture: true });
 
   return () => {
-    handle.removeEventListener('pointerdown', handlePointerDown);
-    handle.removeEventListener('pointermove', handlePointerMove);
-    handle.removeEventListener('pointerup', handlePointerEnd);
-    handle.removeEventListener('pointercancel', handlePointerEnd);
-    freeze.release();
+    area.removeEventListener('pointerdown', handlePointerDown, {
+      capture: true,
+    });
+    finish();
   };
 };
