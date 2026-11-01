@@ -1,5 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Resvg } from '@resvg/resvg-js';
@@ -16,6 +18,10 @@ const insetSvg = svg
   )
   .replace(/<\/svg>\s*$/, '</svg></svg>');
 const insetIcon = new Resvg(insetSvg, { fitTo: { mode: 'width', value: 1024 } })
+  .render()
+  .asPng();
+const glyphSvg = svg.replace(/<rect\b[^>]*\/>/, '');
+const glyphIcon = new Resvg(glyphSvg, { fitTo: { mode: 'width', value: 1024 } })
   .render()
   .asPng();
 
@@ -35,6 +41,73 @@ await writeFile(
     2,
   )}\n`,
 );
+
+const appIconDir = join(genDir, 'AppIcon.icon');
+await mkdir(join(appIconDir, 'Assets'), { recursive: true });
+await writeFile(
+  join(appIconDir, 'Assets', 'glyph.png'),
+  Buffer.from(glyphIcon),
+);
+await writeFile(
+  join(appIconDir, 'icon.json'),
+  `${JSON.stringify(
+    {
+      fill: {
+        'linear-gradient': [
+          'srgb:0.16471,0.16471,0.16471,1.00000',
+          'srgb:0.06667,0.06667,0.06667,1.00000',
+        ],
+        orientation: {
+          start: { x: 0.5, y: 0 },
+          stop: { x: 0.5, y: 1 },
+        },
+      },
+      groups: [
+        {
+          layers: [{ glass: false, 'image-name': 'glyph.png', name: 'glyph' }],
+        },
+      ],
+      'supported-platforms': { squares: ['macOS'] },
+    },
+    undefined,
+    2,
+  )}\n`,
+);
+
+if (process.platform === 'darwin') {
+  const actoolDir = await mkdtemp(join(tmpdir(), 'musetric-actool-'));
+  execFileSync(
+    'xcrun',
+    [
+      'actool',
+      appIconDir,
+      '--compile',
+      actoolDir,
+      '--output-format',
+      'human-readable-text',
+      '--errors',
+      '--warnings',
+      '--output-partial-info-plist',
+      join(actoolDir, 'info.plist'),
+      '--app-icon',
+      'AppIcon',
+      '--include-all-app-icons',
+      '--enable-on-demand-resources',
+      'NO',
+      '--development-region',
+      'en',
+      '--target-device',
+      'mac',
+      '--minimum-deployment-target',
+      '26.0',
+      '--platform',
+      'macosx',
+    ],
+    { stdio: 'inherit' },
+  );
+  await copyFile(join(actoolDir, 'Assets.car'), join(genDir, 'Assets.car'));
+  await rm(actoolDir, { recursive: true });
+}
 
 const androidResDir = join(genDir, 'android', 'app', 'src', 'main', 'res');
 

@@ -25,6 +25,12 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - Both windows load from the embedded host over the loopback address
   (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
 - `src/favicon.svg` is the only icon source, of the app and of the page.
+- `yarn build:icons` also writes `gen/AppIcon.icon`, an Icon Composer icon of the same
+  background and glyph, and on macOS compiles it into `gen/Assets.car` with `actool`
+  from Xcode 26 or later. The macOS bundle lists that `Assets.car` next to
+  `icon.icns`: macOS 26 draws a bundle with only the legacy icon on a light plate at
+  16 and 32 px. The script runs `actool` itself because the Tauri bundler's own call
+  fails on the `.icon` with "Bad file descriptor".
 - It is the shell of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built) on
   [every platform it supports](https://github.com/musetric/headquarters/blob/main/product.md#where-it-runs): the hidden
   executor WebView is `ExecutorViewPlugin`, `minimumSystemVersion` of
