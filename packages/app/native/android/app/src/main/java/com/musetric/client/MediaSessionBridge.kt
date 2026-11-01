@@ -158,7 +158,7 @@ internal class MediaSessionBridge(
           commandIntent(command),
         )
         .build()
-    return notificationBuilder()
+    return Notification.Builder(activity, CHANNEL_ID)
       .setSmallIcon(R.drawable.ic_playback_notification)
       .setContentTitle(state.title)
       .setContentText(activity.getString(R.string.app_name))
@@ -173,9 +173,6 @@ internal class MediaSessionBridge(
       )
       .build()
   }
-
-  private fun notificationBuilder(): Notification.Builder =
-    Notification.Builder(activity, CHANNEL_ID)
 
   private fun createChannel() {
     val channel =
