@@ -301,9 +301,7 @@ export const createEnginePlayback = async (
       return bootPromise.promise;
     },
     play: async () => {
-      if (context.state === 'suspended') {
-        await context.resume();
-      }
+      await outputClock.wake();
       await audioOutput.play();
       const { revision } = store.get().seekEvent;
       const playingPromise = createPlayingPromise(revision);

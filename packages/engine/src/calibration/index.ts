@@ -213,6 +213,7 @@ export const createEngineCalibration = (
   const getPreview = (): CalibrationPreview => {
     preview ??= createCalibrationPreview({
       context,
+      outputClock,
       audioSession,
       store,
       refreshDevices: async () => devices.refresh(),
@@ -240,9 +241,7 @@ export const createEngineCalibration = (
     });
 
     try {
-      if (context.state === 'suspended') {
-        await context.resume();
-      }
+      await outputClock.wake();
       await outputClock.whenSettled();
 
       const inputDevice = resolveAudioInputDevice(store.get().audioDevices, {

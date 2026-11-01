@@ -1,4 +1,5 @@
 import { resolveAudioInputDevice } from '@musetric/audio/recording';
+import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
   clearMicrophoneDenial,
   reportMicrophoneFailure,
@@ -26,6 +27,7 @@ const computeRmsLevel = (analyser: AnalyserNode) => {
 
 export type CalibrationPreviewOptions = {
   context: AudioContext;
+  outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   refreshDevices: () => Promise<MediaDeviceInfo[]>;
@@ -39,7 +41,7 @@ export type CalibrationPreview = {
 export const createCalibrationPreview = (
   options: CalibrationPreviewOptions,
 ): CalibrationPreview => {
-  const { context, audioSession, store, refreshDevices } = options;
+  const { context, outputClock, audioSession, store, refreshDevices } = options;
   let activeMicrophone: EngineMicrophone | undefined = undefined;
 
   const open = () => {
@@ -109,9 +111,7 @@ export const createCalibrationPreview = (
       });
 
       try {
-        if (context.state === 'suspended') {
-          await context.resume();
-        }
+        await outputClock.wake();
         if (isStale()) {
           return;
         }
