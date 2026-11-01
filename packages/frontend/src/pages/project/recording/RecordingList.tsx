@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { getActiveRecording, getTrackProgress } from '@musetric/engine';
 import { useIsMutating, useMutation } from '@tanstack/react-query';
-import { type FC } from 'react';
+import { type FC, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
@@ -81,84 +81,113 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
     minHeight: compact ? 48 : 36,
     px: 3,
   };
+  const listRef = useRef<HTMLDivElement>(null);
+  const activeIndex = recordings.findIndex((recording) => recording.active);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list || activeIndex < 0) return;
+    const rowTop = activeIndex * layout.rowHeight;
+    list.scrollTop = Math.min(
+      rowTop,
+      Math.max(
+        list.scrollTop,
+        layout.rulerHeight + rowTop + layout.rowHeight - list.clientHeight,
+      ),
+    );
+  }, [activeIndex, layout.rowHeight, layout.rulerHeight]);
 
   return (
-    <Stack sx={{ py: 2, position: 'relative' }}>
+    <Stack sx={{ py: 2, position: 'relative', maxHeight: '60dvh' }}>
       <IconButton
         size='small'
         aria-label={t('pages.project.recording.close')}
         onClick={onClose}
-        sx={{ position: 'absolute', top: 4, left: 11, zIndex: 1 }}
+        sx={{ position: 'absolute', top: 4, left: 11, zIndex: 2 }}
       >
         <CloseRoundedIcon fontSize='small' />
       </IconButton>
-      <Box sx={{ position: 'relative' }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: getRecordingColumns(layout),
-            height: layout.rulerHeight,
-            px: `${layout.sidePadding}px`,
-          }}
-        >
-          <Box sx={{ gridColumn: 3, position: 'relative' }}>
-            {getRulerTicks(duration).map((tick) => (
-              <Typography
-                key={tick.seconds}
-                variant='caption'
-                sx={[
-                  {
-                    color: 'text.secondary',
-                    position: 'absolute',
-                    top: 2,
-                    left: `${tick.ratio * 100}%`,
-                    lineHeight: 1.2,
-                  },
-                  tick.ratio > endTickRatio
-                    ? {
-                        pr: 1,
-                        borderRight: 1,
-                        borderColor: 'divider',
-                        transform: 'translateX(-100%)',
-                      }
-                    : { pl: 1, borderLeft: 1, borderColor: 'divider' },
-                ]}
-              >
-                {formatDuration(tick.seconds)}
-              </Typography>
-            ))}
+      <Box
+        ref={listRef}
+        sx={{
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          scrollPaddingTop: layout.rulerHeight,
+        }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <Box
+            sx={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+              display: 'grid',
+              gridTemplateColumns: getRecordingColumns(layout),
+              height: layout.rulerHeight,
+              px: `${layout.sidePadding}px`,
+              bgcolor: 'background.paper',
+              backgroundImage: 'var(--Paper-overlay)',
+            }}
+          >
+            <Box sx={{ gridColumn: 3, position: 'relative' }}>
+              {getRulerTicks(duration).map((tick) => (
+                <Typography
+                  key={tick.seconds}
+                  variant='caption'
+                  sx={[
+                    {
+                      color: 'text.secondary',
+                      position: 'absolute',
+                      top: 2,
+                      left: `${tick.ratio * 100}%`,
+                      lineHeight: 1.2,
+                    },
+                    tick.ratio > endTickRatio
+                      ? {
+                          pr: 1,
+                          borderRight: 1,
+                          borderColor: 'divider',
+                          transform: 'translateX(-100%)',
+                        }
+                      : { pl: 1, borderLeft: 1, borderColor: 'divider' },
+                  ]}
+                >
+                  {formatDuration(tick.seconds)}
+                </Typography>
+              ))}
+            </Box>
           </Box>
-        </Box>
-        {recordings.map((recording) => (
-          <RecordingRow
-            key={recording.id}
-            recording={recording}
-            layout={layout}
-            otherNames={recordings
-              .filter((other) => other.id !== recording.id)
-              .map((other) => other.name)}
-          />
-        ))}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: layout.rulerHeight,
-            bottom: 0,
-            left: waveLeft,
-            right: layout.sidePadding,
-            pointerEvents: 'none',
-          }}
-        >
+          {recordings.map((recording) => (
+            <RecordingRow
+              key={recording.id}
+              recording={recording}
+              layout={layout}
+              otherNames={recordings
+                .filter((other) => other.id !== recording.id)
+                .map((other) => other.name)}
+            />
+          ))}
           <Box
             sx={{
               position: 'absolute',
-              top: 0,
+              top: layout.rulerHeight,
               bottom: 0,
-              left: `${progress * 100}%`,
-              width: '1px',
-              bgcolor: 'primary.main',
+              left: waveLeft,
+              right: layout.sidePadding,
+              pointerEvents: 'none',
             }}
-          />
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: `${progress * 100}%`,
+                width: '1px',
+                bgcolor: 'primary.main',
+              }}
+            />
+          </Box>
         </Box>
       </Box>
       <Divider sx={{ my: 2 }} />
