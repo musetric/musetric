@@ -46,7 +46,7 @@
   "resolutions": {
     "browserslist": "4.28.8",
     "filelist": "2.0.2",
-    "onnxruntime-web": "1.30.0",
+    "onnxruntime-web": "1.31.1",
     "tar": "7.5.21"
   },
   "checks": {
