@@ -82,6 +82,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+      - name: Select Xcode 27.0
+        if: matrix.platform == 'macOS'
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer && xcodebuild -version
       - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
@@ -214,6 +217,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Select Xcode 27.0
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer && xcodebuild -version
       - uses: ./.github/actions/setupYarn
       - uses: actions/cache@v5
         with:
