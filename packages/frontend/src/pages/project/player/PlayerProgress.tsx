@@ -6,6 +6,7 @@ import { formatDuration } from '../../../common/formatDuration.js';
 import { engine } from '../../../engine/engine.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { playHaptic } from '../haptics.js';
 import { LoopProgressRange } from '../loop/LoopProgressRange.js';
 
 const progressScale = 1000;
@@ -13,6 +14,7 @@ const progressScale = 1000;
 export const PlayerProgress: FC = () => {
   const ref = useRef<HTMLSpanElement>(null);
   const currentTimeRef = useRef<HTMLSpanElement>(null);
+  const atEdgeRef = useRef(false);
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
   const realtimeFailed = useEngineStore(
@@ -68,6 +70,7 @@ export const PlayerProgress: FC = () => {
     const handlePointerDown = (event: PointerEvent) => {
       if (!isPrimaryPointerButton(event)) return;
       if (!event.isPrimary) return;
+      atEdgeRef.current = false;
       freeze.freeze();
     };
 
@@ -119,6 +122,11 @@ export const PlayerProgress: FC = () => {
               return;
             }
 
+            const atEdge = value <= 0 || value >= progressScale;
+            if (atEdge && !atEdgeRef.current) {
+              playHaptic('detent');
+            }
+            atEdgeRef.current = atEdge;
             const frameIndex = Math.round((value / progressScale) * frameCount);
             engine.player.seek(frameIndex, 'playerProgress');
           }}

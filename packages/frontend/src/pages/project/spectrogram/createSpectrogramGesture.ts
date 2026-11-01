@@ -20,6 +20,8 @@ const logMinRange = Math.log(minimumSpectrogramFrequencyRatio);
 const logMaxRange = logMaxFrequency - logMinFrequency;
 const minVisibleTime = 0.1;
 const maxVisibleTime = 60;
+const zoomLimitTolerance = 1e-9;
+const edgeTolerance = 0.5;
 
 export type SpectrogramViewWindow = {
   startFrame: number;
@@ -117,6 +119,7 @@ export type SpectrogramGestureControls = {
   setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   seek: (frameIndex: number) => void;
   setFreeze: (freeze: boolean) => void;
+  onLimit: () => void;
 };
 
 const applyState = (
@@ -141,6 +144,30 @@ const applyState = (
   controls.setFrequencyRange(Math.exp(state.lower), Math.exp(state.upper));
 };
 
+const readSize = (state: ViewportState): number =>
+  state.kind === 'position' ? state.size : state.upper - state.lower;
+
+const isAtZoomLimit = (limits: ViewportState, size: number): boolean =>
+  size <= limits.minimumSize * (1 + zoomLimitTolerance) ||
+  size >= limits.maximumSize * (1 - zoomLimitTolerance);
+
+const reachesZoomLimit = (
+  before: ViewportState | undefined,
+  after: ViewportState,
+): boolean =>
+  isAtZoomLimit(after, readSize(after)) &&
+  (before === undefined || !isAtZoomLimit(after, readSize(before)));
+
+const isAtEdge = (state: ViewportState | undefined): boolean =>
+  state?.kind === 'position' &&
+  (state.position <= state.minimumPosition + edgeTolerance ||
+    state.position >= state.maximumPosition - edgeTolerance);
+
+const reachesEdge = (
+  before: ViewportState | undefined,
+  after: ViewportState,
+): boolean => isAtEdge(after) && !isAtEdge(before);
+
 export type SpectrogramGestureOptions = {
   element: HTMLElement;
   context: SpectrogramGestureContext;
@@ -153,11 +180,24 @@ export const createSpectrogramGesture = (
   options: SpectrogramGestureOptions,
 ): ViewportGesture => {
   const { element, context, controls, customPan, zoomSensitivity } = options;
+  let previous: ViewportState | undefined = undefined;
   return createViewportGesture({
     element,
     readState: (axis) => readState(context, axis),
-    applyState: (state) => applyState(context, controls, state),
-    setFreeze: controls.setFreeze,
+    applyState: (state) => {
+      const before = readState(context, state.kind === 'position' ? 'x' : 'y');
+      applyState(context, controls, state);
+      if (reachesZoomLimit(before, state) || reachesEdge(previous, state)) {
+        controls.onLimit();
+      }
+      previous = state;
+    },
+    setFreeze: (shouldFreeze) => {
+      if (!shouldFreeze) {
+        previous = undefined;
+      }
+      controls.setFreeze(shouldFreeze);
+    },
     customPan,
     zoomSensitivity,
   });

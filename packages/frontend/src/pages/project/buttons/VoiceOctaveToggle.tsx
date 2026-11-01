@@ -4,6 +4,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { playHaptic } from '../haptics.js';
 
 export const VoiceOctaveToggle: FC = () => {
   const { t } = useTranslation();
@@ -47,6 +48,9 @@ export const VoiceOctaveToggle: FC = () => {
               '@media (any-pointer: coarse)': { height: 44 },
             }}
             onClick={() => {
+              if (option.value !== voiceOctave) {
+                playHaptic('detent');
+              }
               engine.store.update((state) => {
                 state.voiceOctave = option.value;
               });

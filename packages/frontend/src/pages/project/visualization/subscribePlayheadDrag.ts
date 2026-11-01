@@ -1,6 +1,7 @@
 import { clampToRange } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
+import { playHaptic } from '../haptics.js';
 import { useSettingsStore } from '../settings/store.js';
 import { getVisualizationView } from './visualizationView.js';
 
@@ -25,6 +26,7 @@ type PlayheadDrag = {
   pointerId: number;
   viewStartFrame: number;
   viewFrameCount: number;
+  atEdge: boolean;
 };
 
 type PlayheadPress = {
@@ -53,6 +55,7 @@ export const subscribePlayheadDrag = (
       pointerId,
       viewStartFrame: frameIndex - playheadRatio * viewFrameCount,
       viewFrameCount,
+      atEdge: false,
     };
     freeze.freeze();
     onActiveChange(true);
@@ -87,6 +90,13 @@ export const subscribePlayheadDrag = (
         range,
       ),
     );
+    const atEdge =
+      frameIndex <= (range?.fromFrame ?? 0) ||
+      frameIndex >= (range ? range.toFrame - 1 : frameCount);
+    if (atEdge && !active.atEdge) {
+      playHaptic('detent');
+    }
+    active.atEdge = atEdge;
     if (!viewWindow) {
       useSettingsStore
         .getState()
@@ -151,7 +161,9 @@ export const subscribePlayheadDrag = (
         press = undefined;
         if (!begin(pointerId)) {
           finish();
+          return;
         }
+        playHaptic('grab');
       }, longPressMs),
     };
     listen();

@@ -1,5 +1,6 @@
 import { type EngineRange } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
+import { playHaptic } from '../haptics.js';
 import { moveLoop } from './loopActions.js';
 import { createLoopEdgePush } from './loopEdgePush.js';
 import { getLoopPointerFrame } from './loopPointer.js';
@@ -37,13 +38,21 @@ export const subscribeLoopEdgeDrag = (
   area: HTMLElement,
 ): (() => void) => {
   let dragging = false;
+  let pinned = false;
   const moveTo = (clientX: number) => {
     const { range } = engine.store.get();
     if (!range) {
       return;
     }
     const frame = getLoopPointerFrame(area, clientX);
-    engine.player.setRange(moveEdge(range, edge, frame));
+    const moved = moveEdge(range, edge, frame);
+    const reached =
+      (edge === 'to' ? moved.toFrame : moved.fromFrame) !== Math.round(frame);
+    if (reached && !pinned) {
+      playHaptic('detent');
+    }
+    pinned = reached;
+    engine.player.setRange(moved);
   };
   const push = createLoopEdgePush(area, 'widen', moveTo);
   const handlePointerDown = (event: PointerEvent) => {
@@ -54,6 +63,8 @@ export const subscribeLoopEdgeDrag = (
     event.preventDefault();
     element.setPointerCapture(event.pointerId);
     dragging = true;
+    pinned = false;
+    playHaptic('grab');
   };
   const handlePointerMove = (event: PointerEvent) => {
     if (!dragging) {
