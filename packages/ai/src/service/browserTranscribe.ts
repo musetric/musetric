@@ -6,10 +6,14 @@ import { buildLayout } from '../transcription/audioCompaction.js';
 import { type Span } from '../transcription/spectralChunker.js';
 import {
   decodeChunksPass,
+  type DetectLanguage,
   finalizePass,
   planPass,
   repairPass,
   type Replacement,
+  type TranscribeAligned,
+  type TranscribeBatch,
+  type TranscribePrompted,
 } from '../transcription/transcribePipeline.js';
 import { type TranscriptionWord } from '../transcription/types.js';
 import { createBrowserJobApi } from './browserJob.js';
@@ -55,15 +59,10 @@ export const parseUnitWindow = (bytes: Uint8Array): UnitWindow => {
 };
 
 export type UnitRuntime = {
-  detectLanguage: (audio: Float32Array) => Promise<string>;
-  transcribeBatch: (
-    audios: Float32Array[],
-    language: string,
-  ) => Promise<TranscriptionWord[][]>;
-  transcribeAligned: (
-    audio: Float32Array,
-    language: string,
-  ) => Promise<TranscriptionWord[]>;
+  detectLanguage: DetectLanguage;
+  transcribeBatch: TranscribeBatch;
+  transcribeAligned: TranscribeAligned;
+  transcribePrompted: TranscribePrompted;
 };
 
 type UnitRequest = {
@@ -117,6 +116,7 @@ export const runTranscribeUnit = async (
         language: meta.language,
         transcribeAligned: runtime.transcribeAligned,
         transcribeBatch: runtime.transcribeBatch,
+        transcribePrompted: runtime.transcribePrompted,
       }),
     };
   }

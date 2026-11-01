@@ -10,6 +10,7 @@ import {
 } from './audioCompaction.js';
 import { dropBunchedWords } from './bunchedWords.js';
 import { repairCollapsedWindows } from './collapseRepair.js';
+import { repairFlatWindows } from './flatWindows.js';
 import {
   dropCreditWords,
   filterHallucinatedSegments,
@@ -190,6 +191,12 @@ export type TranscribeAligned = (
   language: string,
 ) => Promise<TranscriptionWord[]>;
 
+export type TranscribePrompted = (
+  audio: Float32Array,
+  language: string,
+  prompt: string,
+) => Promise<TranscriptionWord[]>;
+
 type RepairPassOptions = {
   compacted: Float32Array;
   packed: Span[][];
@@ -199,6 +206,7 @@ type RepairPassOptions = {
   language: string;
   transcribeAligned?: TranscribeAligned;
   transcribeBatch: TranscribeBatch;
+  transcribePrompted: TranscribePrompted;
 };
 
 export type Replacement = {
@@ -223,7 +231,14 @@ export const repairPass = async (
         ? await options.transcribeAligned(slice, options.language)
         : ((await options.transcribeBatch([slice], options.language))[0] ?? []),
   });
-  return repaired.flatMap((words, index) =>
+  const restyled = await repairFlatWindows({
+    compacted: options.compacted,
+    chunks: options.chunks,
+    wordsPerChunk: repaired,
+    transcribeSlice: async (slice, prompt) =>
+      options.transcribePrompted(slice, options.language, prompt),
+  });
+  return restyled.flatMap((words, index) =>
     words === shifted[index] ? [] : [{ index, words }],
   );
 };

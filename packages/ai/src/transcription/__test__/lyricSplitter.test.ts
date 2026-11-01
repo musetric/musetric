@@ -30,6 +30,27 @@ describe('splitSegmentsByLyrics', () => {
     expect(split[1].end).toBeCloseTo(2.2, 5);
   });
 
+  it('splits after strong punctuation before a lowercase word', () => {
+    const words = ['one', 'two.', 'three', 'four'].map((text, index) =>
+      word(text, index, index + 0.9),
+    );
+    const split = splitSegmentsByLyrics([
+      { start: 0, end: 3.9, text: 'one two. three four', words },
+    ]);
+    expect(split.map((s) => s.text)).toEqual(['one two.', 'three four']);
+  });
+
+  it('splits after a comma only once the line is long', () => {
+    const texts = ['a', 'b', 'c', 'd', 'e,', 'f,', 'g', 'h,', 'i'];
+    const words = texts.map((text, index) =>
+      word(text, index * 0.3, index * 0.3 + 0.25),
+    );
+    const split = splitSegmentsByLyrics([
+      { start: 0, end: 2.65, text: texts.join(' '), words },
+    ]);
+    expect(split.map((s) => s.text)).toEqual(['a b c d e, f,', 'g h, i']);
+  });
+
   it('keeps a single short line intact', () => {
     const segments: TranscriptionSegment[] = [
       {
