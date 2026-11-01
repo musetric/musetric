@@ -23,9 +23,13 @@ pub fn create_client() -> Result<Client, BoxedError> {
         .iter()
         .map(|certificate| Certificate::from_der(certificate))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(Client::builder().tls_certs_only(roots).build()?)
+    Ok(Client::builder()
+        .tls_certs_only(roots)
+        .read_timeout(STALL_LIMIT)
+        .build()?)
 }
 
+const STALL_LIMIT: Duration = Duration::from_secs(30);
 const PARTIAL_SUFFIX: &str = ".part";
 const MANIFEST_SUFFIX: &str = ".verified";
 const DOWNLOAD_ATTEMPTS: u32 = 3;
@@ -151,7 +155,11 @@ async fn run_download(
     let mut downloaded = started.resume_from;
     let mut reported = Instant::now();
     report(&progress(model, downloaded, started.total));
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|error| describe_failure(model, error))?
+    {
         hasher.update(&chunk);
         file.write_all(&chunk).await?;
         downloaded += u64::try_from(chunk.len())?;
@@ -190,7 +198,10 @@ async fn start_download(
         let range = HeaderValue::from_str(&format!("bytes={partial_size}-"))?;
         request = request.header(RANGE, range);
     }
-    let response = request.send().await?;
+    let response = request
+        .send()
+        .await
+        .map_err(|error| describe_failure(model, error))?;
     if !response.status().is_success() {
         return Err(format!(
             "Failed to download {}: HTTP {}",
@@ -210,6 +221,13 @@ async fn start_download(
         resume_from,
         total,
     })
+}
+
+fn describe_failure(model: &ModelFile, error: reqwest::Error) -> BoxedError {
+    if error.is_timeout() {
+        return format!("Failed to download {}: the download stalled", model.label).into();
+    }
+    error.into()
 }
 
 fn ensure_room(model: &ModelFile, partial_path: &Path, needed: u64) -> Result<(), BoxedError> {
@@ -342,7 +360,7 @@ mod tests {
             Arc, Mutex,
             atomic::{AtomicUsize, Ordering},
         },
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
     use axum::{
@@ -356,13 +374,17 @@ mod tests {
         response::{IntoResponse, Response},
         routing::get,
     };
+    use futures_util::StreamExt;
     use reqwest::Client;
-    use tokio::{net::TcpListener, sync::oneshot};
+    use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 
     use super::{Download, DownloadStatus, ModelFile, ensure_model_file, has_verified_copy};
 
     const CONTENT: &[u8] = b"the fixture model bytes";
     const SHA256: &str = "015edf815f1917be874183c54bb97d63665f3942dcc22a0ac7e164804ea50e5d";
+    const STALL_AFTER: usize = 7;
+    const SHORT_STALL_LIMIT: Duration = Duration::from_millis(200);
+    const TRICKLE_PAUSE: Duration = Duration::from_millis(50);
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -400,23 +422,25 @@ mod tests {
         ranges: Arc<Mutex<Vec<String>>>,
     }
 
-    async fn serve_content(State(state): State<Served>, headers: HeaderMap) -> Response {
+    fn record_request(state: &Served, headers: &HeaderMap) -> Option<usize> {
         state.requests.fetch_add(1, Ordering::Relaxed);
-        let range = headers
-            .get(RANGE)
-            .and_then(|value| value.to_str().ok())
-            .map(ToOwned::to_owned);
-        if let Some(asked) = range {
-            state
-                .ranges
-                .lock()
-                .expect("the range log should be writable")
-                .push(asked.clone());
-            let from: usize = asked
+        let asked = headers.get(RANGE)?.to_str().ok()?.to_owned();
+        state
+            .ranges
+            .lock()
+            .expect("the range log should be writable")
+            .push(asked.clone());
+        Some(
+            asked
                 .trim_start_matches("bytes=")
                 .trim_end_matches('-')
                 .parse()
-                .expect("the range should be readable");
+                .expect("the range should be readable"),
+        )
+    }
+
+    async fn serve_content(State(state): State<Served>, headers: HeaderMap) -> Response {
+        if let Some(from) = record_request(&state, &headers) {
             return (
                 StatusCode::PARTIAL_CONTENT,
                 Body::from(CONTENT[from..].to_vec()),
@@ -424,6 +448,24 @@ mod tests {
                 .into_response();
         }
         (StatusCode::OK, Body::from(CONTENT.to_vec())).into_response()
+    }
+
+    async fn serve_stalling(State(state): State<Served>, headers: HeaderMap) -> Response {
+        let (status, from) = record_request(&state, &headers).map_or((StatusCode::OK, 0), |from| {
+            (StatusCode::PARTIAL_CONTENT, from)
+        });
+        let sent = CONTENT[from..from + STALL_AFTER].to_vec();
+        let silence = futures_util::stream::pending::<Result<Vec<u8>, std::io::Error>>();
+        let stream = futures_util::stream::once(async move { Ok(sent) }).chain(silence);
+        (status, Body::from_stream(stream)).into_response()
+    }
+
+    async fn serve_trickle() -> Response {
+        let stream = futures_util::stream::iter(CONTENT).then(|byte| async move {
+            sleep(TRICKLE_PAUSE).await;
+            Ok::<_, std::io::Error>(vec![*byte])
+        });
+        Body::from_stream(stream).into_response()
     }
 
     async fn serve_huge() -> Response {
@@ -443,6 +485,8 @@ mod tests {
         let application = Router::new()
             .route("/model", get(serve_content))
             .route("/huge", get(serve_huge))
+            .route("/stalling", get(serve_stalling))
+            .route("/trickle", get(serve_trickle))
             .with_state(state.clone());
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -489,6 +533,13 @@ mod tests {
                 .map(|entry| entry.1)
                 .collect()
         }
+    }
+
+    fn create_impatient_client() -> Client {
+        Client::builder()
+            .read_timeout(SHORT_STALL_LIMIT)
+            .build()
+            .expect("the client should build")
     }
 
     fn create_model(workspace: &Workspace, address: SocketAddr, sha256: &str) -> ModelFile {
@@ -621,5 +672,54 @@ mod tests {
         );
         assert!(!model.path.exists());
         let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn gives_up_on_a_source_that_stops_sending_and_resumes_each_attempt() {
+        let workspace = Workspace::new();
+        let (address, served, shutdown) = start_source().await;
+        let reported = Reported::create();
+        let mut model = create_model(&workspace, address, SHA256);
+        model.url = format!("http://{address}/stalling");
+
+        let refused =
+            ensure_model_file(&create_impatient_client(), &model, reported.sink().as_ref())
+                .await
+                .expect_err("a silent source should fail");
+        let _ = shutdown.send(());
+
+        assert_eq!(
+            refused.to_string(),
+            "Failed to download Chord recognition model: the download stalled"
+        );
+        assert_eq!(served.requests.load(Ordering::Relaxed), 3);
+        assert_eq!(
+            served
+                .ranges
+                .lock()
+                .expect("the range log should be readable")
+                .as_slice(),
+            ["bytes=7-", "bytes=14-"]
+        );
+        assert!(std::path::Path::new(&format!("{}.part", model.path.display())).exists());
+        assert!(!model.path.exists());
+    }
+
+    #[tokio::test]
+    async fn keeps_a_slow_download_that_never_stops() {
+        let workspace = Workspace::new();
+        let (address, _served, shutdown) = start_source().await;
+        let reported = Reported::create();
+        let mut model = create_model(&workspace, address, SHA256);
+        model.url = format!("http://{address}/trickle");
+
+        let started = Instant::now();
+        let path = ensure_model_file(&create_impatient_client(), &model, reported.sink().as_ref())
+            .await
+            .expect("a slow source should finish");
+        let _ = shutdown.send(());
+
+        assert!(started.elapsed() > SHORT_STALL_LIMIT * 4);
+        assert_eq!(read(&path).expect("the model should be stored"), CONTENT);
     }
 }
