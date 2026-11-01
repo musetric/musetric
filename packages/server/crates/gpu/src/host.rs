@@ -33,6 +33,7 @@ use crate::{
     files::{
         Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
     },
+    listener::{ListenerReviver, RevivingListener},
     protocol::{
         ExecutorMessage, ExecutorPhase, JOB_SOCKET_PATH, read_executor_message, write_job_command,
         write_ping_command, write_reload_command, write_unit_close, write_unit_command,
@@ -383,6 +384,7 @@ impl HostState {
 pub struct ExecutorHost {
     state: Arc<HostState>,
     base_url: String,
+    reviver: ListenerReviver,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     served: Mutex<Option<JoinHandle<()>>>,
 }
@@ -433,8 +435,9 @@ impl ExecutorHost {
             session: Mutex::new(None),
             closing: Notify::new(),
         });
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
-        let base_url = format!("http://{}", listener.local_addr()?);
+        let bound = TcpListener::bind("127.0.0.1:0").await?;
+        let base_url = format!("http://{}", bound.local_addr()?);
+        let (listener, reviver) = RevivingListener::wrap(bound)?;
         let application = create_router(Arc::clone(&state));
         let (shutdown, stopped) = oneshot::channel();
         let served = tokio::spawn(async move {
@@ -447,6 +450,7 @@ impl ExecutorHost {
         Ok(Arc::new(Self {
             state,
             base_url,
+            reviver,
             shutdown: Mutex::new(Some(shutdown)),
             served: Mutex::new(Some(served)),
         }))
@@ -492,6 +496,10 @@ impl ExecutorHost {
             "{}{JOB_SOCKET_PATH}",
             self.base_url.replace("http://", "ws://")
         )
+    }
+
+    pub async fn revive(&self) -> std::io::Result<()> {
+        self.reviver.revive().await
     }
 
     pub async fn close(&self) {

@@ -1,6 +1,7 @@
 mod cache;
 mod files;
 mod host;
+mod listener;
 mod protocol;
 mod units;
 
@@ -16,5 +17,6 @@ pub use host::{
     BoxedError, ExecutorArrivals, ExecutorFailure, ExecutorHost, ExecutorSession,
     ExecutorSessionOptions, JobTicket, PhaseSink,
 };
+pub use listener::{ListenerReviver, RevivingListener};
 pub use protocol::{ExecutorPass, ExecutorPhase, ExecutorProgress};
 pub use units::{UnitCompleted, UnitPayload, UnitReject, UnitSession, UnitTarget, UnitWrite};
