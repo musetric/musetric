@@ -12,7 +12,6 @@ import android.content.IntentFilter
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
-import android.os.Build
 import android.os.SystemClock
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -159,7 +158,7 @@ internal class MediaSessionBridge(
           commandIntent(command),
         )
         .build()
-    return notificationBuilder()
+    return Notification.Builder(activity, CHANNEL_ID)
       .setSmallIcon(R.drawable.ic_playback_notification)
       .setContentTitle(state.title)
       .setContentText(activity.getString(R.string.app_name))
@@ -175,18 +174,7 @@ internal class MediaSessionBridge(
       .build()
   }
 
-  @Suppress("DEPRECATION")
-  private fun notificationBuilder(): Notification.Builder =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      Notification.Builder(activity, CHANNEL_ID)
-    } else {
-      Notification.Builder(activity)
-    }
-
   private fun createChannel() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return
-    }
     val channel =
       NotificationChannel(
         CHANNEL_ID,

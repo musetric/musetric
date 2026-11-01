@@ -2,7 +2,6 @@ package com.musetric.client
 
 import android.app.Activity
 import android.graphics.Color
-import android.os.Build
 import android.os.PowerManager
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -83,10 +82,5 @@ class ExecutorViewPlugin(private val activity: Activity) : Plugin(activity) {
 
 private class ThermalBridge(private val activity: Activity) {
   @JavascriptInterface
-  fun status(): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-      return 0
-    }
-    return activity.getSystemService(PowerManager::class.java).currentThermalStatus
-  }
+  fun status(): Int = activity.getSystemService(PowerManager::class.java).currentThermalStatus
 }
