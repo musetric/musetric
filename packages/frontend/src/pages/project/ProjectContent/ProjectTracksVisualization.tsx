@@ -26,7 +26,15 @@ export const ProjectTracksVisualization: FC = () => {
   );
 
   return (
-    <Box sx={{ height: '100%', overflow: 'auto', userSelect: 'none' }}>
+    <Box
+      sx={{
+        height: '100%',
+        overflow: 'auto',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+      }}
+    >
       <Box
         ref={ref}
         sx={{

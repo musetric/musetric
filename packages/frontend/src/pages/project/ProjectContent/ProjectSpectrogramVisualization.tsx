@@ -54,6 +54,9 @@ export const ProjectSpectrogramVisualization: FC = () => {
         position: 'relative',
         minHeight: 0,
         minWidth: 0,
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
     >
       <Box
