@@ -111,6 +111,9 @@ describe('the unit passes', () => {
       words: wordsPerChunk,
       language: 'en',
       transcribeBatch,
+      transcribePrompted: () => {
+        throw new Error('no window here is flat');
+      },
     });
     expect(replaced).toEqual([]);
 

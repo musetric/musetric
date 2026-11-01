@@ -1,6 +1,7 @@
 import { type TranscriptionSegment, type TranscriptionWord } from './types.js';
 
 const uppercaseSplitMinLineDuration = 1.2;
+const softPunctSplitMinWords = 6;
 
 const startsWithUpper = (text: string): boolean => {
   for (const ch of text) {
@@ -13,6 +14,9 @@ const startsWithUpper = (text: string): boolean => {
 
 const endsWithStrongPunct = (text: string): boolean =>
   text.endsWith('.') || text.endsWith('!') || text.endsWith('?');
+
+const endsWithSoftPunct = (text: string): boolean =>
+  text.endsWith(',') || text.endsWith(';') || text.endsWith(':');
 
 const joinWords = (words: TranscriptionWord[]): string =>
   words
@@ -54,9 +58,11 @@ const splitWordsOnCapitalization = (
     const prevText = prevWord.text;
     const lineDuration = Math.max(0, prevWord.end - lineStart);
     if (
-      startsWithUpper(text) &&
-      !startsWithUpper(prevText) &&
-      (endsWithStrongPunct(prevText) ||
+      endsWithStrongPunct(prevText) ||
+      (endsWithSoftPunct(prevText) &&
+        current.length >= softPunctSplitMinWords) ||
+      (startsWithUpper(text) &&
+        !startsWithUpper(prevText) &&
         lineDuration >= uppercaseSplitMinLineDuration)
     ) {
       lines.push(current);
