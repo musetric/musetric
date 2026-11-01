@@ -1,3 +1,5 @@
+import { createClockStall } from './clockStall.cross.js';
+
 const sampleIntervalMs = 100;
 const sampleWindow = 15;
 const startupSampleDelaysMs = [0, 20, 40, 60, 80];
@@ -5,6 +7,7 @@ const renderAheadStepSeconds = 0.001;
 const clockOffsetStepSeconds = 0.0005;
 const staleTimestampMs = 100;
 const settleMs = 1000;
+const stallMs = 500;
 
 const median = (values: readonly number[]) => {
   const sorted = values.toSorted((left, right) => left - right);
@@ -38,6 +41,7 @@ export type EngineOutputClock = {
   read: () => OutputClockReading | undefined;
   subscribe: (listener: (reading: OutputClockReading) => void) => () => void;
   whenSettled: () => Promise<void>;
+  wake: () => Promise<void>;
 };
 
 export const createEngineOutputClock = (
@@ -50,12 +54,18 @@ export const createEngineOutputClock = (
   let reported = true;
   let runningSinceMs =
     context.state === 'running' ? performance.now() : undefined;
+  const stall = createClockStall(
+    stallMs,
+    context.currentTime,
+    performance.now(),
+  );
 
   const sample = () => {
     if (context.state !== 'running') {
       return;
     }
     const nowMs = performance.now();
+    stall.observe(context.currentTime, nowMs);
     const heard = readHeard(context, nowMs);
     if (heard.reported !== reported) {
       reported = heard.reported;
@@ -96,6 +106,7 @@ export const createEngineOutputClock = (
   context.addEventListener('statechange', () => {
     runningSinceMs =
       context.state === 'running' ? performance.now() : undefined;
+    stall.restart(performance.now());
     for (const delay of startupSampleDelaysMs) {
       setTimeout(sample, delay);
     }
@@ -112,6 +123,17 @@ export const createEngineOutputClock = (
         });
       }
       sample();
+    },
+    wake: async () => {
+      if (context.state !== 'running') {
+        await context.resume();
+        return;
+      }
+      if (!stall.isStalled(performance.now())) {
+        return;
+      }
+      await context.suspend();
+      await context.resume();
     },
     subscribe: (listener) => {
       listeners.add(listener);

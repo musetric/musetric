@@ -194,9 +194,7 @@ export const createEngineRecorder = (
 
   const initializeSession = async (session: RecordingSession) => {
     try {
-      if (context.state === 'suspended') {
-        await context.resume();
-      }
+      await outputClock.wake();
       if (isStopRequested(session)) {
         return;
       }
