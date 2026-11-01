@@ -6,6 +6,7 @@ import {
   holdFinished,
   stack,
 } from './whisperBatch.js';
+import { type PromptConfig, promptedGeneration } from './whisperPrompt.js';
 import {
   spanText,
   splitBySegments,
@@ -51,9 +52,7 @@ export type WhisperModelInternals = {
     model: { run: SessionRun };
     decoder_model_merged: DecoderSession & StepSession;
   };
-  generation_config: {
-    lang_to_id?: Record<string, number>;
-    decoder_start_token_id?: number;
+  generation_config: PromptConfig & {
     eos_token_id?: number;
     alignment_heads?: number[][];
   };
@@ -75,6 +74,7 @@ type AsrWords = { chunks?: WordChunk[] };
 
 export type WhisperTokenizer = {
   decode: (ids: TokenId[], options?: Record<string, unknown>) => string;
+  encode: (text: string, options?: Record<string, unknown>) => number[];
   timestamp_begin: number;
   _decode_asr: (
     chunks: AsrChunk[],
@@ -99,6 +99,8 @@ export type WhisperDecodeInspect = (tap: WhisperDecodeTap) => Promise<void>;
 
 export type DecodeGuard = Record<string, number>;
 
+type GenerateOverrides = Record<string, unknown>;
+
 export type DecodeResult = {
   text?: string;
   chunks?: WordChunk[];
@@ -115,6 +117,12 @@ export type WhisperDecoder = {
   decodeAligned: (
     audio: Float32Array,
     language: string,
+  ) => Promise<DecodeResult>;
+
+  decodePrompted: (
+    audio: Float32Array,
+    language: string,
+    prompt: string,
   ) => Promise<DecodeResult>;
 
   decodeTimestampedBatch: (
@@ -167,7 +175,7 @@ export const createWhisperDecoder = (
   const generateArgs = (
     audio: Float32Array,
     language: string,
-    guard: DecodeGuard | undefined,
+    guard: GenerateOverrides | undefined,
   ): Record<string, unknown> => ({
     num_frames: Math.min(
       encoderPositions,
@@ -238,7 +246,7 @@ export const createWhisperDecoder = (
   const decodeTimestamped = async (
     audio: Float32Array,
     language: string,
-    guard: DecodeGuard | undefined,
+    guard: GenerateOverrides | undefined,
   ): Promise<DecodeResult> => {
     const inputs = await inputsFor(audio);
     const output = await internals.model.generate({
@@ -310,6 +318,25 @@ export const createWhisperDecoder = (
     }
   };
 
+  const decodePrompted = async (
+    audio: Float32Array,
+    language: string,
+    prompt: string,
+  ): Promise<DecodeResult> =>
+    decodeTimestamped(
+      audio,
+      language,
+      promptedGeneration({
+        config: model.generation_config,
+        tokenizer: internals.tokenizer,
+        language,
+        prompt,
+        maxNewTokens: Number(
+          generateArgs(audio, language, undefined).max_new_tokens,
+        ),
+      }),
+    );
+
   const decodeAligned = async (
     audio: Float32Array,
     language: string,
@@ -353,5 +380,10 @@ export const createWhisperDecoder = (
     return { text: spanText(chunks), chunks, segments: [chunks] };
   };
 
-  return { decodeTimestamped, decodeAligned, decodeTimestampedBatch };
+  return {
+    decodeTimestamped,
+    decodeAligned,
+    decodePrompted,
+    decodeTimestampedBatch,
+  };
 };

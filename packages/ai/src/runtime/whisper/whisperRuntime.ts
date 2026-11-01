@@ -98,6 +98,12 @@ export type WhisperRuntime = {
     audio: Float32Array,
     language: string,
   ) => Promise<TranscriptionWord[]>;
+
+  transcribePrompted: (
+    audio: Float32Array,
+    language: string,
+    prompt: string,
+  ) => Promise<TranscriptionWord[]>;
   release: () => Promise<void>;
 };
 
@@ -166,10 +172,8 @@ export const createWhisperRuntime = async (
   const encoder = internals.model.sessions.model;
   const runEncoder = encoder.run.bind(encoder);
   encoder.run = async (...args) => pacer.pace(async () => runEncoder(...args));
-  const { decodeAligned, decodeTimestampedBatch } = createWhisperDecoder(
-    internals,
-    options.inspect,
-  );
+  const { decodeAligned, decodePrompted, decodeTimestampedBatch } =
+    createWhisperDecoder(internals, options.inspect);
   routeFirstStep(step, { cross, device });
   const runStep = step.run.bind(step);
   step.run = async (feeds, ...rest) =>
@@ -371,11 +375,26 @@ export const createWhisperRuntime = async (
     return extractWords(aligned.chunks ?? []);
   };
 
+  const transcribePrompted = async (
+    audio: Float32Array,
+    language: string,
+    prompt: string,
+  ): Promise<TranscriptionWord[]> => {
+    const prompted = await decodePrompted(audio, language, prompt);
+    return extractWords(prompted.chunks ?? []);
+  };
+
   const release = async (): Promise<void> => {
     await pacer.release();
     await cross.release();
     await transcriber.dispose();
   };
 
-  return { detectLanguage, transcribeBatch, transcribeAligned, release };
+  return {
+    detectLanguage,
+    transcribeBatch,
+    transcribeAligned,
+    transcribePrompted,
+    release,
+  };
 };

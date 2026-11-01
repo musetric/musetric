@@ -64,6 +64,11 @@ export type UnitRuntime = {
     audio: Float32Array,
     language: string,
   ) => Promise<TranscriptionWord[]>;
+  transcribePrompted: (
+    audio: Float32Array,
+    language: string,
+    prompt: string,
+  ) => Promise<TranscriptionWord[]>;
 };
 
 type UnitRequest = {
@@ -117,6 +122,7 @@ export const runTranscribeUnit = async (
         language: meta.language,
         transcribeAligned: runtime.transcribeAligned,
         transcribeBatch: runtime.transcribeBatch,
+        transcribePrompted: runtime.transcribePrompted,
       }),
     };
   }
