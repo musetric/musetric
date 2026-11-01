@@ -1,14 +1,14 @@
 package com.musetric.client
 
 import android.app.Activity
+import android.graphics.Color
 import android.os.Build
 import android.os.PowerManager
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Lifecycle
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -23,46 +23,51 @@ class OpenExecutorArgs {
 @TauriPlugin
 class ExecutorViewPlugin(private val activity: Activity) : Plugin(activity) {
   private var url: String? = null
-  private var shown = false
+  private var host: Activity? = null
   private var view: WebView? = null
 
-  override fun load(webView: WebView) {
-    (activity as AppCompatActivity).lifecycle.addObserver(
-      object : DefaultLifecycleObserver {
-        override fun onStart(owner: LifecycleOwner) {
-          shown = true
-          attach()
-        }
+  override fun onResume(activity: AppCompatActivity) {
+    show(activity)
+  }
 
-        override fun onStop(owner: LifecycleOwner) {
-          shown = false
-          detach()
-        }
-
-        override fun onDestroy(owner: LifecycleOwner) {
-          detach()
-        }
-      },
-    )
+  override fun onStop(activity: AppCompatActivity) {
+    if (host == activity) {
+      host = null
+      detach()
+    }
   }
 
   @Command
   fun open(invoke: Invoke) {
     url = invoke.parseArgs(OpenExecutorArgs::class.java).url
-    activity.runOnUiThread { attach() }
+    activity.runOnUiThread {
+      if ((activity as AppCompatActivity).lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+        show(activity)
+      }
+    }
     invoke.resolve()
+  }
+
+  private fun show(activity: Activity) {
+    if (host != activity) {
+      detach()
+      host = activity
+    }
+    attach()
   }
 
   private fun attach() {
     val address = url ?: return
-    if (!shown || view != null) {
+    val shown = host ?: return
+    if (view != null) {
       return
     }
-    val created = WebView(activity)
+    val created = WebView(shown)
+    created.setBackgroundColor(Color.TRANSPARENT)
     created.settings.javaScriptEnabled = true
     created.settings.domStorageEnabled = true
-    created.addJavascriptInterface(ThermalBridge(activity), "MusetricThermal")
-    val root = activity.findViewById<ViewGroup>(android.R.id.content)
+    created.addJavascriptInterface(ThermalBridge(shown), "MusetricThermal")
+    val root = shown.window.decorView as ViewGroup
     root.addView(created, 0, ViewGroup.LayoutParams(1, 1))
     created.loadUrl(address)
     view = created
