@@ -160,9 +160,19 @@ export const createPlayerRuntime = async (
     });
   };
 
+  const releaseTracks = () => {
+    for (const channels of Object.values(tracks ?? {})) {
+      for (const channel of channels) {
+        channel.buffer.transfer(0);
+      }
+    }
+    tracks = undefined;
+  };
+
   dataPort.bindHandlers({
     mount: (message) => {
       frameCount = message.frameCount;
+      releaseTracks();
       tracks = message.tracks;
       recordingTrack.clear();
       recordingTrack.setPieces({ pieces: message.recording });
@@ -183,7 +193,7 @@ export const createPlayerRuntime = async (
     },
     unmount: () => {
       frameCount = 0;
-      tracks = undefined;
+      releaseTracks();
       recordingTrack.clear();
       position.begin(0);
       playing = false;

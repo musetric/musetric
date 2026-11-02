@@ -19,7 +19,15 @@ export const ProjectHeaderMenu: FC = () => {
       <Tooltip title={t('pages.project.menu.title')}>
         <IconButton
           size='small'
-          sx={{ p: 0.5 }}
+          sx={{
+            p: 0.5,
+            '@media (any-pointer: coarse)': {
+              width: 44,
+              height: 44,
+              mx: '-10px',
+              '&::after': { content: '""', position: 'absolute', inset: 0 },
+            },
+          }}
           disabled={realtimeFailed}
           aria-label={t('pages.project.menu.title')}
           onClick={(event) => {
