@@ -4,7 +4,7 @@ export type RecordingPiece = {
   transpose: number;
   octave: number;
   frameCount: number;
-  samples: Float32Array;
+  samples: Float32Array<ArrayBuffer>;
 };
 
 export const pieceSongEnd = (piece: RecordingPiece): number =>
