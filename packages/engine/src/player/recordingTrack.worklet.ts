@@ -26,6 +26,12 @@ const toPiece = (piece: PlayerRecordingPiece): RecordingPiece => ({
   samples: piece.samples,
 });
 
+const releasePieces = (pieces: readonly RecordingPiece[]) => {
+  for (const piece of pieces) {
+    piece.samples.buffer.transfer(0);
+  }
+};
+
 type LiveTake = LiveTakeStart & {
   runs: LiveRun[];
 };
@@ -61,6 +67,19 @@ export const createRecordingTrack = async (
     voice.setSegments(toRecordingSegments(layers));
   };
 
+  const replaceWith = (next: RecordingPiece[], keepLive: boolean) => {
+    const releasing = [
+      ...pieces,
+      ...(live && !keepLive ? liveRunPieces(live.runs) : []),
+    ];
+    pieces = next;
+    if (!keepLive) {
+      live = undefined;
+    }
+    update();
+    releasePieces(releasing);
+  };
+
   const appendToLive = (take: LiveTake, chunk: LiveTakeChunk) => {
     let run = take.runs.at(-1);
     if (!continuesRun(run, chunk)) {
@@ -83,11 +102,10 @@ export const createRecordingTrack = async (
 
   return {
     setPieces: (next) => {
-      pieces = next.pieces.map(toPiece);
-      if (live && (next.switched || live.takeId === next.finishedTakeId)) {
-        live = undefined;
-      }
-      update();
+      replaceWith(
+        next.pieces.map(toPiece),
+        !next.switched && live?.takeId !== next.finishedTakeId,
+      );
     },
     beginLiveTake: (take) => {
       if (live?.takeId === take.takeId) {
@@ -104,9 +122,7 @@ export const createRecordingTrack = async (
       update();
     },
     clear: () => {
-      pieces = [];
-      live = undefined;
-      update();
+      replaceWith([], false);
     },
     mixInto: (mix) => {
       const frameCount = mix.outputs[0].length;
