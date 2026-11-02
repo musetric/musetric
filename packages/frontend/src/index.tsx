@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { endpoints } from './api/index.js';
 import { queryClient } from './api/queryClient.js';
+import { blockContextMenu } from './app/contextMenu.js';
 import { App } from './app/index.js';
 import { blockPageZoom } from './app/pageZoom.js';
 import { holdScreenWhileWorking } from './app/screenWakeLock.js';
@@ -12,6 +13,7 @@ import { engine } from './engine/engine.js';
 import { initI18next } from './translations/index.js';
 
 const runApp = async () => {
+  blockContextMenu();
   blockPageZoom();
   allowTextInteractionInFields();
   const rootElement = assertDefined(
