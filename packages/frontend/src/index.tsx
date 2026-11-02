@@ -10,6 +10,7 @@ import { trackKeyboardInset } from './app/keyboardInset.js';
 import { blockMouseNavigation } from './app/mouseNavigation.js';
 import { blockPageZoom } from './app/pageZoom.js';
 import { holdScreenWhileWorking } from './app/screenWakeLock.js';
+import { closeOverlaysOnBack } from './app/systemBack.js';
 import { allowTextInteractionInFields } from './app/textInteraction.js';
 import { engine } from './engine/engine.js';
 import { initI18next } from './translations/index.js';
@@ -20,6 +21,7 @@ const runApp = async () => {
   allowTextInteractionInFields();
   blockMouseNavigation();
   trackKeyboardInset();
+  closeOverlaysOnBack();
   const rootElement = assertDefined(
     document.getElementById('root'),
     'Root element not found',
