@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  Alert,
   Button,
   Dialog,
   DialogActions,
@@ -59,15 +60,17 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
     routes.projects.navigate();
   };
 
-  const onSubmit = async (value: FormValue) => {
+  const onSubmit = (value: FormValue) => {
     const isNameChanged = value.name !== project.data?.name;
     const isPreviewChanged = value.preview?.url !== project.data?.previewUrl;
-    await edit.mutateAsync({
-      name: isNameChanged ? value.name : undefined,
-      preview: isPreviewChanged ? value.preview?.file : undefined,
-      withoutPreview: isPreviewChanged ? !value.preview?.url : undefined,
-    });
-    close();
+    edit.mutate(
+      {
+        name: isNameChanged ? value.name : undefined,
+        preview: isPreviewChanged ? value.preview?.file : undefined,
+        withoutPreview: isPreviewChanged ? !value.preview?.url : undefined,
+      },
+      { onSuccess: close },
+    );
   };
 
   const renderContent = () => {
@@ -106,6 +109,11 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
             );
           }}
         />
+        {edit.isError && (
+          <Alert severity='error'>
+            {t('pages.projects.dialogs.edit.failed')}
+          </Alert>
+        )}
       </Stack>
     );
   };
