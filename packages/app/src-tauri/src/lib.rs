@@ -27,6 +27,8 @@ mod lifecycle;
 mod microphone;
 #[cfg(desktop)]
 mod permission;
+#[cfg(target_os = "ios")]
+mod screen_awake;
 #[cfg(desktop)]
 mod settings;
 #[cfg(target_os = "ios")]
@@ -75,6 +77,7 @@ fn run_app() -> tauri::Result<()> {
         .plugin(executor_view::init())
         .plugin(haptics::init())
         .plugin(microphone::init())
+        .plugin(screen_awake::init())
         .plugin(share::init())
         .on_web_content_process_terminate(reload_main_view);
     let app = builder
