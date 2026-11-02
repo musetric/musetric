@@ -9,6 +9,7 @@ import { MicrophoneAccessDialog } from './audioSettings/MicrophoneAccessDialog.j
 import { TempoPicker } from './buttons/TempoPicker.js';
 import { TransposePicker } from './buttons/TransposePicker.js';
 import { CalibrationDialog } from './calibration/CalibrationDialog.js';
+import { subscribeLoopBack } from './loop/subscribeLoopBack.js';
 import { MediaSessionSync } from './mediaSession/MediaSessionSync.js';
 import { MixPopover } from './mix/MixPopover.js';
 import { MixdownDialog } from './mixdown/MixdownDialog.js';
@@ -33,6 +34,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   );
 
   useEffect(() => subscribeSettingsStore(), []);
+  useEffect(() => subscribeLoopBack(), []);
 
   useEffect(() => {
     engine.store.update((state) => {
