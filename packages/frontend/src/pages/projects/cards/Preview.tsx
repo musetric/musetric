@@ -19,7 +19,6 @@ export const ProjectPreview: FC<Props> = (props) => {
         sx={{
           justifyContent: 'center',
           alignItems: 'center',
-          userSelect: 'none',
           containerType: 'inline-size',
           aspectRatio: '1 / 1',
           borderRadius: 2,
