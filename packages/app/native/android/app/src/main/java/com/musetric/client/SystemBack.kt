@@ -13,11 +13,16 @@ internal fun attachSystemBack(activity: AppCompatActivity, webView: WebView) {
     object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
         webView.evaluateJavascript(BACK_SCRIPT) { unhandled ->
-          if (unhandled != "false") {
-            isEnabled = false
-            activity.onBackPressedDispatcher.onBackPressed()
-            isEnabled = true
+          if (unhandled == "false") {
+            return@evaluateJavascript
           }
+          if (webView.canGoBack()) {
+            webView.goBack()
+            return@evaluateJavascript
+          }
+          isEnabled = false
+          activity.onBackPressedDispatcher.onBackPressed()
+          isEnabled = true
         }
       }
     },
