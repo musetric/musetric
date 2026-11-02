@@ -15,6 +15,13 @@ const sideBySideLayout = {
     md: 'auto minmax(0, 1fr)',
   },
   columns: { xs: 'minmax(0, 1fr)', md: '420px minmax(0, 1fr)' },
+  shortScreen: {
+    '@media (orientation: landscape) and (max-height: 500px)': {
+      gridTemplateAreas: '"header picture" "details picture"',
+      gridTemplateRows: 'auto minmax(0, 1fr)',
+      gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 3fr)',
+    },
+  },
 };
 
 const getStackedLayout = (areas: string[]) => ({
@@ -31,11 +38,14 @@ export const ProjectContent: FC = () => {
   const layout =
     detailsOpen && spectrogramOpen
       ? sideBySideLayout
-      : getStackedLayout([
-          'header',
-          ...(detailsOpen ? ['details'] : []),
-          ...(spectrogramOpen ? ['picture'] : []),
-        ]);
+      : {
+          ...getStackedLayout([
+            'header',
+            ...(detailsOpen ? ['details'] : []),
+            ...(spectrogramOpen ? ['picture'] : []),
+          ]),
+          shortScreen: undefined,
+        };
 
   return (
     <Box
@@ -52,6 +62,7 @@ export const ProjectContent: FC = () => {
         flexGrow: 1,
         minHeight: 0,
         overflow: 'hidden',
+        ...layout.shortScreen,
       }}
     >
       <ProjectHeader />
