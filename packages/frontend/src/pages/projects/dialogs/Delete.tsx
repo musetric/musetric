@@ -41,7 +41,10 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
       maxWidth='xs'
       component='form'
       onKeyDown={async (event) => {
-        if (event.key === 'Enter') {
+        if (
+          event.key === 'Enter' &&
+          !(event.target instanceof HTMLButtonElement)
+        ) {
           event.preventDefault();
           await deleteProject.mutateAsync();
           close();
