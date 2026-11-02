@@ -28,7 +28,7 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
   const projectInfo = useQuery(endpoints.project.get(projectId));
 
   const close = () => {
-    routes.projects.navigate();
+    routes.home.navigate();
   };
 
   const deleteProject = useMutation(

@@ -3,6 +3,20 @@ import { onChangeLocation, useMemoLocation } from '../common/locationEvent.js';
 import { createLink, type LinkFC } from '../components/Link.js';
 import { createMatch, type MatchFC } from '../components/Match.js';
 
+const readCurrentUrl = () => {
+  const { pathname, hash, search } = window.location;
+  return `${pathname}${hash}${search}`;
+};
+
+const isPreviousEntry = (url: string) => {
+  const { state }: { state: unknown } = window.history;
+  return (
+    typeof state === 'object' &&
+    Boolean(state) &&
+    (state as { previous?: unknown }).previous === url
+  );
+};
+
 export type RouteOptions<Params extends object, NativeParams> = {
   locationNativeParams?: () => NativeParams;
   parseNativeParams?: (nativeParams: NativeParams) => Params;
@@ -18,6 +32,9 @@ export type Route<Params extends object, NativeParams> = {
   urlByNativeParams: (params: NativeParams) => string;
   href: (params: Params) => string;
   navigate: keyof Params extends never
+    ? (params?: Params) => void
+    : (params: Params) => void;
+  replace: keyof Params extends never
     ? (params?: Params) => void
     : (params: Params) => void;
   Link: LinkFC<Params>;
@@ -46,7 +63,16 @@ export const createRoute = <Params extends object, NativeParams>(
   const navigate = (params: Params = {} as Params) => {
     const nativeParams = toNativeParams(params);
     const url = urlByNativeParams(nativeParams);
-    history.pushState({}, '', url);
+    if (isPreviousEntry(url)) {
+      history.back();
+      return;
+    }
+    history.pushState({ previous: readCurrentUrl() }, '', url);
+    onChangeLocation();
+  };
+  const replace = (params: Params = {} as Params) => {
+    const nativeParams = toNativeParams(params);
+    history.replaceState(history.state, '', urlByNativeParams(nativeParams));
     onChangeLocation();
   };
   const Link = createLink(href, navigate, prefixName);
@@ -72,6 +98,7 @@ export const createRoute = <Params extends object, NativeParams>(
     urlByNativeParams,
     href,
     navigate,
+    replace,
     Link,
     assertMatch,
     match,

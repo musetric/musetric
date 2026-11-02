@@ -61,7 +61,7 @@ export const CreateDialog: FC = () => {
     resolver: zodResolver(schema(t)),
   });
 
-  const close = () => routes.projects.navigate();
+  const close = () => routes.home.navigate();
   const onSubmit = (value: SubmitValue) => {
     create.mutate(
       {
@@ -71,7 +71,7 @@ export const CreateDialog: FC = () => {
       },
       {
         onSuccess: (project) => {
-          routes.project.navigate({ projectId: project.id });
+          routes.project.replace({ projectId: project.id });
         },
       },
     );
