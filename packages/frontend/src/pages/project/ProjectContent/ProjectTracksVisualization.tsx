@@ -1,8 +1,9 @@
 import { alpha, Box, Stack } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
-import { type FC, useRef } from 'react';
+import { type FC, useEffect, useRef } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { getPageBackground } from '../pageBackground.js';
+import { keepSystemGesturesOut } from '../systemGestures.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
@@ -20,7 +21,12 @@ const deckEdgeLimit = 2;
 
 export const ProjectTracksVisualization: FC = () => {
   const ref = useRef<HTMLDivElement>(null);
+  const lanesRef = useRef<HTMLDivElement>(null);
   useTracksSeekDrag(ref);
+  useEffect(() => {
+    const surface = lanesRef.current;
+    return surface ? keepSystemGesturesOut(surface) : undefined;
+  }, []);
   const deckEdges = useEngineStore((state) =>
     Math.max(0, Math.min(state.recordings.length - 1, deckEdgeLimit)),
   );
@@ -41,35 +47,37 @@ export const ProjectTracksVisualization: FC = () => {
           position: 'relative',
         }}
       >
-        <Stack sx={{ position: 'relative', gap: 2 }}>
-          <Stack>
-            <Box sx={laneSx}>
-              <WaveformCanvas kind='recording' />
-            </Box>
-            {Array.from({ length: deckEdges }, (_, edge) => (
-              <Box
-                key={edge}
-                sx={[
-                  {
-                    height: 4,
-                    mx: 2 * (edge + 1),
-                  },
-                  (theme) => ({
-                    borderRadius: '0 0 6px 6px',
-                    bgcolor: alpha(
-                      theme.palette.background.default,
-                      edge === 0 ? 0.7 : 0.45,
-                    ),
-                  }),
-                ]}
-              />
+        <Stack sx={{ position: 'relative' }}>
+          <Stack ref={lanesRef} sx={{ gap: 2 }}>
+            <Stack>
+              <Box sx={laneSx}>
+                <WaveformCanvas kind='recording' />
+              </Box>
+              {Array.from({ length: deckEdges }, (_, edge) => (
+                <Box
+                  key={edge}
+                  sx={[
+                    {
+                      height: 4,
+                      mx: 2 * (edge + 1),
+                    },
+                    (theme) => ({
+                      borderRadius: '0 0 6px 6px',
+                      bgcolor: alpha(
+                        theme.palette.background.default,
+                        edge === 0 ? 0.7 : 0.45,
+                      ),
+                    }),
+                  ]}
+                />
+              ))}
+            </Stack>
+            {stemTypes.map((stemType) => (
+              <Box key={stemType} sx={laneSx}>
+                <WaveformCanvas kind='delivery' stemType={stemType} />
+              </Box>
             ))}
           </Stack>
-          {stemTypes.map((stemType) => (
-            <Box key={stemType} sx={laneSx}>
-              <WaveformCanvas kind='delivery' stemType={stemType} />
-            </Box>
-          ))}
           <VisualizationCursor mode='tracks' />
         </Stack>
         <Box

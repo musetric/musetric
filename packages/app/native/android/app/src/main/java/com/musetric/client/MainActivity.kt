@@ -27,6 +27,7 @@ class MainActivity : TauriActivity() {
     attachMicrophone(this, webView)
     attachHaptics(webView)
     attachSystemBack(this, webView)
+    attachSystemGestures(webView)
   }
 
   private fun applyWebViewInsets(webView: WebView) {
