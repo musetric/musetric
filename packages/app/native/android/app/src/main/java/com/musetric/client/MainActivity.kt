@@ -9,6 +9,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  private var mainWebView: WebView? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     if (BuildConfig.DEBUG || BuildConfig.MEASURE) {
       WebView.setWebContentsDebuggingEnabled(true)
@@ -18,8 +20,16 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
   }
 
+  override fun onDestroy() {
+    super.onDestroy()
+    val finished = mainWebView ?: return
+    (finished.parent as? ViewGroup)?.removeView(finished)
+    finished.destroy()
+  }
+
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
+    mainWebView = webView
     applyWebViewInsets(webView)
     shareDownloads(this, webView)
     attachMediaSession(this, webView)
