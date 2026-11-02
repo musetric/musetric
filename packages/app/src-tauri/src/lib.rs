@@ -155,7 +155,11 @@ fn create_main_window<R: tauri::Runtime>(
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url)
         .title(TITLE)
         .additional_browser_args(WEBVIEW2_BROWSER_ARGS);
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url)
+        .title(TITLE)
+        .allow_link_preview(false);
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url).title(TITLE);
     finish_main_window(builder)
 }
