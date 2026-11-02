@@ -54,7 +54,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <PlaybackPanel />
       </Stack>
       <RhythmMetronomeSync projectId={project.id} />
-      <MediaSessionSync title={project.name} />
+      <MediaSessionSync title={project.name} coverUrl={project.previewUrl} />
       <VoiceRangeSync
         projectId={project.id}
         leadSpectrogramGainDb={
