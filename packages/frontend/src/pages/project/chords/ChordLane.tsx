@@ -116,7 +116,6 @@ export const ChordLane: FC = () => {
         bgcolor: 'background.default',
         borderRadius: 2,
         flexShrink: 0,
-        userSelect: 'none',
       }}
     >
       <Box

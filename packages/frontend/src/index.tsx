@@ -7,11 +7,13 @@ import { queryClient } from './api/queryClient.js';
 import { App } from './app/index.js';
 import { blockPageZoom } from './app/pageZoom.js';
 import { holdScreenWhileWorking } from './app/screenWakeLock.js';
+import { allowTextInteractionInFields } from './app/textInteraction.js';
 import { engine } from './engine/engine.js';
 import { initI18next } from './translations/index.js';
 
 const runApp = async () => {
   blockPageZoom();
+  allowTextInteractionInFields();
   const rootElement = assertDefined(
     document.getElementById('root'),
     'Root element not found',
