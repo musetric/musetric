@@ -2,7 +2,7 @@ import { Box, TextField } from '@mui/material';
 import { api } from '@musetric/api';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { type FC, useRef, useState } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
@@ -25,6 +25,17 @@ export const RecordingNameField: FC<RecordingNameFieldProps> = (props) => {
   const [draft, setDraft] = useState(recording.name);
   const [error, setError] = useState<string>();
   const cancelledRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const reveal = () => {
+      inputRef.current?.scrollIntoView({ block: 'nearest' });
+    };
+    window.visualViewport?.addEventListener('resize', reveal);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', reveal);
+    };
+  }, []);
 
   const findProblem = (name: string): string | undefined => {
     if (!name) {
@@ -82,6 +93,7 @@ export const RecordingNameField: FC<RecordingNameFieldProps> = (props) => {
         size='small'
         fullWidth
         autoFocus
+        inputRef={inputRef}
         value={draft}
         error={error !== undefined}
         disabled={edited.isPending}

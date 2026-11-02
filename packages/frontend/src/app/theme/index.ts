@@ -90,6 +90,18 @@ export const appTheme = createTheme({
         inputProps: { autoComplete: 'off' },
       },
     },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          variants: [
+            {
+              props: { anchor: 'bottom' },
+              style: { bottom: 'var(--keyboard-inset, 0px)' },
+            },
+          ],
+        },
+      },
+    },
     MuiDialog: {
       defaultProps: {
         scroll: 'body',
