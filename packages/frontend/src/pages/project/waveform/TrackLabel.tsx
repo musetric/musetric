@@ -66,7 +66,6 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
               }),
           zIndex: 1,
           pointerEvents: 'none',
-          userSelect: 'none',
         }),
       ]}
     >

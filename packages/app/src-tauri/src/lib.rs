@@ -31,6 +31,8 @@ mod permission;
 mod settings;
 #[cfg(target_os = "ios")]
 mod share;
+#[cfg(target_os = "ios")]
+mod text_interaction;
 #[cfg(desktop)]
 mod update;
 
@@ -76,6 +78,7 @@ fn run_app() -> tauri::Result<()> {
         .plugin(haptics::init())
         .plugin(microphone::init())
         .plugin(share::init())
+        .plugin(text_interaction::init())
         .on_web_content_process_terminate(reload_main_view);
     let app = builder
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
