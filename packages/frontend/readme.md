@@ -8,7 +8,7 @@ shell.
 - The interface carries the [concepts of the product](https://github.com/musetric/headquarters/blob/main/product.md#concepts):
   songs, takes, recordings, the loop and its tries, key, tempo and octave,
   notes and the export. `src/app/screenWakeLock.ts` keeps the screen on
-  while a phone processes.
+  while a phone processes, plays or records.
 - One value, one control: a value has one way to be changed, and what is
   only information is shown as text, not as another control.
 - An approved mockup is the requirement, over the preference for stock
