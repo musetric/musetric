@@ -227,7 +227,14 @@ fn describe_failure(model: &ModelFile, error: reqwest::Error) -> BoxedError {
     if error.is_timeout() {
         return format!("Failed to download {}: the download stalled", model.label).into();
     }
-    error.into()
+    if error.is_connect() {
+        return format!(
+            "Failed to download {}: no connection. Check the internet and retry",
+            model.label
+        )
+        .into();
+    }
+    error.without_url().into()
 }
 
 fn ensure_room(model: &ModelFile, partial_path: &Path, needed: u64) -> Result<(), BoxedError> {
@@ -378,7 +385,9 @@ mod tests {
     use reqwest::Client;
     use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 
-    use super::{Download, DownloadStatus, ModelFile, ensure_model_file, has_verified_copy};
+    use super::{
+        Download, DownloadStatus, ModelFile, describe_failure, ensure_model_file, has_verified_copy,
+    };
 
     const CONTENT: &[u8] = b"the fixture model bytes";
     const SHA256: &str = "015edf815f1917be874183c54bb97d63665f3942dcc22a0ac7e164804ea50e5d";
@@ -672,6 +681,30 @@ mod tests {
         );
         assert!(!model.path.exists());
         let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn names_a_lost_connection_without_the_address() {
+        let workspace = Workspace::new();
+        let (address, _, shutdown) = start_source().await;
+        let model = create_model(&workspace, address, SHA256);
+        let closed = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a port should be free")
+            .local_addr()
+            .expect("the port should be known");
+
+        let refused = Client::new()
+            .get(format!("http://{closed}/model"))
+            .send()
+            .await
+            .expect_err("a closed port should refuse the request");
+        let _ = shutdown.send(());
+
+        assert_eq!(
+            describe_failure(&model, refused).to_string(),
+            "Failed to download Chord recognition model: no connection. Check the internet and retry"
+        );
     }
 
     #[tokio::test]
