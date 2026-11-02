@@ -27,6 +27,8 @@ mod lifecycle;
 mod microphone;
 #[cfg(desktop)]
 mod permission;
+#[cfg(target_os = "ios")]
+mod screen_awake;
 #[cfg(desktop)]
 mod settings;
 #[cfg(target_os = "ios")]
@@ -77,6 +79,7 @@ fn run_app() -> tauri::Result<()> {
         .plugin(executor_view::init())
         .plugin(haptics::init())
         .plugin(microphone::init())
+        .plugin(screen_awake::init())
         .plugin(share::init())
         .plugin(text_interaction::init())
         .on_web_content_process_terminate(reload_main_view);
@@ -158,7 +161,11 @@ fn create_main_window<R: tauri::Runtime>(
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url)
         .title(TITLE)
         .additional_browser_args(WEBVIEW2_BROWSER_ARGS);
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url)
+        .title(TITLE)
+        .allow_link_preview(false);
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url).title(TITLE);
     finish_main_window(builder)
 }
