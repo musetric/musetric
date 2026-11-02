@@ -14,7 +14,15 @@ export const ProjectHomeButton: FC = () => {
         nativeButton={false}
         size='small'
         aria-label={t('pages.project.progress.backHome')}
-        sx={{ p: 0.5 }}
+        sx={{
+          p: 0.5,
+          '@media (any-pointer: coarse)': {
+            width: 44,
+            height: 44,
+            mx: '-10px',
+            '&::after': { content: '""', position: 'absolute', inset: 0 },
+          },
+        }}
       >
         <HomeOutlinedIcon fontSize='small' />
       </IconButton>
