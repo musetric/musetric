@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -40,17 +41,19 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
       fullWidth
       maxWidth='xs'
       component='form'
-      onKeyDown={async (event) => {
-        if (event.key === 'Enter') {
+      onKeyDown={(event) => {
+        if (
+          event.key === 'Enter' &&
+          !(event.target instanceof HTMLButtonElement) &&
+          !deleteProject.isPending
+        ) {
           event.preventDefault();
-          await deleteProject.mutateAsync();
-          close();
+          deleteProject.mutate(undefined, { onSuccess: close });
         }
       }}
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        await deleteProject.mutateAsync();
-        close();
+        deleteProject.mutate(undefined, { onSuccess: close });
       }}
       onClose={close}
     >
@@ -79,6 +82,11 @@ export const DeleteDialog: FC<DeleteDialogProps> = (props) => {
             {projectInfo.data?.name}
           </Typography>
         </Stack>
+        {deleteProject.isError && (
+          <Alert severity='error' sx={{ mt: 2 }}>
+            {t('pages.projects.dialogs.delete.failed')}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button
