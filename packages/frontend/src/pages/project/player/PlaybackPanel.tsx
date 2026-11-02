@@ -16,7 +16,7 @@ const desktopAreas =
 
 const desktopColumns = 'auto auto 1fr auto auto auto auto auto 1fr auto';
 
-const singleRowMinWidth = 680;
+const singleRowMinWidth = 688;
 
 const phoneRowSx = (theme: Theme) => ({
   display: 'flex',
@@ -25,6 +25,7 @@ const phoneRowSx = (theme: Theme) => ({
   justifyContent: 'space-between',
   [theme.breakpoints.up(singleRowMinWidth)]: {
     display: 'contents',
+    '& .MuiToggleButton-root': { minWidth: 68 },
   },
 });
 
