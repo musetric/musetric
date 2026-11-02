@@ -15,7 +15,7 @@
         android:theme="@style/Theme.musetric_app"
         android:usesCleartextTraffic="false">
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|density|fontScale|fontWeightAdjustment|layoutDirection|navigation|touchscreen|colorMode|mcc|mnc"
             android:launchMode="singleTask"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
