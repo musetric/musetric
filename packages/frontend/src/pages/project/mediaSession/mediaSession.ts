@@ -1,21 +1,35 @@
 import { engine } from '../../../engine/engine.js';
+import {
+  type MediaAction,
+  type MediaBridge,
+  mediaEventName,
+} from './mediaBridge.js';
+import { createWebMediaBridge } from './webMediaBridge.js';
 
-export type MediaBridge = {
+type NativeMediaBridge = {
   update: (state: string) => void;
   clear: () => void;
 };
 
-declare const MusetricMedia: MediaBridge | undefined;
+declare const MusetricMedia: NativeMediaBridge | undefined;
 
-const mediaEventName = 'musetric:media';
 const driftMilliseconds = 500;
 
-export const getMediaBridge = (): MediaBridge | undefined =>
-  typeof MusetricMedia === 'undefined' ? undefined : MusetricMedia;
-
-type MediaAction = {
-  action: 'play' | 'pause' | 'seek';
-  positionMs?: number;
+export const getMediaBridge = (): MediaBridge | undefined => {
+  if (typeof MusetricMedia !== 'undefined') {
+    const native = MusetricMedia;
+    return {
+      update: (state) => {
+        native.update(JSON.stringify(state));
+      },
+      clear: () => {
+        native.clear();
+      },
+    };
+  }
+  return 'mediaSession' in navigator
+    ? createWebMediaBridge(navigator.mediaSession)
+    : undefined;
 };
 
 const isMediaAction = (detail: unknown): detail is MediaAction =>
@@ -30,6 +44,7 @@ type PublishedPosition = {
 export const subscribeMediaSession = (
   bridge: MediaBridge,
   title: string,
+  coverUrl: string | undefined,
 ): (() => void) => {
   const { sampleRate } = engine.context;
   const toMilliseconds = (frame: number) =>
@@ -49,15 +64,15 @@ export const subscribeMediaSession = (
       at: performance.now(),
       speed: state.playing ? state.tempoRatio : 0,
     };
-    bridge.update(
-      JSON.stringify({
-        title,
-        durationMs: toMilliseconds(state.frameCount),
-        positionMs,
-        playing: state.playing,
-        speed: state.tempoRatio,
-      }),
-    );
+    bridge.update({
+      title,
+      coverUrl,
+      durationMs: toMilliseconds(state.frameCount),
+      positionMs,
+      playing: state.playing,
+      recording: state.recording,
+      speed: state.tempoRatio,
+    });
   };
 
   const follow = () => {
@@ -102,6 +117,7 @@ export const subscribeMediaSession = (
   window.addEventListener('pagehide', clear);
   const unsubscribes = [
     engine.store.subscribe((state) => state.playing, publish),
+    engine.store.subscribe((state) => state.recording, publish),
     engine.store.subscribe((state) => state.tempoRatio, publish),
     engine.store.subscribe((state) => state.seekEvent, publish),
     engine.store.subscribe((state) => state.frameIndex, follow),
