@@ -19,6 +19,7 @@ export const PlaybackControlsButton: FC = () => {
     <Box
       sx={{
         width: 128,
+        maxWidth: '100%',
         height: 48,
         px: 1,
         display: 'flex',

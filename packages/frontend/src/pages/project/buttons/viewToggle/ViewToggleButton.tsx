@@ -40,14 +40,15 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
 
   return (
     <Tooltip title={label}>
-      <Box>
+      <Box sx={{ flex: '1 1 68px', minWidth: 0 }}>
         <ToggleButton
+          fullWidth
           size='small'
           color='primary'
           disabled={realtimeFailed}
           selected={selected}
           value={target.view}
-          sx={{ border: 0, borderRadius: 2, px: 2, py: 1, minWidth: 68 }}
+          sx={{ border: 0, borderRadius: 2, px: 1, py: 1 }}
           onClick={() => {
             if (target.panel === 'details') {
               setDetailsView(selected ? undefined : target.view);
@@ -59,7 +60,7 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
             });
           }}
         >
-          <Stack sx={{ alignItems: 'center', gap: 0.5 }}>
+          <Stack sx={{ alignItems: 'center', gap: 0.5, minWidth: 0 }}>
             {icon}
             <Typography
               variant='caption'

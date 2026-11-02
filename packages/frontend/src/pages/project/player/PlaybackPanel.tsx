@@ -48,13 +48,13 @@ export const PlaybackPanel: FC = () => (
       })}
     >
       <Box sx={phoneRowSx}>
-        <Box sx={{ gridArea: 'details' }}>
+        <Box sx={{ gridArea: 'details', flex: '0 1 148px', minWidth: 0 }}>
           <DetailsViewToggle />
         </Box>
-        <Box sx={{ gridArea: 'history' }}>
+        <Box sx={{ gridArea: 'history', flexShrink: 0 }}>
           <RecordingHistoryButtons />
         </Box>
-        <Box sx={{ gridArea: 'spectrogram' }}>
+        <Box sx={{ gridArea: 'spectrogram', flex: '0 1 148px', minWidth: 0 }}>
           <SpectrogramViewToggle />
         </Box>
       </Box>
@@ -65,7 +65,7 @@ export const PlaybackPanel: FC = () => (
         <Box sx={{ gridArea: 'mix' }}>
           <MixButton />
         </Box>
-        <Box sx={{ gridArea: 'transport' }}>
+        <Box sx={{ gridArea: 'transport', flex: '0 1 128px', minWidth: 0 }}>
           <PlaybackControlsButton />
         </Box>
         <Box sx={{ gridArea: 'key' }}>
