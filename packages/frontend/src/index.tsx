@@ -6,6 +6,7 @@ import { endpoints } from './api/index.js';
 import { queryClient } from './api/queryClient.js';
 import { blockContextMenu } from './app/contextMenu.js';
 import { App } from './app/index.js';
+import { blockMouseNavigation } from './app/mouseNavigation.js';
 import { blockPageZoom } from './app/pageZoom.js';
 import { holdScreenWhileWorking } from './app/screenWakeLock.js';
 import { allowTextInteractionInFields } from './app/textInteraction.js';
@@ -16,6 +17,7 @@ const runApp = async () => {
   blockContextMenu();
   blockPageZoom();
   allowTextInteractionInFields();
+  blockMouseNavigation();
   const rootElement = assertDefined(
     document.getElementById('root'),
     'Root element not found',
