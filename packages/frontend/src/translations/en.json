@@ -274,6 +274,7 @@
   "pages.projects.dialogs.create.cancel": "Cancel",
   "pages.projects.dialogs.create.create": "Add",
   "pages.projects.dialogs.create.dragDrop": "Drop an audio file here",
+  "pages.projects.dialogs.create.failed": "Could not add this file. It may be damaged or in a format Musetric cannot read.",
   "pages.projects.dialogs.create.localNotice": "The song is analysed on this device and never leaves it. Expect several minutes of work.",
   "pages.projects.dialogs.create.models": "Before its first results, Musetric downloads {{size}} GB of models.",
   "pages.projects.dialogs.create.select": "Browse",

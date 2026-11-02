@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined';
 import {
+  Alert,
   Button,
   Dialog,
   DialogActions,
@@ -61,13 +62,19 @@ export const CreateDialog: FC = () => {
   });
 
   const close = () => routes.projects.navigate();
-  const onSubmit = async (value: SubmitValue) => {
-    const project = await create.mutateAsync({
-      song: value.song.file,
-      name: value.name,
-      preview: value.preview?.file,
-    });
-    routes.project.navigate({ projectId: project.id });
+  const onSubmit = (value: SubmitValue) => {
+    create.mutate(
+      {
+        song: value.song.file,
+        name: value.name,
+        preview: value.preview?.file,
+      },
+      {
+        onSuccess: (project) => {
+          routes.project.navigate({ projectId: project.id });
+        },
+      },
+    );
   };
 
   const song = useWatch({
@@ -170,6 +177,11 @@ export const CreateDialog: FC = () => {
                     size: (missingBytes / 1e9).toFixed(1),
                   })}
                 </Typography>
+              )}
+              {create.isError && (
+                <Alert severity='error'>
+                  {t('pages.projects.dialogs.create.failed')}
+                </Alert>
               )}
             </>
           )}
