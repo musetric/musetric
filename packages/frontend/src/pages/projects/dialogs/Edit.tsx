@@ -50,11 +50,13 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
     resolver: zodResolver(schema(t)),
   });
 
+  const savedName = project.data?.name;
+  const savedPreviewUrl = project.data?.previewUrl;
+
   useEffect(() => {
-    if (!project.data) return;
-    const { name, previewUrl } = project.data;
-    reset({ name, preview: { url: previewUrl } });
-  }, [project.data, reset]);
+    if (savedName === undefined) return;
+    reset({ name: savedName, preview: { url: savedPreviewUrl } });
+  }, [savedName, savedPreviewUrl, reset]);
 
   const close = () => {
     routes.projects.navigate();
