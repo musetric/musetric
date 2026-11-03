@@ -107,15 +107,19 @@ export const createFollowScrollController = (
     scrollFrame = undefined;
   };
 
-  const centerElement = (
+  const scrollToElement = (
     targetElement: HTMLElement,
-    behavior: ScrollBehavior,
+    block: ScrollLogicalPosition,
   ) => {
     cancelScheduledCentering();
     scrollFrame = window.requestAnimationFrame(() => {
-      targetElement.scrollIntoView({ block: 'center', behavior });
+      targetElement.scrollIntoView({ block, behavior: 'smooth' });
       scrollFrame = undefined;
     });
+  };
+
+  const centerElement = (targetElement: HTMLElement) => {
+    scrollToElement(targetElement, 'center');
   };
 
   const centerActiveImmediately = (behavior: ScrollBehavior) => {
@@ -200,7 +204,7 @@ export const createFollowScrollController = (
       shouldCenterSoughtElement(element, activeElement) &&
       !isKeptInPlace(activeElement)
     ) {
-      centerElement(activeElement, 'smooth');
+      centerElement(activeElement);
     }
   });
 
@@ -226,7 +230,7 @@ export const createFollowScrollController = (
 
     const nextActiveElement = locateElement(nextActiveIndex);
     if (nextActiveElement && !isKeptInPlace(nextActiveElement)) {
-      centerElement(nextActiveElement, 'smooth');
+      centerElement(nextActiveElement);
     }
   });
 
@@ -254,7 +258,7 @@ export const createFollowScrollController = (
       if (isPointerBelowCenter(element, pointerClientY)) {
         const targetElement = locateElement(index);
         if (targetElement && !isKeptInPlace(targetElement)) {
-          centerElement(targetElement, 'smooth');
+          centerElement(targetElement);
         }
       }
     },
@@ -263,13 +267,13 @@ export const createFollowScrollController = (
       scrollHeld = false;
       const activeElement = locateElement(getActiveIndex());
       if (activeElement) {
-        centerElement(activeElement, 'smooth');
+        centerElement(activeElement);
       }
     },
     revealActive: () => {
       const activeElement = locateElement(getActiveIndex());
       if (activeElement && !isFullyVisible(element, activeElement)) {
-        centerElement(activeElement, 'smooth');
+        scrollToElement(activeElement, 'nearest');
       }
     },
     dispose: () => {
