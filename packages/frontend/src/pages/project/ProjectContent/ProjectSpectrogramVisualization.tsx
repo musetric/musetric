@@ -81,8 +81,11 @@ export const ProjectSpectrogramVisualization: FC = () => {
           <Box
             sx={{
               position: 'absolute',
-              top: 8,
+              top: chordBlockInset,
               left: noteNamesInset + 8,
+              height: chordLaneHeight - 2 * chordBlockInset,
+              display: 'flex',
+              alignItems: 'center',
               zIndex: 1,
             }}
           >
