@@ -29,12 +29,22 @@ export const ProjectCard: FC<ProjectCardProps> = (props) => {
         backgroundColor: 'action.hover',
         transition: 'background-color 160ms linear',
 
-        '&:hover, &:focus-within': {
+        '&:has(:focus-visible)': {
           backgroundColor: 'action.selected',
         },
 
-        '&:hover [data-card-menu], &:focus-within [data-card-menu]': {
+        '&:has(:focus-visible) [data-card-menu]': {
           opacity: 1,
+        },
+
+        '@media (hover: hover)': {
+          '&:hover': {
+            backgroundColor: 'action.selected',
+          },
+
+          '&:hover [data-card-menu]': {
+            opacity: 1,
+          },
         },
 
         '@media (hover: none)': {

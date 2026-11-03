@@ -35,6 +35,11 @@ export const ProjectCardMenu: FC<ProjectCardMenuProps> = (props) => {
         sx={{
           opacity: anchorEl ? 1 : 0,
           transition: 'opacity 120ms linear',
+          '@media (any-pointer: coarse)': {
+            width: 44,
+            height: 44,
+            '&::after': { content: '""', position: 'absolute', inset: 0 },
+          },
         }}
       >
         <MoreVertIcon fontSize='small' />

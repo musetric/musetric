@@ -18,7 +18,17 @@ export const ChordsToggleButton: FC = () => {
         color='primary'
         value='chords'
         selected={chordsOpen}
-        sx={{ py: 0, px: 1.5 }}
+        sx={{
+          py: 0,
+          px: 1.5,
+          '@media (any-pointer: coarse)': {
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              inset: '-10px 0',
+            },
+          },
+        }}
         onClick={() => {
           setChordsOpen(!chordsOpen);
         }}

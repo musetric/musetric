@@ -68,6 +68,13 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
             color: theme.palette.text.primary,
             '& .MuiButton-endIcon': { ml: 0.25 },
             '&.Mui-disabled': { color: theme.palette.error.light },
+            '@media (any-pointer: coarse)': {
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                inset: '-10px 0',
+              },
+            },
           })}
         >
           {recording && (

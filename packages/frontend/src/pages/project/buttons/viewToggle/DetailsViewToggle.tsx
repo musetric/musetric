@@ -11,7 +11,13 @@ export const DetailsViewToggle: FC = () => {
   return (
     <Stack
       direction='row'
-      sx={{ gap: 0.5, p: 0.5, borderRadius: 2, bgcolor: 'action.hover' }}
+      sx={{
+        gap: 0.5,
+        p: 0.5,
+        borderRadius: 2,
+        bgcolor: 'action.hover',
+        minWidth: 0,
+      }}
     >
       <ViewToggleButton
         target={{ panel: 'details', view: 'text' }}
