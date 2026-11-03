@@ -9,6 +9,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -47,6 +50,24 @@ internal class MediaSessionBridge(
 ) {
   private var session: MediaSession? = null
   private var serviceStarted = false
+  private val audioManager = activity.getSystemService(AudioManager::class.java)
+  private val audioFocus =
+    AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+      .setAudioAttributes(
+        AudioAttributes.Builder()
+          .setUsage(AudioAttributes.USAGE_MEDIA)
+          .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+          .build(),
+      )
+      .setOnAudioFocusChangeListener { change ->
+        if (
+          change == AudioManager.AUDIOFOCUS_LOSS ||
+            change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+        ) {
+          emit("pause", null)
+        }
+      }
+      .build()
 
   private val commands =
     object : BroadcastReceiver() {
@@ -79,12 +100,24 @@ internal class MediaSessionBridge(
     session = null
     current.isActive = false
     current.release()
+    audioManager.abandonAudioFocusRequest(audioFocus)
     activity.unregisterReceiver(commands)
     MediaPlaybackService.stop(activity)
     serviceStarted = false
   }
 
+  private fun followAudioFocus(playing: Boolean) {
+    if (!playing) {
+      audioManager.abandonAudioFocusRequest(audioFocus)
+      return
+    }
+    if (audioManager.requestAudioFocus(audioFocus) == AudioManager.AUDIOFOCUS_REQUEST_FAILED) {
+      emit("pause", null)
+    }
+  }
+
   private fun apply(state: MediaState) {
+    followAudioFocus(state.playing)
     val current = session ?: createSession()
     current.setMetadata(
       MediaMetadata.Builder()

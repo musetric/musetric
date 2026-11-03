@@ -18,6 +18,7 @@ import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
 import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
 import { RecordingListPicker } from './recording/RecordingListPicker.js';
+import { subscribeTakeInterruptions } from './recording/subscribeTakeInterruptions.js';
 import { RhythmMetronomeSync } from './rhythm/RhythmMetronomeSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
@@ -34,6 +35,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   );
 
   useEffect(() => subscribeSettingsStore(), []);
+  useEffect(() => subscribeTakeInterruptions(), []);
   useEffect(() => subscribeLoopBack(), []);
 
   useEffect(() => {
