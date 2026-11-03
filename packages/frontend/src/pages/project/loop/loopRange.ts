@@ -98,7 +98,7 @@ export type SubtitleWordRef = {
 export const isSameWord = (a: SubtitleWordRef, b: SubtitleWordRef) =>
   a.segmentIndex === b.segmentIndex && a.wordIndex === b.wordIndex;
 
-const isWordBefore = (a: SubtitleWordRef, b: SubtitleWordRef) =>
+export const isWordBefore = (a: SubtitleWordRef, b: SubtitleWordRef) =>
   a.segmentIndex < b.segmentIndex ||
   (a.segmentIndex === b.segmentIndex && a.wordIndex < b.wordIndex);
 

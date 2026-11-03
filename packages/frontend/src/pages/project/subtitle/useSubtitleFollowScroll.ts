@@ -1,13 +1,13 @@
 import { type api } from '@musetric/api';
-import { type RefObject, useLayoutEffect } from 'react';
+import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
-import { moveLoopToTime } from '../loop/moveLoopToTime.js';
+import { moveLoopToWord } from '../loop/moveLoopToWord.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
-import { createSubtitleFollowController } from './subtitleFollowController.js';
 import {
-  getSubtitleSeekFrameIndex,
-  subtitleSeekLeadSeconds,
-} from './subtitleSeek.js';
+  createSubtitleFollowController,
+  type SubtitleFollowController,
+} from './subtitleFollowController.js';
+import { getSubtitleSeekFrameIndex } from './subtitleSeek.js';
 import { createSubtitleWordDrag } from './subtitleWordDrag.js';
 
 export const useSubtitleFollowScroll = (
@@ -15,11 +15,15 @@ export const useSubtitleFollowScroll = (
   subtitleCursor: SubtitleCursor,
   subtitleListRef: RefObject<HTMLDivElement | null>,
 ) => {
+  const controllerRef = useRef<SubtitleFollowController>(undefined);
+
   useLayoutEffect(() => {
     const element = subtitleListRef.current;
     if (!element) return;
 
-    const wordDrag = createSubtitleWordDrag(element, subtitle);
+    const wordDrag = createSubtitleWordDrag(element, subtitle, () => {
+      controllerRef.current?.revealActive();
+    });
     const controller = createSubtitleFollowController({
       element,
       cursor: subtitleCursor,
@@ -29,10 +33,8 @@ export const useSubtitleFollowScroll = (
         engine.store.subscribe((state) => state.seekEvent.revision, callback),
       getSeekFrameIndex: (playbackTime) =>
         getSubtitleSeekFrameIndex(playbackTime, engine.store.get()),
-      seek: (frameIndex) => {
-        const time =
-          frameIndex / engine.context.sampleRate + subtitleSeekLeadSeconds;
-        if (moveLoopToTime(subtitle, time)) {
+      seek: (frameIndex, wordStart) => {
+        if (moveLoopToWord(subtitle, wordStart)) {
           return;
         }
         engine.player.seek(frameIndex, 'subtitle');
@@ -42,12 +44,19 @@ export const useSubtitleFollowScroll = (
         origin === 'playhead' ||
         origin === 'spectrogramVisualization' ||
         origin === 'tracksVisualization',
+      isVisibleLineKept: () => engine.store.get().loopStage !== undefined,
     });
     controller.reset();
+    controllerRef.current = controller;
 
     return () => {
+      controllerRef.current = undefined;
       wordDrag.dispose();
       controller.dispose();
     };
   }, [subtitle, subtitleCursor, subtitleListRef]);
+
+  return useCallback(() => {
+    controllerRef.current?.centerActive();
+  }, []);
 };

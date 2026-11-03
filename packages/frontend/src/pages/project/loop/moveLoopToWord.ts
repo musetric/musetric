@@ -1,19 +1,26 @@
 import { type api } from '@musetric/api';
 import { engine } from '../../../engine/engine.js';
+import { isSubtitleWordStartInRange } from '../subtitle/subtitleLoopBands.js';
 import { moveLoop } from './loopActions.js';
 import { getLoopAtTime } from './loopRange.js';
 
-export const moveLoopToTime = (
+export const moveLoopToWord = (
   subtitle: readonly api.subtitle.Segment[],
-  time: number,
+  wordStart: number,
 ): boolean => {
   const state = engine.store.get();
   if (state.loopStage === undefined) {
     return false;
   }
+  const { sampleRate } = engine.context;
+  if (
+    state.range &&
+    isSubtitleWordStartInRange(subtitle, wordStart, state.range, sampleRate)
+  ) {
+    return state.recording;
+  }
   if (state.loopStage === 'range') {
-    const { sampleRate } = engine.context;
-    moveLoop(getLoopAtTime(subtitle, time, { ...state, sampleRate }));
+    moveLoop(getLoopAtTime(subtitle, wordStart, { ...state, sampleRate }));
   }
   return true;
 };

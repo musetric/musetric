@@ -15,7 +15,12 @@ import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { closeLoop, lockLoop, openLoop } from './loopActions.js';
+import {
+  closeLoop,
+  isLoopAvailable,
+  lockLoop,
+  openLoop,
+} from './loopActions.js';
 import { getLoopAtTime } from './loopRange.js';
 
 const plateSx = {
@@ -29,12 +34,7 @@ export const LoopPictureControls: FC = () => {
   const { t } = useTranslation();
   const subtitleQuery = useQuery(endpoints.subtitle.get(projectId));
   const stage = useEngineStore((state) => state.loopStage);
-  const available = useEngineStore(
-    (state) =>
-      Boolean(state.frameCount) &&
-      !state.isSlave &&
-      state.statuses.realtime !== 'error',
-  );
+  const available = useEngineStore(isLoopAvailable);
 
   if (stage === 'sing' || !available) {
     return undefined;

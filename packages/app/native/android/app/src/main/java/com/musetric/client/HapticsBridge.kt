@@ -16,10 +16,13 @@ private class HapticsBridge(private val webView: WebView) {
         "grab" -> HapticFeedbackConstants.LONG_PRESS
         else -> return
       }
-    webView.post { webView.performHapticFeedback(feedback) }
+    webView.post {
+      webView.performHapticFeedback(feedback, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+    }
   }
 }
 
 internal fun attachHaptics(webView: WebView) {
+  webView.isHapticFeedbackEnabled = false
   webView.addJavascriptInterface(HapticsBridge(webView), HAPTICS_BRIDGE_NAME)
 }

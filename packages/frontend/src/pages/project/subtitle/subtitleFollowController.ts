@@ -3,6 +3,7 @@ import { type SubtitleCursor } from './subtitleCursor.js';
 
 const subtitleSegmentIndexAttribute = 'data-subtitle-segment-index';
 const subtitleWordStartAttribute = 'data-subtitle-word-start';
+const subtitleLoopEdgeSelector = '[data-subtitle-loop-edge]';
 
 const getEventTargetElement = (eventTarget: EventTarget | null) => {
   if (eventTarget instanceof HTMLElement) return eventTarget;
@@ -19,10 +20,17 @@ const getSubtitleSegmentElement = (
     `[${subtitleSegmentIndexAttribute}="${segmentIndex}"]`,
   );
 
-const getClickedSubtitleWordElement = (eventTarget: EventTarget | null) => {
-  const targetElement = getEventTargetElement(eventTarget);
+const getClickedSubtitleWordElement = (event: MouseEvent) => {
+  const targetElement = getEventTargetElement(event.target);
   if (!targetElement) return undefined;
-  return targetElement.closest<HTMLElement>(`[${subtitleWordStartAttribute}]`);
+  const selector = `[${subtitleWordStartAttribute}]`;
+  if (targetElement.closest(subtitleLoopEdgeSelector)) {
+    return document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .find((element) => element.closest(selector))
+      ?.closest<HTMLElement>(selector);
+  }
+  return targetElement.closest<HTMLElement>(selector);
 };
 
 const getSubtitleWordStart = (wordElement: HTMLElement) => {
@@ -52,12 +60,15 @@ export type SubtitleFollowControllerOptions = {
   getSeekEvent: () => SubtitleSeekEvent;
   subscribeSeekRevision: (callback: () => void) => Unsubscribe;
   getSeekFrameIndex: (playbackTime: number) => number | undefined;
-  seek: (frameIndex: number) => void;
+  seek: (frameIndex: number, wordStart: number) => void;
   isIgnoredSeekOrigin: (origin: string) => boolean;
+  isVisibleLineKept: () => boolean;
 };
 
 export type SubtitleFollowController = {
   reset: () => void;
+  centerActive: () => void;
+  revealActive: () => void;
   dispose: () => void;
 };
 
@@ -73,6 +84,7 @@ export const createSubtitleFollowController = (
     getSeekFrameIndex,
     seek,
     isIgnoredSeekOrigin,
+    isVisibleLineKept,
   } = options;
 
   const controller = createFollowScrollController({
@@ -83,10 +95,11 @@ export const createSubtitleFollowController = (
     getRevision: () => getSeekEvent().revision,
     subscribeRevision: subscribeSeekRevision,
     isRevisionIgnored: () => isIgnoredSeekOrigin(getSeekEvent().origin),
+    isVisibleElementKept: isVisibleLineKept,
   });
 
   const handleClick = (event: MouseEvent) => {
-    const clickedWordElement = getClickedSubtitleWordElement(event.target);
+    const clickedWordElement = getClickedSubtitleWordElement(event);
     if (!clickedWordElement) return;
 
     const clickedWordStart = getSubtitleWordStart(clickedWordElement);
@@ -109,7 +122,7 @@ export const createSubtitleFollowController = (
     const frameIndex = getSeekFrameIndex(clickedWordStart);
     if (frameIndex === undefined) return;
 
-    seek(frameIndex);
+    seek(frameIndex, clickedWordStart);
     controller.activate(clickedSegmentIndex, event.clientY);
   };
 
@@ -117,6 +130,8 @@ export const createSubtitleFollowController = (
 
   return {
     reset: controller.reset,
+    centerActive: controller.centerActive,
+    revealActive: controller.revealActive,
     dispose: () => {
       element.removeEventListener('click', handleClick);
       controller.dispose();

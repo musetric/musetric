@@ -1,8 +1,14 @@
 import { type api } from '@musetric/api';
-import { type EngineState } from '@musetric/engine';
+import { type EngineRange, type EngineState } from '@musetric/engine';
+import { type SubtitleWordRef } from '../loop/loopRange.js';
 import { getSubtitleSegmentEndTime } from './subtitleTiming.js';
 
-const wordInset = 4;
+export const wordInset = 4;
+
+const isWordInRange = (word: api.subtitle.Word, from: number, to: number) => {
+  const middle = (word.start + word.end) / 2;
+  return middle >= from && middle <= to;
+};
 
 export const getSubtitleLoopWordsKey = (
   segment: api.subtitle.Segment,
@@ -21,16 +27,53 @@ export const getSubtitleLoopWordsKey = (
       ? 'all'
       : '';
   }
-  const inside = (word: api.subtitle.Word) => {
-    const middle = (word.start + word.end) / 2;
-    return middle >= from && middle <= to;
-  };
+  const inside = (word: api.subtitle.Word) => isWordInRange(word, from, to);
   const first = words.findIndex(inside);
   if (first < 0) {
     return '';
   }
   const last = words.findLastIndex(inside);
   return first === 0 && last === words.length - 1 ? 'all' : `${first}:${last}`;
+};
+
+export const isSubtitleWordStartInRange = (
+  subtitle: readonly api.subtitle.Segment[],
+  wordStart: number,
+  range: EngineRange,
+  sampleRate: number,
+): boolean => {
+  const from = range.fromFrame / sampleRate;
+  const to = range.toFrame / sampleRate;
+  return subtitle.some((segment) =>
+    segment.words.some(
+      (word) => word.start === wordStart && isWordInRange(word, from, to),
+    ),
+  );
+};
+
+export type SubtitleLoopEdges = {
+  first: SubtitleWordRef;
+  last: SubtitleWordRef;
+};
+
+export const getSubtitleLoopEdges = (
+  subtitle: readonly api.subtitle.Segment[],
+  range: EngineRange,
+  sampleRate: number,
+): SubtitleLoopEdges | undefined => {
+  const from = range.fromFrame / sampleRate;
+  const to = range.toFrame / sampleRate;
+  let first: SubtitleWordRef | undefined = undefined;
+  let last: SubtitleWordRef | undefined = undefined;
+  for (const [segmentIndex, segment] of subtitle.entries()) {
+    for (const [wordIndex, word] of segment.words.entries()) {
+      if (isWordInRange(word, from, to)) {
+        last = { segmentIndex, wordIndex };
+        first ??= last;
+      }
+    }
+  }
+  return first && last ? { first, last } : undefined;
 };
 
 export type SubtitleLoopWords = {
