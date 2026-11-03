@@ -1,16 +1,13 @@
 import { type api } from '@musetric/api';
 import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
-import { moveLoopToTime } from '../loop/moveLoopToTime.js';
+import { moveLoopToWord } from '../loop/moveLoopToWord.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
 import {
   createSubtitleFollowController,
   type SubtitleFollowController,
 } from './subtitleFollowController.js';
-import {
-  getSubtitleSeekFrameIndex,
-  subtitleSeekLeadSeconds,
-} from './subtitleSeek.js';
+import { getSubtitleSeekFrameIndex } from './subtitleSeek.js';
 import { createSubtitleWordDrag } from './subtitleWordDrag.js';
 
 export const useSubtitleFollowScroll = (
@@ -36,10 +33,8 @@ export const useSubtitleFollowScroll = (
         engine.store.subscribe((state) => state.seekEvent.revision, callback),
       getSeekFrameIndex: (playbackTime) =>
         getSubtitleSeekFrameIndex(playbackTime, engine.store.get()),
-      seek: (frameIndex) => {
-        const time =
-          frameIndex / engine.context.sampleRate + subtitleSeekLeadSeconds;
-        if (moveLoopToTime(subtitle, time)) {
+      seek: (frameIndex, wordStart) => {
+        if (moveLoopToWord(subtitle, wordStart)) {
           return;
         }
         engine.player.seek(frameIndex, 'subtitle');

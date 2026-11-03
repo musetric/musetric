@@ -60,7 +60,7 @@ export type SubtitleFollowControllerOptions = {
   getSeekEvent: () => SubtitleSeekEvent;
   subscribeSeekRevision: (callback: () => void) => Unsubscribe;
   getSeekFrameIndex: (playbackTime: number) => number | undefined;
-  seek: (frameIndex: number) => void;
+  seek: (frameIndex: number, wordStart: number) => void;
   isIgnoredSeekOrigin: (origin: string) => boolean;
   isVisibleLineKept: () => boolean;
 };
@@ -122,7 +122,7 @@ export const createSubtitleFollowController = (
     const frameIndex = getSeekFrameIndex(clickedWordStart);
     if (frameIndex === undefined) return;
 
-    seek(frameIndex);
+    seek(frameIndex, clickedWordStart);
     controller.activate(clickedSegmentIndex, event.clientY);
   };
 

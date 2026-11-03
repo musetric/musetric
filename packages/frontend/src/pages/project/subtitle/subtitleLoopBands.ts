@@ -36,6 +36,21 @@ export const getSubtitleLoopWordsKey = (
   return first === 0 && last === words.length - 1 ? 'all' : `${first}:${last}`;
 };
 
+export const isSubtitleWordStartInRange = (
+  subtitle: readonly api.subtitle.Segment[],
+  wordStart: number,
+  range: EngineRange,
+  sampleRate: number,
+): boolean => {
+  const from = range.fromFrame / sampleRate;
+  const to = range.toFrame / sampleRate;
+  return subtitle.some((segment) =>
+    segment.words.some(
+      (word) => word.start === wordStart && isWordInRange(word, from, to),
+    ),
+  );
+};
+
 export type SubtitleLoopEdges = {
   first: SubtitleWordRef;
   last: SubtitleWordRef;
