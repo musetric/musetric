@@ -1,5 +1,6 @@
 import { type api } from '@musetric/api';
 import { engine } from '../../../engine/engine.js';
+import { isInsideLoop } from './createLoopRangeGesture.js';
 import { moveLoop } from './loopActions.js';
 import { getLoopAtTime } from './loopRange.js';
 
@@ -13,6 +14,9 @@ export const moveLoopToTime = (
   }
   if (state.loopStage === 'range') {
     const { sampleRate } = engine.context;
+    if (state.range && isInsideLoop(state.range, time * sampleRate)) {
+      return false;
+    }
     moveLoop(getLoopAtTime(subtitle, time, { ...state, sampleRate }));
   }
   return true;
