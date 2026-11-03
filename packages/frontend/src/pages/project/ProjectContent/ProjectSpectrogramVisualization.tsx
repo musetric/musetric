@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import { getActiveRecording } from '@musetric/engine';
 import { stackedLaneGap } from '@musetric/spectrogram';
-import { type FC, useRef } from 'react';
+import { type FC, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import {
@@ -18,6 +18,7 @@ import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
 import { useSpectrogramGesture } from '../spectrogram/useSpectrogramGesture.js';
 import { useProjectStore } from '../store.js';
+import { keepSystemGesturesOut } from '../systemGestures.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
@@ -43,6 +44,10 @@ export const ProjectSpectrogramVisualization: FC = () => {
     (state) => state.spectrogramView === 'spectrum',
   );
   useSpectrogramGesture(spectrogramAreaRef, createLoopRangeGesture);
+  useEffect(() => {
+    const surface = spectrogramAreaRef.current;
+    return surface ? keepSystemGesturesOut(surface) : undefined;
+  }, []);
 
   return (
     <Box

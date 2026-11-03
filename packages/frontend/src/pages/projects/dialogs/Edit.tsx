@@ -59,7 +59,7 @@ export const EditDialog: FC<EditDialogProps> = (props) => {
   }, [savedName, savedPreviewUrl, reset]);
 
   const close = () => {
-    routes.projects.navigate();
+    routes.home.navigate();
   };
 
   const onSubmit = (value: FormValue) => {

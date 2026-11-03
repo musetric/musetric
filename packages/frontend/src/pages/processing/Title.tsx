@@ -15,7 +15,7 @@ export const ProcessingTitle: FC = () => {
     >
       <Stack direction='row' sx={{ gap: 2, alignItems: 'center' }}>
         <IconButton
-          component={routes.projects.Link}
+          component={routes.home.Link}
           nativeButton={false}
           aria-label={t('pages.processing.back')}
         >
