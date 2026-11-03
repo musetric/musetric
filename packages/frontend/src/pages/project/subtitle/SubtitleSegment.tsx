@@ -156,6 +156,7 @@ export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
       data-subtitle-segment-index={index}
       sx={(theme) => ({
         py: 1,
+        px: 4,
         alignSelf: 'stretch',
         display: 'flex',
         justifyContent: 'center',

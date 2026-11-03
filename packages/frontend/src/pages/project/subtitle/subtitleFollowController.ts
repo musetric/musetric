@@ -3,6 +3,7 @@ import { type SubtitleCursor } from './subtitleCursor.js';
 
 const subtitleSegmentIndexAttribute = 'data-subtitle-segment-index';
 const subtitleWordStartAttribute = 'data-subtitle-word-start';
+const subtitleLoopEdgeSelector = '[data-subtitle-loop-edge]';
 
 const getEventTargetElement = (eventTarget: EventTarget | null) => {
   if (eventTarget instanceof HTMLElement) return eventTarget;
@@ -19,10 +20,17 @@ const getSubtitleSegmentElement = (
     `[${subtitleSegmentIndexAttribute}="${segmentIndex}"]`,
   );
 
-const getClickedSubtitleWordElement = (eventTarget: EventTarget | null) => {
-  const targetElement = getEventTargetElement(eventTarget);
+const getClickedSubtitleWordElement = (event: MouseEvent) => {
+  const targetElement = getEventTargetElement(event.target);
   if (!targetElement) return undefined;
-  return targetElement.closest<HTMLElement>(`[${subtitleWordStartAttribute}]`);
+  const selector = `[${subtitleWordStartAttribute}]`;
+  if (targetElement.closest(subtitleLoopEdgeSelector)) {
+    return document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .find((element) => element.closest(selector))
+      ?.closest<HTMLElement>(selector);
+  }
+  return targetElement.closest<HTMLElement>(selector);
 };
 
 const getSubtitleWordStart = (wordElement: HTMLElement) => {
@@ -91,7 +99,7 @@ export const createSubtitleFollowController = (
   });
 
   const handleClick = (event: MouseEvent) => {
-    const clickedWordElement = getClickedSubtitleWordElement(event.target);
+    const clickedWordElement = getClickedSubtitleWordElement(event);
     if (!clickedWordElement) return;
 
     const clickedWordStart = getSubtitleWordStart(clickedWordElement);
