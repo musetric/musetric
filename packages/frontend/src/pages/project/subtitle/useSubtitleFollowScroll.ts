@@ -1,9 +1,12 @@
 import { type api } from '@musetric/api';
-import { type RefObject, useLayoutEffect } from 'react';
+import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { moveLoopToTime } from '../loop/moveLoopToTime.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
-import { createSubtitleFollowController } from './subtitleFollowController.js';
+import {
+  createSubtitleFollowController,
+  type SubtitleFollowController,
+} from './subtitleFollowController.js';
 import {
   getSubtitleSeekFrameIndex,
   subtitleSeekLeadSeconds,
@@ -15,6 +18,8 @@ export const useSubtitleFollowScroll = (
   subtitleCursor: SubtitleCursor,
   subtitleListRef: RefObject<HTMLDivElement | null>,
 ) => {
+  const controllerRef = useRef<SubtitleFollowController>(undefined);
+
   useLayoutEffect(() => {
     const element = subtitleListRef.current;
     if (!element) return;
@@ -44,10 +49,16 @@ export const useSubtitleFollowScroll = (
         origin === 'tracksVisualization',
     });
     controller.reset();
+    controllerRef.current = controller;
 
     return () => {
+      controllerRef.current = undefined;
       wordDrag.dispose();
       controller.dispose();
     };
   }, [subtitle, subtitleCursor, subtitleListRef]);
+
+  return useCallback(() => {
+    controllerRef.current?.centerActive();
+  }, []);
 };

@@ -58,6 +58,7 @@ export type SubtitleFollowControllerOptions = {
 
 export type SubtitleFollowController = {
   reset: () => void;
+  centerActive: () => void;
   dispose: () => void;
 };
 
@@ -117,6 +118,7 @@ export const createSubtitleFollowController = (
 
   return {
     reset: controller.reset,
+    centerActive: controller.centerActive,
     dispose: () => {
       element.removeEventListener('click', handleClick);
       controller.dispose();

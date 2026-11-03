@@ -56,6 +56,7 @@ export type FollowScrollControllerOptions = {
 export type FollowScrollController = {
   reset: () => void;
   activate: (index: number, pointerClientY: number) => void;
+  centerActive: () => void;
   dispose: () => void;
 };
 
@@ -236,6 +237,14 @@ export const createFollowScrollController = (
         if (targetElement) {
           centerElement(targetElement, 'smooth');
         }
+      }
+    },
+    centerActive: () => {
+      clearReleaseTimeout();
+      scrollHeld = false;
+      const activeElement = locateElement(getActiveIndex());
+      if (activeElement) {
+        centerElement(activeElement, 'smooth');
       }
     },
     dispose: () => {
