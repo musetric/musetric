@@ -9,11 +9,8 @@ import { findSubtitleWordElement } from './subtitleWordHit.js';
 
 const knobSize = 12;
 const knobOverhang = 8;
-const knobInward = 10;
 const hitWidth = 40;
 const hitOverhang = 20;
-const screenEdgeMargin = 32;
-const shiftProperty = '--subtitle-loop-handle-shift';
 
 type SubtitleLoopHandleProps = {
   edge: LoopEdge;
@@ -44,11 +41,6 @@ const SubtitleLoopHandle: FC<SubtitleLoopHandleProps> = (props) => {
       const listRect = list.getBoundingClientRect();
       const x =
         edge === 'from' ? rect.left - wordInset : rect.right + wordInset;
-      const shift =
-        edge === 'from'
-          ? Math.max(0, screenEdgeMargin - x)
-          : Math.min(0, window.innerWidth - screenEdgeMargin - x);
-      root.style.setProperty(shiftProperty, `${shift}px`);
       root.style.height = `${rect.height}px`;
       root.style.transform = `translate(${x - listRect.left + list.scrollLeft}px, ${rect.top - listRect.top + list.scrollTop}px)`;
     };
@@ -63,7 +55,6 @@ const SubtitleLoopHandle: FC<SubtitleLoopHandleProps> = (props) => {
 
   const outer = edge === 'from' ? 'top' : 'bottom';
   const inner = edge === 'from' ? 'bottom' : 'top';
-  const inward = edge === 'from' ? 1 : -1;
 
   return (
     <Box ref={ref} sx={{ position: 'absolute', left: 0, top: 0, zIndex: 1 }}>
@@ -80,7 +71,7 @@ const SubtitleLoopHandle: FC<SubtitleLoopHandleProps> = (props) => {
       <Box
         sx={{
           position: 'absolute',
-          left: `calc(var(${shiftProperty}) + ${inward * knobInward - knobSize / 2}px)`,
+          left: -knobSize / 2,
           [outer]: -knobOverhang,
           width: knobSize,
           height: knobSize,
@@ -92,7 +83,7 @@ const SubtitleLoopHandle: FC<SubtitleLoopHandleProps> = (props) => {
         data-subtitle-loop-edge={edge}
         sx={{
           position: 'absolute',
-          left: `calc(var(${shiftProperty}) + ${edge === 'from' ? 0 : -hitWidth}px)`,
+          left: -hitWidth / 2,
           width: hitWidth,
           [outer]: -hitOverhang,
           [inner]: 0,
