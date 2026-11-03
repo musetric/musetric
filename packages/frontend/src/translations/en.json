@@ -120,7 +120,7 @@
   "pages.project.detailsMode.metronomeCaption": "Click",
   "pages.project.detailsView.text": "Text",
   "pages.project.detailsView.tracks": "Tracks",
-  "pages.project.loop.applyRange": "Apply range",
+  "pages.project.loop.applyRange": "Sing this range",
   "pages.project.loop.armed": "Recording starts at {{from}}",
   "pages.project.loop.armedBeats_one": "Recording starts at {{from}} · {{count}} beat",
   "pages.project.loop.armedBeats_other": "Recording starts at {{from}} · {{count}} beats",
