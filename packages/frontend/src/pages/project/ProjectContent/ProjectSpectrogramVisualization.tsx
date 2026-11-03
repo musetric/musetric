@@ -27,8 +27,6 @@ const noteNamesInset = 16;
 
 const leadBandTop = `calc(50% + ${stackedLaneGap / 2}px)`;
 
-const notesPickerInset = 32;
-
 const loopControlsBottom = 64;
 
 export const ProjectSpectrogramVisualization: FC = () => {
@@ -80,7 +78,17 @@ export const ProjectSpectrogramVisualization: FC = () => {
           <SpectrogramCanvas />
           <LoopOverlay />
           <SpectrogramNoteScale />
-          {spectrum ? (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: noteNamesInset + 8,
+              zIndex: 1,
+            }}
+          >
+            <RecordingPicker variant='picture' />
+          </Box>
+          {spectrum && (
             <>
               <Box
                 sx={{
@@ -92,17 +100,6 @@ export const ProjectSpectrogramVisualization: FC = () => {
                   pointerEvents: 'none',
                 }}
               >
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    left: 8,
-                    zIndex: 1,
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  <RecordingPicker variant='picture' />
-                </Box>
                 {emptyRecordingName !== undefined && (
                   <Typography
                     variant='body2'
@@ -139,17 +136,6 @@ export const ProjectSpectrogramVisualization: FC = () => {
                 />
               </Box>
             </>
-          ) : (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 8,
-                left: notesPickerInset,
-                zIndex: 1,
-              }}
-            >
-              <RecordingPicker variant='picture' />
-            </Box>
           )}
         </Box>
         <VisualizationCursor mode='spectrogram' />
