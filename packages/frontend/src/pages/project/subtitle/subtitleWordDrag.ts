@@ -61,6 +61,7 @@ type Drag = {
 export const createSubtitleWordDrag = (
   element: HTMLElement,
   subtitle: readonly api.subtitle.Segment[],
+  onFinish: () => void,
 ): SubtitleWordDrag => {
   let press: Press | undefined = undefined;
   let drag: Drag | undefined = undefined;
@@ -206,6 +207,7 @@ export const createSubtitleWordDrag = (
           )
         : undefined,
     );
+    onFinish();
     blockNextClick();
   };
 

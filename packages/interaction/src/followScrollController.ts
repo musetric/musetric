@@ -38,6 +38,15 @@ const shouldCenterSoughtElement = (
   return !targetCenterVisible || targetCenterY > centerY;
 };
 
+const isFullyVisible = (
+  containerElement: HTMLElement,
+  targetElement: HTMLElement,
+) => {
+  const rect = containerElement.getBoundingClientRect();
+  const targetRect = targetElement.getBoundingClientRect();
+  return targetRect.top >= rect.top && targetRect.bottom <= rect.bottom;
+};
+
 const defaultReleaseHoldMs = 650;
 
 type Unsubscribe = () => void;
@@ -50,6 +59,7 @@ export type FollowScrollControllerOptions = {
   getRevision: () => number;
   subscribeRevision: (callback: () => void) => Unsubscribe;
   isRevisionIgnored: () => boolean;
+  isVisibleElementKept?: () => boolean;
   releaseHoldMs?: number;
 };
 
@@ -57,6 +67,7 @@ export type FollowScrollController = {
   reset: () => void;
   activate: (index: number, pointerClientY: number) => void;
   centerActive: () => void;
+  revealActive: () => void;
   dispose: () => void;
 };
 
@@ -71,6 +82,7 @@ export const createFollowScrollController = (
     getRevision,
     subscribeRevision,
     isRevisionIgnored,
+    isVisibleElementKept,
     releaseHoldMs = defaultReleaseHoldMs,
   } = options;
   let scrollFrame: number | undefined = undefined;
@@ -112,6 +124,9 @@ export const createFollowScrollController = (
       activeElement.scrollIntoView({ block: 'center', behavior });
     }
   };
+
+  const isKeptInPlace = (targetElement: HTMLElement) =>
+    isVisibleElementKept?.() === true && isFullyVisible(element, targetElement);
 
   const holdScroll = () => {
     clearReleaseTimeout();
@@ -180,7 +195,11 @@ export const createFollowScrollController = (
     if (isRevisionIgnored() || scrollHeld) return;
 
     const activeElement = locateElement(getActiveIndex());
-    if (activeElement && shouldCenterSoughtElement(element, activeElement)) {
+    if (
+      activeElement &&
+      shouldCenterSoughtElement(element, activeElement) &&
+      !isKeptInPlace(activeElement)
+    ) {
       centerElement(activeElement, 'smooth');
     }
   });
@@ -206,7 +225,7 @@ export const createFollowScrollController = (
     if (activeChangeFromSeek || !shouldFollow || scrollHeld) return;
 
     const nextActiveElement = locateElement(nextActiveIndex);
-    if (nextActiveElement) {
+    if (nextActiveElement && !isKeptInPlace(nextActiveElement)) {
       centerElement(nextActiveElement, 'smooth');
     }
   });
@@ -234,7 +253,7 @@ export const createFollowScrollController = (
 
       if (isPointerBelowCenter(element, pointerClientY)) {
         const targetElement = locateElement(index);
-        if (targetElement) {
+        if (targetElement && !isKeptInPlace(targetElement)) {
           centerElement(targetElement, 'smooth');
         }
       }
@@ -244,6 +263,12 @@ export const createFollowScrollController = (
       scrollHeld = false;
       const activeElement = locateElement(getActiveIndex());
       if (activeElement) {
+        centerElement(activeElement, 'smooth');
+      }
+    },
+    revealActive: () => {
+      const activeElement = locateElement(getActiveIndex());
+      if (activeElement && !isFullyVisible(element, activeElement)) {
         centerElement(activeElement, 'smooth');
       }
     },

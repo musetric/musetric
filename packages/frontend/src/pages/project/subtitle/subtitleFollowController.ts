@@ -54,11 +54,13 @@ export type SubtitleFollowControllerOptions = {
   getSeekFrameIndex: (playbackTime: number) => number | undefined;
   seek: (frameIndex: number) => void;
   isIgnoredSeekOrigin: (origin: string) => boolean;
+  isVisibleLineKept: () => boolean;
 };
 
 export type SubtitleFollowController = {
   reset: () => void;
   centerActive: () => void;
+  revealActive: () => void;
   dispose: () => void;
 };
 
@@ -74,6 +76,7 @@ export const createSubtitleFollowController = (
     getSeekFrameIndex,
     seek,
     isIgnoredSeekOrigin,
+    isVisibleLineKept,
   } = options;
 
   const controller = createFollowScrollController({
@@ -84,6 +87,7 @@ export const createSubtitleFollowController = (
     getRevision: () => getSeekEvent().revision,
     subscribeRevision: subscribeSeekRevision,
     isRevisionIgnored: () => isIgnoredSeekOrigin(getSeekEvent().origin),
+    isVisibleElementKept: isVisibleLineKept,
   });
 
   const handleClick = (event: MouseEvent) => {
@@ -119,6 +123,7 @@ export const createSubtitleFollowController = (
   return {
     reset: controller.reset,
     centerActive: controller.centerActive,
+    revealActive: controller.revealActive,
     dispose: () => {
       element.removeEventListener('click', handleClick);
       controller.dispose();

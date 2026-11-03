@@ -24,7 +24,9 @@ export const useSubtitleFollowScroll = (
     const element = subtitleListRef.current;
     if (!element) return;
 
-    const wordDrag = createSubtitleWordDrag(element, subtitle);
+    const wordDrag = createSubtitleWordDrag(element, subtitle, () => {
+      controllerRef.current?.revealActive();
+    });
     const controller = createSubtitleFollowController({
       element,
       cursor: subtitleCursor,
@@ -47,6 +49,7 @@ export const useSubtitleFollowScroll = (
         origin === 'playhead' ||
         origin === 'spectrogramVisualization' ||
         origin === 'tracksVisualization',
+      isVisibleLineKept: () => engine.store.get().loopStage !== undefined,
     });
     controller.reset();
     controllerRef.current = controller;
