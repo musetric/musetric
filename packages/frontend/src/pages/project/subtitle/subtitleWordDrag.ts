@@ -1,7 +1,7 @@
 import { type api } from '@musetric/api';
 import { engine } from '../../../engine/engine.js';
 import { playHaptic } from '../haptics.js';
-import { moveLoop, previewLoop } from '../loop/loopActions.js';
+import { isLoopAvailable, moveLoop, previewLoop } from '../loop/loopActions.js';
 import {
   getLoopEdgePreview,
   getLoopForWords,
@@ -150,8 +150,8 @@ export const createSubtitleWordDrag = (
     const { anchor, current, grabbed } = press;
     const offset = getGrabOffset(press);
     clearPress();
-    const { loopStage, recording } = engine.store.get();
-    if (loopStage === 'sing' || recording) {
+    const state = engine.store.get();
+    if (state.loopStage === 'sing' || !isLoopAvailable(state)) {
       return;
     }
     const locked = pointerType !== 'mouse';

@@ -1,6 +1,16 @@
-import { type EngineRange, type EngineRangePlay } from '@musetric/engine';
+import {
+  type EngineRange,
+  type EngineRangePlay,
+  type EngineState,
+} from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { hideLoopView, showLoopView } from './loopView.js';
+
+export const isLoopAvailable = (state: EngineState): boolean =>
+  Boolean(state.frameCount) &&
+  !state.isSlave &&
+  !state.recording &&
+  state.statuses.realtime !== 'error';
 
 export const openLoop = (range: EngineRange) => {
   engine.player.openLoop(range);
