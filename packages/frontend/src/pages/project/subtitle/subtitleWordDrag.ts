@@ -15,6 +15,7 @@ import {
 
 const longPressMs = 350;
 const dragSlop = 6;
+const holdSlop = 12;
 const clickBlockMs = 400;
 
 const findTouch = (touches: TouchList, identifier: number | undefined) =>
@@ -159,22 +160,24 @@ export const createSubtitleWordDrag = (
       }
       return;
     }
-    if (
-      press?.pointerId !== event.pointerId ||
-      Math.hypot(
-        event.clientX - press.clientX,
-        event.clientY - press.clientY,
-      ) <= dragSlop
-    ) {
+    if (press?.pointerId !== event.pointerId) {
       return;
     }
+    const moved = Math.hypot(
+      event.clientX - press.clientX,
+      event.clientY - press.clientY,
+    );
     if (press.timer === undefined) {
-      start();
-      moveTo(event.clientX, event.clientY);
+      if (moved > dragSlop) {
+        start();
+        moveTo(event.clientX, event.clientY);
+      }
       return;
     }
-    clearPress();
-    stopListening();
+    if (moved > holdSlop) {
+      clearPress();
+      stopListening();
+    }
   };
 
   const handlePointerEnd = (event: PointerEvent) => {
