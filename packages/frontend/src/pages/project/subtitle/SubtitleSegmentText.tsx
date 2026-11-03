@@ -32,6 +32,7 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
       variant='h5'
       sx={[
         {
+          fontSize: { xs: '1.125rem', sm: '1.5rem' },
           fontWeight: 'bold',
           lineHeight: 1.18,
           textAlign: 'center',
