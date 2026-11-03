@@ -33,6 +33,9 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
       sx={[
         {
           fontSize: { xs: '1.125rem', sm: '1.5rem' },
+          '@media (orientation: landscape) and (max-height: 500px)': {
+            fontSize: '1.125rem',
+          },
           fontWeight: 'bold',
           lineHeight: 1.18,
           textAlign: 'center',
