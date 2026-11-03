@@ -130,7 +130,11 @@ export const FlowStep: FC<FlowStepProps> = (props) => {
           )}
           {active && <FlowStepDownload step={step} />}
           {step.error && (
-            <Typography variant='caption' color='error'>
+            <Typography
+              variant='caption'
+              color='error'
+              sx={{ overflowWrap: 'anywhere' }}
+            >
               {step.error}
             </Typography>
           )}
