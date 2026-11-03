@@ -12,11 +12,11 @@ export const moveLoopToTime = (
   if (state.loopStage === undefined) {
     return false;
   }
+  const { sampleRate } = engine.context;
+  if (state.range && isInsideLoop(state.range, time * sampleRate)) {
+    return state.recording;
+  }
   if (state.loopStage === 'range') {
-    const { sampleRate } = engine.context;
-    if (state.range && isInsideLoop(state.range, time * sampleRate)) {
-      return false;
-    }
     moveLoop(getLoopAtTime(subtitle, time, { ...state, sampleRate }));
   }
   return true;
