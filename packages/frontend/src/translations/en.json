@@ -129,7 +129,7 @@
   "pages.project.loop.close": "Close the loop",
   "pages.project.loop.closeRange": "Close the range",
   "pages.project.loop.deleteTry": "Delete {{name}}",
-  "pages.project.loop.empty": "The mic records the next pass as a try",
+  "pages.project.loop.empty": "Press the mic to record a try",
   "pages.project.loop.enter": "Loop the line",
   "pages.project.loop.insertFailed": "The try was not inserted. Try again.",
   "pages.project.loop.keepOriginal": "Keep the original",
