@@ -1,6 +1,7 @@
 import { Box, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useRef } from 'react';
+import { SubtitleLoopHandles } from './SubtitleLoopHandles.js';
 import { SubtitleSegment } from './SubtitleSegment.js';
 import { useSubtitleCursor } from './useSubtitleCursor.js';
 import { useSubtitleFollowScroll } from './useSubtitleFollowScroll.js';
@@ -24,7 +25,9 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
         width: '100%',
         height: '100%',
         minHeight: 0,
-        overflow: 'auto',
+        position: 'relative',
+        overflowX: 'hidden',
+        overflowY: 'auto',
         scrollbarGutter: 'stable',
       }}
     >
@@ -38,6 +41,7 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
         />
       ))}
       <Box sx={{ height: 'calc(50% - 2em)', flexShrink: 0 }} />
+      <SubtitleLoopHandles subtitle={subtitle} />
     </Stack>
   );
 };

@@ -3,13 +3,19 @@ import { engine } from '../../../engine/engine.js';
 import { playHaptic } from '../haptics.js';
 import { moveLoop, previewLoop } from '../loop/loopActions.js';
 import {
+  getLoopEdgePreview,
   getLoopForWords,
   isSameWord,
+  isWordBefore,
+  type LoopEdge,
   type SubtitleWordRef,
 } from '../loop/loopRange.js';
 import { createSubtitleEdgeScroll } from './subtitleEdgeScroll.js';
+import { getSubtitleLoopEdges } from './subtitleLoopBands.js';
 import {
+  findSubtitleLoopEdgeFromTarget,
   findSubtitleWordAt,
+  findSubtitleWordElement,
   findSubtitleWordFromTarget,
 } from './subtitleWordHit.js';
 
@@ -33,6 +39,8 @@ type Press = {
   clientX: number;
   clientY: number;
   anchor: SubtitleWordRef;
+  current: SubtitleWordRef;
+  grabbed: boolean;
   timer?: ReturnType<typeof setTimeout>;
 };
 
@@ -43,8 +51,11 @@ type Drag = {
   touchSeen: boolean;
   clientX: number;
   clientY: number;
+  offsetX: number;
+  offsetY: number;
   anchor: SubtitleWordRef;
   current: SubtitleWordRef;
+  grabbed: boolean;
 };
 
 export const createSubtitleWordDrag = (
@@ -65,7 +76,11 @@ export const createSubtitleWordDrag = (
     if (!drag) {
       return;
     }
-    const current = findSubtitleWordAt(element, drag.clientX, drag.clientY);
+    const current = findSubtitleWordAt(
+      element,
+      drag.clientX + drag.offsetX,
+      drag.clientY + drag.offsetY,
+    );
     if (current && !isSameWord(current, drag.current)) {
       drag.current = current;
       previewLoop(getRange(drag));
@@ -82,6 +97,32 @@ export const createSubtitleWordDrag = (
   const stopListening = () => {
     listening?.abort();
     listening = undefined;
+  };
+
+  const getGrabbedWords = (edge: LoopEdge) => {
+    const { range } = engine.store.get();
+    const edges =
+      range && getSubtitleLoopEdges(subtitle, range, engine.context.sampleRate);
+    if (!edges) {
+      return undefined;
+    }
+    return edge === 'from'
+      ? { anchor: edges.last, current: edges.first }
+      : { anchor: edges.first, current: edges.last };
+  };
+
+  const getGrabOffset = (value: Press) => {
+    const word = value.grabbed
+      ? findSubtitleWordElement(element, value.current)
+      : undefined;
+    if (!word) {
+      return { offsetX: 0, offsetY: 0 };
+    }
+    const rect = word.getBoundingClientRect();
+    return {
+      offsetX: rect.left + rect.width / 2 - value.clientX,
+      offsetY: rect.top + rect.height / 2 - value.clientY,
+    };
   };
 
   const blockNextClick = () => {
@@ -104,7 +145,9 @@ export const createSubtitleWordDrag = (
     if (!press) {
       return;
     }
-    const { pointerId, pointerType, touchId, clientX, clientY, anchor } = press;
+    const { pointerId, pointerType, touchId, clientX, clientY } = press;
+    const { anchor, current, grabbed } = press;
+    const offset = getGrabOffset(press);
     clearPress();
     if (engine.store.get().loopStage === 'sing') {
       return;
@@ -117,8 +160,10 @@ export const createSubtitleWordDrag = (
       touchSeen: false,
       clientX,
       clientY,
+      ...offset,
       anchor,
-      current: anchor,
+      current,
+      grabbed,
     };
     if (locked) {
       element.style.overflow = 'hidden';
@@ -142,14 +187,24 @@ export const createSubtitleWordDrag = (
     if (!drag) {
       return;
     }
+    const { anchor, current, grabbed, locked } = drag;
     const range = getRange(drag);
-    if (drag.locked) {
+    if (locked) {
       element.style.overflow = '';
     }
     drag = undefined;
     edgeScroll.stop();
     stopListening();
-    moveLoop(range);
+    moveLoop(
+      range,
+      grabbed
+        ? getLoopEdgePreview(
+            range,
+            isWordBefore(current, anchor) ? 'from' : 'to',
+            engine.context.sampleRate,
+          )
+        : undefined,
+    );
     blockNextClick();
   };
 
@@ -227,14 +282,15 @@ export const createSubtitleWordDrag = (
       return;
     }
     finish();
-    const anchor = findSubtitleWordFromTarget(
-      event.target,
-      event.clientX,
-      event.clientY,
-    );
+    const edge = findSubtitleLoopEdgeFromTarget(event.target);
+    const grabbedWords = edge ? getGrabbedWords(edge) : undefined;
+    const anchor =
+      grabbedWords?.anchor ??
+      findSubtitleWordFromTarget(event.target, event.clientX, event.clientY);
     if (!anchor) {
       return;
     }
+    const grabbed = grabbedWords !== undefined;
     clearPress();
     press = {
       pointerId: event.pointerId,
@@ -242,8 +298,10 @@ export const createSubtitleWordDrag = (
       clientX: event.clientX,
       clientY: event.clientY,
       anchor,
+      current: grabbedWords?.current ?? anchor,
+      grabbed,
       timer:
-        event.pointerType === 'mouse'
+        grabbed || event.pointerType === 'mouse'
           ? undefined
           : setTimeout(start, longPressMs),
     };

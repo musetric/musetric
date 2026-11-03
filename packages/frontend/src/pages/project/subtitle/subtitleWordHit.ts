@@ -1,7 +1,8 @@
-import { type SubtitleWordRef } from '../loop/loopRange.js';
+import { type LoopEdge, type SubtitleWordRef } from '../loop/loopRange.js';
 
 const wordSelector = '[data-subtitle-word-index]';
 const segmentSelector = '[data-subtitle-segment-index]';
+const edgeSelector = '[data-subtitle-loop-edge]';
 const lineDistanceWeight = 1000;
 
 const getDistance = (rect: DOMRect, clientX: number, clientY: number) => {
@@ -70,6 +71,25 @@ export const findSubtitleWordFromTarget = (
   const segment = target.closest<HTMLElement>(segmentSelector);
   return segment ? findWordInSegment(segment, clientX, clientY) : undefined;
 };
+
+export const findSubtitleLoopEdgeFromTarget = (
+  target: EventTarget | null,
+): LoopEdge | undefined => {
+  if (!(target instanceof Element)) {
+    return undefined;
+  }
+  const edge =
+    target.closest<HTMLElement>(edgeSelector)?.dataset.subtitleLoopEdge;
+  return edge === 'from' || edge === 'to' ? edge : undefined;
+};
+
+export const findSubtitleWordElement = (
+  list: HTMLElement,
+  ref: SubtitleWordRef,
+): HTMLElement | null =>
+  list.querySelector<HTMLElement>(
+    `[data-subtitle-segment-index="${ref.segmentIndex}"] [data-subtitle-word-index="${ref.wordIndex}"]`,
+  );
 
 export const findSubtitleWordAt = (
   list: HTMLElement,
