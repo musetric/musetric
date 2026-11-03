@@ -5,6 +5,11 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
+import {
+  pictureLabelHeight,
+  pictureLabelMaxWidth,
+  pictureLabelMinWidth,
+} from '../visualization/pictureLabel.js';
 import { useKeepFromGestures } from './useKeepFromGestures.js';
 
 export type RecordingPickerVariant = 'lane' | 'picture';
@@ -55,18 +60,23 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
               lane: {
                 backgroundColor: theme.palette.background.paper,
                 backgroundImage: 'var(--Paper-overlay)',
+                minWidth: 0,
+                maxWidth: 240,
+                height: 24,
+                '& .MuiButton-endIcon': { ml: 0.25 },
               },
               picture: {
                 backgroundColor: alpha(theme.palette.common.black, 0.8),
+                minWidth: pictureLabelMinWidth,
+                maxWidth: pictureLabelMaxWidth,
+                height: pictureLabelHeight,
+                justifyContent: 'flex-start',
+                '& .MuiButton-endIcon': { ml: 'auto', pl: 0.25 },
               },
             }[variant],
-            minWidth: 0,
-            maxWidth: 240,
-            height: 24,
             px: 0.75,
             borderRadius: 1,
             color: theme.palette.text.primary,
-            '& .MuiButton-endIcon': { ml: 0.25 },
             '&.Mui-disabled': { color: theme.palette.error.light },
             '@media (any-pointer: coarse)': {
               '&::after': {
