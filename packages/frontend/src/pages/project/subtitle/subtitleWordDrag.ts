@@ -123,6 +123,7 @@ export const createSubtitleWordDrag = (
       element.style.overflow = 'hidden';
       playHaptic('grab');
     }
+    edgeScroll.begin(clientY);
     previewLoop(getRange(drag));
   };
 

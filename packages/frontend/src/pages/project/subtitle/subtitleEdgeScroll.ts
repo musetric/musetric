@@ -1,10 +1,12 @@
-const minZonePixels = 40;
+const minZonePixels = 24;
 const zoneRatio = 0.15;
+const armPixels = 12;
 const maxStrength = 2;
 const viewsPerSecond = 0.8;
 const maxStepSeconds = 0.05;
 
 export type SubtitleEdgeScroll = {
+  begin: (clientY: number) => void;
   move: (clientY: number) => void;
   stop: () => void;
 };
@@ -14,6 +16,8 @@ export const createSubtitleEdgeScroll = (
   onScroll: () => void,
 ): SubtitleEdgeScroll => {
   let clientY = 0;
+  let highest = 0;
+  let lowest = 0;
   let frame: number | undefined = undefined;
   let last = 0;
   let position = 0;
@@ -22,11 +26,11 @@ export const createSubtitleEdgeScroll = (
     const rect = element.getBoundingClientRect();
     const zone = Math.max(minZonePixels, rect.height * zoneRatio);
     const y = clientY - rect.top;
-    if (y < zone) {
-      return -Math.min(maxStrength, (zone - y) / zone);
+    if (y < zone && lowest - clientY >= armPixels) {
+      return -Math.min(maxStrength, ((zone - y) / zone) ** 2);
     }
-    if (y > rect.height - zone) {
-      return Math.min(maxStrength, (y - rect.height + zone) / zone);
+    if (y > rect.height - zone && clientY - highest >= armPixels) {
+      return Math.min(maxStrength, ((y - rect.height + zone) / zone) ** 2);
     }
     return 0;
   };
@@ -52,8 +56,15 @@ export const createSubtitleEdgeScroll = (
   };
 
   return {
+    begin: (nextClientY) => {
+      clientY = nextClientY;
+      highest = nextClientY;
+      lowest = nextClientY;
+    },
     move: (nextClientY) => {
       clientY = nextClientY;
+      highest = Math.min(highest, nextClientY);
+      lowest = Math.max(lowest, nextClientY);
       if (frame === undefined && getStrength() !== 0) {
         last = performance.now();
         position = element.scrollTop;
