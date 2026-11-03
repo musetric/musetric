@@ -11,6 +11,8 @@ const isPointerBelowCenter = (
   return pointerClientY >= rect.top + rect.height / 2;
 };
 
+const centeredTolerancePixels = 2;
+
 const shouldFollowFromElement = (
   containerElement: HTMLElement,
   targetElement: HTMLElement,
@@ -18,7 +20,10 @@ const shouldFollowFromElement = (
   const rect = containerElement.getBoundingClientRect();
   const centerY = rect.top + rect.height / 2;
   const targetCenterY = getElementCenterY(targetElement);
-  return targetCenterY >= centerY && targetCenterY <= rect.bottom;
+  return (
+    targetCenterY >= centerY - centeredTolerancePixels &&
+    targetCenterY <= rect.bottom
+  );
 };
 
 const shouldCenterSoughtElement = (
