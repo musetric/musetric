@@ -11,7 +11,17 @@ export const trackKeyboardInset = (): void => {
     style.setProperty('--visible-height', `${viewport.height}px`);
   };
 
-  viewport.addEventListener('resize', update);
+  const revealFocusedField = () => {
+    const focused = document.activeElement;
+    if (focused instanceof HTMLInputElement) {
+      focused.scrollIntoView({ block: 'nearest' });
+    }
+  };
+
+  viewport.addEventListener('resize', () => {
+    update();
+    revealFocusedField();
+  });
   viewport.addEventListener('scroll', update);
   update();
 };
