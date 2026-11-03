@@ -1,7 +1,7 @@
 import { alpha, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { type api } from '@musetric/api';
-import { type FC, useEffect, useRef } from 'react';
+import { type FC, type RefObject, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
@@ -73,19 +73,22 @@ const setElementColor = (element: HTMLElement, color: string) => {
   element.style.color = color;
 };
 
-type ActiveSubtitleSegmentProps = {
-  segment: api.subtitle.Segment;
+const clearElementColor = (element: HTMLElement) => {
+  delete element.dataset.subtitleColor;
+  element.style.color = '';
 };
 
-const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
-  const { segment } = props;
-  const ref = useRef<HTMLDivElement>(null);
+const useActiveSubtitleWordColors = (
+  ref: RefObject<HTMLElement | null>,
+  segment: api.subtitle.Segment,
+  active: boolean,
+) => {
   const theme = useTheme();
 
   useEffect(() => {
     const element = ref.current;
 
-    if (!element) {
+    if (!element || !active) {
       return;
     }
 
@@ -117,14 +120,18 @@ const ActiveSubtitleSegment: FC<ActiveSubtitleSegmentProps> = (props) => {
 
     update();
 
-    return engine.store.subscribe(getSubtitlePlaybackTimeFromState, update);
-  }, [segment, theme]);
+    const unsubscribe = engine.store.subscribe(
+      getSubtitlePlaybackTimeFromState,
+      update,
+    );
 
-  return (
-    <Box ref={ref}>
-      <SubtitleSegmentText segment={segment} status='active' />
-    </Box>
-  );
+    return () => {
+      unsubscribe();
+      for (const timedElement of timedElements) {
+        clearElementColor(timedElement.element);
+      }
+    };
+  }, [ref, segment, active, theme]);
 };
 
 export type SubtitleSegmentProps = {
@@ -140,9 +147,12 @@ export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
     getSubtitleLoopWordsKey(segment, state, engine.context.sampleRate),
   );
   const loopedWords = parseSubtitleLoopWordsKey(loopedKey);
+  const ref = useRef<HTMLDivElement>(null);
+  useActiveSubtitleWordColors(ref, segment, status === 'active');
 
   return (
     <Box
+      ref={ref}
       data-subtitle-segment-index={index}
       sx={(theme) => ({
         py: 1,
@@ -158,11 +168,7 @@ export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
       })}
     >
       {loopedWords && <SubtitleLoopBand words={loopedWords} />}
-      {status === 'active' ? (
-        <ActiveSubtitleSegment segment={segment} />
-      ) : (
-        <SubtitleSegmentText segment={segment} status={status} />
-      )}
+      <SubtitleSegmentText segment={segment} status={status} />
     </Box>
   );
 };
