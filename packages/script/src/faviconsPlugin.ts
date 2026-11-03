@@ -26,6 +26,7 @@ const buildAssets = async (
   options: FaviconsOptions,
 ): Promise<Map<string, Asset>> => {
   const svg = readFileSync(options.svgPath, 'utf8');
+  const squareSvg = svg.replace(/(<rect\b[^>]*?) rx="[^"]*"/, '$1');
   const ico = await pngToIco([16, 32, 48].map((size) => renderPng(svg, size)));
   const manifest = {
     name: options.name,
@@ -67,6 +68,10 @@ const buildAssets = async (
     [
       'web-app-manifest-512x512.png',
       { source: renderPng(svg, 512), contentType: 'image/png' },
+    ],
+    [
+      'media-artwork.png',
+      { source: renderPng(squareSvg, 512), contentType: 'image/png' },
     ],
     [
       'site.webmanifest',

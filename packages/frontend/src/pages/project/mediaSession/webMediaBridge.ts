@@ -8,7 +8,7 @@ import {
 } from './mediaBridge.js';
 
 const artist = 'Musetric';
-const appIconUrl = '/apple-touch-icon.png';
+const defaultArtworkUrl = '/media-artwork.png';
 const silenceSampleRate = 8000;
 const positionToleranceSeconds = 0.25;
 
@@ -47,7 +47,7 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
     session.metadata = new MediaMetadata({
       title: state.title,
       artist,
-      artwork: [{ src: state.coverUrl ?? appIconUrl }],
+      artwork: [{ src: state.coverUrl ?? defaultArtworkUrl }],
     });
     setHandlers();
   };
