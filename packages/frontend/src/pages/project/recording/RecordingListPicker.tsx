@@ -5,7 +5,9 @@ import { useProjectStore } from '../store.js';
 import { RecordingList } from './RecordingList.js';
 
 export const RecordingListPicker: FC = () => {
-  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
+  const isDesktop = useMediaQuery(
+    (theme) => `${theme.breakpoints.up('sm')} and (min-height: 600px)`,
+  );
   const anchorEl = useProjectStore((state) => state.recordingListAnchorEl);
   const setAnchorEl = useProjectStore(
     (state) => state.setRecordingListAnchorEl,
@@ -50,7 +52,7 @@ export const RecordingListPicker: FC = () => {
           width: '100%',
           maxWidth: 460,
           mx: 'auto',
-          pb: 'max(8px, env(safe-area-inset-bottom))',
+          pb: 'max(8px, calc(env(safe-area-inset-bottom) - (100lvh - var(--visible-height, 100lvh))))',
         }}
       >
         <RecordingList compact onClose={close} />

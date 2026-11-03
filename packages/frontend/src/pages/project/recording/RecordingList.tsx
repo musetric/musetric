@@ -64,6 +64,9 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   const setDeletingRecordingId = useProjectStore(
     (state) => state.setDeletingRecordingId,
   );
+  const renaming = useProjectStore(
+    (state) => state.renamingRecordingId !== undefined,
+  );
   const creatingRecordingId = useProjectStore(
     (state) => state.creatingRecordingId,
   );
@@ -81,7 +84,11 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
     minHeight: compact ? 48 : 36,
     px: 3,
   };
+  const hiddenOnShortScreen = renaming
+    ? { '@media (max-height: 500px)': { display: 'none' } }
+    : undefined;
   const listRef = useRef<HTMLDivElement>(null);
+  const keyboardKeeperRef = useRef<HTMLInputElement>(null);
   const activeIndex = recordings.findIndex((recording) => recording.active);
 
   useLayoutEffect(() => {
@@ -98,7 +105,28 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   }, [activeIndex, layout.rowHeight, layout.rulerHeight]);
 
   return (
-    <Stack sx={{ py: 2, position: 'relative', maxHeight: '60dvh' }}>
+    <Stack
+      sx={{
+        py: 2,
+        position: 'relative',
+        maxHeight:
+          'min(60dvh, calc(var(--visible-height, 100dvh) - env(safe-area-inset-top) - 8px))',
+      }}
+    >
+      <Box
+        component='input'
+        ref={keyboardKeeperRef}
+        type='text'
+        tabIndex={-1}
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
+      />
       <IconButton
         size='small'
         aria-label={t('pages.project.recording.close')}
@@ -190,8 +218,11 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
           </Box>
         </Box>
       </Box>
-      <Divider sx={{ my: 2 }} />
-      <Stack direction='row' sx={{ alignItems: 'center', gap: 1, px: 2 }}>
+      <Divider sx={{ my: 2, ...hiddenOnShortScreen }} />
+      <Stack
+        direction='row'
+        sx={{ alignItems: 'center', gap: 1, px: 2, ...hiddenOnShortScreen }}
+      >
         {creatingRecordingId === undefined ? (
           <Button
             key='new'
@@ -199,12 +230,16 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
             startIcon={<AddRoundedIcon />}
             loading={created.isPending}
             onClick={() => {
+              keyboardKeeperRef.current?.focus();
               created.mutate(undefined, {
                 onSuccess: (response) => {
                   setCreatingRecordingId(
                     response.recordings.find((recording) => recording.active)
                       ?.id,
                   );
+                },
+                onError: () => {
+                  keyboardKeeperRef.current?.blur();
                 },
               });
             }}
