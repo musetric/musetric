@@ -36,6 +36,27 @@ export const createEnginePlayerLoop = (
     getDecoder().discardLoopTries();
   };
 
+  const cancelTry = async () => {
+    const currentState = store.get();
+    if (
+      currentState.playerCommandPending ||
+      currentState.loopTryPhase === undefined
+    ) {
+      return;
+    }
+
+    store.update((draft) => {
+      draft.playerCommandPending = true;
+    });
+    try {
+      await getEngineRecorder().finish();
+    } finally {
+      store.update((draft) => {
+        draft.playerCommandPending = false;
+      });
+    }
+  };
+
   return {
     openLoop: (range) => {
       discardTries();
@@ -50,6 +71,7 @@ export const createEnginePlayerLoop = (
       });
     },
     closeLoop: () => {
+      void cancelTry();
       discardTries();
       store.update((draft) => {
         draft.loopStage = undefined;
@@ -104,26 +126,7 @@ export const createEnginePlayerLoop = (
         });
       }
     },
-    cancelTry: async () => {
-      const currentState = store.get();
-      if (
-        currentState.playerCommandPending ||
-        currentState.loopTryPhase === undefined
-      ) {
-        return;
-      }
-
-      store.update((draft) => {
-        draft.playerCommandPending = true;
-      });
-      try {
-        await getEngineRecorder().finish();
-      } finally {
-        store.update((draft) => {
-          draft.playerCommandPending = false;
-        });
-      }
-    },
+    cancelTry,
     selectTry: (tryId) => {
       store.update((draft) => {
         draft.loopSelectedTryId = tryId;
