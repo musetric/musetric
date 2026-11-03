@@ -5,6 +5,11 @@ import { type TFunction } from 'i18next';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { chordBlockInset } from '../chords/ChordLane.js';
+import {
+  pictureLabelHeight,
+  pictureLabelMinWidth,
+} from '../visualization/pictureLabel.js';
 
 const stemLabels: Record<StemType, (t: TFunction) => string> = {
   lead: (t) => t('pages.project.waveform.stemType.lead'),
@@ -59,7 +64,17 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
           py: 0.25,
           borderRadius: 1,
           ...(props.variant === 'spectrogram'
-            ? { backgroundColor: alpha(theme.palette.common.black, 0.8) }
+            ? {
+                top: chordBlockInset,
+                display: 'flex',
+                alignItems: 'center',
+                minWidth: pictureLabelMinWidth,
+                height: pictureLabelHeight,
+                px: 0.75,
+                py: 0,
+                color: theme.palette.text.primary,
+                backgroundColor: alpha(theme.palette.common.black, 0.8),
+              }
             : {
                 backgroundColor: theme.palette.background.paper,
                 backgroundImage: 'var(--Paper-overlay)',

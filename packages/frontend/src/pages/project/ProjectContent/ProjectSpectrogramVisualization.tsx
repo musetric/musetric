@@ -83,9 +83,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
               position: 'absolute',
               top: chordBlockInset,
               left: noteNamesInset + 8,
-              height: chordLaneHeight - 2 * chordBlockInset,
               display: 'flex',
-              alignItems: 'center',
               zIndex: 1,
             }}
           >
