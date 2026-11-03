@@ -149,7 +149,8 @@ export const createSubtitleWordDrag = (
     const { anchor, current, grabbed } = press;
     const offset = getGrabOffset(press);
     clearPress();
-    if (engine.store.get().loopStage === 'sing') {
+    const { loopStage, recording } = engine.store.get();
+    if (loopStage === 'sing' || recording) {
       return;
     }
     const locked = pointerType !== 'mouse';

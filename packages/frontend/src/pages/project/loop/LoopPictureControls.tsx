@@ -33,6 +33,7 @@ export const LoopPictureControls: FC = () => {
     (state) =>
       Boolean(state.frameCount) &&
       !state.isSlave &&
+      !state.recording &&
       state.statuses.realtime !== 'error',
   );
 
