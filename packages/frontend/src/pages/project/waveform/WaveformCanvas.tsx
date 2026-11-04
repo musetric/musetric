@@ -10,8 +10,6 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useTrackVolume } from '../mix/trackVolume.js';
 import { RecordingEmptyHint } from '../recording/RecordingEmptyHint.js';
 
-const minimumWaveScale = 0.03;
-
 export type WaveformCanvasProps =
   | {
       kind: 'delivery';
@@ -54,9 +52,7 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
       <Box
         ref={setCanvas}
         component='canvas'
-        style={{
-          transform: `scaleY(${Math.max(minimumWaveScale, volume)})`,
-        }}
+        style={{ transform: `scaleY(${volume})` }}
         sx={{
           height: '100%',
           width: '100%',
