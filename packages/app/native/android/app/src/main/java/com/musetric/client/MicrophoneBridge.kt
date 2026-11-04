@@ -51,6 +51,7 @@ private const val BUFFER_SECONDS = 0.5
 private const val HEADER_BYTES = 32
 private const val NANOS_PER_SECOND = 1_000_000_000L
 private const val NANOS_PER_MILLI = 1_000_000.0
+private const val BUILT_IN_GAIN = 17.8f
 private const val COMPRESSOR_THRESHOLD_DB = -23.0
 private const val COMPRESSOR_RATIO = 1.3
 private const val COMPRESSOR_ATTACK_SECONDS = 0.05
@@ -64,14 +65,6 @@ private const val LIMIT = 0.891f
 private const val LIMIT_RELEASE_SECONDS = 0.05
 private const val SHELF_Q = 0.707
 private const val GALAXY_S24_ULTRA = "SM-S928"
-
-private class MicrophoneInput(val source: Int, val gain: Float)
-
-private val INPUTS =
-  listOf(
-    MicrophoneInput(MediaRecorder.AudioSource.VOICE_PERFORMANCE, 17.8f),
-    MicrophoneInput(MediaRecorder.AudioSource.VOICE_RECOGNITION, 3.16f),
-  )
 
 private class MicrophoneClock {
   @JavascriptInterface
@@ -180,7 +173,7 @@ private class Compressor(
   }
 }
 
-private class BuiltInProcessing(sampleRate: Int, private val gain: Float) {
+private class BuiltInProcessing(sampleRate: Int) {
   private val curve = builtInCurve(Build.MODEL, sampleRate)
   private val compressor =
     Compressor(
@@ -206,7 +199,7 @@ private class BuiltInProcessing(sampleRate: Int, private val gain: Float) {
     for (index in curve.indices) {
       filtered = curve[index].process(filtered)
     }
-    val compressed = leveler.process(compressor.process(filtered * gain))
+    val compressed = leveler.process(compressor.process(filtered * BUILT_IN_GAIN))
     val peak = abs(compressed)
     val target = if (peak > LIMIT) LIMIT / peak else 1f
     limiterGain =
@@ -219,13 +212,12 @@ private class Capture(
   val session: Int,
   val record: AudioRecord,
   val sampleRate: Int,
-  gain: Float,
   val proxy: JavaScriptReplyProxy,
   private val send: (ByteArray) -> Unit,
 ) {
   @Volatile private var running = true
   @Volatile private var builtIn = false
-  private val processing = BuiltInProcessing(sampleRate, gain)
+  private val processing = BuiltInProcessing(sampleRate)
   private val thread = Thread({ pump() }, "musetric-microphone")
   private val routing = AudioRouting.OnRoutingChangedListener { updateRoute() }
 
@@ -473,19 +465,15 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
       return
     }
     stopCapture()
-    val opened =
-      INPUTS.firstNotNullOfOrNull { input ->
-        createRecord(sampleRate, input.source)?.let { record -> record to input.gain }
-      }
-    if (opened == null) {
+    val record = createRecord(sampleRate)
+    if (record == null) {
       fail(pending.proxy, pending.id, UNAVAILABLE)
       return
     }
-    val (record, gain) = opened
     record.setPreferredDevice(device)
     session += 1
     val proxy = pending.proxy
-    val next = Capture(session, record, sampleRate, gain, proxy) { bytes ->
+    val next = Capture(session, record, sampleRate, proxy) { bytes ->
       mainHandler.post { proxy.postMessage(bytes) }
     }
     if (!next.start()) {
@@ -506,7 +494,7 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
   }
 
   @SuppressLint("MissingPermission")
-  private fun createRecord(sampleRate: Int, source: Int): AudioRecord? {
+  private fun createRecord(sampleRate: Int): AudioRecord? {
     val minimum =
       AudioRecord.getMinBufferSize(
         sampleRate,
@@ -526,7 +514,7 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
     val record =
       runCatching {
           AudioRecord.Builder()
-            .setAudioSource(source)
+            .setAudioSource(MediaRecorder.AudioSource.VOICE_PERFORMANCE)
             .setAudioFormat(format)
             .setBufferSizeInBytes(bufferBytes)
             .build()
