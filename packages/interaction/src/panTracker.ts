@@ -2,19 +2,21 @@ import { type InertialDragVelocityTracker } from './inertialDrag.js';
 import { type GestureAxis } from './multiPointerGesture.js';
 import { type PointerInputType } from './pointerType.js';
 
+const xLockDistance = 8;
+const yLockDistance = 16;
+const yDominance = 2;
+const undecidedLockDistance = 24;
+
 const resolveAxis = (
-  fixedAxis: GestureAxis | undefined,
-  axisLockDistance: number,
   deltaX: number,
   deltaY: number,
 ): GestureAxis | undefined => {
-  if (fixedAxis) {
-    const axisDelta = fixedAxis === 'x' ? deltaX : deltaY;
-    if (Math.abs(axisDelta) < axisLockDistance) return undefined;
-    return fixedAxis;
-  }
-  if (Math.hypot(deltaX, deltaY) < axisLockDistance) return undefined;
-  return Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
+  const x = Math.abs(deltaX);
+  const y = Math.abs(deltaY);
+  if (x >= xLockDistance && x >= y) return 'x';
+  if (y >= yLockDistance && y >= x * yDominance) return 'y';
+  if (Math.hypot(x, y) < undecidedLockDistance) return undefined;
+  return x >= y ? 'x' : 'y';
 };
 
 export type CreatePanVelocityTracker = (
@@ -23,8 +25,6 @@ export type CreatePanVelocityTracker = (
 ) => InertialDragVelocityTracker;
 
 export type CreatePanTrackerOptions = {
-  fixedAxis: GestureAxis | undefined;
-  axisLockDistance: number;
   createVelocityTracker: CreatePanVelocityTracker | undefined;
 };
 
@@ -70,7 +70,7 @@ export type PanTracker = {
 export const createPanTracker = (
   options: CreatePanTrackerOptions,
 ): PanTracker => {
-  const { fixedAxis, axisLockDistance, createVelocityTracker } = options;
+  const { createVelocityTracker } = options;
   let state: PanState | undefined = undefined;
 
   return {
@@ -94,27 +94,23 @@ export const createPanTracker = (
       if (current.axis === undefined) {
         const deltaX = pointer.x - current.startX;
         const deltaY = pointer.y - current.startY;
-        const axis = resolveAxis(fixedAxis, axisLockDistance, deltaX, deltaY);
+        const axis = resolveAxis(deltaX, deltaY);
         if (!axis) return undefined;
-        const startPosition = axis === 'x' ? current.startX : current.startY;
+        const lockPosition = axis === 'x' ? pointer.x : pointer.y;
         current.axis = axis;
-        current.lastPosition = startPosition;
+        current.lastPosition = lockPosition;
         current.velocityTracker = createVelocityTracker?.(
-          startPosition,
+          lockPosition,
           performance.now(),
         );
-        const currentPosition = axis === 'x' ? pointer.x : pointer.y;
-        current.lastPosition = currentPosition;
-        const velocity =
-          current.velocityTracker?.add(currentPosition, performance.now()) ?? 0;
         return {
           justLockedAxis: true,
           axis,
           pointerType: current.pointerType,
           startClientX: current.startX,
           startClientY: current.startY,
-          delta: currentPosition - startPosition,
-          velocity,
+          delta: 0,
+          velocity: 0,
         };
       }
 
