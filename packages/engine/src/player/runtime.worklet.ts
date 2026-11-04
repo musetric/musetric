@@ -213,7 +213,6 @@ export const createPlayerRuntime = async (
       }
 
       applyLatencyFrameCounts(message);
-      position.begin(position.getFrameIndex());
       metronome.reset(position.getFrameIndex());
       playing = true;
       recordingRuntime.resetInputOffset();
@@ -222,6 +221,7 @@ export const createPlayerRuntime = async (
     stop: (message) => {
       revision = message.revision;
       playing = false;
+      position.begin(message.frameIndex);
       metronome.clear();
       publishHeld();
       setPlaying();

@@ -120,9 +120,16 @@ export const createSpectrogramRuntime = async (
     if (playing) {
       return false;
     }
+    if (rendering) {
+      return true;
+    }
     const request = renderRequest;
     await renderFromPlayhead();
-    return request !== renderRequest || processor.hasPendingWork();
+    return (
+      request !== renderRequest ||
+      processor.hasPendingWork() ||
+      playhead.read().rate !== 0
+    );
   });
 
   const renderPaused = () => {

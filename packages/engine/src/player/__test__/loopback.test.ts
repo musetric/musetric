@@ -191,7 +191,10 @@ const recordUntilHeard = async (heardSeconds: number) => {
   for (let block = 0; block < heardBlocks; block += 1) {
     played.push(...harness.process(loopBack(block)));
   }
-  harness.player.methods.stop({ revision: 2 });
+  harness.player.methods.stop({
+    revision: 2,
+    frameIndex: Math.round(heardSeconds * rate),
+  });
   harness.player.methods.flushRecording();
   await settle();
   for (let block = heardBlocks; block < heardBlocks + 24; block += 1) {

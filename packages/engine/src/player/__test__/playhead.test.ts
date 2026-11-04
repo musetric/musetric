@@ -92,6 +92,41 @@ describe('player playhead', () => {
     );
   });
 
+  it('holds the frame it is stopped on and plays on from it', async () => {
+    const { harness, run } = await createPlayer();
+    const play = () => {
+      harness.player.methods.play({
+        revision: 1,
+        latencyFrameCount: outputLatency,
+        inputLatencyFrameCount: 0,
+      });
+    };
+    harness.player.methods.seek({ frameIndex: rate, revision: 1 });
+    play();
+    await settle();
+    await run(100);
+
+    const stopFrame = rate + 12345;
+    harness.player.methods.stop({ revision: 1, frameIndex: stopFrame });
+    await settle();
+    const held = await run(10);
+    expect(held.frameIndex).toBe(stopFrame);
+    expect(held.rate).toBe(0);
+
+    play();
+    await settle();
+    const started = await run(10);
+    expect(started.frameIndex).toBe(stopFrame);
+    const moving = await run(100);
+    expect(moving.frameIndex).toBe(
+      renderedFrame(
+        stopFrame,
+        [{ blocks: 110, rate: 1 }],
+        moving.contextFrame - moving.startContextFrame,
+      ),
+    );
+  });
+
   it('wraps the heard frame at the loop end an output latency after the render', async () => {
     const { harness, run } = await createPlayer();
     const range = { fromFrame: rate, toFrame: rate + 50 * blockSize };
