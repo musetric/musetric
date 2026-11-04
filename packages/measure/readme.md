@@ -9,9 +9,9 @@ the open project, deletes it afterwards and writes the runs and `report.md` to
 
 | Command                                           | What it measures                                                                                                                              |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `yarn workspace @musetric/measure measure:timing` | The playhead against the click the microphone hears, the take against the beats ([#1059](https://github.com/musetric/musetric/issues/1059))   |
-| `yarn workspace @musetric/measure measure:delay`  | How far the voice line, the spectrogram and the newest audio trail the playhead ([#1071](https://github.com/musetric/musetric/issues/1071))   |
-| `yarn workspace @musetric/measure measure:sound`  | A synthetic file through the browser path and through a take, gaps in a long take ([#1070](https://github.com/musetric/musetric/issues/1070)) |
+| `yarn workspace @musetric/measure measure:timing` | The playhead against the click the microphone hears, the take against the beats ([#1072](https://github.com/musetric/musetric/issues/1072))   |
+| `yarn workspace @musetric/measure measure:delay`  | How far the voice line, the spectrogram and the newest audio trail the playhead ([#1072](https://github.com/musetric/musetric/issues/1072))   |
+| `yarn workspace @musetric/measure measure:sound`  | A synthetic file through the browser path and through a take, gaps in a long take ([#1072](https://github.com/musetric/musetric/issues/1072)) |
 
 Every command first runs the app's calibration check and stops if it fails; a
 call it cannot parse prints its options. Open a project before running one.

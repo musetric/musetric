@@ -51,7 +51,7 @@ private const val BUFFER_SECONDS = 0.5
 private const val HEADER_BYTES = 32
 private const val NANOS_PER_SECOND = 1_000_000_000L
 private const val NANOS_PER_MILLI = 1_000_000.0
-private const val BUILT_IN_GAIN = 3.16f
+private const val BUILT_IN_GAIN = 17.8f
 private const val COMPRESSOR_THRESHOLD_DB = -23.0
 private const val COMPRESSOR_RATIO = 1.3
 private const val COMPRESSOR_ATTACK_SECONDS = 0.05
@@ -63,12 +63,8 @@ private const val LEVELER_RELEASE_SECONDS = 0.15
 private const val DETECTOR_CUTOFF_HZ = 100.0
 private const val LIMIT = 0.891f
 private const val LIMIT_RELEASE_SECONDS = 0.05
-private const val TREBLE_SHELF_HZ = 3000.0
-private const val TREBLE_SHELF_DB = -7.0
-private const val TREBLE_SHELF_Q = 0.707
-private const val TREBLE_CUTOFF_HZ = 6500.0
-private const val TREBLE_CUTOFF_FIRST_Q = 0.541196
-private const val TREBLE_CUTOFF_SECOND_Q = 1.306563
+private const val SHELF_Q = 0.707
+private const val GALAXY_S24_ULTRA = "SM-S928"
 
 private class MicrophoneClock {
   @JavascriptInterface
@@ -105,11 +101,19 @@ private fun biquad(b0: Double, b1: Double, b2: Double, a0: Double, a1: Double, a
     (a2 / a0).toFloat(),
   )
 
-private fun lowPass(frequency: Double, q: Double, sampleRate: Int): Biquad {
+private fun peaking(frequency: Double, gainDb: Double, q: Double, sampleRate: Int): Biquad {
+  val amplitude = 10.0.pow(gainDb / 40)
   val omega = 2 * PI * frequency / sampleRate
   val alpha = sin(omega) / (2 * q)
   val cosine = cos(omega)
-  return biquad((1 - cosine) / 2, 1 - cosine, (1 - cosine) / 2, 1 + alpha, -2 * cosine, 1 - alpha)
+  return biquad(
+    1 + alpha * amplitude,
+    -2 * cosine,
+    1 - alpha * amplitude,
+    1 + alpha / amplitude,
+    -2 * cosine,
+    1 - alpha / amplitude,
+  )
 }
 
 private fun highShelf(frequency: Double, gainDb: Double, q: Double, sampleRate: Int): Biquad {
@@ -126,6 +130,23 @@ private fun highShelf(frequency: Double, gainDb: Double, q: Double, sampleRate: 
     (amplitude + 1) - (amplitude - 1) * cosine - slope,
   )
 }
+
+private fun builtInCurve(model: String, sampleRate: Int): Array<Biquad> =
+  when {
+    model.startsWith(GALAXY_S24_ULTRA) ->
+      arrayOf(
+        highShelf(6175.0, -3.2, SHELF_Q, sampleRate),
+        peaking(4348.0, -2.6, 3.0, sampleRate),
+        peaking(4786.0, -2.8, 3.0, sampleRate),
+        peaking(9407.0, -13.5, 3.0, sampleRate),
+        peaking(8890.0, -8.7, 2.9, sampleRate),
+      )
+    else ->
+      arrayOf(
+        peaking(5821.0, -4.5, 1.07, sampleRate),
+        peaking(8707.0, -13.5, 1.2, sampleRate),
+      )
+  }
 
 private class Compressor(
   thresholdDb: Double,
@@ -153,9 +174,7 @@ private class Compressor(
 }
 
 private class BuiltInProcessing(sampleRate: Int) {
-  private val shelf = highShelf(TREBLE_SHELF_HZ, TREBLE_SHELF_DB, TREBLE_SHELF_Q, sampleRate)
-  private val firstCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_FIRST_Q, sampleRate)
-  private val secondCutoff = lowPass(TREBLE_CUTOFF_HZ, TREBLE_CUTOFF_SECOND_Q, sampleRate)
+  private val curve = builtInCurve(Build.MODEL, sampleRate)
   private val compressor =
     Compressor(
       COMPRESSOR_THRESHOLD_DB,
@@ -176,7 +195,10 @@ private class BuiltInProcessing(sampleRate: Int) {
   private var limiterGain = 1f
 
   fun process(sample: Float): Float {
-    val filtered = secondCutoff.process(firstCutoff.process(shelf.process(sample)))
+    var filtered = sample
+    for (index in curve.indices) {
+      filtered = curve[index].process(filtered)
+    }
     val compressed = leveler.process(compressor.process(filtered * BUILT_IN_GAIN))
     val peak = abs(compressed)
     val target = if (peak > LIMIT) LIMIT / peak else 1f
@@ -492,7 +514,7 @@ private class MicrophoneBridge(private val activity: AppCompatActivity) :
     val record =
       runCatching {
           AudioRecord.Builder()
-            .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+            .setAudioSource(MediaRecorder.AudioSource.VOICE_PERFORMANCE)
             .setAudioFormat(format)
             .setBufferSizeInBytes(bufferBytes)
             .build()
