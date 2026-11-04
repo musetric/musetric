@@ -1,6 +1,7 @@
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
 import { alpha, Box, Stack, Typography } from '@mui/material';
+import { createScaledDrag } from '@musetric/interaction';
 import { type FC, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -23,7 +24,7 @@ type VolumeDrag = {
   pointerId: number;
   startX: number;
   startPercent: number;
-  moved: boolean;
+  getPercent: ((position: number) => number) | undefined;
 };
 
 export type TrackVolumeCellProps = {
@@ -78,34 +79,34 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
             pointerId: event.pointerId,
             startX: event.clientX,
             startPercent: percent,
-            moved: false,
+            getPercent: undefined,
           };
         }}
         onPointerMove={(event) => {
           const drag = dragRef.current;
           if (drag?.pointerId !== event.pointerId) return;
-          if (!drag.moved) {
+          if (!drag.getPercent) {
             if (Math.abs(event.clientX - drag.startX) < dragLockDistance) {
               return;
             }
-            drag.moved = true;
-            drag.startX = event.clientX;
+            const rect = event.currentTarget.getBoundingClientRect();
+            drag.getPercent = createScaledDrag({
+              startPosition: event.clientX,
+              startValue: drag.startPercent,
+              maxValue: volumeFullPercent,
+              min: rect.left,
+              max: rect.right,
+            });
             setDragging(true);
           }
-          const offset = event.clientX - drag.startX;
-          changePercent(
-            Math.round(
-              drag.startPercent +
-                (offset / event.currentTarget.clientWidth) * volumeFullPercent,
-            ),
-          );
+          changePercent(Math.round(drag.getPercent(event.clientX)));
         }}
         onPointerUp={(event) => {
           const drag = dragRef.current;
           if (drag?.pointerId !== event.pointerId) return;
           dragRef.current = undefined;
           setDragging(false);
-          if (!drag.moved) {
+          if (!drag.getPercent) {
             toggleMute();
           }
         }}
@@ -114,7 +115,7 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
           if (drag?.pointerId !== event.pointerId) return;
           dragRef.current = undefined;
           setDragging(false);
-          if (drag.moved) {
+          if (drag.getPercent) {
             setTrackVolume(target, drag.startPercent / volumeFullPercent);
           }
         }}
