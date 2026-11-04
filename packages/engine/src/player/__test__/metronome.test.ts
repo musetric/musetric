@@ -64,8 +64,8 @@ const createPlayer = async () => {
     }
     return played.findIndex((value) => Math.abs(value) > 0.01) - 1;
   };
-  const stop = async () => {
-    player.stop({ revision: 1 });
+  const stop = async (frameIndex: number) => {
+    player.stop({ revision: 1, frameIndex });
     await settle();
   };
   return { playClickAt, stop };
@@ -81,8 +81,8 @@ describe('player metronome', () => {
     const player = await createPlayer();
     const blocks = Math.ceil((beat - start + latency / 2) / blockSize);
     await player.playClickAt(blocks);
-    await player.stop();
     const heard = start + blocks * blockSize - latency;
+    await player.stop(heard);
     expect(await player.playClickAt(blocks)).toBe(beat - heard);
   });
 });

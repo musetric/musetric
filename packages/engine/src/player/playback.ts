@@ -309,9 +309,16 @@ export const createEnginePlayback = async (
       await playingPromise;
     },
     stop: async () => {
+      stopFrameIndexPump();
       const { revision } = store.get().seekEvent;
+      const frameIndex = isCurrentRevision(playhead.read().revision)
+        ? playhead.readFrameIndex()
+        : store.get().frameIndex;
+      store.update((state) => {
+        state.frameIndex = frameIndex;
+      });
       const playingPromise = createPlayingPromise(revision);
-      port.methods.stop({ revision });
+      port.methods.stop({ revision, frameIndex });
       return await playingPromise;
     },
     setFrozen: (frozen) => {

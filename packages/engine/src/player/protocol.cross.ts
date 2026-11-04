@@ -21,7 +21,7 @@ export type PlayerOutboundMethods = {
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
   }) => void;
-  stop: (message: { revision: number }) => void;
+  stop: (message: { revision: number; frameIndex: number }) => void;
   setFrozen: (message: { frozen: boolean }) => void;
   seek: (message: { frameIndex: number; revision: number }) => void;
   setLatency: (message: {
