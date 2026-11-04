@@ -2,7 +2,7 @@ import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
 import { alpha, Box, Stack, Typography } from '@mui/material';
 import { createScaledDrag } from '@musetric/interaction';
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { playHaptic } from '../haptics.js';
@@ -41,7 +41,6 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
   );
   const dragRef = useRef<VolumeDrag>(undefined);
   const audibleVolumeRef = useRef(volume > 0 ? volume : 1);
-  const [dragging, setDragging] = useState(false);
   const percent = Math.round(volume * volumeFullPercent);
   const muted = volume === 0;
 
@@ -97,7 +96,6 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
               min: rect.left,
               max: rect.right,
             });
-            setDragging(true);
           }
           changePercent(Math.round(drag.getPercent(event.clientX)));
         }}
@@ -105,7 +103,6 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
           const drag = dragRef.current;
           if (drag?.pointerId !== event.pointerId) return;
           dragRef.current = undefined;
-          setDragging(false);
           if (!drag.getPercent) {
             toggleMute();
           }
@@ -114,7 +111,6 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
           const drag = dragRef.current;
           if (drag?.pointerId !== event.pointerId) return;
           dragRef.current = undefined;
-          setDragging(false);
           if (drag.getPercent) {
             setTrackVolume(target, drag.startPercent / volumeFullPercent);
           }
@@ -177,9 +173,17 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
           ) : (
             <VolumeUpRoundedIcon sx={{ fontSize: iconSize }} />
           )}
-          <Typography variant='caption' noWrap sx={{ minWidth: 0 }}>
-            {dragging ? `${percent}%` : name}
-          </Typography>
+          <Stack sx={{ minWidth: 0 }}>
+            <Typography variant='caption' noWrap sx={{ lineHeight: 1.25 }}>
+              {name}
+            </Typography>
+            <Typography
+              variant='caption'
+              sx={{ color: 'text.secondary', lineHeight: 1.25 }}
+            >
+              {`${percent}%`}
+            </Typography>
+          </Stack>
         </Stack>
       </Box>
       {target.kind === 'recording' && (
