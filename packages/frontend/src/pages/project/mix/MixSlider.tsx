@@ -8,7 +8,9 @@ import { playHaptic } from '../haptics.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
 import {
   playVolumeTick,
+  rememberTrackVolume,
   setTrackVolume,
+  toggleTrackMute,
   type TrackVolumeTarget,
   useTrackVolume,
   volumeFullPercent,
@@ -57,7 +59,7 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
             }
             onClick={() => {
               playHaptic('detent');
-              setTrackVolume(target, muted ? 1 : 0);
+              toggleTrackMute(target);
             }}
           >
             {muted ? (
@@ -75,6 +77,9 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
         max={volumeFullPercent}
         marks={notches}
         value={volumePercent}
+        onPointerDownCapture={() => {
+          rememberTrackVolume(target);
+        }}
         onChange={(_, value) => {
           playVolumeTick(volumePercent, value);
           setTrackVolume(target, value / volumeFullPercent);

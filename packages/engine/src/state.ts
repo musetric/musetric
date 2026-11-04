@@ -130,6 +130,9 @@ export type EngineState = {
   trackVolumes: Record<StemType, number> & {
     recording: number;
   };
+  audibleTrackVolumes: Record<StemType, number> & {
+    recording: number;
+  };
   metronomeEnabled: boolean;
   metronomeVolume: number;
   metronomeBeats: number[];

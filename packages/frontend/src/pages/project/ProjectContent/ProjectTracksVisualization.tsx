@@ -1,7 +1,7 @@
 import { alpha, Box, Typography } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
 import { type FC, useEffect, useRef } from 'react';
-import { type TrackVolumeTarget } from '../mix/trackVolume.js';
+import { getTrackKey, type TrackVolumeTarget } from '../mix/trackVolume.js';
 import { TrackVolumeCell } from '../mix/TrackVolumeCell.js';
 import { keepSystemGesturesOut } from '../systemGestures.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
@@ -18,9 +18,6 @@ const tracks: readonly TrackVolumeTarget[] = [
   { kind: 'recording' },
   ...stemTypes.map((stemType) => ({ kind: 'delivery' as const, stemType })),
 ];
-
-const getTrackKey = (track: TrackVolumeTarget) =>
-  track.kind === 'recording' ? track.kind : track.stemType;
 
 const rowsSx = {
   display: 'grid',

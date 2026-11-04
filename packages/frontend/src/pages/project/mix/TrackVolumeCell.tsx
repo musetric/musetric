@@ -2,7 +2,7 @@ import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
 import { alpha, Box, Stack, Typography } from '@mui/material';
 import { createScaledDrag } from '@musetric/interaction';
-import { type FC, useEffect, useRef } from 'react';
+import { type FC, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { playHaptic } from '../haptics.js';
@@ -10,7 +10,9 @@ import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { useTrackName } from '../waveform/trackName.js';
 import {
   playVolumeTick,
+  rememberTrackVolume,
   setTrackVolume,
+  toggleTrackMute,
   type TrackVolumeTarget,
   useTrackVolume,
   volumeFullPercent,
@@ -40,15 +42,8 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
     (state) => state.statuses.realtime === 'error',
   );
   const dragRef = useRef<VolumeDrag>(undefined);
-  const audibleVolumeRef = useRef(volume > 0 ? volume : 1);
   const percent = Math.round(volume * volumeFullPercent);
   const muted = volume === 0;
-
-  useEffect(() => {
-    if (volume > 0) {
-      audibleVolumeRef.current = volume;
-    }
-  }, [volume]);
 
   const changePercent = (next: number) => {
     const limited = Math.max(0, Math.min(next, volumeFullPercent));
@@ -58,7 +53,7 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
 
   const toggleMute = () => {
     playHaptic('detent');
-    setTrackVolume(target, muted ? audibleVolumeRef.current : 0);
+    toggleTrackMute(target);
   };
 
   return (
@@ -88,6 +83,7 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
             if (Math.abs(event.clientX - drag.startX) < dragLockDistance) {
               return;
             }
+            rememberTrackVolume(target);
             const rect = event.currentTarget.getBoundingClientRect();
             drag.getPercent = createScaledDrag({
               startPosition: event.clientX,

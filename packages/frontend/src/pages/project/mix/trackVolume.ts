@@ -26,19 +26,32 @@ export type TrackVolumeTarget =
       kind: 'recording';
     };
 
+export const getTrackKey = (target: TrackVolumeTarget) =>
+  target.kind === 'recording' ? target.kind : target.stemType;
+
 export const setTrackVolume = (target: TrackVolumeTarget, value: number) => {
   engine.store.update((state) => {
-    if (target.kind === 'recording') {
-      state.trackVolumes.recording = value;
-      return;
+    state.trackVolumes[getTrackKey(target)] = value;
+  });
+};
+
+export const rememberTrackVolume = (target: TrackVolumeTarget) => {
+  const key = getTrackKey(target);
+  engine.store.update((state) => {
+    if (state.trackVolumes[key] > 0) {
+      state.audibleTrackVolumes[key] = state.trackVolumes[key];
     }
-    state.trackVolumes[target.stemType] = value;
+  });
+};
+
+export const toggleTrackMute = (target: TrackVolumeTarget) => {
+  rememberTrackVolume(target);
+  const key = getTrackKey(target);
+  engine.store.update((state) => {
+    state.trackVolumes[key] =
+      state.trackVolumes[key] > 0 ? 0 : state.audibleTrackVolumes[key];
   });
 };
 
 export const useTrackVolume = (target: TrackVolumeTarget) =>
-  useEngineStore((state) =>
-    target.kind === 'recording'
-      ? state.trackVolumes.recording
-      : state.trackVolumes[target.stemType],
-  );
+  useEngineStore((state) => state.trackVolumes[getTrackKey(target)]);
