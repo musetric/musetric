@@ -4,22 +4,22 @@ import { IconButton, Slider, Stack, Typography } from '@mui/material';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { playCrossedTick, playHaptic } from '../haptics.js';
+import { playHaptic } from '../haptics.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
 import {
+  playVolumeTick,
   setTrackVolume,
   type TrackVolumeTarget,
   useTrackVolume,
+  volumeFullPercent,
+  volumeMajorNotchIndex,
+  volumeTickEvery,
 } from './trackVolume.js';
 
-const fullPercent = 100;
-const tickEvery = 10;
-const majorTickEvery = 50;
 const notches = Array.from(
-  { length: fullPercent / tickEvery - 1 },
-  (_, index) => ({ value: (index + 1) * tickEvery }),
+  { length: volumeFullPercent / volumeTickEvery - 1 },
+  (_, index) => ({ value: (index + 1) * volumeTickEvery }),
 );
-const majorNotchIndex = majorTickEvery / tickEvery - 1;
 
 export type MixSliderProps = {
   target: TrackVolumeTarget;
@@ -32,7 +32,7 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const volumePercent = Math.round(trackVolume * fullPercent);
+  const volumePercent = Math.round(trackVolume * volumeFullPercent);
   const muted = trackVolume === 0;
 
   return (
@@ -72,17 +72,12 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
         color='primary'
         disabled={realtimeFailed}
         min={0}
-        max={fullPercent}
+        max={volumeFullPercent}
         marks={notches}
         value={volumePercent}
         onChange={(_, value) => {
-          playCrossedTick(
-            volumePercent,
-            value,
-            tickEvery,
-            (tick) => tick % majorTickEvery === 0,
-          );
-          setTrackVolume(target, value / fullPercent);
+          playVolumeTick(volumePercent, value);
+          setTrackVolume(target, value / volumeFullPercent);
         }}
         sx={{
           height: 4,
@@ -97,7 +92,9 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
             bgcolor: 'background.paper',
             backgroundImage: 'var(--Paper-overlay)',
           },
-          [`& .MuiSlider-mark[data-index="${majorNotchIndex}"]`]: { width: 3 },
+          [`& .MuiSlider-mark[data-index="${volumeMajorNotchIndex}"]`]: {
+            width: 3,
+          },
           '& .MuiSlider-thumb': { width: 18, height: 18 },
           '@media (any-pointer: coarse)': { py: '16px' },
         }}

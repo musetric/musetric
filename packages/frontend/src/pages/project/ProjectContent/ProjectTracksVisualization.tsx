@@ -1,100 +1,106 @@
-import { alpha, Box, Stack } from '@mui/material';
+import { alpha, Box, Typography } from '@mui/material';
 import { stemTypes } from '@musetric/audio';
 import { type FC, useEffect, useRef } from 'react';
-import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { getPageBackground } from '../pageBackground.js';
+import { type TrackVolumeTarget } from '../mix/trackVolume.js';
+import { TrackVolumeCell } from '../mix/TrackVolumeCell.js';
 import { keepSystemGesturesOut } from '../systemGestures.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
-import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
+import {
+  playedWidthVariable,
+  useTracksCursorTime,
+} from './useTracksCursorTime.js';
 import { useTracksSeekDrag } from './useTracksSeekDrag.js';
 
-const laneSx = {
-  height: 80,
-  flexShrink: 0,
-  overflow: 'hidden',
-  borderRadius: 2,
-  bgcolor: 'background.default',
+const nameColumnWidth = 116;
+
+const tracks: readonly TrackVolumeTarget[] = [
+  { kind: 'recording' },
+  ...stemTypes.map((stemType) => ({ kind: 'delivery' as const, stemType })),
+];
+
+const getTrackKey = (track: TrackVolumeTarget) =>
+  track.kind === 'recording' ? track.kind : track.stemType;
+
+const rowsSx = {
+  display: 'grid',
+  gridTemplateRows: `repeat(${tracks.length}, minmax(0, 1fr))`,
+  rowGap: 1,
+  minWidth: 0,
+  minHeight: 0,
 } as const;
 
-const deckEdgeLimit = 2;
-
 export const ProjectTracksVisualization: FC = () => {
-  const ref = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const lanesRef = useRef<HTMLDivElement>(null);
-  useTracksSeekDrag(ref);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  useTracksSeekDrag(lanesRef);
+  useTracksCursorTime(lanesRef, timeRef);
   useEffect(() => {
-    const surface = lanesRef.current;
+    const surface = surfaceRef.current;
     return surface ? keepSystemGesturesOut(surface) : undefined;
   }, []);
-  const deckEdges = useEngineStore((state) =>
-    Math.max(0, Math.min(state.recordings.length - 1, deckEdgeLimit)),
-  );
 
   return (
     <Box
+      ref={surfaceRef}
       sx={{
+        display: 'grid',
+        gridTemplateColumns: `${nameColumnWidth}px minmax(0, 1fr)`,
+        columnGap: 1,
         height: '100%',
-        overflow: 'auto',
+        overflow: 'hidden',
       }}
     >
-      <Box
-        ref={ref}
-        sx={{
-          display: 'grid',
-          gridTemplateRows: '1fr auto',
-          height: '100%',
-          position: 'relative',
-        }}
-      >
-        <Stack sx={{ position: 'relative' }}>
-          <Stack ref={lanesRef} sx={{ gap: 2 }}>
-            <Stack>
-              <Box sx={laneSx}>
-                <WaveformCanvas kind='recording' />
-              </Box>
-              {Array.from({ length: deckEdges }, (_, edge) => (
-                <Box
-                  key={edge}
-                  sx={[
-                    {
-                      height: 4,
-                      mx: 2 * (edge + 1),
-                    },
-                    (theme) => ({
-                      borderRadius: '0 0 6px 6px',
-                      bgcolor: alpha(
-                        theme.palette.background.default,
-                        edge === 0 ? 0.7 : 0.45,
-                      ),
-                    }),
-                  ]}
-                />
-              ))}
-            </Stack>
-            {stemTypes.map((stemType) => (
-              <Box key={stemType} sx={laneSx}>
-                <WaveformCanvas kind='delivery' stemType={stemType} />
-              </Box>
-            ))}
-          </Stack>
-          <VisualizationCursor mode='tracks' />
-        </Stack>
-        <Box
-          sx={[
-            {
-              position: 'sticky',
-              bottom: 0,
-              zIndex: 2,
-            },
-            (theme) => ({
-              pointerEvents: 'none',
-              bgcolor: getPageBackground(theme),
-            }),
-          ]}
-        >
-          <VisualizationTimeline mode='tracks' />
-        </Box>
+      <Box sx={rowsSx}>
+        {tracks.map((track) => (
+          <TrackVolumeCell key={getTrackKey(track)} target={track} />
+        ))}
+      </Box>
+      <Box ref={lanesRef} sx={{ ...rowsSx, position: 'relative' }}>
+        {tracks.map((track) => (
+          <Box
+            key={getTrackKey(track)}
+            sx={{
+              position: 'relative',
+              isolation: 'isolate',
+              overflow: 'hidden',
+              borderRadius: 1.5,
+              bgcolor: 'background.default',
+              minHeight: 0,
+              cursor: 'ew-resize',
+            }}
+          >
+            <WaveformCanvas {...track} />
+            <Box
+              sx={(theme) => ({
+                position: 'absolute',
+                inset: 0,
+                transform: `translateX(var(${playedWidthVariable}, 0px))`,
+                bgcolor: alpha(theme.palette.background.default, 0.6),
+                pointerEvents: 'none',
+                willChange: 'transform',
+              })}
+            />
+          </Box>
+        ))}
+        <VisualizationCursor mode='tracks' />
+        <Typography
+          ref={timeRef}
+          variant='caption'
+          sx={{
+            position: 'absolute',
+            top: 2,
+            left: 0,
+            px: 1,
+            borderRadius: 1,
+            bgcolor: 'common.black',
+            color: 'primary.main',
+            lineHeight: 1.2,
+            pointerEvents: 'none',
+            willChange: 'transform',
+          }}
+        />
       </Box>
     </Box>
   );

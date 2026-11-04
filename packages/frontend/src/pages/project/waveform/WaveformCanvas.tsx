@@ -7,8 +7,10 @@ import { ViewError } from '../../../components/ViewError.js';
 import { ViewPending } from '../../../components/ViewPending.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { RecordingLaneHeader } from '../recording/RecordingLaneHeader.js';
-import { TrackLabel } from './TrackLabel.js';
+import { useTrackVolume } from '../mix/trackVolume.js';
+import { RecordingEmptyHint } from '../recording/RecordingEmptyHint.js';
+
+const minimumWaveScale = 0.03;
 
 export type WaveformCanvasProps =
   | {
@@ -22,6 +24,7 @@ export type WaveformCanvasProps =
 export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
   const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
+  const volume = useTrackVolume(props);
 
   const [canvas, setCanvas] = useState<HTMLCanvasElement>();
   const status = useEngineStore((state) =>
@@ -47,14 +50,13 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-      {props.kind === 'recording' ? (
-        <RecordingLaneHeader />
-      ) : (
-        <TrackLabel {...props} />
-      )}
+      {props.kind === 'recording' && <RecordingEmptyHint />}
       <Box
         ref={setCanvas}
         component='canvas'
+        style={{
+          transform: `scaleY(${Math.max(minimumWaveScale, volume)})`,
+        }}
         sx={{
           height: '100%',
           width: '100%',

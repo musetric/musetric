@@ -141,7 +141,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
         </Box>
         <VisualizationCursor mode='spectrogram' />
       </Box>
-      <VisualizationTimeline mode='spectrogram' />
+      <VisualizationTimeline />
       <Box
         sx={{
           position: 'absolute',

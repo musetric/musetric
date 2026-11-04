@@ -22,21 +22,13 @@ type TimelineWindow = {
 };
 
 const getTimelineWindow = (config: TimelineConfig): TimelineWindow => {
-  if (config.mode === 'spectrogram') {
-    const currentTime = getCurrentTime(config);
-    const start = currentTime - config.visibleTime * config.playheadRatio;
-
-    return {
-      start,
-      end: start + config.visibleTime,
-      duration: config.visibleTime,
-    };
-  }
+  const currentTime = getCurrentTime(config);
+  const start = currentTime - config.visibleTime * config.playheadRatio;
 
   return {
-    start: 0,
-    end: config.duration,
-    duration: config.duration,
+    start,
+    end: start + config.visibleTime,
+    duration: config.visibleTime,
   };
 };
 

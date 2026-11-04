@@ -1,9 +1,6 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import {
-  createTimelineProcessor,
-  type TimelineMode,
-} from '@musetric/audio/timeline';
+import { createTimelineProcessor } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import {
@@ -12,14 +9,7 @@ import {
 } from './visualizationRender.js';
 import { getVisualizationView } from './visualizationView.js';
 
-export type VisualizationTimelineProps = {
-  mode: TimelineMode;
-};
-
-export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
-  props,
-) => {
-  const { mode } = props;
+export const VisualizationTimeline: FC = () => {
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -47,7 +37,6 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       const { visibleTime, playheadRatio } = getVisualizationView();
 
       processor.updateConfig({
-        mode,
         duration,
         frameIndex,
         frameCount,
@@ -56,14 +45,8 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       });
       processor.render();
 
-      let cursorRatio = playheadRatio;
-
-      if (mode === 'tracks') {
-        cursorRatio = frameCount ? frameIndex / frameCount : 0;
-      }
-
       const cursorX = alignPixel(
-        cursorRatio * canvasWidth,
+        playheadRatio * canvasWidth,
         window.devicePixelRatio,
       );
 
@@ -89,7 +72,7 @@ export const VisualizationTimeline: FC<VisualizationTimelineProps> = (
       unsubscribe();
       processor.dispose();
     };
-  }, [theme, mode]);
+  }, [theme]);
 
   return (
     <Box sx={{ height: '16px', position: 'relative', flexShrink: 0 }}>

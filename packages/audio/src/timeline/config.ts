@@ -1,6 +1,5 @@
 const requiredTimelineConfigKeys = [
   'canvas',
-  'mode',
   'duration',
   'frameIndex',
   'visibleTime',
@@ -10,11 +9,8 @@ const requiredTimelineConfigKeys = [
   'font',
 ] as const;
 
-export type TimelineMode = 'spectrogram' | 'tracks';
-
 export type TimelineConfig = {
   canvas: HTMLCanvasElement;
-  mode: TimelineMode;
   duration: number;
   frameIndex: number;
   frameCount?: number;

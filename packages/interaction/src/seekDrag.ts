@@ -143,7 +143,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     finish();
   };
 
-  element.style.touchAction = 'pan-y';
+  element.style.touchAction = 'none';
   element.style.userSelect = 'none';
   element.addEventListener('pointerdown', handlePointerDown);
   element.addEventListener('pointermove', handlePointerMove);

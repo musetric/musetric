@@ -1,43 +1,19 @@
 import { alpha, Typography } from '@mui/material';
-import { type StemType } from '@musetric/audio';
-import { getActiveRecording } from '@musetric/engine';
-import { type TFunction } from 'i18next';
 import { type FC } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { chordBlockInset } from '../chords/ChordLane.js';
+import { type TrackVolumeTarget } from '../mix/trackVolume.js';
 import {
   pictureLabelHeight,
   pictureLabelMinWidth,
 } from '../visualization/pictureLabel.js';
+import { useTrackName } from './trackName.js';
 
-const stemLabels: Record<StemType, (t: TFunction) => string> = {
-  lead: (t) => t('pages.project.waveform.stemType.lead'),
-  backing: (t) => t('pages.project.waveform.stemType.backing'),
-  instrumental: (t) => t('pages.project.waveform.stemType.instrumental'),
-};
-
-export type TrackLabelProps = (
-  | {
-      kind: 'delivery';
-      stemType: StemType;
-    }
-  | {
-      kind: 'recording';
-    }
-) & {
-  variant?: 'overlay' | 'spectrogram' | 'inline';
+export type TrackLabelProps = TrackVolumeTarget & {
+  variant: 'spectrogram' | 'inline';
 };
 
 export const TrackLabel: FC<TrackLabelProps> = (props) => {
-  const { t } = useTranslation();
-  const recordingName = useEngineStore(
-    (state) => getActiveRecording(state)?.name,
-  );
-  const label =
-    props.kind === 'recording'
-      ? (recordingName ?? t('pages.project.waveform.stemType.recording'))
-      : stemLabels[props.stemType](t);
+  const label = useTrackName(props);
 
   if (props.variant === 'inline') {
     return (
@@ -54,31 +30,19 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
         {
           fontWeight: 600,
           lineHeight: 1,
-          color: 'text.secondary',
         },
         (theme) => ({
           position: 'absolute',
-          top: 12,
+          top: chordBlockInset,
           left: 8,
-          px: 0.5,
-          py: 0.25,
+          display: 'flex',
+          alignItems: 'center',
+          minWidth: pictureLabelMinWidth,
+          height: pictureLabelHeight,
+          px: 0.75,
           borderRadius: 1,
-          ...(props.variant === 'spectrogram'
-            ? {
-                top: chordBlockInset,
-                display: 'flex',
-                alignItems: 'center',
-                minWidth: pictureLabelMinWidth,
-                height: pictureLabelHeight,
-                px: 0.75,
-                py: 0,
-                color: theme.palette.text.primary,
-                backgroundColor: alpha(theme.palette.common.black, 0.8),
-              }
-            : {
-                backgroundColor: theme.palette.background.paper,
-                backgroundImage: 'var(--Paper-overlay)',
-              }),
+          color: theme.palette.text.primary,
+          backgroundColor: alpha(theme.palette.common.black, 0.8),
           zIndex: 1,
           pointerEvents: 'none',
         }),
