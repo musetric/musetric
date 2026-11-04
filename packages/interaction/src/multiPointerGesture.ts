@@ -101,9 +101,7 @@ export type GesturePinchStart = {
 
 export type MultiPointerGestureOptions = {
   element: HTMLElement;
-  axis?: GestureAxis;
   pointerTypes?: readonly PointerInputType[];
-  axisLockDistance?: number;
   createVelocityTracker?: CreatePanVelocityTracker;
   pinchLockDistance?: number;
   minimumPinchSpread?: number;
@@ -133,9 +131,7 @@ export const createMultiPointerGesture = (
 ): MultiPointerGesture => {
   const {
     element,
-    axis: fixedAxis,
     pointerTypes = defaultPointerTypes,
-    axisLockDistance = 6,
     createVelocityTracker,
     pinchLockDistance = 6,
     minimumPinchSpread = 1,
@@ -152,8 +148,6 @@ export const createMultiPointerGesture = (
   const initialUserSelect = element.style.userSelect;
   const pointers = new Map<number, Pointer>();
   const panTracker: PanTracker = createPanTracker({
-    fixedAxis,
-    axisLockDistance,
     createVelocityTracker,
   });
   const pinchTracker: PinchTracker = createPinchTracker({

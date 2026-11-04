@@ -48,6 +48,9 @@ export const useTracksSeekDrag = (
         pinned = atEdge;
         engine.player.seek(clamped, 'tracksVisualization');
       },
+      onCancel: () => {
+        engine.player.seek(startFrameIndex, 'tracksVisualization');
+      },
       onEnd: () => {
         if (releaseFrozenOnEnd) {
           engine.player.setFrozen(false);

@@ -4,6 +4,8 @@ import {
   type PointerInputType,
 } from './pointerType.js';
 
+const touchLockDistance = 8;
+
 const getRatio = (element: HTMLElement, clientX: number) => {
   const rect = element.getBoundingClientRect();
   const width = element.clientWidth;
@@ -28,6 +30,7 @@ export type SeekDragOptions = {
   element: HTMLElement;
   onStart?: () => void;
   onUpdate: (event: SeekDragUpdate) => void;
+  onCancel?: () => void;
   onEnd?: () => void;
 };
 
@@ -40,10 +43,11 @@ type SeekDragInternalState = {
   pointerId: number;
   pointerType: PointerInputType;
   startX: number;
+  locked: boolean;
 };
 
 export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
-  const { element, onStart, onUpdate, onEnd } = options;
+  const { element, onStart, onUpdate, onCancel, onEnd } = options;
   const initialTouchAction = element.style.touchAction;
   const initialUserSelect = element.style.userSelect;
   let state: SeekDragInternalState | undefined = undefined;
@@ -81,6 +85,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
       startX: event.clientX,
+      locked: event.pointerType !== 'touch',
     };
     element.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -105,6 +110,13 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
       return;
     }
     event.preventDefault();
+    if (!currentState.locked) {
+      if (Math.abs(event.clientX - currentState.startX) < touchLockDistance) {
+        return;
+      }
+      currentState.locked = true;
+      currentState.startX = event.clientX;
+    }
     onUpdate({
       pointerType: currentState.pointerType,
       ratio: getRatio(element, event.clientX),
@@ -127,6 +139,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     if (!currentState || event.pointerId !== currentState.pointerId) return;
     releasePointerCapture(event.pointerId);
     state = undefined;
+    onCancel?.();
     finish();
   };
 
