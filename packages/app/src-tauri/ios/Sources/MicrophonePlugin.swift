@@ -9,9 +9,11 @@ private let accessDenied = "microphone-access-denied"
 class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
   private weak var page: WKWebView?
   private let capture = MicrophoneCapture()
+  private let probe = MicrophoneProbe()
 
   override func load(webview: WKWebView) {
     page = webview
+    probe.start()
     capture.onChunk = { [weak self] session, frame, samples in
       self?.page?.evaluateJavaScript("\(receiver)?.receive(\(session),\(frame),'\(samples)')")
     }

@@ -126,12 +126,15 @@ final class MicrophoneCapture: NSObject {
     if let preferred, audio.preferredInput?.uid != preferred.uid {
       try audio.setPreferredInput(preferred)
     }
-    if audio.isInputGainSettable, audio.inputGain != inputGain {
-      try? audio.setInputGain(inputGain)
+    let gain = MicrophoneProbe.captureGain() ?? inputGain
+    if audio.isInputGainSettable, audio.inputGain != gain {
+      try? audio.setInputGain(gain)
     }
     silentTicks = 0
+    MicrophoneProbe.captureRunning = true
     try startEngine()
     startTimer()
+    MicrophoneProbe.writeCaptureState()
   }
 
   private func halt() {
@@ -139,6 +142,7 @@ final class MicrophoneCapture: NSObject {
       return
     }
     running = false
+    MicrophoneProbe.captureRunning = false
     timer?.cancel()
     timer = nil
     engine.stop()
@@ -149,9 +153,13 @@ final class MicrophoneCapture: NSObject {
   }
 
   private func configureCategory() throws {
+    guard !MicrophoneProbe.active else {
+      return
+    }
     let audio = AVAudioSession.sharedInstance()
-    if audio.category != .playAndRecord || audio.mode != .measurement {
-      try audio.setCategory(.playAndRecord, mode: .measurement, options: sessionOptions)
+    let mode = MicrophoneProbe.captureMode()
+    if audio.category != .playAndRecord || audio.mode != mode {
+      try audio.setCategory(.playAndRecord, mode: mode, options: sessionOptions)
     }
   }
 
