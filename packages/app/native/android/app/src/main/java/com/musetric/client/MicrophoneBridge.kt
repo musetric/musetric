@@ -147,8 +147,9 @@ private fun builtInCurve(model: String, sampleRate: Int): Array<Biquad> =
       )
     else ->
       arrayOf(
-        peaking(5821.0, -4.5, 1.07, sampleRate),
-        peaking(8707.0, -13.5, 1.2, sampleRate),
+        highShelf(4480.0, -6.7, SHELF_Q, sampleRate),
+        peaking(9030.0, -6.5, 2.5, sampleRate),
+        peaking(6561.0, -6.8, 2.18, sampleRate),
       )
   }
 
