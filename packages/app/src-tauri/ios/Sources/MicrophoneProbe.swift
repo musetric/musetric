@@ -303,6 +303,8 @@ final class MicrophoneProbe {
       running.stop()
     }
     engine = nil
-    try? AVAudioSession.sharedInstance().setActive(false)
+    let audio = AVAudioSession.sharedInstance()
+    try? audio.setActive(false)
+    try? audio.setCategory(.soloAmbient, mode: .default, options: [])
   }
 }
