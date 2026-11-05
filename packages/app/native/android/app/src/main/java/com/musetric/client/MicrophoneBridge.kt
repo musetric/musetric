@@ -65,6 +65,7 @@ private const val LIMIT = 0.891f
 private const val LIMIT_RELEASE_SECONDS = 0.05
 private const val SHELF_Q = 0.707
 private const val GALAXY_S24_ULTRA = "SM-S928"
+private const val ONEPLUS_9RT = "MT2111"
 
 private class MicrophoneClock {
   @JavascriptInterface
@@ -135,11 +136,14 @@ private fun builtInCurve(model: String, sampleRate: Int): Array<Biquad> =
   when {
     model.startsWith(GALAXY_S24_ULTRA) ->
       arrayOf(
-        highShelf(6175.0, -3.2, SHELF_Q, sampleRate),
-        peaking(4348.0, -2.6, 3.0, sampleRate),
-        peaking(4786.0, -2.8, 3.0, sampleRate),
-        peaking(9407.0, -13.5, 3.0, sampleRate),
-        peaking(8890.0, -8.7, 2.9, sampleRate),
+        highShelf(7491.0, -6.7, SHELF_Q, sampleRate),
+        peaking(9473.0, -14.2, 2.64, sampleRate),
+        peaking(5966.0, -3.2, 3.0, sampleRate),
+      )
+    model.startsWith(ONEPLUS_9RT) ->
+      arrayOf(
+        peaking(6557.0, -13.7, 2.09, sampleRate),
+        peaking(8116.0, -7.9, 3.0, sampleRate),
       )
     else ->
       arrayOf(
