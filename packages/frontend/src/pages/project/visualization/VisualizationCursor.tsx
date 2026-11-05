@@ -1,5 +1,4 @@
 import { alpha, Box } from '@mui/material';
-import { type TimelineMode } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribePlayheadDrag } from './subscribePlayheadDrag.js';
@@ -10,7 +9,7 @@ import {
 import { getVisualizationView } from './visualizationView.js';
 
 export type VisualizationCursorProps = {
-  mode: TimelineMode;
+  mode: 'spectrogram' | 'tracks';
 };
 
 export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {

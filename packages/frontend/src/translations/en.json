@@ -155,6 +155,7 @@
   "pages.project.microphoneAccess.tryAgain": "Try again",
   "pages.project.mix.mute": "Mute",
   "pages.project.mix.title": "Mix",
+  "pages.project.mix.trackVolume": "{{name}} volume",
   "pages.project.mix.unmute": "Unmute",
   "pages.project.mixdown.bitDepth": "{{value}}-bit",
   "pages.project.mixdown.bitrate": "{{value}} kbps",

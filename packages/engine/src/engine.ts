@@ -102,6 +102,12 @@ const initialState: EngineState = {
     instrumental: 1,
     recording: 1,
   },
+  audibleTrackVolumes: {
+    lead: 1,
+    backing: 1,
+    instrumental: 1,
+    recording: 1,
+  },
   metronomeEnabled: false,
   metronomeVolume: 0.3,
   metronomeBeats: [],

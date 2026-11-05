@@ -49,6 +49,9 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
         <Button
           size='small'
           disabled={recording}
+          aria-label={
+            variant === 'lane' ? t('pages.project.recording.choose') : undefined
+          }
           aria-haspopup='menu'
           aria-expanded={listAnchorEl !== undefined}
           endIcon={recording ? undefined : <ExpandMoreRoundedIcon />}
@@ -58,12 +61,10 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
           sx={(theme) => ({
             ...{
               lane: {
-                backgroundColor: theme.palette.background.paper,
-                backgroundImage: 'var(--Paper-overlay)',
                 minWidth: 0,
-                maxWidth: 240,
-                height: 24,
-                '& .MuiButton-endIcon': { ml: 0.25 },
+                width: 24,
+                height: '100%',
+                '& .MuiButton-endIcon': { m: 0 },
               },
               picture: {
                 backgroundColor: alpha(theme.palette.common.black, 0.8),
@@ -99,17 +100,19 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
               }}
             />
           )}
-          <Typography
-            variant='caption'
-            noWrap
-            sx={{ fontWeight: 600, lineHeight: 1 }}
-          >
-            {recording
-              ? t('pages.project.recording.recordingInto', {
-                  name: active.name,
-                })
-              : active.name}
-          </Typography>
+          {variant === 'picture' && (
+            <Typography
+              variant='caption'
+              noWrap
+              sx={{ fontWeight: 600, lineHeight: 1 }}
+            >
+              {recording
+                ? t('pages.project.recording.recordingInto', {
+                    name: active.name,
+                  })
+                : active.name}
+            </Typography>
+          )}
         </Button>
       </Box>
     </Tooltip>
