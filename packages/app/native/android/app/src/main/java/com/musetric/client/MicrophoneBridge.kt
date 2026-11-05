@@ -135,11 +135,9 @@ private fun builtInCurve(model: String, sampleRate: Int): Array<Biquad> =
   when {
     model.startsWith(GALAXY_S24_ULTRA) ->
       arrayOf(
-        highShelf(6175.0, -3.2, SHELF_Q, sampleRate),
-        peaking(4348.0, -2.6, 3.0, sampleRate),
-        peaking(4786.0, -2.8, 3.0, sampleRate),
-        peaking(9407.0, -13.5, 3.0, sampleRate),
-        peaking(8890.0, -8.7, 2.9, sampleRate),
+        highShelf(7491.0, -6.7, SHELF_Q, sampleRate),
+        peaking(9473.0, -14.2, 2.64, sampleRate),
+        peaking(5966.0, -3.2, 3.00, sampleRate),
       )
     else ->
       arrayOf(
