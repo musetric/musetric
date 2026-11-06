@@ -68,6 +68,8 @@ export const RecordingPicker: FC<RecordingPickerProps> = (props) => {
               },
               picture: {
                 backgroundColor: alpha(theme.palette.common.black, 0.8),
+                border: 1,
+                borderColor: 'divider',
                 minWidth: pictureLabelMinWidth,
                 maxWidth: pictureLabelMaxWidth,
                 height: pictureLabelHeight,
