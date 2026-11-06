@@ -40,6 +40,8 @@ export const TrackLabel: FC<TrackLabelProps> = (props) => {
           minWidth: pictureLabelMinWidth,
           height: pictureLabelHeight,
           px: 0.75,
+          border: 1,
+          borderColor: 'divider',
           borderRadius: 1,
           color: theme.palette.text.primary,
           backgroundColor: alpha(theme.palette.common.black, 0.8),

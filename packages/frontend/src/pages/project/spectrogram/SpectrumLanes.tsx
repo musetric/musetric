@@ -87,33 +87,40 @@ export const SpectrumLanes: FC = () => {
         </Tooltip>
         {expandedLane !== 'none' && (
           <Tooltip title={swapLabel}>
-            <IconButton
-              aria-label={swapLabel}
+            <Box
               sx={{
+                display: 'flex',
                 height: pictureLabelHeight,
-                px: 0.75,
-                py: 0,
-                border: 1,
-                borderColor: 'divider',
                 borderRadius: 1,
                 bgcolor: 'background.default',
-                color: 'text.primary',
-                '@media (any-pointer: coarse)': {
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    inset: '-10px 0',
-                  },
-                },
-              }}
-              onClick={() => {
-                engine.store.update((state) => {
-                  state.expandedSpectrumLane = otherLane;
-                });
               }}
             >
-              <SwapVertRoundedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
+              <IconButton
+                aria-label={swapLabel}
+                sx={{
+                  px: 0.75,
+                  py: 0,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  color: 'text.primary',
+                  '@media (any-pointer: coarse)': {
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      inset: '-10px 0',
+                    },
+                  },
+                }}
+                onClick={() => {
+                  engine.store.update((state) => {
+                    state.expandedSpectrumLane = otherLane;
+                  });
+                }}
+              >
+                <SwapVertRoundedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
           </Tooltip>
         )}
       </Box>
