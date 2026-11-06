@@ -1,6 +1,9 @@
 import { type api } from '@musetric/api';
 import { type StemType } from '@musetric/audio';
-import { type SpectrogramColors } from '@musetric/spectrogram';
+import {
+  type SpectrogramColors,
+  type SpectrogramExpandedLane,
+} from '@musetric/spectrogram';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -88,6 +91,7 @@ export type EngineState = {
   frameCount?: number;
   colors: SpectrogramColors;
   spectrogramView: SpectrogramViewMode;
+  expandedSpectrumLane: SpectrogramExpandedLane;
   frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
   viewWindow?: EngineViewWindow;
   duration: number;

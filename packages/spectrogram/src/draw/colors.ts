@@ -8,6 +8,7 @@ import {
   type SpectrogramComparison,
   type SpectrogramConfig,
   type SpectrogramLaneConfig,
+  type TrackKey,
 } from '../config.cross.js';
 
 const toVec4 = (hex: string): [number, number, number, number] => {
@@ -61,7 +62,8 @@ const areConfigsEqual = (
   if (
     current.minFrequency !== next.minFrequency ||
     current.maxFrequency !== next.maxFrequency ||
-    current.visibleTime !== next.visibleTime
+    current.visibleTime !== next.visibleTime ||
+    current.expandedLane !== next.expandedLane
   ) {
     return false;
   }
@@ -125,10 +127,11 @@ export const createColorsCell = (device: GPUDevice) =>
         ...overlayTuning,
         ...laneLayout,
       ]);
-      const layer0 = lanes[allTrackKeys[0]];
-      const layer1 = lanes[allTrackKeys[1]];
-      u32[48] = layer0.showSpectrogram ? 1 : 0;
-      u32[49] = layer1.showSpectrogram ? 1 : 0;
+      const isLayerDrawn = (key: TrackKey) =>
+        lanes[key].showSpectrogram &&
+        (config.expandedLane === 'none' || config.expandedLane === key);
+      u32[48] = isLayerDrawn(allTrackKeys[0]) ? 1 : 0;
+      u32[49] = isLayerDrawn(allTrackKeys[1]) ? 1 : 0;
       u32[50] = referenceLane.showFundamental ? 1 : 0;
       u32[51] = targetLane.showFundamental ? 1 : 0;
       u32[52] = referenceLane.showNotes ? 1 : 0;

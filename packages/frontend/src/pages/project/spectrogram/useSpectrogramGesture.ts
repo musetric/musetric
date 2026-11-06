@@ -42,8 +42,13 @@ export const useSpectrogramGesture = (
       getRange: () => engine.store.get().range,
       getMinFrequency: () => getFrequencyRange(engine.store.get()).minFrequency,
       getMaxFrequency: () => getFrequencyRange(engine.store.get()).maxFrequency,
-      getFrequencyBandCount: () =>
-        engine.store.get().spectrogramView === 'spectrum' ? 2 : 1,
+      getFrequencyBandCount: () => {
+        const state = engine.store.get();
+        return state.spectrogramView === 'spectrum' &&
+          state.expandedSpectrumLane === 'none'
+          ? 2
+          : 1;
+      },
     };
 
     const controls: SpectrogramGestureControls = {

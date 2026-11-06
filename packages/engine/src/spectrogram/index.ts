@@ -144,6 +144,7 @@ export const createEngineSpectrogram = (
       const buildStateView = (state: EngineState) => ({
         ...getFrequencyRange(state),
         lanes: buildLanes(state),
+        expandedLane: state.expandedSpectrumLane,
       });
 
       port.methods.setFrameCount({ frameCount: engineState.frameCount ?? 0 });
@@ -170,7 +171,7 @@ export const createEngineSpectrogram = (
       const unsubscribeView = store.subscribe(
         (state) => {
           const range = getFrequencyRange(state);
-          return `${state.spectrogramView}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${state.voiceOctave}:${range.minFrequency}:${range.maxFrequency}`;
+          return `${state.spectrogramView}:${state.expandedSpectrumLane}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${state.voiceOctave}:${range.minFrequency}:${range.maxFrequency}`;
         },
         () => {
           port.methods.updateConfig({

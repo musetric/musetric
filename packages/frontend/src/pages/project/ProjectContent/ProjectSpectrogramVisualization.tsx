@@ -16,9 +16,11 @@ import { LoopPictureControls } from '../loop/LoopPictureControls.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
+import { SpectrumLanes } from '../spectrogram/SpectrumLanes.js';
 import { useSpectrogramGesture } from '../spectrogram/useSpectrogramGesture.js';
 import { useProjectStore } from '../store.js';
 import { keepSystemGesturesOut } from '../systemGestures.js';
+import { pictureLabelHeight } from '../visualization/pictureLabel.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { VisualizationTimeline } from '../visualization/VisualizationTimeline.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
@@ -41,6 +43,8 @@ export const ProjectSpectrogramVisualization: FC = () => {
   const spectrum = useEngineStore(
     (state) => state.spectrogramView === 'spectrum',
   );
+  const expandedLane = useEngineStore((state) => state.expandedSpectrumLane);
+  const recordingBandShown = !spectrum || expandedLane !== 'lead';
   useSpectrogramGesture(spectrogramAreaRef, createLoopRangeGesture);
   useEffect(() => {
     const surface = spectrogramAreaRef.current;
@@ -78,30 +82,43 @@ export const ProjectSpectrogramVisualization: FC = () => {
           <SpectrogramCanvas />
           <LoopOverlay />
           <SpectrogramNoteScale />
-          <Box
-            sx={{
-              position: 'absolute',
-              top: chordBlockInset,
-              left: noteNamesInset + 8,
-              display: 'flex',
-              zIndex: 1,
-            }}
-          >
-            <RecordingPicker variant='picture' />
-          </Box>
+          {recordingBandShown && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: chordBlockInset,
+                left: noteNamesInset + 8,
+                display: 'flex',
+                zIndex: 1,
+              }}
+            >
+              <RecordingPicker variant='picture' />
+            </Box>
+          )}
           {spectrum && (
             <>
               <Box
                 sx={{
                   position: 'absolute',
+                  top: chordBlockInset + pictureLabelHeight + 4,
+                  left: noteNamesInset + 8,
+                  display: 'flex',
+                  zIndex: 1,
+                }}
+              >
+                <SpectrumLanes />
+              </Box>
+              <Box
+                sx={{
+                  position: 'absolute',
                   top: 0,
                   right: 0,
-                  bottom: leadBandTop,
+                  bottom: expandedLane === 'none' ? leadBandTop : 0,
                   left: noteNamesInset,
                   pointerEvents: 'none',
                 }}
               >
-                {emptyRecordingName !== undefined && (
+                {recordingBandShown && emptyRecordingName !== undefined && (
                   <Typography
                     variant='body2'
                     sx={{
@@ -120,22 +137,24 @@ export const ProjectSpectrogramVisualization: FC = () => {
                   </Typography>
                 )}
               </Box>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: leadBandTop,
-                  right: 0,
-                  bottom: 0,
-                  left: noteNamesInset,
-                  pointerEvents: 'none',
-                }}
-              >
-                <TrackLabel
-                  kind='delivery'
-                  stemType='lead'
-                  variant='spectrogram'
-                />
-              </Box>
+              {expandedLane !== 'recording' && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: expandedLane === 'none' ? leadBandTop : 0,
+                    right: 0,
+                    bottom: 0,
+                    left: noteNamesInset,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <TrackLabel
+                    kind='delivery'
+                    stemType='lead'
+                    variant='spectrogram'
+                  />
+                </Box>
+              )}
             </>
           )}
         </Box>

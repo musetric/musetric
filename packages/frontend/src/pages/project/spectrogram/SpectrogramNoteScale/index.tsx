@@ -86,8 +86,9 @@ export const SpectrogramNoteScale: FC = () => {
       context.textBaseline = 'middle';
       context.lineWidth = 1;
 
-      const bandCount = notesMode ? 1 : 2;
-      const bandGap = notesMode ? 0 : stackedLaneGap;
+      const bandCount =
+        notesMode || state.expandedSpectrumLane !== 'none' ? 1 : 2;
+      const bandGap = bandCount > 1 ? stackedLaneGap : 0;
       const bandHeight = (height - bandGap * (bandCount - 1)) / bandCount;
       const markerSpacing =
         markers.length > 1 ? bandHeight / (markers.length - 1) : bandHeight;
@@ -143,7 +144,7 @@ export const SpectrogramNoteScale: FC = () => {
     const unsubscribeResize = subscribeResizeObserver(canvas, resizeAndRender);
     const unsubscribeView = engine.store.subscribe((state) => {
       const range = getFrequencyRange(state);
-      return `${state.spectrogramView}:${range.minFrequency}:${range.maxFrequency}`;
+      return `${state.spectrogramView}:${state.expandedSpectrumLane}:${range.minFrequency}:${range.maxFrequency}`;
     }, render);
 
     return () => {
