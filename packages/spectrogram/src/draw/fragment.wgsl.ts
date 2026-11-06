@@ -334,6 +334,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     drawParams.visibility.y,
     recordingShown,
   );
+  let recordingSpectrumShown = recordingShown && laneVisible != 0u;
   if (laneVisible != 0u) {
     let intensity = sampleBandSpectrogram(
       select(layer0Slot, layer1Slot, recordingShown),
@@ -352,7 +353,8 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let bandPixelHeight = f32(bandHeight);
 
   var referenceMask = 0.0;
-  let referenceVisible = !recordingBand && drawParams.visibility.z != 0u;
+  let referenceVisible =
+    !recordingSpectrumShown && drawParams.visibility.z != 0u;
   if (referenceVisible) {
     var referencePrev = 0.0;
     if (x > 0u) {
@@ -380,7 +382,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
 
   var targetMask = 0.0;
   var targetOutlineMask = 0.0;
-  let targetVisible = !recordingBand && drawParams.visibility.w != 0u;
+  let targetVisible = !recordingSpectrumShown && drawParams.visibility.w != 0u;
   if (targetVisible) {
     var targetPrev = 0.0;
     if (x > 0u) {
@@ -394,7 +396,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
         slotForScreenX(drawParams.ringSlots.w, x + 1u, width)
       ];
     }
-    if (stacked) {
+    if (laneVisible != 0u) {
       let distance = lineDistanceAtPixel(
         bandPoint,
         width,

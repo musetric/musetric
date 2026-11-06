@@ -17,6 +17,8 @@ export const mapTrackKeys = <Value>(
   return result;
 };
 
+export type SpectrogramExpandedLane = TrackKey | 'none';
+
 export type SpectrogramZeroPaddingFactor = 1 | 2 | 4;
 
 export type SpectrogramLaneConfig = {
@@ -76,6 +78,7 @@ export type SpectrogramConfig = {
   viewSize: ViewSize;
   colors: SpectrogramColors;
   lanes: Record<TrackKey, SpectrogramLaneConfig>;
+  expandedLane: SpectrogramExpandedLane;
   comparison: SpectrogramComparison;
 };
 export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
@@ -95,6 +98,7 @@ export const allSpectrogramConfigKeys = createObjectKeys<SpectrogramConfig>()([
   'viewSize',
   'colors',
   'lanes',
+  'expandedLane',
   'comparison',
 ]);
 

@@ -89,6 +89,7 @@ export const defaultSpectrogramConfig: Omit<SpectrogramConfig, 'canvas'> = {
       transposeSemitones: 0,
     },
   },
+  expandedLane: 'none',
   comparison: {
     reference: 'lead',
     target: 'recording',

@@ -62,6 +62,7 @@ const initialState: EngineState = {
   },
   colors: defaultSpectrogramConfig.colors,
   spectrogramView: 'notes',
+  expandedSpectrumLane: 'none',
   frequencyRanges: defaultFrequencyRanges,
   duration: 0,
   playing: false,
