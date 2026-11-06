@@ -264,6 +264,8 @@
   "pages.project.spectrum.lanes.both": "Recording and lead",
   "pages.project.spectrum.lanes.lead": "Lead vocal only",
   "pages.project.spectrum.lanes.recording": "Recording only",
+  "pages.project.spectrum.lanes.showLead": "Show the lead vocal",
+  "pages.project.spectrum.lanes.showRecording": "Show the recording",
   "pages.project.spectrum.lanes.title": "What the picture shows: {{lanes}}",
   "pages.project.subtitle.currentLine": "Current line",
   "pages.project.visualizationMode.notes": "Notes",

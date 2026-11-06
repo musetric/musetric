@@ -10,9 +10,11 @@ shell.
   notes and the export. `src/app/screenWakeLock.ts` keeps the screen on
   while a phone processes, plays or records.
 - One value, one control: a value has one way to be changed, and what is
-  only information is shown as text, not as another control. A track's volume
-  is the exception: its name on Tracks sets it beside the wave, and Mix sets it
-  from any view and for the export.
+  only information is shown as text, not as another control. Two values are
+  the exception: a track's volume, which its name on Tracks sets beside the
+  wave and Mix sets from any view and for the export, and the band Spectrum
+  shows alone, which its list picks and a swap beside the list flips in one
+  tap.
 - An approved mockup is the requirement, over the preference for stock
   Material UI styles too: before calling an interface done, put a screenshot
   of it next to the mockup.

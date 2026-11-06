@@ -16,7 +16,7 @@ import { LoopPictureControls } from '../loop/LoopPictureControls.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { SpectrogramCanvas } from '../spectrogram/SpectrogramCanvas.js';
 import { SpectrogramNoteScale } from '../spectrogram/SpectrogramNoteScale/index.js';
-import { SpectrumLanesMenu } from '../spectrogram/SpectrumLanesMenu.js';
+import { SpectrumLanes } from '../spectrogram/SpectrumLanes.js';
 import { useSpectrogramGesture } from '../spectrogram/useSpectrogramGesture.js';
 import { useProjectStore } from '../store.js';
 import { keepSystemGesturesOut } from '../systemGestures.js';
@@ -106,7 +106,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
                   zIndex: 1,
                 }}
               >
-                <SpectrumLanesMenu />
+                <SpectrumLanes />
               </Box>
               <Box
                 sx={{
