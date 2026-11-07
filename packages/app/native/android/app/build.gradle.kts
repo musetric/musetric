@@ -14,6 +14,12 @@ val tauriProperties = Properties().apply {
     }
 }
 
+val published = when (val value = System.getenv("MUSETRIC_PUBLISH")) {
+    null, "false" -> false
+    "true" -> true
+    else -> throw GradleException("MUSETRIC_PUBLISH must be true or false, got $value")
+}
+
 android {
     compileSdk = 36
     namespace = "com.musetric.client"
@@ -23,10 +29,12 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
-        buildConfigField("boolean", "MEASURE", (System.getenv("frontendMeasure") == "true").toString())
     }
     buildTypes {
         getByName("debug") {
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "Musetric Dev")
+            buildConfigField("boolean", "PUBLISHED", "false")
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
@@ -36,6 +44,11 @@ android {
             }
         }
         getByName("release") {
+            if (!published) {
+                applicationIdSuffix = ".dev"
+            }
+            resValue("string", "app_name", if (published) "Musetric" else "Musetric Dev")
+            buildConfigField("boolean", "PUBLISHED", published.toString())
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
@@ -50,6 +63,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        resValues = true
     }
 }
 

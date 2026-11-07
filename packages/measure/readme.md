@@ -24,8 +24,9 @@ A frontend built with `frontendMeasure=true` carries the engine's measure
 points; what uses them lives in `src/__test__` and runs in the page and in its
 spectrogram worker.
 
-- Android: `frontendMeasure=true yarn build:android` also turns on WebView
-  debugging in the release APK; the command forwards its socket with `adb`.
+- Android: `frontendMeasure=true yarn build:android`. Like every development
+  build, the APK is Musetric Dev, whose WebView can be inspected; the command
+  forwards its socket with `adb`.
 - Chrome: the frontend run with `frontendMeasure=true` and Chrome with
   `--remote-debugging-port=9334`, then `--device chrome`.
 - Desktop app: `frontendMeasure=true yarn build:app`, started with

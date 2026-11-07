@@ -20,6 +20,14 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 
 - `src-tauri/gen` is generated and untracked: edit only its overlay `native`,
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
+- A mobile build is a development build: `com.musetric.client.dev`, named
+  Musetric Dev, with a WebView that can be inspected. Only a release build
+  with `MUSETRIC_PUBLISH=true`, which `appBuild.yml` sets in its release mode,
+  is `com.musetric.client`, named Musetric, with a WebView that cannot. The two
+  install side by side, each with its own data. On Android the Tauri CLI
+  writes the debug suffix from `debugApplicationIdSuffix` of
+  `tauri.android.conf.json` and starts the app by it, so `yarn dev:android`
+  starts Musetric Dev.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
@@ -54,7 +62,10 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 The folder holds `storage/db/app.db`, `storage/blobs`, `storage/work`, `models`
 and, on desktop, `logs` (`src-tauri/src/lib.rs`). A desktop debug build uses
 `Musetric Dev` (`src-tauri/src/lifecycle.rs`), a local `yarn build:app` the
-installed app's folder; one process holds a folder at a time.
+installed app's folder; one process holds a folder at a time. A mobile
+development build is an app of its own: on Android its folder is
+`/data/user/0/com.musetric.client.dev`, on iOS the same path in its own
+container.
 
 ## Toolchain
 

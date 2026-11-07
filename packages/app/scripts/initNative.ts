@@ -33,6 +33,7 @@ const platforms = new Map<string, Platform>([
         'app/src/main/res/drawable-v24/ic_launcher_foreground.xml',
         'app/src/main/res/layout/activity_main.xml',
         'app/src/main/res/values-night/themes.xml',
+        'app/src/main/res/values/strings.xml',
       ],
     },
   ],
@@ -71,8 +72,21 @@ if (!existsSync(join(genDir, platform.marker))) {
   });
 }
 
-const substituteEnvPlaceholders = (content: string): string =>
-  content.replaceAll('${DEVELOPMENT_TEAM}', process.env.DEVELOPMENT_TEAM ?? '');
+const parsePublished = (value: string | undefined): boolean => {
+  if (value === undefined || value === 'false') return false;
+  if (value === 'true') return true;
+  throw new Error(`MUSETRIC_PUBLISH must be true or false, got ${value}`);
+};
+
+const identity = parsePublished(process.env.MUSETRIC_PUBLISH)
+  ? { identifier: 'com.musetric.client', name: 'Musetric' }
+  : { identifier: 'com.musetric.client.dev', name: 'Musetric Dev' };
+
+const substitutePlaceholders = (content: string): string =>
+  content
+    .replaceAll('${DEVELOPMENT_TEAM}', process.env.DEVELOPMENT_TEAM ?? '')
+    .replaceAll('${APP_IDENTIFIER}', identity.identifier)
+    .replaceAll('${APP_NAME}', identity.name);
 
 const applyOverlay = (sourceDir: string, targetDir: string): boolean => {
   let changed = false;
@@ -86,7 +100,7 @@ const applyOverlay = (sourceDir: string, targetDir: string): boolean => {
       continue;
     }
 
-    const content = substituteEnvPlaceholders(readFileSync(source, 'utf8'));
+    const content = substitutePlaceholders(readFileSync(source, 'utf8'));
     if (existsSync(target) && readFileSync(target, 'utf8') === content)
       continue;
 
