@@ -75,7 +75,12 @@ const fetchOk = async (url: string): Promise<Response> => {
   return response;
 };
 
-const readHeads = async (): Promise<Map<string, string>> => {
+type ListedModel = {
+  id: string;
+  head: string;
+};
+
+const readListing = async (): Promise<Map<string, ListedModel>> => {
   const response = await fetchOk(
     `${hub}/api/models?author=musetric&expand%5B%5D=sha&limit=1000`,
   );
@@ -84,7 +89,7 @@ const readHeads = async (): Promise<Map<string, string>> => {
     throw new Error('Hugging Face sent no list of models');
   }
   const models: unknown[] = raw;
-  const heads = new Map<string, string>();
+  const listing = new Map<string, ListedModel>();
   for (const model of models) {
     if (
       typeof model === 'object' &&
@@ -94,24 +99,25 @@ const readHeads = async (): Promise<Map<string, string>> => {
       typeof model.id === 'string' &&
       typeof model.sha === 'string'
     ) {
-      heads.set(model.id, model.sha);
+      listing.set(model.id, { id: model.id, head: model.sha });
     }
   }
-  return heads;
+  return listing;
 };
 
 type TreeFile = {
+  path: string;
   size: number;
   lfsSha256: string | undefined;
 };
 
-const readTree = async (pin: ModelPin): Promise<Map<string, TreeFile>> => {
+const readTree = async (model: ListedModel): Promise<Map<string, TreeFile>> => {
   const response = await fetchOk(
-    `${hub}/api/models/${pin.modelId}/tree/${pin.revision}`,
+    `${hub}/api/models/${model.id}/tree/${model.head}`,
   );
   const raw: unknown = await response.json();
   if (!Array.isArray(raw)) {
-    throw new Error(`Hugging Face sent no file list of ${pin.modelId}`);
+    throw new Error(`Hugging Face sent no file list of ${model.id}`);
   }
   const entries: unknown[] = raw;
   const tree = new Map<string, TreeFile>();
@@ -126,6 +132,7 @@ const readTree = async (pin: ModelPin): Promise<Map<string, TreeFile>> => {
     ) {
       const lfs = 'lfs' in entry ? entry.lfs : undefined;
       tree.set(entry.path, {
+        path: entry.path,
         size: entry.size,
         lfsSha256:
           typeof lfs === 'object' &&
@@ -140,9 +147,9 @@ const readTree = async (pin: ModelPin): Promise<Map<string, TreeFile>> => {
   return tree;
 };
 
-const hashFile = async (pin: ModelPin, name: string): Promise<string> => {
+const hashFile = async (model: ListedModel, path: string): Promise<string> => {
   const response = await fetchOk(
-    `${hub}/${pin.modelId}/resolve/${pin.revision}/${name}`,
+    `${hub}/${model.id}/resolve/${model.head}/${path}`,
   );
   return createHash('sha256')
     .update(Buffer.from(await response.arrayBuffer()))
@@ -151,6 +158,7 @@ const hashFile = async (pin: ModelPin, name: string): Promise<string> => {
 
 const checkFile = async (
   pin: ModelPin,
+  model: ListedModel,
   tree: Map<string, TreeFile>,
   file: PinnedFile,
 ): Promise<string[]> => {
@@ -161,7 +169,7 @@ const checkFile = async (
       `${where} is pinned, but revision ${pin.revision} has no such file.`,
     ];
   }
-  const sha256 = found.lfsSha256 ?? (await hashFile(pin, file.name));
+  const sha256 = found.lfsSha256 ?? (await hashFile(model, found.path));
   const faults: string[] = [];
   if (sha256 !== file.sha256) {
     faults.push(
@@ -176,20 +184,23 @@ const checkFile = async (
   return faults;
 };
 
-const checkFiles = async (pin: ModelPin): Promise<string[]> => {
+const checkFiles = async (
+  pin: ModelPin,
+  model: ListedModel,
+): Promise<string[]> => {
   if (pin.files.length === 0 || pin.unread !== 0) {
     return [
       `${pin.modelId}: the check reads ${pin.files.length} pinned files in models.rs and cannot read ${pin.unread} more.`,
     ];
   }
-  const tree = await readTree(pin);
+  const tree = await readTree(model);
   const faults = await Promise.all(
-    pin.files.map(async (file) => checkFile(pin, tree, file)),
+    pin.files.map(async (file) => checkFile(pin, model, tree, file)),
   );
   return faults.flat();
 };
 
-const heads = await readHeads();
+const listing = await readListing();
 
 type PinVerdict = ModelPin & {
   head: string | undefined;
@@ -198,11 +209,12 @@ type PinVerdict = ModelPin & {
 
 const verdicts: PinVerdict[] = await Promise.all(
   pins.map(async (pin) => {
-    const head = heads.get(pin.modelId);
+    const listed = listing.get(pin.modelId);
     return {
       ...pin,
-      head,
-      faults: head === undefined ? [] : await checkFiles(pin),
+      head: listed?.head,
+      faults:
+        listed?.head === pin.revision ? await checkFiles(pin, listed) : [],
     };
   }),
 );
