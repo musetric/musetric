@@ -2027,7 +2027,10 @@ __metadata:
   dependencies:
     "@musetric/eslint-config": "workspace:*"
     "@typescript/native": "catalog:"
+    "@vitest/browser": "catalog:"
+    "@vitest/browser-playwright": "catalog:"
     eslint: "catalog:"
+    playwright: "catalog:"
     typescript: "catalog:"
     vite: "catalog:"
     vitest: "catalog:"

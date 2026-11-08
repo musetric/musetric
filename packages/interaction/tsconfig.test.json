@@ -1,4 +1,7 @@
 {
   "extends": "../../tsconfigs/tsconfig.test.json",
-  "references": [{ "path": "./tsconfig.src.json" }]
+  "references": [{ "path": "./tsconfig.src.json" }],
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"]
+  }
 }

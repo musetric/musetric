@@ -94,6 +94,7 @@ export const createFollowScrollController = (
   let skippedRevision: number | undefined = undefined;
   let activeIndex = getActiveIndex();
   let revision = getRevision();
+  let disposed = false;
 
   const clearReleaseTimeout = () => {
     if (releaseTimeout === undefined) return;
@@ -188,7 +189,8 @@ export const createFollowScrollController = (
     }
   };
 
-  const unsubscribeRevision = subscribeRevision(() => {
+  const handleRevision = () => {
+    if (disposed) return;
     revision = getRevision();
 
     if (skippedRevision === revision) {
@@ -206,6 +208,10 @@ export const createFollowScrollController = (
     ) {
       centerElement(activeElement);
     }
+  };
+
+  const unsubscribeRevision = subscribeRevision(() => {
+    queueMicrotask(handleRevision);
   });
 
   const unsubscribeActiveIndex = subscribeActiveIndex(() => {
@@ -277,6 +283,7 @@ export const createFollowScrollController = (
       }
     },
     dispose: () => {
+      disposed = true;
       unsubscribeRevision();
       unsubscribeActiveIndex();
       clearReleaseTimeout();
