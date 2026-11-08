@@ -1,0 +1,146 @@
+name: App Build iOS
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        required: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    permissions:
+      contents: read
+    env:
+      MUSETRIC_PUBLISH: ${{ inputs.publish }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode 27.1
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
+      - uses: ./.github/actions/setupYarn
+      - uses: actions/cache@v5
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      - run: yarn --immutable
+        env:
+          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - run: rustup toolchain install --no-self-update
+        working-directory: packages/app
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/server/target
+          key: cargo-${{ runner.os }}-ios-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-ios-
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/Library/Developer/Xcode/DerivedData
+          key: ios-xcode-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/app/native/apple/project.yml') }}
+          restore-keys: ios-xcode-${{ runner.os }}-
+      - run: brew install xcodegen
+      - name: Init iOS project
+        working-directory: packages/app
+        run: yarn init:ios
+      - name: Build iOS app (unsigned)
+        working-directory: packages/app
+        run: |
+          bundle_version=$((1000 + GITHUB_RUN_NUMBER))
+          yarn build:ios --no-sign --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$bundle_version\"}}}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musetric-ios-unsigned
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: packages/app/src-tauri/gen/apple/build/**/*.ipa
+
+  testflight:
+    if: inputs.mode == 'testing'
+    needs: build
+    runs-on: xcode-27
+    environment: app-store
+    steps:
+      - name: Select Xcode 27.1
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
+      - uses: actions/download-artifact@v8
+        with:
+          name: musetric-ios-unsigned
+          path: unsigned
+      - name: Sign for App Store distribution
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.APPLE_APP_STORE_PROFILE }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(openssl rand -hex 24)
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 1800 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/distribution.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/"Apple Distribution: / { print $2; exit }')
+          test -n "$identity"
+
+          profile="$RUNNER_TEMP/profile.mobileprovision"
+          printf '%s' "$PROFILE" | base64 --decode > "$profile"
+          security cms -D -i "$profile" > "$RUNNER_TEMP/profile.plist"
+          entitlements="$RUNNER_TEMP/entitlements.plist"
+          /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' "$RUNNER_TEMP/profile.plist" > "$entitlements"
+          app_id=$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$entitlements")
+          /usr/libexec/PlistBuddy -c 'Delete :keychain-access-groups' "$entitlements" 2> /dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :keychain-access-groups array' -c "Add :keychain-access-groups:0 string $app_id" "$entitlements"
+
+          mkdir "$RUNNER_TEMP/ipa"
+          unzip -q unsigned/arm64/Musetric.ipa -d "$RUNNER_TEMP/ipa"
+          app="$RUNNER_TEMP/ipa/Payload/Musetric.app"
+          bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+          if [ "$bundle_id" != com.musetric.client ] || [ "${app_id#*.}" != "$bundle_id" ]; then
+            echo "the app is $bundle_id and the profile is for $app_id" >&2
+            exit 1
+          fi
+          cp "$profile" "$app/embedded.mobileprovision"
+          if [ -d "$app/Frameworks" ]; then
+            find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) \
+              -exec codesign --force --sign "$identity" --keychain "$keychain" --timestamp=none {} \;
+          fi
+          codesign --force --sign "$identity" --keychain "$keychain" --timestamp=none \
+            --entitlements "$entitlements" --generate-entitlement-der "$app"
+          codesign --verify --strict --verbose=2 "$app"
+          codesign --display --entitlements - "$app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$RUNNER_TEMP/Musetric.ipa" Payload)
+          security delete-keychain "$keychain"
+      - name: Upload to TestFlight
+        env:
+          API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_ID: ${{ vars.APP_STORE_APP_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_"$API_KEY_ID".p8
+          info="$RUNNER_TEMP/ipa/Payload/Musetric.app/Info.plist"
+          read_info() { /usr/libexec/PlistBuddy -c "Print :$1" "$info"; }
+          echo "uploading $(read_info CFBundleIdentifier) $(read_info CFBundleShortVersionString) ($(read_info CFBundleVersion))"
+          xcrun altool --upload-package "$RUNNER_TEMP/Musetric.ipa" --type ios \
+            --apple-id "$APP_ID" \
+            --bundle-id "$(read_info CFBundleIdentifier)" \
+            --bundle-version "$(read_info CFBundleVersion)" \
+            --bundle-short-version-string "$(read_info CFBundleShortVersionString)" \
+            --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
+          rm -r ~/.appstoreconnect/private_keys

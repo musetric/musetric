@@ -21,15 +21,16 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - `src-tauri/gen` is generated and untracked: edit only its overlay `native`,
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
 - A mobile build is a development build, `com.musetric.client.dev` named
-  Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true`, which
-  `appBuild.yml` sets in its release and testing modes, is `com.musetric.client`
-  named Musetric. The two install side by side, each with its own data, and on
-  Android only the development build's WebView can be inspected. The Tauri CLI
-  sets the identifier itself: on Android it writes the debug suffix from
-  `debugApplicationIdSuffix` of `tauri.android.conf.json` and starts the app by
-  it, and on iOS it takes `identifier` from `gen/apple/identity.conf.json`,
-  which `initNative.ts` writes and `yarn dev:ios` and `yarn build:ios` pass
-  with `--config`.
+  Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true` is
+  `com.musetric.client` named Musetric. The `prepare` job of `appBuild.yml`
+  sets it by name, for the release and testing modes only: any other mode, or
+  none, builds Musetric Dev. The two install side by side, each with its own
+  data, and on Android only the development build's WebView can be inspected.
+  The Tauri CLI sets the identifier itself: on Android it writes the debug
+  suffix from `debugApplicationIdSuffix` of `tauri.android.conf.json` and
+  starts the app by it, and on iOS it takes `identifier` from
+  `gen/apple/identity.conf.json`, which `initNative.ts` writes and
+  `yarn dev:ios` and `yarn build:ios` pass with `--config`.
 - `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
   reason API the iOS binary calls, now file timestamps and disk space: App Store
   Connect refuses a build that calls one without its reason.
@@ -37,8 +38,11 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   the export compliance questions of App Store Connect for every build: the app
   uses standard encryption, rustls for HTTPS, and is not distributed in France.
   Encryption of its own or distribution in France changes the answer.
-- `appBuild.yml` numbers every iOS and Android build 1000 plus its run number,
-  since App Store Connect and Google Play refuse a number they already have.
+- `appBuild.yml` takes the mode, sets the version and `MUSETRIC_PUBLISH`,
+  calls one workflow per platform, `appBuildDesktop.yml`, `appBuildAndroid.yml`
+  and `appBuildIos.yml`, and publishes the GitHub release. It numbers every iOS
+  and Android build 1000 plus its run number, since App Store Connect and
+  Google Play refuse a number they already have.
   In the testing mode jobs of their own sign the iOS build and the Android App
   Bundle and upload them to TestFlight and to Google Play internal testing once
   the owner approves the run in the `app-store` and `google-play`
