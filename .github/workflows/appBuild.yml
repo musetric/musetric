@@ -36,10 +36,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           declared=$(node -p "require('./packages/app/package.json').version")
-          if [ "$MODE" != release ]; then
-            echo "version=$declared-dev.g${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          case "$MODE" in
+            dev)
+              echo "version=$declared-dev.g${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            testing)
+              echo "version=$declared" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           if ! printf '%s' "$declared" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
             echo "not a release version: $declared" >&2
             exit 1
@@ -62,7 +68,6 @@ jobs:
           echo "version=$declared" >> "$GITHUB_OUTPUT"
 
   desktop:
-    if: inputs.mode != 'testing'
     needs: prepare
     strategy:
       fail-fast: false
@@ -147,19 +152,9 @@ jobs:
           api-issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           app-id: ${{ vars.APP_STORE_APP_ID }}
 
-  mac-app-store:
-    if: inputs.mode == 'testing'
-    needs: prepare
-    runs-on: xcode-27
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/appBuildMacAppStore
-
   testflight-macos:
     if: inputs.mode == 'testing'
-    needs: mac-app-store
+    needs: desktop
     runs-on: xcode-27
     environment: app-store
     permissions:

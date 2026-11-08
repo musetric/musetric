@@ -71,11 +71,27 @@ runs:
         restore-keys: cargo-${{ runner.os }}-${{ inputs.arch }}-
     - run: rm -rf packages/server/target/*/release/bundle packages/server/target/release/bundle 2>/dev/null
       shell: bash
-    - run: yarn workspace @musetric/app pack:installer -- --target ${{ inputs.rust-target }} --version ${{ inputs.version }}
+    - run: yarn workspace @musetric/app pack:installer -- --target ${{ inputs.rust-target }} --version ${{ inputs.version }} --build-number $((1000 + GITHUB_RUN_NUMBER))
       env:
         TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.tauri-signing-private-key }}
         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.tauri-signing-private-key-password }}
       shell: bash
+    - name: Keep the macOS app with its Mac App Store entitlements
+      if: inputs.platform == 'macOS'
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/macApp"
+        ditto -c -k --keepParent packages/server/target/${{ inputs.rust-target }}/release/bundle/macos/Musetric.app "$RUNNER_TEMP/macApp/Musetric.app.zip"
+        cp packages/app/src-tauri/macAppStore.entitlements "$RUNNER_TEMP/macApp/"
+      shell: bash
+    - if: inputs.platform == 'macOS'
+      uses: actions/upload-artifact@v7
+      with:
+        name: musetric-macos-app-unsigned
+        if-no-files-found: error
+        retention-days: 14
+        compression-level: 0
+        path: ${{ runner.temp }}/macApp/
     - uses: actions/upload-artifact@v7
       with:
         name: musetric-desktop-${{ inputs.platform }}-${{ inputs.arch }}-installer

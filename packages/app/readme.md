@@ -42,18 +42,22 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   the version and `MUSETRIC_PUBLISH`, builds every platform and publishes the
   GitHub release. The steps of each job live in a composite action of
   `.github/actions`: `appBuildDesktop`, `appBuildAndroid`, `appBuildIos`,
-  `appBuildMacAppStore`, `uploadTestflight`, `uploadTestflightMacos` and
-  `uploadGooglePlay`. It numbers every iOS, Mac App Store and Android build
-  1000 plus its run number, since App Store Connect and Google Play refuse a
-  number they already have.
-  In the testing mode jobs of their own sign the iOS build, the macOS build for
-  the Mac App Store and the Android App Bundle and upload them to TestFlight and
-  to Google Play internal testing once the owner approves the run in the
-  `app-store` and `google-play` environments; they check out only
-  `.github/actions` and run none of the project's code. The macOS build is
-  signed into the App Sandbox with `src-tauri/macAppStore.entitlements` and
-  packaged as an installer the Mac Installer Distribution certificate signs. The Google Play job signs in to Google Cloud through
-  Workload Identity Federation, so its service account has no key.
+  `uploadTestflight`, `uploadTestflightMacos` and `uploadGooglePlay`. Only the
+  dev mode marks its version as a development one; the testing and release
+  modes carry the version of `package.json`, which the stores take. It numbers
+  every iOS, macOS and Android build 1000 plus its run number, since App Store
+  Connect and Google Play refuse a number they already have.
+  The macOS app is built once, by the desktop job: its DMG goes to the GitHub
+  release, and the same app, unsigned, to the Mac App Store.
+  In the testing mode jobs of their own sign the iOS build, the macOS app and
+  the Android App Bundle and upload them to TestFlight and to Google Play
+  internal testing once the owner approves the run in the `app-store` and
+  `google-play` environments; they check out only `.github/actions` and run
+  none of the project's code. The macOS app is signed into the App Sandbox with
+  `src-tauri/macAppStore.entitlements` and packaged as an installer the Mac
+  Installer Distribution certificate signs. The Google Play job signs in to
+  Google Cloud through Workload Identity Federation, so its service account
+  has no key.
 - On Windows `appBuild.yml` also packs the app as an MSIX for the Microsoft
   Store with `scripts/packMsix.ts`: `makeappx` of the Windows SDK puts the
   app, its notices and its logos under `src-tauri/windows/AppxManifest.xml`,

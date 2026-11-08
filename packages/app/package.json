@@ -13,7 +13,6 @@
     "build:ui": "yarn build:icons && vite build --configLoader native && yarn build:executor",
     "pack:installer": "node ./scripts/packInstaller.ts",
     "pack:msix": "node ./scripts/packMsix.ts",
-    "pack:macAppStore": "tauri build --target aarch64-apple-darwin --bundles app",
     "dev:app": "tauri dev",
     "build:app": "tauri build --no-bundle",
     "build:icons": "node ./scripts/buildIcons.ts",

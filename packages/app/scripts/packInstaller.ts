@@ -13,16 +13,23 @@ const readArg = (name: string): string | undefined => {
 
 const target = readArg('--target');
 const version = readArg('--version');
+const buildNumber = readArg('--build-number');
 const config: {
   version?: string;
-  bundle?: { createUpdaterArtifacts: boolean };
+  bundle?: {
+    createUpdaterArtifacts?: boolean;
+    macOS?: { bundleVersion: string };
+  };
 } = {};
 
 if (version !== undefined) {
   config.version = version;
 }
 if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
-  config.bundle = { createUpdaterArtifacts: true };
+  config.bundle = { ...config.bundle, createUpdaterArtifacts: true };
+}
+if (buildNumber !== undefined) {
+  config.bundle = { ...config.bundle, macOS: { bundleVersion: buildNumber } };
 }
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
