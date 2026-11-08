@@ -120,4 +120,43 @@ describe('rhythm summary', () => {
     expect(result.beats).toEqual(everyOther);
     expect(result.downbeats).toEqual(downbeats);
   });
+
+  it('clicks the shown tempo through a half-time section', () => {
+    const grid = createGrid(() => 60 / 120);
+    const inSection = (index: number) => index >= 120 && index < 180;
+    const tracked = grid.filter(
+      (beat) => !inSection(beat.index) || beat.index % 2 === 0,
+    );
+    const { result } = summarizeGrid(
+      tracked,
+      (index) => index % (inSection(index) ? 8 : 4) === 0,
+    );
+    expect(result.bpm).toBeCloseTo(120, 1);
+    expect(result.beats).toHaveLength(grid.length);
+    result.beats.forEach((time, index) => {
+      expect(Math.abs(time - grid[index].time)).toBeLessThan(0.011);
+    });
+    expect(result.downbeats).toHaveLength(
+      grid.filter((beat) => beat.index % 4 === 0).length,
+    );
+  });
+
+  it('keeps every other beat of a double-time section', () => {
+    const grid = createGrid(() => 60 / 100);
+    const inSection = (index: number) => index >= 100 && index < 150;
+    const tracked = grid.flatMap((beat) =>
+      inSection(beat.index)
+        ? [beat, { time: onFrames(beat.time + 0.3), index: -1 }]
+        : [beat],
+    );
+    const { result } = summarizeGrid(
+      tracked,
+      (index) => index % (inSection(index) ? 2 : 4) === 0,
+    );
+    expect(result.bpm).toBeCloseTo(100, 1);
+    expect(result.beats).toEqual(grid.map((beat) => beat.time));
+    expect(result.downbeats).toEqual(
+      grid.filter((beat) => beat.index % 4 === 0).map((beat) => beat.time),
+    );
+  });
 });

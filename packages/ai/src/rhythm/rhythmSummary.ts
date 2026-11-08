@@ -1,5 +1,7 @@
 const minBeats = 2;
 const stepTolerance = 0.125;
+const octaveTolerance = 0.17;
+const minSectionIntervals = 4;
 const defaultMeter = 4;
 const minPreferredBpm = 60;
 const maxPreferredBpm = 160;
@@ -191,6 +193,106 @@ const estimateMeter = (beats: number[], downbeats: number[]): number => {
   return roundHalfToEven(median(counts));
 };
 
+type OctaveSection = {
+  octave: number;
+  first: number;
+  last: number;
+};
+
+const findOctaveSections = (
+  beats: number[],
+  period: number,
+): OctaveSection[] => {
+  const octaves = differences(beats).map((interval) => {
+    const exact = Math.log2(interval / period);
+    const octave = Math.round(exact);
+    return Math.abs(exact - octave) < octaveTolerance ? octave : undefined;
+  });
+  const sections: OctaveSection[] = [];
+  let first = 0;
+  for (let index = 1; index <= octaves.length; index += 1) {
+    if (index === octaves.length || octaves[index] !== octaves[first]) {
+      const octave = octaves[first];
+      if (
+        (octave === -1 || octave === 1) &&
+        index - first >= minSectionIntervals
+      ) {
+        sections.push({ octave, first, last: index });
+      }
+      first = index;
+    }
+  }
+  return sections;
+};
+
+type FittedBeats = {
+  beats: number[];
+  sections: { start: number; end: number }[];
+};
+
+const fitSectionsToTempo = (
+  beats: number[],
+  downbeats: number[],
+  period: number,
+): FittedBeats => {
+  const fitted: number[] = [];
+  const sections: FittedBeats['sections'] = [];
+  let next = 0;
+  for (const section of findOctaveSections(beats, period)) {
+    fitted.push(...beats.slice(next, section.first));
+    const own = beats.slice(section.first, section.last + 1);
+    const [start] = own;
+    const end = own[own.length - 1];
+    if (section.octave < 0) {
+      const inside = downbeats.filter((time) => time >= start && time <= end);
+      fitted.push(...everyOtherBeat(own, inside));
+    } else {
+      own.slice(1).forEach((time, index) => {
+        fitted.push(own[index], (own[index] + time) / 2);
+      });
+      fitted.push(end);
+    }
+    sections.push({ start, end });
+    next = section.last + 1;
+  }
+  fitted.push(...beats.slice(next));
+  return { beats: fitted, sections };
+};
+
+const alignBarsInSections = (
+  fitted: FittedBeats,
+  downbeats: number[],
+  meter: number,
+): number[] => {
+  const positions = new Map(
+    fitted.beats.map((time, position) => [time, position]),
+  );
+  const inSection = (time: number) =>
+    fitted.sections.some(
+      (section) => time > section.start && time <= section.end,
+    );
+  const aligned: number[] = [];
+  for (const time of downbeats) {
+    const position = positions.get(time);
+    const previous =
+      aligned.length > 0
+        ? positions.get(aligned[aligned.length - 1])
+        : undefined;
+    if (position === undefined) {
+      continue;
+    }
+    if (!inSection(time) || previous === undefined) {
+      aligned.push(time);
+    } else if (position - previous >= meter) {
+      if (position - previous === 2 * meter) {
+        aligned.push(fitted.beats[previous + meter]);
+      }
+      aligned.push(time);
+    }
+  }
+  return aligned;
+};
+
 type ListeningTempo = {
   bpm: number;
   beats: number[];
@@ -207,7 +309,7 @@ export const summarizeRhythm = (
     probeBpms.length > 0 ? probeBpms : [estimateBpm(beats)],
   );
   const rawBpm = estimateBpm(beats);
-  if (bpm <= 0 || rawBpm <= 0 || rawBpm / bpm < 1.5) {
+  if (bpm <= 0 || rawBpm <= 0) {
     return {
       bpm,
       beats,
@@ -215,17 +317,25 @@ export const summarizeRhythm = (
       meter: estimateMeter(beats, downbeats),
     };
   }
-  const foldedBeats = everyOtherBeat(beats, downbeats);
-  const foldedDownbeats: number[] = [];
+  const halvedBeats =
+    rawBpm / bpm < 1.5 ? beats : everyOtherBeat(beats, downbeats);
+  const halved = new Set(halvedBeats);
+  const halvedDownbeats: number[] = [];
   for (const time of downbeats) {
-    if (foldedBeats.includes(time)) {
-      foldedDownbeats.push(time);
+    if (halved.has(time)) {
+      halvedDownbeats.push(time);
     }
   }
+  const fitted = fitSectionsToTempo(halvedBeats, halvedDownbeats, 60 / bpm);
+  const fittedDownbeats = alignBarsInSections(
+    fitted,
+    halvedDownbeats,
+    estimateMeter(halvedBeats, halvedDownbeats),
+  );
   return {
     bpm,
-    beats: foldedBeats,
-    downbeats: foldedDownbeats,
-    meter: estimateMeter(foldedBeats, foldedDownbeats),
+    beats: fitted.beats,
+    downbeats: fittedDownbeats,
+    meter: estimateMeter(fitted.beats, fittedDownbeats),
   };
 };
