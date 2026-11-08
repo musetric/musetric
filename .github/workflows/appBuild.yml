@@ -78,10 +78,6 @@ jobs:
             rustTarget: aarch64-pc-windows-msvc
           - os: xcode-27
             platform: macOS
-            arch: x64
-            rustTarget: x86_64-apple-darwin
-          - os: xcode-27
-            platform: macOS
             arch: arm64
             rustTarget: aarch64-apple-darwin
           - os: ubuntu-22.04

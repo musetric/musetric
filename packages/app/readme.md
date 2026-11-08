@@ -77,9 +77,9 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   [every platform it supports](https://github.com/musetric/headquarters/blob/main/product.md#where-it-runs): the hidden
   executor WebView is `ExecutorViewPlugin`, `minimumSystemVersion` of
   `tauri.macos.conf.json` and `tauri.ios.conf.json` holds Apple systems at
-  version 26, `minSdk` of `native/android/app/build.gradle.kts` and
-  `tauri.android.conf.json` hold Android at version 12, and the Linux build is
-  not offered.
+  version 26, the macOS app is built for Apple silicon alone, `minSdk` of
+  `native/android/app/build.gradle.kts` and `tauri.android.conf.json` hold
+  Android at version 12, and the Linux build is not offered.
 - Pull requests do not build the app (`.github/workflows/appBuild.yml`); the
   installed app is checked by a [release run](https://github.com/musetric/headquarters/blob/main/practices/release.md).
 
