@@ -3,7 +3,6 @@ import { consecutiveProbeBpms, summarizeRhythm } from '../rhythmSummary.js';
 
 const fps = 50;
 const duration = 180;
-const beatsPerBar = 8;
 
 const onFrames = (time: number) => Math.round(time * fps) / fps;
 
@@ -22,10 +21,13 @@ const createGrid = (beatSeconds: (time: number) => number): GridBeat[] => {
   return grid;
 };
 
-const summarizeGrid = (grid: GridBeat[]) => {
+const summarizeGrid = (
+  grid: GridBeat[],
+  isDownbeat = (index: number) => index % 8 === 0,
+) => {
   const beats = grid.map((beat) => beat.time);
   const downbeats = grid
-    .filter((beat) => beat.index % beatsPerBar === 0)
+    .filter((beat) => isDownbeat(beat.index))
     .map((beat) => beat.time);
   const result = summarizeRhythm(
     beats,
@@ -86,6 +88,29 @@ describe('rhythm summary', () => {
     const { downbeats, everyOther, result } = summarizeGrid(grid);
     expect(result.beats).toEqual(everyOther);
     expect(result.downbeats).toEqual(downbeats);
+  });
+
+  it('keeps every downbeat after a bar of five beats', () => {
+    const grid = createGrid(() => 60 / 184);
+    const { downbeats, result } = summarizeGrid(grid, (index) =>
+      index < 25 ? index % 4 === 0 : (index - 25) % 4 === 0,
+    );
+    expect(result.downbeats).toEqual(downbeats);
+    expect(result.beats).toEqual(
+      grid
+        .filter(
+          (beat) => (beat.index < 25 ? beat.index : beat.index - 25) % 2 === 0,
+        )
+        .map((beat) => beat.time),
+    );
+  });
+
+  it('halves bars of three beats on every other beat', () => {
+    const { everyOther, result } = summarizeGrid(
+      createGrid(() => 60 / 184),
+      (index) => index % 3 === 0,
+    );
+    expect(result.beats).toEqual(everyOther);
   });
 
   it('keeps the downbeats of a drifting tempo', () => {

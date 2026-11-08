@@ -119,7 +119,33 @@ const consensusBpm = (bpms: number[]): number => {
   return median(sorted.slice(bestStart, bestStart + bestSize));
 };
 
-const everyOtherBeat = (beats: number[], origin: number): number[] => {
+const keepFromLatestDownbeat = (
+  counts: number[],
+  downbeatCounts: number[],
+): boolean[] => {
+  let latest = 0;
+  return counts.map((count) => {
+    while (
+      latest + 1 < downbeatCounts.length &&
+      downbeatCounts[latest + 1] <= count
+    ) {
+      latest += 1;
+    }
+    return (count - downbeatCounts[latest]) % 2 === 0;
+  });
+};
+
+const keepOnDownbeatParity = (
+  counts: number[],
+  downbeatCounts: number[],
+): boolean[] => {
+  const even = downbeatCounts.filter((count) => count % 2 === 0).length;
+  const odd = downbeatCounts.length - even;
+  const parity = even === odd ? downbeatCounts[0] % 2 : Number(odd > even);
+  return counts.map((count) => count % 2 === parity);
+};
+
+const everyOtherBeat = (beats: number[], downbeats: number[]): number[] => {
   if (beats.length < minBeats) {
     return beats;
   }
@@ -132,10 +158,16 @@ const everyOtherBeat = (beats: number[], origin: number): number[] => {
   intervals.forEach((interval, index) => {
     counts.push(counts[index] + Math.round(interval / step));
   });
-  const originCount = counts[beats.indexOf(origin)];
-  const kept = beats.filter(
-    (_, index) => (counts[index] - originCount) % 2 === 0,
-  );
+  const downbeatCounts =
+    downbeats.length > 0
+      ? downbeats.map((time) => counts[beats.indexOf(time)])
+      : [0];
+  const bars = differences(downbeatCounts);
+  const keep =
+    bars.length === 0 || roundHalfToEven(median(bars)) % 2 === 0
+      ? keepFromLatestDownbeat(counts, downbeatCounts)
+      : keepOnDownbeatParity(counts, downbeatCounts);
+  const kept = beats.filter((_, index) => keep[index]);
   return kept.length >= minBeats ? kept : beats;
 };
 
@@ -183,8 +215,7 @@ export const summarizeRhythm = (
       meter: estimateMeter(beats, downbeats),
     };
   }
-  const origin = downbeats.length > 0 ? downbeats[0] : beats[0];
-  const foldedBeats = everyOtherBeat(beats, origin);
+  const foldedBeats = everyOtherBeat(beats, downbeats);
   const foldedDownbeats: number[] = [];
   for (const time of downbeats) {
     if (foldedBeats.includes(time)) {
