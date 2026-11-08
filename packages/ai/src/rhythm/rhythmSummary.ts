@@ -1,5 +1,4 @@
 const minBeats = 2;
-const minIntervalsForIqr = 4;
 const defaultMeter = 4;
 const minPreferredBpm = 60;
 const maxPreferredBpm = 160;
@@ -20,6 +19,9 @@ const median = (values: number[]): number =>
     0.5,
   );
 
+const mean = (values: number[]): number =>
+  values.reduce((sum, value) => sum + value, 0) / values.length;
+
 const roundHalfToEven = (value: number): number => {
   const floor = Math.floor(value);
   if (value - floor !== 0.5) {
@@ -31,33 +33,19 @@ const roundHalfToEven = (value: number): number => {
 const differences = (values: number[]): number[] =>
   values.slice(1).map((value, index) => value - values[index]);
 
-const withoutOutliers = (intervals: number[]): number[] => {
-  const sorted = [...intervals].sort((a, b) => a - b);
-  const q1 = percentile(sorted, 0.25);
-  const q3 = percentile(sorted, 0.75);
-  const iqr = q3 - q1;
-  const low = q1 - 1.5 * iqr;
-  const high = q3 + 1.5 * iqr;
-  const filtered = intervals.filter(
-    (interval) => interval >= low && interval <= high,
-  );
-  return filtered.length > 0 ? filtered : intervals;
-};
-
 const estimateBpm = (beats: number[]): number => {
   if (beats.length < minBeats) {
     return 0;
   }
   const intervals = differences(beats);
-  const kept =
-    intervals.length >= minIntervalsForIqr
-      ? withoutOutliers(intervals)
-      : intervals;
-  const interval = median(kept);
-  if (interval <= 0) {
+  const step = median(intervals);
+  if (step <= 0) {
     return 0;
   }
-  return 60 / interval;
+  const oneBeatIntervals = intervals.filter(
+    (interval) => Math.round(interval / step) === 1,
+  );
+  return 60 / mean(oneBeatIntervals);
 };
 
 const mapProbeBpm = (bpm: number): number => {

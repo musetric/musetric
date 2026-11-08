@@ -39,6 +39,23 @@ const summarizeGrid = (grid: GridBeat[]) => {
 };
 
 describe('rhythm summary', () => {
+  it.each([100, 105, 108, 110, 112, 120, 128, 140])(
+    'finds the tempo of a steady %d BPM grid',
+    (bpm) => {
+      const { result } = summarizeGrid(createGrid(() => 60 / bpm));
+      expect(result.bpm).toBeCloseTo(bpm, 1);
+    },
+  );
+
+  it('keeps the tempo across a pause and a late beat', () => {
+    const grid = createGrid(() => 60 / 110).filter(
+      (beat) => beat.time < 60 || beat.time > 65,
+    );
+    grid[200].time += 0.1;
+    const { result } = summarizeGrid(grid);
+    expect(result.bpm).toBeCloseTo(110, 1);
+  });
+
   it.each([170, 176, 180, 184, 190, 200])(
     'halves a steady %d BPM grid on every other beat',
     (bpm) => {
@@ -47,6 +64,7 @@ describe('rhythm summary', () => {
       );
       expect(result.beats).toEqual(everyOther);
       expect(result.downbeats).toEqual(downbeats);
+      expect(result.bpm).toBeCloseTo(bpm / 2, 1);
     },
   );
 
