@@ -50,6 +50,13 @@ jobs:
         run: yarn init:android
       - name: Pin Android SDK path for gradle
         run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('packages/app/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties', 'packages/app/src-tauri/gen/android/**/*.gradle.kts', 'packages/app/src-tauri/gen/android/gradle.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
       - name: Build the release APK and App Bundle (unsigned)
         working-directory: packages/app
         run: |
