@@ -36,13 +36,6 @@ const targets: Target[] = [
   },
   {
     os: 'macOS',
-    cpu: 'x64',
-    tauri: 'darwin-x86_64',
-    installer: '.dmg',
-    updater: '.app.tar.gz',
-  },
-  {
-    os: 'macOS',
     cpu: 'arm64',
     tauri: 'darwin-aarch64',
     installer: '.dmg',
