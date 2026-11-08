@@ -18,6 +18,8 @@ runs:
     - run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server
+    - run: echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
+      shell: bash
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: packages/server
