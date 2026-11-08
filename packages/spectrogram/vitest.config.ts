@@ -1,9 +1,13 @@
 import { playwright } from '@vitest/browser-playwright';
+import { defaultClientConditions } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const isSkip = process.platform === 'linux';
 
 export default defineConfig({
+  resolve: {
+    conditions: defaultClientConditions.concat('monorepo'),
+  },
   test: {
     dir: 'src',
     exclude: isSkip ? ['**/*'] : [],
