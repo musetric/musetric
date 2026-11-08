@@ -61,10 +61,14 @@ runs:
       run: rustup target add ${{ inputs.rust-target }}
       working-directory: packages/app
       shell: bash
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/cache@v5
       with:
-        workspaces: packages/server
-        shared-key: app-desktop-${{ inputs.rust-target }}
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          packages/server/target
+        key: cargo-${{ runner.os }}-${{ inputs.arch }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-${{ inputs.arch }}-
     - run: rm -rf packages/server/target/*/release/bundle packages/server/target/release/bundle 2>/dev/null
       shell: bash
     - run: yarn workspace @musetric/app pack:installer -- --target ${{ inputs.rust-target }} --version ${{ inputs.version }}
