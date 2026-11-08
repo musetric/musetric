@@ -17,7 +17,7 @@ use tokio::time::sleep;
 
 use crate::{
     queue::{Queue, QueueOptions, StatusEvent, StepAnswer, StepOutcome, StepReport, StepRunner},
-    summary::{StepPass, StepPhase, StepWait, StepWaiting},
+    summary::{StepPass, StepPhase, StepView, StepWait, StepWaiting},
 };
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -125,6 +125,7 @@ enum Answer {
     Gone,
     Dropped,
     Flaky,
+    Saving,
     Stuck,
     Exploded,
     Lively,
@@ -179,6 +180,15 @@ impl StepRunner for FakeRunner {
                     StepAnswer::Waiting(StepWaiting::Lost)
                 });
             }
+            Answer::Saving => {
+                let database_path = self.database_path.clone();
+                let step = job.step;
+                return Box::pin(async move {
+                    report(running_phase(1));
+                    FakeRunner::save_checkpoint(&database_path, step);
+                    StepAnswer::Waiting(StepWaiting::Lost)
+                });
+            }
             Answer::Exploded if self.seen().len() == 1 => {
                 return Box::pin(async {
                     report(running_phase(1));
@@ -200,6 +210,7 @@ impl StepRunner for FakeRunner {
                 | Answer::Gone
                 | Answer::Dropped
                 | Answer::Flaky
+                | Answer::Saving
                 | Answer::Stuck
                 | Answer::Exploded
                 | Answer::Lively => {}
@@ -211,6 +222,20 @@ impl StepRunner for FakeRunner {
 }
 
 impl FakeRunner {
+    fn save_checkpoint(database_path: &Path, step: ProcessingStep) {
+        let options = OpenOptions {
+            foreign_keys: false,
+        };
+        open_database(database_path, &options)
+            .expect("the database should open")
+            .execute(
+                "UPDATE ProcessingStep SET checkpointGeneration = checkpointGeneration + 1
+                 WHERE projectId = 1 AND step = ?1",
+                [step.name()],
+            )
+            .expect("the checkpoint should be written");
+    }
+
     fn write_result(database_path: &Path, step: ProcessingStep) {
         let options = OpenOptions {
             foreign_keys: false,
@@ -244,6 +269,22 @@ async fn lively(database_path: PathBuf, step: ProcessingStep, report: &StepRepor
     }
     FakeRunner::write_result(&database_path, step);
     StepAnswer::Finished
+}
+
+async fn drain_separation(queue: &Arc<Queue>, times: usize) -> Vec<StepView> {
+    let mut seen = Vec::new();
+    for _ in 0..times {
+        queue.drain().await;
+        seen.push(
+            queue
+                .processing(1)
+                .await
+                .expect("the summary should be built")
+                .step(ProcessingStep::Separation)
+                .clone(),
+        );
+    }
+    seen
 }
 
 fn collect_events(events: &mut tokio::sync::broadcast::Receiver<StatusEvent>) -> Vec<StatusEvent> {
@@ -377,28 +418,35 @@ async fn fails_a_step_when_the_executor_never_runs_a_unit() {
     let runner = FakeRunner::create(&workspace, Answer::Dropped);
     let queue = workspace.create_queue(runner.clone());
 
-    let mut waited = Vec::new();
-    for _ in 0..5 {
-        queue.drain().await;
-        let separation = queue
-            .processing(1)
-            .await
-            .expect("the summary should be built")
-            .step(ProcessingStep::Separation)
-            .clone();
-        waited.push((separation.status, separation.wait));
-    }
+    let mut waited = drain_separation(&queue, 5).await;
 
-    let (status, wait) = waited.pop().expect("the last attempt should be recorded");
-    assert_eq!(status, StepStatus::Failed);
-    assert_eq!(wait, None);
-    assert!(waited.iter().all(|(seen, _)| *seen == StepStatus::Pending));
+    let last = waited.pop().expect("the last attempt should be recorded");
+    assert_eq!(last.status, StepStatus::Failed);
+    assert_eq!(last.wait, None);
+    assert!(waited.iter().all(|seen| seen.status == StepStatus::Pending));
 }
 
 #[tokio::test]
-async fn never_gives_up_on_a_step_whose_executor_ran_a_unit() {
+async fn fails_a_step_whose_executor_stops_before_every_checkpoint() {
     let workspace = Workspace::new();
     let runner = FakeRunner::create(&workspace, Answer::Flaky);
+    let queue = workspace.create_queue(runner.clone());
+
+    let mut waited = drain_separation(&queue, 5).await;
+
+    let last = waited.pop().expect("the last attempt should be recorded");
+    assert_eq!(last.status, StepStatus::Failed);
+    assert!(
+        last.error
+            .is_some_and(|message| message.contains("5 times in a row"))
+    );
+    assert!(waited.iter().all(|seen| seen.status == StepStatus::Pending));
+}
+
+#[tokio::test]
+async fn never_gives_up_on_a_step_that_saves_checkpoints() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Saving);
     let queue = workspace.create_queue(runner.clone());
 
     for _ in 0..8 {
