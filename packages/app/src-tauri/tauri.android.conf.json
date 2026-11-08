@@ -1,7 +1,8 @@
 {
   "bundle": {
     "android": {
-      "minSdkVersion": 31
+      "minSdkVersion": 31,
+      "debugApplicationIdSuffix": ".dev"
     }
   }
 }

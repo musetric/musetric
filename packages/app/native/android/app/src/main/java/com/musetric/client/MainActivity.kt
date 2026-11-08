@@ -12,7 +12,7 @@ class MainActivity : TauriActivity() {
   private var mainWebView: WebView? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    if (BuildConfig.DEBUG || BuildConfig.MEASURE) {
+    if (!BuildConfig.PUBLISHED) {
       WebView.setWebContentsDebuggingEnabled(true)
     }
     installSplashScreen()

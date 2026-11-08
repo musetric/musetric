@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Musetric
-      PRODUCT_BUNDLE_IDENTIFIER: com.musetric.client
+      PRODUCT_BUNDLE_IDENTIFIER: ${APP_IDENTIFIER}
 targetTemplates:
   app:
     type: application
@@ -41,6 +41,7 @@ targets:
     info:
       path: musetric-app_iOS/Info.plist
       properties:
+        CFBundleDisplayName: ${APP_NAME}
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]

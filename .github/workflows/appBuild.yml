@@ -164,6 +164,8 @@ jobs:
           - abi: x86_64
             target: x86_64
     runs-on: ubuntu-22.04
+    env:
+      MUSETRIC_PUBLISH: ${{ inputs.mode == 'release' }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setupYarn
@@ -215,6 +217,8 @@ jobs:
   ios:
     needs: prepare
     runs-on: xcode-27
+    env:
+      MUSETRIC_PUBLISH: ${{ inputs.mode == 'release' }}
     steps:
       - uses: actions/checkout@v5
       - name: Select Xcode 27.1

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 
-const androidPackage = 'com.musetric.client';
+const androidPackage = 'com.musetric.client.dev';
 const projectPath = /\/project\/(\d+)/;
 
 const targetListSchema = z.array(
