@@ -1,15 +1,15 @@
 import { dirname, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { experimental_getRunnerTask, startVitest } from 'vitest/node';
-import { type FourierBenchSummary } from '../src/fourier/__test__/bench.es.js';
-import { runCufftBenchmark } from './benchCufft.js';
-import { writeBenchReport } from './genBenchReport.js';
+import { createVitest, experimental_getRunnerTask } from 'vitest/node';
+import type * as fourierBench from '../src/fourier/__test__/bench.es.js';
+import type * as benchCufft from './benchCufft.js';
+import type * as benchReport from './genBenchReport.js';
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface TaskMeta {
-    bench?: FourierBenchSummary;
+    bench?: fourierBench.FourierBenchSummary;
   }
 }
 
@@ -33,9 +33,7 @@ const main = async (): Promise<void> => {
       stream.write(log.content + '\n');
     },
   };
-  const cufftResults = runCufftBenchmark() ?? [];
-  const vitest = await startVitest(
-    [],
+  const vitest = await createVitest(
     {
       config: resolve(packageRoot, 'vitest.bench.config.ts'),
       watch: false,
@@ -44,8 +42,8 @@ const main = async (): Promise<void> => {
     undefined,
     { stdout: devNull, stderr: devNull },
   );
-  const collectWebgpuResults = (): FourierBenchSummary[] => {
-    const webgpuResults: FourierBenchSummary[] = [];
+  const collectWebgpuResults = (): fourierBench.FourierBenchSummary[] => {
+    const webgpuResults: fourierBench.FourierBenchSummary[] = [];
 
     for (const module of vitest.state.getTestModules()) {
       for (const testCase of module.children.allTests()) {
@@ -61,6 +59,14 @@ const main = async (): Promise<void> => {
   };
 
   try {
+    const { runCufftBenchmark } = await vitest.import<typeof benchCufft>(
+      resolve(currentDir, 'benchCufft.ts'),
+    );
+    const { writeBenchReport } = await vitest.import<typeof benchReport>(
+      resolve(currentDir, 'genBenchReport.ts'),
+    );
+    const cufftResults = runCufftBenchmark() ?? [];
+    await vitest.start();
     writeBenchReport(collectWebgpuResults(), cufftResults);
   } finally {
     await vitest.close();
