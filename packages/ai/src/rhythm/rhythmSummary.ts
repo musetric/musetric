@@ -135,17 +135,18 @@ const everyOtherBeat = (beats: number[], origin: number): number[] => {
     return beats;
   }
   const intervals = differences(beats);
-  if (intervals.length === 0) {
-    return beats;
-  }
   const step = median(intervals);
   if (step <= 0) {
     return beats;
   }
-  const kept = beats.filter((time) => {
-    const index = Math.round((time - origin) / step);
-    return index % 2 === 0;
+  const counts = [0];
+  intervals.forEach((interval, index) => {
+    counts.push(counts[index] + Math.round(interval / step));
   });
+  const originCount = counts[beats.indexOf(origin)];
+  const kept = beats.filter(
+    (_, index) => (counts[index] - originCount) % 2 === 0,
+  );
   return kept.length >= minBeats ? kept : beats;
 };
 
