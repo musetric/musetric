@@ -16,8 +16,19 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
+      publish: ${{ steps.publish.outputs.publish }}
       version: ${{ steps.version.outputs.version }}
     steps:
+      - id: publish
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            testing | release) publish=true ;;
+            *) publish=false ;;
+          esac
+          echo "mode '$MODE' builds with MUSETRIC_PUBLISH=$publish"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
       - id: version
         env:
@@ -159,7 +170,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-22.04
     env:
-      MUSETRIC_PUBLISH: ${{ inputs.mode != 'dev' }}
+      MUSETRIC_PUBLISH: ${{ needs.prepare.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setupYarn
@@ -221,7 +232,7 @@ jobs:
     needs: prepare
     runs-on: xcode-27
     env:
-      MUSETRIC_PUBLISH: ${{ inputs.mode != 'dev' }}
+      MUSETRIC_PUBLISH: ${{ needs.prepare.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
       - name: Select Xcode 27.1

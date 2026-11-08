@@ -21,15 +21,16 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - `src-tauri/gen` is generated and untracked: edit only its overlay `native`,
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
 - A mobile build is a development build, `com.musetric.client.dev` named
-  Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true`, which
-  `appBuild.yml` sets in its release and testing modes, is `com.musetric.client`
-  named Musetric. The two install side by side, each with its own data, and on
-  Android only the development build's WebView can be inspected. The Tauri CLI
-  sets the identifier itself: on Android it writes the debug suffix from
-  `debugApplicationIdSuffix` of `tauri.android.conf.json` and starts the app by
-  it, and on iOS it takes `identifier` from `gen/apple/identity.conf.json`,
-  which `initNative.ts` writes and `yarn dev:ios` and `yarn build:ios` pass
-  with `--config`.
+  Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true` is
+  `com.musetric.client` named Musetric. The `prepare` job of `appBuild.yml`
+  sets it by name, for the release and testing modes only: any other mode, or
+  none, builds Musetric Dev. The two install side by side, each with its own
+  data, and on Android only the development build's WebView can be inspected.
+  The Tauri CLI sets the identifier itself: on Android it writes the debug
+  suffix from `debugApplicationIdSuffix` of `tauri.android.conf.json` and
+  starts the app by it, and on iOS it takes `identifier` from
+  `gen/apple/identity.conf.json`, which `initNative.ts` writes and
+  `yarn dev:ios` and `yarn build:ios` pass with `--config`.
 - `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
   reason API the iOS binary calls, now file timestamps and disk space: App Store
   Connect refuses a build that calls one without its reason.
