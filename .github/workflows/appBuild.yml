@@ -386,9 +386,12 @@ jobs:
         run: |
           set -euo pipefail
           call() {
-            local body
+            local body arg url=
+            for arg in "$@"; do
+              case "$arg" in https://*) url=${arg%%\?*} ;; esac
+            done
             if ! body=$(curl --silent --show-error --fail-with-body "$@"); then
-              printf '%s\n' "$body" >&2
+              printf '%s\n%s\n' "$url" "$body" >&2
               return 1
             fi
             printf '%s' "$body"
