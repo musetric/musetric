@@ -42,14 +42,17 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   the version and `MUSETRIC_PUBLISH`, builds every platform and publishes the
   GitHub release. The steps of each job live in a composite action of
   `.github/actions`: `appBuildDesktop`, `appBuildAndroid`, `appBuildIos`,
-  `uploadTestflight` and `uploadGooglePlay`. It numbers every iOS and Android
-  build 1000 plus its run number, since App Store Connect and Google Play
-  refuse a number they already have.
-  In the testing mode jobs of their own sign the iOS build and the Android App
-  Bundle and upload them to TestFlight and to Google Play internal testing once
-  the owner approves the run in the `app-store` and `google-play`
-  environments; they check out only `.github/actions` and run none of the
-  project's code. The Google Play job signs in to Google Cloud through
+  `appBuildMacAppStore`, `uploadTestflight`, `uploadTestflightMacos` and
+  `uploadGooglePlay`. It numbers every iOS, Mac App Store and Android build
+  1000 plus its run number, since App Store Connect and Google Play refuse a
+  number they already have.
+  In the testing mode jobs of their own sign the iOS build, the macOS build for
+  the Mac App Store and the Android App Bundle and upload them to TestFlight and
+  to Google Play internal testing once the owner approves the run in the
+  `app-store` and `google-play` environments; they check out only
+  `.github/actions` and run none of the project's code. The macOS build is
+  signed into the App Sandbox with `src-tauri/macAppStore.entitlements` and
+  packaged as an installer the Mac Installer Distribution certificate signs. The Google Play job signs in to Google Cloud through
   Workload Identity Federation, so its service account has no key.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
