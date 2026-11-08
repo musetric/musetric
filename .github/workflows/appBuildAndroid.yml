@@ -65,6 +65,9 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
+          CARGO_LOG: cargo::core::compiler::fingerprint=info
+      - name: Size of the Gradle cache (temporary)
+        run: du -sh ~/.gradle/caches ~/.gradle/wrapper ~/.gradle/caches/* 2>/dev/null | sort -h | tail -12
       - name: Name the APK by version
         run: |
           cd packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release
