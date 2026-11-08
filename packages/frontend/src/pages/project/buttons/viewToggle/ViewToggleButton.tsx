@@ -1,19 +1,8 @@
 import { Box, Stack, ToggleButton, Tooltip, Typography } from '@mui/material';
-import { type SpectrogramViewMode } from '@musetric/engine';
 import { type FC, type ReactNode } from 'react';
-import { engine } from '../../../../engine/engine.js';
 import { useEngineStore } from '../../../../engine/useEngineStore.js';
-import { type DetailsView, useProjectStore } from '../../store.js';
-
-export type ViewToggleTarget =
-  | {
-      panel: 'details';
-      view: DetailsView;
-    }
-  | {
-      panel: 'spectrogram';
-      view: SpectrogramViewMode;
-    };
+import { useProjectStore } from '../../store.js';
+import { toggleView, type ViewToggleTarget } from './viewToggle.js';
 
 export type ViewToggleButtonProps = {
   target: ViewToggleTarget;
@@ -24,11 +13,7 @@ export type ViewToggleButtonProps = {
 export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
   const { target, icon, label } = props;
   const detailsView = useProjectStore((state) => state.detailsView);
-  const setDetailsView = useProjectStore((state) => state.setDetailsView);
   const spectrogramOpen = useProjectStore((state) => state.spectrogramOpen);
-  const setSpectrogramOpen = useProjectStore(
-    (state) => state.setSpectrogramOpen,
-  );
   const spectrogramView = useEngineStore((state) => state.spectrogramView);
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
@@ -50,14 +35,7 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
           value={target.view}
           sx={{ border: 0, borderRadius: 2, px: 1, py: 1 }}
           onClick={() => {
-            if (target.panel === 'details') {
-              setDetailsView(selected ? undefined : target.view);
-              return;
-            }
-            setSpectrogramOpen(!selected);
-            engine.store.update((state) => {
-              state.spectrogramView = target.view;
-            });
+            toggleView(target);
           }}
         >
           <Stack sx={{ alignItems: 'center', gap: 0.5, minWidth: 0 }}>

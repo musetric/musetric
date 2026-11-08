@@ -4,17 +4,11 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { canStop } from './playback.js';
 
 export const PlaybackStopButton: FC = () => {
   const { t } = useTranslation();
-  const frameCount = useEngineStore((state) => state.frameCount);
-  const playerCommandPending = useEngineStore(
-    (state) => state.playerCommandPending,
-  );
-  const realtimeFailed = useEngineStore(
-    (state) => state.statuses.realtime === 'error',
-  );
-  const disabled = !frameCount || realtimeFailed || playerCommandPending;
+  const disabled = !useEngineStore(canStop);
 
   return (
     <IconButton

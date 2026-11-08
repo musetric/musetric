@@ -1,9 +1,11 @@
+import { type api } from '@musetric/api';
 import {
   type EngineRange,
   type EngineRangePlay,
   type EngineState,
 } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
+import { getLoopAtTime } from './loopRange.js';
 import { hideLoopView, showLoopView } from './loopView.js';
 
 export const isLoopAvailable = (state: EngineState): boolean =>
@@ -16,6 +18,17 @@ export const openLoop = (range: EngineRange) => {
   engine.player.openLoop(range);
   showLoopView(range);
   void engine.player.replayRange();
+};
+
+export const enterLoop = (subtitle: readonly api.subtitle.Segment[]) => {
+  const state = engine.store.get();
+  const { sampleRate } = engine.context;
+  openLoop(
+    getLoopAtTime(subtitle, state.frameIndex / sampleRate, {
+      ...state,
+      sampleRate,
+    }),
+  );
 };
 
 export const previewLoop = (range: EngineRange) => {
@@ -41,6 +54,12 @@ export const lockLoop = () => {
 export const closeLoop = () => {
   engine.player.closeLoop();
   hideLoopView();
+};
+
+export const leaveLoop = () => {
+  if (engine.store.get().loopTries.length === 0) {
+    closeLoop();
+  }
 };
 
 export const applyLoopTry = async (projectId: number): Promise<boolean> => {
