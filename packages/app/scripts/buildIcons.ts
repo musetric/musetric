@@ -1,11 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { crc32, deflateSync } from 'node:zlib';
 import { Resvg } from '@resvg/resvg-js';
 
+const iconBackground = '#111111';
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const svg = readFileSync(join(packageDir, 'src', 'favicon.svg'), 'utf8');
 const icon = new Resvg(svg, { fitTo: { mode: 'width', value: 1024 } })
@@ -35,7 +38,7 @@ await writeFile(
     {
       default: 'icon.png',
       android_fg: 'iconForeground.png',
-      bg_color: '#111111',
+      bg_color: iconBackground,
     },
     undefined,
     2,
@@ -119,4 +122,75 @@ if (existsSync(androidResDir)) {
     join(androidSplashDir, 'splash_system_icon.png'),
     Buffer.from(insetIcon),
   );
+}
+
+const tauri = createRequire(import.meta.url).resolve(
+  '@tauri-apps/cli/tauri.js',
+);
+execFileSync(
+  process.execPath,
+  [
+    tauri,
+    'icon',
+    '-o',
+    join(packageDir, 'src-tauri', 'gen-assets'),
+    join(genDir, 'icon.json'),
+  ],
+  { cwd: packageDir, stdio: 'inherit' },
+);
+
+const pngChunk = (type: string, data: Buffer): Buffer => {
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, checksum]);
+};
+
+const encodeOpaquePng = (
+  width: number,
+  height: number,
+  rgba: Buffer,
+): Buffer => {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const rowLength = width * 3 + 1;
+  const rows = Buffer.alloc(height * rowLength);
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    const target =
+      Math.floor(pixel / width) * rowLength + 1 + (pixel % width) * 3;
+    rgba.copy(rows, target, pixel * 4, pixel * 4 + 3);
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(rows)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+};
+
+const iosIconDir = join(
+  genDir,
+  'apple',
+  'Assets.xcassets',
+  'AppIcon.appiconset',
+);
+
+if (existsSync(iosIconDir)) {
+  const names = readdirSync(iosIconDir).filter((name) => name.endsWith('.png'));
+  for (const name of names) {
+    const path = join(iosIconDir, name);
+    const size = readFileSync(path).readUInt32BE(16);
+    const rendered = new Resvg(svg, {
+      background: iconBackground,
+      fitTo: { mode: 'width', value: size },
+    }).render();
+    await writeFile(
+      path,
+      encodeOpaquePng(rendered.width, rendered.height, rendered.pixels),
+    );
+  }
 }

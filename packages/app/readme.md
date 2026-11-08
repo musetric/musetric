@@ -42,6 +42,8 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - Both windows load from the embedded host over the loopback address
   (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
 - `src/favicon.svg` is the only icon source, of the app and of the page.
+  `yarn build:icons` redraws the iOS icons that `tauri icon` writes as PNG
+  without an alpha channel: App Store Connect refuses an app icon with one.
 - `yarn build:icons` also writes `gen/AppIcon.icon`, an Icon Composer icon of the same
   background and glyph, and on macOS compiles it into `gen/Assets.car` with `actool`
   from Xcode 26 or later. The macOS bundle lists that `Assets.car` next to
