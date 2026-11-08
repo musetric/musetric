@@ -16,14 +16,13 @@ import {
   type Dispatch2dOptions,
 } from './helpers.js';
 import { type ChunkGeometry } from './modelGraphs.js';
+import { createOrtSession } from './ortSession.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
   getMusetricWebGpuDevice,
   musetricWebGpuProvider,
 } from './webgpuDevice.js';
-
-ort.env.logLevel = 'error';
 
 export type StftStage = Omit<Dispatch2dOptions, 'pass'>;
 
@@ -105,7 +104,7 @@ export const createStftInferenceRuntime = async (
   });
   const { device } = webgpu;
 
-  const session = await ort.InferenceSession.create(options.modelFile, {
+  const session = await createOrtSession(options.modelFile, {
     executionProviders: [
       await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
     ],

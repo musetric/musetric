@@ -4,11 +4,9 @@ import {
   AutoProcessor,
   AutoTokenizer,
   env,
-  type PretrainedConfig,
   Tensor,
   WhisperForConditionalGeneration,
 } from '@huggingface/transformers';
-import * as ort from 'onnxruntime-web/webgpu';
 import {
   loadModelFilesInTurn,
   type ModelLoadReport,
@@ -18,6 +16,7 @@ import { isHallucination } from '../../transcription/hallucinationFilter.js';
 import { type TranscriptionWord } from '../../transcription/types.js';
 import { createGpuPacer } from '../gpuPacer.js';
 import { type WhisperGraph } from '../modelGraphs.js';
+import { createOrtSession } from '../ortSession.js';
 import {
   getMusetricWebGpuDevice,
   musetricWebGpuProvider,
@@ -44,6 +43,7 @@ import {
   routeFirstStep,
   type StepSession,
 } from './whisperStep.js';
+import { presentOnGpu } from './whisperStepOutputs.js';
 
 const sampleRate = 16000;
 
@@ -58,23 +58,6 @@ const alignedWordsPerSecond = 0.8;
 const halvesRule: HalvesRule = { minSeconds: 12, coverage: 0.6, maxGap: 6 };
 const splitMinGain = 3;
 export const whisperDeviceOptions = { subgroups: false };
-
-const presentOnGpu = (
-  config: PretrainedConfig,
-): Record<string, ort.Tensor.DataLocation> => {
-  if (
-    !('decoder_layers' in config) ||
-    typeof config.decoder_layers !== 'number'
-  ) {
-    throw new Error('the whisper config names no decoder layers');
-  }
-  const names = Array.from({ length: config.decoder_layers }, (_, layer) =>
-    ['decoder', 'encoder'].flatMap((part) =>
-      ['key', 'value'].map((kind) => `present.${layer}.${part}.${kind}`),
-    ),
-  ).flat();
-  return Object.fromEntries(names.map((name) => [name, 'gpu-buffer']));
-};
 
 export type WhisperRuntimeOptions = {
   graph: WhisperGraph;
@@ -144,7 +127,7 @@ export const createWhisperRuntime = async (
     options.report,
     async (files, index) => {
       const [graph, data] = files;
-      return ort.InferenceSession.create(graph, {
+      return createOrtSession(graph, {
         ...graphs[index].outputs,
         executionProviders: [provider],
         externalData: [{ path: `${graphs[index].file}_data`, data }],

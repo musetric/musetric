@@ -1,8 +1,30 @@
+import { type PretrainedConfig } from '@huggingface/transformers';
+import type * as ort from 'onnxruntime-web/webgpu';
+
 export const encoderPositions = 1500;
 
 const crossAttentionPrefix = 'cross_attentions.';
 const presentPrefix = 'present';
 const packedStepOutput = 'step_outputs';
+
+export const presentOnGpu = (
+  config: PretrainedConfig,
+): Record<string, ort.Tensor.DataLocation> => {
+  if (
+    !('decoder_layers' in config) ||
+    typeof config.decoder_layers !== 'number'
+  ) {
+    throw new Error('the whisper config names no decoder layers');
+  }
+  const names = Array.from({ length: config.decoder_layers }, (_, layer) =>
+    ['decoder', 'encoder'].flatMap((part) =>
+      ['key', 'value'].map(
+        (kind) => `${presentPrefix}.${layer}.${part}.${kind}`,
+      ),
+    ),
+  ).flat();
+  return Object.fromEntries(names.map((name) => [name, 'gpu-buffer']));
+};
 
 type OrtTensorClass = new (
   type: 'float32',
