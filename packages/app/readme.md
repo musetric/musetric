@@ -22,14 +22,21 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
 - A mobile build is a development build, `com.musetric.client.dev` named
   Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true`, which
-  `appBuild.yml` sets in its release mode, is `com.musetric.client` named
-  Musetric. The two install side by side, each with its own data, and on
+  `appBuild.yml` sets in its release and testing modes, is `com.musetric.client`
+  named Musetric. The two install side by side, each with its own data, and on
   Android only the development build's WebView can be inspected. The Tauri CLI
   sets the identifier itself: on Android it writes the debug suffix from
   `debugApplicationIdSuffix` of `tauri.android.conf.json` and starts the app by
   it, and on iOS it takes `identifier` from `gen/apple/identity.conf.json`,
   which `initNative.ts` writes and `yarn dev:ios` and `yarn build:ios` pass
   with `--config`.
+- `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
+  reason API the iOS binary calls, now file timestamps and disk space: App Store
+  Connect refuses a build that calls one without its reason.
+- `appBuild.yml` numbers an iOS build 1000 plus its run number, since App Store
+  Connect refuses a build number it already has. In the testing mode a job of
+  its own signs the build and uploads it to TestFlight once the owner approves
+  the run in the `app-store` environment; it runs none of the project's code.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address

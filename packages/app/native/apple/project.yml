@@ -38,6 +38,8 @@ targets:
         type: folder
         optional: true
       - path: LaunchScreen.storyboard
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
     info:
       path: musetric-app_iOS/Info.plist
       properties:
