@@ -61,6 +61,9 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   `development` cfg by the same rules that pick the identifier and the desktop
   data folder. While another process holds the port, the host takes a free one
   for that run.
+- An app in the App Sandbox, as every app of the Mac App Store is, leaves its
+  updates to the store and never starts its own updater
+  (`APP_SANDBOX_CONTAINER_ID` in `src-tauri/src/update.rs`).
 - `src/favicon.svg` is the only icon source, of the app and of the page.
   `yarn build:icons` redraws the iOS icons that `tauri icon` writes as PNG
   without an alpha channel: App Store Connect refuses an app icon with one.
