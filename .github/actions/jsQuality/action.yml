@@ -1,10 +1,5 @@
 name: JS Quality
-description: JS dependency, format, TypeScript, lint, and test checks, one part at a time
-
-inputs:
-  part:
-    description: static (dependencies, unused code, format, translations, comments), types (TypeScript and the frontend build), lint or test
-    required: true
+description: JS dependency, format, TypeScript, lint, and test checks, run side by side
 
 runs:
   using: composite
@@ -19,40 +14,40 @@ runs:
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
-    - if: inputs.part == 'static'
-      run: |
-        yarn check:deps:security
-        yarn check:deps:dupe
-        yarn check:unused
-        yarn check:format
-        yarn check:translations
-        yarn check:comments
-      shell: bash
-    - if: inputs.part == 'types'
-      run: |
-        yarn check:ts
-        yarn workspace @musetric/app build:ui
-      shell: bash
-    - if: inputs.part == 'lint'
-      uses: actions/cache@v5
+    - uses: actions/cache@v5
       with:
         path: packages/*/.eslintcache
         key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
         restore-keys: |
           eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
-    - if: inputs.part == 'lint'
-      run: yarn check:lint
+    - name: Run the checks side by side
       shell: bash
-    - if: inputs.part == 'test'
-      run: rustup toolchain install --no-self-update
-      shell: bash
-      working-directory: packages/server
-    - if: inputs.part == 'test'
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: packages/server
-        shared-key: js-quality
-        save-if: ${{ github.ref == 'refs/heads/main' }}
-    - if: inputs.part == 'test'
-      run: yarn test
-      shell: bash
+      run: |
+        logs="$RUNNER_TEMP/js-quality"
+        mkdir -p "$logs"
+        part() {
+          local name=$1 status=0
+          shift
+          for command in "$@"; do
+            echo "\$ $command" >> "$logs/$name.log"
+            bash -c "$command" >> "$logs/$name.log" 2>&1 || { status=$?; break; }
+          done
+          echo "$status" > "$logs/$name.status"
+        }
+        part static 'yarn check:deps:security' 'yarn check:deps:dupe' 'yarn check:unused' 'yarn check:format' 'yarn check:translations' 'yarn check:comments' &
+        part types 'yarn check:ts' 'yarn workspace @musetric/app build:ui' &
+        part lint 'yarn check:lint' &
+        part test 'yarn test' &
+        wait
+        failed=
+        for name in static types lint test; do
+          status=$(cat "$logs/$name.status")
+          echo "::group::$name, exit $status"
+          cat "$logs/$name.log"
+          echo "::endgroup::"
+          if [ "$status" != 0 ]; then
+            echo "::error title=JS checks::the $name part failed, exit $status; its group above has the output"
+            failed=1
+          fi
+        done
+        test -z "$failed"

@@ -7,27 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  js-quality:
-    strategy:
-      fail-fast: false
-      matrix:
-        part: [static, types, lint, test]
+  check-js-quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/jsQuality
-        with:
-          part: ${{ matrix.part }}
-  check-js-quality:
-    if: always()
-    needs: js-quality
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          RESULT: ${{ needs.js-quality.result }}
-        run: |
-          echo "the parts of the JS checks: $RESULT"
-          test "$RESULT" = success
   check-rust-quality:
     runs-on: ubuntu-latest
     permissions:
