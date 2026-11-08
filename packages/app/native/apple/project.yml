@@ -38,6 +38,8 @@ targets:
         type: folder
         optional: true
       - path: LaunchScreen.storyboard
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
     info:
       path: musetric-app_iOS/Info.plist
       properties:
@@ -59,6 +61,7 @@ targets:
         NSLocalNetworkUsageDescription: Musetric uses your local network to find and connect to Musetric running on your computer.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        ITSAppUsesNonExemptEncryption: false
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

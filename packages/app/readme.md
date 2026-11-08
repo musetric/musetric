@@ -22,19 +22,32 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
 - A mobile build is a development build, `com.musetric.client.dev` named
   Musetric Dev; only a release build with `MUSETRIC_PUBLISH=true`, which
-  `appBuild.yml` sets in its release mode, is `com.musetric.client` named
-  Musetric. The two install side by side, each with its own data, and on
+  `appBuild.yml` sets in its release and testing modes, is `com.musetric.client`
+  named Musetric. The two install side by side, each with its own data, and on
   Android only the development build's WebView can be inspected. The Tauri CLI
   sets the identifier itself: on Android it writes the debug suffix from
   `debugApplicationIdSuffix` of `tauri.android.conf.json` and starts the app by
   it, and on iOS it takes `identifier` from `gen/apple/identity.conf.json`,
   which `initNative.ts` writes and `yarn dev:ios` and `yarn build:ios` pass
   with `--config`.
+- `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
+  reason API the iOS binary calls, now file timestamps and disk space: App Store
+  Connect refuses a build that calls one without its reason.
+- `ITSAppUsesNonExemptEncryption: false` in `native/apple/project.yml` answers
+  the export compliance questions of App Store Connect for every build: the app
+  uses standard encryption, rustls for HTTPS, and is not distributed in France.
+  Encryption of its own or distribution in France changes the answer.
+- `appBuild.yml` numbers an iOS build 1000 plus its run number, since App Store
+  Connect refuses a build number it already has. In the testing mode a job of
+  its own signs the build and uploads it to TestFlight once the owner approves
+  the run in the `app-store` environment; it runs none of the project's code.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
   (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
 - `src/favicon.svg` is the only icon source, of the app and of the page.
+  `yarn build:icons` redraws the iOS icons that `tauri icon` writes as PNG
+  without an alpha channel: App Store Connect refuses an app icon with one.
 - `yarn build:icons` also writes `gen/AppIcon.icon`, an Icon Composer icon of the same
   background and glyph, and on macOS compiles it into `gen/Assets.car` with `actool`
   from Xcode 26 or later. The macOS bundle lists that `Assets.car` next to
