@@ -70,7 +70,8 @@ struct Running {
     states: Vec<StepState>,
     step: ActiveStep,
     activity: Instant,
-    executor_ran: bool,
+    generation: Option<u32>,
+    saved: bool,
 }
 
 pub struct Queue {
@@ -124,11 +125,14 @@ fn stuck_message(idle_limit: Duration) -> String {
 }
 
 fn attach_message(attempts: u32) -> String {
-    format!("No gpu executor ran a unit in {attempts} attempts")
+    format!(
+        "The gpu executor stopped {attempts} times in a row before the step saved any progress; \
+         the device may lack the memory this step needs"
+    )
 }
 
-fn next_wait(previous: Option<StepWait>, reason: StepWaiting, progressed: bool) -> StepWait {
-    let attempt = if progressed {
+fn next_wait(previous: Option<StepWait>, reason: StepWaiting, saved: bool) -> StepWait {
+    let attempt = if saved {
         0
     } else {
         previous
@@ -138,7 +142,7 @@ fn next_wait(previous: Option<StepWait>, reason: StepWaiting, progressed: bool) 
     StepWait {
         reason,
         attempt,
-        limit: (reason == StepWaiting::Lost && !progressed).then_some(ATTACH_LIMIT),
+        limit: (reason == StepWaiting::Lost && !saved).then_some(ATTACH_LIMIT),
     }
 }
 
@@ -303,11 +307,11 @@ impl Queue {
         step: ProcessingStep,
         reason: StepWaiting,
     ) -> (StepStatus, Option<String>) {
-        let progressed = self.executor_ran();
+        let saved = self.checkpoint_was_saved();
         let Ok(mut parked) = self.parked.lock() else {
             return (StepStatus::Pending, None);
         };
-        let wait = next_wait(parked.get(&(project_id, step)).copied(), reason, progressed);
+        let wait = next_wait(parked.get(&(project_id, step)).copied(), reason, saved);
         if exhausted(wait) {
             parked.remove(&(project_id, step));
             return (StepStatus::Failed, Some(attach_message(wait.attempt)));
@@ -333,13 +337,34 @@ impl Queue {
             })
     }
 
-    fn executor_ran(&self) -> bool {
+    async fn checkpoint_saved(&self, project_id: i64, step: ProcessingStep) -> bool {
+        let Some(started) = self
+            .running
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|running| running.generation))
+        else {
+            return false;
+        };
+        let now = self.read_generation(project_id, step).await.ok().flatten();
+        now.is_some_and(|current| started.is_none_or(|first| current > first))
+    }
+
+    fn checkpoint_was_saved(&self) -> bool {
         self.running
             .lock()
-            .is_ok_and(|guard| guard.as_ref().is_some_and(|running| running.executor_ran))
+            .is_ok_and(|guard| guard.as_ref().is_some_and(|running| running.saved))
     }
 
     async fn settle(&self, project_id: i64, step: ProcessingStep, answer: &StepAnswer) {
+        if matches!(answer, StepAnswer::Waiting(_)) {
+            let saved = self.checkpoint_saved(project_id, step).await;
+            if let Ok(mut guard) = self.running.lock()
+                && let Some(running) = guard.as_mut()
+            {
+                running.saved = saved;
+            }
+        }
         let (status, error) = self.resolve(project_id, step, answer);
         self.persist(StepUpdate {
             project_id,
@@ -438,6 +463,11 @@ impl Queue {
             .await;
             return false;
         };
+        let generation = self
+            .read_generation(job.project_id, job.step)
+            .await
+            .ok()
+            .flatten();
         let Ok(mut running) = self.running.lock() else {
             return false;
         };
@@ -449,7 +479,8 @@ impl Queue {
                 phase: StepPhase::Preparing { download: None },
             },
             activity: Instant::now(),
-            executor_ran: false,
+            generation,
+            saved: false,
         });
         true
     }
@@ -462,7 +493,6 @@ impl Queue {
             return;
         };
         running.activity = Instant::now();
-        running.executor_ran |= matches!(phase, StepPhase::Running { .. });
         running.step.phase = phase;
         let parked = self.parked_step(running.step.project_id);
         let processing = build_processing(&running.states, Some(&running.step), parked.as_ref());
@@ -496,5 +526,15 @@ impl Queue {
     async fn read_states(&self, project_id: i64) -> Result<Vec<StepState>, BoxedError> {
         let reader = Arc::clone(&self.reader);
         spawn_blocking(move || reader.step_states(project_id)).await?
+    }
+
+    async fn read_generation(
+        &self,
+        project_id: i64,
+        step: ProcessingStep,
+    ) -> Result<Option<u32>, BoxedError> {
+        let reader = Arc::clone(&self.reader);
+        let checkpoint = spawn_blocking(move || reader.step_checkpoint(project_id, step)).await??;
+        Ok(checkpoint.map(|found| found.generation))
     }
 }
