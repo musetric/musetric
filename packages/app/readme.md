@@ -33,6 +33,10 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
   reason API the iOS binary calls, now file timestamps and disk space: App Store
   Connect refuses a build that calls one without its reason.
+- `ITSAppUsesNonExemptEncryption: false` in `native/apple/project.yml` answers
+  the export compliance questions of App Store Connect for every build: the app
+  uses standard encryption, rustls for HTTPS, and is not distributed in France.
+  Encryption of its own or distribution in France changes the answer.
 - `appBuild.yml` numbers an iOS build 1000 plus its run number, since App Store
   Connect refuses a build number it already has. In the testing mode a job of
   its own signs the build and uploads it to TestFlight once the owner approves

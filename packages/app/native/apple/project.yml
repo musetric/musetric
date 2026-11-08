@@ -61,6 +61,7 @@ targets:
         NSLocalNetworkUsageDescription: Musetric uses your local network to find and connect to Musetric running on your computer.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        ITSAppUsesNonExemptEncryption: false
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
