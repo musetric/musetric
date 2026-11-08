@@ -10,6 +10,7 @@
   "exclude": [
     "${configDir}/src/**/*",
     "${configDir}/dist/**/*",
+    "${configDir}/**/target/**/*",
     "${configDir}/.tsbuildinfo/**/*"
   ]
 }
