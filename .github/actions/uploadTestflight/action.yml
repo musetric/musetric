@@ -1,0 +1,105 @@
+name: Upload to TestFlight
+description: Signs the unsigned iOS app for App Store distribution and uploads it to TestFlight
+
+inputs:
+  certificate:
+    description: The Apple Distribution certificate, a base64 PKCS12
+    required: true
+  certificate-password:
+    description: The password of the certificate
+    required: true
+  profile:
+    description: The App Store provisioning profile, base64
+    required: true
+  api-key:
+    description: The App Store Connect API key
+    required: true
+  api-key-id:
+    description: The id of the App Store Connect API key
+    required: true
+  api-issuer-id:
+    description: The issuer id of the App Store Connect API key
+    required: true
+  app-id:
+    description: The Apple id of the app in App Store Connect
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode 27.1
+      run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
+      shell: bash
+    - uses: actions/download-artifact@v8
+      with:
+        name: musetric-ios-unsigned
+        path: unsigned
+    - name: Sign for App Store distribution
+      env:
+        CERTIFICATE: ${{ inputs.certificate }}
+        CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
+        PROFILE: ${{ inputs.profile }}
+      run: |
+        set -euo pipefail
+        keychain="$RUNNER_TEMP/signing.keychain-db"
+        keychain_password=$(openssl rand -hex 24)
+        security create-keychain -p "$keychain_password" "$keychain"
+        security set-keychain-settings -lut 1800 "$keychain"
+        security unlock-keychain -p "$keychain_password" "$keychain"
+        printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+        security import "$RUNNER_TEMP/distribution.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+        rm "$RUNNER_TEMP/distribution.p12"
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+        identity=$(security find-identity -v -p codesigning "$keychain" | awk '/"Apple Distribution: / { print $2; exit }')
+        test -n "$identity"
+
+        profile="$RUNNER_TEMP/profile.mobileprovision"
+        printf '%s' "$PROFILE" | base64 --decode > "$profile"
+        security cms -D -i "$profile" > "$RUNNER_TEMP/profile.plist"
+        entitlements="$RUNNER_TEMP/entitlements.plist"
+        /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' "$RUNNER_TEMP/profile.plist" > "$entitlements"
+        app_id=$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$entitlements")
+        /usr/libexec/PlistBuddy -c 'Delete :keychain-access-groups' "$entitlements" 2> /dev/null || true
+        /usr/libexec/PlistBuddy -c 'Add :keychain-access-groups array' -c "Add :keychain-access-groups:0 string $app_id" "$entitlements"
+
+        mkdir "$RUNNER_TEMP/ipa"
+        unzip -q unsigned/arm64/Musetric.ipa -d "$RUNNER_TEMP/ipa"
+        app="$RUNNER_TEMP/ipa/Payload/Musetric.app"
+        bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+        if [ "$bundle_id" != com.musetric.client ] || [ "${app_id#*.}" != "$bundle_id" ]; then
+          echo "the app is $bundle_id and the profile is for $app_id" >&2
+          exit 1
+        fi
+        cp "$profile" "$app/embedded.mobileprovision"
+        if [ -d "$app/Frameworks" ]; then
+          find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) \
+            -exec codesign --force --sign "$identity" --keychain "$keychain" --timestamp=none {} \;
+        fi
+        codesign --force --sign "$identity" --keychain "$keychain" --timestamp=none \
+          --entitlements "$entitlements" --generate-entitlement-der "$app"
+        codesign --verify --strict --verbose=2 "$app"
+        codesign --display --entitlements - "$app"
+        (cd "$RUNNER_TEMP/ipa" && zip -qry "$RUNNER_TEMP/Musetric.ipa" Payload)
+        security delete-keychain "$keychain"
+      shell: bash
+    - name: Upload to TestFlight
+      env:
+        API_KEY: ${{ inputs.api-key }}
+        API_KEY_ID: ${{ inputs.api-key-id }}
+        API_ISSUER_ID: ${{ inputs.api-issuer-id }}
+        APP_ID: ${{ inputs.app-id }}
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.appstoreconnect/private_keys
+        printf '%s\n' "$API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_"$API_KEY_ID".p8
+        info="$RUNNER_TEMP/ipa/Payload/Musetric.app/Info.plist"
+        read_info() { /usr/libexec/PlistBuddy -c "Print :$1" "$info"; }
+        echo "uploading $(read_info CFBundleIdentifier) $(read_info CFBundleShortVersionString) ($(read_info CFBundleVersion))"
+        xcrun altool --upload-package "$RUNNER_TEMP/Musetric.ipa" --type ios \
+          --apple-id "$APP_ID" \
+          --bundle-id "$(read_info CFBundleIdentifier)" \
+          --bundle-version "$(read_info CFBundleVersion)" \
+          --bundle-short-version-string "$(read_info CFBundleShortVersionString)" \
+          --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
+        rm -r ~/.appstoreconnect/private_keys
+      shell: bash

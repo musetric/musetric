@@ -1,0 +1,57 @@
+name: App Build iOS
+description: Builds the unsigned iOS app and keeps it as an artifact
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode 27.1
+      run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
+      shell: bash
+    - uses: ./.github/actions/setupYarn
+    - uses: actions/cache@v5
+      with:
+        path: ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+        restore-keys: yarn-${{ runner.os }}-
+    - run: yarn --immutable
+      env:
+        MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+        ONNXRUNTIME_NODE_INSTALL: skip
+      shell: bash
+    - run: rustup toolchain install --no-self-update
+      working-directory: packages/app
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          packages/server/target
+        key: cargo-${{ runner.os }}-ios-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-ios-
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~/Library/Caches/CocoaPods
+          ~/Library/Developer/Xcode/DerivedData
+        key: ios-xcode-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/app/native/apple/project.yml') }}
+        restore-keys: ios-xcode-${{ runner.os }}-
+    - run: brew install xcodegen
+      shell: bash
+    - name: Init iOS project
+      working-directory: packages/app
+      run: yarn init:ios
+      shell: bash
+    - name: Build iOS app (unsigned)
+      working-directory: packages/app
+      run: |
+        bundle_version=$((1000 + GITHUB_RUN_NUMBER))
+        yarn build:ios --no-sign --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$bundle_version\"}}}"
+      shell: bash
+    - uses: actions/upload-artifact@v7
+      with:
+        name: musetric-ios-unsigned
+        if-no-files-found: error
+        retention-days: 14
+        compression-level: 0
+        path: packages/app/src-tauri/gen/apple/build/**/*.ipa

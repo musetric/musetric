@@ -1,0 +1,90 @@
+name: Upload to Google Play
+description: Signs the unsigned App Bundle with the upload key and releases it to Google Play internal testing
+
+inputs:
+  keystore:
+    description: The upload keystore, a base64 PKCS12
+    required: true
+  keystore-password:
+    description: The password of the upload keystore and its key
+    required: true
+  workload-identity-provider:
+    description: The full name of the Workload Identity Federation provider
+    required: true
+  service-account:
+    description: The email of the service account that releases to Google Play
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v8
+      with:
+        name: musetric-android-bundle
+        path: unsigned
+    - name: Sign with the upload key
+      env:
+        KEYSTORE: ${{ inputs.keystore }}
+        KEYSTORE_PASSWORD: ${{ inputs.keystore-password }}
+      run: |
+        set -euo pipefail
+        keystore="$RUNNER_TEMP/upload.p12"
+        printf '%s' "$KEYSTORE" | base64 --decode > "$keystore"
+        alias=$("$JAVA_HOME/bin/keytool" -list -keystore "$keystore" -storetype PKCS12 -storepass:env KEYSTORE_PASSWORD \
+          | awk -F', ' '/PrivateKeyEntry/ { print $1; exit }')
+        test -n "$alias"
+        cp unsigned/app-universal-release.aab "$RUNNER_TEMP/musetric.aab"
+        "$JAVA_HOME/bin/jarsigner" -keystore "$keystore" -storetype PKCS12 \
+          -storepass:env KEYSTORE_PASSWORD -keypass:env KEYSTORE_PASSWORD \
+          -sigalg SHA256withRSA -digestalg SHA-256 "$RUNNER_TEMP/musetric.aab" "$alias"
+        rm "$keystore"
+        "$JAVA_HOME/bin/jarsigner" -verify "$RUNNER_TEMP/musetric.aab" | grep '^jar verified'
+      shell: bash
+    - name: Upload to Google Play internal testing
+      env:
+        PROVIDER: ${{ inputs.workload-identity-provider }}
+        SERVICE_ACCOUNT: ${{ inputs.service-account }}
+      run: |
+        set -euo pipefail
+        call() {
+          local body arg url=
+          for arg in "$@"; do
+            case "$arg" in https://*) url=${arg%%\?*} ;; esac
+          done
+          if ! body=$(curl --silent --show-error --fail-with-body "$@"); then
+            printf '%s\n%s\n' "$url" "$body" >&2
+            return 1
+          fi
+          printf '%s' "$body"
+        }
+        github_token=$(call -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://iam.googleapis.com/$PROVIDER" | jq -r .value)
+        echo "::add-mask::$github_token"
+        federated_token=$(call -X POST https://sts.googleapis.com/v1/token -H 'Content-Type: application/json' \
+          -d "$(jq -n --arg audience "//iam.googleapis.com/$PROVIDER" --arg token "$github_token" '{
+            grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+            audience: $audience,
+            scope: "https://www.googleapis.com/auth/cloud-platform",
+            requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+            subjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+            subjectToken: $token
+          }')" | jq -r .access_token)
+        echo "::add-mask::$federated_token"
+        token=$(call -X POST "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$SERVICE_ACCOUNT:generateAccessToken" \
+          -H "Authorization: Bearer $federated_token" -H 'Content-Type: application/json' \
+          -d '{"scope":["https://www.googleapis.com/auth/androidpublisher"]}' | jq -r .accessToken)
+        echo "::add-mask::$token"
+
+        app=applications/com.musetric.client
+        api=https://androidpublisher.googleapis.com/androidpublisher/v3/$app
+        auth="Authorization: Bearer $token"
+        edit=$(call -X POST "$api/edits" -H "$auth" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
+        bundle=$(call -X POST "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/$app/edits/$edit/bundles?uploadType=media" \
+          -H "$auth" -H 'Content-Type: application/octet-stream' --data-binary @"$RUNNER_TEMP/musetric.aab")
+        version_code=$(printf '%s' "$bundle" | jq -r .versionCode)
+        echo "uploaded version code $version_code, sha256 $(printf '%s' "$bundle" | jq -r .sha256)"
+        call -X PUT "$api/edits/$edit/tracks/internal" -H "$auth" -H 'Content-Type: application/json' \
+          -d "{\"track\":\"internal\",\"releases\":[{\"versionCodes\":[\"$version_code\"],\"status\":\"completed\"}]}" > /dev/null
+        call -X POST "$api/edits/$edit:commit" -H "$auth" -H 'Content-Type: application/json' -d '{}' > /dev/null
+        echo "released $version_code to internal testing"
+      shell: bash
