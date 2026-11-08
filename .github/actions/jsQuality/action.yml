@@ -44,15 +44,5 @@ runs:
       run: yarn check:lint
       shell: bash
     - if: inputs.part == 'test'
-      run: rustup toolchain install --no-self-update
-      shell: bash
-      working-directory: packages/server
-    - if: inputs.part == 'test'
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: packages/server
-        shared-key: js-quality
-        save-if: ${{ github.ref == 'refs/heads/main' }}
-    - if: inputs.part == 'test'
       run: yarn test
       shell: bash
