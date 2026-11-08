@@ -101,3 +101,14 @@ runs:
         path: |
           packages/server/target/**/release/bundle/appimage/*.AppImage
           packages/server/target/**/release/bundle/appimage/*.AppImage.sig
+    - if: inputs.platform == 'Windows'
+      run: yarn workspace @musetric/app pack:msix --target ${{ inputs.rust-target }} --build $((1000 + GITHUB_RUN_NUMBER))
+      shell: bash
+    - if: inputs.platform == 'Windows'
+      uses: actions/upload-artifact@v7
+      with:
+        name: musetric-desktop-Windows-${{ inputs.arch }}-msix
+        if-no-files-found: error
+        retention-days: 14
+        compression-level: 0
+        path: packages/server/target/${{ inputs.rust-target }}/release/msix/*.msix
