@@ -37,10 +37,14 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   the export compliance questions of App Store Connect for every build: the app
   uses standard encryption, rustls for HTTPS, and is not distributed in France.
   Encryption of its own or distribution in France changes the answer.
-- `appBuild.yml` numbers an iOS build 1000 plus its run number, since App Store
-  Connect refuses a build number it already has. In the testing mode a job of
-  its own signs the build and uploads it to TestFlight once the owner approves
-  the run in the `app-store` environment; it runs none of the project's code.
+- `appBuild.yml` numbers every iOS and Android build 1000 plus its run number,
+  since App Store Connect and Google Play refuse a number they already have.
+  In the testing mode jobs of their own sign the iOS build and the Android App
+  Bundle and upload them to TestFlight and to Google Play internal testing once
+  the owner approves the run in the `app-store` and `google-play`
+  environments; they run none of the project's code. The Google Play job signs
+  in to Google Cloud through Workload Identity Federation, so its service
+  account has no key.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
