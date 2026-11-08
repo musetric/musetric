@@ -56,6 +56,17 @@ describe('rhythm summary', () => {
     expect(result.bpm).toBeCloseTo(110, 1);
   });
 
+  it('keeps the tempo when the tracker adds a beat inside an interval', () => {
+    const grid = createGrid(() => 60 / 110);
+    const added = grid.flatMap((beat, index) =>
+      index % 16 === 5
+        ? [beat, { time: onFrames(beat.time + 0.35), index: -1 }]
+        : [beat],
+    );
+    const { result } = summarizeGrid(added);
+    expect(result.bpm).toBeCloseTo(110, 1);
+  });
+
   it.each([170, 176, 180, 184, 190, 200])(
     'halves a steady %d BPM grid on every other beat',
     (bpm) => {

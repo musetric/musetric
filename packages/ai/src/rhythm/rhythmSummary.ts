@@ -1,4 +1,5 @@
 const minBeats = 2;
+const stepTolerance = 0.125;
 const defaultMeter = 4;
 const minPreferredBpm = 60;
 const maxPreferredBpm = 160;
@@ -42,10 +43,10 @@ const estimateBpm = (beats: number[]): number => {
   if (step <= 0) {
     return 0;
   }
-  const oneBeatIntervals = intervals.filter(
-    (interval) => Math.round(interval / step) === 1,
+  const nearStep = intervals.filter(
+    (interval) => Math.abs(interval / step - 1) < stepTolerance,
   );
-  return 60 / mean(oneBeatIntervals);
+  return 60 / mean(nearStep);
 };
 
 const mapProbeBpm = (bpm: number): number => {
