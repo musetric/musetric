@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: dev builds artifacts only, testing uploads the iOS app to TestFlight, release publishes packages/app/package.json version
+        description: dev builds artifacts only, testing uploads the iOS app to TestFlight and the Android app to Google Play internal testing, release publishes packages/app/package.json version
         type: choice
         options:
           - dev
@@ -156,19 +156,10 @@ jobs:
             packages/server/target/**/release/bundle/appimage/*.AppImage.sig
 
   android:
-    if: inputs.mode != 'testing'
     needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - abi: arm64-v8a
-            target: aarch64
-          - abi: x86_64
-            target: x86_64
     runs-on: ubuntu-22.04
     env:
-      MUSETRIC_PUBLISH: ${{ inputs.mode == 'release' }}
+      MUSETRIC_PUBLISH: ${{ inputs.mode != 'dev' }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setupYarn
@@ -192,30 +183,39 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             packages/server/target
-          key: cargo-${{ runner.os }}-android-${{ matrix.target }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-android-${{ matrix.target }}-
+          key: cargo-${{ runner.os }}-android-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-android-
       - name: Init Android project
         working-directory: packages/app
         run: yarn init:android
       - name: Pin Android SDK path for gradle
         run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
-      - name: Assemble ${{ matrix.abi }} release APK
+      - name: Build the release APK and App Bundle (unsigned)
         working-directory: packages/app
-        run: yarn build:android --target ${{ matrix.target }}
+        run: |
+          version_code=$((1000 + GITHUB_RUN_NUMBER))
+          yarn build:android --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
-      - name: Rename APK with ABI suffix
+      - name: Name the APK by version
         run: |
           cd packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release
-          mv app-universal-release*.apk "Musetric_${{ needs.prepare.outputs.version }}_${{ matrix.abi }}.apk"
+          mv app-universal-release*.apk "Musetric_${{ needs.prepare.outputs.version }}.apk"
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-android-${{ matrix.abi }}
+          name: musetric-android
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musetric-android-bundle
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: packages/app/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/*.aab
 
   ios:
     needs: prepare
@@ -349,6 +349,83 @@ jobs:
             --bundle-short-version-string "$(read_info CFBundleShortVersionString)" \
             --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
           rm -r ~/.appstoreconnect/private_keys
+
+  google-play:
+    if: inputs.mode == 'testing'
+    needs: android
+    runs-on: ubuntu-latest
+    environment: google-play
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: musetric-android-bundle
+          path: unsigned
+      - name: Sign with the upload key
+        env:
+          KEYSTORE: ${{ secrets.GOOGLE_PLAY_UPLOAD_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.GOOGLE_PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/upload.p12"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$keystore"
+          alias=$("$JAVA_HOME/bin/keytool" -list -keystore "$keystore" -storetype PKCS12 -storepass:env KEYSTORE_PASSWORD \
+            | awk -F', ' '/PrivateKeyEntry/ { print $1; exit }')
+          test -n "$alias"
+          cp unsigned/app-universal-release.aab "$RUNNER_TEMP/musetric.aab"
+          "$JAVA_HOME/bin/jarsigner" -keystore "$keystore" -storetype PKCS12 \
+            -storepass:env KEYSTORE_PASSWORD -keypass:env KEYSTORE_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 "$RUNNER_TEMP/musetric.aab" "$alias"
+          rm "$keystore"
+          "$JAVA_HOME/bin/jarsigner" -verify "$RUNNER_TEMP/musetric.aab" | grep '^jar verified'
+      - name: Upload to Google Play internal testing
+        env:
+          PROVIDER: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          call() {
+            local body arg url=
+            for arg in "$@"; do
+              case "$arg" in https://*) url=${arg%%\?*} ;; esac
+            done
+            if ! body=$(curl --silent --show-error --fail-with-body "$@"); then
+              printf '%s\n%s\n' "$url" "$body" >&2
+              return 1
+            fi
+            printf '%s' "$body"
+          }
+          github_token=$(call -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://iam.googleapis.com/$PROVIDER" | jq -r .value)
+          echo "::add-mask::$github_token"
+          federated_token=$(call -X POST https://sts.googleapis.com/v1/token -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg audience "//iam.googleapis.com/$PROVIDER" --arg token "$github_token" '{
+              grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+              audience: $audience,
+              scope: "https://www.googleapis.com/auth/cloud-platform",
+              requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+              subjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+              subjectToken: $token
+            }')" | jq -r .access_token)
+          echo "::add-mask::$federated_token"
+          token=$(call -X POST "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$SERVICE_ACCOUNT:generateAccessToken" \
+            -H "Authorization: Bearer $federated_token" -H 'Content-Type: application/json' \
+            -d '{"scope":["https://www.googleapis.com/auth/androidpublisher"]}' | jq -r .accessToken)
+          echo "::add-mask::$token"
+
+          app=applications/com.musetric.client
+          api=https://androidpublisher.googleapis.com/androidpublisher/v3/$app
+          auth="Authorization: Bearer $token"
+          edit=$(call -X POST "$api/edits" -H "$auth" -H 'Content-Type: application/json' -d '{}' | jq -r .id)
+          bundle=$(call -X POST "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/$app/edits/$edit/bundles?uploadType=media" \
+            -H "$auth" -H 'Content-Type: application/octet-stream' --data-binary @"$RUNNER_TEMP/musetric.aab")
+          version_code=$(printf '%s' "$bundle" | jq -r .versionCode)
+          echo "uploaded version code $version_code, sha256 $(printf '%s' "$bundle" | jq -r .sha256)"
+          call -X PUT "$api/edits/$edit/tracks/internal" -H "$auth" -H 'Content-Type: application/json' \
+            -d "{\"track\":\"internal\",\"releases\":[{\"versionCodes\":[\"$version_code\"],\"status\":\"completed\"}]}" > /dev/null
+          call -X POST "$api/edits/$edit:commit" -H "$auth" -H 'Content-Type: application/json' -d '{}' > /dev/null
+          echo "released $version_code to internal testing"
 
   release:
     if: inputs.mode == 'release'
