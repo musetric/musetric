@@ -50,6 +50,28 @@ jobs:
         run: yarn init:android
       - name: Pin Android SDK path for gradle
         run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
+      - name: Restore the files the Rust build writes into the Android project
+        id: generated
+        uses: actions/cache@v5
+        with:
+          path: |
+            packages/app/src-tauri/gen/android/app/src/main/java/com/musetric/client/generated
+            packages/app/src-tauri/gen/android/tauri.settings.gradle
+            packages/app/src-tauri/gen/android/app/tauri.build.gradle.kts
+          key: android-generated-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+      - name: Date the restored files before any cached build
+        if: steps.generated.outputs.cache-hit == 'true'
+        working-directory: packages/app/src-tauri/gen/android
+        run: |
+          find app/src/main/java/com/musetric/client/generated tauri.settings.gradle app/tauri.build.gradle.kts \
+            -type f -exec touch -d '2000-01-01 00:00:00' {} +
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('packages/app/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties', 'packages/app/src-tauri/gen/android/**/*.gradle.kts', '!packages/app/src-tauri/gen/android/app/tauri.build.gradle.kts', 'packages/app/src-tauri/gen/android/gradle.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
       - name: Build the release APK and App Bundle (unsigned)
         working-directory: packages/app
         run: |

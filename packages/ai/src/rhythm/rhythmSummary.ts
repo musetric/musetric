@@ -1,5 +1,5 @@
 const minBeats = 2;
-const minIntervalsForIqr = 4;
+const stepTolerance = 0.125;
 const defaultMeter = 4;
 const minPreferredBpm = 60;
 const maxPreferredBpm = 160;
@@ -20,6 +20,9 @@ const median = (values: number[]): number =>
     0.5,
   );
 
+const mean = (values: number[]): number =>
+  values.reduce((sum, value) => sum + value, 0) / values.length;
+
 const roundHalfToEven = (value: number): number => {
   const floor = Math.floor(value);
   if (value - floor !== 0.5) {
@@ -31,33 +34,19 @@ const roundHalfToEven = (value: number): number => {
 const differences = (values: number[]): number[] =>
   values.slice(1).map((value, index) => value - values[index]);
 
-const withoutOutliers = (intervals: number[]): number[] => {
-  const sorted = [...intervals].sort((a, b) => a - b);
-  const q1 = percentile(sorted, 0.25);
-  const q3 = percentile(sorted, 0.75);
-  const iqr = q3 - q1;
-  const low = q1 - 1.5 * iqr;
-  const high = q3 + 1.5 * iqr;
-  const filtered = intervals.filter(
-    (interval) => interval >= low && interval <= high,
-  );
-  return filtered.length > 0 ? filtered : intervals;
-};
-
 const estimateBpm = (beats: number[]): number => {
   if (beats.length < minBeats) {
     return 0;
   }
   const intervals = differences(beats);
-  const kept =
-    intervals.length >= minIntervalsForIqr
-      ? withoutOutliers(intervals)
-      : intervals;
-  const interval = median(kept);
-  if (interval <= 0) {
+  const step = median(intervals);
+  if (step <= 0) {
     return 0;
   }
-  return 60 / interval;
+  const nearStep = intervals.filter(
+    (interval) => Math.abs(interval / step - 1) < stepTolerance,
+  );
+  return 60 / mean(nearStep);
 };
 
 const mapProbeBpm = (bpm: number): number => {
@@ -130,7 +119,33 @@ const consensusBpm = (bpms: number[]): number => {
   return median(sorted.slice(bestStart, bestStart + bestSize));
 };
 
-const everyOtherBeat = (beats: number[], origin: number): number[] => {
+const keepFromLatestDownbeat = (
+  counts: number[],
+  downbeatCounts: number[],
+): boolean[] => {
+  let latest = 0;
+  return counts.map((count) => {
+    while (
+      latest + 1 < downbeatCounts.length &&
+      downbeatCounts[latest + 1] <= count
+    ) {
+      latest += 1;
+    }
+    return (count - downbeatCounts[latest]) % 2 === 0;
+  });
+};
+
+const keepOnDownbeatParity = (
+  counts: number[],
+  downbeatCounts: number[],
+): boolean[] => {
+  const even = downbeatCounts.filter((count) => count % 2 === 0).length;
+  const odd = downbeatCounts.length - even;
+  const parity = even === odd ? downbeatCounts[0] % 2 : Number(odd > even);
+  return counts.map((count) => count % 2 === parity);
+};
+
+const everyOtherBeat = (beats: number[], downbeats: number[]): number[] => {
   if (beats.length < minBeats) {
     return beats;
   }
@@ -143,10 +158,16 @@ const everyOtherBeat = (beats: number[], origin: number): number[] => {
   intervals.forEach((interval, index) => {
     counts.push(counts[index] + Math.round(interval / step));
   });
-  const originCount = counts[beats.indexOf(origin)];
-  const kept = beats.filter(
-    (_, index) => (counts[index] - originCount) % 2 === 0,
-  );
+  const downbeatCounts =
+    downbeats.length > 0
+      ? downbeats.map((time) => counts[beats.indexOf(time)])
+      : [0];
+  const bars = differences(downbeatCounts);
+  const keep =
+    bars.length === 0 || roundHalfToEven(median(bars)) % 2 === 0
+      ? keepFromLatestDownbeat(counts, downbeatCounts)
+      : keepOnDownbeatParity(counts, downbeatCounts);
+  const kept = beats.filter((_, index) => keep[index]);
   return kept.length >= minBeats ? kept : beats;
 };
 
@@ -194,8 +215,7 @@ export const summarizeRhythm = (
       meter: estimateMeter(beats, downbeats),
     };
   }
-  const origin = downbeats.length > 0 ? downbeats[0] : beats[0];
-  const foldedBeats = everyOtherBeat(beats, origin);
+  const foldedBeats = everyOtherBeat(beats, downbeats);
   const foldedDownbeats: number[] = [];
   for (const time of downbeats) {
     if (foldedBeats.includes(time)) {

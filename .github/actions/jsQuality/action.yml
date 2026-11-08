@@ -1,5 +1,10 @@
 name: JS Quality
-description: JS dependency, format, TypeScript, lint, and test checks
+description: JS dependency, format, TypeScript, lint, and test checks, one part at a time
+
+inputs:
+  part:
+    description: static (dependencies, unused code, format, translations, comments), types (TypeScript and the frontend build), lint or test
+    required: true
 
 runs:
   using: composite
@@ -14,34 +19,40 @@ runs:
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
-    - uses: actions/cache@v5
+    - if: inputs.part == 'static'
+      run: |
+        yarn check:deps:security
+        yarn check:deps:dupe
+        yarn check:unused
+        yarn check:format
+        yarn check:translations
+        yarn check:comments
+      shell: bash
+    - if: inputs.part == 'types'
+      run: |
+        yarn check:ts
+        yarn workspace @musetric/app build:ui
+      shell: bash
+    - if: inputs.part == 'lint'
+      uses: actions/cache@v5
       with:
         path: packages/*/.eslintcache
         key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
         restore-keys: |
           eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
-    - run: yarn check:deps:security
+    - if: inputs.part == 'lint'
+      run: yarn check:lint
       shell: bash
-    - run: yarn check:deps:dupe
-      shell: bash
-    - run: yarn check:unused
-      shell: bash
-    - run: yarn check:format
-      shell: bash
-    - run: yarn check:translations
-      shell: bash
-    - run: yarn check:ts
-      shell: bash
-    - run: yarn check:lint
-      shell: bash
-    - run: yarn check:comments
-      shell: bash
-    - run: rustup toolchain install --no-self-update
+    - if: inputs.part == 'test'
+      run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server
-    - uses: Swatinem/rust-cache@v2
+    - if: inputs.part == 'test'
+      uses: Swatinem/rust-cache@v2
       with:
         workspaces: packages/server
         shared-key: js-quality
-    - run: yarn test
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - if: inputs.part == 'test'
+      run: yarn test
       shell: bash
