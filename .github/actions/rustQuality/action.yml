@@ -18,10 +18,13 @@ runs:
     - run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server
+    - run: echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
+      shell: bash
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: packages/server
         shared-key: rust-quality
+        save-if: ${{ github.ref == 'refs/heads/main' }}
     - run: |
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
