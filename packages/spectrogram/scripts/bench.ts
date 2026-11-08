@@ -1,5 +1,4 @@
 import { dirname, resolve } from 'node:path';
-import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createVitest, experimental_getRunnerTask } from 'vitest/node';
 import type * as spectrogramBench from '../src/__test__/bench.es.js';
@@ -17,33 +16,10 @@ const startTime = performance.now();
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(currentDir, '..');
 
-const devNull = new Writable({
-  write: (_chunk, _encoding, callback) => {
-    callback();
-  },
+const vitest = await createVitest({
+  config: resolve(packageRoot, 'vitest.bench.config.ts'),
+  watch: false,
 });
-
-type BenchReporterLog = {
-  content: string;
-  type: string;
-};
-
-const benchReporter = {
-  onUserConsoleLog: (log: BenchReporterLog) => {
-    const stream = log.type === 'stderr' ? process.stderr : process.stdout;
-    stream.write(log.content + '\n');
-  },
-};
-
-const vitest = await createVitest(
-  {
-    config: resolve(packageRoot, 'vitest.bench.config.ts'),
-    watch: false,
-    reporters: [benchReporter],
-  },
-  undefined,
-  { stdout: devNull, stderr: devNull },
-);
 
 const runVitest = async (): Promise<
   spectrogramBench.SpectrogramBenchSummary[]

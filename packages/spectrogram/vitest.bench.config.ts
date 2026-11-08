@@ -9,5 +9,14 @@ export default defineConfig({
     fileParallelism: false,
     pool: 'forks',
     maxWorkers: 1,
+    reporters: [
+      {
+        onUserConsoleLog: (log) => {
+          const stream =
+            log.type === 'stderr' ? process.stderr : process.stdout;
+          stream.write(log.content + '\n');
+        },
+      },
+    ],
   },
 });
