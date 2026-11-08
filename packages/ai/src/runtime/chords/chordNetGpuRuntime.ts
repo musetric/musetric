@@ -15,6 +15,7 @@ import {
   dispatch1d,
 } from '../helpers.js';
 import { type ChordNetGraph } from '../modelGraphs.js';
+import { createOrtSession } from '../ortSession.js';
 import {
   assertStorageBufferLimit,
   defaultStorageBufferLimit,
@@ -23,8 +24,6 @@ import {
 } from '../webgpuDevice.js';
 import { chordPadFeaturesShader } from './padFeatures.wgsl.js';
 import { chordSmoothArgmaxShader } from './smoothArgmax.wgsl.js';
-
-ort.env.logLevel = 'error';
 
 const smoothingKernel = 9;
 const chordQueueBudgetMs = 32;
@@ -215,7 +214,7 @@ export const createChordNetGpuRuntime = async (
   options: ChordNetGpuRuntimeOptions,
 ): Promise<ChordNetGpuRuntime> => {
   const { graph, modelFile, plan } = options;
-  const session = await ort.InferenceSession.create(modelFile, {
+  const session = await createOrtSession(modelFile, {
     executionProviders: [await musetricWebGpuProvider()],
     graphOptimizationLevel: 'all',
     preferredOutputLocation: { [graph.outputName]: 'gpu-buffer' },

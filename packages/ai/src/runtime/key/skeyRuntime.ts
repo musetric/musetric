@@ -1,7 +1,6 @@
 import * as ort from 'onnxruntime-web/webgpu';
 import { type SkeyGraph } from '../modelGraphs.js';
-
-ort.env.logLevel = 'error';
+import { createOrtSession } from '../ortSession.js';
 
 export type SkeyRuntime = {
   analyze: (audio: Float32Array) => Promise<Float32Array>;
@@ -17,7 +16,7 @@ export const createSkeyRuntime = async (
   options: SkeyRuntimeOptions,
 ): Promise<SkeyRuntime> => {
   const { inputName, outputName } = options.graph;
-  const session = await ort.InferenceSession.create(options.modelFile, {
+  const session = await createOrtSession(options.modelFile, {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
   });

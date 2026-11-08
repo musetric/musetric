@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web/webgpu';
+import { createOrtSession } from './ortSession.js';
 import { musetricWebGpuProvider } from './webgpuDevice.js';
 
 const textEncoder = new TextEncoder();
@@ -92,7 +93,7 @@ const createWarmupModel = (): Uint8Array => {
 };
 
 export const warmUpOrt = async (settleMs: number): Promise<void> => {
-  const session = await ort.InferenceSession.create(createWarmupModel(), {
+  const session = await createOrtSession(createWarmupModel(), {
     executionProviders: [
       await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
     ],

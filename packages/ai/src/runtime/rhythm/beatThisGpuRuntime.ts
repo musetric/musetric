@@ -4,6 +4,7 @@ import { yieldGpuToCompositor } from '../gpuCooldown.js';
 import { createGpuPacer } from '../gpuPacer.js';
 import { createStorageBuffer, dispatch2d } from '../helpers.js';
 import { type BeatThisGraph } from '../modelGraphs.js';
+import { createOrtSession } from '../ortSession.js';
 import { type ReportUnit } from '../unitProgress.js';
 import {
   assertStorageBufferLimit,
@@ -16,8 +17,6 @@ import {
   createBeatThisGpuState,
   destroyBeatThisGpuState,
 } from './beatThisGpuState.js';
-
-ort.env.logLevel = 'error';
 
 const emptyLogit = -1000;
 
@@ -126,7 +125,7 @@ export const createBeatThisGpuRuntime = async (
   options: BeatThisGpuRuntimeOptions,
 ): Promise<BeatThisGpuRuntime> => {
   const { graph } = options;
-  const session = await ort.InferenceSession.create(options.modelFile, {
+  const session = await createOrtSession(options.modelFile, {
     executionProviders: [
       await musetricWebGpuProvider({ storageBufferCacheMode: 'simple' }),
     ],
