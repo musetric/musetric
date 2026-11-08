@@ -60,13 +60,30 @@ jobs:
       - name: Build the release APK and App Bundle (unsigned)
         working-directory: packages/app
         run: |
+          spy=/tmp/cargo-spy
+          mkdir -p "$spy/bin" "$spy/calls"
+          real=$(command -v cargo)
+          printf '%s\n' '#!/bin/bash' \
+            "{ echo \"ARGS: \$*\"; echo \"PWD: \$PWD\"; env | sort; } > $spy/calls/\$(date +%s%N).env" \
+            "exec $real \"\$@\"" > "$spy/bin/cargo"
+          chmod +x "$spy/bin/cargo"
+          export PATH="$spy/bin:$PATH"
           version_code=$((1000 + GITHUB_RUN_NUMBER))
-          yarn build:android -v --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
+          yarn build:android --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
-      - name: Size of the Gradle cache (temporary)
-        run: du -sh ~/.gradle/wrapper ~/.gradle/caches/* | sort -h | tail -12
+      - name: Compare the cargo calls (temporary)
+        run: |
+          cd /tmp/cargo-spy/calls
+          keep='^(ARGS|PWD|CARGO|RUST|WRY|TAURI|MUSETRIC|ANDROID|NDK|CC|CXX|AR|CFLAGS|TARGET|PROFILE|DEBUG|OPT_LEVEL|HOST)'
+          builds=$(grep -l '^ARGS: .*build' -- * | sort)
+          first=
+          for call in $builds; do
+            grep -E "$keep" "$call" | grep -v '^CARGO_HOME\|^RUSTUP_HOME' > "$call.kept"
+            echo "== $call: $(head -1 "$call")"
+            if [ -n "$first" ]; then diff "$first.kept" "$call.kept" || true; else first=$call; cat "$call.kept"; fi
+          done
       - name: Name the APK by version
         run: |
           cd packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release
