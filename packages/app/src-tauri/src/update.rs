@@ -6,6 +6,7 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 const FIRST_CHECK: Duration = Duration::from_secs(90);
 const CHECK_EVERY: Duration = Duration::from_hours(4);
 const SANDBOX_CONTAINER: &str = "APP_SANDBOX_CONTAINER_ID";
+const PACKAGES_FOLDER: &str = "WindowsApps";
 
 struct PendingInstall {
     update: Update,
@@ -13,7 +14,7 @@ struct PendingInstall {
 }
 
 pub(crate) fn start<R: Runtime>(app: &AppHandle<R>) {
-    if cfg!(debug_assertions) || sandboxed() {
+    if cfg!(debug_assertions) || sandboxed() || packaged() {
         return;
     }
     app.manage(Mutex::new(None::<PendingInstall>));
@@ -31,6 +32,14 @@ pub(crate) fn start<R: Runtime>(app: &AppHandle<R>) {
 
 fn sandboxed() -> bool {
     std::env::var_os(SANDBOX_CONTAINER).is_some()
+}
+
+fn packaged() -> bool {
+    cfg!(windows)
+        && std::env::current_exe().is_ok_and(|path| {
+            path.components()
+                .any(|part| part.as_os_str().eq_ignore_ascii_case(PACKAGES_FOLDER))
+        })
 }
 
 pub(crate) fn install_on_exit<R: Runtime>(app: &AppHandle<R>) {
