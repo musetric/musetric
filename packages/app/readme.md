@@ -54,6 +54,19 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   signed into the App Sandbox with `src-tauri/macAppStore.entitlements` and
   packaged as an installer the Mac Installer Distribution certificate signs. The Google Play job signs in to Google Cloud through
   Workload Identity Federation, so its service account has no key.
+- On Windows `appBuild.yml` also packs the app as an MSIX for the Microsoft
+  Store with `scripts/packMsix.ts`: `makeappx` of the Windows SDK puts the
+  app, its notices and its logos under `src-tauri/windows/AppxManifest.xml`,
+  whose identity is the app's record in Partner Center. The package goes
+  unsigned, since the Store signs it, and its version is the major and minor
+  version of `package.json` with 1000 plus the run number. Started from a
+  package, from under `WindowsApps`, the app runs no updater of its own,
+  since the Store updates it. The manifest turns off the redirection of the
+  package's writes (`unvirtualizedResources`), so the packaged app keeps its
+  data in `%LOCALAPPDATA%\Musetric` as the NSIS build does; Windows would
+  otherwise move a folder it creates there into the package. `buildIcons.ts`
+  draws the taskbar logos unplated, which `makepri` indexes in
+  `resources.pri`: a plated logo shows the plate in its transparent corners.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
