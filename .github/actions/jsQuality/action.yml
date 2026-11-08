@@ -52,6 +52,7 @@ runs:
       with:
         workspaces: packages/server
         shared-key: js-quality
+        save-if: ${{ github.ref == 'refs/heads/main' }}
     - if: inputs.part == 'test'
       run: yarn test
       shell: bash
