@@ -50,6 +50,11 @@ jobs:
         run: yarn init:android
       - name: Pin Android SDK path for gradle
         run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
+      - name: Restore the Kotlin files the Rust build generates
+        uses: actions/cache@v5
+        with:
+          path: packages/app/src-tauri/gen/android/app/src/main/java/com/musetric/client/generated
+          key: android-generated-${{ runner.os }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
       - uses: actions/cache@v5
         with:
           path: |
