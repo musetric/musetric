@@ -180,7 +180,9 @@ export const CreateDialog: FC = () => {
               )}
               {create.isError && (
                 <Alert severity='error'>
-                  {t('pages.projects.dialogs.create.failed')}
+                  {endpoints.project.isUnsupportedSong(create.error)
+                    ? t('pages.projects.dialogs.create.unsupported')
+                    : t('pages.projects.dialogs.create.failed')}
                 </Alert>
               )}
             </>

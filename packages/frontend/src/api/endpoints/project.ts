@@ -70,6 +70,10 @@ export const subscribeToStatus = (queryClient: QueryClient) => {
   };
 };
 
+export const isUnsupportedSong = (error: unknown): boolean =>
+  axios.isAxiosError(error) &&
+  error.response?.status === axios.HttpStatusCode.UnsupportedMediaType;
+
 export const create = (queryClient: QueryClient) =>
   mutationOptions({
     mutationKey: ['project', 'create'],
