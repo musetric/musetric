@@ -1,0 +1,53 @@
+name: App Build Mac App Store
+description: Builds the unsigned macOS app for the Mac App Store and keeps it, with its sandbox entitlements, as an artifact
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode 27.1
+      run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
+      shell: bash
+    - uses: ./.github/actions/setupYarn
+    - uses: actions/cache@v5
+      with:
+        path: ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+        restore-keys: yarn-${{ runner.os }}-
+    - run: yarn --immutable
+      env:
+        MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
+        ONNXRUNTIME_NODE_INSTALL: skip
+      shell: bash
+    - run: rustup toolchain install --no-self-update && rustup target add aarch64-apple-darwin
+      working-directory: packages/app
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          packages/server/target
+        key: cargo-${{ runner.os }}-arm64-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-arm64-
+    - run: rm -rf packages/server/target/aarch64-apple-darwin/release/bundle
+      shell: bash
+    - name: Build the macOS app (unsigned)
+      working-directory: packages/app
+      run: |
+        bundle_version=$((1000 + GITHUB_RUN_NUMBER))
+        yarn pack:macAppStore --config "{\"bundle\":{\"macOS\":{\"bundleVersion\":\"$bundle_version\"}}}"
+      shell: bash
+    - name: Keep the app with its entitlements
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/macAppStore"
+        ditto -c -k --keepParent packages/server/target/aarch64-apple-darwin/release/bundle/macos/Musetric.app "$RUNNER_TEMP/macAppStore/Musetric.app.zip"
+        cp packages/app/src-tauri/macAppStore.entitlements "$RUNNER_TEMP/macAppStore/"
+      shell: bash
+    - uses: actions/upload-artifact@v7
+      with:
+        name: musetric-macos-app-store-unsigned
+        if-no-files-found: error
+        retention-days: 14
+        compression-level: 0
+        path: ${{ runner.temp }}/macAppStore/

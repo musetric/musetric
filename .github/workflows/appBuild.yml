@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: dev builds artifacts only, testing uploads the iOS app to TestFlight and the Android app to Google Play internal testing, release publishes packages/app/package.json version
+        description: dev builds artifacts only, testing uploads the iOS and the macOS app to TestFlight and the Android app to Google Play internal testing, release publishes packages/app/package.json version
         type: choice
         options:
           - dev
@@ -142,6 +142,41 @@ jobs:
           certificate: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
           certificate-password: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           profile: ${{ secrets.APPLE_APP_STORE_PROFILE }}
+          api-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          app-id: ${{ vars.APP_STORE_APP_ID }}
+
+  mac-app-store:
+    if: inputs.mode == 'testing'
+    needs: prepare
+    runs-on: xcode-27
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/appBuildMacAppStore
+
+  testflight-macos:
+    if: inputs.mode == 'testing'
+    needs: mac-app-store
+    runs-on: xcode-27
+    environment: app-store
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/uploadTestflightMacos
+        with:
+          certificate: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
+          certificate-password: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          installer-certificate: ${{ secrets.MAC_INSTALLER_CERTIFICATE }}
+          installer-certificate-password: ${{ secrets.MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+          profile: ${{ secrets.APPLE_MAC_APP_STORE_PROFILE }}
           api-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           api-issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
