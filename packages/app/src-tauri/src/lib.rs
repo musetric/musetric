@@ -41,7 +41,10 @@ mod update;
 const STARTUP_FAILURE: &str = "musetric could not start: ";
 const EXECUTOR_PREFIX: &str = "executor/";
 const MAIN_WINDOW: &str = "main";
+#[cfg(development)]
 const SERVER_LISTEN: &str = "127.0.0.1:47205";
+#[cfg(not(development))]
+const SERVER_LISTEN: &str = "127.0.0.1:47206";
 #[cfg(desktop)]
 const EXECUTOR_WINDOW: &str = "executor";
 #[cfg(desktop)]
