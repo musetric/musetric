@@ -20,13 +20,17 @@ import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
+import {
+  loadMixdownChoice,
+  mixdownFormatNames,
+  saveMixdownChoice,
+} from './mixdownChoice.js';
 import { getMixdownLabel } from './mixdownLabel.js';
 import { MixdownTiles } from './MixdownTiles.js';
 import { saveMixdown } from './saveMixdown.js';
 
 type FormatName = api.mixdown.Format['format'];
 
-const formatNames: FormatName[] = ['flac', 'mp3', 'm4a', 'wav'];
 const formatLabels: Record<FormatName, string> = {
   flac: 'FLAC',
   mp3: 'MP3',
@@ -52,11 +56,10 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
   const tempoRatio = useEngineStore((state) => state.tempoRatio);
   const activeRecording = useEngineStore(getActiveRecording);
   const project = useQuery(endpoints.project.get(projectId));
-  const [formatName, setFormatName] = useState<FormatName>('flac');
-  const [bitrate, setBitrate] = useState<api.mixdown.Bitrate>(256);
-  const [bitDepth, setBitDepth] = useState<api.mixdown.BitDepth>(24);
+  const [choice, setChoice] = useState(loadMixdownChoice);
+  const { format, bitrate, bitDepth } = choice;
   const mixdown = useMutation(endpoints.mixdown.create(projectId));
-  const lossy = formatName === 'm4a' || formatName === 'mp3';
+  const lossy = format === 'm4a' || format === 'mp3';
 
   const label = getMixdownLabel(
     {
@@ -122,7 +125,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
                   (item) => item === event.target.value,
                 );
                 if (value) {
-                  setBitrate(value);
+                  setChoice({ ...choice, bitrate: value });
                 }
               }}
               sx={{ fontSize: 13, color: 'text.secondary' }}
@@ -145,7 +148,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
                   (item) => item === event.target.value,
                 );
                 if (value) {
-                  setBitDepth(value);
+                  setChoice({ ...choice, bitDepth: value });
                 }
               }}
               sx={{ fontSize: 13, color: 'text.secondary' }}
@@ -164,14 +167,14 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
           aria-label={t('pages.project.mixdown.format')}
           sx={{ gap: 1, p: 1, borderRadius: '10px', bgcolor: 'action.hover' }}
         >
-          {formatNames.map((name) => (
+          {mixdownFormatNames.map((name) => (
             <ToggleButton
               key={name}
               value={name}
-              selected={name === formatName}
+              selected={name === format}
               disabled={mixdown.isPending}
               onClick={() => {
-                setFormatName(name);
+                setChoice({ ...choice, format: name });
               }}
               sx={{
                 flex: 1,
@@ -212,7 +215,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
             : t('pages.project.mixdown.fileName', {
                 name: project.data?.name ?? '',
                 label,
-                extension: formatName,
+                extension: format,
               })}
         </Typography>
         <Button
@@ -225,14 +228,13 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
             if (label === undefined) {
               return;
             }
+            saveMixdownChoice(choice);
             const state = engine.store.get();
             const voiceShifted = state.singerVoice === 'shifted';
             mixdown.mutate(
               {
                 request: {
-                  format: lossy
-                    ? { format: formatName, bitrate }
-                    : { format: formatName, bitDepth },
+                  format: lossy ? { format, bitrate } : { format, bitDepth },
                   volumes: state.trackVolumes,
                   playback: {
                     tempoRatio: state.tempoRatio,

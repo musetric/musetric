@@ -30,7 +30,7 @@ const UPLOAD_LIMIT: usize = 200 * 1024 * 1024;
 const RETRY_LIMIT: usize = 4 * 1024;
 const SAMPLE_RATE: u32 = 48000;
 const NAME_MIN_LENGTH: usize = 3;
-const INVALID_AUDIO: &str = "Uploaded audio file is invalid";
+const UNSUPPORTED_AUDIO: &str = "The format of the uploaded file is not supported";
 const SHORT_NAME: &str = "body/name Too small: expected string to have >=3 characters";
 const MISSING_STEP: &str = "body/step Invalid input: expected string, received undefined";
 const BODY: &str = "body";
@@ -394,7 +394,7 @@ async fn convert_and_measure(
         .await
         .map_err(|failure| {
             if failure.is::<SourceFailure>() {
-                Failure::Invalid(format!("{INVALID_AUDIO}: {failure}"))
+                Failure::Unsupported(format!("{UNSUPPORTED_AUDIO}: {failure}"))
             } else {
                 Failure::failed(failure)
             }
