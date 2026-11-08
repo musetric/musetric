@@ -45,6 +45,12 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
   (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
+- Each identity has its own port of the embedded host, so that its page keeps
+  one origin and with it its local storage: Musetric listens on 47206, Musetric
+  Dev, a desktop debug build included, on 47205. `src-tauri/build.rs` sets the
+  `development` cfg by the same rules that pick the identifier and the desktop
+  data folder. While another process holds the port, the host takes a free one
+  for that run.
 - `src/favicon.svg` is the only icon source, of the app and of the page.
   `yarn build:icons` redraws the iOS icons that `tauri icon` writes as PNG
   without an alpha channel: App Store Connect refuses an app icon with one.

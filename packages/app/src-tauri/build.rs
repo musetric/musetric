@@ -1,11 +1,37 @@
 use std::{env, error::Error};
 
+const PUBLISH_VARIABLE: &str = "MUSETRIC_PUBLISH";
+
 fn main() -> Result<(), Box<dyn Error>> {
+    println!("cargo:rustc-check-cfg=cfg(development)");
+    println!("cargo:rerun-if-env-changed={PUBLISH_VARIABLE}");
+    if development()? {
+        println!("cargo:rustc-cfg=development");
+    }
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
         ios::link_ios_plugins()?;
     }
     tauri_build::try_build(tauri_build::Attributes::new())?;
     Ok(())
+}
+
+fn development() -> Result<bool, Box<dyn Error>> {
+    let debug = env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_some();
+    Ok(match env::var("CARGO_CFG_TARGET_OS")?.as_str() {
+        "ios" => !published()?,
+        "android" => debug || !published()?,
+        _ => debug,
+    })
+}
+
+fn published() -> Result<bool, Box<dyn Error>> {
+    match env::var(PUBLISH_VARIABLE) {
+        Err(env::VarError::NotPresent) => Ok(false),
+        Ok(value) if value == "false" => Ok(false),
+        Ok(value) if value == "true" => Ok(true),
+        Ok(value) => Err(format!("{PUBLISH_VARIABLE} must be true or false, got {value}").into()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(target_os = "macos")]

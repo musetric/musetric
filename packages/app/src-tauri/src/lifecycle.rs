@@ -11,7 +11,7 @@ const DEVELOPMENT_APPLICATION_NAME: &str = "Musetric Dev";
 const LOG_FILE_NAME: &str = "musetric.log";
 const LOGS_DIRECTORY: &str = "logs";
 pub(crate) fn application_data_dir<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<PathBuf> {
-    let name = if cfg!(debug_assertions) {
+    let name = if cfg!(development) {
         DEVELOPMENT_APPLICATION_NAME
     } else {
         APPLICATION_NAME
