@@ -2,8 +2,9 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap desktop6 rescap">
   <Identity
     Name="Musetric.Musetric"
     Publisher="CN=A144AFBE-1A5E-4C67-8801-75814CB190B2"
@@ -13,11 +14,12 @@
     <DisplayName>Musetric</DisplayName>
     <PublisherDisplayName>Musetric</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
-      MinVersion="10.0.17763.0"
+      MinVersion="10.0.19041.0"
       MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   <Resources>
@@ -38,6 +40,7 @@
   </Applications>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
     <DeviceCapability Name="microphone" />
   </Capabilities>
 </Package>
