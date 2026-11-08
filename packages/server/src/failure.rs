@@ -11,6 +11,7 @@ const CONTENT_TYPE_ERROR: &str = "application/json; charset=utf-8";
 #[derive(Debug)]
 pub(crate) enum Failure {
     Invalid(String),
+    Unsupported(String),
     NotFound(String),
     Conflict(String),
     Failed(String),
@@ -46,6 +47,7 @@ pub(crate) fn finish(result: Result<Response<Body>, Failure>) -> Response<Body> 
 fn create_failure_response(failure: Failure) -> Response<Body> {
     let (status, message) = match failure {
         Failure::Invalid(message) => (StatusCode::BAD_REQUEST, message),
+        Failure::Unsupported(message) => (StatusCode::UNSUPPORTED_MEDIA_TYPE, message),
         Failure::NotFound(message) => (StatusCode::NOT_FOUND, message),
         Failure::Conflict(message) => (StatusCode::CONFLICT, message),
         Failure::Failed(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
