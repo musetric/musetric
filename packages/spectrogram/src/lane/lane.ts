@@ -78,7 +78,6 @@ export type SpectrogramLaneDispatch = (
 ) => void;
 
 export type SpectrogramLane = {
-  signal: GPUBuffer;
   bandSpectra: SpectrogramBandSpectrum[];
   fundamentalLineBuffer: GPUBuffer;
   fundamentalDecodedBuffer: GPUBuffer;
@@ -115,11 +114,9 @@ const buildSpectrogramLane = (
     config,
   } = args;
   const laneConfig = config.lanes[options.label];
-  const baseBandPipeline = buildBandSpectrumPipeline(
-    cells,
-    config,
-    options.label,
-  );
+  const baseBandPipeline = laneConfig.showSpectrogram
+    ? buildBandSpectrumPipeline(cells, config, options.label)
+    : undefined;
   const columnScale = columnScaleCell.get(config.windowCount);
   const fundamentalFrequency = fundamentalFrequencyCell.get({
     sampleRate: config.sampleRate,
@@ -147,7 +144,7 @@ const buildSpectrogramLane = (
   const bandPipelines: {
     band: SpectrogramSpectralBand;
     pipeline: BandSpectrumPipeline;
-  }[] = laneConfig.showSpectrogram
+  }[] = baseBandPipeline
     ? config.spectralBands.map((band) => {
         const pipeline =
           band.windowSize === config.windowSize
@@ -167,7 +164,6 @@ const buildSpectrogramLane = (
   }));
 
   return {
-    signal: baseBandPipeline.signal,
     bandSpectra,
     fundamentalLineBuffer: fundamentalFrequency.lineBuffer,
     fundamentalDecodedBuffer: fundamentalFrequency.decodedBuffer,
@@ -206,7 +202,7 @@ const buildSpectrogramLane = (
       });
     },
     clear: (encoder) => {
-      baseBandPipeline.clear(encoder);
+      baseBandPipeline?.clear(encoder);
       for (const pipeline of externalPipelines) {
         pipeline.clear(encoder);
       }
