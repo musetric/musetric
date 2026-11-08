@@ -5,6 +5,7 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 const FIRST_CHECK: Duration = Duration::from_secs(90);
 const CHECK_EVERY: Duration = Duration::from_hours(4);
+const SANDBOX_CONTAINER: &str = "APP_SANDBOX_CONTAINER_ID";
 
 struct PendingInstall {
     update: Update,
@@ -12,7 +13,7 @@ struct PendingInstall {
 }
 
 pub(crate) fn start<R: Runtime>(app: &AppHandle<R>) {
-    if cfg!(debug_assertions) {
+    if cfg!(debug_assertions) || sandboxed() {
         return;
     }
     app.manage(Mutex::new(None::<PendingInstall>));
@@ -26,6 +27,10 @@ pub(crate) fn start<R: Runtime>(app: &AppHandle<R>) {
             tokio::time::sleep(CHECK_EVERY).await;
         }
     });
+}
+
+fn sandboxed() -> bool {
+    std::env::var_os(SANDBOX_CONTAINER).is_some()
 }
 
 pub(crate) fn install_on_exit<R: Runtime>(app: &AppHandle<R>) {
