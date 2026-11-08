@@ -61,7 +61,12 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   unsigned, since the Store signs it, and its version is the major and minor
   version of `package.json` with 1000 plus the run number. Started from a
   package, from under `WindowsApps`, the app runs no updater of its own,
-  since the Store updates it.
+  since the Store updates it. The manifest turns off the redirection of the
+  package's writes (`unvirtualizedResources`), so the packaged app keeps its
+  data in `%LOCALAPPDATA%\Musetric` as the NSIS build does; Windows would
+  otherwise move a folder it creates there into the package. `buildIcons.ts`
+  draws the taskbar logos unplated, which `makepri` indexes in
+  `resources.pri`: a plated logo shows the plate in its transparent corners.
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address

@@ -85,6 +85,10 @@ for (const name of assets) {
     join(stageDir, 'Assets', name),
   );
 }
+const unplatedDir = join(tauriDir, 'gen-assets', 'msix');
+for (const name of readdirSync(unplatedDir)) {
+  copyFileSync(join(unplatedDir, name), join(stageDir, 'Assets', name));
+}
 writeFileSync(
   join(stageDir, 'AppxManifest.xml'),
   readFileSync(join(tauriDir, 'windows', 'AppxManifest.xml'), 'utf8')
@@ -106,6 +110,29 @@ const sdk = existsSync(kitsDir)
 if (sdk === undefined) {
   throw new Error(`No makeappx.exe of the Windows SDK under ${kitsDir}`);
 }
+
+const priConfig = join(msixDir, 'priconfig.xml');
+execFileSync(
+  join(kitsDir, sdk, 'x64', 'makepri.exe'),
+  ['createconfig', '/cf', priConfig, '/dq', 'en-US', '/pv', '10.0.0', '/o'],
+  { stdio: 'inherit' },
+);
+execFileSync(
+  join(kitsDir, sdk, 'x64', 'makepri.exe'),
+  [
+    'new',
+    '/pr',
+    stageDir,
+    '/cf',
+    priConfig,
+    '/mn',
+    join(stageDir, 'AppxManifest.xml'),
+    '/of',
+    join(stageDir, 'resources.pri'),
+    '/o',
+  ],
+  { stdio: 'inherit' },
+);
 
 const output = join(msixDir, `Musetric_${version}_${architecture}.msix`);
 execFileSync(

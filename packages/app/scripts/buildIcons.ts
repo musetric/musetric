@@ -194,3 +194,19 @@ if (existsSync(iosIconDir)) {
     );
   }
 }
+
+const msixAssetsDir = join(packageDir, 'src-tauri', 'gen-assets', 'msix');
+await mkdir(msixAssetsDir, { recursive: true });
+const unplatedSizes = [16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256];
+for (const size of unplatedSizes) {
+  const rendered = new Resvg(svg, { fitTo: { mode: 'width', value: size } })
+    .render()
+    .asPng();
+  await writeFile(
+    join(
+      msixAssetsDir,
+      `Square44x44Logo.targetsize-${size}_altform-unplated.png`,
+    ),
+    Buffer.from(rendered),
+  );
+}
