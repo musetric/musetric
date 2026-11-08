@@ -8,6 +8,8 @@ use musetric_server::{Bundle, EmbeddedServerOptions, Frontend, start_embedded};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(desktop)]
+use tauri::utils::config::BackgroundThrottlingPolicy;
+#[cfg(desktop)]
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 #[cfg(desktop)]
 use tauri_plugin_window_state::StateFlags;
@@ -152,6 +154,7 @@ fn create_executor_window<R: tauri::Runtime>(
         .title(EXECUTOR_TITLE)
         .visible(false)
         .skip_taskbar(true)
+        .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .build()?;
     Ok(())
 }
