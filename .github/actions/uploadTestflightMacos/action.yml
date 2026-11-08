@@ -38,7 +38,7 @@ runs:
       shell: bash
     - uses: actions/download-artifact@v8
       with:
-        name: musetric-macos-app-store-unsigned
+        name: musetric-macos-app-unsigned
         path: unsigned
     - name: Sign and package for the Mac App Store
       env:
