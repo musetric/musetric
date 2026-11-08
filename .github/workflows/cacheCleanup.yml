@@ -1,0 +1,26 @@
+name: Cache Cleanup
+
+on:
+  delete:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name == 'delete' && github.event.ref_type == 'branch')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || format('refs/heads/{0}', github.event.ref) }}
+        run: |
+          set -euo pipefail
+          ids=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$REF" --limit 100 --json id --jq '.[].id')
+          for id in $ids; do
+            gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
+          done
+          echo "deleted $(printf '%s\n' "$ids" | grep -c . || true) caches of $REF"
