@@ -721,4 +721,36 @@ mod tests {
         assert_eq!(pieces.status(), StatusCode::NOT_FOUND);
         assert_eq!(activated.status(), StatusCode::NOT_FOUND);
     }
+
+    #[tokio::test]
+    async fn refuses_a_song_whose_format_it_cannot_read() {
+        let workspace = Workspace::new();
+        let boundary = "song";
+        let body = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nUnreadable\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"song\"; filename=\"song.bin\"\r\nContent-Type: application/octet-stream\r\n\r\nnot audio in any format\r\n--{boundary}--\r\n"
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/project/create")
+            .header(
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            )
+            .body(Body::from(body))
+            .expect("the request should be valid");
+
+        let response = create_test_router(&workspace)
+            .await
+            .oneshot(request)
+            .await
+            .expect("the router should answer");
+
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+        let refusal = read_body(response).await;
+        assert!(
+            refusal
+                .starts_with("{\"message\":\"The format of the uploaded file is not supported: "),
+            "{refusal}"
+        );
+    }
 }

@@ -112,7 +112,9 @@ export const ProjectsDropZone: FC<PropsWithChildren> = (props) => {
         onClose={() => setFailed(false)}
       >
         <Alert severity='error' onClose={() => setFailed(false)}>
-          {t('pages.projects.drop.failed')}
+          {endpoints.project.isUnsupportedSong(create.error)
+            ? t('pages.projects.drop.unsupported')
+            : t('pages.projects.drop.failed')}
         </Alert>
       </Snackbar>
     </Box>
