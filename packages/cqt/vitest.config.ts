@@ -22,6 +22,7 @@ export default defineConfig({
             '--enable-unsafe-webgpu',
             '--disable-webgpu-blocklist',
             '--ignore-gpu-blocklist',
+            '--force_high_performance_gpu',
           ],
         },
         contextOptions: { colorScheme: 'dark' },
