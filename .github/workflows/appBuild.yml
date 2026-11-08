@@ -64,32 +64,113 @@ jobs:
   desktop:
     if: inputs.mode != 'testing'
     needs: prepare
-    uses: ./.github/workflows/appBuildDesktop.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-    secrets:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: Windows
+            arch: x64
+            rustTarget: x86_64-pc-windows-msvc
+          - os: windows-latest
+            platform: Windows
+            arch: arm64
+            rustTarget: aarch64-pc-windows-msvc
+          - os: xcode-27
+            platform: macOS
+            arch: x64
+            rustTarget: x86_64-apple-darwin
+          - os: xcode-27
+            platform: macOS
+            arch: arm64
+            rustTarget: aarch64-apple-darwin
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: x64
+            rustTarget: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            platform: Linux
+            arch: arm64
+            rustTarget: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/appBuildDesktop
+        with:
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          rust-target: ${{ matrix.rustTarget }}
+          version: ${{ needs.prepare.outputs.version }}
+          tauri-signing-private-key: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          tauri-signing-private-key-password: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   android:
     needs: prepare
-    uses: ./.github/workflows/appBuildAndroid.yml
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
-      id-token: write
-    with:
-      mode: ${{ inputs.mode }}
-      publish: ${{ needs.prepare.outputs.publish == 'true' }}
-      version: ${{ needs.prepare.outputs.version }}
+    env:
+      MUSETRIC_PUBLISH: ${{ needs.prepare.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/appBuildAndroid
+        with:
+          version: ${{ needs.prepare.outputs.version }}
 
   ios:
     needs: prepare
-    uses: ./.github/workflows/appBuildIos.yml
+    runs-on: xcode-27
     permissions:
       contents: read
-    with:
-      mode: ${{ inputs.mode }}
-      publish: ${{ needs.prepare.outputs.publish == 'true' }}
+    env:
+      MUSETRIC_PUBLISH: ${{ needs.prepare.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/appBuildIos
+
+  testflight:
+    if: inputs.mode == 'testing'
+    needs: ios
+    runs-on: xcode-27
+    environment: app-store
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/uploadTestflight
+        with:
+          certificate: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE }}
+          certificate-password: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          profile: ${{ secrets.APPLE_APP_STORE_PROFILE }}
+          api-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          app-id: ${{ vars.APP_STORE_APP_ID }}
+
+  google-play:
+    if: inputs.mode == 'testing'
+    needs: android
+    runs-on: ubuntu-latest
+    environment: google-play
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/uploadGooglePlay
+        with:
+          keystore: ${{ secrets.GOOGLE_PLAY_UPLOAD_KEYSTORE }}
+          keystore-password: ${{ secrets.GOOGLE_PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+          workload-identity-provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service-account: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
 
   release:
     if: inputs.mode == 'release'
