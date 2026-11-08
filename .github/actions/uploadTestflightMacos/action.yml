@@ -61,6 +61,13 @@ runs:
         security import "$RUNNER_TEMP/installer.p12" -k "$keychain" -P "$INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
         rm "$RUNNER_TEMP/installer.p12"
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+        searched=()
+        while IFS= read -r line; do
+          line="${line#"${line%%[![:space:]]*}"}"
+          searched+=("${line//\"/}")
+        done < <(security list-keychains -d user)
+        trap 'security list-keychains -d user -s "${searched[@]}"; security delete-keychain "$keychain"' EXIT
+        security list-keychains -d user -s "$keychain" "${searched[@]}"
         identity=$(security find-identity -v -p codesigning "$keychain" | awk '/"Apple Distribution: / { print $2; exit }')
         test -n "$identity"
         installer=$(security find-identity -v "$keychain" | awk -F '"' '/"(3rd Party Mac Developer Installer|Mac Installer Distribution): / { print $2; exit }')
@@ -93,7 +100,6 @@ runs:
         codesign --display --entitlements - "$app"
         productbuild --component "$app" /Applications --sign "$installer" --keychain "$keychain" "$RUNNER_TEMP/Musetric.pkg"
         pkgutil --check-signature "$RUNNER_TEMP/Musetric.pkg"
-        security delete-keychain "$keychain"
       shell: bash
     - name: Upload to TestFlight
       env:
