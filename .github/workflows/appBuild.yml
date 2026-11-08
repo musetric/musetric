@@ -156,19 +156,10 @@ jobs:
             packages/server/target/**/release/bundle/appimage/*.AppImage.sig
 
   android:
-    if: inputs.mode != 'testing'
     needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - abi: arm64-v8a
-            target: aarch64
-          - abi: x86_64
-            target: x86_64
     runs-on: ubuntu-22.04
     env:
-      MUSETRIC_PUBLISH: ${{ inputs.mode == 'release' }}
+      MUSETRIC_PUBLISH: ${{ inputs.mode != 'dev' }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setupYarn
@@ -192,79 +183,35 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             packages/server/target
-          key: cargo-${{ runner.os }}-android-${{ matrix.target }}-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-android-${{ matrix.target }}-
+          key: cargo-${{ runner.os }}-android-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-android-
       - name: Init Android project
         working-directory: packages/app
         run: yarn init:android
       - name: Pin Android SDK path for gradle
         run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
-      - name: Assemble ${{ matrix.abi }} release APK
+      - name: Build the release APK and App Bundle (unsigned)
         working-directory: packages/app
         run: |
           version_code=$((1000 + GITHUB_RUN_NUMBER))
-          yarn build:android --target ${{ matrix.target }} --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
+          yarn build:android --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
-      - name: Rename APK with ABI suffix
+      - name: Name the APK by version
         run: |
           cd packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release
-          mv app-universal-release*.apk "Musetric_${{ needs.prepare.outputs.version }}_${{ matrix.abi }}.apk"
+          mv app-universal-release*.apk "Musetric_${{ needs.prepare.outputs.version }}.apk"
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-android-${{ matrix.abi }}
+          name: musetric-android
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
           path: packages/app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
-
-  android-bundle:
-    if: inputs.mode == 'testing'
-    runs-on: ubuntu-22.04
-    env:
-      MUSETRIC_PUBLISH: true
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setupYarn
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v4
-      - uses: actions/cache@v5
-        with:
-          path: ~/.yarn/berry/cache
-          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-
-      - run: yarn --immutable
-        env:
-          MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
-          ONNXRUNTIME_NODE_INSTALL: skip
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            packages/server/target
-          key: cargo-${{ runner.os }}-android-bundle-${{ hashFiles('packages/server/rust-toolchain.toml', 'packages/server/Cargo.lock', 'packages/app/src-tauri/gen/android/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-android-bundle-
-      - name: Init Android project
-        working-directory: packages/app
-        run: yarn init:android
-      - name: Pin Android SDK path for gradle
-        run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
-      - name: Assemble the release App Bundle (unsigned)
-        working-directory: packages/app
-        run: |
-          version_code=$((1000 + GITHUB_RUN_NUMBER))
-          yarn tauri android build --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}
       - uses: actions/upload-artifact@v7
         with:
-          name: musetric-android-bundle-unsigned
+          name: musetric-android-bundle
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -405,7 +352,7 @@ jobs:
 
   google-play:
     if: inputs.mode == 'testing'
-    needs: android-bundle
+    needs: android
     runs-on: ubuntu-latest
     environment: google-play
     permissions:
@@ -413,7 +360,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: musetric-android-bundle-unsigned
+          name: musetric-android-bundle
           path: unsigned
       - name: Sign with the upload key
         env:
