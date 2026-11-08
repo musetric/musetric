@@ -288,13 +288,7 @@ fn progress(model: &ModelFile, downloaded: u64, total: Option<u64>) -> Download<
 }
 
 pub async fn has_verified_copy(model: &ModelFile) -> bool {
-    let Ok(manifest) = create_manifest(&model.path, &model.sha256).await else {
-        return false;
-    };
-    let manifest_path = with_suffix(&model.path, MANIFEST_SUFFIX);
-    read_to_string(&manifest_path)
-        .await
-        .is_ok_and(|stored| stored == manifest)
+    read_cached_size(model).await.is_some()
 }
 
 async fn read_cached_size(model: &ModelFile) -> Option<u64> {
@@ -304,7 +298,10 @@ async fn read_cached_size(model: &ModelFile) -> Option<u64> {
     }
     let manifest = create_manifest(&model.path, &model.sha256).await.ok()?;
     let manifest_path = with_suffix(&model.path, MANIFEST_SUFFIX);
-    if read_to_string(&manifest_path).await.ok()? == manifest {
+    if read_to_string(&manifest_path)
+        .await
+        .is_ok_and(|stored| stored == manifest)
+    {
         return Some(stat.len());
     }
     let mut hasher = Sha256::new();
@@ -632,6 +629,51 @@ mod tests {
 
         assert_eq!(served.requests.load(Ordering::Relaxed), 1);
         assert_eq!(second.statuses(), vec![DownloadStatus::Cached]);
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn hashes_a_file_left_without_its_manifest() {
+        let workspace = Workspace::new();
+        let (address, served, shutdown) = start_source().await;
+        let reported = Reported::create();
+        let model = create_model(&workspace, address, SHA256);
+        let directory = model.path.parent().expect("the model should have a folder");
+        create_dir_all(directory).expect("the models folder should be created");
+        write_file(&model.path, CONTENT).expect("the model should be written");
+
+        assert!(has_verified_copy(&model).await);
+        ensure_model_file(&Client::new(), &model, reported.sink().as_ref())
+            .await
+            .expect("the model should be kept");
+
+        assert_eq!(served.requests.load(Ordering::Relaxed), 0);
+        assert_eq!(reported.statuses(), vec![DownloadStatus::Cached]);
+        assert!(
+            read_to_string(format!("{}.verified", model.path.display()))
+                .expect("the manifest should be written")
+                .contains(SHA256)
+        );
+        let _ = shutdown.send(());
+    }
+
+    #[tokio::test]
+    async fn replaces_a_file_left_without_its_manifest_that_misses_its_pin() {
+        let workspace = Workspace::new();
+        let (address, served, shutdown) = start_source().await;
+        let reported = Reported::create();
+        let model = create_model(&workspace, address, SHA256);
+        let directory = model.path.parent().expect("the model should have a folder");
+        create_dir_all(directory).expect("the models folder should be created");
+        write_file(&model.path, b"other bytes").expect("the model should be written");
+
+        assert!(!has_verified_copy(&model).await);
+        let path = ensure_model_file(&Client::new(), &model, reported.sink().as_ref())
+            .await
+            .expect("the model should download");
+
+        assert_eq!(served.requests.load(Ordering::Relaxed), 1);
+        assert_eq!(read(&path).expect("the model should be stored"), CONTENT);
         let _ = shutdown.send(());
     }
 
