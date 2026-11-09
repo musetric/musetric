@@ -6,13 +6,17 @@ use std::{
 
 use musetric_gpu::{ModelFile, has_verified_copy, kept_files};
 use musetric_media::Downmix;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 use tokio::fs::{DirEntry, ReadDir, read_dir, remove_dir_all, remove_file, try_exists};
 
 use crate::analysis::browser::Failure;
 
-const MODEL_PINS: &str = include_str!("../../../ai/src/modelPins.json");
+const SEPARATION_PIN: &str = include_str!("../../../ai/src/runtime/vocals/pin.json");
+const TRANSCRIPTION_PIN: &str = include_str!("../../../ai/src/runtime/whisper/pin.json");
+const CHORDS_PIN: &str = include_str!("../../../ai/src/runtime/chords/pin.json");
+const RHYTHM_PIN: &str = include_str!("../../../ai/src/runtime/rhythm/pin.json");
+const KEY_PIN: &str = include_str!("../../../ai/src/runtime/key/pin.json");
 
 #[derive(Deserialize)]
 pub(crate) struct PinnedFile {
@@ -74,7 +78,10 @@ impl SeparationGraph {
     }
 }
 
-#[derive(Deserialize)]
+fn read_pin<Pin: DeserializeOwned>(step: &str, text: &str) -> Result<Pin, String> {
+    serde_json::from_str(text).map_err(|error| format!("the {step} pin does not parse: {error}"))
+}
+
 pub(crate) struct ModelPins {
     pub(crate) separation: GraphPin<SeparationGraph>,
     pub(crate) transcription: GraphPin<Value>,
@@ -84,8 +91,14 @@ pub(crate) struct ModelPins {
 }
 
 impl ModelPins {
-    pub(crate) fn read() -> serde_json::Result<Self> {
-        serde_json::from_str(MODEL_PINS)
+    pub(crate) fn read() -> Result<Self, String> {
+        Ok(Self {
+            separation: read_pin("separation", SEPARATION_PIN)?,
+            transcription: read_pin("transcription", TRANSCRIPTION_PIN)?,
+            chords: read_pin("chords", CHORDS_PIN)?,
+            rhythm: read_pin("rhythm", RHYTHM_PIN)?,
+            key: read_pin("key", KEY_PIN)?,
+        })
     }
 
     fn bundles(&self) -> [(&'static ModelBundle, &ModelPin); 5] {

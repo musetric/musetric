@@ -9,8 +9,8 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
   in or out) bumps that step's `DSP_VERSION`.
 - The host reads the
   [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models
-  from `packages/ai/src/modelPins.json`, embedded at build time;
-  `src/analysis/models.rs` adds only what the host keeps for itself: the
+  from the `pin.json` files of `packages/ai/src/runtime`, embedded at build
+  time; `src/analysis/models.rs` adds only what the host keeps for itself: the
   folder and the label of each model in its cache.
 - A model file counts as cached only next to its manifest `<file>.verified`
   (`crates/gpu/src/cache.rs`); the host deletes a file without one and

@@ -1,4 +1,16 @@
-import modelPins from '../../modelPins.json' with { type: 'json' };
+import chordsPin from '../../runtime/chords/pin.json' with { type: 'json' };
+import keyPin from '../../runtime/key/pin.json' with { type: 'json' };
+import rhythmPin from '../../runtime/rhythm/pin.json' with { type: 'json' };
+import vocalsPin from '../../runtime/vocals/pin.json' with { type: 'json' };
+import whisperPin from '../../runtime/whisper/pin.json' with { type: 'json' };
+
+const modelPins = {
+  separation: vocalsPin,
+  transcription: whisperPin,
+  chords: chordsPin,
+  rhythm: rhythmPin,
+  key: keyPin,
+};
 
 export type ParityPinName = keyof typeof modelPins;
 

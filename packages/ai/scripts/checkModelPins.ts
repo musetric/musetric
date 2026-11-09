@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
-import modelPins from '../src/modelPins.json' with { type: 'json' };
+import chordsPin from '../src/runtime/chords/pin.json' with { type: 'json' };
+import keyPin from '../src/runtime/key/pin.json' with { type: 'json' };
+import rhythmPin from '../src/runtime/rhythm/pin.json' with { type: 'json' };
+import vocalsPin from '../src/runtime/vocals/pin.json' with { type: 'json' };
+import whisperPin from '../src/runtime/whisper/pin.json' with { type: 'json' };
 
-const pinsFile = 'packages/ai/src/modelPins.json';
 const hub = 'https://huggingface.co';
 const requestTimeout = 15_000;
 
@@ -11,17 +14,33 @@ type PinnedFile = {
   bytes: number;
 };
 
+type PinFile = {
+  repository: string;
+  revision: string;
+  files: Record<string, PinnedFile>;
+};
+
 type ModelPin = {
+  source: string;
   modelId: string;
   revision: string;
   files: PinnedFile[];
 };
 
-const pins: ModelPin[] = Object.values(modelPins).map((pin) => ({
+const readPin = (folder: string, pin: PinFile): ModelPin => ({
+  source: `packages/ai/src/runtime/${folder}/pin.json`,
   modelId: pin.repository,
   revision: pin.revision,
   files: Object.values(pin.files),
-}));
+});
+
+const pins: ModelPin[] = [
+  readPin('vocals', vocalsPin),
+  readPin('whisper', whisperPin),
+  readPin('chords', chordsPin),
+  readPin('rhythm', rhythmPin),
+  readPin('key', keyPin),
+];
 
 const fetchOk = async (url: string): Promise<Response> => {
   const response = await fetch(url, {
@@ -152,12 +171,12 @@ const checkFile = async (
   const faults: string[] = [];
   if (sha256 !== file.sha256) {
     faults.push(
-      `${where}: ${pinsFile} pins sha256 ${file.sha256}, but revision ${pin.revision} has ${sha256}.`,
+      `${where}: ${pin.source} pins sha256 ${file.sha256}, but revision ${pin.revision} has ${sha256}.`,
     );
   }
   if (found.size !== file.bytes) {
     faults.push(
-      `${where}: ${pinsFile} pins ${file.bytes} bytes, but revision ${pin.revision} has ${found.size}.`,
+      `${where}: ${pin.source} pins ${file.bytes} bytes, but revision ${pin.revision} has ${found.size}.`,
     );
   }
   return faults;
@@ -223,7 +242,7 @@ for (const verdict of failed) {
     );
   } else if (verdict.head !== verdict.revision) {
     console.log(
-      `${verdict.modelId}: ${pinsFile} pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`,
+      `${verdict.modelId}: ${verdict.source} pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`,
     );
   }
   for (const fault of verdict.faults) {

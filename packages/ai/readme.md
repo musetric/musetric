@@ -16,11 +16,10 @@ WebGPU except the key, and the voice range from the pitch tracker of
 
 ## Rules
 
-- `src/modelPins.json` holds the
-  [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models
-  and the values their graphs are run with, for every runtime: the host embeds
-  the file, and `yarn workspace @musetric/ai check:models` checks the pins
-  against Hugging Face.
+- The [pin](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins)
+  of each model, with the values its graph is run with, is the `pin.json` next
+  to its runtime in `src/runtime`, read by every runtime: the host embeds it,
+  and `yarn workspace @musetric/ai check:models` checks it against Hugging Face.
 - The package does not depend on `@musetric/api`; the types of its results
   are declared next to the code that builds them.
 - Sessions whose tensors meet, such as Whisper's `cross_kv` graph and its
