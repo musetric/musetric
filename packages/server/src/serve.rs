@@ -70,6 +70,7 @@ pub struct EmbeddedServer {
     executor_url: String,
     reviver: ListenerReviver,
     executor: Arc<ExecutorHost>,
+    queue: Arc<Queue>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -88,6 +89,10 @@ impl EmbeddedServer {
         let page = self.reviver.revive().await;
         let executor = self.executor.revive().await;
         page.and(executor)
+    }
+
+    pub async fn processing_runs(&self) -> bool {
+        self.queue.has_work().await
     }
 
     pub fn close(&self) {
@@ -187,6 +192,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         router,
         executor_url,
         executor,
+        queue,
     } = app;
     tokio::spawn(async move {
         let _ = axum::serve(listener, router)
@@ -200,6 +206,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         executor_url,
         reviver,
         executor,
+        queue,
         shutdown: Mutex::new(Some(shutdown)),
     })
 }
@@ -216,6 +223,7 @@ struct CreatedApp {
     router: Router,
     executor_url: String,
     executor: Arc<ExecutorHost>,
+    queue: Arc<Queue>,
 }
 
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
@@ -244,7 +252,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let router = create_router(RouterOptions {
         frontend: options.frontend,
         storage,
-        queue,
+        queue: Arc::clone(&queue),
         executor: host,
         models_path: options.models,
     });
@@ -252,6 +260,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         router,
         executor_url,
         executor,
+        queue,
     })
 }
 

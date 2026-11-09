@@ -37,6 +37,8 @@ mod settings;
 mod share;
 #[cfg(target_os = "ios")]
 mod text_interaction;
+#[cfg(target_os = "windows")]
+mod tray;
 #[cfg(desktop)]
 mod update;
 
@@ -287,6 +289,8 @@ fn focus_main_window(app: &tauri::AppHandle) -> bool {
 
 #[cfg(desktop)]
 fn open_main_window(app: &tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    tray::hide(app);
     if focus_main_window(app) {
         return;
     }
@@ -336,9 +340,21 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             label,
             event: tauri::WindowEvent::Destroyed,
             ..
-        } if label == MAIN_WINDOW => app.exit(0),
+        } if label == MAIN_WINDOW => close_main_window(app),
         _ => {}
     }
+}
+
+#[cfg(all(desktop, not(target_os = "macos")))]
+fn close_main_window(app: &tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    if tray::processing_runs(app) {
+        match tray::show(app) {
+            Ok(()) => return,
+            Err(error) => log::error!("could not keep processing in the tray: {error}"),
+        }
+    }
+    app.exit(0);
 }
 
 #[cfg(target_os = "ios")]

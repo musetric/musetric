@@ -179,6 +179,11 @@ impl Queue {
         self.wake.notify_one();
     }
 
+    pub async fn has_work(&self) -> bool {
+        let running = self.running.lock().is_ok_and(|running| running.is_some());
+        running || self.next_job().await.is_some()
+    }
+
     pub fn pause_changed(&self) {
         self.cancel.notify_one();
         self.wake.notify_one();

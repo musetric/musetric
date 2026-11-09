@@ -639,3 +639,26 @@ async fn holds_a_finished_step_until_its_status_is_written() {
         .expect("the summary should be built");
     assert!(processing.done);
 }
+
+#[tokio::test]
+async fn has_work_while_a_step_waits_and_the_queue_is_not_paused() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Complete);
+    let queue = workspace.create_queue(runner);
+    let writer = Writer::open(&workspace.database_path()).expect("the writer should open");
+
+    let pending = queue.has_work().await;
+    writer
+        .set_processing_paused(true)
+        .expect("the queue should pause");
+    let paused = queue.has_work().await;
+    writer
+        .set_processing_paused(false)
+        .expect("the queue should resume");
+    queue.drain().await;
+    let done = queue.has_work().await;
+
+    assert!(pending, "a pending step is work");
+    assert!(!paused, "a paused queue has no work to run");
+    assert!(!done, "a finished project is no work");
+}
