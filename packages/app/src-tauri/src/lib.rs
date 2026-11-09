@@ -37,6 +37,8 @@ mod settings;
 mod share;
 #[cfg(target_os = "ios")]
 mod text_interaction;
+#[cfg(target_os = "windows")]
+mod tray;
 #[cfg(desktop)]
 mod update;
 
@@ -288,6 +290,8 @@ fn focus_main_window(app: &tauri::AppHandle) -> bool {
 #[cfg(desktop)]
 fn open_main_window(app: &tauri::AppHandle) {
     if focus_main_window(app) {
+        #[cfg(target_os = "windows")]
+        tray::hide(app);
         return;
     }
     let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() else {
@@ -300,8 +304,12 @@ fn open_main_window(app: &tauri::AppHandle) {
             return;
         }
     };
-    if let Err(error) = create_main_window(app, url) {
-        log::error!("could not reopen the main window: {error}");
+    match create_main_window(app, url) {
+        Ok(()) => {
+            #[cfg(target_os = "windows")]
+            tray::hide(app);
+        }
+        Err(error) => log::error!("could not reopen the main window: {error}"),
     }
 }
 
@@ -336,9 +344,21 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
             label,
             event: tauri::WindowEvent::Destroyed,
             ..
-        } if label == MAIN_WINDOW => app.exit(0),
+        } if label == MAIN_WINDOW => close_main_window(app),
         _ => {}
     }
+}
+
+#[cfg(all(desktop, not(target_os = "macos")))]
+fn close_main_window(app: &tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    if tray::processing_runs(app) {
+        match tray::show(app) {
+            Ok(()) => return,
+            Err(error) => log::error!("could not keep processing in the tray: {error}"),
+        }
+    }
+    app.exit(0);
 }
 
 #[cfg(target_os = "ios")]
