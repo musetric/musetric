@@ -4,7 +4,7 @@ use musetric_db::{
     BoxedError, Recording, RecordingAudio, RecordingLayer, RecordingPiece, blob_path,
 };
 use musetric_media::WAVE_PEAK_COUNT;
-use tokio::fs::{read as read_file, rename, try_exists, write as write_file};
+use tokio::fs::{create_dir_all, read as read_file, rename, try_exists, write as write_file};
 
 use crate::{
     blobs::{StagedBlob, stage_blob},
@@ -372,7 +372,10 @@ fn encode_peaks(peaks: &[f32]) -> Vec<u8> {
     bytes
 }
 
-async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), BoxedError> {
+pub(crate) async fn write_peaks(
+    storage: &Arc<Storage>,
+    recording_id: i64,
+) -> Result<(), BoxedError> {
     let (recording, pieces) = read_state(storage, recording_id)
         .await?
         .ok_or(MISSING_RECORDING)?;
@@ -383,6 +386,9 @@ async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), Bo
     let samples = compose(storage, &layers, audio.frame_count).await?;
     let path = blob_path(&storage.blobs_path, &audio.wave_blob_id);
     let staged = path.with_extension("next");
+    if let Some(directory) = path.parent() {
+        create_dir_all(directory).await?;
+    }
     write_file(&staged, encode_peaks(&measure_peaks(&samples, &layers))).await?;
     rename(&staged, &path).await?;
     Ok(())
