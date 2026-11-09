@@ -7,9 +7,11 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 - A change to a step's unit plan (stride, overlap, windows per unit, channels
   in or out) bumps that step's `DSP_VERSION`.
-- `src/analysis/models.rs` holds the
-  [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models;
-  `yarn workspace @musetric/server check:models` checks them.
+- The host reads the
+  [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models
+  from `packages/ai/src/modelPins.json`, embedded at build time;
+  `src/analysis/models.rs` adds only what the host keeps for itself: the
+  folder and the label of each model in its cache.
 - A model file counts as cached only next to its manifest `<file>.verified`
   (`crates/gpu/src/cache.rs`); the host deletes a file without one and
   downloads it again.

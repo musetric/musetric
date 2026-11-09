@@ -1,0 +1,210 @@
+{
+  "separation": {
+    "repository": "musetric/mel-band-roformer-duality-kara2-student-onnx",
+    "revision": "48a53200678a45f88e21dc1af957f1e4b55ba5ae",
+    "sampleRate": 44100,
+    "files": {
+      "model": {
+        "name": "duality_kara2_student_core_t1100.onnx",
+        "sha256": "86a884e0225233a7d77f88e60d9a7e2febdb0d386d19ddc9476fcf51ed858228",
+        "bytes": 6230015
+      },
+      "modelData": {
+        "name": "duality_kara2_student_core_t1100.onnx.data",
+        "sha256": "176673d2446d8578976dd1a17ebca5fa0651dd23446967ff44fad5bf22c45d5c",
+        "bytes": 235400588
+      }
+    },
+    "graph": {
+      "inputName": "stft_repr",
+      "outputName": "masks",
+      "nFft": 2048,
+      "hop": 441,
+      "frames": 1100,
+      "channels": 2,
+      "masks": 2,
+      "minStorageBuffersPerShaderStage": 9
+    }
+  },
+  "transcription": {
+    "repository": "musetric/whisper-large-v3-turbo-onnx",
+    "revision": "2c3af36696f93c4989ecfe8da4b0f525bd86c9bb",
+    "sampleRate": 16000,
+    "files": {
+      "config": {
+        "name": "config.json",
+        "sha256": "3895aac9c18e541502ded9bf0f4c31cbe25a3387ef88ffdc85214e43acc0ca57",
+        "bytes": 1223
+      },
+      "generationConfig": {
+        "name": "generation_config.json",
+        "sha256": "db262b08585e6c86efb23ac22c1ea49d577f66d82649063b0761a1513c01f5a2",
+        "bytes": 3794
+      },
+      "preprocessorConfig": {
+        "name": "preprocessor_config.json",
+        "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+        "bytes": 340
+      },
+      "tokenizer": {
+        "name": "tokenizer.json",
+        "sha256": "b3c8202bbf06d8ee4232c5984baa563784ac4737e2e7fdc42fa180200d3cfcdb",
+        "bytes": 2480645
+      },
+      "tokenizerConfig": {
+        "name": "tokenizer_config.json",
+        "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+        "bytes": 282843
+      },
+      "specialTokensMap": {
+        "name": "special_tokens_map.json",
+        "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+        "bytes": 2186
+      },
+      "addedTokens": {
+        "name": "added_tokens.json",
+        "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+        "bytes": 34648
+      },
+      "vocab": {
+        "name": "vocab.json",
+        "sha256": "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387",
+        "bytes": 1036558
+      },
+      "merges": {
+        "name": "merges.txt",
+        "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+        "bytes": 493869
+      },
+      "normalizer": {
+        "name": "normalizer.json",
+        "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+        "bytes": 52666
+      },
+      "encoder": {
+        "name": "encoder_model_q4.onnx",
+        "sha256": "8814e622cee0736d725a5ad587e24909fe3cefefc91bf3f125c513387e907a52",
+        "bytes": 627006
+      },
+      "encoderData": {
+        "name": "encoder_model_q4.onnx_data",
+        "sha256": "565aec56b45d4247ad729724eee548e680b97aa3124f809bcf601b1596c2f8d6",
+        "bytes": 432189440
+      },
+      "decoder": {
+        "name": "decoder_model_merged_fp16.onnx",
+        "sha256": "933a4f8e4358414a281750448e20f2249b3981880b9bfeb5327ca18a71638ee9",
+        "bytes": 159565
+      },
+      "decoderData": {
+        "name": "decoder_model_merged_fp16.onnx_data",
+        "sha256": "7835ed241ab19116dae6faf12c173d6f3f0c6bfa230cbe6b60b13085eaaf5651",
+        "bytes": 317593600
+      },
+      "crossKv": {
+        "name": "cross_kv_fp16.onnx",
+        "sha256": "86d4ad47d781ae6fa8c08a55dbbaa8e5b8dc8adb5cf0b17f2d4aa59d24e21b7d",
+        "bytes": 4790
+      },
+      "crossKvData": {
+        "name": "cross_kv_fp16.onnx_data",
+        "sha256": "f7e1cc8c070895800ecca27e1fcca0dbed0bd94623abbcc89c84de2dbd812ddd",
+        "bytes": 26224640
+      }
+    },
+    "graph": {
+      "windowsPerBatch": 4
+    }
+  },
+  "chords": {
+    "repository": "musetric/chordmini-onnx",
+    "revision": "8ab85fc0f61439900cd07ac21257a43eac57075c",
+    "sampleRate": 22050,
+    "files": {
+      "config": {
+        "name": "config.json",
+        "sha256": "1f26c11ebea51ec08f12e813eb213a729fa0ecc407ac7632dfdc7bad67e65aa4",
+        "bytes": 3009
+      },
+      "model": {
+        "name": "chordnet.onnx",
+        "sha256": "1faee8e1cf168300afe0f47517e76836ac200c3841b0fb430fad7dfea5ad6394",
+        "bytes": 17080550
+      },
+      "plan": {
+        "name": "cqt-plan.bin",
+        "sha256": "c31f0a6fd2d582d753be6628b5daecdee58acba53cba93b2bc2b5c75dee2ba48",
+        "bytes": 23896
+      },
+      "planManifest": {
+        "name": "cqt-plan.manifest.json",
+        "sha256": "522b178e4f6e8ae5b6bf63b8e2f1a615fe2398592e27f7d9e3e219810081019f",
+        "bytes": 1721
+      }
+    },
+    "graph": {
+      "inputName": "features",
+      "outputName": "logits",
+      "frameDuration": 0.09287981859410431,
+      "sequenceLength": 108,
+      "inputBins": 144,
+      "chordCount": 170,
+      "windowsPerRun": 16
+    }
+  },
+  "rhythm": {
+    "repository": "musetric/beat-this-onnx",
+    "revision": "25308706dda545c0d5950065bb0604ad71bcf1f5",
+    "sampleRate": 22050,
+    "files": {
+      "config": {
+        "name": "config.json",
+        "sha256": "966f271e9a44c8f1b9e438622b34165ecdf6df9adedc8a9c0a6f7fd9d3458cc2",
+        "bytes": 1012
+      },
+      "model": {
+        "name": "beat_this.onnx",
+        "sha256": "1337dc6c21257ed6b803418efc320df42b5d8eb296ef16648ef60457cd4b9e55",
+        "bytes": 190649026
+      },
+      "filterbank": {
+        "name": "mel-filterbank.bin",
+        "sha256": "1ee975d96f44ccf2c3bfe37825c1c1f0b089f5703c7a12a84b1f0a3bce004533",
+        "bytes": 262656
+      }
+    },
+    "graph": {
+      "inputName": "spect",
+      "beatOutputName": "beat",
+      "downbeatOutputName": "downbeat",
+      "nFft": 1024,
+      "hopLength": 441,
+      "fps": 50,
+      "melBins": 128,
+      "logMultiplier": 1000,
+      "chunkSize": 1500,
+      "borderSize": 6
+    }
+  },
+  "key": {
+    "repository": "musetric/skey-onnx",
+    "revision": "9d90d2a9ff6679df1d64000f4fa750643f247643",
+    "sampleRate": 22050,
+    "files": {
+      "config": {
+        "name": "config.json",
+        "sha256": "20be1e139e1b05dea4bae2e2dde717d593c10c30bb38b300aeedc6693be88a52",
+        "bytes": 712
+      },
+      "model": {
+        "name": "skey.onnx",
+        "sha256": "5113c1378c1007c8559fcb767593366ba9794397b060535eb80a113db50530fc",
+        "bytes": 338482
+      }
+    },
+    "graph": {
+      "inputName": "audio",
+      "outputName": "probs"
+    }
+  }
+}

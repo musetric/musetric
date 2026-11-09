@@ -1,3 +1,5 @@
+import { type ParityPinName } from './parityModels.js';
+
 export type ParityStep =
   'vocals' | 'rhythm' | 'key' | 'chords' | 'transcribe' | 'lines';
 
@@ -38,8 +40,7 @@ export const paritySourceChannels = 2;
 export type ParityWasm = 'none' | 'desktop' | 'all';
 
 export type ParityStepModel = {
-  bundle: string;
-  graph: string;
+  pin: ParityPinName;
   wasm: ParityWasm;
   webgpu: boolean;
   simpleBufferCache: boolean;
@@ -48,16 +49,14 @@ export type ParityStepModel = {
 
 export const parityStepModels: Record<ParityStep, ParityStepModel> = {
   vocals: {
-    bundle: 'VOCALS',
-    graph: 'vocals',
+    pin: 'separation',
     wasm: 'none',
     webgpu: true,
     simpleBufferCache: true,
     outputs: { outputName: 'model.output' },
   },
   rhythm: {
-    bundle: 'BEAT_THIS',
-    graph: 'beat_this',
+    pin: 'rhythm',
     wasm: 'desktop',
     webgpu: true,
     simpleBufferCache: true,
@@ -67,32 +66,28 @@ export const parityStepModels: Record<ParityStep, ParityStepModel> = {
     },
   },
   key: {
-    bundle: 'SKEY',
-    graph: 'skey',
+    pin: 'key',
     wasm: 'all',
     webgpu: false,
     simpleBufferCache: false,
     outputs: { outputName: 'model.output' },
   },
   chords: {
-    bundle: 'CHORD_NET',
-    graph: 'chord_net',
+    pin: 'chords',
     wasm: 'desktop',
     webgpu: true,
     simpleBufferCache: false,
     outputs: { outputName: 'model.output' },
   },
   transcribe: {
-    bundle: 'WHISPER',
-    graph: 'whisper',
+    pin: 'transcription',
     wasm: 'desktop',
     webgpu: true,
     simpleBufferCache: false,
     outputs: {},
   },
   lines: {
-    bundle: 'WHISPER',
-    graph: 'whisper',
+    pin: 'transcription',
     wasm: 'none',
     webgpu: false,
     simpleBufferCache: false,

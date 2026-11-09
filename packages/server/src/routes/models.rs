@@ -8,7 +8,7 @@ pub(crate) fn create_router() -> Router<RouteState> {
 }
 
 async fn handle(State(state): State<RouteState>) -> Json<Value> {
-    let size = download_size(&state.models_path).await;
+    let size = download_size(&state.models_path, &state.pins).await;
     Json(json!({
         "totalBytes": size.total_bytes,
         "missingBytes": size.missing_bytes,

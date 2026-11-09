@@ -15,7 +15,7 @@ The upstream repository README asks third-party application developers who use U
 
 - Source: https://github.com/lucidrains/BS-RoFormer
 - Usage: Mel-Band RoFormer source-separation architecture and model contract used by the vocal separation ONNX pipeline.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
@@ -45,7 +45,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student-onnx
 - Usage: WebGPU-ready ONNX separation model and external data file that give the vocals and the backing vocals of a song in one pass, exported from `musetric/mel-band-roformer-duality-kara2-student` (https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student, Apache-2.0), a model distilled from `Aname-Tommy/Mel-Band-Roformer_Duality` (https://huggingface.co/Aname-Tommy/Mel-Band-Roformer_Duality, Apache-2.0), a fine-tune of `SYH99999/MelBandRoformerMergedSYHFTBeta1` (MIT), which builds on `KimberleyJSN/melbandroformer` (MIT). Its lead/backing split is distilled from UVR MDX-Net KARA 2 of Ultimate Vocal Remover (MIT), with credit to UVR and its developers.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserEntry.ts`, `packages/ai/src/service/browserSeparation.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/service/browserEntry.ts`, `packages/ai/src/service/browserSeparation.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`.
 - License: Apache-2.0.
 - License source: Hugging Face model card metadata.
 
@@ -64,7 +64,7 @@ specific language governing permissions and limitations under the License.
 
 - Source: https://github.com/ptnghia-j/ChordMini
 - Usage: ChordNet "2E1D" chord recognizer. The `2e1d_model_best.pth` checkpoint is the basis of the ONNX classifier this project runs, and the 170-label chord vocabulary reproduces the index ordering of upstream `idx2voca_chord()`, which is the exported graph's output contract. The recursive constant-Q transform that produces its features, the temporal smoothing/argmax passes and the segment grouping are independent implementations.
-- Local files: `packages/ai/src/chords/chordVocab.ts`, `packages/server/src/analysis/models.rs`, `packages/ai/src/runtime/chords/chordNetGpuRuntime.ts`, `packages/ai/src/service/browserChords.ts`.
+- Local files: `packages/ai/src/chords/chordVocab.ts`, `packages/ai/src/modelPins.json`, `packages/ai/src/runtime/chords/chordNetGpuRuntime.ts`, `packages/ai/src/service/browserChords.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 - Vendoring details: the inference subset is vendored in `musetric/lab`; see its `thirdPartyNotices.md` and `musetric_toolkit/chords_audio/chordmini/NOTICE.md`.
@@ -95,7 +95,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/musetric/chordmini-onnx
 - Usage: ChordNet classifier ONNX and its matched CQT plan, downloaded at runtime.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserChords.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/service/browserChords.ts`.
 - License: MIT, inherited from the upstream ChordMini weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 
@@ -103,7 +103,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/openai/whisper-large-v3-turbo
 - Usage: base speech-to-text weights behind lyric transcription. The `musetric/whisper-large-v3-turbo-onnx` export is an inference-only re-export of these weights with no fine-tuning.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/runtime/whisper/whisperRuntime.ts`, `packages/ai/src/service/browserTranscribe.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/runtime/whisper/whisperRuntime.ts`, `packages/ai/src/service/browserTranscribe.ts`.
 - License: MIT.
 - License source: the Hugging Face model card metadata of the repository the weights are downloaded from, and the `LICENSE` of https://github.com/openai/whisper.
 
@@ -141,7 +141,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/musetric/whisper-large-v3-turbo-onnx
 - Usage: word-timestamped ONNX export of Whisper large-v3-turbo, a q4 encoder and a float16 decoder, in the transformers.js layout, downloaded at runtime.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserTranscribe.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/service/browserTranscribe.ts`.
 - License: MIT, inherited from the base weights; conversion to ONNX does not change the weight license.
 - License source: the license of the base weights above.
 
@@ -149,7 +149,7 @@ SOFTWARE.
 
 - Source: https://github.com/deezer/skey
 - Usage: S-KEY key detector (harmonic VQT + ChromaNet). The `skey.pt` checkpoint is the basis of the ONNX graph this project runs, and the 24-entry key map reproduces the index ordering of the upstream `key_map`, which is the exported graph's output contract. The audio decoding, peak normalization and argmax around the graph are independent implementations.
-- Local files: `packages/ai/src/key/keyMap.ts`, `packages/ai/src/key/types.ts`, `packages/server/src/analysis/models.rs`, `packages/ai/src/runtime/key/skeyRuntime.ts`, `packages/ai/src/service/browserKey.ts`.
+- Local files: `packages/ai/src/key/keyMap.ts`, `packages/ai/src/key/types.ts`, `packages/ai/src/modelPins.json`, `packages/ai/src/runtime/key/skeyRuntime.ts`, `packages/ai/src/service/browserKey.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 - Vendoring details: the inference subset is vendored in `musetric/lab`; see its `thirdPartyNotices.md`.
@@ -180,7 +180,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/musetric/skey-onnx
 - Usage: self-contained key-detection ONNX (`audio` → 24 key probabilities) and its `config.json` descriptor, downloaded at runtime.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserKey.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/service/browserKey.ts`.
 - License: MIT, inherited from the upstream S-KEY weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 
@@ -188,7 +188,7 @@ SOFTWARE.
 
 - Source: https://github.com/CPJKU/beat_this
 - Usage: Beat This! beat and downbeat tracker. The `final0` checkpoint is the basis of the ONNX graph this project runs, its mel filterbank is the basis of the WebGPU log-mel front end, the chunking and aggregation around them reproduce the upstream `split_piece` and `aggregate_prediction`, which are the exported graph's input and output contract, and the beat tracking reproduces the upstream `dbn` `Postprocessor` (see madmom below). The audio decoding and the tempo/meter estimation are independent implementations.
-- Local files: `packages/ai/src/rhythm/downbeatTracker.ts`, `packages/ai/src/rhythm/rhythmSummary.ts`, `packages/ai/src/rhythm/types.ts`, `packages/server/src/analysis/models.rs`, `packages/ai/src/runtime/rhythm/`, `packages/ai/src/service/browserRhythm.ts`.
+- Local files: `packages/ai/src/rhythm/downbeatTracker.ts`, `packages/ai/src/rhythm/rhythmSummary.ts`, `packages/ai/src/rhythm/types.ts`, `packages/ai/src/modelPins.json`, `packages/ai/src/runtime/rhythm/`, `packages/ai/src/service/browserRhythm.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
@@ -218,7 +218,7 @@ SOFTWARE.
 
 - Source: https://huggingface.co/musetric/beat-this-onnx
 - Usage: rhythm ONNX graph (`beat_this.onnx`: spectrogram windows → beat/downbeat logits), the `mel-filterbank.bin` its WebGPU log-mel front end projects onto, and their `config.json` descriptor, downloaded at runtime.
-- Local files: `packages/server/src/analysis/models.rs`, `packages/ai/src/service/browserRhythm.ts`.
+- Local files: `packages/ai/src/modelPins.json`, `packages/ai/src/service/browserRhythm.ts`.
 - License: MIT, inherited from the upstream Beat This! weights; conversion to ONNX does not change the weight license.
 - License source: Hugging Face model card metadata.
 

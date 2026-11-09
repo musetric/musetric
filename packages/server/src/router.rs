@@ -5,8 +5,8 @@ use musetric_gpu::ExecutorHost;
 use musetric_jobs::Queue;
 
 use crate::{
-    frontend, frontend::Frontend, mixdown::Mixdowns, realtime::Rooms, routes, routes::RouteState,
-    storage::Storage,
+    analysis::models::ModelPins, frontend, frontend::Frontend, mixdown::Mixdowns, realtime::Rooms,
+    routes, routes::RouteState, storage::Storage,
 };
 
 pub(crate) struct RouterOptions {
@@ -15,6 +15,7 @@ pub(crate) struct RouterOptions {
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) models_path: PathBuf,
+    pub(crate) pins: Arc<ModelPins>,
 }
 
 pub(crate) fn create_router(options: RouterOptions) -> Router {
@@ -25,6 +26,7 @@ pub(crate) fn create_router(options: RouterOptions) -> Router {
         queue: options.queue,
         executor: options.executor,
         models_path: options.models_path,
+        pins: options.pins,
     };
     routes::create_router(state).merge(frontend::create_router(options.frontend))
 }

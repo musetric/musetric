@@ -1,84 +1,27 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import modelPins from '../src/modelPins.json' with { type: 'json' };
 
-const modelsFile = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../src/analysis/models.rs',
-);
+const pinsFile = 'packages/ai/src/modelPins.json';
 const hub = 'https://huggingface.co';
 const requestTimeout = 15_000;
-
-const constantPattern =
-  /const ([A-Z][A-Z0-9_]*): &(?:'static )?str =\s*"([^"]+)";/g;
-const pinPattern = /model_id: "([^"]+)",\s+revision: "([0-9a-f]{40})"/;
-const entryPattern =
-  /\(\s*("[^"]+"|[A-Z][A-Z0-9_]*),\s*"([0-9a-f]{64})",\s*([\d_]+),?\s*\)/g;
-const filesStart = 'files: &[';
-
-const readFilesArray = (bundle: string): string => {
-  const start = bundle.indexOf(filesStart);
-  if (start < 0) {
-    return '';
-  }
-  const end = bundle.indexOf('],', start);
-  return end < 0 ? '' : bundle.slice(start + filesStart.length, end);
-};
 
 type PinnedFile = {
   name: string;
   sha256: string;
-  size: number;
+  bytes: number;
 };
 
 type ModelPin = {
   modelId: string;
   revision: string;
   files: PinnedFile[];
-  unread: number;
 };
 
-const readPins = (source: string): ModelPin[] => {
-  const names = new Map(
-    [...source.matchAll(constantPattern)].map((match) => [match[1], match[2]]),
-  );
-  return source
-    .split('ModelBundle {')
-    .slice(1)
-    .flatMap((bundle) => {
-      const pin = pinPattern.exec(bundle);
-      if (!pin) {
-        return [];
-      }
-      const array = readFilesArray(bundle);
-      const files = [...array.matchAll(entryPattern)].map((match) => {
-        const [, token, sha256, size] = match;
-        const name = token.startsWith('"')
-          ? token.slice(1, -1)
-          : names.get(token);
-        if (name === undefined) {
-          throw new Error(`models.rs names no file for ${token}`);
-        }
-        return {
-          name,
-          sha256,
-          size: Number(size.replaceAll('_', '')),
-        };
-      });
-      const entries = array.match(/\(/g)?.length ?? 0;
-      return [
-        {
-          modelId: pin[1],
-          revision: pin[2],
-          files,
-          unread: entries - files.length,
-        },
-      ];
-    });
-};
-
-const pins = readPins(readFileSync(modelsFile, 'utf8'));
+const pins: ModelPin[] = Object.values(modelPins).map((pin) => ({
+  modelId: pin.repository,
+  revision: pin.revision,
+  files: Object.values(pin.files),
+}));
 
 const fetchOk = async (url: string): Promise<Response> => {
   const response = await fetch(url, {
@@ -209,12 +152,12 @@ const checkFile = async (
   const faults: string[] = [];
   if (sha256 !== file.sha256) {
     faults.push(
-      `${where}: models.rs pins sha256 ${file.sha256}, but revision ${pin.revision} has ${sha256}.`,
+      `${where}: ${pinsFile} pins sha256 ${file.sha256}, but revision ${pin.revision} has ${sha256}.`,
     );
   }
-  if (found.size !== file.size) {
+  if (found.size !== file.bytes) {
     faults.push(
-      `${where}: models.rs pins ${file.size} bytes, but revision ${pin.revision} has ${found.size}.`,
+      `${where}: ${pinsFile} pins ${file.bytes} bytes, but revision ${pin.revision} has ${found.size}.`,
     );
   }
   return faults;
@@ -224,11 +167,6 @@ const checkFiles = async (
   pin: ModelPin,
   model: ListedModel,
 ): Promise<string[]> => {
-  if (pin.files.length === 0 || pin.unread !== 0) {
-    return [
-      `${pin.modelId}: the check reads ${pin.files.length} pinned files in models.rs and cannot read ${pin.unread} more.`,
-    ];
-  }
   try {
     const tree = await readTree(model);
     const faults = await Promise.all(
@@ -285,14 +223,11 @@ for (const verdict of failed) {
     );
   } else if (verdict.head !== verdict.revision) {
     console.log(
-      `${verdict.modelId}: models.rs pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`,
+      `${verdict.modelId}: ${pinsFile} pins ${verdict.revision}, but main on Hugging Face is ${verdict.head}. A pin is always the head of main: pin ${verdict.head}, with the sha256 and size of every file it lists.`,
     );
   }
   for (const fault of verdict.faults) {
     console.log(fault);
   }
 }
-if (pins.length === 0) {
-  console.log(`No model pins found in ${modelsFile}.`);
-}
-process.exitCode = failed.length === 0 && pins.length > 0 ? 0 : 1;
+process.exitCode = failed.length === 0 ? 0 : 1;
