@@ -287,6 +287,15 @@ fn progress(model: &ModelFile, downloaded: u64, total: Option<u64>) -> Download<
     }
 }
 
+#[must_use]
+pub fn kept_files(model: &ModelFile) -> [PathBuf; 3] {
+    [
+        model.path.clone(),
+        with_suffix(&model.path, MANIFEST_SUFFIX),
+        with_suffix(&model.path, PARTIAL_SUFFIX),
+    ]
+}
+
 pub async fn has_verified_copy(model: &ModelFile) -> bool {
     read_cached_size(model).await.is_some()
 }
