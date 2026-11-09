@@ -7,8 +7,8 @@ import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { ScaleSlider } from './ScaleSlider.js';
+import { tempoStepsPerRatio } from './tempoSteps.js';
 
-const stepsPerRatio = 20;
 const labelledTempoRatios = [minTempoRatio, 0.5, 1.5, maxTempoRatio];
 
 export const TempoPickerContent: FC = () => {
@@ -25,12 +25,12 @@ export const TempoPickerContent: FC = () => {
   return (
     <ScaleSlider
       title={t('pages.project.player.controls.tempoTitle')}
-      value={Math.round(tempoRatio * stepsPerRatio)}
-      min={Math.round(minTempoRatio * stepsPerRatio)}
-      max={Math.round(maxTempoRatio * stepsPerRatio)}
-      original={stepsPerRatio}
-      largeTickEvery={stepsPerRatio / 2}
-      mediumTickEvery={stepsPerRatio / 4}
+      value={Math.round(tempoRatio * tempoStepsPerRatio)}
+      min={Math.round(minTempoRatio * tempoStepsPerRatio)}
+      max={Math.round(maxTempoRatio * tempoStepsPerRatio)}
+      original={tempoStepsPerRatio}
+      largeTickEvery={tempoStepsPerRatio / 2}
+      mediumTickEvery={tempoStepsPerRatio / 4}
       valueText={tempoRatio.toFixed(2)}
       unit={t('pages.project.player.controls.tempoRatioUnit')}
       info={
@@ -48,7 +48,7 @@ export const TempoPickerContent: FC = () => {
             })
       }
       labels={labelledTempoRatios.map((ratio) => ({
-        value: Math.round(ratio * stepsPerRatio),
+        value: Math.round(ratio * tempoStepsPerRatio),
         label: t('pages.project.player.controls.tempoRatioValue', {
           value: ratio,
         }),
@@ -65,7 +65,7 @@ export const TempoPickerContent: FC = () => {
       }
       onChange={(steps) => {
         engine.store.update((state) => {
-          state.tempoRatio = steps / stepsPerRatio;
+          state.tempoRatio = steps / tempoStepsPerRatio;
         });
       }}
     />

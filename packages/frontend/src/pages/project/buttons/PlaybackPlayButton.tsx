@@ -4,19 +4,11 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { canPlay } from './playback.js';
 
 export const PlaybackPlayButton: FC = () => {
   const { t } = useTranslation();
-  const frameCount = useEngineStore((state) => state.frameCount);
-  const isSlave = useEngineStore((state) => state.isSlave);
-  const playerCommandPending = useEngineStore(
-    (state) => state.playerCommandPending,
-  );
-  const realtimeFailed = useEngineStore(
-    (state) => state.statuses.realtime === 'error',
-  );
-  const disabled =
-    !frameCount || realtimeFailed || playerCommandPending || isSlave;
+  const disabled = !useEngineStore(canPlay);
 
   return (
     <IconButton

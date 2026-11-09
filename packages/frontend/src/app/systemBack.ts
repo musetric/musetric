@@ -1,6 +1,6 @@
 const backEventName = 'musetric:back';
 
-const findTopOverlay = (): Element | undefined =>
+export const findTopOverlay = (): Element | undefined =>
   [...document.querySelectorAll('.MuiModal-root:not(.MuiModal-hidden)')].at(-1);
 
 export const subscribeSystemBack = (

@@ -6,20 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { requestTake } from '../calibration/takeActions.js';
+import { canPressRecord, pressRecord } from '../calibration/takeActions.js';
 import { getBeatsToFrom } from '../loop/loopCountdown.js';
 
 export const PlaybackRecordButton: FC = () => {
   const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
-  const frameCount = useEngineStore((state) => state.frameCount);
-  const isSlave = useEngineStore((state) => state.isSlave);
-  const playerCommandPending = useEngineStore(
-    (state) => state.playerCommandPending,
-  );
-  const realtimeFailed = useEngineStore(
-    (state) => state.statuses.realtime === 'error',
-  );
   const recording = useEngineStore((state) => state.recording);
   const stage = useEngineStore((state) => state.loopStage);
   const looping = stage !== undefined;
@@ -33,12 +25,7 @@ export const PlaybackRecordButton: FC = () => {
   const recordingName = useEngineStore(
     (state) => getActiveRecording(state)?.name,
   );
-  const disabled =
-    !frameCount ||
-    recordingName === undefined ||
-    realtimeFailed ||
-    isSlave ||
-    playerCommandPending;
+  const disabled = !useEngineStore(canPressRecord);
 
   const getTitle = () => {
     if (looping) {
@@ -85,19 +72,7 @@ export const PlaybackRecordButton: FC = () => {
           color={writing ? 'inherit' : 'error'}
           disabled={disabled}
           onClick={() => {
-            if (looping) {
-              if (phase) {
-                void engine.player.cancelTry();
-                return;
-              }
-              requestTake('recordTry', projectId);
-              return;
-            }
-            if (recording) {
-              void engine.player.stopRecording();
-              return;
-            }
-            requestTake('record', projectId);
+            pressRecord(projectId);
           }}
           sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}
         >

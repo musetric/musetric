@@ -13,15 +13,13 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
-import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import {
   closeLoop,
+  enterLoop,
   isLoopAvailable,
   lockLoop,
-  openLoop,
 } from './loopActions.js';
-import { getLoopAtTime } from './loopRange.js';
 
 const plateSx = {
   display: 'flex',
@@ -40,17 +38,6 @@ export const LoopPictureControls: FC = () => {
     return undefined;
   }
 
-  const enter = () => {
-    const state = engine.store.get();
-    const { sampleRate } = engine.context;
-    openLoop(
-      getLoopAtTime(subtitleQuery.data ?? [], state.frameIndex / sampleRate, {
-        ...state,
-        sampleRate,
-      }),
-    );
-  };
-
   return (
     <Stack direction='row' sx={{ gap: 1 }}>
       {stage === undefined ? (
@@ -60,7 +47,9 @@ export const LoopPictureControls: FC = () => {
               size='small'
               color='inherit'
               aria-label={t('pages.project.loop.enter')}
-              onClick={enter}
+              onClick={() => {
+                enterLoop(subtitleQuery.data ?? []);
+              }}
               sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
             >
               <Stack sx={{ alignItems: 'center', gap: 0.5 }}>

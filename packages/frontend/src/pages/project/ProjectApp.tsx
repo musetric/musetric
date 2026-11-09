@@ -22,6 +22,7 @@ import { subscribeTakeInterruptions } from './recording/subscribeTakeInterruptio
 import { RhythmMetronomeSync } from './rhythm/RhythmMetronomeSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
+import { ProjectShortcuts } from './shortcuts/ProjectShortcuts.js';
 import { VoiceRangeSync } from './spectrogram/VoiceRangeSync.js';
 
 export type ProjectAppProps = {
@@ -59,6 +60,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       </Stack>
       <RhythmMetronomeSync projectId={project.id} />
       <MediaSessionSync title={project.name} coverUrl={project.previewUrl} />
+      <ProjectShortcuts projectId={project.id} />
       <VoiceRangeSync
         projectId={project.id}
         leadSpectrogramGainDb={
