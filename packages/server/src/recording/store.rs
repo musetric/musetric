@@ -408,6 +408,9 @@ pub(crate) async fn ensure_recording(
         .await?
         .ok_or(MISSING_RECORDING)?;
     if let Some(audio) = existing.audio {
+        if !try_exists(blob_path(&storage.blobs_path, &audio.wave_blob_id)).await? {
+            write_peaks(storage, recording_id).await?;
+        }
         return Ok(audio);
     }
     let wave = stage_blob(area, &storage.blobs_path);

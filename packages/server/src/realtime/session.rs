@@ -8,7 +8,7 @@ use std::{
 use musetric_db::{BoxedError, RecordingLayer, RecordingPiece, blob_path};
 use musetric_media::WAVE_PEAK_COUNT;
 use tokio::{
-    fs::{File, OpenOptions, try_exists},
+    fs::{File, OpenOptions},
     io::{AsyncSeekExt, AsyncWriteExt},
 };
 
@@ -16,7 +16,7 @@ use crate::{
     blobs::{StagedBlob, close_area, open_area, recording_area, stage_blob},
     recording::{
         FinishedTake, History, TakeFormat, TakeRun, commit_take, ensure_recording, frames_per_peak,
-        peak_index, sample_value, write_peaks,
+        peak_index, sample_value,
     },
     storage::{Storage, read_database},
     wav::{BYTES_PER_SAMPLE, HEADER_BYTE_LENGTH, create_header},
@@ -87,11 +87,8 @@ impl Session {
         let area = recording_area(&storage.work_path, project_id);
         open_area(&area).await?;
         let recording = ensure_recording(storage, &area, recording_id, format).await?;
-        let wave_path = blob_path(&storage.blobs_path, &recording.wave_blob_id);
-        if !try_exists(&wave_path).await? {
-            write_peaks(storage, recording_id).await?;
-        }
-        let wave = open_for_update(&wave_path).await?;
+        let wave =
+            open_for_update(&blob_path(&storage.blobs_path, &recording.wave_blob_id)).await?;
         Ok(Self {
             recording_id,
             song_frame_count: recording.frame_count,
