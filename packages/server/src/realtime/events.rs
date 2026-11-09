@@ -42,6 +42,7 @@ pub(crate) fn recording_item(recording: &RecordingSummary) -> Value {
         "canUndo": recording.history.can_undo,
         "canRedo": recording.history.can_redo,
         "empty": recording.empty,
+        "lost": recording.lost,
     })
 }
 

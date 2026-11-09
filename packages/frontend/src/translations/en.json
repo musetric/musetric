@@ -244,6 +244,7 @@
   "pages.project.recording.emptyHint": "Empty — press Record to sing into it",
   "pages.project.recording.failed": "Could not change the recordings",
   "pages.project.recording.locked": "Stop recording to switch",
+  "pages.project.recording.lost": "Part of it is lost",
   "pages.project.recording.name": "Recording name",
   "pages.project.recording.nameEmpty": "The name can’t be empty",
   "pages.project.recording.nameFailed": "Could not rename the recording",

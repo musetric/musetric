@@ -12,6 +12,7 @@ export const itemSchema = z.object({
   canUndo: z.boolean(),
   canRedo: z.boolean(),
   empty: z.boolean(),
+  lost: z.boolean(),
 });
 export type Item = z.infer<typeof itemSchema>;
 
