@@ -63,6 +63,11 @@ export type FollowScrollControllerOptions = {
   releaseHoldMs?: number;
 };
 
+type PendingSeek = {
+  revision: number;
+  ignored: boolean;
+};
+
 export type FollowScrollController = {
   reset: () => void;
   activate: (index: number, pointerClientY: number) => void;
@@ -95,6 +100,7 @@ export const createFollowScrollController = (
   let activeIndex = getActiveIndex();
   let revision = getRevision();
   let disposed = false;
+  let pendingSeek: PendingSeek | undefined = undefined;
 
   const clearReleaseTimeout = () => {
     if (releaseTimeout === undefined) return;
@@ -190,15 +196,17 @@ export const createFollowScrollController = (
   };
 
   const handleRevision = () => {
-    if (disposed) return;
-    revision = getRevision();
+    const seek = pendingSeek;
+    pendingSeek = undefined;
+    if (disposed || !seek) return;
+    revision = seek.revision;
 
     if (skippedRevision === revision) {
       skippedRevision = undefined;
       return;
     }
 
-    if (isRevisionIgnored() || scrollHeld) return;
+    if (seek.ignored) return;
 
     const activeElement = locateElement(getActiveIndex());
     if (
@@ -211,7 +219,14 @@ export const createFollowScrollController = (
   };
 
   const unsubscribeRevision = subscribeRevision(() => {
-    queueMicrotask(handleRevision);
+    const queued = pendingSeek !== undefined;
+    pendingSeek = {
+      revision: getRevision(),
+      ignored: isRevisionIgnored() || scrollHeld,
+    };
+    if (!queued) {
+      queueMicrotask(handleRevision);
+    }
   });
 
   const unsubscribeActiveIndex = subscribeActiveIndex(() => {

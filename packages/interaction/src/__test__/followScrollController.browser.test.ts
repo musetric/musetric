@@ -100,7 +100,7 @@ describe('follow scroll controller', () => {
       isRevisionIgnored: () => false,
     });
     opened.push({ element, controller });
-    return element;
+    return { element, controller };
   };
 
   afterEach(() => {
@@ -115,7 +115,7 @@ describe('follow scroll controller', () => {
     'centers the line a seek moves to further on, with %s',
     async (order) => {
       const store = createStore(order, 0);
-      const element = open(store, 0);
+      const { element } = open(store, 0);
       const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
 
       store.seek(30);
@@ -130,7 +130,7 @@ describe('follow scroll controller', () => {
     'centers the line a seek moves back to, with %s',
     async (order) => {
       const store = createStore(order, 30);
-      const element = open(store, 30);
+      const { element } = open(store, 30);
       const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
 
       store.seek(2);
@@ -140,4 +140,34 @@ describe('follow scroll controller', () => {
       expect(scrollIntoView.mock.contexts).toEqual([locateLine(element, 2)]);
     },
   );
+
+  it.each(seekOrders)(
+    'lets a click decide the scroll of its own seek, with %s',
+    async (order) => {
+      const store = createStore(order, 0);
+      const { element, controller } = open(store, 0);
+      const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+      const { top } = element.getBoundingClientRect();
+
+      store.seek(3);
+      controller.activate(3, top + lineHeight);
+      await nextFrame();
+      await nextFrame();
+
+      expect(scrollIntoView.mock.contexts).toEqual([]);
+    },
+  );
+
+  it('drops a seek still pending when it is disposed', async () => {
+    const store = createStore('the seek first', 0);
+    const { controller } = open(store, 0);
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+
+    store.seek(30);
+    controller.dispose();
+    await nextFrame();
+    await nextFrame();
+
+    expect(scrollIntoView.mock.contexts).toEqual([]);
+  });
 });
