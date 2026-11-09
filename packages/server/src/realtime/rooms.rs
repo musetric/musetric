@@ -8,7 +8,10 @@ use std::{
 
 use axum::extract::ws::Message;
 use serde_json::Value;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+    watch,
+};
 
 use crate::realtime::events;
 
@@ -113,6 +116,16 @@ impl Room {
 pub(crate) struct Rooms {
     projects: Mutex<HashMap<i64, Room>>,
     next_member: AtomicU64,
+    closing: watch::Sender<bool>,
+    live: watch::Sender<usize>,
+}
+
+pub(crate) struct Live<'rooms>(&'rooms watch::Sender<usize>);
+
+impl Drop for Live<'_> {
+    fn drop(&mut self) {
+        self.0.send_modify(|count| *count -= 1);
+    }
 }
 
 impl Rooms {
@@ -120,7 +133,24 @@ impl Rooms {
         Self {
             projects: Mutex::new(HashMap::new()),
             next_member: AtomicU64::new(0),
+            closing: watch::Sender::new(false),
+            live: watch::Sender::new(0),
         }
+    }
+
+    pub(crate) fn enter(&self) -> Live<'_> {
+        self.live.send_modify(|count| *count += 1);
+        Live(&self.live)
+    }
+
+    pub(crate) fn closing(&self) -> watch::Receiver<bool> {
+        self.closing.subscribe()
+    }
+
+    pub(crate) async fn close(&self) {
+        self.closing.send_replace(true);
+        let mut live = self.live.subscribe();
+        let _ = live.wait_for(|count| *count == 0).await;
     }
 
     pub(crate) fn join(&self, project_id: i64) -> (MemberId, UnboundedReceiver<Message>) {

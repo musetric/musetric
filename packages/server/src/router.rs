@@ -11,6 +11,7 @@ use crate::{
 
 pub(crate) struct RouterOptions {
     pub(crate) frontend: Frontend,
+    pub(crate) rooms: Arc<Rooms>,
     pub(crate) storage: Arc<Storage>,
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
@@ -19,7 +20,7 @@ pub(crate) struct RouterOptions {
 
 pub(crate) fn create_router(options: RouterOptions) -> Router {
     let state = RouteState {
-        rooms: Arc::new(Rooms::create()),
+        rooms: options.rooms,
         mixdowns: Arc::new(Mixdowns::create(&options.storage.work_path)),
         storage: options.storage,
         queue: options.queue,

@@ -65,6 +65,7 @@ async fn serve(
             .await;
         return;
     };
+    let _live = state.rooms.enter();
     let (member, outgoing) = state.rooms.join(project_id);
     let mut channel = Channel::create(socket, outgoing);
     let mut connection = Connection::new(project_id, member, Arc::clone(&state.storage));
@@ -96,7 +97,15 @@ async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id:
 }
 
 async fn run_connection(channel: &mut Channel, rooms: &Rooms, connection: &mut Connection) {
-    while let Some(incoming) = channel.receive().await {
+    let mut closing = rooms.closing();
+    loop {
+        let received = tokio::select! {
+            received = channel.receive() => received,
+            _ = closing.wait_for(|closed| *closed) => None,
+        };
+        let Some(incoming) = received else {
+            break;
+        };
         if !receive_message(channel, rooms, connection, incoming).await {
             break;
         }

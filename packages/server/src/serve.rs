@@ -16,7 +16,7 @@ use musetric_gpu::{Bundle, ExecutorHost, ListenerReviver, RevivingListener, crea
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use rcgen::generate_simple_self_signed;
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::oneshot, time::timeout};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner, models::remove_unpinned},
@@ -25,11 +25,13 @@ use crate::{
     frontend::Frontend,
     garbage::spawn_collector,
     publish::Publication,
+    realtime::Rooms,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+const SESSION_CLOSE_LIMIT: Duration = Duration::from_secs(10);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
 const NO_BROWSER: &str =
@@ -71,6 +73,7 @@ pub struct EmbeddedServer {
     reviver: ListenerReviver,
     executor: Arc<ExecutorHost>,
     queue: Arc<Queue>,
+    rooms: Arc<Rooms>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -95,7 +98,8 @@ impl EmbeddedServer {
         self.queue.has_work().await
     }
 
-    pub fn close(&self) {
+    pub async fn close(&self) {
+        let _ = timeout(SESSION_CLOSE_LIMIT, self.rooms.close()).await;
         let sender = self.shutdown.lock().ok().and_then(|mut guard| guard.take());
         if let Some(shutdown) = sender {
             let _ = shutdown.send(());
@@ -193,6 +197,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         executor_url,
         executor,
         queue,
+        rooms,
     } = app;
     tokio::spawn(async move {
         let _ = axum::serve(listener, router)
@@ -207,6 +212,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         reviver,
         executor,
         queue,
+        rooms,
         shutdown: Mutex::new(Some(shutdown)),
     })
 }
@@ -224,6 +230,7 @@ struct CreatedApp {
     executor_url: String,
     executor: Arc<ExecutorHost>,
     queue: Arc<Queue>,
+    rooms: Arc<Rooms>,
 }
 
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
@@ -249,8 +256,10 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     }
     let executor_url = host.base_url().to_owned();
     let executor = Arc::clone(&host);
+    let rooms = Arc::new(Rooms::create());
     let router = create_router(RouterOptions {
         frontend: options.frontend,
+        rooms: Arc::clone(&rooms),
         storage,
         queue: Arc::clone(&queue),
         executor: host,
@@ -261,6 +270,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         executor_url,
         executor,
         queue,
+        rooms,
     })
 }
 
@@ -402,7 +412,13 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    use futures_util::{SinkExt, StreamExt};
     use musetric_db::{OpenOptions, init_database, lock_storage, open_database};
+    use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
+
+    type ClientSocket = tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >;
 
     use super::{EmbeddedServerOptions, ServerOptions, serve, start_embedded};
     use crate::{Asset, Assets, Bundle, Frontend};
@@ -482,7 +498,7 @@ mod tests {
         assert!(workspace.root.join("storage/db/app.db").is_file());
         assert_eq!(shell, "<!doctype html><title>Musetric</title>");
         assert_eq!(projects, "[]");
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -501,7 +517,7 @@ mod tests {
         .expect("the embedded server should start");
 
         assert_eq!(server.url(), format!("http://{listen}"));
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -523,7 +539,7 @@ mod tests {
 
         assert_ne!(server.url(), format!("http://{listen}"));
         assert_eq!(projects, "[]");
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -578,5 +594,81 @@ mod tests {
 
         assert!(refused.is_err());
         assert_eq!(status, "processing");
+    }
+    async fn next_event(socket: &mut ClientSocket, wanted: &str) {
+        loop {
+            let received = socket
+                .next()
+                .await
+                .expect("the server should send an event")
+                .expect("the event should be valid");
+            if let ClientMessage::Text(text) = received
+                && serde_json::from_str::<serde_json::Value>(&text)
+                    .expect("the event should be json")["type"]
+                    == wanted
+            {
+                return;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn saves_a_take_left_open_when_the_server_closes() {
+        let workspace = Workspace::new();
+        let options = workspace.options();
+        let database = options.database.clone();
+        let server = start_embedded(options)
+            .await
+            .expect("the embedded server should start");
+        open_database(&database, &OpenOptions { foreign_keys: true })
+            .expect("the database should open")
+            .execute_batch(
+                "INSERT INTO Project (id, name, sampleRate, frameCount)
+                 VALUES (1, 'Song', 48000, 480000);
+                 INSERT INTO Recording (id, projectId, name, active) VALUES (1, 1, 'Recording 1', 1);",
+            )
+            .expect("the project should be stored");
+        let url = format!(
+            "{}/api/project/1/realtime",
+            server.url().replacen("http", "ws", 1)
+        );
+        let (mut socket, _) = connect_async(url).await.expect("the take should connect");
+        let start = serde_json::json!({
+            "type": "recording.start",
+            "recordingId": 1,
+            "sampleRate": 48000,
+            "frameCount": 480_000,
+            "latencyFrameCount": 0,
+            "sessionId": "open-take",
+        });
+        socket
+            .send(ClientMessage::Text(start.to_string().into()))
+            .await
+            .expect("the start should send");
+        next_event(&mut socket, "recording.started").await;
+        let mut packet = Vec::new();
+        for value in [0_u32, 0, 4] {
+            packet.extend_from_slice(&value.to_le_bytes());
+        }
+        for _ in 0..4 {
+            packet.extend_from_slice(&0.5_f32.to_le_bytes());
+        }
+        socket
+            .send(ClientMessage::Binary(packet.into()))
+            .await
+            .expect("the packet should send");
+        next_event(&mut socket, "recording.peaksChanged").await;
+
+        server.close().await;
+
+        let pieces: i64 = open_database(&database, &OpenOptions { foreign_keys: true })
+            .expect("the database should open")
+            .query_row(
+                "SELECT COUNT(*) FROM RecordingPiece WHERE recordingId = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("the pieces should be counted");
+        assert_eq!(pieces, 1);
     }
 }
