@@ -641,7 +641,7 @@ async fn holds_a_finished_step_until_its_status_is_written() {
 }
 
 #[tokio::test]
-async fn has_work_while_a_step_waits_and_the_queue_is_not_paused() {
+async fn has_work_while_a_step_is_pending_and_the_queue_is_not_paused() {
     let workspace = Workspace::new();
     let runner = FakeRunner::create(&workspace, Answer::Complete);
     let queue = workspace.create_queue(runner);
@@ -661,4 +661,29 @@ async fn has_work_while_a_step_waits_and_the_queue_is_not_paused() {
     assert!(pending, "a pending step is work");
     assert!(!paused, "a paused queue has no work to run");
     assert!(!done, "a finished project is no work");
+}
+
+#[tokio::test]
+async fn has_work_while_a_step_runs() {
+    let workspace = Workspace::new();
+    let runner = FakeRunner::create(&workspace, Answer::Stuck);
+    let queue = workspace.create_queue(runner.clone());
+    let writer = Writer::open(&workspace.database_path()).expect("the writer should open");
+    let worker = Arc::clone(&queue);
+    let draining = tokio::spawn(async move { worker.drain().await });
+    for _ in 0..200 {
+        if !runner.seen().is_empty() {
+            break;
+        }
+        sleep(Duration::from_millis(10)).await;
+    }
+    writer
+        .set_processing_paused(true)
+        .expect("the queue should pause");
+
+    let running = queue.has_work().await;
+    draining.abort();
+
+    assert_eq!(runner.seen(), vec!["separation"]);
+    assert!(running, "a step that runs is work, also after a pause");
 }

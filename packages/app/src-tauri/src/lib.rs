@@ -289,9 +289,9 @@ fn focus_main_window(app: &tauri::AppHandle) -> bool {
 
 #[cfg(desktop)]
 fn open_main_window(app: &tauri::AppHandle) {
-    #[cfg(target_os = "windows")]
-    tray::hide(app);
     if focus_main_window(app) {
+        #[cfg(target_os = "windows")]
+        tray::hide(app);
         return;
     }
     let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() else {
@@ -304,8 +304,12 @@ fn open_main_window(app: &tauri::AppHandle) {
             return;
         }
     };
-    if let Err(error) = create_main_window(app, url) {
-        log::error!("could not reopen the main window: {error}");
+    match create_main_window(app, url) {
+        Ok(()) => {
+            #[cfg(target_os = "windows")]
+            tray::hide(app);
+        }
+        Err(error) => log::error!("could not reopen the main window: {error}"),
     }
 }
 
