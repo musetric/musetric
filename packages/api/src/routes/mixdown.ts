@@ -54,11 +54,52 @@ export namespace create {
   export type Response = z.infer<typeof base.responseSchema>;
 }
 
+export const stageSchema = z.enum(['mixing', 'stretching', 'encoding']);
+export type Stage = z.infer<typeof stageSchema>;
+
+export const statusSchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('running'),
+    stage: stageSchema,
+    done: z.number().min(0).max(1).optional(),
+  }),
+  z.object({ state: z.literal('ready') }),
+  z.object({ state: z.literal('failed'), error: z.string() }),
+]);
+
+const mixdownParamsSchema = z.object({ mixdownId: z.string() });
+
+export namespace get {
+  export const base = createApiRoute({
+    method: 'get',
+    path: '/api/mixdown/:mixdownId',
+    paramsSchema: mixdownParamsSchema,
+    requestSchema: z.void(),
+    responseSchema: statusSchema,
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
+export namespace remove {
+  export const base = createApiRoute({
+    method: 'delete',
+    path: '/api/mixdown/:mixdownId',
+    paramsSchema: mixdownParamsSchema,
+    requestSchema: z.void(),
+    responseSchema: z.void(),
+  });
+  export type Params = z.infer<typeof base.paramsSchema>;
+  export type Request = z.infer<typeof base.requestSchema>;
+  export type Response = z.infer<typeof base.responseSchema>;
+}
+
 export namespace content {
   export const base = createApiRoute({
     method: 'get',
     path: '/api/mixdown/:mixdownId/content',
-    paramsSchema: z.object({ mixdownId: z.string() }),
+    paramsSchema: mixdownParamsSchema,
     requestSchema: z.void(),
     responseSchema: z.instanceof(Uint8Array<ArrayBuffer>),
   });

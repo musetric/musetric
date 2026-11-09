@@ -1,17 +1,21 @@
+use std::sync::Arc;
+
 use axum::{
     Router,
     body::Body,
     extract::{DefaultBodyLimit, Multipart, Path, State},
+    http::StatusCode,
     response::Response,
     routing::{get, post},
 };
 use musetric_db::{MasterType, ProjectItem, Reader, StemLoudness, blob_path};
 use musetric_media::{
     ENCODER_DELAY, Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup,
-    MixdownTrack, SampleDepth, write_mixdown,
+    MixdownStage, MixdownTrack, MixdownWatch, SampleDepth, write_mixdown,
 };
 use serde::Deserialize;
 use serde_json::json;
+use tokio::{fs::remove_file, spawn};
 
 use crate::{
     analysis::read_gains,
@@ -19,7 +23,7 @@ use crate::{
     blobs::upload_area,
     failure::{Failure, finish, invalid_number},
     form::{Field, Form, UploadTarget, UploadedFile, read_form},
-    mixdown::MixdownFile,
+    mixdown::{MixdownFile, MixdownState, Removal},
     routes::{
         RouteState,
         item::{json_response, missing_message},
@@ -52,6 +56,10 @@ const STEMS: [MasterType; 3] = [
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
         .route("/api/project/{projectId}/mixdown", post(handle_create))
+        .route(
+            "/api/mixdown/{mixdownId}",
+            get(handle_status).delete(handle_remove),
+        )
         .route("/api/mixdown/{mixdownId}/content", get(handle_content))
         .layer(DefaultBodyLimit::max(UPLOAD_LIMIT))
 }
@@ -99,6 +107,12 @@ struct MixdownRequest<'form> {
     recording: Option<&'form UploadedFile>,
 }
 
+struct Prepared {
+    mixdown: Mixdown,
+    filename: String,
+    content_type: &'static str,
+}
+
 struct SongAudio {
     project: ProjectItem,
     stems: Vec<Option<String>>,
@@ -122,12 +136,48 @@ async fn handle_create(
         Ok(form) => form,
         Err(failure) => return finish(Err(failure)),
     };
-    let created = match read_request(&form) {
-        Ok(request) => create(&state, project_id, request).await,
+    let planned = match read_request(&form) {
+        Ok(request) => prepare(&state, project_id, request).await,
         Err(failure) => Err(failure),
     };
-    form.discard().await;
-    finish(created.map(|mixdown_id| json_response(&json!({ "mixdownId": mixdown_id }))))
+    let started = match planned {
+        Ok(prepared) => start(&state, prepared, form).await,
+        Err(failure) => {
+            form.discard().await;
+            Err(failure)
+        }
+    };
+    finish(started.map(|mixdown_id| json_response(&json!({ "mixdownId": mixdown_id }))))
+}
+
+async fn start(state: &RouteState, prepared: Prepared, form: Form) -> Result<String, Failure> {
+    let (mixdown_id, path) = match state.mixdowns.reserve().await {
+        Ok(reserved) => reserved,
+        Err(error) => {
+            form.discard().await;
+            return Err(Failure::failed(error));
+        }
+    };
+    let watch = Arc::new(MixdownWatch::default());
+    state.mixdowns.start(mixdown_id.clone(), Arc::clone(&watch));
+    let worker = state.clone();
+    let settled_id = mixdown_id.clone();
+    spawn(async move {
+        let written =
+            write_mixdown(worker.storage.pcm.as_ref(), prepared.mixdown, &path, &watch).await;
+        form.discard().await;
+        let outcome = written
+            .map(|()| MixdownFile {
+                path: path.clone(),
+                filename: prepared.filename,
+                content_type: prepared.content_type,
+            })
+            .map_err(|failure| failure.to_string());
+        if !worker.mixdowns.settle(&settled_id, outcome) {
+            let _ = remove_file(&path).await;
+        }
+    });
+    Ok(mixdown_id)
 }
 
 fn read_request(form: &Form) -> Result<MixdownRequest<'_>, Failure> {
@@ -158,14 +208,60 @@ fn read_request(form: &Form) -> Result<MixdownRequest<'_>, Failure> {
     })
 }
 
+fn missing_mixdown(mixdown_id: &str) -> Failure {
+    Failure::NotFound(format!("Mixdown {mixdown_id} not found"))
+}
+
+const fn stage_name(stage: MixdownStage) -> &'static str {
+    match stage {
+        MixdownStage::Mixing => "mixing",
+        MixdownStage::Stretching => "stretching",
+        MixdownStage::Encoding => "encoding",
+    }
+}
+
+async fn handle_status(
+    State(state): State<RouteState>,
+    Path(mixdown_id): Path<String>,
+) -> Response<Body> {
+    let status = match state.mixdowns.find(&mixdown_id) {
+        None => return finish(Err(missing_mixdown(&mixdown_id))),
+        Some(MixdownState::Running(watch)) => {
+            let progress = watch.progress();
+            let mut running = json!({ "state": "running", "stage": stage_name(progress.stage) });
+            if let Some(done) = progress.done {
+                running["done"] = json!(done);
+            }
+            running
+        }
+        Some(MixdownState::Ready(_)) => json!({ "state": "ready" }),
+        Some(MixdownState::Failed(error)) => json!({ "state": "failed", "error": error }),
+    };
+    json_response(&status)
+}
+
+async fn handle_remove(
+    State(state): State<RouteState>,
+    Path(mixdown_id): Path<String>,
+) -> Response<Body> {
+    match state.mixdowns.remove(&mixdown_id) {
+        Removal::Missing => return finish(Err(missing_mixdown(&mixdown_id))),
+        Removal::Removed(Some(path)) => {
+            let _ = remove_file(path).await;
+        }
+        Removal::Stopping | Removal::Removed(None) => {}
+    }
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = StatusCode::OK;
+    response
+}
+
 async fn handle_content(
     State(state): State<RouteState>,
     Path(mixdown_id): Path<String>,
 ) -> Response<Body> {
-    let Some(file) = state.mixdowns.find(&mixdown_id) else {
-        return finish(Err(Failure::NotFound(format!(
-            "Mixdown {mixdown_id} not found"
-        ))));
+    let Some(MixdownState::Ready(file)) = state.mixdowns.find(&mixdown_id) else {
+        return finish(Err(missing_mixdown(&mixdown_id)));
     };
     finish(
         send_named(NamedFile {
@@ -178,11 +274,11 @@ async fn handle_content(
     )
 }
 
-async fn create(
+async fn prepare(
     state: &RouteState,
     project_id: i64,
     request: MixdownRequest<'_>,
-) -> Result<String, Failure> {
+) -> Result<Prepared, Failure> {
     let format = read_format(&request.format)?;
     let change = read_change(&request.playback)?;
     let label = read_label(request.label)?;
@@ -200,17 +296,12 @@ async fn create(
             group: MixdownGroup::Ready,
         });
     }
-    let (mixdown_id, path) = state.mixdowns.reserve().await.map_err(Failure::failed)?;
-    write_mixdown(state.storage.pcm.as_ref(), mixdown, &path)
-        .await
-        .map_err(Failure::failed)?;
     let (extension, content_type) = describe(format);
-    let filename = format!("{} ({label}).{extension}", audio.project.name);
-    state.mixdowns.register(
-        mixdown_id.clone(),
-        MixdownFile::create(path, filename, content_type),
-    );
-    Ok(mixdown_id)
+    Ok(Prepared {
+        mixdown,
+        filename: format!("{} ({label}).{extension}", audio.project.name),
+        content_type,
+    })
 }
 
 fn read_audio(

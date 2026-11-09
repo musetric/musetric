@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 /* eslint-disable @typescript-eslint/consistent-type-assertions */
-import { type AxiosInstance } from 'axios';
+import { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { type z } from 'zod';
 import { apiMultipart } from './apiMultipart.dom.js';
 import { type ApiRoute, type RequestMethod } from './apiRoute.js';
@@ -14,8 +14,10 @@ type AxiosRequest<RequestSchema> = RequestSchema extends z.ZodVoid
   ? {}
   : { data: z.infer<RequestSchema> };
 
+type AxiosTransfer = Pick<AxiosRequestConfig, 'signal' | 'onUploadProgress'>;
+
 export type RequestWithAxiosOptions<ParamsSchema, RequestSchema> =
-  AxiosParams<ParamsSchema> & AxiosRequest<RequestSchema>;
+  AxiosParams<ParamsSchema> & AxiosRequest<RequestSchema> & AxiosTransfer;
 
 export const requestWithAxios = async <
   Method extends RequestMethod,
@@ -31,6 +33,7 @@ export const requestWithAxios = async <
   const arrayConstructor = getArrayBufferViewConstructor(route.responseSchema);
   const { params } = options as { params: z.infer<ParamsSchema> };
   const { data } = options as { data: z.infer<RequestSchema> };
+  const { signal, onUploadProgress } = options;
   const requestData = route.isMultipart
     ? apiMultipart.data(data as object)
     : data;
@@ -40,6 +43,8 @@ export const requestWithAxios = async <
     url: route.endpoint(params),
     data: requestData,
     responseType: arrayConstructor ? 'arraybuffer' : 'json',
+    signal,
+    onUploadProgress,
   });
 
   if (arrayConstructor) {

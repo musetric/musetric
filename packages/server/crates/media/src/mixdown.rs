@@ -2,9 +2,13 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
 };
 
-use musetric_stretch::Stretch;
+use musetric_stretch::{Refusal, Stretch};
 use rusty_mp3::{Error, Mp3Encoder, Mp3EncoderConfig};
 use tokio::task::{JoinHandle, spawn_blocking};
 
@@ -20,6 +24,8 @@ const PEAK_CEILING: f32 = 0.891_250_9;
 const KILOBIT: u32 = 1000;
 const ORIGINAL_TEMPO_PERCENT: usize = 100;
 const TOO_SHORT: &str = "The song is too short to change its tempo or key";
+const STOPPED: &str = "The mixdown was stopped";
+const ENCODED_FRAMES: usize = 65_536;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MixdownFormat {
@@ -85,16 +91,109 @@ pub struct Mixdown {
     pub change: MixdownChange,
 }
 
-type Stretching = JoinHandle<Option<Vec<Vec<f32>>>>;
+type Stretching = JoinHandle<Result<Vec<Vec<f32>>, Refusal>>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MixdownStage {
+    Mixing,
+    Stretching,
+    Encoding,
+}
+
+const STAGES: [MixdownStage; 3] = [
+    MixdownStage::Mixing,
+    MixdownStage::Stretching,
+    MixdownStage::Encoding,
+];
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MixdownProgress {
+    pub stage: MixdownStage,
+    pub done: Option<f64>,
+}
+
+#[derive(Default)]
+pub struct MixdownWatch {
+    stage: AtomicUsize,
+    done: [AtomicUsize; 3],
+    total: [AtomicUsize; 3],
+    stopped: AtomicBool,
+}
+
+impl MixdownWatch {
+    pub fn stop(&self) {
+        self.stopped.store(true, Ordering::Relaxed);
+    }
+
+    #[must_use]
+    pub fn stopped(&self) -> bool {
+        self.stopped.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a share of the frames of a song needs far less than the f64 mantissa"
+    )]
+    pub fn progress(&self) -> MixdownProgress {
+        let index = self.stage.load(Ordering::Relaxed);
+        let total = self.total[index].load(Ordering::Relaxed);
+        let done = self.done[index].load(Ordering::Relaxed);
+        MixdownProgress {
+            stage: STAGES[index],
+            done: (total > 0).then(|| (done as f64 / total as f64).min(1.0)),
+        }
+    }
+
+    fn plan(&self, stage: MixdownStage, amount: usize) {
+        self.total[stage as usize].fetch_add(amount, Ordering::Relaxed);
+    }
+
+    fn enter(&self, stage: MixdownStage) {
+        self.stage.store(stage as usize, Ordering::Relaxed);
+    }
+
+    fn advance(&self, stage: MixdownStage, amount: usize) {
+        self.done[stage as usize].fetch_add(amount, Ordering::Relaxed);
+    }
+
+    fn check(&self) -> Result<(), BoxedError> {
+        if self.stopped() {
+            return Err(STOPPED.into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Reading<'mixdown> {
+    source: &'mixdown dyn PcmSource,
+    sample_rate: u32,
+    watch: &'mixdown MixdownWatch,
+}
+
+struct Output<'mixdown> {
+    sample_rate: u32,
+    format: MixdownFormat,
+    to: &'mixdown Path,
+    watch: &'mixdown MixdownWatch,
+}
 
 pub async fn write_mixdown(
     source: &dyn PcmSource,
     mixdown: Mixdown,
     to: &Path,
+    watch: &Arc<MixdownWatch>,
 ) -> Result<(), BoxedError> {
+    let reading = Reading {
+        source,
+        sample_rate: mixdown.sample_rate,
+        watch,
+    };
     let frame_count = mixdown.change.frame_count(mixdown.frame_count);
     let mut mixed = vec![0.0_f32; frame_count * CHANNELS];
     let mut stretching = Vec::new();
+    watch.plan(MixdownStage::Mixing, mixdown.tracks.len());
     for group in [MixdownGroup::Song, MixdownGroup::Lead] {
         let tracks: Vec<&MixdownTrack> = mixdown
             .tracks
@@ -107,13 +206,13 @@ pub async fn write_mixdown(
         let semitones = mixdown.change.semitones_of(group);
         if mixdown.change.tempo_percent == ORIGINAL_TEMPO_PERCENT && semitones == 0 {
             for track in tracks {
-                add_track(source, mixdown.sample_rate, track, &mut mixed).await?;
+                add_track(reading, track, &mut mixed).await?;
             }
             continue;
         }
         let mut song = vec![0.0_f32; mixdown.frame_count * CHANNELS];
         for track in tracks {
-            add_track(source, mixdown.sample_rate, track, &mut song).await?;
+            add_track(reading, track, &mut song).await?;
         }
         let stretch = Stretch {
             sample_rate: mixdown.sample_rate,
@@ -121,24 +220,60 @@ pub async fn write_mixdown(
             semitones,
             keep_formants: group == MixdownGroup::Lead,
         };
-        stretching.push(spawn_blocking(move || stretch.apply(&deinterleave(&song))));
+        stretching.push(spawn_stretch(stretch, &song, watch));
     }
-    add_stretched(stretching, &mut mixed).await?;
+    add_stretched(stretching, &mut mixed, watch).await?;
     for track in mixdown
         .tracks
         .iter()
         .filter(|track| track.group == MixdownGroup::Ready)
     {
-        add_track(source, mixdown.sample_rate, track, &mut mixed).await?;
+        add_track(reading, track, &mut mixed).await?;
     }
     limit_peak(&mut mixed);
     let target = to.to_owned();
-    spawn_blocking(move || encode(&mixed, mixdown.sample_rate, mixdown.format, &target)).await?
+    let encoding = Arc::clone(watch);
+    spawn_blocking(move || {
+        encode(
+            &mixed,
+            &Output {
+                sample_rate: mixdown.sample_rate,
+                format: mixdown.format,
+                to: &target,
+                watch: &encoding,
+            },
+        )
+    })
+    .await?
 }
 
-async fn add_stretched(stretching: Vec<Stretching>, mixed: &mut [f32]) -> Result<(), BoxedError> {
+fn spawn_stretch(stretch: Stretch, song: &[f32], watch: &Arc<MixdownWatch>) -> Stretching {
+    let channels = deinterleave(song);
+    let stretching = Arc::clone(watch);
+    watch.plan(MixdownStage::Stretching, stretch.frame_count);
+    spawn_blocking(move || {
+        let mut reported = 0;
+        stretch.apply(&channels, &mut |written| {
+            stretching.advance(MixdownStage::Stretching, written - reported);
+            reported = written;
+            !stretching.stopped()
+        })
+    })
+}
+
+async fn add_stretched(
+    stretching: Vec<Stretching>,
+    mixed: &mut [f32],
+    watch: &MixdownWatch,
+) -> Result<(), BoxedError> {
+    if !stretching.is_empty() {
+        watch.enter(MixdownStage::Stretching);
+    }
     for task in stretching {
-        let channels = task.await?.ok_or(TOO_SHORT)?;
+        let channels = task.await?.map_err(|refusal| match refusal {
+            Refusal::TooShort => TOO_SHORT,
+            Refusal::Stopped => STOPPED,
+        })?;
         for (frame, pair) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().enumerate() {
             pair[0] += channels[0][frame];
             pair[1] += channels[1][frame];
@@ -160,19 +295,21 @@ fn deinterleave(song: &[f32]) -> Vec<Vec<f32>> {
 }
 
 async fn add_track(
-    source: &dyn PcmSource,
-    sample_rate: u32,
+    reading: Reading<'_>,
     track: &MixdownTrack,
     mixed: &mut [f32],
 ) -> Result<(), BoxedError> {
+    reading.watch.check()?;
     let request = PcmRequest {
         from: &track.from,
-        sample_rate,
+        sample_rate: reading.sample_rate,
     };
     match track.channels {
-        MixdownChannels::Stereo => add_stereo(source, request, track, mixed).await,
-        MixdownChannels::Mono => add_mono(source, request, track, mixed).await,
+        MixdownChannels::Stereo => add_stereo(reading.source, request, track, mixed).await?,
+        MixdownChannels::Mono => add_mono(reading.source, request, track, mixed).await?,
     }
+    reading.watch.advance(MixdownStage::Mixing, 1);
+    Ok(())
 }
 
 async fn add_stereo(
@@ -240,42 +377,53 @@ fn limit_peak(mixed: &mut [f32]) {
     }
 }
 
-fn encode(
-    mixed: &[f32],
-    sample_rate: u32,
-    format: MixdownFormat,
-    to: &Path,
-) -> Result<(), BoxedError> {
-    match format {
-        MixdownFormat::M4a { bitrate } => encode_m4a(mixed, sample_rate, bitrate, to),
-        MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, sample_rate, bitrate, to),
+fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
+    let frames = mixed.as_chunks::<CHANNELS>().0;
+    let chunks = frames.chunks(ENCODED_FRAMES);
+    let watch = output.watch;
+    if !matches!(output.format, MixdownFormat::M4a { .. }) {
+        watch.plan(MixdownStage::Encoding, frames.len());
+    }
+    watch.enter(MixdownStage::Encoding);
+    match output.format {
+        MixdownFormat::M4a { bitrate } => encode_m4a(mixed, output, bitrate),
+        MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, output, bitrate),
         MixdownFormat::Flac(depth) => {
-            let mut writer = FlacWriter::create(to, sample_rate, depth)?;
-            for pair in mixed.as_chunks::<CHANNELS>().0 {
-                writer.push(pair[0], pair[1]);
+            let mut writer = FlacWriter::create(output.to, output.sample_rate, depth)?;
+            for chunk in chunks {
+                watch.check()?;
+                for pair in chunk {
+                    writer.push(pair[0], pair[1]);
+                }
+                watch.advance(MixdownStage::Encoding, chunk.len());
             }
             writer.finish()
         }
         MixdownFormat::Wav(depth) => {
-            let mut writer = WavWriter::create(to, sample_rate, depth, mixed.len() / CHANNELS)?;
-            for pair in mixed.as_chunks::<CHANNELS>().0 {
-                writer.push(pair[0], pair[1])?;
+            let mut writer = WavWriter::create(output.to, output.sample_rate, depth, frames.len())?;
+            for chunk in chunks {
+                watch.check()?;
+                for pair in chunk {
+                    writer.push(pair[0], pair[1])?;
+                }
+                watch.advance(MixdownStage::Encoding, chunk.len());
             }
             writer.finish()
         }
     }
 }
 
-fn encode_m4a(mixed: &[f32], sample_rate: u32, bitrate: u32, to: &Path) -> Result<(), BoxedError> {
+fn encode_m4a(mixed: &[f32], output: &Output<'_>, bitrate: u32) -> Result<(), BoxedError> {
     let channels = u8::try_from(CHANNELS)?;
-    let mut encoder = AacEncoder::create(sample_rate, channels, bitrate)?;
+    let mut encoder = AacEncoder::create(output.sample_rate, channels, bitrate)?;
     encoder.push(mixed)?;
     let packets = encoder.finish()?;
+    output.watch.check()?;
     let frame_count = u32::try_from(mixed.len() / CHANNELS)?;
     write_m4a(
-        to,
+        output.to,
         &M4aTrack {
-            sample_rate,
+            sample_rate: output.sample_rate,
             channels,
             packets: &packets,
             frame_count,
@@ -283,14 +431,20 @@ fn encode_m4a(mixed: &[f32], sample_rate: u32, bitrate: u32, to: &Path) -> Resul
     )
 }
 
-fn encode_mp3(mixed: &[f32], sample_rate: u32, bitrate: u32, to: &Path) -> Result<(), BoxedError> {
+fn encode_mp3(mixed: &[f32], output: &Output<'_>, bitrate: u32) -> Result<(), BoxedError> {
     let mut encoder = Mp3Encoder::new(Mp3EncoderConfig {
         bitrate_kbps: bitrate / KILOBIT,
         vbr_quality: None,
     });
-    encoder.push_pcm_f32(mixed, u16::try_from(CHANNELS)?, sample_rate)?;
+    for chunk in mixed.chunks(ENCODED_FRAMES * CHANNELS) {
+        output.watch.check()?;
+        encoder.push_pcm_f32(chunk, u16::try_from(CHANNELS)?, output.sample_rate)?;
+        output
+            .watch
+            .advance(MixdownStage::Encoding, chunk.len() / CHANNELS);
+    }
     encoder.finish();
-    let mut file = BufWriter::new(File::create(to)?);
+    let mut file = BufWriter::new(File::create(output.to)?);
     loop {
         match encoder.next_packet() {
             Ok(packet) => file.write_all(&packet)?,
@@ -308,11 +462,12 @@ mod tests {
         f32::consts::FRAC_1_SQRT_2,
         fs::{create_dir_all, read, remove_dir_all},
         path::{Path, PathBuf},
+        sync::Arc,
     };
 
     use super::{
-        Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownTrack,
-        PEAK_CEILING, write_mixdown,
+        Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownProgress,
+        MixdownStage, MixdownTrack, MixdownWatch, PEAK_CEILING, STOPPED, write_mixdown,
     };
     use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth, SymphoniaPcm};
 
@@ -394,7 +549,7 @@ mod tests {
             format: MixdownFormat::Wav(SampleDepth::TwentyFour),
             change: scene.change,
         };
-        write_mixdown(fixture, mixdown, &to)
+        write_mixdown(fixture, mixdown, &to, &Arc::new(MixdownWatch::default()))
             .await
             .expect("the mixdown should be written");
         let mixed = read_wav(&to);
@@ -428,7 +583,7 @@ mod tests {
             format,
             change: MixdownChange::ORIGINAL,
         };
-        write_mixdown(&fixture, mixdown, &to)
+        write_mixdown(&fixture, mixdown, &to, &Arc::new(MixdownWatch::default()))
             .await
             .expect("the export should be written");
         let mut decoded = Vec::new();
@@ -589,5 +744,137 @@ mod tests {
         let power = middle.iter().map(|value| value * value).sum::<f32>() / 12_000.0;
         assert!(power > 0.01, "{power}");
         assert!(mixed[0] > 0.05, "{}", mixed[0]);
+    }
+    struct Stopping {
+        samples: Vec<f32>,
+        watch: Arc<MixdownWatch>,
+    }
+
+    impl PcmSource for Stopping {
+        fn read_pcm<'source>(
+            &'source self,
+            _request: PcmRequest<'source>,
+            sink: PcmSink<'source>,
+        ) -> ReadingPcm<'source> {
+            Box::pin(async move {
+                sink(&self.samples);
+                self.watch.stop();
+                Ok(())
+            })
+        }
+    }
+
+    async fn stop_after_the_first_track(name: &str, scene: Scene) -> (bool, MixdownProgress) {
+        let watch = Arc::new(MixdownWatch::default());
+        let source = Stopping {
+            samples: [0.25, -0.25].repeat(scene.frame_count),
+            watch: Arc::clone(&watch),
+        };
+        let directory =
+            std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let to = directory.join("mix.wav");
+        let mixdown = Mixdown {
+            sample_rate: RATE,
+            frame_count: scene.frame_count,
+            tracks: scene.tracks,
+            format: MixdownFormat::Wav(SampleDepth::Sixteen),
+            change: scene.change,
+        };
+        let written = write_mixdown(&source, mixdown, &to, &watch).await;
+        assert_eq!(
+            written.map_err(|failure| failure.to_string()),
+            Err(STOPPED.to_owned())
+        );
+        let left = to.exists();
+        remove_dir_all(&directory).expect("the workspace should be removed");
+        (left, watch.progress())
+    }
+
+    #[tokio::test]
+    async fn stops_between_the_tracks_and_inside_the_stretch_and_writes_no_file() {
+        let song = PathBuf::from("song.flac");
+        let backing = PathBuf::from("backing.flac");
+        let mixed = stop_after_the_first_track(
+            "stop-mixing",
+            Scene {
+                frame_count: 48_000,
+                tracks: vec![stem(&song, 1.0), stem(&backing, 1.0)],
+                change: MixdownChange::ORIGINAL,
+            },
+        )
+        .await;
+        assert_eq!(
+            mixed,
+            (
+                false,
+                MixdownProgress {
+                    stage: MixdownStage::Mixing,
+                    done: Some(0.5),
+                }
+            )
+        );
+        let stretched = stop_after_the_first_track(
+            "stop-stretch",
+            Scene {
+                frame_count: 48_000,
+                tracks: vec![stem(&song, 1.0)],
+                change: MixdownChange {
+                    tempo_percent: 80,
+                    semitones: -2,
+                    lead_semitones: -2,
+                },
+            },
+        )
+        .await;
+        assert_eq!(
+            stretched,
+            (
+                false,
+                MixdownProgress {
+                    stage: MixdownStage::Stretching,
+                    done: Some(0.0),
+                }
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn follows_every_stage_to_its_end() {
+        let song = PathBuf::from("song.flac");
+        let fixture = Fixture(vec![(song.clone(), [0.1, 0.2].repeat(48_000))]);
+        let directory =
+            std::env::temp_dir().join(format!("musetric-mixdown-stages-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        for (format, done) in [
+            (MixdownFormat::Flac(SampleDepth::Sixteen), Some(1.0)),
+            (MixdownFormat::Mp3 { bitrate: 128_000 }, Some(1.0)),
+            (MixdownFormat::M4a { bitrate: 128_000 }, None),
+        ] {
+            let watch = Arc::new(MixdownWatch::default());
+            let mixdown = Mixdown {
+                sample_rate: RATE,
+                frame_count: 48_000,
+                tracks: vec![stem(&song, 1.0)],
+                format,
+                change: MixdownChange {
+                    tempo_percent: 125,
+                    semitones: 1,
+                    lead_semitones: 1,
+                },
+            };
+            write_mixdown(&fixture, mixdown, &directory.join("mix"), &watch)
+                .await
+                .expect("the mixdown should be written");
+            assert_eq!(
+                watch.progress(),
+                MixdownProgress {
+                    stage: MixdownStage::Encoding,
+                    done,
+                },
+                "{format:?}"
+            );
+        }
+        remove_dir_all(&directory).expect("the workspace should be removed");
     }
 }
