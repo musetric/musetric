@@ -136,6 +136,10 @@ mod tests {
     }
 
     async fn read_recordings(response: Response<Body>) -> Vec<(String, bool)> {
+        read_recording_flags(response, "active").await
+    }
+
+    async fn read_recording_flags(response: Response<Body>, flag: &str) -> Vec<(String, bool)> {
         assert_eq!(response.status(), StatusCode::OK);
         let listed: serde_json::Value =
             serde_json::from_str(&read_body(response).await).expect("the list should be json");
@@ -149,7 +153,7 @@ mod tests {
                         .as_str()
                         .expect("a recording should have a name")
                         .to_owned(),
-                    recording["active"] == true,
+                    recording[flag] == true,
                 )
             })
             .collect()
@@ -472,25 +476,10 @@ mod tests {
 
         let response = request(router, &format!("{RECORDINGS_URL}/list")).await;
 
-        assert_eq!(response.status(), StatusCode::OK);
-        let listed: serde_json::Value =
-            serde_json::from_str(&read_body(response).await).expect("the list should be json");
-        let lost: Vec<(&str, bool)> = listed["recordings"]
-            .as_array()
-            .expect("the list should hold recordings")
-            .iter()
-            .map(|recording| {
-                (
-                    recording["name"]
-                        .as_str()
-                        .expect("a recording should have a name"),
-                    recording["lost"]
-                        .as_bool()
-                        .expect("a recording should say whether it lost a piece"),
-                )
-            })
-            .collect();
-        assert_eq!(lost, [("Recording 1", false), ("Recording 2", true)]);
+        assert_eq!(
+            read_recording_flags(response, "lost").await,
+            named(&[("Recording 1", false), ("Recording 2", true)])
+        );
     }
 
     #[tokio::test]
