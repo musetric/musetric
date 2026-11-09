@@ -24,8 +24,8 @@ pub use depth::SampleDepth;
 pub use frames::{read_flac_sample_rate, read_frame_count};
 pub use loudness::{LeadVisualLoudness, Loudness, analyze_lead_visual_loudness, analyze_loudness};
 pub use mixdown::{
-    Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownTrack,
-    write_mixdown,
+    Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownProgress,
+    MixdownStage, MixdownTrack, MixdownWatch, write_mixdown,
 };
 pub use mono::{Downmix, MonoRequest, decode_mono_pcm};
 pub use pcm::{
