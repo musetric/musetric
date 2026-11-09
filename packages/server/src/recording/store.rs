@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, io, path::Path, sync::Arc};
 
 use musetric_db::{
     BoxedError, Recording, RecordingAudio, RecordingLayer, RecordingPiece, blob_path,
 };
 use musetric_media::WAVE_PEAK_COUNT;
-use tokio::fs::{read as read_file, rename, try_exists, write as write_file};
+use tokio::fs::{create_dir_all, read as read_file, rename, try_exists, write as write_file};
 
 use crate::{
     blobs::{StagedBlob, stage_blob},
@@ -54,6 +54,7 @@ pub(crate) struct RecordingSummary {
     pub(crate) active: bool,
     pub(crate) history: History,
     pub(crate) empty: bool,
+    pub(crate) lost: bool,
 }
 
 type PcmCache = HashMap<String, Vec<i16>>;
@@ -96,21 +97,47 @@ pub(crate) async fn read_recordings(
     storage: &Arc<Storage>,
     project_id: i64,
 ) -> Result<Vec<RecordingSummary>, BoxedError> {
-    read_database(storage, move |database| {
-        let mut summaries = Vec::new();
+    let listed = read_database(storage, move |database| {
+        let mut listed = Vec::new();
         for recording in database.recordings(project_id)? {
             let pieces = database.recording_pieces(recording.id)?;
-            summaries.push(RecordingSummary {
-                id: recording.id,
-                history: history_of(&recording, &pieces),
-                empty: sounding(&recording, &pieces).is_empty(),
-                name: recording.name,
-                active: recording.active,
-            });
+            let history = history_of(&recording, &pieces);
+            let heard: Vec<String> = sounding(&recording, &pieces)
+                .into_iter()
+                .map(|piece| piece.blob_id.clone())
+                .collect();
+            listed.push((recording, history, heard));
         }
-        Ok(summaries)
+        Ok(listed)
     })
-    .await
+    .await?;
+    let mut gone: HashMap<String, bool> = HashMap::new();
+    let mut summaries = Vec::with_capacity(listed.len());
+    for (recording, history, heard) in listed {
+        let mut lost = false;
+        for blob_id in &heard {
+            let missing = if let Some(missing) = gone.get(blob_id) {
+                *missing
+            } else {
+                let missing = matches!(has_file(storage, blob_id).await, Ok(false));
+                gone.insert(blob_id.clone(), missing);
+                missing
+            };
+            if missing {
+                lost = true;
+                break;
+            }
+        }
+        summaries.push(RecordingSummary {
+            id: recording.id,
+            history,
+            empty: heard.is_empty(),
+            lost,
+            name: recording.name,
+            active: recording.active,
+        });
+    }
+    Ok(summaries)
 }
 
 pub(crate) async fn is_active_recording(
@@ -158,13 +185,17 @@ async fn load_pcm(
     Ok(cache)
 }
 
+async fn has_file(storage: &Arc<Storage>, blob_id: &str) -> io::Result<bool> {
+    try_exists(blob_path(&storage.blobs_path, blob_id)).await
+}
+
 async fn present_pieces(
     storage: &Arc<Storage>,
     pieces: Vec<RecordingPiece>,
 ) -> Result<Vec<RecordingPiece>, BoxedError> {
     let mut present = Vec::with_capacity(pieces.len());
     for piece in pieces {
-        if try_exists(blob_path(&storage.blobs_path, &piece.blob_id)).await? {
+        if has_file(storage, &piece.blob_id).await? {
             present.push(piece);
         }
     }
@@ -372,7 +403,10 @@ fn encode_peaks(peaks: &[f32]) -> Vec<u8> {
     bytes
 }
 
-async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), BoxedError> {
+pub(crate) async fn write_peaks(
+    storage: &Arc<Storage>,
+    recording_id: i64,
+) -> Result<(), BoxedError> {
     let (recording, pieces) = read_state(storage, recording_id)
         .await?
         .ok_or(MISSING_RECORDING)?;
@@ -383,6 +417,9 @@ async fn write_peaks(storage: &Arc<Storage>, recording_id: i64) -> Result<(), Bo
     let samples = compose(storage, &layers, audio.frame_count).await?;
     let path = blob_path(&storage.blobs_path, &audio.wave_blob_id);
     let staged = path.with_extension("next");
+    if let Some(directory) = path.parent() {
+        create_dir_all(directory).await?;
+    }
     write_file(&staged, encode_peaks(&measure_peaks(&samples, &layers))).await?;
     rename(&staged, &path).await?;
     Ok(())
@@ -402,6 +439,9 @@ pub(crate) async fn ensure_recording(
         .await?
         .ok_or(MISSING_RECORDING)?;
     if let Some(audio) = existing.audio {
+        if !try_exists(blob_path(&storage.blobs_path, &audio.wave_blob_id)).await? {
+            write_peaks(storage, recording_id).await?;
+        }
         return Ok(audio);
     }
     let wave = stage_blob(area, &storage.blobs_path);
