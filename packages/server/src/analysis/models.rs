@@ -1,14 +1,13 @@
 use std::{
     collections::HashSet,
-    io::ErrorKind,
+    io::{self, ErrorKind},
     path::{Path, PathBuf},
 };
 
-use musetric_db::BoxedError;
 use musetric_gpu::{ModelFile, has_verified_copy, kept_files};
 use musetric_media::Downmix;
 use serde_json::{Value, json};
-use tokio::fs::{ReadDir, read_dir, remove_dir_all, remove_file};
+use tokio::fs::{DirEntry, ReadDir, read_dir, remove_dir_all, remove_file, try_exists};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CacheLayout {
@@ -32,14 +31,14 @@ impl ModelBundle {
         models_path.join(self.directory)
     }
 
+    fn revisions(&self, models_path: &Path) -> PathBuf {
+        self.root(models_path).join(self.model_id).join("resolve")
+    }
+
     pub(crate) fn cached(&self, models_path: &Path) -> Vec<ModelFile> {
         let directory = match self.layout {
             CacheLayout::Flat => self.root(models_path),
-            CacheLayout::Hub => self
-                .root(models_path)
-                .join(self.model_id)
-                .join("resolve")
-                .join(self.revision),
+            CacheLayout::Hub => self.revisions(models_path).join(self.revision),
         };
         self.files
             .iter()
@@ -363,6 +362,7 @@ pub(crate) fn vocals_graph() -> Value {
 }
 
 const BUNDLES: [&ModelBundle; 5] = [&VOCALS, &WHISPER, &BEAT_THIS, &CHORD_NET, &SKEY];
+const REVISION_LENGTH: usize = 40;
 
 pub(crate) struct DownloadSize {
     pub(crate) total_bytes: u64,
@@ -385,7 +385,7 @@ pub(crate) async fn download_size(models_path: &Path) -> DownloadSize {
     size
 }
 
-pub(crate) async fn remove_unpinned(models_path: &Path) -> Result<Vec<PathBuf>, BoxedError> {
+pub(crate) async fn remove_unpinned(models_path: &Path) -> Vec<PathBuf> {
     let mut removed = Vec::new();
     for bundle in BUNDLES {
         let models = bundle.cached(models_path);
@@ -393,55 +393,96 @@ pub(crate) async fn remove_unpinned(models_path: &Path) -> Result<Vec<PathBuf>, 
             continue;
         };
         if bundle.layout == CacheLayout::Hub {
-            removed.extend(remove_other_revisions(directory).await?);
+            remove_other_revisions(
+                &bundle.revisions(models_path),
+                bundle.revision,
+                &mut removed,
+            )
+            .await;
         }
-        let kept: HashSet<PathBuf> = models.iter().flat_map(kept_files).collect();
-        removed.extend(remove_files_but(directory, &kept).await?);
+        let kept = read_kept_names(&models).await;
+        remove_files_but(directory, &kept, &mut removed).await;
     }
-    Ok(removed)
+    removed
 }
 
-async fn remove_other_revisions(revision: &Path) -> Result<Vec<PathBuf>, BoxedError> {
-    let mut removed = Vec::new();
-    let Some(revisions) = revision.parent() else {
-        return Ok(removed);
+fn folded_name(path: &Path) -> Option<String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+}
+
+async fn read_kept_names(models: &[ModelFile]) -> HashSet<String> {
+    let mut kept = HashSet::new();
+    for model in models {
+        let [file, manifest, part] = kept_files(model);
+        let finished = try_exists(&file).await.unwrap_or(true);
+        let paths = [Some(file), Some(manifest), (!finished).then_some(part)];
+        kept.extend(paths.iter().flatten().filter_map(|path| folded_name(path)));
+    }
+    kept
+}
+
+fn is_revision(name: &str) -> bool {
+    name.len() == REVISION_LENGTH && name.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+async fn remove_other_revisions(revisions: &Path, pinned: &str, removed: &mut Vec<PathBuf>) {
+    let Some(mut entries) = open_directory(revisions).await else {
+        return;
     };
-    let Some(mut entries) = open_directory(revisions).await? else {
-        return Ok(removed);
-    };
-    while let Some(entry) = entries.next_entry().await? {
+    while let Some(entry) = read_entry(&mut entries, revisions).await {
         let path = entry.path();
-        if entry.file_type().await?.is_dir() && path != revision {
-            remove_dir_all(&path).await?;
+        let name = entry.file_name().to_string_lossy().to_lowercase();
+        let folder = entry.file_type().await.is_ok_and(|kind| kind.is_dir());
+        if !folder || !is_revision(&name) || name == pinned.to_lowercase() {
+            continue;
+        }
+        report_removal(remove_dir_all(&path).await, path, removed);
+    }
+}
+
+async fn remove_files_but(directory: &Path, kept: &HashSet<String>, removed: &mut Vec<PathBuf>) {
+    let Some(mut entries) = open_directory(directory).await else {
+        return;
+    };
+    while let Some(entry) = read_entry(&mut entries, directory).await {
+        let path = entry.path();
+        let file = entry.file_type().await.is_ok_and(|kind| kind.is_file());
+        if !file || folded_name(&path).is_none_or(|name| kept.contains(&name)) {
+            continue;
+        }
+        report_removal(remove_file(&path).await, path, removed);
+    }
+}
+
+fn report_removal(outcome: io::Result<()>, path: PathBuf, removed: &mut Vec<PathBuf>) {
+    match outcome {
+        Ok(()) => {
+            log::info!("removed {}, which no model pin names", path.display());
             removed.push(path);
         }
+        Err(error) => log::warn!("could not remove {}: {error}", path.display()),
     }
-    Ok(removed)
 }
 
-async fn remove_files_but(
-    directory: &Path,
-    kept: &HashSet<PathBuf>,
-) -> Result<Vec<PathBuf>, BoxedError> {
-    let mut removed = Vec::new();
-    let Some(mut entries) = open_directory(directory).await? else {
-        return Ok(removed);
-    };
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-        if entry.file_type().await?.is_file() && !kept.contains(&path) {
-            remove_file(&path).await?;
-            removed.push(path);
-        }
-    }
-    Ok(removed)
-}
-
-async fn open_directory(directory: &Path) -> Result<Option<ReadDir>, BoxedError> {
+async fn open_directory(directory: &Path) -> Option<ReadDir> {
     match read_dir(directory).await {
-        Ok(entries) => Ok(Some(entries)),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
+        Ok(entries) => Some(entries),
+        Err(error) if error.kind() == ErrorKind::NotFound => None,
+        Err(error) => {
+            log::warn!("could not read {}: {error}", directory.display());
+            None
+        }
+    }
+}
+
+async fn read_entry(entries: &mut ReadDir, directory: &Path) -> Option<DirEntry> {
+    match entries.next_entry().await {
+        Ok(entry) => entry,
+        Err(error) => {
+            log::warn!("could not read {}: {error}", directory.display());
+            None
+        }
     }
 }
 
@@ -486,13 +527,16 @@ mod tests {
             chords[0].path.clone(),
             flat.join(format!("{}.verified", chords[0].file)),
             flat.join(format!("{}.part", chords[1].file)),
+            flat.join(chords[2].file.to_uppercase()),
             flat.join("folder").join("file"),
             whisper[0].path.clone(),
+            revisions.join("not-a-revision").join("file"),
             models.join("hub").join("checkpoints").join("model.pth"),
         ];
         let stale = [
             flat.join("chordnet-old.onnx"),
             flat.join("chordnet-old.onnx.verified"),
+            flat.join(format!("{}.part", chords[0].file)),
             revision.join("stale.json"),
             old_revision.join("config.json"),
         ];
@@ -500,14 +544,13 @@ mod tests {
             put(path);
         }
 
-        let mut removed = remove_unpinned(&models)
-            .await
-            .expect("the unpinned files should be removed");
+        let mut removed = remove_unpinned(&models).await;
         removed.sort();
 
         let mut expected = vec![
             flat.join("chordnet-old.onnx"),
             flat.join("chordnet-old.onnx.verified"),
+            flat.join(format!("{}.part", chords[0].file)),
             revision.join("stale.json"),
             old_revision.clone(),
         ];
