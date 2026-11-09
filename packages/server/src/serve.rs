@@ -19,7 +19,7 @@ use rcgen::generate_simple_self_signed;
 use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
-    analysis::{AnalysisContext, AnalysisRunner},
+    analysis::{AnalysisContext, AnalysisRunner, models::remove_unpinned},
     blobs::clear_upload_area,
     executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
@@ -235,6 +235,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         idle_limit: STEP_IDLE_LIMIT,
     });
     if options.processing {
+        remove_unpinned(&options.models).await;
         queue.spawn();
         wake_on_arrival(&host, &queue);
     }

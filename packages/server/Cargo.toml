@@ -15,6 +15,7 @@ bytemuck = "=1.25.2"
 clap = { version = "=4.6.7", features = ["derive"] }
 futures-util = "=0.3.34"
 http-body-util = "=0.1.5"
+log = "=0.4.34"
 md5 = "=0.8.1"
 musetric-db = { path = "crates/db" }
 musetric-gpu = { path = "crates/gpu" }
