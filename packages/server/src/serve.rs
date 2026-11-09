@@ -20,6 +20,7 @@ use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
     analysis::{AnalysisContext, AnalysisRunner},
+    blobs::clear_upload_area,
     executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
     garbage::spawn_collector,
@@ -292,6 +293,7 @@ fn create_storage(
 ) -> Result<Arc<Storage>, BoxedError> {
     let writer = Writer::open(database)?;
     writer.abandon_running_steps()?;
+    clear_upload_area(&work);
     create_dir_all(&work)?;
     let storage = Arc::new(Storage {
         database: Arc::new(Reader::open(database)?),

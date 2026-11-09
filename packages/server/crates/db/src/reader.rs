@@ -16,8 +16,8 @@ use crate::{
         read_pending, read_states,
     },
     project::{
-        ProjectItem, read_processing_paused, read_project, read_project_name, read_project_paused,
-        read_projects,
+        ProjectItem, read_processing_paused, read_project, read_project_ids, read_project_name,
+        read_project_paused, read_projects,
     },
     recording::{
         Recording, RecordingPiece, read_recording, read_recording_pieces, read_recordings,
@@ -75,6 +75,10 @@ impl Reader {
 
     pub fn projects(&self) -> Result<Vec<ProjectItem>, BoxedError> {
         self.read(read_projects)
+    }
+
+    pub fn project_ids(&self) -> Result<Vec<i64>, BoxedError> {
+        self.read(read_project_ids)
     }
 
     pub fn stem_loudness(&self, project_id: i64) -> Result<Vec<StemLoudness>, BoxedError> {

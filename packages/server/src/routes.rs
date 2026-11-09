@@ -753,4 +753,27 @@ mod tests {
             "{refusal}"
         );
     }
+    #[tokio::test]
+    async fn removes_the_work_area_with_the_project() {
+        let workspace = Workspace::new();
+        workspace.seed(
+            "INSERT INTO Project (id, name, sampleRate, frameCount)
+             VALUES (1, 'Removed', 48000, 480000);",
+        );
+        let area = workspace.work_path().join("1");
+        std::fs::create_dir_all(area.join("separation")).expect("the step area should be created");
+        std::fs::write(area.join("separation").join("input.f32"), "checkpoint")
+            .expect("the checkpoint should be written");
+
+        let response = send(
+            create_test_router(&workspace).await,
+            "DELETE",
+            "/api/project/1/remove",
+            "",
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(!area.exists());
+    }
 }

@@ -7,11 +7,12 @@ use std::{
 
 use musetric_db::BoxedError;
 use tokio::{
-    fs::{read_dir, remove_file},
+    fs::{read_dir, remove_dir_all, remove_file},
     time::sleep,
 };
 
 use crate::{
+    blobs::read_project_area_id,
     failure::Failure,
     publish::hold_publications,
     storage::{Storage, read},
@@ -23,6 +24,7 @@ const BLOB_RETENTION: Duration = Duration::from_mins(5);
 pub(crate) fn spawn_collector(storage: Arc<Storage>) {
     tokio::spawn(async move {
         loop {
+            let _ = remove_orphaned_areas(&storage).await;
             sleep(COLLECT_INTERVAL).await;
             let _ = collect(&storage, BLOB_RETENTION).await;
         }
@@ -36,6 +38,28 @@ pub(crate) async fn collect(storage: &Arc<Storage>, retention: Duration) -> Resu
     }
     let _held = hold_publications(storage).await;
     remove_unreferenced(storage, candidates).await
+}
+
+pub(crate) async fn remove_orphaned_areas(storage: &Arc<Storage>) -> Result<(), Failure> {
+    let areas: Vec<(i64, PathBuf)> = list_directories(&storage.work_path)
+        .await
+        .map_err(Failure::failed)?
+        .into_iter()
+        .filter_map(|area| Some((read_project_area_id(&area)?, area)))
+        .collect();
+    if areas.is_empty() {
+        return Ok(());
+    }
+    let alive: HashSet<i64> = read(storage, musetric_db::Reader::project_ids)
+        .await?
+        .into_iter()
+        .collect();
+    for (project_id, area) in areas {
+        if !alive.contains(&project_id) {
+            let _ = remove_dir_all(&area).await;
+        }
+    }
+    Ok(())
 }
 
 async fn remove_unreferenced(
@@ -125,7 +149,7 @@ async fn has_exceeded_retention(path: &Path, retention: Duration) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use super::{collect, read_candidates, remove_unreferenced};
+    use super::{collect, read_candidates, remove_orphaned_areas, remove_unreferenced};
     use crate::test_workspace::Workspace;
 
     const KEPT_BLOB_ID: &str = "1f2e3d4c-0000-4000-8000-000000000001";
@@ -186,5 +210,34 @@ mod tests {
         assert!(workspace.has_blob(KEPT_BLOB_ID));
         assert!(workspace.has_blob(FRESH_BLOB_ID));
         assert!(!workspace.has_blob(STALE_BLOB_ID));
+    }
+    #[tokio::test]
+    async fn removes_only_the_work_areas_of_removed_projects() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_SOURCE);
+        let work = workspace.work_path();
+        let areas = [
+            "1/separation",
+            "2/separation",
+            "007",
+            "mixdown",
+            "upload",
+            "executor-browser",
+        ];
+        for area in areas {
+            std::fs::create_dir_all(work.join(area)).expect("the area should be created");
+            std::fs::write(work.join(area).join("file"), BLOB).expect("the file should be written");
+        }
+
+        remove_orphaned_areas(&workspace.create_storage())
+            .await
+            .expect("the sweep should finish");
+
+        assert!(work.join("1/separation/file").exists());
+        assert!(!work.join("2").exists());
+        assert!(work.join("007/file").exists());
+        assert!(work.join("mixdown/file").exists());
+        assert!(work.join("upload/file").exists());
+        assert!(work.join("executor-browser/file").exists());
     }
 }
