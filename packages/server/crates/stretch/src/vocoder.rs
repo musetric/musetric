@@ -2,7 +2,7 @@ use std::ops::{Add, Mul, Sub};
 
 use rustfft::num_complex::Complex32;
 
-use crate::frames::Stft;
+use crate::{Refusal, frames::Stft};
 
 const NOISE_FLOOR: f32 = 1e-15;
 const TINY: f32 = 1e-30;
@@ -211,21 +211,22 @@ impl Engine {
         &mut self,
         input: &[Vec<f32>],
         output_length: usize,
-    ) -> Option<Vec<Vec<f32>>> {
+        go_on: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<Vec<Vec<f32>>, Refusal> {
         let latency = self.stft.synthesis_latency();
         if output_length < latency * 2 {
-            return None;
+            return Err(Refusal::TooShort);
         }
-        let input_length = input.first().map_or(0, Vec::len);
-        let rate = to_float(input_length) / to_float(output_length);
-        let seek_time_factor = self.seek(input, rate);
         let mut output = vec![vec![0.0; output_length]; self.channels];
-        self.process(input, seek_time_factor, &mut output);
+        self.process(input, &mut output, go_on)?;
         for channel in &mut output {
             fold_start(channel, latency);
         }
         self.flush(&mut output, latency);
-        Some(output)
+        if !go_on(output_length) {
+            return Err(Refusal::Stopped);
+        }
+        Ok(output)
     }
 
     #[expect(
@@ -256,17 +257,27 @@ impl Engine {
         }
     }
 
-    fn process(&mut self, input: &[Vec<f32>], seek_time_factor: f32, output: &mut [Vec<f32>]) {
+    fn process(
+        &mut self,
+        input: &[Vec<f32>],
+        output: &mut [Vec<f32>],
+        go_on: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<(), Refusal> {
         let input_length = input.first().map_or(0, Vec::len);
         let output_length = output.first().map_or(0, Vec::len);
+        let rate = to_float(input_length) / to_float(output_length);
         let mut cursor = Cursor {
             copied: 0,
             previous_offset: -1,
             seeking: true,
-            seek_time_factor,
+            seek_time_factor: self.seek(input, rate),
         };
         for output_index in 0..output_length {
-            if output_index % self.stft.interval() == 0 {
+            let starts_block = output_index % self.stft.interval() == 0;
+            if starts_block && !go_on(output_index) {
+                return Err(Refusal::Stopped);
+            }
+            if starts_block {
                 let offset = input_position(output_index, input_length, output_length);
                 self.start_block(input, &mut cursor, offset);
             }
@@ -275,6 +286,7 @@ impl Engine {
             }
             self.stft.move_output(1);
         }
+        Ok(())
     }
 
     fn start_block(&mut self, input: &[Vec<f32>], cursor: &mut Cursor, offset: usize) {

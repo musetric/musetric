@@ -7,6 +7,12 @@ mod window;
 
 use vocoder::{Engine, Settings};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Refusal {
+    TooShort,
+    Stopped,
+}
+
 pub struct Stretch {
     pub sample_rate: u32,
     pub frame_count: usize,
@@ -15,15 +21,18 @@ pub struct Stretch {
 }
 
 impl Stretch {
-    #[must_use]
-    pub fn apply(&self, channels: &[Vec<f32>]) -> Option<Vec<Vec<f32>>> {
+    pub fn apply(
+        &self,
+        channels: &[Vec<f32>],
+        go_on: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<Vec<Vec<f32>>, Refusal> {
         let mut engine = Engine::new(&Settings {
             channels: channels.len(),
             sample_rate: self.sample_rate,
             semitones: self.semitones,
             keep_formants: self.keep_formants,
         });
-        engine.exact(channels, self.frame_count)
+        engine.exact(channels, self.frame_count, go_on)
     }
 }
 
@@ -31,7 +40,7 @@ impl Stretch {
 mod tests {
     use std::f64::consts::TAU;
 
-    use super::Stretch;
+    use super::{Refusal, Stretch};
 
     const SAMPLE_RATE: u32 = 44_100;
 
@@ -73,7 +82,7 @@ mod tests {
             semitones,
             keep_formants: false,
         }
-        .apply(input)
+        .apply(input, &mut |_| true)
         .unwrap()
     }
 
@@ -142,7 +151,34 @@ mod tests {
             semitones: 0,
             keep_formants: false,
         }
-        .apply(&input);
-        assert!(refused.is_none());
+        .apply(&input, &mut |_| true);
+        assert_eq!(refused, Err(Refusal::TooShort));
+    }
+
+    #[test]
+    fn reports_the_frames_it_wrote_and_stops_when_told() {
+        let input = vec![sine(440.0, frames(2000))];
+        let stretch = Stretch {
+            sample_rate: SAMPLE_RATE,
+            frame_count: frames(3000),
+            semitones: 2,
+            keep_formants: false,
+        };
+        let mut written = Vec::new();
+        let output = stretch.apply(&input, &mut |frames| {
+            written.push(frames);
+            true
+        });
+        assert!(output.is_ok());
+        assert_eq!(written.first(), Some(&0));
+        assert_eq!(written.last(), Some(&frames(3000)));
+        assert!(written.is_sorted());
+        let mut blocks = 0;
+        let stopped = stretch.apply(&input, &mut |_| {
+            blocks += 1;
+            blocks < 3
+        });
+        assert_eq!(stopped, Err(Refusal::Stopped));
+        assert_eq!(blocks, 3);
     }
 }

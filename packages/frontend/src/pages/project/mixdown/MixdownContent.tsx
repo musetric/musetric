@@ -10,9 +10,9 @@ import {
   ToggleButton,
   Typography,
 } from '@mui/material';
-import { api } from '@musetric/api';
+import { type api } from '@musetric/api';
 import { getActiveRecording } from '@musetric/engine';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
@@ -25,9 +25,14 @@ import {
   mixdownFormatNames,
   saveMixdownChoice,
 } from './mixdownChoice.js';
+import {
+  cancelMixdownExport,
+  startMixdownExport,
+  useMixdownExports,
+} from './mixdownExport.js';
 import { getMixdownLabel } from './mixdownLabel.js';
+import { MixdownProgress } from './MixdownProgress.js';
 import { MixdownTiles } from './MixdownTiles.js';
-import { saveMixdown } from './saveMixdown.js';
 
 type FormatName = api.mixdown.Format['format'];
 
@@ -58,7 +63,9 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
   const project = useQuery(endpoints.project.get(projectId));
   const [choice, setChoice] = useState(loadMixdownChoice);
   const { format, bitrate, bitDepth } = choice;
-  const mixdown = useMutation(endpoints.mixdown.create(projectId));
+  const progress = useMixdownExports((state) => state.running[projectId]);
+  const failed = useMixdownExports((state) => state.failed[projectId] === true);
+  const exporting = progress !== undefined;
   const lossy = format === 'm4a' || format === 'mp3';
 
   const label = getMixdownLabel(
@@ -104,7 +111,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
           <CloseRoundedIcon />
         </IconButton>
       </Stack>
-      <MixdownTiles sideAnchor={sideAnchor} disabled={mixdown.isPending} />
+      <MixdownTiles sideAnchor={sideAnchor} disabled={exporting} />
       <Stack sx={{ gap: 1.5 }}>
         <Stack
           direction='row'
@@ -118,7 +125,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               variant='standard'
               disableUnderline
               value={bitrate}
-              disabled={mixdown.isPending}
+              disabled={exporting}
               inputProps={{ 'aria-label': t('pages.project.mixdown.quality') }}
               onChange={(event) => {
                 const value = bitrates.find(
@@ -141,7 +148,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               variant='standard'
               disableUnderline
               value={bitDepth}
-              disabled={mixdown.isPending}
+              disabled={exporting}
               inputProps={{ 'aria-label': t('pages.project.mixdown.quality') }}
               onChange={(event) => {
                 const value = bitDepths.find(
@@ -172,7 +179,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               key={name}
               value={name}
               selected={name === format}
-              disabled={mixdown.isPending}
+              disabled={exporting}
               onClick={() => {
                 setChoice({ ...choice, format: name });
               }}
@@ -191,48 +198,57 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
           ))}
         </Stack>
       </Stack>
-      {mixdown.isError && (
+      {failed && !exporting && (
         <Alert severity='error'>{t('pages.project.mixdown.failed')}</Alert>
       )}
-      <Stack
-        direction={{ xs: 'column-reverse', sm: 'row' }}
-        sx={{
-          alignItems: { xs: 'stretch', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
-        }}
-      >
-        <Typography
-          variant='caption'
-          noWrap
+      {progress ? (
+        <MixdownProgress
+          progress={progress}
+          onCancel={() => {
+            cancelMixdownExport(projectId);
+          }}
+        />
+      ) : (
+        <Stack
+          direction={{ xs: 'column-reverse', sm: 'row' }}
           sx={{
-            color: 'text.secondary',
-            textAlign: { xs: 'center', sm: 'left' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 2,
           }}
         >
-          {label === undefined
-            ? t('pages.project.mixdown.silent')
-            : t('pages.project.mixdown.fileName', {
-                name: project.data?.name ?? '',
-                label,
-                extension: format,
-              })}
-        </Typography>
-        <Button
-          variant='contained'
-          startIcon={<DownloadRoundedIcon />}
-          loading={mixdown.isPending}
-          disabled={label === undefined}
-          sx={{ flexShrink: 0, '@media (any-pointer: coarse)': { height: 48 } }}
-          onClick={() => {
-            if (label === undefined) {
-              return;
-            }
-            saveMixdownChoice(choice);
-            const state = engine.store.get();
-            const voiceShifted = state.singerVoice === 'shifted';
-            mixdown.mutate(
-              {
+          <Typography
+            variant='caption'
+            noWrap
+            sx={{
+              color: 'text.secondary',
+              textAlign: { xs: 'center', sm: 'left' },
+            }}
+          >
+            {label === undefined
+              ? t('pages.project.mixdown.silent')
+              : t('pages.project.mixdown.fileName', {
+                  name: project.data?.name ?? '',
+                  label,
+                  extension: format,
+                })}
+          </Typography>
+          <Button
+            variant='contained'
+            startIcon={<DownloadRoundedIcon />}
+            disabled={label === undefined}
+            sx={{
+              flexShrink: 0,
+              '@media (any-pointer: coarse)': { height: 48 },
+            }}
+            onClick={() => {
+              if (label === undefined) {
+                return;
+              }
+              saveMixdownChoice(choice);
+              const state = engine.store.get();
+              const voiceShifted = state.singerVoice === 'shifted';
+              startMixdownExport(projectId, {
                 request: {
                   format: lossy ? { format, bitrate } : { format, bitDepth },
                   volumes: state.trackVolumes,
@@ -250,25 +266,18 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
                     voiceOctave: state.voiceOctave,
                     voiceShifted,
                   }),
-              },
-              {
-                onSuccess: (created) => {
-                  void saveMixdown(
-                    api.mixdown.content.base.endpoint({
-                      mixdownId: created.mixdownId,
-                    }),
-                  ).catch((error: unknown) => {
-                    console.error('Failed to save the mixdown', error);
-                  });
-                  setOpen(false);
+                onSaved: () => {
+                  if (routes.project.match()?.projectId === projectId) {
+                    setOpen(false);
+                  }
                 },
-              },
-            );
-          }}
-        >
-          {t('pages.project.mixdown.download')}
-        </Button>
-      </Stack>
+              });
+            }}
+          >
+            {t('pages.project.mixdown.download')}
+          </Button>
+        </Stack>
+      )}
     </Stack>
   );
 };
