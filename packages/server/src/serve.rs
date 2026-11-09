@@ -19,7 +19,7 @@ use rcgen::generate_simple_self_signed;
 use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
-    analysis::{AnalysisContext, AnalysisRunner},
+    analysis::{AnalysisContext, AnalysisRunner, models::remove_unpinned},
     blobs::clear_upload_area,
     executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
@@ -237,6 +237,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     if options.processing {
         queue.spawn();
         wake_on_arrival(&host, &queue);
+        remove_unpinned_models(options.models.clone());
     }
     let executor_url = host.base_url().to_owned();
     let executor = Arc::clone(&host);
@@ -252,6 +253,19 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         executor_url,
         executor,
     })
+}
+
+fn remove_unpinned_models(models: PathBuf) {
+    tokio::spawn(async move {
+        match remove_unpinned(&models).await {
+            Ok(removed) => {
+                for path in removed {
+                    log::info!("removed {}, which no model pin names", path.display());
+                }
+            }
+            Err(error) => log::warn!("could not remove the model files no pin names: {error}"),
+        }
+    });
 }
 
 fn wake_on_arrival(host: &ExecutorHost, queue: &Arc<Queue>) {

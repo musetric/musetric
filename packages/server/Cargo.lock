@@ -2953,6 +2953,7 @@ dependencies = [
  "clap",
  "futures-util",
  "http-body-util",
+ "log",
  "md5",
  "musetric-db",
  "musetric-gpu",

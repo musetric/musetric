@@ -1,8 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
 
-use musetric_gpu::{ModelFile, has_verified_copy};
+use musetric_db::BoxedError;
+use musetric_gpu::{ModelFile, has_verified_copy, kept_files};
 use musetric_media::Downmix;
 use serde_json::{Value, json};
+use tokio::fs::{ReadDir, read_dir, remove_dir_all, remove_file};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CacheLayout {
@@ -377,4 +383,137 @@ pub(crate) async fn download_size(models_path: &Path) -> DownloadSize {
         }
     }
     size
+}
+
+pub(crate) async fn remove_unpinned(models_path: &Path) -> Result<Vec<PathBuf>, BoxedError> {
+    let mut removed = Vec::new();
+    for bundle in BUNDLES {
+        let models = bundle.cached(models_path);
+        let Some(directory) = models.first().and_then(|model| model.path.parent()) else {
+            continue;
+        };
+        if bundle.layout == CacheLayout::Hub {
+            removed.extend(remove_other_revisions(directory).await?);
+        }
+        let kept: HashSet<PathBuf> = models.iter().flat_map(kept_files).collect();
+        removed.extend(remove_files_but(directory, &kept).await?);
+    }
+    Ok(removed)
+}
+
+async fn remove_other_revisions(revision: &Path) -> Result<Vec<PathBuf>, BoxedError> {
+    let mut removed = Vec::new();
+    let Some(revisions) = revision.parent() else {
+        return Ok(removed);
+    };
+    let Some(mut entries) = open_directory(revisions).await? else {
+        return Ok(removed);
+    };
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if entry.file_type().await?.is_dir() && path != revision {
+            remove_dir_all(&path).await?;
+            removed.push(path);
+        }
+    }
+    Ok(removed)
+}
+
+async fn remove_files_but(
+    directory: &Path,
+    kept: &HashSet<PathBuf>,
+) -> Result<Vec<PathBuf>, BoxedError> {
+    let mut removed = Vec::new();
+    let Some(mut entries) = open_directory(directory).await? else {
+        return Ok(removed);
+    };
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if entry.file_type().await?.is_file() && !kept.contains(&path) {
+            remove_file(&path).await?;
+            removed.push(path);
+        }
+    }
+    Ok(removed)
+}
+
+async fn open_directory(directory: &Path) -> Result<Option<ReadDir>, BoxedError> {
+    match read_dir(directory).await {
+        Ok(entries) => Ok(Some(entries)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::{create_dir_all, write},
+        path::Path,
+    };
+
+    use super::{CHORD_NET, WHISPER, remove_unpinned};
+    use crate::test_workspace::Workspace;
+
+    fn put(path: &Path) {
+        let directory = path.parent().expect("a file should have a folder");
+        create_dir_all(directory).expect("the folder should be created");
+        write(path, "bytes").expect("the file should be written");
+    }
+
+    #[tokio::test]
+    async fn removes_only_the_files_no_pin_names() {
+        let workspace = Workspace::new();
+        let models = workspace.models_path();
+        let chords = CHORD_NET.cached(&models);
+        let flat = chords[0]
+            .path
+            .parent()
+            .expect("a pin has a folder")
+            .to_owned();
+        let whisper = WHISPER.cached(&models);
+        let revision = whisper[0]
+            .path
+            .parent()
+            .expect("a pin has a folder")
+            .to_owned();
+        let revisions = revision
+            .parent()
+            .expect("a revision has a folder")
+            .to_owned();
+        let old_revision = revisions.join("0".repeat(40));
+        let kept = [
+            chords[0].path.clone(),
+            flat.join(format!("{}.verified", chords[0].file)),
+            flat.join(format!("{}.part", chords[1].file)),
+            flat.join("folder").join("file"),
+            whisper[0].path.clone(),
+            models.join("hub").join("checkpoints").join("model.pth"),
+        ];
+        let stale = [
+            flat.join("chordnet-old.onnx"),
+            flat.join("chordnet-old.onnx.verified"),
+            revision.join("stale.json"),
+            old_revision.join("config.json"),
+        ];
+        for path in kept.iter().chain(&stale) {
+            put(path);
+        }
+
+        let mut removed = remove_unpinned(&models)
+            .await
+            .expect("the unpinned files should be removed");
+        removed.sort();
+
+        let mut expected = vec![
+            flat.join("chordnet-old.onnx"),
+            flat.join("chordnet-old.onnx.verified"),
+            revision.join("stale.json"),
+            old_revision.clone(),
+        ];
+        expected.sort();
+        assert_eq!(removed, expected);
+        assert!(kept.iter().all(|path| path.exists()));
+        assert!(!old_revision.exists());
+    }
 }
