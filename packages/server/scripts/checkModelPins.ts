@@ -10,6 +10,22 @@ const modelsFile = resolve(
 const hub = 'https://huggingface.co';
 const requestTimeout = 15_000;
 
+const constantPattern =
+  /const ([A-Z][A-Z0-9_]*): &(?:'static )?str =\s*"([^"]+)";/g;
+const pinPattern = /model_id: "([^"]+)",\s+revision: "([0-9a-f]{40})"/;
+const entryPattern =
+  /\(\s*("[^"]+"|[A-Z][A-Z0-9_]*),\s*"([0-9a-f]{64})",\s*([\d_]+),?\s*\)/g;
+const filesStart = 'files: &[';
+
+const readFilesArray = (bundle: string): string => {
+  const start = bundle.indexOf(filesStart);
+  if (start < 0) {
+    return '';
+  }
+  const end = bundle.indexOf('],', start);
+  return end < 0 ? '' : bundle.slice(start + filesStart.length, end);
+};
+
 type PinnedFile = {
   name: string;
   sha256: string;
@@ -25,42 +41,41 @@ type ModelPin = {
 
 const readPins = (source: string): ModelPin[] => {
   const names = new Map(
-    [...source.matchAll(/const ([A-Z][A-Z0-9_]*): &str = "([^"]+)";/g)].map(
-      (match) => [match[1], match[2]],
-    ),
+    [...source.matchAll(constantPattern)].map((match) => [match[1], match[2]]),
   );
-  const starts = [
-    ...source.matchAll(/model_id: "([^"]+)",\s+revision: "([0-9a-f]{40})"/g),
-  ];
-  return starts.map((start, index) => {
-    const end = starts[index + 1]?.index ?? source.length;
-    const bundle = source.slice(start.index, end);
-    const files = [
-      ...bundle.matchAll(
-        /\(\s*("[^"]+"|[A-Z][A-Z0-9_]*),\s*"([0-9a-f]{64})",\s*([\d_]+),?\s*\)/g,
-      ),
-    ].map((match) => {
-      const [, token, sha256, size] = match;
-      const name = token.startsWith('"')
-        ? token.slice(1, -1)
-        : names.get(token);
-      if (name === undefined) {
-        throw new Error(`models.rs names no file for ${token}`);
+  return source
+    .split('ModelBundle {')
+    .slice(1)
+    .flatMap((bundle) => {
+      const pin = pinPattern.exec(bundle);
+      if (!pin) {
+        return [];
       }
-      return {
-        name,
-        sha256,
-        size: Number(size.replaceAll('_', '')),
-      };
+      const array = readFilesArray(bundle);
+      const files = [...array.matchAll(entryPattern)].map((match) => {
+        const [, token, sha256, size] = match;
+        const name = token.startsWith('"')
+          ? token.slice(1, -1)
+          : names.get(token);
+        if (name === undefined) {
+          throw new Error(`models.rs names no file for ${token}`);
+        }
+        return {
+          name,
+          sha256,
+          size: Number(size.replaceAll('_', '')),
+        };
+      });
+      const entries = array.match(/\(/g)?.length ?? 0;
+      return [
+        {
+          modelId: pin[1],
+          revision: pin[2],
+          files,
+          unread: entries - files.length,
+        },
+      ];
     });
-    const listed = bundle.match(/"[0-9a-f]{64}"/g)?.length ?? 0;
-    return {
-      modelId: start[1],
-      revision: start[2],
-      files,
-      unread: listed - files.length,
-    };
-  });
 };
 
 const pins = readPins(readFileSync(modelsFile, 'utf8'));
@@ -105,22 +120,33 @@ const readListing = async (): Promise<Map<string, ListedModel>> => {
   return listing;
 };
 
+const nextPage = (response: Response): string | undefined => {
+  const link = response.headers
+    .get('link')
+    ?.split(',')
+    .find((part) => part.includes('rel="next"'));
+  return link === undefined
+    ? undefined
+    : new URL(link.slice(link.indexOf('<') + 1, link.indexOf('>')), hub).href;
+};
+
 type TreeFile = {
   path: string;
   size: number;
   lfsSha256: string | undefined;
 };
 
-const readTree = async (model: ListedModel): Promise<Map<string, TreeFile>> => {
-  const response = await fetchOk(
-    `${hub}/api/models/${model.id}/tree/${model.head}`,
-  );
+const readTreePage = async (
+  url: string,
+  model: ListedModel,
+  tree: Map<string, TreeFile>,
+): Promise<string | undefined> => {
+  const response = await fetchOk(url);
   const raw: unknown = await response.json();
   if (!Array.isArray(raw)) {
     throw new Error(`Hugging Face sent no file list of ${model.id}`);
   }
   const entries: unknown[] = raw;
-  const tree = new Map<string, TreeFile>();
   for (const entry of entries) {
     if (
       typeof entry === 'object' &&
@@ -144,12 +170,22 @@ const readTree = async (model: ListedModel): Promise<Map<string, TreeFile>> => {
       });
     }
   }
+  return nextPage(response);
+};
+
+const readTree = async (model: ListedModel): Promise<Map<string, TreeFile>> => {
+  const tree = new Map<string, TreeFile>();
+  let page: string | undefined =
+    `${hub}/api/models/${model.id}/tree/${model.head}?recursive=true`;
+  while (page !== undefined) {
+    page = await readTreePage(page, model, tree);
+  }
   return tree;
 };
 
 const hashFile = async (model: ListedModel, path: string): Promise<string> => {
   const response = await fetchOk(
-    `${hub}/${model.id}/resolve/${model.head}/${path}`,
+    `${hub}/${model.id}/resolve/${model.head}/${path.split('/').map(encodeURIComponent).join('/')}`,
   );
   return createHash('sha256')
     .update(Buffer.from(await response.arrayBuffer()))
@@ -193,11 +229,16 @@ const checkFiles = async (
       `${pin.modelId}: the check reads ${pin.files.length} pinned files in models.rs and cannot read ${pin.unread} more.`,
     ];
   }
-  const tree = await readTree(model);
-  const faults = await Promise.all(
-    pin.files.map(async (file) => checkFile(pin, model, tree, file)),
-  );
-  return faults.flat();
+  try {
+    const tree = await readTree(model);
+    const faults = await Promise.all(
+      pin.files.map(async (file) => checkFile(pin, model, tree, file)),
+    );
+    return faults.flat();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return [`${pin.modelId}: its files could not be read: ${reason}`];
+  }
 };
 
 const listing = await readListing();
@@ -219,14 +260,21 @@ const verdicts: PinVerdict[] = await Promise.all(
   }),
 );
 
+const isStale = (verdict: PinVerdict): boolean =>
+  verdict.head !== verdict.revision;
+
+const isWrong = (verdict: PinVerdict): boolean => verdict.faults.length > 0;
+
 const readMark = (verdict: PinVerdict): string => {
-  if (verdict.head !== verdict.revision) {
+  if (isStale(verdict)) {
     return 'stale';
   }
-  return verdict.faults.length > 0 ? 'wrong' : 'ok   ';
+  return isWrong(verdict) ? 'wrong' : 'ok   ';
 };
 
-const failed = verdicts.filter((verdict) => readMark(verdict) !== 'ok   ');
+const failed = verdicts.filter(
+  (verdict) => isStale(verdict) || isWrong(verdict),
+);
 for (const verdict of verdicts) {
   console.log(`${readMark(verdict)} ${verdict.modelId} ${verdict.revision}`);
 }
