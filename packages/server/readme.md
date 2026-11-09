@@ -39,6 +39,33 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 - The export is stretched by `crates/stretch`, the host's own Rust port of
   Signalsmith Stretch, which keeps it free of unsafe code and of a C++
   toolchain on every target.
+- A column that names a blob ends in `blobId`: the collector keeps exactly the
+  files those columns name. `crates/db/src/tests.rs` checks that every such
+  column is read by `REFERENCED_BLOB_IDS` of `crates/db/src/blob.rs`, and that
+  every other `TEXT` column whose name ends in `Id` is known to hold no blob.
+
+## Storage
+
+The host keeps a project's files in two folders.
+
+- `--blobs` holds the finished files, each under the first two byte pairs of
+  its id (`blob_path` of `crates/db/src/blob.rs`). A file enters it only
+  through `publish` of `src/publish.rs`, which moves it in and writes the row
+  that names it while the collector waits. Every five minutes the collector of
+  `src/garbage.rs` removes the files older than five minutes that no row
+  names.
+- `--work` holds what is not finished (`src/blobs.rs`): `upload/` the files of
+  a request being read, `<project id>/<step>/` the area and checkpoints of a
+  step, `<project id>/recording/` the take being recorded, `mixdown/` the
+  exports of the last hour, and `executor-browser/` the profile of the
+  executor's browser. A step removes its area when it finishes and keeps it
+  after a failure or a pause, to resume from it.
+
+What no project needs is removed: removing a project removes its folder under
+`--work`; at start the host empties `upload/` and `mixdown/`; at start and
+every five minutes the collector removes the folder of every project the
+database no longer has, which catches a step that wrote after its project was
+removed.
 
 ## A second server
 

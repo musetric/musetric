@@ -11,12 +11,24 @@ pub(crate) fn upload_area(work_path: &Path) -> PathBuf {
     work_path.join(UPLOAD_AREA)
 }
 
+pub(crate) fn clear_upload_area(work_path: &Path) {
+    let _ = std::fs::remove_dir_all(upload_area(work_path));
+}
+
+pub(crate) fn project_area(work_path: &Path, project_id: i64) -> PathBuf {
+    work_path.join(project_id.to_string())
+}
+
+pub(crate) fn read_project_area_id(area: &Path) -> Option<i64> {
+    area.file_name()?.to_str()?.parse().ok()
+}
+
 pub(crate) fn step_area(work_path: &Path, project_id: i64, step: ProcessingStep) -> PathBuf {
-    work_path.join(project_id.to_string()).join(step.name())
+    project_area(work_path, project_id).join(step.name())
 }
 
 pub(crate) fn recording_area(work_path: &Path, project_id: i64) -> PathBuf {
-    work_path.join(project_id.to_string()).join(RECORDING_AREA)
+    project_area(work_path, project_id).join(RECORDING_AREA)
 }
 
 pub(crate) async fn open_area(area: &Path) -> Result<(), BoxedError> {
@@ -86,7 +98,7 @@ mod tests {
     use tokio::{fs::try_exists, io::AsyncWriteExt};
     use uuid::Uuid;
 
-    use super::{stage_blob, upload_area};
+    use super::{clear_upload_area, stage_blob, upload_area};
 
     struct Directories {
         root: PathBuf,
@@ -148,5 +160,19 @@ mod tests {
 
         assert!(!try_exists(staged.path()).await.unwrap_or(true));
         assert!(!try_exists(&directories.blobs).await.unwrap_or(true));
+    }
+    #[test]
+    fn clears_the_upload_area_and_nothing_else() {
+        let directories = Directories::create();
+        let work = directories.root.join("work");
+        for area in [directories.area.clone(), work.join("1").join("separation")] {
+            std::fs::create_dir_all(&area).expect("the area should be created");
+            std::fs::write(area.join("file"), "staged").expect("the file should be written");
+        }
+
+        clear_upload_area(&work);
+
+        assert!(!directories.area.exists());
+        assert!(work.join("1").join("separation").join("file").exists());
     }
 }

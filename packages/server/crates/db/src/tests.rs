@@ -329,7 +329,7 @@ const BLOB_SEED: &str = "
     VALUES (1, 'RecordingPiece.blobId', 'base', 0, 100, 1.0, 0, 0);
 ";
 
-fn blob_columns(path: &Path) -> Vec<String> {
+fn schema_columns(path: &Path) -> Vec<(String, String)> {
     let tables: Vec<String> = read(path, |connection| {
         let mut statement = connection
             .prepare(
@@ -342,7 +342,7 @@ fn blob_columns(path: &Path) -> Vec<String> {
             .map(Result::unwrap)
             .collect()
     });
-    let mut columns: Vec<String> = tables
+    let mut columns: Vec<(String, String)> = tables
         .iter()
         .flat_map(|table| {
             read(path, |connection| {
@@ -350,17 +350,45 @@ fn blob_columns(path: &Path) -> Vec<String> {
                     .prepare(&format!("PRAGMA table_info({table})"))
                     .unwrap();
                 statement
-                    .query_map([], |row| row.get::<_, String>(1))
+                    .query_map([], |row| {
+                        Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                    })
                     .unwrap()
                     .map(Result::unwrap)
-                    .map(|column| format!("{table}.{column}"))
+                    .map(|(column, kind)| (format!("{table}.{column}"), kind))
                     .collect::<Vec<_>>()
             })
         })
-        .filter(|column| column.to_lowercase().ends_with("blobid"))
         .collect();
     columns.sort();
     columns
+}
+
+fn blob_columns(path: &Path) -> Vec<String> {
+    schema_columns(path)
+        .into_iter()
+        .map(|(column, _)| column)
+        .filter(|column| column.to_lowercase().ends_with("blobid"))
+        .collect()
+}
+
+const OTHER_ID_COLUMNS: [&str; 2] = ["ProcessingStep.attemptId", "ProcessingStep.computationId"];
+
+#[test]
+fn names_every_text_id_column_that_holds_no_blob() {
+    let workspace = Workspace::new();
+    init_database(&workspace.database_path()).unwrap();
+
+    let others: Vec<String> = schema_columns(&workspace.database_path())
+        .into_iter()
+        .filter(|(column, kind)| {
+            let lower = column.to_lowercase();
+            kind == "TEXT" && lower.ends_with("id") && !lower.ends_with("blobid")
+        })
+        .map(|(column, _)| column)
+        .collect();
+
+    assert_eq!(others, OTHER_ID_COLUMNS);
 }
 
 #[test]
