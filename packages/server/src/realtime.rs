@@ -23,6 +23,7 @@ use crate::{
     realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
     recording::{
         TakeFormat, is_active_recording, read_recordings, refresh_peaks, set_fresh_applied,
+        write_peaks,
     },
     routes::RouteState,
     storage::{Storage, read},
@@ -396,21 +397,26 @@ async fn finish_session(
     rooms.end_take(connection.project_id, connection.member);
     rooms.save_session(connection.project_id, connection.member);
     let finished = session.finish(&connection.storage).await;
-    if let Ok(committed) = finished.as_ref() {
+    rooms.broadcast_event(
+        connection.project_id,
+        &events::recording_finished(&id),
+        finished.is_err().then_some(connection.member),
+    );
+    channel.flush().await;
+    let changed = match &finished {
+        Ok(None) => false,
+        Ok(Some(_)) => {
+            refresh_peaks(&connection.storage, recording_id).await;
+            true
+        }
+        Err(_) => write_peaks(&connection.storage, recording_id).await.is_ok(),
+    };
+    if changed {
         rooms.broadcast_event(
             connection.project_id,
-            &events::recording_finished(&id),
+            &events::recording_changed(recording_id),
             None,
         );
-        channel.flush().await;
-        if committed.is_some() {
-            refresh_peaks(&connection.storage, recording_id).await;
-            rooms.broadcast_event(
-                connection.project_id,
-                &events::recording_changed(recording_id),
-                None,
-            );
-        }
     }
     rooms.end_session(connection.project_id, connection.member);
     if matches!(finished, Ok(Some(_))) {
@@ -1782,5 +1788,99 @@ mod tests {
         .await;
         expect_changed([&mut owner, &mut listener], true, false).await;
         assert_eq!(composite(&storage).await, sung);
+    }
+    async fn read_wave(storage: &Storage) -> Vec<u8> {
+        tokio::fs::read(musetric_db::blob_path(
+            &storage.blobs_path,
+            &stored_audio(storage).wave_blob_id,
+        ))
+        .await
+        .expect("the wave should be readable")
+    }
+
+    async fn collect_events(socket: &mut ClientSocket) -> Vec<Value> {
+        let mut events = Vec::new();
+        while let Ok(Some(Ok(ClientMessage::Text(text)))) = timeout(SILENCE, socket.next()).await {
+            events.push(serde_json::from_str(&text).expect("the event should be json"));
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn ends_a_take_that_cannot_be_saved_for_every_member_and_restores_the_wave() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        let silent = read_wave(&storage).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+        workspace.seed(
+            "CREATE TRIGGER refuse_piece BEFORE INSERT ON RecordingPiece
+             BEGIN SELECT RAISE(ABORT, 'the disk is full'); END;",
+        );
+
+        send_json(&mut owner, json!({ "type": "recording.finish" })).await;
+
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+        );
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.changed", "recordingId": 1 })
+        );
+        assert_eq!(
+            receive_json(&mut owner).await,
+            json!({ "type": "recording.changed", "recordingId": 1 })
+        );
+        assert_eq!(receive_json(&mut owner).await["type"], "error");
+        assert_eq!(read_wave(&storage).await, silent);
+    }
+
+    #[tokio::test]
+    async fn sends_no_change_of_a_recording_removed_during_its_take() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+        workspace.seed("DELETE FROM Recording WHERE id = 1;");
+
+        send_json(&mut owner, json!({ "type": "recording.finish" })).await;
+
+        let events = collect_events(&mut listener).await;
+        assert_eq!(
+            events.first(),
+            Some(&json!({ "type": "recording.finished", "sessionId": OWNER_TAKE }))
+        );
+        assert!(
+            events
+                .iter()
+                .all(|event| event["type"] != "recording.changed"),
+            "{events:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn writes_a_lost_wave_again_from_the_takes_before_a_take_starts() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server) = start_server(&workspace, Arc::clone(&storage)).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+        commit_take(&mut owner, &mut listener, OWNER_TAKE).await;
+        let kept = read_wave(&storage).await;
+        std::fs::remove_file(musetric_db::blob_path(
+            &storage.blobs_path,
+            &stored_audio(&storage).wave_blob_id,
+        ))
+        .expect("the wave should be removed");
+
+        restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
+
+        assert_eq!(read_wave(&storage).await, kept);
     }
 }
