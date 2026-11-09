@@ -1,8 +1,9 @@
 use axum::extract::ws::{Message, WebSocket};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::{mpsc::UnboundedReceiver, watch};
 
 use crate::realtime::events;
 
+pub(crate) const CLOSE_GOING_AWAY: u16 = 1001;
 pub(crate) const CLOSE_UNSUPPORTED: u16 = 1003;
 pub(crate) const CLOSE_POLICY: u16 = 1008;
 pub(crate) const CLOSE_INTERNAL: u16 = 1011;
@@ -17,18 +18,15 @@ impl Channel {
         Self { socket, outgoing }
     }
 
-    pub(crate) async fn receive(&mut self) -> Option<Message> {
+    pub(crate) async fn receive(&mut self, closing: &mut watch::Receiver<bool>) -> Option<Message> {
         loop {
-            tokio::select! {
-                received = self.socket.recv() => {
-                    return received.and_then(Result::ok);
-                }
-                queued = self.outgoing.recv() => {
-                    let message = queued?;
-                    if self.socket.send(message).await.is_err() {
-                        return None;
-                    }
-                }
+            let message = tokio::select! {
+                received = self.socket.recv() => return received.and_then(Result::ok),
+                queued = self.outgoing.recv() => queued?,
+                _ = closing.wait_for(|closed| *closed) => return None,
+            };
+            if self.socket.send(message).await.is_err() {
+                return None;
             }
         }
     }

@@ -20,7 +20,7 @@ use musetric_db::BoxedError;
 use serde_json::Value;
 
 use crate::{
-    realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
+    realtime::channel::{CLOSE_GOING_AWAY, CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
     recording::{
         TakeFormat, is_active_recording, read_recordings, refresh_peaks, set_fresh_applied,
         write_peaks,
@@ -74,6 +74,9 @@ async fn serve(
     }
     state.rooms.leave(project_id, member);
     let _ = finish_session(&mut channel, &state.rooms, &mut connection).await;
+    if state.rooms.is_closing() {
+        channel.close(CLOSE_GOING_AWAY, "The host is closing").await;
+    }
 }
 
 async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id: i64) -> bool {
@@ -98,14 +101,7 @@ async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id:
 
 async fn run_connection(channel: &mut Channel, rooms: &Rooms, connection: &mut Connection) {
     let mut closing = rooms.closing();
-    loop {
-        let received = tokio::select! {
-            received = channel.receive() => received,
-            _ = closing.wait_for(|closed| *closed) => None,
-        };
-        let Some(incoming) = received else {
-            break;
-        };
+    while let Some(incoming) = channel.receive(&mut closing).await {
         if !receive_message(channel, rooms, connection, incoming).await {
             break;
         }

@@ -99,7 +99,7 @@ impl EmbeddedServer {
     }
 
     pub async fn close(&self) {
-        let _ = timeout(SESSION_CLOSE_LIMIT, self.rooms.close()).await;
+        close_sessions(&self.rooms).await;
         let sender = self.shutdown.lock().ok().and_then(|mut guard| guard.take());
         if let Some(shutdown) = sender {
             let _ = shutdown.send(());
@@ -132,6 +132,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let CreatedApp {
         router: app,
         executor_url,
+        rooms,
         ..
     } = create_app(AppOptions {
         storage,
@@ -161,7 +162,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     };
     if let Some(config) = tls {
         let handle = Handle::<SocketAddr>::new();
-        tokio::spawn(shutdown_on_signal(handle.clone()));
+        tokio::spawn(shutdown_on_signal(handle.clone(), rooms));
         announce_ready("https", address);
         axum_server::from_tcp_rustls(socket, config)?
             .handle(handle)
@@ -172,7 +173,10 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let listener = TcpListener::from_std(socket)?;
     announce_ready("http", address);
     axum::serve(listener, app)
-        .with_graceful_shutdown(stop_requested())
+        .with_graceful_shutdown(async move {
+            stop_requested().await;
+            close_sessions(&rooms).await;
+        })
         .await?;
     Ok(())
 }
@@ -394,9 +398,14 @@ fn report_migration_failure(failure: &MigrationFailure) {
     let _ = writeln!(io::stderr().lock(), "{}", lines.join("\n"));
 }
 
-async fn shutdown_on_signal(handle: Handle<SocketAddr>) {
+async fn shutdown_on_signal(handle: Handle<SocketAddr>, rooms: Arc<Rooms>) {
     stop_requested().await;
+    close_sessions(&rooms).await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+}
+
+async fn close_sessions(rooms: &Rooms) {
+    let _ = timeout(SESSION_CLOSE_LIMIT, rooms.close()).await;
 }
 
 #[cfg(test)]
@@ -416,12 +425,12 @@ mod tests {
     use musetric_db::{OpenOptions, init_database, lock_storage, open_database};
     use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
+    use super::{EmbeddedServerOptions, ServerOptions, serve, start_embedded};
+    use crate::{Asset, Assets, Bundle, Frontend};
+
     type ClientSocket = tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >;
-
-    use super::{EmbeddedServerOptions, ServerOptions, serve, start_embedded};
-    use crate::{Asset, Assets, Bundle, Frontend};
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -595,6 +604,14 @@ mod tests {
         assert!(refused.is_err());
         assert_eq!(status, "processing");
     }
+
+    fn read_close_code(received: ClientMessage) -> Option<u16> {
+        match received {
+            ClientMessage::Close(Some(frame)) => Some(u16::from(frame.code)),
+            _ => None,
+        }
+    }
+
     async fn next_event(socket: &mut ClientSocket, wanted: &str) {
         loop {
             let received = socket
@@ -661,6 +678,11 @@ mod tests {
 
         server.close().await;
 
+        let mut code = None;
+        while let Some(Ok(received)) = socket.next().await {
+            code = code.or_else(|| read_close_code(received));
+        }
+        assert_eq!(code, Some(1001));
         let pieces: i64 = open_database(&database, &OpenOptions { foreign_keys: true })
             .expect("the database should open")
             .query_row(

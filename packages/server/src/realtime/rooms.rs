@@ -147,6 +147,10 @@ impl Rooms {
         self.closing.subscribe()
     }
 
+    pub(crate) fn is_closing(&self) -> bool {
+        *self.closing.borrow()
+    }
+
     pub(crate) async fn close(&self) {
         self.closing.send_replace(true);
         let mut live = self.live.subscribe();
