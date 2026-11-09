@@ -1,7 +1,15 @@
+import { defaultServerConditions } from 'vite';
 import { defineConfig } from 'vitest/config';
 import defaultConfig from './vitest.config.js';
 
 export default defineConfig({
+  environments: {
+    __vitest__: {
+      resolve: {
+        conditions: defaultServerConditions.concat('monorepo'),
+      },
+    },
+  },
   test: {
     ...defaultConfig.test,
     include: ['**/*.bench.ts'],

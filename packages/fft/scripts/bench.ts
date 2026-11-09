@@ -13,6 +13,9 @@ declare module 'vitest' {
 }
 
 const main = async (): Promise<void> => {
+  process.env.TEST = 'true';
+  process.env.VITEST = 'true';
+  process.env.NODE_ENV ??= 'test';
   const startTime = performance.now();
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const packageRoot = resolve(currentDir, '..');
@@ -45,6 +48,13 @@ const main = async (): Promise<void> => {
     );
     const cufftResults = runCufftBenchmark() ?? [];
     await vitest.start();
+    const failures = vitest.state
+      .getTestModules()
+      .flatMap((module) => [...module.children.allTests()])
+      .flatMap((test) => test.result().errors ?? []);
+    if (failures.length > 0) {
+      throw new Error(failures.map((failure) => failure.message).join('; '));
+    }
     writeBenchReport(collectWebgpuResults(), cufftResults);
   } finally {
     await vitest.close();

@@ -16,6 +16,10 @@ const startTime = performance.now();
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(currentDir, '..');
 
+process.env.TEST = 'true';
+process.env.VITEST = 'true';
+process.env.NODE_ENV ??= 'test';
+
 const vitest = await createVitest({
   config: resolve(packageRoot, 'vitest.bench.config.ts'),
   watch: false,
@@ -25,6 +29,14 @@ const runVitest = async (): Promise<
   spectrogramBench.SpectrogramBenchSummary[]
 > => {
   await vitest.start();
+
+  const failures = vitest.state
+    .getTestModules()
+    .flatMap((module) => [...module.children.allTests()])
+    .flatMap((test) => test.result().errors ?? []);
+  if (failures.length > 0) {
+    throw new Error(failures.map((failure) => failure.message).join('; '));
+  }
 
   const summaries: spectrogramBench.SpectrogramBenchSummary[] = [];
 
