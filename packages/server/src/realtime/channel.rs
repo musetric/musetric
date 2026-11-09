@@ -1,5 +1,13 @@
-use axum::extract::ws::{Message, WebSocket};
-use tokio::sync::{mpsc::UnboundedReceiver, watch};
+use std::time::Duration;
+
+use axum::{
+    body::Bytes,
+    extract::ws::{Message, WebSocket},
+};
+use tokio::{
+    sync::{mpsc::UnboundedReceiver, watch},
+    time::{Instant, Interval, MissedTickBehavior, interval_at},
+};
 
 use crate::realtime::events;
 
@@ -8,21 +16,56 @@ pub(crate) const CLOSE_UNSUPPORTED: u16 = 1003;
 pub(crate) const CLOSE_POLICY: u16 = 1008;
 pub(crate) const CLOSE_INTERNAL: u16 = 1011;
 
+#[derive(Clone, Copy)]
+pub(crate) struct Heartbeat {
+    pub(crate) interval: Duration,
+    pub(crate) silence: Duration,
+}
+
+pub(crate) const HEARTBEAT: Heartbeat = Heartbeat {
+    interval: Duration::from_secs(5),
+    silence: Duration::from_secs(15),
+};
+
 pub(crate) struct Channel {
     socket: WebSocket,
     outgoing: UnboundedReceiver<Message>,
+    beats: Interval,
+    silence: Duration,
+    heard: Instant,
 }
 
 impl Channel {
-    pub(crate) fn create(socket: WebSocket, outgoing: UnboundedReceiver<Message>) -> Self {
-        Self { socket, outgoing }
+    pub(crate) fn create(
+        socket: WebSocket,
+        outgoing: UnboundedReceiver<Message>,
+        heartbeat: Heartbeat,
+    ) -> Self {
+        let mut beats = interval_at(Instant::now() + heartbeat.interval, heartbeat.interval);
+        beats.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        Self {
+            socket,
+            outgoing,
+            beats,
+            silence: heartbeat.silence,
+            heard: Instant::now(),
+        }
     }
 
     pub(crate) async fn receive(&mut self, closing: &mut watch::Receiver<bool>) -> Option<Message> {
         loop {
             let message = tokio::select! {
-                received = self.socket.recv() => return received.and_then(Result::ok),
+                received = self.socket.recv() => {
+                    self.heard = Instant::now();
+                    return received.and_then(Result::ok);
+                }
                 queued = self.outgoing.recv() => queued?,
+                _ = self.beats.tick() => {
+                    if self.heard.elapsed() >= self.silence {
+                        return None;
+                    }
+                    Message::Ping(Bytes::new())
+                }
                 _ = closing.wait_for(|closed| *closed) => return None,
             };
             if self.socket.send(message).await.is_err() {

@@ -13,7 +13,10 @@ use tokio::sync::{
     watch,
 };
 
-use crate::realtime::events;
+use crate::realtime::{
+    channel::{HEARTBEAT, Heartbeat},
+    events,
+};
 
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 
@@ -118,6 +121,7 @@ pub(crate) struct Rooms {
     next_member: AtomicU64,
     closing: watch::Sender<bool>,
     live: watch::Sender<usize>,
+    heartbeat: Heartbeat,
 }
 
 pub(crate) struct Live<'rooms>(&'rooms watch::Sender<usize>);
@@ -130,12 +134,21 @@ impl Drop for Live<'_> {
 
 impl Rooms {
     pub(crate) fn create() -> Self {
+        Self::with_heartbeat(HEARTBEAT)
+    }
+
+    pub(crate) fn with_heartbeat(heartbeat: Heartbeat) -> Self {
         Self {
             projects: Mutex::new(HashMap::new()),
             next_member: AtomicU64::new(0),
             closing: watch::Sender::new(false),
             live: watch::Sender::new(0),
+            heartbeat,
         }
+    }
+
+    pub(crate) const fn heartbeat(&self) -> Heartbeat {
+        self.heartbeat
     }
 
     pub(crate) fn enter(&self) -> Live<'_> {
