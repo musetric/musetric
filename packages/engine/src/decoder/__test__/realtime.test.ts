@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe('project realtime', () => {
-  it('sends no packet of an earlier take when the next take starts', async () => {
+  it('drops the queued packets and keeps the queued messages', async () => {
     const sockets = stubSockets();
     let recordingReady = false;
     const realtime = createProjectRealtime({
@@ -67,23 +67,19 @@ describe('project realtime', () => {
     });
     realtime.open(1);
     const [socket] = sockets;
-    socket.open();
-    await realtime.ready();
     const refused = new Uint8Array([1, 2, 3]).buffer;
     const sung = new Uint8Array([4, 5, 6]).buffer;
+    const start = { type: 'recording.start', sessionId: 'next' };
 
-    realtime.sendJson({ type: 'recording.start', sessionId: 'refused' });
     realtime.sendBinary(refused);
-    realtime.sendJson({ type: 'recording.start', sessionId: 'next' });
+    realtime.sendJson(start);
+    realtime.dropPackets();
+    socket.open();
+    await realtime.ready();
     realtime.sendBinary(sung);
     recordingReady = true;
     realtime.flush();
 
-    expect(
-      socket.sent.filter((message) => typeof message !== 'string'),
-    ).toEqual([sung]);
-    expect(
-      socket.sent.filter((message) => typeof message === 'string'),
-    ).toHaveLength(2);
+    expect(socket.sent).toEqual([JSON.stringify(start), sung]);
   });
 });

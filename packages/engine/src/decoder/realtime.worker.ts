@@ -33,9 +33,6 @@ const closeSocket = (realtime: InternalRealtime) => {
   realtime.socket.close();
 };
 
-const isTakeStart = (message: object): boolean =>
-  'type' in message && message.type === 'recording.start';
-
 export type ProjectRealtimeOptions = {
   isRecordingReady: () => boolean;
   onOpen: () => void;
@@ -50,6 +47,7 @@ export type ProjectRealtime = {
   ready: () => Promise<void>;
   sendJson: (message: object) => void;
   sendBinary: (packet: ArrayBuffer) => void;
+  dropPackets: () => void;
   flush: () => void;
 };
 
@@ -146,11 +144,6 @@ export const createProjectRealtime = (
       if (!realtime || realtime.closed) {
         return;
       }
-      if (isTakeStart(message)) {
-        realtime.pendingMessages = realtime.pendingMessages.filter(
-          (pending) => typeof pending === 'string',
-        );
-      }
       const json = JSON.stringify(message);
       if (realtime.socket.readyState === WebSocket.OPEN) {
         flush();
@@ -169,6 +162,14 @@ export const createProjectRealtime = (
         return;
       }
       realtime.pendingMessages.push(packet);
+    },
+    dropPackets: () => {
+      if (!realtime) {
+        return;
+      }
+      realtime.pendingMessages = realtime.pendingMessages.filter(
+        (message) => typeof message === 'string',
+      );
     },
     flush,
   };
