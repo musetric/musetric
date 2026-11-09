@@ -117,6 +117,9 @@ const buildSpectrogramLane = (
   const baseBandPipeline = laneConfig.showSpectrogram
     ? buildBandSpectrumPipeline(cells, config, options.label)
     : undefined;
+  if (!baseBandPipeline) {
+    disposeBandPipelineCells(cells);
+  }
   const columnScale = columnScaleCell.get(config.windowCount);
   const fundamentalFrequency = fundamentalFrequencyCell.get({
     sampleRate: config.sampleRate,
