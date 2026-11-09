@@ -6,8 +6,7 @@ model/runtime code it loads. It has no node API.
 The executor bundle (`src/service`, entry `browserEntry.ts`) runs on a hidden
 executor page hosted by the rust core: it takes jobs over the core's
 websocket, fetches model files from the core's model cache over http, runs
-them with `onnxruntime-web` and uploads the results. The models are pinned in
-`packages/server/src/analysis/models.rs`.
+them with `onnxruntime-web` and uploads the results.
 
 It serves separation (a Mel-Band RoFormer core whose two masks give the vocals
 and the backing vocals in one pass), transcription (Whisper large-v3 turbo
@@ -17,6 +16,10 @@ WebGPU except the key, and the voice range from the pitch tracker of
 
 ## Rules
 
+- The [pin](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins)
+  of each model, with the values its graph is run with, is the `pin.json` next
+  to its runtime in `src/runtime`, read by every runtime: the host embeds it,
+  and `yarn workspace @musetric/ai check:models` checks it against Hugging Face.
 - The package does not depend on `@musetric/api`; the types of its results
   are declared next to the code that builds them.
 - Sessions whose tensors meet, such as Whisper's `cross_kv` graph and its

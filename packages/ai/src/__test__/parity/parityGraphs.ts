@@ -36,13 +36,17 @@ const modelIo = (graph: ParityGraphFields): ModelIo => ({
   outputName: stringField(graph, 'outputName'),
 });
 
-const geometry = (graph: ParityGraphFields): ChunkGeometry => ({
-  nFft: numberField(graph, 'nFft'),
-  hop: numberField(graph, 'hop'),
-  frames: numberField(graph, 'frames'),
-  channels: numberField(graph, 'channels'),
-  chunkSamples: numberField(graph, 'chunkSamples'),
-});
+const geometry = (graph: ParityGraphFields): ChunkGeometry => {
+  const hop = numberField(graph, 'hop');
+  const frames = numberField(graph, 'frames');
+  return {
+    nFft: numberField(graph, 'nFft'),
+    hop,
+    frames,
+    channels: numberField(graph, 'channels'),
+    chunkSamples: hop * (frames - 1),
+  };
+};
 
 export const vocalsGraph = (graph: ParityGraphFields): VocalsGraph => ({
   ...geometry(graph),

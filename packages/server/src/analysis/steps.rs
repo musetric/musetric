@@ -6,25 +6,25 @@ use serde_json::{Value, json};
 
 use crate::analysis::{
     browser::{BrowserAnalysis, Failure, RequestInput, Serve},
-    models::{
-        BEAT_THIS, BEAT_THIS_FILTERBANK, BEAT_THIS_MODEL, CHORD_NET, CHORD_NET_MODEL,
-        CHORD_NET_PLAN, CHORD_NET_PLAN_MANIFEST, SKEY, SKEY_MODEL, beat_this_graph,
-        chord_net_graph, skey_graph,
-    },
+    models::{BEAT_THIS, CHORD_NET, ModelPins, SKEY},
 };
 
 const VOICE_RANGE_SAMPLE_RATE: u32 = 48_000;
 
-pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<BrowserAnalysis> {
+pub(crate) fn create(
+    step: ProcessingStep,
+    models_path: &Path,
+    pins: &ModelPins,
+) -> Option<BrowserAnalysis> {
     match step {
         ProcessingStep::Chords => Some(BrowserAnalysis {
             label: "Headless chords analysis",
             api: "musetricAiAnalyzeChords",
             stored: Analysis::Chords,
-            sample_rate: CHORD_NET.sample_rate,
+            sample_rate: pins.chords.model.sample_rate,
             downmix: CHORD_NET.downmix,
             require_shader_f16: false,
-            files: CHORD_NET.cached(models_path),
+            files: CHORD_NET.cached(&pins.chords.model, models_path),
             serve: Serve::Files,
             build: build_chords,
         }),
@@ -32,10 +32,10 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             label: "Headless rhythm analysis",
             api: "musetricAiAnalyzeRhythm",
             stored: Analysis::Rhythm,
-            sample_rate: BEAT_THIS.sample_rate,
+            sample_rate: pins.rhythm.model.sample_rate,
             downmix: BEAT_THIS.downmix,
             require_shader_f16: false,
-            files: BEAT_THIS.cached(models_path),
+            files: BEAT_THIS.cached(&pins.rhythm.model, models_path),
             serve: Serve::Files,
             build: build_rhythm,
         }),
@@ -43,10 +43,10 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
             label: "Headless key analysis",
             api: "musetricAiAnalyzeKey",
             stored: Analysis::Key,
-            sample_rate: SKEY.sample_rate,
+            sample_rate: pins.key.model.sample_rate,
             downmix: SKEY.downmix,
             require_shader_f16: false,
-            files: SKEY.cached(models_path),
+            files: SKEY.cached(&pins.key.model, models_path),
             serve: Serve::Files,
             build: build_key,
         }),
@@ -66,35 +66,38 @@ pub(crate) fn create(step: ProcessingStep, models_path: &Path) -> Option<Browser
 }
 
 fn build_chords(input: &RequestInput<'_>) -> Result<Value, Failure> {
+    let pin = &input.pins.chords;
     Ok(json!({
         "attemptId": input.attempt_id,
         "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": input.files.url(CHORD_NET_MODEL)?,
-        "planUrl": input.files.url(CHORD_NET_PLAN)?,
-        "planManifestUrl": input.files.url(CHORD_NET_PLAN_MANIFEST)?,
-        "graph": chord_net_graph(),
+        "modelUrl": input.url(&pin.model, "model")?,
+        "planUrl": input.url(&pin.model, "plan")?,
+        "planManifestUrl": input.url(&pin.model, "planManifest")?,
+        "graph": pin.graph,
     }))
 }
 
 fn build_rhythm(input: &RequestInput<'_>) -> Result<Value, Failure> {
+    let pin = &input.pins.rhythm;
     Ok(json!({
         "attemptId": input.attempt_id,
         "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": input.files.url(BEAT_THIS_MODEL)?,
-        "filterbankUrl": input.files.url(BEAT_THIS_FILTERBANK)?,
-        "graph": beat_this_graph(),
+        "modelUrl": input.url(&pin.model, "model")?,
+        "filterbankUrl": input.url(&pin.model, "filterbank")?,
+        "graph": pin.graph,
     }))
 }
 
 fn build_key(input: &RequestInput<'_>) -> Result<Value, Failure> {
+    let pin = &input.pins.key;
     Ok(json!({
         "attemptId": input.attempt_id,
         "attemptUrl": input.attempt_url,
         "outputs": ["result"],
-        "modelUrl": input.files.url(SKEY_MODEL)?,
-        "graph": skey_graph(),
+        "modelUrl": input.url(&pin.model, "model")?,
+        "graph": pin.graph,
     }))
 }
 

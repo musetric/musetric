@@ -19,7 +19,10 @@ use rcgen::generate_simple_self_signed;
 use tokio::{net::TcpListener, sync::oneshot};
 
 use crate::{
-    analysis::{AnalysisContext, AnalysisRunner, models::remove_unpinned},
+    analysis::{
+        AnalysisContext, AnalysisRunner,
+        models::{ModelPins, remove_unpinned},
+    },
     blobs::clear_upload_area,
     executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
@@ -229,10 +232,12 @@ struct CreatedApp {
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let storage = options.storage;
     let host = ExecutorHost::start(options.browser_bundle).await?;
+    let pins = Arc::new(ModelPins::read()?);
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         client: create_client()?,
         models_path: options.models.clone(),
+        pins: Arc::clone(&pins),
         host: Arc::clone(&host),
     });
     let queue = Queue::create(QueueOptions {
@@ -243,7 +248,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         idle_limit: STEP_IDLE_LIMIT,
     });
     if options.processing {
-        remove_unpinned(&options.models).await;
+        remove_unpinned(&options.models, &pins).await;
         queue.spawn();
         wake_on_arrival(&host, &queue);
     }
@@ -255,6 +260,7 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         queue: Arc::clone(&queue),
         executor: host,
         models_path: options.models,
+        pins,
     });
     Ok(CreatedApp {
         router,

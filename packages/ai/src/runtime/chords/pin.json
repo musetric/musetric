@@ -1,0 +1,36 @@
+{
+  "repository": "musetric/chordmini-onnx",
+  "revision": "8ab85fc0f61439900cd07ac21257a43eac57075c",
+  "sampleRate": 22050,
+  "files": {
+    "config": {
+      "name": "config.json",
+      "sha256": "1f26c11ebea51ec08f12e813eb213a729fa0ecc407ac7632dfdc7bad67e65aa4",
+      "bytes": 3009
+    },
+    "model": {
+      "name": "chordnet.onnx",
+      "sha256": "1faee8e1cf168300afe0f47517e76836ac200c3841b0fb430fad7dfea5ad6394",
+      "bytes": 17080550
+    },
+    "plan": {
+      "name": "cqt-plan.bin",
+      "sha256": "c31f0a6fd2d582d753be6628b5daecdee58acba53cba93b2bc2b5c75dee2ba48",
+      "bytes": 23896
+    },
+    "planManifest": {
+      "name": "cqt-plan.manifest.json",
+      "sha256": "522b178e4f6e8ae5b6bf63b8e2f1a615fe2398592e27f7d9e3e219810081019f",
+      "bytes": 1721
+    }
+  },
+  "graph": {
+    "inputName": "features",
+    "outputName": "logits",
+    "frameDuration": 0.09287981859410431,
+    "sequenceLength": 108,
+    "inputBins": 144,
+    "chordCount": 170,
+    "windowsPerRun": 16
+  }
+}

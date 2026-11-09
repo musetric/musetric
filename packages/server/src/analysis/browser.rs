@@ -18,7 +18,12 @@ use tokio::{fs::write, sync::mpsc};
 use uuid::Uuid;
 
 use crate::{
-    analysis::{AnalysisContext, json_units::JsonUnits, result_check::check_result},
+    analysis::{
+        AnalysisContext,
+        json_units::JsonUnits,
+        models::{ModelPin, ModelPins},
+        result_check::check_result,
+    },
     blobs::{StagedBlob, close_area, ensure_area, stage_blob, step_area},
     publish::publish,
     storage::write_database,
@@ -80,6 +85,13 @@ pub(crate) struct RequestInput<'input> {
     pub(crate) attempt_id: &'input str,
     pub(crate) attempt_url: &'input str,
     pub(crate) files: &'input HostedModel,
+    pub(crate) pins: &'input ModelPins,
+}
+
+impl RequestInput<'_> {
+    pub(crate) fn url(&self, pin: &ModelPin, role: &str) -> Result<&str, Failure> {
+        self.files.url(&pin.file(role)?.name)
+    }
 }
 
 pub(crate) type BuildRequest = fn(&RequestInput<'_>) -> Result<Value, Failure>;
@@ -249,6 +261,7 @@ async fn drive(job: DriveJob<'_>) -> Result<Value, Failure> {
         attempt_id: &attempt_id,
         attempt_url: &attempt_url,
         files: &hosted,
+        pins: &job.context.pins,
     })?;
     let ticket = session.send_job(job.analysis.api, &request)?;
     let mut answered = Box::pin(async move { ticket.wait().await });

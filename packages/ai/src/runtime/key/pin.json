@@ -1,0 +1,21 @@
+{
+  "repository": "musetric/skey-onnx",
+  "revision": "9d90d2a9ff6679df1d64000f4fa750643f247643",
+  "sampleRate": 22050,
+  "files": {
+    "config": {
+      "name": "config.json",
+      "sha256": "20be1e139e1b05dea4bae2e2dde717d593c10c30bb38b300aeedc6693be88a52",
+      "bytes": 712
+    },
+    "model": {
+      "name": "skey.onnx",
+      "sha256": "5113c1378c1007c8559fcb767593366ba9794397b060535eb80a113db50530fc",
+      "bytes": 338482
+    }
+  },
+  "graph": {
+    "inputName": "audio",
+    "outputName": "probs"
+  }
+}
