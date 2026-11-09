@@ -50,8 +50,10 @@ pub(crate) async fn remove_orphaned_areas(storage: &Arc<Storage>) -> Result<(), 
     if areas.is_empty() {
         return Ok(());
     }
-    let projects = read(storage, musetric_db::Reader::projects).await?;
-    let alive: HashSet<i64> = projects.iter().map(|project| project.id).collect();
+    let alive: HashSet<i64> = read(storage, musetric_db::Reader::project_ids)
+        .await?
+        .into_iter()
+        .collect();
     for (project_id, area) in areas {
         if !alive.contains(&project_id) {
             let _ = remove_dir_all(&area).await;
@@ -217,6 +219,7 @@ mod tests {
         let areas = [
             "1/separation",
             "2/separation",
+            "007",
             "mixdown",
             "upload",
             "executor-browser",
@@ -232,6 +235,7 @@ mod tests {
 
         assert!(work.join("1/separation/file").exists());
         assert!(!work.join("2").exists());
+        assert!(work.join("007/file").exists());
         assert!(work.join("mixdown/file").exists());
         assert!(work.join("upload/file").exists());
         assert!(work.join("executor-browser/file").exists());

@@ -383,7 +383,10 @@ fn names_every_text_id_column_that_holds_no_blob() {
         .into_iter()
         .filter(|(column, kind)| {
             let lower = column.to_lowercase();
-            kind == "TEXT" && lower.ends_with("id") && !lower.ends_with("blobid")
+            let text = ["CHAR", "CLOB", "TEXT"]
+                .iter()
+                .any(|affinity| kind.to_uppercase().contains(affinity));
+            text && lower.ends_with("id") && !lower.ends_with("blobid")
         })
         .map(|(column, _)| column)
         .collect();

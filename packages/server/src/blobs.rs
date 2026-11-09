@@ -20,7 +20,10 @@ pub(crate) fn project_area(work_path: &Path, project_id: i64) -> PathBuf {
 }
 
 pub(crate) fn read_project_area_id(area: &Path) -> Option<i64> {
-    area.file_name()?.to_str()?.parse().ok()
+    let name = area.file_name()?.to_str()?;
+    name.parse()
+        .ok()
+        .filter(|project_id: &i64| project_id.to_string() == name)
 }
 
 pub(crate) fn step_area(work_path: &Path, project_id: i64, step: ProcessingStep) -> PathBuf {
