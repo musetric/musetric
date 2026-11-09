@@ -33,6 +33,9 @@ const closeSocket = (realtime: InternalRealtime) => {
   realtime.socket.close();
 };
 
+const isTakeStart = (message: object): boolean =>
+  'type' in message && message.type === 'recording.start';
+
 export type ProjectRealtimeOptions = {
   isRecordingReady: () => boolean;
   onOpen: () => void;
@@ -142,6 +145,11 @@ export const createProjectRealtime = (
     sendJson: (message) => {
       if (!realtime || realtime.closed) {
         return;
+      }
+      if (isTakeStart(message)) {
+        realtime.pendingMessages = realtime.pendingMessages.filter(
+          (pending) => typeof pending === 'string',
+        );
       }
       const json = JSON.stringify(message);
       if (realtime.socket.readyState === WebSocket.OPEN) {
