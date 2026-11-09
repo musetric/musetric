@@ -12,6 +12,8 @@ use tokio::{
 
 use musetric_db::BoxedError;
 
+use crate::blobs::project_area;
+
 const TAIL_NAME: &str = "separated.tail";
 const PREFIX_NAME: &str = "separated.prefix";
 const INPUT_NAME: &str = "input.f32";
@@ -177,9 +179,7 @@ pub(crate) fn restore_refused(reason: &str) -> String {
 }
 
 pub(crate) fn area_root(work: &Path, project_id: i64, step: &str, computation: &str) -> PathBuf {
-    work.join(project_id.to_string())
-        .join(step)
-        .join(computation)
+    project_area(work, project_id).join(step).join(computation)
 }
 
 #[cfg(test)]

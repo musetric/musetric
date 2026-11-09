@@ -94,6 +94,12 @@ pub(crate) fn write_project_order(transaction: &Transaction, project_ids: &[i64]
     Ok(())
 }
 
+pub(crate) fn read_project_ids(connection: &Connection) -> Result<Vec<i64>> {
+    let mut statement = connection.prepare("SELECT id FROM Project")?;
+    let rows = statement.query_map([], |row| row.get(0))?;
+    rows.collect()
+}
+
 pub(crate) fn read_projects(connection: &Connection) -> Result<Vec<ProjectItem>> {
     let mut statement =
         connection.prepare(&format!("{PROJECT_COLUMNS} ORDER BY Project.id DESC"))?;

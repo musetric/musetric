@@ -15,7 +15,7 @@ use musetric_media::{PcmRequest, SourceFailure, convert_to_flac, read_frame_coun
 use serde_json::Value;
 
 use crate::{
-    blobs::{StagedBlob, stage_blob, upload_area},
+    blobs::{StagedBlob, close_area, project_area, stage_blob, upload_area},
     failure::{Failure, finish, invalid_number, invalid_option},
     form::{Field, Form, UploadTarget, UploadedFile, read_form},
     publish::publish,
@@ -247,6 +247,7 @@ async fn remove(state: &RouteState, project_id: i64) -> Result<Response<Body>, F
         return Err(Failure::NotFound(missing_message(project_id)));
     }
     state.queue.cancel_project(project_id);
+    close_area(&project_area(&state.storage.work_path, project_id)).await;
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::OK;
     Ok(response)
