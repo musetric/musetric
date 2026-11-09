@@ -58,6 +58,8 @@ const follow = async (
 
 type ExportRun = {
   controller: AbortController;
+  upload: AbortController;
+  uploaded: boolean;
   mixdownId?: string;
 };
 
@@ -83,8 +85,9 @@ const runExport = async (
     projectId,
     { ...creation.request, recording },
     {
-      signal,
+      signal: run.upload.signal,
       onUploadProgress: (event) => {
+        run.uploaded = event.progress === 1;
         report({ stage: 'preparing', done: event.progress });
       },
     },
@@ -104,7 +107,11 @@ export const startMixdownExport = (
   if (runs.has(projectId)) {
     return;
   }
-  const run: ExportRun = { controller: new AbortController() };
+  const run: ExportRun = {
+    controller: new AbortController(),
+    upload: new AbortController(),
+    uploaded: false,
+  };
   const { signal } = run.controller;
   runs.set(projectId, run);
   markFailed(projectId, false);
@@ -115,7 +122,11 @@ export const startMixdownExport = (
   };
   report({ stage: 'preparing' });
   void runExport(projectId, run, creation, report)
-    .then(creation.onSaved)
+    .then(() => {
+      if (!signal.aborted) {
+        creation.onSaved();
+      }
+    })
     .catch((error: unknown) => {
       if (!signal.aborted) {
         console.error('Failed to export the mix', error);
@@ -145,5 +156,8 @@ export const cancelMixdownExport = (projectId: number) => {
   }
   runs.delete(projectId);
   run.controller.abort();
+  if (!run.uploaded) {
+    run.upload.abort();
+  }
   show(projectId, undefined);
 };

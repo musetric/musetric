@@ -118,6 +118,7 @@ pub struct MixdownWatch {
     done: [AtomicUsize; 3],
     total: [AtomicUsize; 3],
     stopped: AtomicBool,
+    abandoned: AtomicBool,
 }
 
 impl MixdownWatch {
@@ -143,6 +144,14 @@ impl MixdownWatch {
             stage: STAGES[index],
             done: (total > 0).then(|| (done as f64 / total as f64).min(1.0)),
         }
+    }
+
+    fn abandon(&self) {
+        self.abandoned.store(true, Ordering::Relaxed);
+    }
+
+    fn going(&self) -> bool {
+        !self.stopped() && !self.abandoned.load(Ordering::Relaxed)
     }
 
     fn plan(&self, stage: MixdownStage, amount: usize) {
@@ -185,6 +194,19 @@ pub async fn write_mixdown(
     to: &Path,
     watch: &Arc<MixdownWatch>,
 ) -> Result<(), BoxedError> {
+    let written = mix(source, mixdown, to, watch).await;
+    if written.is_err() {
+        watch.abandon();
+    }
+    written
+}
+
+async fn mix(
+    source: &dyn PcmSource,
+    mixdown: Mixdown,
+    to: &Path,
+    watch: &Arc<MixdownWatch>,
+) -> Result<(), BoxedError> {
     let reading = Reading {
         source,
         sample_rate: mixdown.sample_rate,
@@ -193,7 +215,14 @@ pub async fn write_mixdown(
     let frame_count = mixdown.change.frame_count(mixdown.frame_count);
     let mut mixed = vec![0.0_f32; frame_count * CHANNELS];
     let mut stretching = Vec::new();
-    watch.plan(MixdownStage::Mixing, mixdown.tracks.len());
+    watch.plan(
+        MixdownStage::Mixing,
+        mixdown
+            .tracks
+            .iter()
+            .filter(|track| track.group != MixdownGroup::Ready)
+            .count(),
+    );
     for group in [MixdownGroup::Song, MixdownGroup::Lead] {
         let tracks: Vec<&MixdownTrack> = mixdown
             .tracks
@@ -256,7 +285,7 @@ fn spawn_stretch(stretch: Stretch, song: &[f32], watch: &Arc<MixdownWatch>) -> S
         stretch.apply(&channels, &mut |written| {
             stretching.advance(MixdownStage::Stretching, written - reported);
             reported = written;
-            !stretching.stopped()
+            stretching.going()
         })
     })
 }
@@ -308,7 +337,9 @@ async fn add_track(
         MixdownChannels::Stereo => add_stereo(reading.source, request, track, mixed).await?,
         MixdownChannels::Mono => add_mono(reading.source, request, track, mixed).await?,
     }
-    reading.watch.advance(MixdownStage::Mixing, 1);
+    if track.group != MixdownGroup::Ready {
+        reading.watch.advance(MixdownStage::Mixing, 1);
+    }
     Ok(())
 }
 
@@ -876,5 +907,67 @@ mod tests {
             );
         }
         remove_dir_all(&directory).expect("the workspace should be removed");
+    }
+    struct FailingLead;
+
+    impl PcmSource for FailingLead {
+        fn read_pcm<'source>(
+            &'source self,
+            request: PcmRequest<'source>,
+            sink: PcmSink<'source>,
+        ) -> ReadingPcm<'source> {
+            let lead = request.from == Path::new("lead.flac");
+            let samples = if lead {
+                Vec::new()
+            } else {
+                [0.25, -0.25].repeat(48_000)
+            };
+            let outcome: Result<(), crate::BoxedError> = if lead {
+                Err("the lead stem cannot be read".into())
+            } else {
+                Ok(())
+            };
+            Box::pin(async move {
+                sink(&samples);
+                outcome
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn lets_the_stretches_go_when_a_track_fails_and_keeps_the_failure() {
+        let song = PathBuf::from("song.flac");
+        let lead = PathBuf::from("lead.flac");
+        let watch = Arc::new(MixdownWatch::default());
+        let mixdown = Mixdown {
+            sample_rate: RATE,
+            frame_count: 48_000,
+            tracks: vec![
+                stem(&song, 1.0),
+                MixdownTrack {
+                    group: MixdownGroup::Lead,
+                    ..stem(&lead, 1.0)
+                },
+            ],
+            format: MixdownFormat::Wav(SampleDepth::Sixteen),
+            change: MixdownChange {
+                tempo_percent: 80,
+                semitones: -2,
+                lead_semitones: 10,
+            },
+        };
+        let written = write_mixdown(
+            &FailingLead,
+            mixdown,
+            &std::env::temp_dir().join("musetric-mixdown-failing.wav"),
+            &watch,
+        )
+        .await;
+        assert_eq!(
+            written.map_err(|failure| failure.to_string()),
+            Err("the lead stem cannot be read".to_owned())
+        );
+        assert!(!watch.going());
+        assert!(!watch.stopped());
     }
 }

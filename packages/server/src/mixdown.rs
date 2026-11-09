@@ -86,6 +86,7 @@ impl Mixdowns {
             return false;
         }
         let kept = outcome.is_ok();
+        entry.created = Instant::now();
         entry.state = match outcome {
             Ok(file) => MixdownState::Ready(file),
             Err(message) => MixdownState::Failed(message),

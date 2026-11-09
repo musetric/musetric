@@ -160,20 +160,26 @@ async fn start(state: &RouteState, prepared: Prepared, form: Form) -> Result<Str
     };
     let watch = Arc::new(MixdownWatch::default());
     state.mixdowns.start(mixdown_id.clone(), Arc::clone(&watch));
-    let worker = state.clone();
+    let pcm = Arc::clone(&state.storage.pcm);
+    let target = path.clone();
+    let writing = spawn(async move {
+        write_mixdown(pcm.as_ref(), prepared.mixdown, &target, &watch)
+            .await
+            .map_err(|failure| failure.to_string())
+    });
+    let mixdowns = Arc::clone(&state.mixdowns);
     let settled_id = mixdown_id.clone();
     spawn(async move {
-        let written =
-            write_mixdown(worker.storage.pcm.as_ref(), prepared.mixdown, &path, &watch).await;
+        let written = writing
+            .await
+            .unwrap_or_else(|failure| Err(failure.to_string()));
         form.discard().await;
-        let outcome = written
-            .map(|()| MixdownFile {
-                path: path.clone(),
-                filename: prepared.filename,
-                content_type: prepared.content_type,
-            })
-            .map_err(|failure| failure.to_string());
-        if !worker.mixdowns.settle(&settled_id, outcome) {
+        let outcome = written.map(|()| MixdownFile {
+            path: path.clone(),
+            filename: prepared.filename,
+            content_type: prepared.content_type,
+        });
+        if !mixdowns.settle(&settled_id, outcome) {
             let _ = remove_file(&path).await;
         }
     });

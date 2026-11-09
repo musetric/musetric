@@ -267,7 +267,9 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
                     voiceShifted,
                   }),
                 onSaved: () => {
-                  setOpen(false);
+                  if (routes.project.match()?.projectId === projectId) {
+                    setOpen(false);
+                  }
                 },
               });
             }}
