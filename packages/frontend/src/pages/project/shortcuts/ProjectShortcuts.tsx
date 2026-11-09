@@ -23,6 +23,7 @@ export const ProjectShortcuts: FC<ProjectShortcutsProps> = (props) => {
   const [listOpen, setListOpen] = useState(false);
 
   useEffect(() => {
+    const handledCodes = new Set<string>();
     const handleKeyDown = (event: KeyboardEvent) => {
       const handled = handleProjectShortcut(event, {
         projectId,
@@ -33,11 +34,19 @@ export const ProjectShortcuts: FC<ProjectShortcutsProps> = (props) => {
       });
       if (handled) {
         event.preventDefault();
+        handledCodes.add(event.code);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (handledCodes.delete(event.code)) {
+        event.preventDefault();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [projectId, subtitle]);
 

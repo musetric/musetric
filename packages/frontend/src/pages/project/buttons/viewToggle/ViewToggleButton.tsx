@@ -2,7 +2,11 @@ import { Box, Stack, ToggleButton, Tooltip, Typography } from '@mui/material';
 import { type FC, type ReactNode } from 'react';
 import { useEngineStore } from '../../../../engine/useEngineStore.js';
 import { useProjectStore } from '../../store.js';
-import { toggleView, type ViewToggleTarget } from './viewToggle.js';
+import {
+  isViewSelected,
+  toggleView,
+  type ViewToggleTarget,
+} from './viewToggle.js';
 
 export type ViewToggleButtonProps = {
   target: ViewToggleTarget;
@@ -18,10 +22,11 @@ export const ViewToggleButton: FC<ViewToggleButtonProps> = (props) => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const selected =
-    target.panel === 'details'
-      ? detailsView === target.view
-      : spectrogramOpen && spectrogramView === target.view;
+  const selected = isViewSelected(target, {
+    detailsView,
+    spectrogramOpen,
+    spectrogramView,
+  });
 
   return (
     <Tooltip title={label}>

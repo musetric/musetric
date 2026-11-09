@@ -1,33 +1,25 @@
 import { type api } from '@musetric/api';
-import {
-  maxTempoRatio,
-  maxTransposeSemitones,
-  minTempoRatio,
-  minTransposeSemitones,
-} from '@musetric/audio';
+import { maxTransposeSemitones, minTransposeSemitones } from '@musetric/audio';
 import { type EngineState } from '@musetric/engine';
+import { findTopOverlay } from '../../../app/systemBack.js';
 import { engine } from '../../../engine/engine.js';
 import { togglePlayback } from '../buttons/playback.js';
+import { stepTempo } from '../buttons/tempoSteps.js';
 import {
   toggleView,
   type ViewToggleTarget,
 } from '../buttons/viewToggle/viewToggle.js';
 import { pressRecord } from '../calibration/takeActions.js';
-import { enterLoop, isLoopAvailable, leaveLoop } from '../loop/loopActions.js';
+import {
+  deleteChosenTry,
+  enterLoop,
+  isLoopAvailable,
+  leaveLoop,
+  pickTry,
+} from '../loop/loopActions.js';
+import { useProjectStore } from '../store.js';
 
 const seekSeconds = 5;
-const tempoStepsPerRatio = 20;
-const textInputTypes = new Set([
-  'email',
-  'number',
-  'password',
-  'search',
-  'tel',
-  'text',
-  'url',
-]);
-const overlaySelector =
-  '[role=dialog], [role=presentation], [role=menu], [role=listbox]';
 const digitPattern = /^(?:Digit|Numpad)(\d)$/;
 
 const shortcutViews: ViewToggleTarget[] = [
@@ -37,18 +29,12 @@ const shortcutViews: ViewToggleTarget[] = [
   { panel: 'spectrogram', view: 'spectrum' },
 ];
 
-const isTextField = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  if (target.isContentEditable || target instanceof HTMLTextAreaElement) {
-    return true;
-  }
-  return target instanceof HTMLInputElement && textInputTypes.has(target.type);
-};
-
-const isInsideOverlay = (target: EventTarget | null): boolean =>
-  target instanceof Element && Boolean(target.closest(overlaySelector));
+const isField = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLInputElement && target.type !== 'range'));
 
 const isSlider = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement && target.type === 'range';
@@ -59,20 +45,6 @@ const seekBy = (state: EngineState, seconds: number) => {
   }
   const frames = Math.round(seconds * engine.context.sampleRate);
   engine.player.seek(state.frameIndex + frames, 'player');
-};
-
-const stepTempo = (state: EngineState, steps: number) => {
-  const next = Math.round(state.tempoRatio * tempoStepsPerRatio) + steps;
-  if (
-    state.recording ||
-    next < Math.round(minTempoRatio * tempoStepsPerRatio) ||
-    next > Math.round(maxTempoRatio * tempoStepsPerRatio)
-  ) {
-    return;
-  }
-  engine.store.update((draft) => {
-    draft.tempoRatio = next / tempoStepsPerRatio;
-  });
 };
 
 const stepKey = (state: EngineState, semitones: number) => {
@@ -93,44 +65,24 @@ const toggleLoop = (
   state: EngineState,
   subtitle: readonly api.subtitle.Segment[],
 ) => {
-  if (state.loopStage === undefined) {
-    if (isLoopAvailable(state)) {
-      enterLoop(subtitle);
-    }
+  if (state.loopStage !== undefined) {
+    leaveLoop();
     return;
   }
-  if (!state.recording) {
-    leaveLoop();
+  if (isLoopAvailable(state) && useProjectStore.getState().spectrogramOpen) {
+    enterLoop(subtitle);
   }
 };
 
 const pressDigit = (state: EngineState, digit: number) => {
   if (state.loopStage === 'sing') {
-    if (digit === 0) {
-      engine.player.selectTry(undefined);
-      return;
-    }
-    const picked = state.loopTries.find((item) => item.number === digit);
-    if (picked) {
-      engine.player.selectTry(picked.id);
-    }
+    pickTry(digit === 0 ? undefined : digit);
     return;
   }
   const target = shortcutViews.at(digit - 1);
   if (digit > 0 && target && state.statuses.realtime !== 'error') {
     toggleView(target);
   }
-};
-
-const deleteSelectedTry = (state: EngineState) => {
-  if (
-    state.loopStage !== 'sing' ||
-    state.loopTryPhase !== undefined ||
-    state.loopSelectedTryId === undefined
-  ) {
-    return;
-  }
-  engine.player.deleteTry(state.loopSelectedTryId);
 };
 
 export type ProjectShortcutContext = {
@@ -177,14 +129,14 @@ const shortcutActions: Partial<Record<string, ShortcutAction>> = {
   },
   BracketLeft: {
     repeats: true,
-    run: (state) => {
-      stepTempo(state, -1);
+    run: () => {
+      stepTempo(-1);
     },
   },
   BracketRight: {
     repeats: true,
-    run: (state) => {
-      stepTempo(state, 1);
+    run: () => {
+      stepTempo(1);
     },
   },
   Minus: {
@@ -201,16 +153,14 @@ const shortcutActions: Partial<Record<string, ShortcutAction>> = {
   },
   Delete: {
     repeats: false,
-    run: (state) => {
-      deleteSelectedTry(state);
+    run: () => {
+      deleteChosenTry();
     },
   },
   Escape: {
     repeats: false,
-    run: (state) => {
-      if (state.loopStage !== undefined && !state.recording) {
-        leaveLoop();
-      }
+    run: () => {
+      leaveLoop();
     },
   },
 };
@@ -220,8 +170,8 @@ const isIgnored = (event: KeyboardEvent): boolean =>
   event.ctrlKey ||
   event.metaKey ||
   event.altKey ||
-  isTextField(event.target) ||
-  isInsideOverlay(event.target);
+  isField(event.target) ||
+  findTopOverlay() !== undefined;
 
 export const handleProjectShortcut = (
   event: KeyboardEvent,

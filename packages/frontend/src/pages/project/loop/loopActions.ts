@@ -5,6 +5,7 @@ import {
   type EngineState,
 } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
+import { useProjectStore } from '../store.js';
 import { getLoopAtTime } from './loopRange.js';
 import { hideLoopView, showLoopView } from './loopView.js';
 
@@ -57,9 +58,39 @@ export const closeLoop = () => {
 };
 
 export const leaveLoop = () => {
-  if (engine.store.get().loopTries.length === 0) {
-    closeLoop();
+  const { loopStage, loopTries, recording } = engine.store.get();
+  if (loopStage === undefined || recording || loopTries.length > 0) {
+    return;
   }
+  closeLoop();
+};
+
+export const pickTry = (number: number | undefined) => {
+  const { loopStage, loopTries } = engine.store.get();
+  if (loopStage !== 'sing' || useProjectStore.getState().insertingTry) {
+    return;
+  }
+  if (number === undefined) {
+    engine.player.selectTry(undefined);
+    return;
+  }
+  const picked = loopTries.find((item) => item.number === number);
+  if (picked) {
+    engine.player.selectTry(picked.id);
+  }
+};
+
+export const deleteChosenTry = () => {
+  const { loopStage, loopTryPhase, loopSelectedTryId } = engine.store.get();
+  if (
+    loopStage !== 'sing' ||
+    loopTryPhase !== undefined ||
+    loopSelectedTryId === undefined ||
+    useProjectStore.getState().insertingTry
+  ) {
+    return;
+  }
+  engine.player.deleteTry(loopSelectedTryId);
 };
 
 export const applyLoopTry = async (projectId: number): Promise<boolean> => {

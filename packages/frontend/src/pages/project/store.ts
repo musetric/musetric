@@ -21,6 +21,7 @@ export type ProjectState = {
   deletingRecordingId?: number;
   renamingRecordingId?: number;
   creatingRecordingId?: number;
+  insertingTry: boolean;
 };
 
 const initialState: ProjectState = {
@@ -30,6 +31,7 @@ const initialState: ProjectState = {
   audioSettingsOpen: false,
   mixdownOpen: false,
   pickerSide: 'top',
+  insertingTry: false,
 };
 
 export type ProjectActions = {
@@ -55,6 +57,7 @@ export type ProjectActions = {
   setDeletingRecordingId: (recordingId: number | undefined) => void;
   setRenamingRecordingId: (recordingId: number | undefined) => void;
   setCreatingRecordingId: (recordingId: number | undefined) => void;
+  setInsertingTry: (value: boolean) => void;
 };
 
 type State = ProjectState & ProjectActions;
@@ -98,5 +101,6 @@ export const useProjectStore = create<State>()(
         renamingRecordingId: creatingRecordingId,
         creatingRecordingId,
       }),
+    setInsertingTry: (insertingTry) => set({ insertingTry }),
   })),
 );

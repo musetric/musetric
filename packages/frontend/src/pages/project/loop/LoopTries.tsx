@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { useProjectStore } from '../store.js';
 import { applyLoopTry, closeLoop } from './loopActions.js';
 import { getBeatsToFrom } from './loopCountdown.js';
 import { LoopFinishButton } from './LoopFinishButton.js';
@@ -52,7 +53,8 @@ export const LoopTries: FC = () => {
       ? getBeatsToFrom(state, engine.context.sampleRate)
       : undefined,
   );
-  const [pending, setPending] = useState(false);
+  const pending = useProjectStore((state) => state.insertingTry);
+  const setPending = useProjectStore((state) => state.setInsertingTry);
   const [failed, setFailed] = useState(false);
 
   if (!singing || !range) {
