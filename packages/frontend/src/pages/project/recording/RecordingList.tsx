@@ -12,7 +12,6 @@ import {
   Typography,
 } from '@mui/material';
 import { getActiveRecording, getTrackProgress } from '@musetric/engine';
-import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { useIsMutating, useMutation } from '@tanstack/react-query';
 import { type FC, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,12 +27,20 @@ import { RecordingRow } from './RecordingRow.js';
 const lastTickRatio = 0.98;
 const endTickRatio = 0.8;
 
-const tickSteps = [10, 15, 30, 60, 120, 300];
-const minTickGap = 72;
+const tickSteps = [10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const labelCharWidth = 7;
+const labelPadding = 9;
 
-const getTickStep = (duration: number, width: number): number =>
-  tickSteps.find((step) => (step / duration) * width >= minTickGap) ??
-  Math.max(...tickSteps);
+const getMinTickGap = (duration: number): number =>
+  2 * (formatDuration(duration).length * labelCharWidth + labelPadding);
+
+const getTickStep = (duration: number, width: number): number => {
+  const minTickGap = getMinTickGap(duration);
+  return (
+    tickSteps.find((step) => (step / duration) * width >= minTickGap) ??
+    tickSteps[tickSteps.length - 1]
+  );
+};
 
 const getRulerTicks = (duration: number, width: number) => {
   if (duration <= 0 || width <= 0) return [];
@@ -99,9 +106,13 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
     const ruler = rulerRef.current;
     if (!ruler) return undefined;
     setRulerWidth(ruler.clientWidth);
-    return subscribeResizeObserver(ruler, () => {
+    const observer = new ResizeObserver(() => {
       setRulerWidth(ruler.clientWidth);
     });
+    observer.observe(ruler);
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   useLayoutEffect(() => {
