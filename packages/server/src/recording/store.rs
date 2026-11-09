@@ -54,6 +54,7 @@ pub(crate) struct RecordingSummary {
     pub(crate) active: bool,
     pub(crate) history: History,
     pub(crate) empty: bool,
+    pub(crate) lost: bool,
 }
 
 type PcmCache = HashMap<String, Vec<i16>>;
@@ -96,14 +97,19 @@ pub(crate) async fn read_recordings(
     storage: &Arc<Storage>,
     project_id: i64,
 ) -> Result<Vec<RecordingSummary>, BoxedError> {
+    let blobs_path = storage.blobs_path.clone();
     read_database(storage, move |database| {
         let mut summaries = Vec::new();
         for recording in database.recordings(project_id)? {
             let pieces = database.recording_pieces(recording.id)?;
+            let heard = sounding(&recording, &pieces);
             summaries.push(RecordingSummary {
                 id: recording.id,
                 history: history_of(&recording, &pieces),
-                empty: sounding(&recording, &pieces).is_empty(),
+                empty: heard.is_empty(),
+                lost: heard
+                    .iter()
+                    .any(|piece| !blob_path(&blobs_path, &piece.blob_id).is_file()),
                 name: recording.name,
                 active: recording.active,
             });

@@ -456,6 +456,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn marks_a_recording_whose_piece_is_gone() {
+        let workspace = Workspace::new();
+        workspace.seed(CREATE_PROJECT);
+        workspace.seed(CREATE_RECORDING);
+        workspace.seed(
+            "INSERT INTO Recording (id, projectId, name, active) VALUES (2, 1, 'Recording 2', 0);
+             INSERT INTO RecordingPiece
+               (recordingId, blobId, layer, songStartFrame, frameCount, tempo, transpose, octave)
+             VALUES (1, '1f2e3d4c-0000-4000-8000-000000000001', 'base', 0, 8, 1, 0, 0),
+                    (2, '5a6b7c8d-0000-4000-8000-000000000002', 'base', 0, 8, 1, 0, 0);",
+        );
+        workspace.add_blob("1f2e3d4c-0000-4000-8000-000000000001", "piece");
+        let router = create_test_router(&workspace).await;
+
+        let response = request(router, &format!("{RECORDINGS_URL}/list")).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let listed: serde_json::Value =
+            serde_json::from_str(&read_body(response).await).expect("the list should be json");
+        let lost: Vec<(&str, bool)> = listed["recordings"]
+            .as_array()
+            .expect("the list should hold recordings")
+            .iter()
+            .map(|recording| {
+                (
+                    recording["name"]
+                        .as_str()
+                        .expect("a recording should have a name"),
+                    recording["lost"]
+                        .as_bool()
+                        .expect("a recording should say whether it lost a piece"),
+                )
+            })
+            .collect();
+        assert_eq!(lost, [("Recording 1", false), ("Recording 2", true)]);
+    }
+
+    #[tokio::test]
     async fn hands_out_an_empty_take_when_nothing_is_recorded() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);

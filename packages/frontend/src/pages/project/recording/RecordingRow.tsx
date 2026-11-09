@@ -1,8 +1,16 @@
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
-import { alpha, Box, ButtonBase, type Theme, Typography } from '@mui/material';
+import {
+  alpha,
+  Box,
+  ButtonBase,
+  Stack,
+  type Theme,
+  Typography,
+} from '@mui/material';
 import { type api } from '@musetric/api';
 import { useMutation } from '@tanstack/react-query';
 import { type FC } from 'react';
+import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
 import { useProjectStore } from '../store.js';
@@ -21,6 +29,7 @@ export type RecordingRowProps = {
 
 export const RecordingRow: FC<RecordingRowProps> = (props) => {
   const { recording, otherNames, layout } = props;
+  const { t } = useTranslation();
   const { projectId } = routes.project.useAssertMatch();
   const renaming = useProjectStore(
     (state) => state.renamingRecordingId === recording.id,
@@ -49,9 +58,16 @@ export const RecordingRow: FC<RecordingRowProps> = (props) => {
       {renaming ? (
         <RecordingNameField recording={recording} otherNames={otherNames} />
       ) : (
-        <Typography variant='body2' noWrap sx={{ pr: 3 }}>
-          {recording.name}
-        </Typography>
+        <Stack sx={{ pr: 3, minWidth: 0 }}>
+          <Typography variant='body2' noWrap>
+            {recording.name}
+          </Typography>
+          {recording.lost && (
+            <Typography variant='caption' noWrap sx={{ color: 'warning.main' }}>
+              {t('pages.project.recording.lost')}
+            </Typography>
+          )}
+        </Stack>
       )}
       <Box
         sx={{
