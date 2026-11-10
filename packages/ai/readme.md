@@ -36,8 +36,12 @@ WebGPU except the key, and the voice range from the pitch tracker of
 - A GPU defect is fixed by rewriting the graph, never by a CPU fallback
   ([principles](https://github.com/musetric/headquarters/blob/main/principles.md)).
 - The WebGPU device is created here and handed to `onnxruntime-web`, and
-  `src/runtime/gpuPacer.ts` paces its queue, so that a long queue of GPU work
-  does not freeze a phone; `onnxruntime-web` is not patched for it.
+  `src/runtime/gpuPacer.ts` paces its queue: it lets about 16 ms of GPU work
+  wait in it, unless a model sets its own budget, and waits for every
+  submission where one alone takes longer, so that a long queue of GPU work
+  neither freezes a phone nor keeps the screen waiting
+  ([#956](https://github.com/musetric/musetric/issues/956) H2, H4);
+  `onnxruntime-web` is not patched for it.
 - The vocal separation core runs as one graph, not in stages: its heavy
   projections, split into rows at export, keep the phone responsive with an
   identical output ([#957](https://github.com/musetric/musetric/issues/957) H7).
