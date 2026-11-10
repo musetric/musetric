@@ -93,22 +93,17 @@ type SeparationProgress = {
   peaks: StemValues;
 };
 
-const startProgress = async (
+const restoreProgress = (
   options: SeparateTrackOptions,
   foldOptions: FoldOptions,
   layout: SeparationLayout,
-): Promise<SeparationProgress> => {
+): SeparationProgress | undefined => {
   const restored =
     options.resume && readSeparationState(layout, options.resume);
   const fold = restored && restoreSeparationFold(foldOptions, restored.tail);
-  if (restored && fold) {
-    return { fold, mixtureScale: restored.mixtureScale, peaks: restored.peaks };
-  }
-  return {
-    fold: createSeparationFold(foldOptions),
-    mixtureScale: peakScale(await options.source.peak()),
-    peaks: silentPeaks(),
-  };
+  return restored && fold
+    ? { fold, mixtureScale: restored.mixtureScale, peaks: restored.peaks }
+    : undefined;
 };
 
 export const separateTrack = async (
@@ -132,14 +127,19 @@ export const separateTrack = async (
     unitCount: units.length,
     outputs,
   };
-  const progress = await startProgress(options, foldOptions, layout);
-  const { fold, mixtureScale } = progress;
-  let { peaks } = progress;
-  if (fold.nextUnit() === units.length) {
-    return stemScales(peaks);
+  const restored = restoreProgress(options, foldOptions, layout);
+  if ((restored?.fold.nextUnit() ?? 0) === units.length) {
+    return stemScales(restored?.peaks ?? silentPeaks());
   }
   const model = await options.loadModel();
   try {
+    const progress = restored ?? {
+      fold: createSeparationFold(foldOptions),
+      mixtureScale: peakScale(await source.peak()),
+      peaks: silentPeaks(),
+    };
+    const { fold, mixtureScale } = progress;
+    let { peaks } = progress;
     const { chunkSamples } = geometry;
     const window = new Float32Array(stereoChannels * chunkSamples);
     const output = new Float32Array(outputs * chunkSamples);
@@ -184,8 +184,8 @@ export const separateTrack = async (
       committing.catch(() => undefined);
     }
     await committing;
+    return stemScales(peaks);
   } finally {
     await model.release();
   }
-  return stemScales(peaks);
 };

@@ -4,11 +4,7 @@ import {
   separateTrack,
   type SeparationSource,
 } from '../separation/separateTrack.js';
-import {
-  peakOf,
-  stemNames,
-  stereoChannels,
-} from '../separation/separationStems.js';
+import { stemNames, stereoChannels } from '../separation/separationStems.js';
 import { createBrowserJobApi } from './browserJob.js';
 import {
   fetchModelFiles,
@@ -22,6 +18,7 @@ import {
   type BrowserSeparateResult,
   separationStateOutput,
 } from './separationApi.js';
+import { readStreamPeak } from './streamPeak.js';
 
 const partialContent = 206;
 const frameBytes = stereoChannels * Float32Array.BYTES_PER_ELEMENT;
@@ -31,31 +28,7 @@ const readMixturePeak = async (url: string): Promise<number> => {
   if (!response.body) {
     throw new Error('The mixture answered without a body');
   }
-  const reader = response.body.getReader();
-  let carry = new Uint8Array(0);
-  let peak = 0;
-  for (;;) {
-    const read = await reader.read();
-    if (read.done) {
-      return peak;
-    }
-    const bytes = new Uint8Array(carry.length + read.value.length);
-    bytes.set(carry);
-    bytes.set(read.value, carry.length);
-    const whole =
-      bytes.length - (bytes.length % Float32Array.BYTES_PER_ELEMENT);
-    peak = Math.max(
-      peak,
-      peakOf(
-        new Float32Array(
-          bytes.buffer,
-          0,
-          whole / Float32Array.BYTES_PER_ELEMENT,
-        ),
-      ),
-    );
-    carry = bytes.slice(whole);
-  }
+  return readStreamPeak(response.body);
 };
 
 const createMixtureSource = (
