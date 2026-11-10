@@ -1,16 +1,21 @@
 use super::{PlanChannels, PlanRules, PlanUnit, UnitPlan};
+use crate::analysis::models::ModelPins;
 
 const CHUNK: u32 = 484_659;
 const STEP: u64 = 352_800;
-const SAMPLE_RATE: u32 = 44_100;
 const STEREO_STEMS: PlanChannels = PlanChannels {
     input: 2,
     output: 4,
 };
 
+fn vocals(samples: u64) -> UnitPlan {
+    let pins = ModelPins::read().expect("the pins should parse");
+    UnitPlan::vocals(&pins.separation, samples)
+}
+
 #[test]
 fn keeps_the_declared_rules_version() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, STEP);
+    let plan = vocals(STEP);
     assert_eq!(plan.rules, PlanRules::VocalsV1);
     assert_eq!(plan.channels, STEREO_STEMS);
     assert_eq!(plan.chunk_samples, CHUNK);
@@ -18,7 +23,7 @@ fn keeps_the_declared_rules_version() {
 
 #[test]
 fn takes_a_stereo_window_and_expects_the_vocals_and_the_backing_back() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, STEP);
+    let plan = vocals(STEP);
     assert_eq!(
         plan.window_bytes(&vec![0.0; 2 * 352_800], 0).len(),
         2 * 4 * 484_659
@@ -28,7 +33,7 @@ fn takes_a_stereo_window_and_expects_the_vocals_and_the_backing_back() {
 
 #[test]
 fn covers_a_track_shorter_than_one_window_once() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, 1_000);
+    let plan = vocals(1_000);
     assert_eq!(plan.units().len(), 1);
     assert_eq!(plan.units()[0].start, 0);
     assert_eq!(plan.units()[0].length, 1_000);
@@ -36,7 +41,7 @@ fn covers_a_track_shorter_than_one_window_once() {
 
 #[test]
 fn covers_exactly_one_window_without_a_shift() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, u64::from(CHUNK));
+    let plan = vocals(u64::from(CHUNK));
     assert_eq!(plan.units().len(), 2);
     for unit in plan.units() {
         assert_eq!(unit.start, 0);
@@ -46,7 +51,7 @@ fn covers_exactly_one_window_without_a_shift() {
 
 #[test]
 fn shifts_the_last_window_back_by_one_frame() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, u64::from(CHUNK) + 1);
+    let plan = vocals(u64::from(CHUNK) + 1);
     assert_eq!(plan.units().len(), 2);
     assert_eq!(plan.units()[0].start, 0);
     assert_eq!(plan.units()[0].length, CHUNK);
@@ -57,7 +62,7 @@ fn shifts_the_last_window_back_by_one_frame() {
 #[test]
 #[expect(clippy::cast_possible_truncation, reason = "the step fits u32")]
 fn stops_on_a_step_boundary() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, STEP);
+    let plan = vocals(STEP);
     assert_eq!(plan.units().len(), 1);
     assert_eq!(plan.units()[0].length, STEP as u32);
 }
@@ -66,7 +71,7 @@ fn stops_on_a_step_boundary() {
 #[expect(clippy::cast_possible_truncation, reason = "the short track fits u32")]
 fn repeats_the_window_on_a_short_track() {
     let samples = 400_000;
-    let plan = UnitPlan::vocals(SAMPLE_RATE, samples);
+    let plan = vocals(samples);
     assert_eq!(plan.units().len(), 2);
     for unit in plan.units() {
         assert_eq!(unit.start, 0);
@@ -77,7 +82,7 @@ fn repeats_the_window_on_a_short_track() {
 #[test]
 fn repeats_the_shifted_last_window_until_the_track_ends() {
     let samples = 805_600;
-    let plan = UnitPlan::vocals(SAMPLE_RATE, samples);
+    let plan = vocals(samples);
     assert_eq!(plan.units().len(), 3);
     assert_eq!(plan.units()[0].start, 0);
     assert_eq!(plan.units()[0].length, CHUNK);
@@ -90,7 +95,7 @@ fn repeats_the_shifted_last_window_until_the_track_ends() {
 #[test]
 fn counts_units_like_the_previous_browser_loop() {
     for samples in [1_000_u64, STEP, STEP + 1, u64::from(CHUNK), 793_800 * 2 + 7] {
-        let plan = UnitPlan::vocals(SAMPLE_RATE, samples);
+        let plan = vocals(samples);
         let counted = samples.div_ceil(STEP);
         assert_eq!(u64::from(plan.unit_count()), counted, "samples: {samples}");
     }
@@ -98,7 +103,7 @@ fn counts_units_like_the_previous_browser_loop() {
 
 #[test]
 fn weighs_the_hamming_window_over_the_whole_chunk() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, 793_800 * 2);
+    let plan = vocals(793_800 * 2);
     assert!((f64::from(plan.weight(0, 0)) - 0.08).abs() < 1e-6);
     let middle = f64::from(plan.weight(0, CHUNK / 2));
     assert!((middle - 1.0).abs() < 1e-3);
@@ -108,7 +113,7 @@ fn weighs_the_hamming_window_over_the_whole_chunk() {
 
 #[test]
 fn weighs_a_short_window_by_the_full_period() {
-    let plan = UnitPlan::vocals(SAMPLE_RATE, 1_000);
+    let plan = vocals(1_000);
     let first = f64::from(plan.weight(0, 1));
     let expected = 0.54 - 0.46 * (std::f64::consts::TAU / f64::from(CHUNK)).cos();
     assert!((first - expected).abs() < 1e-6);

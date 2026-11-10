@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::analysis::models::{VOCALS_GEOMETRY, VOCALS_MASKS};
+use crate::analysis::models::{GraphPin, SeparationGraph};
 
 const TAU: f64 = 2.0 * std::f64::consts::PI;
 
@@ -72,9 +72,10 @@ impl UnitPlan {
         clippy::cast_possible_truncation,
         reason = "the traversal mirrors the browser loop over non-negative offsets"
     )]
-    pub(crate) fn vocals(sample_rate: u32, samples: u64) -> Self {
-        let chunk_samples = VOCALS_GEOMETRY.chunk_samples;
-        let step = u64::from(VOCALS_STEP_SECONDS * sample_rate).min(u64::from(chunk_samples));
+    pub(crate) fn vocals(pin: &GraphPin<SeparationGraph>, samples: u64) -> Self {
+        let chunk_samples = pin.graph.chunk_samples();
+        let step =
+            u64::from(VOCALS_STEP_SECONDS * pin.model.sample_rate).min(u64::from(chunk_samples));
         let mut units = Vec::new();
         let mut offset = 0_u64;
         while offset < samples {
@@ -100,8 +101,8 @@ impl UnitPlan {
         Self::create(
             PlanRules::VocalsV1,
             PlanChannels {
-                input: VOCALS_GEOMETRY.channels,
-                output: VOCALS_GEOMETRY.channels * VOCALS_MASKS,
+                input: pin.graph.channels,
+                output: pin.graph.channels * pin.graph.masks,
             },
             chunk_samples,
             units,
