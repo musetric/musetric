@@ -23,12 +23,13 @@ use reqwest::Client;
 
 use musetric_gpu::ExecutorHost;
 
-use crate::storage::Storage;
+use crate::{analysis::models::ModelPins, storage::Storage};
 
 pub(crate) struct AnalysisContext {
     pub(crate) storage: Arc<Storage>,
     pub(crate) client: Client,
     pub(crate) models_path: PathBuf,
+    pub(crate) pins: Arc<ModelPins>,
     pub(crate) host: Arc<ExecutorHost>,
 }
 
@@ -51,7 +52,7 @@ impl StepRunner for AnalysisRunner {
         match job.step {
             ProcessingStep::Transcription => Box::pin(transcribe::run(&self.context, job, report)),
             _ => {
-                match steps::create(job.step, &self.context.models_path) {
+                match steps::create(job.step, &self.context.models_path, &self.context.pins) {
                     Some(analysis) => Box::pin(async move {
                         browser::run(&self.context, job, report, &analysis).await
                     }),

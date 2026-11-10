@@ -23,7 +23,7 @@ import {
   type ParityTensorRef,
   type ParityWhisperModelTask,
 } from './parityJob.js';
-import { findBundle, findFile, type ParityModels } from './parityModels.js';
+import { findBundle, findFile } from './parityModels.js';
 
 type CaseModel = {
   caseName: string;
@@ -32,34 +32,30 @@ type CaseModel = {
   revision: string;
   modelUrl: string;
   externalData: ParityExternalData[];
-  fileUrl: (constant: string) => string;
-  fileStarting: (prefix: string) => string;
+  fileUrl: (role: string) => string;
   meta: Record<string, unknown>;
   tensor: (key: string) => ParityTensorRef;
 };
 
 const caseModel = (
-  models: ParityModels,
   testCase: ParityCase,
   manifest: ParityManifest,
 ): CaseModel => {
-  const step = parityStepModels[testCase.step];
-  const bundle = findBundle(models, step.bundle);
+  const bundle = findBundle(parityStepModels[testCase.step].pin);
   const root = `/models/${bundle.directory}`;
-  const model = bundle.files.find((file) => file.name.endsWith('.onnx'));
-  const data = bundle.files.find((file) => file.name.endsWith('.onnx.data'));
+  const files = Object.values(bundle.files);
+  const model = files.find((file) => file.name.endsWith('.onnx'));
+  const data = files.find((file) => file.name.endsWith('.onnx.data'));
   return {
     caseName: testCase.name,
-    graph: models.graphs[step.graph],
+    graph: bundle.graph,
     modelId: bundle.modelId,
     revision: bundle.revision,
     modelUrl: `${root}/${model?.name ?? ''}`,
     externalData: data
       ? [{ path: data.name, data: `${root}/${data.name}` }]
       : [],
-    fileUrl: (constant) => `${root}/${findFile(models, constant)}`,
-    fileStarting: (prefix) =>
-      `${root}/${bundle.files.find((file) => file.name.startsWith(prefix))?.name ?? prefix}`,
+    fileUrl: (role) => `${root}/${findFile(bundle, role).name}`,
     meta: manifest.meta,
     tensor: (key) => {
       const tensor = manifest.tensors[key];
@@ -110,9 +106,9 @@ const whisperModelTask = (
   kind: 'whisperModel',
   caseName: model.caseName,
   provider,
-  encoderUrl: model.fileStarting('encoder_model'),
-  decoderUrl: model.fileStarting('decoder_model_merged'),
-  crossUrl: model.fileStarting('cross_kv'),
+  encoderUrl: model.fileUrl('encoder'),
+  decoderUrl: model.fileUrl('decoder'),
+  crossUrl: model.fileUrl('crossKv'),
   features: model.tensor('model.input@reference'),
   encoderStates: model.tensor('encoder.output@onnx-cpu'),
   tokens: model.tensor('decoder.tokens@reference'),
@@ -160,7 +156,7 @@ const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
     caseName: model.caseName,
     graph: beatThisGraph(model.graph),
     modelUrl: model.modelUrl,
-    filterbankUrl: model.fileUrl('BEAT_THIS_FILTERBANK'),
+    filterbankUrl: model.fileUrl('filterbank'),
     unitInput: model.tensor('unit.input@reference'),
   }),
   key: (model) => ({
@@ -175,15 +171,14 @@ const productTasks: Record<ParityStep, (model: CaseModel) => ParityTask> = {
     caseName: model.caseName,
     graph: chordNetGraph(model.graph),
     modelUrl: model.modelUrl,
-    planUrl: model.fileUrl('CHORD_NET_PLAN'),
-    planManifestUrl: model.fileUrl('CHORD_NET_PLAN_MANIFEST'),
+    planUrl: model.fileUrl('plan'),
+    planManifestUrl: model.fileUrl('planManifest'),
     unitInput: model.tensor('unit.input@reference'),
   }),
 };
 
 export type ParityCaseTasks = {
   outDir: string;
-  models: ParityModels;
   testCase: ParityCase;
   desktop: boolean;
 };
@@ -193,7 +188,7 @@ export const caseTasks = (request: ParityCaseTasks): ParityTask[] => {
   const manifest = readManifest(
     resolve(request.outDir, 'cases', testCase.name, 'manifest.json'),
   );
-  const model = caseModel(request.models, testCase, manifest);
+  const model = caseModel(testCase, manifest);
   return [
     ...(wasmRuns(testCase.step, request.desktop)
       ? [providerTask(testCase, model, 'wasm')]

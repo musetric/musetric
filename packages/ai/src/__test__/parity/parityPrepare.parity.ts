@@ -15,11 +15,7 @@ import {
   readTensorValues,
   writeWav,
 } from './parityFiles.js';
-import {
-  findBundle,
-  type ParityBundle,
-  readParityModels,
-} from './parityModels.js';
+import { findBundle, type ParityBundle } from './parityModels.js';
 
 type ParityPrepareRequest = ParityCaseFile & {
   outDir: string;
@@ -41,7 +37,7 @@ const ensureBundle = async (
   outDir: string,
   bundle: ParityBundle,
 ): Promise<void> => {
-  for (const file of bundle.files) {
+  for (const file of Object.values(bundle.files)) {
     await ensureDownload({
       url: `https://huggingface.co/${bundle.modelId}/resolve/${bundle.revision}/${file.name}`,
       sha256: file.sha256,
@@ -136,7 +132,6 @@ it('prepares the parity cases', async (context) => {
   if (!request) {
     return;
   }
-  const models = readParityModels();
   const prepared: string[] = [];
   for (const testCase of request.cases) {
     const caseDir = resolve(request.outDir, 'cases', testCase.name);
@@ -162,9 +157,11 @@ it('prepares the parity cases', async (context) => {
         });
       }
     }
-    const bundle = findBundle(models, parityStepModels[testCase.step].bundle);
+    const bundle = findBundle(parityStepModels[testCase.step].pin);
     await ensureBundle(request.outDir, bundle);
-    const onnx = bundle.files.find((file) => file.name.endsWith('.onnx'));
+    const onnx = Object.values(bundle.files).find((file) =>
+      file.name.endsWith('.onnx'),
+    );
     runReference(request.referenceCommand, [
       `--step ${testCase.step}`,
       `--audio-path "${audio}"`,
