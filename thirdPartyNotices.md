@@ -15,7 +15,7 @@ The upstream repository README asks third-party application developers who use U
 
 - Source: https://github.com/lucidrains/BS-RoFormer
 - Usage: Mel-Band RoFormer source-separation architecture and model contract used by the vocal separation ONNX pipeline.
-- Local files: `packages/ai/src/runtime/vocals/pin.json`, `packages/server/src/unit_plan.rs`, `packages/server/src/unit_fold.rs`, `packages/server/src/analysis/stem_signal.rs`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
+- Local files: `packages/ai/src/runtime/vocals/pin.json`, `packages/ai/src/separation/separationPlan.ts`, `packages/ai/src/separation/separationFold.ts`, `packages/ai/src/separation/separationStems.ts`, `packages/ai/src/runtime/vocals/vocalsRuntime.ts`, `packages/ai/src/runtime/vocals/applyMasks.wgsl.ts`, `packages/ai/src/runtime/vocals/pack.wgsl.ts`.
 - License: MIT.
 - License source: upstream `LICENSE`.
 
