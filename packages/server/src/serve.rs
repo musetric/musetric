@@ -16,20 +16,25 @@ use musetric_gpu::{Bundle, ExecutorHost, ListenerReviver, RevivingListener, crea
 use musetric_jobs::{Queue, QueueOptions};
 use musetric_media::SymphoniaPcm;
 use rcgen::generate_simple_self_signed;
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::oneshot, time::timeout};
 
 use crate::{
-    analysis::{AnalysisContext, AnalysisRunner, models::remove_unpinned},
+    analysis::{
+        AnalysisContext, AnalysisRunner,
+        models::{ModelPins, remove_unpinned},
+    },
     blobs::clear_upload_area,
     executor_browser::{ExecutorBrowser, ExecutorBrowserOptions, find_browser},
     frontend::Frontend,
     garbage::spawn_collector,
     publish::Publication,
+    realtime::Rooms,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+const SESSION_CLOSE_LIMIT: Duration = Duration::from_secs(10);
 const PROCESSING_INTERVAL: Duration = Duration::from_secs(10);
 const STEP_IDLE_LIMIT: Duration = Duration::from_mins(10);
 const NO_BROWSER: &str =
@@ -71,6 +76,7 @@ pub struct EmbeddedServer {
     reviver: ListenerReviver,
     executor: Arc<ExecutorHost>,
     queue: Arc<Queue>,
+    rooms: Arc<Rooms>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
@@ -95,7 +101,8 @@ impl EmbeddedServer {
         self.queue.has_work().await
     }
 
-    pub fn close(&self) {
+    pub async fn close(&self) {
+        close_sessions(&self.rooms).await;
         let sender = self.shutdown.lock().ok().and_then(|mut guard| guard.take());
         if let Some(shutdown) = sender {
             let _ = shutdown.send(());
@@ -128,6 +135,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let CreatedApp {
         router: app,
         executor_url,
+        rooms,
         ..
     } = create_app(AppOptions {
         storage,
@@ -157,7 +165,7 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     };
     if let Some(config) = tls {
         let handle = Handle::<SocketAddr>::new();
-        tokio::spawn(shutdown_on_signal(handle.clone()));
+        tokio::spawn(shutdown_on_signal(handle.clone(), rooms));
         announce_ready("https", address);
         axum_server::from_tcp_rustls(socket, config)?
             .handle(handle)
@@ -168,7 +176,10 @@ pub async fn serve(options: ServerOptions) -> Result<(), BoxedError> {
     let listener = TcpListener::from_std(socket)?;
     announce_ready("http", address);
     axum::serve(listener, app)
-        .with_graceful_shutdown(stop_requested())
+        .with_graceful_shutdown(async move {
+            stop_requested().await;
+            close_sessions(&rooms).await;
+        })
         .await?;
     Ok(())
 }
@@ -193,6 +204,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         executor_url,
         executor,
         queue,
+        rooms,
     } = app;
     tokio::spawn(async move {
         let _ = axum::serve(listener, router)
@@ -207,6 +219,7 @@ pub async fn start_embedded(options: EmbeddedServerOptions) -> Result<EmbeddedSe
         reviver,
         executor,
         queue,
+        rooms,
         shutdown: Mutex::new(Some(shutdown)),
     })
 }
@@ -224,15 +237,18 @@ struct CreatedApp {
     executor_url: String,
     executor: Arc<ExecutorHost>,
     queue: Arc<Queue>,
+    rooms: Arc<Rooms>,
 }
 
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let storage = options.storage;
     let host = ExecutorHost::start(options.browser_bundle).await?;
+    let pins = Arc::new(ModelPins::read()?);
     let runner = AnalysisRunner::create(AnalysisContext {
         storage: Arc::clone(&storage),
         client: create_client()?,
         models_path: options.models.clone(),
+        pins: Arc::clone(&pins),
         host: Arc::clone(&host),
     });
     let queue = Queue::create(QueueOptions {
@@ -243,24 +259,28 @@ async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
         idle_limit: STEP_IDLE_LIMIT,
     });
     if options.processing {
-        remove_unpinned(&options.models).await;
+        remove_unpinned(&options.models, &pins).await;
         queue.spawn();
         wake_on_arrival(&host, &queue);
     }
     let executor_url = host.base_url().to_owned();
     let executor = Arc::clone(&host);
+    let rooms = Arc::new(Rooms::create());
     let router = create_router(RouterOptions {
         frontend: options.frontend,
+        rooms: Arc::clone(&rooms),
         storage,
         queue: Arc::clone(&queue),
         executor: host,
         models_path: options.models,
+        pins,
     });
     Ok(CreatedApp {
         router,
         executor_url,
         executor,
         queue,
+        rooms,
     })
 }
 
@@ -384,9 +404,14 @@ fn report_migration_failure(failure: &MigrationFailure) {
     let _ = writeln!(io::stderr().lock(), "{}", lines.join("\n"));
 }
 
-async fn shutdown_on_signal(handle: Handle<SocketAddr>) {
+async fn shutdown_on_signal(handle: Handle<SocketAddr>, rooms: Arc<Rooms>) {
     stop_requested().await;
+    close_sessions(&rooms).await;
     handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+}
+
+async fn close_sessions(rooms: &Rooms) {
+    let _ = timeout(SESSION_CLOSE_LIMIT, rooms.close()).await;
 }
 
 #[cfg(test)]
@@ -402,10 +427,16 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    use futures_util::{SinkExt, StreamExt};
     use musetric_db::{OpenOptions, init_database, lock_storage, open_database};
+    use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
 
     use super::{EmbeddedServerOptions, ServerOptions, serve, start_embedded};
     use crate::{Asset, Assets, Bundle, Frontend};
+
+    type ClientSocket = tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >;
 
     static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -482,7 +513,7 @@ mod tests {
         assert!(workspace.root.join("storage/db/app.db").is_file());
         assert_eq!(shell, "<!doctype html><title>Musetric</title>");
         assert_eq!(projects, "[]");
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -501,7 +532,7 @@ mod tests {
         .expect("the embedded server should start");
 
         assert_eq!(server.url(), format!("http://{listen}"));
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -523,7 +554,7 @@ mod tests {
 
         assert_ne!(server.url(), format!("http://{listen}"));
         assert_eq!(projects, "[]");
-        server.close();
+        server.close().await;
     }
 
     #[tokio::test]
@@ -578,5 +609,94 @@ mod tests {
 
         assert!(refused.is_err());
         assert_eq!(status, "processing");
+    }
+
+    fn read_close_code(received: ClientMessage) -> Option<u16> {
+        match received {
+            ClientMessage::Close(Some(frame)) => Some(u16::from(frame.code)),
+            _ => None,
+        }
+    }
+
+    async fn next_event(socket: &mut ClientSocket, wanted: &str) {
+        loop {
+            let received = socket
+                .next()
+                .await
+                .expect("the server should send an event")
+                .expect("the event should be valid");
+            if let ClientMessage::Text(text) = received
+                && serde_json::from_str::<serde_json::Value>(&text)
+                    .expect("the event should be json")["type"]
+                    == wanted
+            {
+                return;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn saves_a_take_left_open_when_the_server_closes() {
+        let workspace = Workspace::new();
+        let options = workspace.options();
+        let database = options.database.clone();
+        let server = start_embedded(options)
+            .await
+            .expect("the embedded server should start");
+        open_database(&database, &OpenOptions { foreign_keys: true })
+            .expect("the database should open")
+            .execute_batch(
+                "INSERT INTO Project (id, name, sampleRate, frameCount)
+                 VALUES (1, 'Song', 48000, 480000);
+                 INSERT INTO Recording (id, projectId, name, active) VALUES (1, 1, 'Recording 1', 1);",
+            )
+            .expect("the project should be stored");
+        let url = format!(
+            "{}/api/project/1/realtime",
+            server.url().replacen("http", "ws", 1)
+        );
+        let (mut socket, _) = connect_async(url).await.expect("the take should connect");
+        let start = serde_json::json!({
+            "type": "recording.start",
+            "recordingId": 1,
+            "sampleRate": 48000,
+            "frameCount": 480_000,
+            "latencyFrameCount": 0,
+            "sessionId": "open-take",
+        });
+        socket
+            .send(ClientMessage::Text(start.to_string().into()))
+            .await
+            .expect("the start should send");
+        next_event(&mut socket, "recording.started").await;
+        let mut packet = Vec::new();
+        for value in [0_u32, 0, 4] {
+            packet.extend_from_slice(&value.to_le_bytes());
+        }
+        for _ in 0..4 {
+            packet.extend_from_slice(&0.5_f32.to_le_bytes());
+        }
+        socket
+            .send(ClientMessage::Binary(packet.into()))
+            .await
+            .expect("the packet should send");
+        next_event(&mut socket, "recording.peaksChanged").await;
+
+        server.close().await;
+
+        let mut code = None;
+        while let Some(Ok(received)) = socket.next().await {
+            code = code.or_else(|| read_close_code(received));
+        }
+        assert_eq!(code, Some(1001));
+        let pieces: i64 = open_database(&database, &OpenOptions { foreign_keys: true })
+            .expect("the database should open")
+            .query_row(
+                "SELECT COUNT(*) FROM RecordingPiece WHERE recordingId = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("the pieces should be counted");
+        assert_eq!(pieces, 1);
     }
 }

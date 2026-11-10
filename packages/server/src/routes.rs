@@ -17,7 +17,9 @@ use axum::Router;
 
 use musetric_jobs::Queue;
 
-use crate::{mixdown::Mixdowns, realtime, realtime::Rooms, storage::Storage};
+use crate::{
+    analysis::models::ModelPins, mixdown::Mixdowns, realtime, realtime::Rooms, storage::Storage,
+};
 
 #[derive(Clone)]
 pub(crate) struct RouteState {
@@ -26,6 +28,7 @@ pub(crate) struct RouteState {
     pub(crate) queue: Arc<Queue>,
     pub(crate) executor: Arc<ExecutorHost>,
     pub(crate) models_path: PathBuf,
+    pub(crate) pins: Arc<ModelPins>,
     pub(crate) mixdowns: Arc<Mixdowns>,
 }
 

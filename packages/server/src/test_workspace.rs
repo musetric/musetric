@@ -10,7 +10,8 @@ use std::{
 };
 
 use crate::{
-    mixdown::Mixdowns, publish::Publication, realtime::Rooms, routes::RouteState, storage::Storage,
+    analysis::models::ModelPins, mixdown::Mixdowns, publish::Publication, realtime::Rooms,
+    routes::RouteState, storage::Storage,
 };
 use axum::http::StatusCode;
 use musetric_db::{
@@ -200,6 +201,7 @@ pub(crate) async fn create_route_state(workspace: &Workspace, storage: Arc<Stora
         queue,
         executor,
         models_path: workspace.models_path(),
+        pins: Arc::new(ModelPins::read().expect("the pins should parse")),
     }
 }
 

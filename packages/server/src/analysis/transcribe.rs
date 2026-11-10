@@ -19,7 +19,7 @@ use crate::{
             sample_duration, show_phase, store,
         },
         checkpoint_persist::{CheckpointCursor, persist_tail},
-        models::{WHISPER, whisper_graph},
+        models::{GraphPin, WHISPER, whisper_graph},
         result_check::check_result,
         transcribe_units::{
             CHUNK_SIZE_SECONDS, Plan, REPAIR_UNITS, Restored, SEAM_SECONDS, StartPass,
@@ -56,10 +56,11 @@ async fn transcribe(
     job: &PendingJob,
     report: &StepReport,
 ) -> Result<(), Failure> {
-    ensure_files(context, report, &WHISPER.cached(&context.models_path)).await?;
+    let pin = &context.pins.transcription.model;
+    ensure_files(context, report, &WHISPER.cached(pin, &context.models_path)).await?;
     require_executor(context)?;
     let samples = read_voice(context, job, report).await?;
-    let duration = sample_duration(samples.len(), WHISPER.sample_rate);
+    let duration = sample_duration(samples.len(), pin.sample_rate);
     let result = drive(context, job, report, samples).await?;
     check_result(Analysis::Subtitle, &result, duration)?;
     (report)(StepPhase::Saving);
@@ -78,9 +79,9 @@ async fn read_voice(
     })
     .await?
     .map(|blob_id| blob_path(&context.storage.blobs_path, &blob_id));
-    let lead_frames = count_frames(&lead, WHISPER.sample_rate).await?;
+    let lead_frames = count_frames(&lead, context.pins.transcription.model.sample_rate).await?;
     let backing_frames = match &backing {
-        Some(path) => count_frames(path, WHISPER.sample_rate).await?,
+        Some(path) => count_frames(path, context.pins.transcription.model.sample_rate).await?,
         None => 0,
     };
     let mut decoded = decode_reporter(report, lead_frames + backing_frames);
@@ -104,7 +105,7 @@ async fn decode_voice(
         source: context.storage.pcm.as_ref(),
         request: PcmRequest {
             from,
-            sample_rate: WHISPER.sample_rate,
+            sample_rate: context.pins.transcription.model.sample_rate,
         },
         downmix: WHISPER.downmix,
         decoded,
@@ -129,8 +130,8 @@ async fn drive(
     let computation = computation_id(&[
         DSP_VERSION,
         &digest_samples(&samples),
-        WHISPER.model_id,
-        WHISPER.revision,
+        &context.pins.transcription.model.repository,
+        &context.pins.transcription.model.revision,
     ]);
     let area = step_area(&context.storage.work_path, job.project_id, job.step);
     ensure_area(&area).await?;
@@ -161,7 +162,7 @@ async fn drive(
     let units = Arc::new(TranscribeUnits::create(
         area.join("incoming"),
         Arc::new(samples),
-        WHISPER.sample_rate,
+        context.pins.transcription.model.sample_rate,
         state,
     ));
     units.register(&attempt_id)?;
@@ -235,8 +236,12 @@ async fn restore(
             "the tail hash does not match",
         )));
     }
-    let state = restore_state(&tail.bytes, identity.samples, WHISPER.sample_rate)
-        .map_err(|reason| Failure::Refused(restore_refused(&reason)))?;
+    let state = restore_state(
+        &tail.bytes,
+        identity.samples,
+        context.pins.transcription.model.sample_rate,
+    )
+    .map_err(|reason| Failure::Refused(restore_refused(&reason)))?;
     let next_unit = cursor.next_unit;
     let pass = match cursor.pass.as_deref() {
         Some(PASS_DECODE) => {
@@ -431,22 +436,32 @@ async fn open_attempt(
     }
     let models = WHISPER.root(&context.models_path);
     let hosted = session.register_directory(&models).await?;
-    let request = request_json(attempt_id, &session.attempt_url(attempt_id), &hosted);
+    let request = request_json(
+        &context.pins.transcription,
+        attempt_id,
+        &session.attempt_url(attempt_id),
+        &hosted,
+    );
     session.send_job(API_NAME, &request).map_err(Failure::from)
 }
 
-pub(crate) fn request_json(attempt_id: &str, attempt_url: &str, model_host: &str) -> Value {
+pub(crate) fn request_json(
+    pin: &GraphPin<Value>,
+    attempt_id: &str,
+    attempt_url: &str,
+    model_host: &str,
+) -> Value {
     json!({
         "attemptId": attempt_id,
         "attemptUrl": attempt_url,
         "outputs": [OUTPUT],
-        "sampleRate": WHISPER.sample_rate,
+        "sampleRate": pin.model.sample_rate,
         "chunkSize": CHUNK_SIZE_SECONDS,
         "seamSeconds": SEAM_SECONDS,
         "modelHost": model_host,
-        "modelId": WHISPER.model_id,
-        "revision": WHISPER.revision,
-        "graph": whisper_graph(),
+        "modelId": pin.model.repository,
+        "revision": pin.model.revision,
+        "graph": whisper_graph(pin),
     })
 }
 

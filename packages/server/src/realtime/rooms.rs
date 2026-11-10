@@ -8,9 +8,15 @@ use std::{
 
 use axum::extract::ws::Message;
 use serde_json::Value;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+    watch,
+};
 
-use crate::realtime::events;
+use crate::realtime::{
+    channel::{HEARTBEAT, Heartbeat},
+    events,
+};
 
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 
@@ -113,14 +119,55 @@ impl Room {
 pub(crate) struct Rooms {
     projects: Mutex<HashMap<i64, Room>>,
     next_member: AtomicU64,
+    closing: watch::Sender<bool>,
+    live: watch::Sender<usize>,
+    heartbeat: Heartbeat,
+}
+
+pub(crate) struct Live<'rooms>(&'rooms watch::Sender<usize>);
+
+impl Drop for Live<'_> {
+    fn drop(&mut self) {
+        self.0.send_modify(|count| *count -= 1);
+    }
 }
 
 impl Rooms {
     pub(crate) fn create() -> Self {
+        Self::with_heartbeat(HEARTBEAT)
+    }
+
+    pub(crate) fn with_heartbeat(heartbeat: Heartbeat) -> Self {
         Self {
             projects: Mutex::new(HashMap::new()),
             next_member: AtomicU64::new(0),
+            closing: watch::Sender::new(false),
+            live: watch::Sender::new(0),
+            heartbeat,
         }
+    }
+
+    pub(crate) const fn heartbeat(&self) -> Heartbeat {
+        self.heartbeat
+    }
+
+    pub(crate) fn enter(&self) -> Live<'_> {
+        self.live.send_modify(|count| *count += 1);
+        Live(&self.live)
+    }
+
+    pub(crate) fn closing(&self) -> watch::Receiver<bool> {
+        self.closing.subscribe()
+    }
+
+    pub(crate) fn is_closing(&self) -> bool {
+        *self.closing.borrow()
+    }
+
+    pub(crate) async fn close(&self) {
+        self.closing.send_replace(true);
+        let mut live = self.live.subscribe();
+        let _ = live.wait_for(|count| *count == 0).await;
     }
 
     pub(crate) fn join(&self, project_id: i64) -> (MemberId, UnboundedReceiver<Message>) {

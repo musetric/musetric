@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
           changed=$(git diff --name-only HEAD^1 HEAD)
-          if printf '%s\n' "$changed" | grep -Eq '^(packages/server/|packages/app/src-tauri/|packages/app/rust-toolchain\.toml$|\.github/actions/rustQuality/|\.github/workflows/repoQuality\.yml$)'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(packages/server/|packages/ai/src/runtime/[^/]+/pin\.json$|packages/app/src-tauri/|packages/app/rust-toolchain\.toml$|\.github/actions/rustQuality/|\.github/workflows/repoQuality\.yml$)'; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           else
             echo "The pull request changes nothing the Rust checks read:"
@@ -72,5 +72,5 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-      - working-directory: packages/server
+      - working-directory: packages/ai
         run: bash -c "$(jq -r '.scripts["check:models"]' package.json)"

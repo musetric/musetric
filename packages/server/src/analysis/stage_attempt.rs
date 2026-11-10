@@ -24,7 +24,6 @@ use crate::{
             show_phase,
         },
         checkpoint_persist::{CheckpointCursor, PrefixAppend, persist_tail},
-        models::VOCALS,
         stage_units::{StageRegistration, StageResume, StageUnits},
         stem_files::read_at,
     },
@@ -348,10 +347,11 @@ pub(crate) async fn read_stage_input(
     let models = ensure_files(context, report, files).await?;
     require_executor(context)?;
     let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let mut decoded = decode_reporter(report, count_frames(&source, VOCALS.sample_rate).await?);
+    let sample_rate = context.pins.separation.model.sample_rate;
+    let mut decoded = decode_reporter(report, count_frames(&source, sample_rate).await?);
     let pcm = collect_interleaved_pcm(
         context.storage.pcm.as_ref(),
-        read_at(&source, VOCALS.sample_rate),
+        read_at(&source, sample_rate),
         &mut decoded,
     )
     .await?;

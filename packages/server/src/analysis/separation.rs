@@ -14,7 +14,7 @@ use crate::{
         AnalysisContext,
         browser::Failure,
         gains::{lead_loudness, plain_loudness},
-        models::{VOCALS, VOCALS_MODEL, VOCALS_MODEL_DATA, vocals_graph},
+        models::{GraphPin, SeparationGraph, VOCALS},
         stage_attempt::{
             StageAttempt, StageInput, StageRun, StageStart, StepStems, UNIT_OUTPUT, cached_model,
             read_stage_input, run_step,
@@ -36,6 +36,8 @@ const LABEL: &str = "Headless stem separation";
 const PASS: &str = "vocals";
 const DSP_VERSION: &str = "separation-dsp-v2";
 const UNSPLIT_FOLD: &str = "the folded units do not hold the vocals and the backing";
+const MODEL: &str = "model";
+const MODEL_DATA: &str = "modelData";
 
 struct Separated {
     vocals: StemFiles,
@@ -99,14 +101,15 @@ async fn process_stems(
 ) -> Result<(), Failure> {
     separate_stems(running, job, stems).await?;
     (running.report)(StepPhase::Saving);
+    let model_rate = running.context.pins.separation.model.sample_rate;
     let delivered = SampleRates {
-        input: VOCALS.sample_rate,
+        input: model_rate,
         output: sample_rate,
     };
     tokio::try_join!(
         stems.vocals.encode(SampleRates {
-            input: VOCALS.sample_rate,
-            output: VOCALS.sample_rate,
+            input: model_rate,
+            output: model_rate,
         }),
         stems.instrumental.encode(delivered),
         stems.lead.encode(delivered),
@@ -126,18 +129,18 @@ async fn separate_stems(
     job: &PendingJob,
     stems: &Separated,
 ) -> Result<(), Failure> {
-    let StageInput { models, pcm } =
-        read_stage_input(running, job, &VOCALS.cached(&running.context.models_path)).await?;
+    let pin = &running.context.pins.separation;
+    let cached = VOCALS.cached(&pin.model, &running.context.models_path);
+    let StageInput { models, pcm } = read_stage_input(running, job, &cached).await?;
     let mixture = Arc::new(normalize_peak(
         &planar_from_interleaved(&deinterleave(&pcm)),
         MAX_PEAK,
     ));
-    let samples = u64::try_from(mixture.len() / CHANNELS).unwrap_or(0);
     let computation = computation_id(&[
         DSP_VERSION,
         &digest_samples(&mixture),
-        VOCALS.files[0].1,
-        VOCALS.files[1].1,
+        &pin.model.file(MODEL)?.sha256,
+        &pin.model.file(MODEL_DATA)?.sha256,
     ]);
     let mut attempt = StageAttempt::start(
         running,
@@ -149,7 +152,7 @@ async fn separate_stems(
         },
     )
     .await?;
-    let outcome = produce(&mut attempt, &mixture, samples, &models).await;
+    let outcome = produce(&mut attempt, pin, &mixture, &models).await;
     attempt.close();
     let folded = outcome?;
     let (raw_vocals, raw_backing) = folded
@@ -171,16 +174,16 @@ async fn separate_stems(
 
 async fn produce(
     attempt: &mut StageAttempt<'_>,
+    pin: &GraphPin<SeparationGraph>,
     mixture: &Arc<Vec<f32>>,
-    samples: u64,
     models: &[(String, PathBuf)],
 ) -> Result<Vec<f32>, Failure> {
     attempt.open().await?;
-    let model = attempt
-        .register(&cached_model(models, VOCALS_MODEL)?)
-        .await?;
+    let model_name = &pin.model.file(MODEL)?.name;
+    let model_data_name = &pin.model.file(MODEL_DATA)?.name;
+    let model = attempt.register(&cached_model(models, model_name)?).await?;
     let model_data = attempt
-        .register(&cached_model(models, VOCALS_MODEL_DATA)?)
+        .register(&cached_model(models, model_data_name)?)
         .await?;
     let attempt_id = Uuid::new_v4().to_string();
     let request = json!({
@@ -189,10 +192,11 @@ async fn produce(
         "outputs": [UNIT_OUTPUT],
         "vocalsModelUrl": model,
         "vocalsModelDataUrl": model_data,
-        "vocalsModelDataPath": VOCALS_MODEL_DATA,
-        "graph": vocals_graph(),
+        "vocalsModelDataPath": model_data_name,
+        "graph": pin.graph.request(),
     });
-    let plan = UnitPlan::vocals(VOCALS.sample_rate, samples);
+    let samples = u64::try_from(mixture.len() / CHANNELS).unwrap_or(0);
+    let plan = UnitPlan::vocals(pin, samples);
     let resume = attempt.resume(samples, plan.channels.output).await?;
     attempt
         .run(

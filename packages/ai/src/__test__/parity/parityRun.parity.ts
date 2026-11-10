@@ -5,7 +5,7 @@ import { inject, it } from 'vitest';
 import { createBrowserBundleConfig } from '../../browserBundle.vite.js';
 import { type ParityCase, type ParityDevice } from './parityCases.js';
 import { type ParityJob } from './parityJob.js';
-import { readParityModels } from './parityModels.js';
+import { readBundles } from './parityModels.js';
 import { openDevice, startParityServer } from './parityServer.js';
 import { caseTasks } from './parityTasks.js';
 
@@ -37,12 +37,10 @@ it('runs the parity page on one device', async (context) => {
   if (!request) {
     return;
   }
-  const models = readParityModels();
   const job: ParityJob = {
     tasks: request.cases.flatMap((testCase) =>
       caseTasks({
         outDir: request.outDir,
-        models,
         testCase,
         desktop: request.device.serial === undefined,
       }),
@@ -65,7 +63,7 @@ it('runs the parity page on one device', async (context) => {
     device: request.device.name,
     job,
     hub: new Map(
-      models.bundles.map((bundle) => [bundle.modelId, bundle.directory]),
+      readBundles().map((bundle) => [bundle.modelId, bundle.directory]),
     ),
   });
   const close = openDevice({
