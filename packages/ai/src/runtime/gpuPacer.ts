@@ -1,3 +1,5 @@
+const defaultBudgetMs = 16;
+
 export type GpuPacer = {
   pace: <T>(operation: () => Promise<T>) => Promise<T>;
   release: () => Promise<void>;
@@ -16,7 +18,7 @@ export const createGpuPacer = (
   device: GPUDevice,
   options: GpuPacerOptions = {},
 ): GpuPacer => {
-  const { budgetMs } = options;
+  const { budgetMs = defaultBudgetMs } = options;
   const { queue } = device;
   const submit = queue.submit.bind(queue);
   const writeBuffer = queue.writeBuffer.bind(queue);
@@ -89,10 +91,7 @@ export const createGpuPacer = (
         continue;
       }
       sinceWait += 1;
-      if (
-        budgetMs !== undefined &&
-        (sinceWait + 1) * perSubmission <= budgetMs
-      ) {
+      if ((sinceWait + 1) * perSubmission <= budgetMs) {
         continue;
       }
       await complete();
