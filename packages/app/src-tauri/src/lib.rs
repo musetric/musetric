@@ -317,7 +317,7 @@ fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
     match event {
         tauri::RunEvent::Exit => {
             if let Some(server) = app.try_state::<musetric_server::EmbeddedServer>() {
-                server.close();
+                tauri::async_runtime::block_on(server.close());
             }
             #[cfg(desktop)]
             update::install_on_exit(app);
