@@ -1,21 +1,16 @@
 use std::{
     fmt::Write,
-    io::SeekFrom,
     path::{Path, PathBuf},
 };
 
 use sha2::{Digest, Sha256};
-use tokio::{
-    fs::{self, File, OpenOptions, create_dir_all},
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-};
+use tokio::fs::{self, create_dir_all};
 
 use musetric_db::BoxedError;
 
 use crate::blobs::project_area;
 
 const TAIL_NAME: &str = "separated.tail";
-const PREFIX_NAME: &str = "separated.prefix";
 const INPUT_NAME: &str = "input.f32";
 const CHECKPOINTS: &str = "checkpoints";
 const INCOMING: &str = "incoming";
@@ -43,7 +38,7 @@ impl CheckpointDir {
         self.root.join(CHECKPOINTS).join(generation.to_string())
     }
 
-    fn tail_path(&self, generation: u32) -> PathBuf {
+    pub(crate) fn tail_path(&self, generation: u32) -> PathBuf {
         self.generation_dir(generation).join(TAIL_NAME)
     }
 
@@ -89,36 +84,6 @@ impl CheckpointDir {
         })
     }
 
-    pub(crate) async fn append_prefix(
-        &self,
-        committed_bytes: u64,
-        bytes: &[u8],
-    ) -> Result<(), BoxedError> {
-        create_dir_all(&self.root).await?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(false)
-            .open(self.root.join(PREFIX_NAME))
-            .await?;
-        file.set_len(committed_bytes).await?;
-        file.seek(SeekFrom::Start(committed_bytes)).await?;
-        file.write_all(bytes).await?;
-        file.flush().await?;
-        Ok(())
-    }
-
-    pub(crate) async fn read_prefix(&self, committed_bytes: u64) -> Result<Vec<u8>, BoxedError> {
-        let mut prefix = vec![0_u8; usize::try_from(committed_bytes)?];
-        if committed_bytes > 0 {
-            File::open(self.root.join(PREFIX_NAME))
-                .await?
-                .read_exact(&mut prefix)
-                .await?;
-        }
-        Ok(prefix)
-    }
-
     pub(crate) async fn read_tail(&self, generation: u32) -> Result<StoredTail, BoxedError> {
         let bytes = fs::read(self.tail_path(generation)).await?;
         Ok(StoredTail {
@@ -139,6 +104,10 @@ pub(crate) fn digest_samples(samples: &[f32]) -> String {
 pub(crate) fn digest_of(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
+    hex_digest(hasher)
+}
+
+pub(crate) fn hex_digest(hasher: Sha256) -> String {
     hasher
         .finalize()
         .iter()

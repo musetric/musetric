@@ -6,13 +6,18 @@ use std::{
 use axum::{
     body::Body,
     http::{
-        HeaderValue,
-        header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE},
+        HeaderMap, HeaderValue, StatusCode,
+        header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE},
     },
     response::Response,
 };
-use tokio::fs::{File, metadata};
+use tokio::{
+    fs::{File, metadata},
+    io::{AsyncReadExt, AsyncSeekExt, SeekFrom},
+};
 use tokio_util::io::ReaderStream;
+
+use crate::range::{ByteRange, parse};
 
 pub(crate) const LOADER_HTML: &str = concat!(
     "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>",
@@ -114,6 +119,41 @@ pub(crate) fn read_content_type(path: &Path) -> &'static str {
 
 pub(crate) fn resolve_asset(bundle_path: &Path, pathname: &str) -> Option<PathBuf> {
     Some(bundle_path.join(read_relative(pathname)?))
+}
+
+pub(crate) async fn send_file_range(
+    path: &Path,
+    content_type: &'static str,
+    request: &HeaderMap,
+) -> Option<Response<Body>> {
+    let stat = metadata(path).await.ok()?;
+    if !stat.is_file() {
+        return None;
+    }
+    let size = stat.len();
+    let range = match parse(request, size) {
+        ByteRange::Full => return send_file(path, content_type).await,
+        ByteRange::Unsatisfiable => {
+            let mut response = Response::new(Body::empty());
+            *response.status_mut() = StatusCode::RANGE_NOT_SATISFIABLE;
+            let unsatisfied = HeaderValue::from_str(&format!("bytes */{size}")).ok()?;
+            response.headers_mut().insert(CONTENT_RANGE, unsatisfied);
+            return Some(response);
+        }
+        ByteRange::Partial(range) => range,
+    };
+    let mut content = File::open(path).await.ok()?;
+    content.seek(SeekFrom::Start(range.start)).await.ok()?;
+    let length = range.end - range.start + 1;
+    let mut response = Response::new(Body::from_stream(ReaderStream::new(content.take(length))));
+    *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+    let headers = response.headers_mut();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+    headers.insert(CONTENT_LENGTH, HeaderValue::from(length));
+    let served = format!("bytes {}-{}/{size}", range.start, range.end);
+    headers.insert(CONTENT_RANGE, HeaderValue::from_str(&served).ok()?);
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static(NO_STORE));
+    Some(response)
 }
 
 pub(crate) async fn send_file(path: &Path, content_type: &'static str) -> Option<Response<Body>> {

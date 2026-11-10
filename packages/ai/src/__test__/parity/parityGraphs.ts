@@ -1,9 +1,9 @@
 import {
   type BeatThisGraph,
   type ChordNetGraph,
-  type ChunkGeometry,
   type SkeyGraph,
   type VocalsGraph,
+  vocalsGraphOf,
   type WhisperGraph,
 } from '../../runtime/modelGraphs.js';
 import { type ParityGraphValue } from './parityModels.js';
@@ -36,27 +36,19 @@ const modelIo = (graph: ParityGraphFields): ModelIo => ({
   outputName: stringField(graph, 'outputName'),
 });
 
-const geometry = (graph: ParityGraphFields): ChunkGeometry => {
-  const hop = numberField(graph, 'hop');
-  const frames = numberField(graph, 'frames');
-  return {
+export const vocalsGraph = (graph: ParityGraphFields): VocalsGraph =>
+  vocalsGraphOf({
     nFft: numberField(graph, 'nFft'),
-    hop,
-    frames,
+    hop: numberField(graph, 'hop'),
+    frames: numberField(graph, 'frames'),
     channels: numberField(graph, 'channels'),
-    chunkSamples: hop * (frames - 1),
-  };
-};
-
-export const vocalsGraph = (graph: ParityGraphFields): VocalsGraph => ({
-  ...geometry(graph),
-  ...modelIo(graph),
-  masks: numberField(graph, 'masks'),
-  minStorageBuffersPerShaderStage: numberField(
-    graph,
-    'minStorageBuffersPerShaderStage',
-  ),
-});
+    ...modelIo(graph),
+    masks: numberField(graph, 'masks'),
+    minStorageBuffersPerShaderStage: numberField(
+      graph,
+      'minStorageBuffersPerShaderStage',
+    ),
+  });
 
 export const beatThisGraph = (graph: ParityGraphFields): BeatThisGraph => ({
   inputName: stringField(graph, 'inputName'),

@@ -362,7 +362,7 @@ impl Run<'_> {
                 pass: pass_name(step.pass),
                 next_unit,
                 unit_count: step.count,
-                prefix: None,
+                prefix_frames: 0,
             },
         )
         .await

@@ -3,19 +3,20 @@ use axum::http::{HeaderMap, header::RANGE};
 const UNIT: &str = "bytes";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ByteRange {
+pub enum ByteRange {
     Full,
     Partial(PartialRange),
     Unsatisfiable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct PartialRange {
-    pub(crate) start: u64,
-    pub(crate) end: u64,
+pub struct PartialRange {
+    pub start: u64,
+    pub end: u64,
 }
 
-pub(crate) fn parse(headers: &HeaderMap, size: u64) -> ByteRange {
+#[must_use]
+pub fn parse(headers: &HeaderMap, size: u64) -> ByteRange {
     let value = headers
         .get(RANGE)
         .and_then(|found| found.to_str().ok())

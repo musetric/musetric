@@ -1,27 +1,17 @@
 import { fetchOk } from './browserShared.js';
 import { type UnitEvent } from './jobProtocol.js';
 
-export type UnitServing = {
-  attemptId: string;
-  attemptUrl: string;
-  outputs: string[];
-  run: (input: Uint8Array, unit: number) => Promise<Uint8Array>;
-};
-
-const putOutput = async (
-  serving: UnitServing,
+export const putUnitOutput = async (
+  attemptUrl: string,
   unit: number,
   output: string,
-  body: Uint8Array,
+  body: Uint8Array<ArrayBuffer>,
 ): Promise<void> => {
-  const response = await fetch(
-    `${serving.attemptUrl}/unit/${String(unit)}/${output}`,
-    {
-      method: 'PUT',
-      headers: { 'content-type': 'application/octet-stream' },
-      body: Uint8Array.from(body),
-    },
-  );
+  const response = await fetch(`${attemptUrl}/unit/${String(unit)}/${output}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/octet-stream' },
+    body,
+  });
   if (!response.ok) {
     const reason = await response.text();
     throw new Error(
@@ -40,6 +30,13 @@ type UnitReceiver = (event: UnitEvent) => Promise<void>;
 export type UnitHost = {
   unitOpened: (jobId: string, attemptId: string) => void;
   unitDone: (jobId: string, attemptId: string, unit: number) => void;
+};
+
+export type UnitServing = {
+  attemptId: string;
+  attemptUrl: string;
+  outputs: string[];
+  run: (input: Uint8Array, unit: number) => Promise<Uint8Array>;
 };
 
 export type UnitServer = {
@@ -108,7 +105,12 @@ export const createUnitServer = (host: UnitHost): UnitServer => {
         );
         const produced = await serving.run(input, event.unit);
         for (const output of serving.outputs) {
-          await putOutput(serving, event.unit, output, produced);
+          await putUnitOutput(
+            serving.attemptUrl,
+            event.unit,
+            output,
+            Uint8Array.from(produced),
+          );
         }
         host.unitDone(jobId, serving.attemptId, event.unit);
       });

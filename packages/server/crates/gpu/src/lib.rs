@@ -3,6 +3,7 @@ mod files;
 mod host;
 mod listener;
 mod protocol;
+pub mod range;
 mod units;
 
 #[cfg(test)]

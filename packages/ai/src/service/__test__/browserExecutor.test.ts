@@ -58,6 +58,7 @@ test('the browser client runs a job and reports its phases', async () => {
         context.reportLoading({ loaded: 1, total: 4 });
         context.reportBuilding();
         context.reportLoaded();
+        context.reportRunning({ unit: 2, unitCount: 5 });
         return Promise.resolve({ frames: request.gain });
       },
     ),
@@ -76,6 +77,13 @@ test('the browser client runs a job and reports its phases', async () => {
       { type: 'loading', jobId: expect.any(String), loaded: 1, total: 4 },
       { type: 'building', jobId: expect.any(String) },
       { type: 'loaded', jobId: expect.any(String) },
+      {
+        type: 'running',
+        jobId: expect.any(String),
+        pass: 'decode',
+        unit: 2,
+        unitCount: 5,
+      },
     ]);
   });
 });

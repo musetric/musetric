@@ -297,7 +297,7 @@ async fn write_part(write: &UnitWrite, mut body: Body) -> Result<(), OutputFailu
         carry.drain(..take);
     }
     let complete = match write.payload {
-        UnitPayload::Floats => carry.is_empty() && written == write.expected,
+        UnitPayload::Floats => carry.is_empty() && written <= write.expected,
         UnitPayload::Bytes => carry.is_empty() && written > 0 && written <= write.expected,
     };
     if !complete {

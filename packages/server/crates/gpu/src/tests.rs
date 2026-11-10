@@ -721,6 +721,58 @@ async fn fails_a_running_job_when_the_executor_disappears() {
     assert!(matches!(failure, ExecutorFailure::Lost));
 }
 
+async fn get_range(url: &str, range: &str) -> (StatusCode, Vec<u8>, String) {
+    let uri: Uri = url.parse().expect("the url should be valid");
+    let request = Request::get(uri)
+        .header("range", range)
+        .body(Body::empty())
+        .expect("the request should build");
+    let response = create_client()
+        .request(request)
+        .await
+        .expect("the host should answer");
+    let status = response.status();
+    let content_range = response
+        .headers()
+        .get("content-range")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let collected = response
+        .into_body()
+        .collect()
+        .await
+        .expect("the body should be read");
+    (status, collected.to_bytes().to_vec(), content_range)
+}
+
+#[tokio::test]
+async fn serves_a_registered_file_by_byte_range() {
+    let workspace = Workspace::new();
+    let reported = Reported::create();
+    let host = start_host(&workspace, false, &reported).await;
+    let file_url = host
+        .register_file(&workspace.file("mixture.f32", "0123456789"))
+        .await
+        .expect("the file should register");
+
+    let (partial_status, partial, partial_range) = get_range(&file_url, "bytes=2-5").await;
+    let (tail_status, tail, _) = get_range(&file_url, "bytes=7-").await;
+    let (refused_status, _, refused_range) = get_range(&file_url, "bytes=10-12").await;
+    let (whole_status, whole) = get(&file_url).await;
+
+    assert_eq!(partial_status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(String::from_utf8_lossy(&partial), "2345");
+    assert_eq!(partial_range, "bytes 2-5/10");
+    assert_eq!(tail_status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(String::from_utf8_lossy(&tail), "789");
+    assert_eq!(refused_status, StatusCode::RANGE_NOT_SATISFIABLE);
+    assert_eq!(refused_range, "bytes */10");
+    assert_eq!(whole_status, StatusCode::OK);
+    assert_eq!(String::from_utf8_lossy(&whole), "0123456789");
+    host.close().await;
+}
+
 struct CountedUnits {
     done: Mutex<Vec<(String, u32)>>,
 }
