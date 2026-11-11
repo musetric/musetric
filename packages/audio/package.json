@@ -78,6 +78,7 @@
     "eslint": "catalog:",
     "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

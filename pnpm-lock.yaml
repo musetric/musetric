@@ -413,6 +413,9 @@ importers:
       '@musetric/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
@@ -519,6 +522,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: '@typescript/typescript6@6.0.2'
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
 
   packages/checks:
     dependencies:
@@ -553,6 +559,9 @@ importers:
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
@@ -704,6 +713,9 @@ importers:
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
@@ -863,6 +875,9 @@ importers:
       '@musetric/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
@@ -986,6 +1001,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
@@ -1124,6 +1142,9 @@ importers:
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
