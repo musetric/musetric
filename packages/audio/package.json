@@ -62,10 +62,10 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "@alexanderolsen/libsamplerate-js": "2.1.2",
+    "@alexanderolsen/libsamplerate-js": "catalog:",
     "@musetric/utils": "workspace:*",
-    "mediabunny": "1.61.4",
-    "signalsmith-stretch": "1.3.2"
+    "mediabunny": "catalog:",
+    "signalsmith-stretch": "catalog:"
   },
   "devDependencies": {
     "@alexanderolsen/libsamplerate-js": "catalog:",

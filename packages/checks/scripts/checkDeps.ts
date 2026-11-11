@@ -80,23 +80,18 @@ const dependencyLine = (
   return index === -1 ? 1 : index + 1;
 };
 
-type Holder = {
-  manifest: Manifest;
-  range: string;
-};
+const fieldLine = (manifest: Manifest, field: DependencyField): number =>
+  manifest.lines.findIndex((text) =>
+    text.trimStart().startsWith(`"${field}":`),
+  ) + 1;
 
-const collectHolders = (
-  manifests: Manifest[],
-  field: DependencyField,
-): Map<string, Holder[]> => {
-  const holders = new Map<string, Holder[]>();
-  for (const manifest of manifests) {
-    for (const [ident, range] of rangesOf(manifest, field)) {
-      holders.set(ident, [...(holders.get(ident) ?? []), { manifest, range }]);
-    }
-  }
-  return holders;
-};
+const catalogRange = 'catalog:';
+const workspaceRange = 'workspace:*';
+
+const expectedRange = (
+  ident: string,
+  workspaces: Map<string, Manifest>,
+): string => (workspaces.has(ident) ? workspaceRange : catalogRange);
 
 type Finding = {
   file: string;
@@ -104,35 +99,52 @@ type Finding = {
   message: string;
 };
 
-const checkHolders = (
+const checkFieldRanges = (
+  manifest: Manifest,
   field: DependencyField,
-  ident: string,
-  users: Holder[],
+  workspaces: Map<string, Manifest>,
 ): Finding[] =>
-  users.flatMap((user) => {
-    const others = users
-      .filter((other) => other.range !== user.range)
-      .map((other) => `${other.range} in ${other.manifest.file}`);
-    return others.length === 0
+  [...rangesOf(manifest, field)].flatMap((entry) => {
+    const [ident, range] = entry;
+    const expected = expectedRange(ident, workspaces);
+    return range === expected
       ? []
       : [
           {
-            file: user.manifest.file,
-            line: dependencyLine(user.manifest, field, ident),
-            message: `${field} ${ident} is ${user.range} here and ${others.join(', ')}`,
+            file: manifest.file,
+            line: dependencyLine(manifest, field, ident),
+            message: `${field} ${ident} is ${range}, not ${expected}`,
           },
         ];
   });
 
-const checkOneRange = (manifests: Manifest[]): Finding[] => {
-  const findings: Finding[] = [];
-  for (const field of dependencyFields) {
-    for (const [ident, users] of collectHolders(manifests, field)) {
-      findings.push(...checkHolders(field, ident, users));
-    }
-  }
-  return findings;
-};
+const checkRanges = (
+  manifests: Manifest[],
+  workspaces: Map<string, Manifest>,
+): Finding[] =>
+  manifests.flatMap((manifest) =>
+    dependencyFields.flatMap((field) =>
+      checkFieldRanges(manifest, field, workspaces),
+    ),
+  );
+
+const dependencyOwners = new Set([
+  '@musetric/eslint-config',
+  '@musetric/checks',
+]);
+
+const checkDependencyOwners = (manifests: Manifest[]): Finding[] =>
+  manifests
+    .filter(
+      (manifest) =>
+        rangesOf(manifest, 'dependencies').size > 0 &&
+        !dependencyOwners.has(manifest.name),
+    )
+    .map((manifest) => ({
+      file: manifest.file,
+      line: fieldLine(manifest, 'dependencies'),
+      message: `${manifest.name} has dependencies, which only ${[...dependencyOwners].join(' and ')} ship`,
+    }));
 
 const checkPeersOf = (
   manifest: Manifest,
@@ -141,8 +153,8 @@ const checkPeersOf = (
   workspaces: Map<string, Manifest>,
 ): Finding[] => {
   const findings: Finding[] = [];
-  for (const [peer, peerRange] of rangesOf(workspace, 'peerDependencies')) {
-    const expected = workspaces.has(peer) ? peerRange : 'catalog:';
+  for (const peer of rangesOf(workspace, 'peerDependencies').keys()) {
+    const expected = expectedRange(peer, workspaces);
     if (
       peer !== workspace.name &&
       rangesOf(manifest, field).get(peer) !== expected
@@ -169,10 +181,10 @@ const checkConsumer = (
       : checkPeersOf(manifest, field, workspace, workspaces);
   });
 
-const checkWorkspacePeers = (manifests: Manifest[]): Finding[] => {
-  const workspaces = new Map(
-    manifests.map((manifest) => [manifest.name, manifest]),
-  );
+const checkWorkspacePeers = (
+  manifests: Manifest[],
+  workspaces: Map<string, Manifest>,
+): Finding[] => {
   const findings: Finding[] = [];
   for (const manifest of manifests) {
     for (const field of ['dependencies', 'devDependencies'] as const) {
@@ -180,6 +192,37 @@ const checkWorkspacePeers = (manifests: Manifest[]): Finding[] => {
     }
   }
   return findings;
+};
+
+const workspaceFile = 'pnpm-workspace.yaml';
+
+const checkOverrides = (): Finding[] => {
+  if (!existsSync(workspaceFile)) {
+    return [];
+  }
+  const lines = readFileSync(workspaceFile, 'utf8').split('\n');
+  const start = lines.indexOf('overrides:') + 1;
+  if (start === 0) {
+    return [];
+  }
+  const end = lines.findIndex(
+    (text, index) => index >= start && !text.startsWith('  '),
+  );
+  return lines
+    .slice(start, end === -1 ? lines.length : end)
+    .flatMap((text, offset) => {
+      const [, ident = '', range = ''] =
+        /^ {2}'?([^':]+)'?: '?([^']*)'?$/.exec(text) ?? [];
+      return range === catalogRange
+        ? []
+        : [
+            {
+              file: workspaceFile,
+              line: start + offset + 1,
+              message: `overrides ${ident} is ${range}, not ${catalogRange}`,
+            },
+          ];
+    });
 };
 
 const manifests = execFileSync(
@@ -193,9 +236,15 @@ const manifests = execFileSync(
   .filter((file) => basename(file) === 'package.json' && existsSync(file))
   .map(readManifest);
 
+const workspaces = new Map(
+  manifests.map((manifest) => [manifest.name, manifest]),
+);
+
 const findings = [
-  ...checkOneRange(manifests),
-  ...checkWorkspacePeers(manifests),
+  ...checkRanges(manifests, workspaces),
+  ...checkDependencyOwners(manifests),
+  ...checkWorkspacePeers(manifests, workspaces),
+  ...checkOverrides(),
 ];
 
 for (const finding of findings) {
@@ -204,6 +253,6 @@ for (const finding of findings) {
 console.log(
   findings.length === 0
     ? 'deps: ok'
-    : `deps: ${findings.length} found. Give a dependency the same range in every package.json, and list in a package the peers of the workspace packages it depends on: catalog: for an external peer, the range of the workspace for a workspace peer.`,
+    : `deps: ${findings.length} found. Take a version from the catalog with catalog: in every dependency, peer and override, and a workspace package with workspace:*. Only ${[...dependencyOwners].join(' and ')} ship dependencies; another package lists peerDependencies and devDependencies, and lists the peers of the workspace packages it depends on.`,
 );
 process.exitCode = findings.length === 0 ? 0 : 1;

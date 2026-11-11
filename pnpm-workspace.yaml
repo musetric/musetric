@@ -12,10 +12,8 @@ allowBuilds:
   'protobufjs': true
   'unrs-resolver': true
 overrides:
-  'browserslist': '4.28.8'
-  'filelist': '2.0.2'
-  'onnxruntime-web': '1.30.0'
-  'tar': '7.5.21'
+  'browserslist': 'catalog:'
+  'onnxruntime-web': 'catalog:'
 catalog:
   '@alexanderolsen/libsamplerate-js': '2.1.2'
   '@ast-grep/cli': '0.50.0'
@@ -42,6 +40,7 @@ catalog:
   '@vitest/browser-playwright': '5.0.5'
   '@webgpu/types': '0.1.74'
   'axios': '1.20.0'
+  'browserslist': '4.28.8'
   'cpx2': '9.0.3'
   'eslint': '10.12.0'
   'eslint-import-resolver-typescript': '4.4.5'

@@ -28,24 +28,23 @@
     "build:executor": "vite build --config vite.executor.config.ts --configLoader native"
   },
   "devDependencies": {
+    "@huggingface/transformers": "catalog:",
+    "@musetric/ai": "workspace:*",
+    "@musetric/cqt": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
+    "@musetric/fft": "workspace:*",
     "@musetric/script": "workspace:*",
+    "@musetric/spectrogram": "workspace:*",
+    "@musetric/utils": "workspace:*",
     "@resvg/resvg-js": "catalog:",
     "@tauri-apps/cli": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "eslint": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:"
-  },
-  "dependencies": {
-    "@musetric/ai": "workspace:*",
-    "@musetric/cqt": "workspace:*",
-    "@musetric/fft": "workspace:*",
-    "@musetric/spectrogram": "workspace:*",
-    "@musetric/utils": "workspace:*",
     "onnxruntime-web": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "zod": "catalog:"
   }
 }

@@ -338,9 +338,7 @@ catalogs:
 
 overrides:
   browserslist: 4.28.8
-  filelist: 2.0.2
   onnxruntime-web: 1.30.0
-  tar: 7.5.21
 
 importers:
 
@@ -354,11 +352,10 @@ importers:
         version: 3.9.10
 
   packages/ai:
-    dependencies:
+    devDependencies:
       '@huggingface/transformers':
         specifier: 'catalog:'
         version: 4.3.1(@types/node@26.6.5)
-    devDependencies:
       '@musetric/cqt':
         specifier: workspace:*
         version: link:../cqt
@@ -433,35 +430,31 @@ importers:
         version: 4.6.7
 
   packages/app:
-    dependencies:
+    devDependencies:
+      '@huggingface/transformers':
+        specifier: 'catalog:'
+        version: 4.3.1(@types/node@26.6.5)
       '@musetric/ai':
         specifier: workspace:*
         version: link:../ai
       '@musetric/cqt':
         specifier: workspace:*
         version: link:../cqt
+      '@musetric/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@musetric/fft':
         specifier: workspace:*
         version: link:../fft
+      '@musetric/script':
+        specifier: workspace:*
+        version: link:../script
       '@musetric/spectrogram':
         specifier: workspace:*
         version: link:../spectrogram
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
-      onnxruntime-web:
-        specifier: 1.30.0
-        version: 1.30.0
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
-    devDependencies:
-      '@musetric/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@musetric/script':
-        specifier: workspace:*
-        version: link:../script
       '@resvg/resvg-js':
         specifier: 'catalog:'
         version: 2.6.2
@@ -480,12 +473,18 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      onnxruntime-web:
+        specifier: 1.30.0
+        version: 1.30.0
       typescript:
         specifier: 'catalog:'
         version: '@typescript/typescript6@6.0.2'
       vite:
         specifier: 'catalog:'
         version: 8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
 
   packages/audio:
     devDependencies:
@@ -1064,6 +1063,9 @@ importers:
       '@ast-grep/cli':
         specifier: 'catalog:'
         version: 0.50.0
+      '@huggingface/transformers':
+        specifier: 'catalog:'
+        version: 4.3.1(@types/node@26.6.5)
       '@musetric/ai':
         specifier: workspace:*
         version: link:../ai
