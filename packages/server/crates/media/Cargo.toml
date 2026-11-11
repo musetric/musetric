@@ -10,7 +10,7 @@ repository = "https://github.com/musetric/musetric"
 
 [dependencies]
 ebur128 = "=0.1.10"
-flacenc = { version = "=0.5.1", default-features = false }
+flacenc = { git = "https://github.com/yotarok/flacenc-rs", rev = "f2ebcf85550ce337ceceed7ba25a1e84c034efc1", default-features = false }
 musetric-stretch = { path = "../stretch" }
 rusty_aac = "=1.1.0"
 rusty_mp3 = "=1.0.0"
