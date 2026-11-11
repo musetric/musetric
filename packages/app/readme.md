@@ -18,6 +18,17 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 
 ## Rules
 
+- On desktop the window of `yarn dev:app` shows the page of `dist`, as the
+  last `yarn build:ui` left it: a change of the frontend is built again before
+  it is checked there.
+- A script drives that window over the Chrome DevTools Protocol, such as
+  Playwright's `chromium.connectOverCDP`, when `yarn dev:app` starts with
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`.
+  WebView2 adds it to the app's own arguments of `src-tauri/src/lib.rs`, so the
+  WebView keeps `--force_high_performance_gpu`.
+- A download of the page goes through `src-tauri/src/download.rs`: the file is
+  staged in the app's cache, and the system's Save dialog asks where to keep it
+  when it is complete.
 - `src-tauri/gen` is generated and untracked: edit only its overlay `native`,
   which `scripts/initNative.ts` copies over it before a mobile `dev` or `build`.
 - A mobile build is a development build, `com.musetric.client.dev` named

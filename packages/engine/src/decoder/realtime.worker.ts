@@ -47,6 +47,7 @@ export type ProjectRealtime = {
   ready: () => Promise<void>;
   sendJson: (message: object) => void;
   sendBinary: (packet: ArrayBuffer) => void;
+  dropPackets: () => void;
   flush: () => void;
 };
 
@@ -161,6 +162,14 @@ export const createProjectRealtime = (
         return;
       }
       realtime.pendingMessages.push(packet);
+    },
+    dropPackets: () => {
+      if (!realtime) {
+        return;
+      }
+      realtime.pendingMessages = realtime.pendingMessages.filter(
+        (message) => typeof message === 'string',
+      );
     },
     flush,
   };

@@ -14,12 +14,12 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
   from the `pin.json` files of `packages/ai/src/runtime`, embedded at build
   time; `src/analysis/models.rs` adds only what the host keeps for itself: the
   folder and the label of each model in its cache.
-- A model file counts as cached only next to its manifest `<file>.verified`
-  (`crates/gpu/src/cache.rs`); the host deletes a file without one and
-  downloads it again.
+- A model file counts as cached when its manifest `<file>.verified` matches
+  it, or when its sha256 matches the pin, which writes the manifest anew
+  (`crates/gpu/src/cache.rs`); the host downloads any other file again.
 - An unpublished revision is tried in a local build only: the pin points at it
-  with every changed file's sha256 and size, and the files and their manifests
-  go to the paths of `ModelBundle::cached` under the app's
+  with every changed file's sha256 and size, and the files go to the paths of
+  `ModelBundle::cached` under the app's
   [`models` folder](../app/readme.md#data) before the step starts.
 - A recording is `RecordingPiece` rows in two layers, `base` and `fresh`
   (`crates/db/src/schema.rs`); undo, redo and the next take are in

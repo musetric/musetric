@@ -20,7 +20,7 @@ use musetric_db::BoxedError;
 use serde_json::Value;
 
 use crate::{
-    realtime::channel::{CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
+    realtime::channel::{CLOSE_GOING_AWAY, CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
     recording::{
         TakeFormat, is_active_recording, read_recordings, refresh_peaks, set_fresh_applied,
         write_peaks,
@@ -65,14 +65,18 @@ async fn serve(
             .await;
         return;
     };
+    let _live = state.rooms.enter();
     let (member, outgoing) = state.rooms.join(project_id);
-    let mut channel = Channel::create(socket, outgoing);
+    let mut channel = Channel::create(socket, outgoing, state.rooms.heartbeat());
     let mut connection = Connection::new(project_id, member, Arc::clone(&state.storage));
     if open_project(&mut channel, &state.storage, project_id).await {
         run_connection(&mut channel, &state.rooms, &mut connection).await;
     }
     state.rooms.leave(project_id, member);
     let _ = finish_session(&mut channel, &state.rooms, &mut connection).await;
+    if state.rooms.is_closing() {
+        channel.close(CLOSE_GOING_AWAY, "The host is closing").await;
+    }
 }
 
 async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id: i64) -> bool {
@@ -96,7 +100,8 @@ async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id:
 }
 
 async fn run_connection(channel: &mut Channel, rooms: &Rooms, connection: &mut Connection) {
-    while let Some(incoming) = channel.receive().await {
+    let mut closing = rooms.closing();
+    while let Some(incoming) = channel.receive(&mut closing).await {
         if !receive_message(channel, rooms, connection, incoming).await {
             break;
         }
@@ -588,10 +593,10 @@ mod tests {
 
     use musetric_db::{RecordingLayer, RecordingPiece};
 
-    use super::packet;
+    use super::{Rooms, channel::Heartbeat, packet};
     use crate::{
         recording::read_sounding,
-        routes,
+        routes::{self, RouteState},
         storage::Storage,
         test_workspace::{Workspace, create_route_state},
     };
@@ -631,8 +636,11 @@ mod tests {
     }
 
     async fn start_server(workspace: &Workspace, storage: Arc<Storage>) -> (String, TestServer) {
-        let application: Router =
-            routes::create_router(create_route_state(workspace, storage).await);
+        serve_state(create_route_state(workspace, storage).await).await
+    }
+
+    async fn serve_state(state: RouteState) -> (String, TestServer) {
+        let application: Router = routes::create_router(state);
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("the test server should bind");
@@ -1882,5 +1890,56 @@ mod tests {
         restart_take(&mut owner, &mut listener, SECOND_TAKE).await;
 
         assert_eq!(read_wave(&storage).await, kept);
+    }
+    async fn receive_event(socket: &mut ClientSocket) -> Value {
+        loop {
+            let received_message = socket
+                .next()
+                .await
+                .expect("the server should send an event")
+                .expect("the event should be valid");
+            if let ClientMessage::Text(event_text) = received_message {
+                return serde_json::from_str(&event_text).expect("the event should be json");
+            }
+        }
+    }
+
+    async fn receive_until_changed(socket: &mut ClientSocket) -> Vec<Value> {
+        let changed = json!({ "type": "recording.changed", "recordingId": 1 });
+        let mut events = Vec::new();
+        while events.last() != Some(&changed) {
+            events.push(receive_event(socket).await);
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn saves_the_take_of_a_recorder_that_falls_silent() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let mut state = create_route_state(&workspace, Arc::clone(&storage)).await;
+        state.rooms = Arc::new(Rooms::with_heartbeat(Heartbeat {
+            interval: Duration::from_millis(50),
+            silence: Duration::from_millis(300),
+        }));
+        let (base, _server) = serve_state(state).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, &mut listener, 0, &[0.5; 4]).await;
+
+        let events = timeout(Duration::from_secs(5), receive_until_changed(&mut listener))
+            .await
+            .expect("the silent recorder should be let go");
+
+        assert_eq!(
+            events,
+            [
+                json!({ "type": "player.stop" }),
+                json!({ "type": "recording.finished", "sessionId": OWNER_TAKE }),
+                json!({ "type": "recording.changed", "recordingId": 1 }),
+            ]
+        );
+        assert_eq!(stored_pieces(&storage).len(), 1);
+        drop(owner);
     }
 }

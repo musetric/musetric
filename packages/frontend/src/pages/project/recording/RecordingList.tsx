@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { getActiveRecording, getTrackProgress } from '@musetric/engine';
 import { useIsMutating, useMutation } from '@tanstack/react-query';
-import { type FC, useLayoutEffect, useRef } from 'react';
+import { type FC, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
@@ -27,15 +27,24 @@ import { RecordingRow } from './RecordingRow.js';
 const lastTickRatio = 0.98;
 const endTickRatio = 0.8;
 
-const getTickStep = (duration: number): number => {
-  if (duration > 150) return 60;
-  if (duration > 60) return 30;
-  return 10;
+const tickSteps = [10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const labelCharWidth = 7;
+const labelPadding = 9;
+
+const getMinTickGap = (duration: number): number =>
+  2 * (formatDuration(duration).length * labelCharWidth + labelPadding);
+
+const getTickStep = (duration: number, width: number): number => {
+  const minTickGap = getMinTickGap(duration);
+  return (
+    tickSteps.find((step) => (step / duration) * width >= minTickGap) ??
+    tickSteps[tickSteps.length - 1]
+  );
 };
 
-const getRulerTicks = (duration: number) => {
-  if (duration <= 0) return [];
-  const step = getTickStep(duration);
+const getRulerTicks = (duration: number, width: number) => {
+  if (duration <= 0 || width <= 0) return [];
+  const step = getTickStep(duration, width);
   return Array.from(
     { length: Math.floor(duration / step) + 1 },
     (_, index) => index * step,
@@ -57,6 +66,8 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   const recordings = useEngineStore((state) => state.recordings);
   const active = useEngineStore(getActiveRecording);
   const duration = useEngineStore((state) => state.duration);
+  const rulerRef = useRef<HTMLDivElement>(null);
+  const [rulerWidth, setRulerWidth] = useState(0);
   const progress = useEngineStore(getTrackProgress);
   const setRenamingRecordingId = useProjectStore(
     (state) => state.setRenamingRecordingId,
@@ -90,6 +101,19 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   const listRef = useRef<HTMLDivElement>(null);
   const keyboardKeeperRef = useRef<HTMLInputElement>(null);
   const activeIndex = recordings.findIndex((recording) => recording.active);
+
+  useLayoutEffect(() => {
+    const ruler = rulerRef.current;
+    if (!ruler) return undefined;
+    setRulerWidth(ruler.clientWidth);
+    const observer = new ResizeObserver(() => {
+      setRulerWidth(ruler.clientWidth);
+    });
+    observer.observe(ruler);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -157,8 +181,8 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
               backgroundImage: 'var(--Paper-overlay)',
             }}
           >
-            <Box sx={{ gridColumn: 3, position: 'relative' }}>
-              {getRulerTicks(duration).map((tick) => (
+            <Box ref={rulerRef} sx={{ gridColumn: 3, position: 'relative' }}>
+              {getRulerTicks(duration, rulerWidth).map((tick) => (
                 <Typography
                   key={tick.seconds}
                   variant='caption'
