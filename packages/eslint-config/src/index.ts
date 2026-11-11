@@ -3,7 +3,9 @@ import { jsConfig } from './config/js.js';
 import { reactConfig } from './config/react.js';
 import { silenceSonarjsCatalogLog } from './config/silenceSonarjsCatalogLog.js';
 
-export const config = (): Linter.Config[] => {
+export type Config = Linter.Config[];
+
+export const config = (): Config => {
   silenceSonarjsCatalogLog();
 
   const configs: Linter.Config[] = [

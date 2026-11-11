@@ -7,13 +7,8 @@ runs:
     - name: Select Xcode 27.1
       run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
       shell: bash
-    - uses: ./.github/actions/setupYarn
-    - uses: actions/cache@v5
-      with:
-        path: ~/.yarn/berry/cache
-        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-${{ runner.os }}-
-    - run: yarn --immutable
+    - uses: ./.github/actions/setupPnpm
+    - run: pnpm install --frozen-lockfile
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -34,19 +29,19 @@ runs:
         path: |
           ~/Library/Caches/CocoaPods
           ~/Library/Developer/Xcode/DerivedData
-        key: ios-xcode-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/app/native/apple/project.yml') }}
+        key: ios-xcode-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'packages/app/native/apple/project.yml') }}
         restore-keys: ios-xcode-${{ runner.os }}-
     - run: brew install xcodegen
       shell: bash
     - name: Init iOS project
       working-directory: packages/app
-      run: yarn init:ios
+      run: pnpm init:ios
       shell: bash
     - name: Build iOS app (unsigned)
       working-directory: packages/app
       run: |
         bundle_version=$((1000 + GITHUB_RUN_NUMBER))
-        yarn build:ios --no-sign --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$bundle_version\"}}}"
+        pnpm build:ios --no-sign --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$bundle_version\"}}}"
       shell: bash
     - uses: actions/upload-artifact@v7
       with:

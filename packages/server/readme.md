@@ -73,7 +73,7 @@ removed.
 
 ## A second server
 
-A server next to the one of `yarn dev`, which keeps its data in `storage/`,
+A server next to the one of `pnpm dev`, which keeps its data in `storage/`,
 takes its own `--database`, `--blobs` and `--work`; `--processing false` starts
 no browser and runs no step. From `packages/server`:
 

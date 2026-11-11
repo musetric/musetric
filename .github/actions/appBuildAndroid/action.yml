@@ -9,18 +9,13 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setupYarn
+    - uses: ./.github/actions/setupPnpm
     - uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: '17'
     - uses: android-actions/setup-android@v4
-    - uses: actions/cache@v5
-      with:
-        path: ~/.yarn/berry/cache
-        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-${{ runner.os }}-
-    - run: yarn --immutable
+    - run: pnpm install --frozen-lockfile
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -35,7 +30,7 @@ runs:
         restore-keys: cargo-${{ runner.os }}-android-
     - name: Init Android project
       working-directory: packages/app
-      run: yarn init:android
+      run: pnpm init:android
       shell: bash
     - name: Pin Android SDK path for gradle
       run: echo "sdk.dir=$ANDROID_HOME" > packages/app/src-tauri/gen/android/local.properties
@@ -67,7 +62,7 @@ runs:
       working-directory: packages/app
       run: |
         version_code=$((1000 + GITHUB_RUN_NUMBER))
-        yarn build:android --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
+        pnpm build:android --aab --target aarch64 x86_64 --config "{\"bundle\":{\"android\":{\"versionCode\":$version_code}}}"
       env:
         ANDROID_HOME: ${{ env.ANDROID_HOME }}
         ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}

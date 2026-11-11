@@ -2,8 +2,8 @@
 
 ## Context
 
-- This repository is a Yarn monorepo. Node comes from `.node-version` and Yarn from `packageManager` in `package.json`, through corepack.
-- Prefer existing Yarn scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
+- This repository is a pnpm monorepo. Node comes from `.node-version` and pnpm from `packageManager` in `package.json`, through corepack.
+- Prefer existing pnpm scripts from the root or the target package `package.json`; use free-form commands only when no script exists for the required action.
 - Follow the existing ESLint and TypeScript config. Do not fight it.
 - The rules of the organization apply here and are not repeated: the [code](https://github.com/musetric/headquarters/blob/main/practices/code.md) of every repository, [what may be said about audio](https://github.com/musetric/headquarters/blob/main/practices/public-texts.md#material) and the other [practices](https://github.com/musetric/headquarters/blob/main/AGENTS.md#map). The rules below are this repository's own.
 
@@ -88,15 +88,15 @@
 
 If code was changed, run the relevant repository-root scripts before finishing.
 
-- `yarn check:unused`: detect unused files, dependencies, and exports.
-- `yarn check:ts`: TypeScript checks across the monorepo.
-- `yarn fix:lint`: lint checks with automatic fixes; before a pull request, lint the changed files once without the cache.
-- `yarn fix:translations`: update translation extraction results.
-- `yarn fix:format`: apply repository formatting.
-- `yarn check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
-- `yarn test`: the tests of every package.
-- `yarn check:deps:dupe` and `yarn check:deps:security`, when dependencies changed: Yarn constraints and duplicate versions in the lockfile, which `yarn fix:deps:dupe` fixes, and advisories of high severity.
-- `yarn check:deps:security:rust`: every advisory against `packages/server/Cargo.lock` in the OSV database, which holds those of GitHub and RustSec, through the global osv-scanner binary at the version `.github/actions/baseQuality` pins. CI runs it on every pull request, since a new advisory needs no change of ours; one that no release can fix yet goes to `packages/server/osv-scanner.toml` with its reason.
-- `yarn check:english`, `yarn check:notices` and `yarn check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
-- `yarn check:comments`: comments and docstrings in any language, beyond tool directives and `@see`, `@todo` and `@fixme`; third-party code goes to `checks.comments.except` of the root `package.json`.
-- `yarn check:dupe` and `yarn check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.
+- `pnpm check:unused`: detect unused files, dependencies, and exports.
+- `pnpm check:ts`: TypeScript checks across the monorepo.
+- `pnpm fix:lint`: lint checks with automatic fixes; before a pull request, lint the changed files once without the cache.
+- `pnpm fix:translations`: update translation extraction results.
+- `pnpm fix:format`: apply repository formatting.
+- `pnpm check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
+- `pnpm test`: the tests of every package.
+- `pnpm check:deps:dupe` and `pnpm check:deps:security`, when dependencies changed: one range per dependency and the peers of the workspace packages, which `packages/checks/scripts/checkDeps.ts` checks, duplicate versions in the lockfile, which `pnpm fix:deps:dupe` fixes, and advisories of high severity.
+- `pnpm check:deps:security:rust`: every advisory against `packages/server/Cargo.lock` in the OSV database, which holds those of GitHub and RustSec, through the global osv-scanner binary at the version `.github/actions/baseQuality` pins. CI runs it on every pull request, since a new advisory needs no change of ours; one that no release can fix yet goes to `packages/server/osv-scanner.toml` with its reason.
+- `pnpm check:english`, `pnpm check:notices` and `pnpm check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
+- `pnpm check:comments`: comments and docstrings in any language, beyond tool directives and `@see`, `@todo` and `@fixme`; third-party code goes to `checks.comments.except` of the root `package.json`.
+- `pnpm check:dupe` and `pnpm check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.

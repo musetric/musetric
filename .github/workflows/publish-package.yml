@@ -30,13 +30,8 @@ jobs:
       publish-version: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setupYarn
-      - uses: actions/cache@v5
-        with:
-          path: ~/.yarn/berry/cache
-          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-
-      - run: yarn --immutable
+      - uses: ./.github/actions/setupPnpm
+      - run: pnpm install --frozen-lockfile
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           ONNXRUNTIME_NODE_INSTALL: skip
@@ -45,11 +40,12 @@ jobs:
           PACKAGE_NAME: ${{ inputs.package }}
         run: |
           set -euo pipefail
-          workspace=$(yarn workspaces list --json | jq -r --arg n "$PACKAGE_NAME" 'select(.name == $n) | .location')
-          if [ -z "$workspace" ]; then
+          path=$(pnpm ls -r --depth -1 --json | jq -r --arg n "$PACKAGE_NAME" '.[] | select(.name == $n) | .path')
+          if [ -z "$path" ]; then
             echo "Workspace $PACKAGE_NAME not found" >&2
             exit 1
           fi
+          workspace=$(realpath --relative-to=. "$path")
           echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
       - id: version
         env:
@@ -90,13 +86,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setupYarn
-      - uses: actions/cache@v5
-        with:
-          path: ~/.yarn/berry/cache
-          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-
-      - run: yarn --immutable
+      - uses: ./.github/actions/setupPnpm
+      - run: pnpm install --frozen-lockfile
         env:
           MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
           ONNXRUNTIME_NODE_INSTALL: skip
@@ -114,7 +105,7 @@ jobs:
 
       - name: Build
         working-directory: ${{ needs.prepare.outputs.workspace }}
-        run: yarn run build:project
+        run: pnpm run build:project
 
       - name: Copy root license
         working-directory: ${{ needs.prepare.outputs.workspace }}
@@ -126,9 +117,9 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           if [ "$MODE" = dev ]; then
-            yarn npm publish --access public --tag dev
+            pnpm publish --access public --tag dev --no-git-checks
           else
-            yarn npm publish --access public --tag latest
+            pnpm publish --access public --tag latest --no-git-checks
           fi
 
       - name: Remove temporary license

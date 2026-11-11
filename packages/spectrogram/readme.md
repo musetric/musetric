@@ -17,7 +17,7 @@ the `kinds` of its spec by `computeBufferEntries`.
 ## Measuring the pitch line
 
 ```sh
-yarn workspace @musetric/spectrogram measure:pitch all --audio <file|dir>
+pnpm --filter @musetric/spectrogram measure:pitch all --audio <file|dir>
 ```
 
 `scripts/measurePitch.ts` scores the tracker against the neural reference

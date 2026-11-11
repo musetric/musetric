@@ -54,7 +54,7 @@ declare module 'vitest' {
   }
 }
 
-const usage = `usage: yarn workspace @musetric/ai measure:parity <stage> [options]
+const usage = `usage: pnpm --filter @musetric/ai measure:parity <stage> [options]
 
 stages
   prepare   download the pinned models and case audio, write each case's reference with the lab

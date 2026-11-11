@@ -8,7 +8,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "dev": "yarn build:browser && cargo run --quiet --locked -- --listen 0.0.0.0:3000 --tls-self-signed --database storage/db/app.db --blobs storage/blobs --work storage/work --models storage/models --browser-bundle dist-browser --public storage/public",
+    "dev": "pnpm build:browser && cargo run --quiet --locked -- --listen 0.0.0.0:3000 --tls-self-signed --database storage/db/app.db --blobs storage/blobs --work storage/work --models storage/models --browser-bundle dist-browser --public storage/public",
     "build:browser": "vite build --configLoader native",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
@@ -17,7 +17,7 @@
     "check:rust:fmt": "cargo fmt --all --check",
     "check:rust:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
     "check:rust:test": "cargo test --workspace --locked",
-    "check:rust": "yarn check:rust:ast && yarn check:rust:fmt && yarn check:rust:clippy && yarn check:rust:test",
+    "check:rust": "pnpm check:rust:ast && pnpm check:rust:fmt && pnpm check:rust:clippy && pnpm check:rust:test",
     "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
   },
   "devDependencies": {

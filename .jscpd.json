@@ -5,7 +5,6 @@
   "minTokens": 80,
   "ignore": [
     "**/.git/**",
-    "**/.yarn/**",
     "**/dist/**",
     "**/dist-browser/**",
     "**/build/**",
