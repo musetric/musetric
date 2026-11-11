@@ -15,6 +15,7 @@ const config: KnipConfig = {
     'adb',
     'jscpd',
     'editorconfig-checker',
+    'osv-scanner',
   ],
   ignoreUnresolved: ['vite/client'],
   ignoreDependencies: ['@vitest/browser'],
