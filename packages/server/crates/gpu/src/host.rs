@@ -14,7 +14,7 @@ use axum::{
     body::Body,
     extract::{Request, State, WebSocketUpgrade, ws::Message, ws::WebSocket},
     http::{
-        HeaderValue, StatusCode,
+        HeaderMap, HeaderValue, StatusCode,
         header::{CACHE_CONTROL, CONTENT_TYPE},
     },
     response::{IntoResponse, Response},
@@ -32,6 +32,7 @@ use uuid::Uuid;
 use crate::{
     files::{
         Bundle, LOADER_HTML, NO_STORE, OCTET_STREAM, read_content_type, resolve_asset, send_file,
+        send_file_range,
     },
     listener::{ListenerReviver, RevivingListener},
     protocol::{
@@ -693,6 +694,7 @@ async fn handle_page() -> Response {
 async fn handle_file(
     State(state): State<Arc<HostState>>,
     axum::extract::Path((token, _name)): axum::extract::Path<(String, String)>,
+    request: HeaderMap,
 ) -> Response {
     let found = state.session().and_then(|session| {
         session
@@ -704,7 +706,7 @@ async fn handle_file(
     let Some(path) = found else {
         return missing();
     };
-    match send_file(&path, OCTET_STREAM).await {
+    match send_file_range(&path, OCTET_STREAM, &request).await {
         Some(response) => response,
         None => missing(),
     }

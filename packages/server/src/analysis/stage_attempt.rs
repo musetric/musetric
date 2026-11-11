@@ -1,43 +1,16 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
-};
+use std::path::{Path, PathBuf};
 
-use musetric_db::{PendingJob, ProcessingStep, blob_path};
-use musetric_gpu::{
-    ExecutorFailure, ExecutorPhase, ExecutorSession, ExecutorSessionOptions, ModelFile, PhaseSink,
-    UnitSession,
-};
-use musetric_jobs::{StepAnswer, StepPass, StepPhase, StepReport};
-use musetric_media::collect_interleaved_pcm;
-use serde_json::Value;
-use tokio::sync::mpsc;
+use musetric_db::{PendingJob, ProcessingStep};
+use musetric_jobs::{StepAnswer, StepReport};
 
 use crate::{
     analysis::{
         AnalysisContext,
-        browser::{
-            Failure, answer, count_frames, decode_reporter, ensure_files, require_executor,
-            show_phase,
-        },
-        checkpoint_persist::{CheckpointCursor, PrefixAppend, persist_tail},
-        stage_units::{StageRegistration, StageResume, StageUnits},
-        stem_files::read_at,
+        browser::{Failure, answer},
     },
     blobs::{StagedBlob, close_area, ensure_area, step_area},
-    checkpoint::{CheckpointDir, area_root, computation_id, restore_refused},
-    storage::{read_database, write_database},
-    unit_fold::{FoldAccumulator, record_bytes},
+    storage::read_database,
 };
-
-pub(crate) const UNIT_OUTPUT: &str = "separated";
-const API_NAME: &str = "musetricAiSeparateUnits";
-const CHECKPOINT_EVERY: u32 = 2;
-const FOLD_FORMAT: &str = "fold-prefix-v1";
-const NOT_ACTIVE: &str = "the attempt is not active";
 
 pub(crate) struct StageRun<'run> {
     pub(crate) context: &'run AnalysisContext,
@@ -58,6 +31,10 @@ impl StageRun<'_> {
         u32::try_from(project.sample_rate)
             .map_err(|_| Failure::Refused("The project sample rate is out of range".to_owned()))
     }
+
+    pub(crate) fn area(&self) -> PathBuf {
+        step_area(&self.context.storage.work_path, self.project_id, self.step)
+    }
 }
 
 pub(crate) trait StepStems: Sized {
@@ -71,291 +48,22 @@ pub(crate) async fn run_step<Stems: StepStems>(
     report: &StepReport,
     produce: impl AsyncFnOnce(&StageRun<'_>, &PendingJob, &Stems) -> Result<(), Failure>,
 ) -> StepAnswer {
-    let area = step_area(&context.storage.work_path, job.project_id, job.step);
-    if let Err(error) = ensure_area(&area).await {
-        return answer(Err(Failure::from(error.to_string())));
-    }
-    let stems = Stems::create(&area, &context.storage.blobs_path);
     let running = StageRun {
         context,
         report,
         project_id: job.project_id,
         step: job.step,
     };
+    let area = running.area();
+    if let Err(error) = ensure_area(&area).await {
+        return answer(Err(Failure::from(error.to_string())));
+    }
+    let stems = Stems::create(&area, &context.storage.blobs_path);
     let found = produce(&running, job, &stems).await;
     if found.is_ok() {
         close_area(&area).await;
     }
     answer(found)
-}
-
-pub(crate) struct StageStart<'start> {
-    pub(crate) label: &'static str,
-    pub(crate) pass: &'static str,
-    pub(crate) computation: String,
-    pub(crate) input: &'start [f32],
-}
-
-pub(crate) struct StageAttempt<'run> {
-    running: &'run StageRun<'run>,
-    session: ExecutorSession,
-    units: Arc<StageUnits>,
-    reported: mpsc::UnboundedReceiver<ExecutorPhase>,
-    pass: &'static str,
-    computation: String,
-    store: CheckpointDir,
-    committed_prefix: AtomicU64,
-}
-
-impl<'run> StageAttempt<'run> {
-    pub(crate) async fn start(
-        running: &'run StageRun<'run>,
-        start: StageStart<'_>,
-    ) -> Result<Self, Failure> {
-        let computation = computation_id(&[FOLD_FORMAT, &start.computation]);
-        let store = CheckpointDir::create(area_root(
-            &running.context.storage.work_path,
-            running.project_id,
-            running.step.name(),
-            &computation,
-        ));
-        store
-            .write_input(start.input)
-            .await
-            .map_err(|error| Failure::from(error.to_string()))?;
-        let units = Arc::new(StageUnits::create(store.incoming_root()));
-        let (phases, reported) = mpsc::unbounded_channel();
-        let sink: PhaseSink = Arc::new(move |phase| {
-            let _ = phases.send(phase);
-        });
-        let session = running.context.host.open(ExecutorSessionOptions {
-            label: start.label.to_owned(),
-            require_shader_f16: true,
-            on_phase: sink,
-            units: Some(Arc::clone(&units) as Arc<dyn UnitSession>),
-        });
-        Ok(Self {
-            running,
-            session,
-            units,
-            reported,
-            pass: start.pass,
-            computation,
-            store,
-            committed_prefix: AtomicU64::new(0),
-        })
-    }
-
-    pub(crate) async fn open(&self) -> Result<(), Failure> {
-        self.session.wait_ready().await?;
-        (self.running.report)(StepPhase::Loading { progress: None });
-        Ok(())
-    }
-
-    pub(crate) async fn register(&self, path: &Path) -> Result<String, Failure> {
-        Ok(self.session.register_file(path).await?)
-    }
-
-    pub(crate) fn attempt_url(&self, attempt_id: &str) -> String {
-        self.session.attempt_url(attempt_id)
-    }
-
-    pub(crate) fn close(self) {
-        drop(self.session);
-    }
-
-    pub(crate) async fn resume(
-        &self,
-        frames: u64,
-        channels: u32,
-    ) -> Result<Option<StageResume>, Failure> {
-        let project_id = self.running.project_id;
-        let step = self.running.step;
-        let found = read_database(&self.running.context.storage, move |reader| {
-            reader.step_checkpoint(project_id, step)
-        })
-        .await?;
-        let Some(cursor) = found else {
-            return Ok(None);
-        };
-        if cursor.computation_id.as_deref() != Some(self.computation.as_str())
-            || cursor.pass.as_deref() != Some(self.pass)
-            || cursor.generation == 0
-        {
-            return Ok(None);
-        }
-        let tail = self
-            .store
-            .read_tail(cursor.generation)
-            .await
-            .map_err(|_| Failure::Refused(restore_refused("the tail file is missing")))?;
-        if Some(tail.digest.as_str()) != cursor.tail_hash.as_deref() {
-            return Err(Failure::Refused(restore_refused(
-                "the tail hash does not match",
-            )));
-        }
-        let settled = u64::from(cursor.prefix_frames);
-        let prefix = self
-            .store
-            .read_prefix(settled * record_bytes(channels) as u64)
-            .await
-            .map_err(|_| Failure::Refused(restore_refused("the prefix file is short")))?;
-        let fold = FoldAccumulator::restore(frames, channels, &prefix, &tail.bytes)
-            .ok_or_else(|| Failure::Refused(restore_refused("the tail is not a fold")))?;
-        self.committed_prefix.store(settled, Ordering::Relaxed);
-        Ok(Some(StageResume {
-            fold,
-            next_unit: cursor.next_unit,
-        }))
-    }
-
-    pub(crate) async fn run(
-        &mut self,
-        registration: StageRegistration,
-        request: Value,
-    ) -> Result<Vec<f32>, Failure> {
-        let attempt_id = registration.attempt.clone();
-        self.stage(registration, request).await?;
-        self.units.finalize(&attempt_id)
-    }
-
-    async fn stage(
-        &mut self,
-        registration: StageRegistration,
-        request: Value,
-    ) -> Result<(), Failure> {
-        let count = registration.plan.unit_count();
-        let attempt_id = registration.attempt.clone();
-        self.units.register(registration)?;
-        self.bind(&attempt_id).await?;
-        let start = self.units.next_unit(&attempt_id)?;
-        let ticket = self.session.send_job(API_NAME, &request)?;
-        let mut answered = Box::pin(async move { ticket.wait().await });
-        let opened = self.units.wait_opened(&attempt_id);
-        tokio::pin!(opened);
-        loop {
-            tokio::select! {
-                finished = &mut answered => return early_job(finished),
-                outcome = &mut opened => {
-                    outcome?;
-                    break;
-                }
-                Some(phase) = self.reported.recv() => {
-                    show_phase(self.running.report, phase, None);
-                }
-            }
-        }
-        for index in start..count {
-            let running = StepPhase::Running {
-                pass: StepPass::Decode,
-                unit: index,
-                unit_count: count,
-            };
-            (self.running.report)(running.clone());
-            self.session.send_unit(&attempt_id, index, count)?;
-            let folded = self.units.folded(&attempt_id, index);
-            tokio::pin!(folded);
-            loop {
-                tokio::select! {
-                    finished = &mut answered => return early_job(finished),
-                    outcome = &mut folded => {
-                        outcome?;
-                        break;
-                    }
-                    Some(phase) = self.reported.recv() => {
-                        show_phase(self.running.report, phase, Some(&running));
-                    }
-                }
-            }
-            self.persist(&attempt_id, index + 1, count).await?;
-        }
-        self.session.send_unit_close(&attempt_id)?;
-        loop {
-            tokio::select! {
-                finished = &mut answered => {
-                    finished.map_err(Failure::from)?;
-                    return Ok(());
-                }
-                Some(phase) = self.reported.recv() => {
-                    show_phase(self.running.report, phase, None);
-                }
-            }
-        }
-    }
-
-    async fn bind(&self, attempt: &str) -> Result<(), Failure> {
-        let project_id = self.running.project_id;
-        let step = self.running.step;
-        let attempt_id = attempt.to_owned();
-        let bound = write_database(&self.running.context.storage, move |writer| {
-            writer.bind_attempt(project_id, step, attempt_id)
-        })
-        .await?;
-        if bound {
-            Ok(())
-        } else {
-            Err(Failure::Refused(NOT_ACTIVE.to_owned()))
-        }
-    }
-
-    async fn persist(&self, attempt: &str, next_unit: u32, count: u32) -> Result<(), Failure> {
-        if next_unit != count && !next_unit.is_multiple_of(CHECKPOINT_EVERY) {
-            return Ok(());
-        }
-        let committed = self.committed_prefix.load(Ordering::Relaxed);
-        let snapshot = self.units.snapshot(attempt, next_unit, committed)?;
-        let prefix = PrefixAppend {
-            committed_bytes: committed * snapshot.record_bytes as u64,
-            bytes: snapshot.prefix,
-            frames: u32::try_from(snapshot.settled)
-                .map_err(|_| Failure::Refused("the track is too long to checkpoint".to_owned()))?,
-        };
-        persist_tail(
-            &self.running.context.storage,
-            &self.store,
-            snapshot.tail,
-            CheckpointCursor {
-                project_id: self.running.project_id,
-                step: self.running.step,
-                attempt_id: attempt,
-                computation_id: &self.computation,
-                pass: self.pass,
-                next_unit,
-                unit_count: count,
-                prefix: Some(prefix),
-            },
-        )
-        .await?;
-        self.committed_prefix
-            .store(snapshot.settled, Ordering::Relaxed);
-        Ok(())
-    }
-}
-
-pub(crate) struct StageInput {
-    pub(crate) models: Vec<(String, PathBuf)>,
-    pub(crate) pcm: Vec<u8>,
-}
-
-pub(crate) async fn read_stage_input(
-    running: &StageRun<'_>,
-    job: &PendingJob,
-    files: &[ModelFile],
-) -> Result<StageInput, Failure> {
-    let context = running.context;
-    let report = running.report;
-    let models = ensure_files(context, report, files).await?;
-    require_executor(context)?;
-    let source = blob_path(&context.storage.blobs_path, &job.blob_id);
-    let sample_rate = context.pins.separation.model.sample_rate;
-    let mut decoded = decode_reporter(report, count_frames(&source, sample_rate).await?);
-    let pcm = collect_interleaved_pcm(
-        context.storage.pcm.as_ref(),
-        read_at(&source, sample_rate),
-        &mut decoded,
-    )
-    .await?;
-    Ok(StageInput { models, pcm })
 }
 
 pub(crate) fn cached_model(models: &[(String, PathBuf)], name: &str) -> Result<PathBuf, Failure> {
@@ -364,11 +72,4 @@ pub(crate) fn cached_model(models: &[(String, PathBuf)], name: &str) -> Result<P
         .find(|(file, _)| file == name)
         .map(|(_, path)| path.clone())
         .ok_or_else(|| Failure::Refused(format!("The model cache is missing {name}")))
-}
-
-fn early_job(finished: Result<Value, ExecutorFailure>) -> Result<(), Failure> {
-    finished.map_err(Failure::from)?;
-    Err(Failure::Refused(
-        "the separation job answered before the close".to_owned(),
-    ))
 }

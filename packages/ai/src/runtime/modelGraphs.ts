@@ -6,12 +6,19 @@ export type ChunkGeometry = {
   chunkSamples: number;
 };
 
-export type VocalsGraph = ChunkGeometry & {
+export type VocalsPinGraph = Omit<ChunkGeometry, 'chunkSamples'> & {
   inputName: string;
   outputName: string;
   masks: number;
   minStorageBuffersPerShaderStage: number;
 };
+
+export type VocalsGraph = VocalsPinGraph & ChunkGeometry;
+
+export const vocalsGraphOf = (graph: VocalsPinGraph): VocalsGraph => ({
+  ...graph,
+  chunkSamples: graph.hop * (graph.frames - 1),
+});
 
 export type BeatThisGraph = {
   inputName: string;

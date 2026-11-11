@@ -42,6 +42,15 @@ WebGPU except the key, and the voice range from the pitch tracker of
   neither freezes a phone nor keeps the screen waiting
   ([#956](https://github.com/musetric/musetric/issues/956) H2, H4);
   `onnxruntime-web` is not patched for it.
+- The logic of separation around its core, the plan of 11 s windows every
+  8 s, the fold of their overlap, the stems with their peaks and the state of a
+  checkpoint, is `src/separation`, one implementation for the app and the site
+  ([#1265](https://github.com/musetric/musetric/issues/1265)). It keeps only
+  the overlap still open, so its memory does not grow with the track; in the
+  app it reads the mixture from the host by byte range and sends each unit's
+  finished stems and state, which the host stores without reading. A change to
+  the plan or the fold bumps `stateVersion` in `separationState.ts`, so that a
+  checkpoint of the old one starts over.
 - The vocal separation core runs as one graph, not in stages: its heavy
   projections, split into rows at export, keep the phone responsive with an
   identical output ([#957](https://github.com/musetric/musetric/issues/957) H7).

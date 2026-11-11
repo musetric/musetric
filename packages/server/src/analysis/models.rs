@@ -6,8 +6,8 @@ use std::{
 
 use musetric_gpu::{ModelFile, has_verified_copy, kept_files};
 use musetric_media::Downmix;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::{Map, Value, json};
+use serde::{Deserialize, de::DeserializeOwned};
+use serde_json::{Value, json};
 use tokio::fs::{DirEntry, ReadDir, read_dir, remove_dir_all, remove_file, try_exists};
 
 use crate::analysis::browser::Failure;
@@ -53,37 +53,12 @@ pub(crate) struct GraphPin<Graph> {
     pub(crate) graph: Graph,
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct SeparationGraph {
-    pub(crate) hop: u32,
-    pub(crate) frames: u32,
-    pub(crate) channels: u32,
-    pub(crate) masks: u32,
-    #[serde(flatten)]
-    other: Map<String, Value>,
-}
-
-impl SeparationGraph {
-    pub(crate) fn chunk_samples(&self) -> u32 {
-        self.hop * (self.frames - 1)
-    }
-
-    pub(crate) fn request(&self) -> Value {
-        let mut graph = json!(self);
-        if let Some(fields) = graph.as_object_mut() {
-            fields.insert("chunkSamples".to_owned(), json!(self.chunk_samples()));
-        }
-        graph
-    }
-}
-
 fn read_pin<Pin: DeserializeOwned>(step: &str, text: &str) -> Result<Pin, String> {
     serde_json::from_str(text).map_err(|error| format!("the {step} pin does not parse: {error}"))
 }
 
 pub(crate) struct ModelPins {
-    pub(crate) separation: GraphPin<SeparationGraph>,
+    pub(crate) separation: GraphPin<Value>,
     pub(crate) transcription: GraphPin<Value>,
     pub(crate) chords: GraphPin<Value>,
     pub(crate) rhythm: GraphPin<Value>,

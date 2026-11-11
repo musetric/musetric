@@ -12,6 +12,7 @@ use axum::{
     response::Response,
 };
 use musetric_db::blob_path;
+use musetric_gpu::range::{ByteRange, parse};
 use tokio::{
     fs::{File, metadata},
     io::{AsyncReadExt, AsyncSeekExt, SeekFrom},
@@ -21,7 +22,6 @@ use tokio_util::io::ReaderStream;
 use crate::{
     cached_file::{CachedFile, CachedHeaders, DOWNLOAD_CACHE},
     failure::Failure,
-    range::{ByteRange, parse},
     storage::Storage,
 };
 

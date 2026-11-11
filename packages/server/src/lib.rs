@@ -10,15 +10,12 @@ mod frontend;
 mod garbage;
 mod mixdown;
 mod publish;
-mod range;
 mod realtime;
 mod recording;
 mod router;
 mod routes;
 mod serve;
 mod storage;
-mod unit_fold;
-mod unit_plan;
 mod wav;
 
 #[cfg(test)]

@@ -93,14 +93,33 @@ pub async fn encode_flac_from_raw(
     from: &Path,
     to: &Path,
     rates: SampleRates,
+    scale: f64,
 ) -> Result<(), BoxedError> {
     create_parent(to).await?;
     let source = from.to_owned();
     let target = to.to_owned();
-    spawn_blocking(move || encode_raw(&source, &target, rates)).await?
+    spawn_blocking(move || encode_raw(&source, &target, rates, scale)).await?
 }
 
-fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedError> {
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the scale reproduces the browser float32 arithmetic"
+)]
+fn scale_samples<'scaled>(
+    samples: &[f32],
+    scale: f64,
+    scaled: &'scaled mut Vec<f32>,
+) -> &'scaled [f32] {
+    scaled.clear();
+    scaled.extend(
+        samples
+            .iter()
+            .map(|value| (f64::from(*value) * scale) as f32),
+    );
+    scaled
+}
+
+fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<(), BoxedError> {
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
     let mut conversion = Conversion::create(rates)?;
@@ -108,12 +127,17 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates) -> Result<(), BoxedErr
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
+    let mut scaled = Vec::new();
     loop {
         let read = reader.read(&mut buffer)?;
         if read == 0 {
             break;
         }
-        let converted = conversion.convert(frames.push(&buffer[..read]))?;
+        let converted = conversion.convert(scale_samples(
+            frames.push(&buffer[..read]),
+            scale,
+            &mut scaled,
+        ))?;
         write_frames(&mut writer, converted);
     }
     write_frames(
@@ -140,10 +164,10 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
 mod tests {
     use std::fs::{create_dir_all, remove_dir_all, write};
 
-    use super::{convert_to_flac, convert_to_fmp4};
+    use super::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
     use crate::{
-        ENCODER_DELAY, PcmRequest, PcmSource, SampleDepth, SourceFailure, SymphoniaPcm,
-        wav::WavWriter,
+        ENCODER_DELAY, PcmRequest, PcmSource, SampleDepth, SampleRates, SourceFailure,
+        SymphoniaPcm, wav::WavWriter,
     };
 
     const RATE: u32 = 48_000;
@@ -159,6 +183,49 @@ mod tests {
                 let phase = f32::from(u16::try_from(offset).expect("the offset is small"));
                 0.5 * (std::f32::consts::TAU * phase / 16.0).sin()
             })
+    }
+
+    #[tokio::test]
+    async fn scales_the_raw_samples_before_it_encodes_them() {
+        let directory =
+            std::env::temp_dir().join(format!("musetric-scaled-{}", std::process::id()));
+        create_dir_all(&directory).expect("the workspace should be created");
+        let raw = directory.join("stem.raw");
+        let master = directory.join("stem.flac");
+        let samples: Vec<f32> = (0..2_000_u16)
+            .map(|index| f32::from(index % 9) / 8.0 - 0.5)
+            .collect();
+        let bytes: Vec<u8> = samples
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        write(&raw, bytes).expect("the raw stem should be written");
+        let rates = SampleRates {
+            input: RATE,
+            output: RATE,
+        };
+
+        encode_flac_from_raw(&raw, &master, rates, 0.5)
+            .await
+            .expect("the stem should encode");
+        let mut decoded = Vec::new();
+        let mut sink = |chunk: &[f32]| decoded.extend_from_slice(chunk);
+        SymphoniaPcm
+            .read_pcm(
+                PcmRequest {
+                    from: &master,
+                    sample_rate: RATE,
+                },
+                &mut sink,
+            )
+            .await
+            .expect("the master should decode");
+        remove_dir_all(&directory).expect("the workspace should be removed");
+
+        assert_eq!(decoded.len(), samples.len());
+        for (found, sample) in decoded.iter().zip(&samples) {
+            assert!((found - sample * 0.5).abs() < 1e-6);
+        }
     }
 
     #[tokio::test]

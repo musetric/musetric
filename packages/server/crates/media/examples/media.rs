@@ -36,6 +36,8 @@ enum Operation {
         input_sample_rate: u32,
         #[arg(long)]
         output_sample_rate: u32,
+        #[arg(long)]
+        scale: f64,
     },
     Fmp4 {
         #[arg(long)]
@@ -105,12 +107,13 @@ async fn run(media: &Media, operation: Operation) -> Result<String, BoxedError> 
             to,
             input_sample_rate,
             output_sample_rate,
+            scale,
         } => {
             let rates = SampleRates {
                 input: input_sample_rate,
                 output: output_sample_rate,
             };
-            encode_flac_from_raw(&from, &to, rates).await?;
+            encode_flac_from_raw(&from, &to, rates, scale).await?;
             Ok(String::new())
         }
         Operation::Fmp4 {

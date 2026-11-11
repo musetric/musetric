@@ -12,9 +12,8 @@ use axum::{
     response::Response,
 };
 use musetric_db::BoxedError;
+use musetric_gpu::range::PartialRange;
 use time::{OffsetDateTime, format_description::BorrowedFormatItem, macros::format_description};
-
-use crate::range::PartialRange;
 
 pub(crate) const DOWNLOAD_CACHE: &str = "public, max-age=86400";
 pub(crate) const REVALIDATE_CACHE: &str = "public, max-age=0";
