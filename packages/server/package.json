@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
+    "@huggingface/transformers": "catalog:",
     "@musetric/ai": "workspace:*",
     "@musetric/cqt": "workspace:*",
     "@musetric/eslint-config": "workspace:*",

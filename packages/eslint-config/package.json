@@ -32,8 +32,8 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "eslint": "10.12.0",
-    "typescript": "^6.0.2"
+    "eslint": "catalog:",
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@eslint-react/eslint-plugin": "catalog:",
