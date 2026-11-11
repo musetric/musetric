@@ -63,6 +63,7 @@ export const createRecordingController = (
     deps.getRecordingStream()?.close();
     deps.setRecordingStream(undefined);
     deps.setRecordingReady(false);
+    deps.realtime.dropPackets();
   };
 
   const failRecordingStream = (error: unknown): void => {
