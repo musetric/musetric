@@ -5,10 +5,9 @@ use musetric_media::{
     BoxedError, PcmRequest, PcmSource, SampleRates, WavePeaks, convert_to_fmp4,
     encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
-use tokio::fs;
 
 use crate::{
-    analysis::{browser::Failure, stem_signal::interleaved_from_planar},
+    analysis::separation_sink::SinkStem,
     blobs::{StagedBlob, stage_blob},
 };
 
@@ -55,6 +54,13 @@ impl StemFiles {
         &self.raw
     }
 
+    pub(crate) fn sink_stem(&self) -> SinkStem {
+        SinkStem {
+            name: self.stem.name(),
+            raw: self.raw.clone(),
+        }
+    }
+
     pub(crate) fn staged(&self) -> Vec<&StagedBlob> {
         let mut blobs = vec![&self.master];
         if let Some(delivered) = self.delivered.as_ref() {
@@ -75,19 +81,8 @@ impl StemFiles {
         }
     }
 
-    pub(crate) async fn write_raw(&self, planar: &[f32]) -> Result<(), Failure> {
-        if let Some(directory) = self.raw.parent() {
-            fs::create_dir_all(directory)
-                .await
-                .map_err(|error| Failure::from(error.to_string()))?;
-        }
-        fs::write(&self.raw, interleaved_from_planar(planar))
-            .await
-            .map_err(|error| Failure::from(error.to_string()))
-    }
-
-    pub(crate) async fn encode(&self, rates: SampleRates) -> Result<(), BoxedError> {
-        encode_flac_from_raw(&self.raw, self.master.path(), rates).await
+    pub(crate) async fn encode(&self, rates: SampleRates, scale: f64) -> Result<(), BoxedError> {
+        encode_flac_from_raw(&self.raw, self.master.path(), rates, scale).await
     }
 
     pub(crate) async fn deliver(

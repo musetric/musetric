@@ -6,8 +6,6 @@ use std::{
 };
 
 use super::{CheckpointDir, computation_id, digest_of};
-use crate::unit_fold::FoldAccumulator;
-use crate::unit_plan::{PlanChannels, PlanRules, PlanUnit, UnitPlan};
 
 static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -39,52 +37,19 @@ impl Drop for Workspace {
     }
 }
 
-fn plan() -> UnitPlan {
-    UnitPlan::create(
-        PlanRules::VocalsV1,
-        PlanChannels {
-            input: 2,
-            output: 2,
-        },
-        4,
-        vec![
-            PlanUnit {
-                start: 0,
-                length: 4,
-            },
-            PlanUnit {
-                start: 2,
-                length: 4,
-            },
-        ],
-    )
-}
-
-fn stereo(chunk: &[f32]) -> Vec<f32> {
-    let channel: Vec<f32> = chunk.to_vec();
-    [channel.clone(), channel].concat()
-}
-
-fn folded_once() -> FoldAccumulator {
-    let plan = plan();
-    let mut fold = FoldAccumulator::create(6, 2);
-    fold.add(&plan, 0, &stereo(&[1.0, 0.5, -0.25, 2.0]));
-    fold
-}
+const FIRST: &[u8] = &[1, 2, 3, 4];
+const SECOND: &[u8] = &[5, 6, 7, 8, 9];
 
 #[tokio::test]
 async fn restores_the_committed_generation_when_a_newer_tail_is_uncommitted() {
     let workspace = Workspace::new();
     let store = workspace.store();
-    let first = folded_once().records(0, 6);
     let committed = store
-        .write_tail(1, &first)
+        .write_tail(1, FIRST)
         .await
         .expect("the first tail should write");
-    let mut second = folded_once();
-    second.add(&plan(), 1, &stereo(&[0.5, 0.5, 0.5, 0.5]));
     store
-        .write_tail(2, &second.records(0, 6))
+        .write_tail(2, SECOND)
         .await
         .expect("the uncommitted tail should write");
 
@@ -93,7 +58,7 @@ async fn restores_the_committed_generation_when_a_newer_tail_is_uncommitted() {
         .await
         .expect("the committed tail should load");
     assert_eq!(restored.digest, committed.digest);
-    assert_eq!(restored.bytes, first);
+    assert_eq!(restored.bytes, FIRST);
 }
 
 #[tokio::test]
@@ -101,13 +66,11 @@ async fn uses_the_new_generation_after_the_cursor_moves() {
     let workspace = Workspace::new();
     let store = workspace.store();
     store
-        .write_tail(1, &folded_once().records(0, 6))
+        .write_tail(1, FIRST)
         .await
         .expect("the old tail should write");
-    let mut second = folded_once();
-    second.add(&plan(), 1, &stereo(&[0.5, 0.5, 0.5, 0.5]));
     let committed = store
-        .write_tail(2, &second.records(0, 6))
+        .write_tail(2, SECOND)
         .await
         .expect("the new tail should write");
     store.discard(1).await;
@@ -125,58 +88,12 @@ async fn refuses_a_tail_whose_digest_does_not_match() {
     let workspace = Workspace::new();
     let store = workspace.store();
     let stored = store
-        .write_tail(1, &folded_once().records(0, 6))
+        .write_tail(1, FIRST)
         .await
         .expect("the tail should write");
     let loaded = store.read_tail(1).await.expect("the tail should load");
     assert_eq!(loaded.digest, stored.digest);
     assert_ne!(digest_of(b"other"), loaded.digest);
-}
-
-#[tokio::test]
-async fn round_trips_a_fold_through_the_tail_file() {
-    let workspace = Workspace::new();
-    let store = workspace.store();
-    let original = folded_once();
-    store
-        .write_tail(1, &original.records(0, 6))
-        .await
-        .expect("the tail should write");
-    let loaded = store.read_tail(1).await.expect("the tail should load");
-    let restored =
-        FoldAccumulator::restore(6, 2, &[], &loaded.bytes).expect("the tail should decode");
-    assert_eq!(original.finalize(), restored.finalize());
-}
-
-#[tokio::test]
-async fn drops_prefix_bytes_that_no_checkpoint_confirmed() {
-    let workspace = Workspace::new();
-    let store = workspace.store();
-    store
-        .append_prefix(0, &[1, 2, 3, 4])
-        .await
-        .expect("the first prefix should write");
-    store
-        .append_prefix(4, &[5, 6, 7, 8, 9, 9])
-        .await
-        .expect("the unconfirmed prefix should write");
-    store
-        .append_prefix(8, &[10, 11])
-        .await
-        .expect("the next prefix should replace the unconfirmed bytes");
-
-    assert_eq!(
-        store.read_prefix(10).await.expect("the prefix should load"),
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
-    );
-    assert!(store.read_prefix(11).await.is_err());
-    assert_eq!(
-        store
-            .read_prefix(0)
-            .await
-            .expect("an empty prefix should load"),
-        Vec::<u8>::new()
-    );
 }
 
 #[tokio::test]

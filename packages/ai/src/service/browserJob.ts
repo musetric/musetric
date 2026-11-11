@@ -1,3 +1,4 @@
+import { type UnitProgress } from '../runtime/unitProgress.js';
 import { type UnitServing } from './browserUnitServing.js';
 
 export type LoadingProgress = {
@@ -9,6 +10,7 @@ export type BrowserJobContext = {
   reportLoading: (progress: LoadingProgress) => void;
   reportBuilding: () => void;
   reportLoaded: () => void;
+  reportRunning: (progress: UnitProgress) => void;
   serveUnits: (serving: UnitServing) => Promise<void>;
 };
 

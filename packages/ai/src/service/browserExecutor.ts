@@ -97,6 +97,14 @@ const serveConnection = async (
         reportLoaded: () => {
           send({ type: 'loaded', jobId: command.jobId });
         },
+        reportRunning: (progress) => {
+          send({
+            type: 'running',
+            jobId: command.jobId,
+            pass: 'decode',
+            ...progress,
+          });
+        },
         serveUnits: async (serving) =>
           await unitServer.serve(command.jobId, serving),
       });

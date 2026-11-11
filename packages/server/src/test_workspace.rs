@@ -33,16 +33,12 @@ static WORKSPACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) struct UnitHost {
     host: Arc<ExecutorHost>,
-    pub(crate) session: ExecutorSession,
+    _session: ExecutorSession,
 }
 
 impl UnitHost {
     pub(crate) fn base_url(&self) -> &str {
         self.host.base_url()
-    }
-
-    pub(crate) fn socket_url(&self) -> String {
-        self.host.socket_url()
     }
 
     pub(crate) async fn close(self) {
@@ -111,7 +107,10 @@ impl Workspace {
             on_phase: sink,
             units: Some(units),
         });
-        UnitHost { host, session }
+        UnitHost {
+            host,
+            _session: session,
+        }
     }
 
     pub(crate) fn seed(&self, statements: &str) {

@@ -5,8 +5,10 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Rules
 
-- A change to a step's unit plan (stride, overlap, windows per unit, channels
-  in or out) bumps that step's `DSP_VERSION`.
+- A change to the unit plan of transcription (stride, overlap, windows per
+  unit, channels in or out) bumps its `DSP_VERSION`. Separation plans its units
+  in `@musetric/ai` (`src/separation`): the host serves it the decoded mixture,
+  stores the stems and the state each unit sends, and keeps none of its math.
 - The host reads the
   [pins](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins) of the models
   from the `pin.json` files of `packages/ai/src/runtime`, embedded at build
