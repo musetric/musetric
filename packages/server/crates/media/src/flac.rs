@@ -280,13 +280,20 @@ mod tests {
         units::Timestamp,
     };
 
+    use flacenc::{
+        component::Stream,
+        config::Encoder as Configuration,
+        source::{Fill, FrameBuf},
+    };
+
     use super::{
         BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
-        containing_frame, raw_byte_length, seek_spacing, seek_table,
+        containing_frame, encode_frame, raw_byte_length, seek_spacing, seek_table, verify,
     };
     use crate::{SampleDepth, pcm::CHANNELS};
 
     const RATE: u32 = 48_000;
+    const NOISY_FRAMES: usize = 2944;
 
     struct Point<'point>(&'point [u8]);
 
@@ -348,6 +355,46 @@ mod tests {
         assert!(
             written <= limit,
             "{written} bytes written for a {limit} byte limit"
+        );
+    }
+
+    fn full_scale(state: &mut u32) -> i32 {
+        *state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+        i32::try_from(*state >> 8).expect("the noise is 24 bits") - (1 << 23)
+    }
+
+    #[test]
+    fn encodes_noise_that_falls_silent_within_its_raw_samples() {
+        let depth = SampleDepth::TwentyFour;
+        let configuration =
+            verify(Configuration::default()).expect("the configuration should be valid");
+        let rate = usize::try_from(RATE).expect("the rate fits");
+        let stream = Stream::new(rate, CHANNELS, depth.bits()).expect("the stream should open");
+        let mut frames =
+            FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).expect("the block should be allocated");
+        let mut state = 1;
+        let samples: Vec<i32> = (0..BLOCK_FRAMES)
+            .flat_map(|frame| {
+                let value = if frame < NOISY_FRAMES {
+                    full_scale(&mut state)
+                } else {
+                    0
+                };
+                [value, value]
+            })
+            .collect();
+        frames
+            .fill_interleaved(&samples)
+            .expect("the block should be filled");
+
+        let sink =
+            encode_frame(&configuration, &frames, 0, &stream).expect("the block should encode");
+
+        let written = sink.as_slice().len();
+        let limit = raw_byte_length(samples.len(), depth);
+        assert!(
+            written <= limit,
+            "{written} bytes encoded for a {limit} byte block"
         );
     }
 

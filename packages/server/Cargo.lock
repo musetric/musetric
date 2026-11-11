@@ -1522,8 +1522,7 @@ checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 [[package]]
 name = "flacenc"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74c892c2b5fa08f967e8b5ad29121570b4762202f2402033ce08479ec65eccd0"
+source = "git+https://github.com/yotarok/flacenc-rs?rev=f2ebcf85550ce337ceceed7ba25a1e84c034efc1#f2ebcf85550ce337ceceed7ba25a1e84c034efc1"
 dependencies = [
  "built",
  "crc",
