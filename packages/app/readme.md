@@ -7,22 +7,22 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 
 | Command              | What it does                                                      |
 | -------------------- | ----------------------------------------------------------------- |
-| `yarn dev:app`       | Runs the Tauri shell                                              |
-| `yarn build:app`     | Compiles the shell without packaging it                           |
-| `yarn init:android`  | Materializes `src-tauri/gen/android`                              |
-| `yarn dev:android`   | Runs a connected device against the development server            |
-| `yarn build:android` | Builds the APK; `--debug` builds one `adb shell run-as` can enter |
-| `yarn init:ios`      | Materializes `src-tauri/gen/apple`                                |
-| `yarn dev:ios`       | Runs a connected device against the development server            |
-| `yarn build:ios`     | Builds the app                                                    |
+| `pnpm dev:app`       | Runs the Tauri shell                                              |
+| `pnpm build:app`     | Compiles the shell without packaging it                           |
+| `pnpm init:android`  | Materializes `src-tauri/gen/android`                              |
+| `pnpm dev:android`   | Runs a connected device against the development server            |
+| `pnpm build:android` | Builds the APK; `--debug` builds one `adb shell run-as` can enter |
+| `pnpm init:ios`      | Materializes `src-tauri/gen/apple`                                |
+| `pnpm dev:ios`       | Runs a connected device against the development server            |
+| `pnpm build:ios`     | Builds the app                                                    |
 
 ## Rules
 
-- On desktop the window of `yarn dev:app` shows the page of `dist`, as the
-  last `yarn build:ui` left it: a change of the frontend is built again before
+- On desktop the window of `pnpm dev:app` shows the page of `dist`, as the
+  last `pnpm build:ui` left it: a change of the frontend is built again before
   it is checked there.
 - A script drives that window over the Chrome DevTools Protocol, such as
-  Playwright's `chromium.connectOverCDP`, when `yarn dev:app` starts with
+  Playwright's `chromium.connectOverCDP`, when `pnpm dev:app` starts with
   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`.
   WebView2 adds it to the app's own arguments of `src-tauri/src/lib.rs`, so the
   WebView keeps `--force_high_performance_gpu`.
@@ -41,7 +41,7 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   suffix from `debugApplicationIdSuffix` of `tauri.android.conf.json` and
   starts the app by it, and on iOS it takes `identifier` from
   `gen/apple/identity.conf.json`, which `initNative.ts` writes and
-  `yarn dev:ios` and `yarn build:ios` pass with `--config`.
+  `pnpm dev:ios` and `pnpm build:ios` pass with `--config`.
 - `native/apple/PrivacyInfo.xcprivacy` gives the reason for every required
   reason API the iOS binary calls, now file timestamps and disk space: App Store
   Connect refuses a build that calls one without its reason.
@@ -96,9 +96,9 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   updates to the store and never starts its own updater
   (`APP_SANDBOX_CONTAINER_ID` in `src-tauri/src/update.rs`).
 - `src/favicon.svg` is the only icon source, of the app and of the page.
-  `yarn build:icons` redraws the iOS icons that `tauri icon` writes as PNG
+  `pnpm build:icons` redraws the iOS icons that `tauri icon` writes as PNG
   without an alpha channel: App Store Connect refuses an app icon with one.
-- `yarn build:icons` also writes `gen/AppIcon.icon`, an Icon Composer icon of the same
+- `pnpm build:icons` also writes `gen/AppIcon.icon`, an Icon Composer icon of the same
   background and glyph, and on macOS compiles it into `gen/Assets.car` with `actool`
   from Xcode 26 or later. The macOS bundle lists that `Assets.car` next to
   `icon.icns`: macOS 26 draws a bundle with only the legacy icon on a light plate at
@@ -126,7 +126,7 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 
 The folder holds `storage/db/app.db`, `storage/blobs`, `storage/work`, `models`
 and, on desktop, `logs` (`src-tauri/src/lib.rs`). A desktop debug build uses
-`Musetric Dev` (`src-tauri/src/lifecycle.rs`), a local `yarn build:app` the
+`Musetric Dev` (`src-tauri/src/lifecycle.rs`), a local `pnpm build:app` the
 installed app's folder; one process holds a folder at a time. A mobile
 development build is an app of its own: on Android its folder is
 `/data/user/0/com.musetric.client.dev`, on iOS

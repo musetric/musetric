@@ -44,7 +44,7 @@ declare module 'vitest' {
   }
 }
 
-const usage = `usage: yarn workspace @musetric/spectrogram measure:pitch <stage> --audio <file|dir> [options]
+const usage = `usage: pnpm --filter @musetric/spectrogram measure:pitch <stage> --audio <file|dir> [options]
 
 stages
   reference   run the neural reference (musetric-pitch) and write reference.csv

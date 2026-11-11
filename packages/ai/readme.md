@@ -19,7 +19,7 @@ WebGPU except the key, and the voice range from the pitch tracker of
 - The [pin](https://github.com/musetric/headquarters/blob/main/practices/models.md#pins)
   of each model, with the values its graph is run with, is the `pin.json` next
   to its runtime in `src/runtime`, read by every runtime: the host embeds it,
-  and `yarn workspace @musetric/ai check:models` checks it against Hugging Face.
+  and `pnpm --filter @musetric/ai check:models` checks it against Hugging Face.
 - The package does not depend on `@musetric/api`; the types of its results
   are declared next to the code that builds them.
 - Sessions whose tensors meet, such as Whisper's `cross_kv` graph and its
@@ -62,7 +62,7 @@ WebGPU except the key, and the voice range from the pitch tracker of
 ## Parity run
 
 ```sh
-yarn workspace @musetric/ai measure:parity all --devices pc,<name>=<adb serial>
+pnpm --filter @musetric/ai measure:parity all --devices pc,<name>=<adb serial>
 ```
 
 It follows each step from the model author's torch code to the executor on

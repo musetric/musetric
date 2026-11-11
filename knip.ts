@@ -38,6 +38,7 @@ const config: KnipConfig = {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },
     'packages/checks': {
+      entry: ['scripts/**/*.ts'],
       ignoreDependencies: ['@ast-grep/cli'],
     },
     'packages/cqt': {

@@ -4,13 +4,8 @@ description: Rust ast, format, clippy, and test checks
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setupYarn
-    - uses: actions/cache@v5
-      with:
-        path: ~/.yarn/berry/cache
-        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-${{ runner.os }}-
-    - run: yarn --immutable
+    - uses: ./.github/actions/setupPnpm
+    - run: pnpm install --frozen-lockfile
       shell: bash
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
@@ -29,13 +24,13 @@ runs:
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       shell: bash
-    - run: yarn workspace @musetric/app build:ui
+    - run: pnpm --filter @musetric/app build:ui
       shell: bash
-    - run: yarn workspace @musetric/server check:rust:ast
+    - run: pnpm --filter @musetric/server check:rust:ast
       shell: bash
-    - run: yarn workspace @musetric/server check:rust:fmt
+    - run: pnpm --filter @musetric/server check:rust:fmt
       shell: bash
-    - run: yarn workspace @musetric/server check:rust:clippy
+    - run: pnpm --filter @musetric/server check:rust:clippy
       shell: bash
-    - run: yarn workspace @musetric/server check:rust:test
+    - run: pnpm --filter @musetric/server check:rust:test
       shell: bash

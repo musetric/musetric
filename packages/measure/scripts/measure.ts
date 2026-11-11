@@ -31,7 +31,7 @@ declare module 'vitest' {
   }
 }
 
-const usage = `usage: yarn workspace @musetric/measure measure:<timing|delay|sound> [options]
+const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|sound> [options]
 
   measure:timing   the playhead against the heard metronome click, and the take against the beats
   measure:delay    how far the voice line, the spectrogram and the newest audio trail the playhead

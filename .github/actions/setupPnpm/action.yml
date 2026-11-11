@@ -1,0 +1,24 @@
+name: Setup pnpm
+description: Node from .node-version, pnpm from packageManager through corepack, and the pnpm store cached by the lockfile
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version-file: .node-version
+        package-manager-cache: false
+    - run: npm install -g corepack@0.36.0 --force
+      shell: bash
+    - run: corepack enable
+      shell: bash
+    - run: corepack install
+      shell: bash
+    - id: store
+      run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-${{ runner.os }}-

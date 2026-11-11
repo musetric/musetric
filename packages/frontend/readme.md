@@ -36,5 +36,5 @@ shell.
 
 `build:project`, also run from the root, builds into `dist` and copies the
 build over `../server/storage/public`, clearing it first, for the server of
-`yarn dev`; a second server gets its own build from
+`pnpm dev`; a second server gets its own build from
 `vite build --configLoader native --outDir <dir>`.

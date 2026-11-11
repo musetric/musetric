@@ -28,13 +28,8 @@ runs:
       if: inputs.platform == 'macOS'
       run: sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer && xcodebuild -version
       shell: bash
-    - uses: ./.github/actions/setupYarn
-    - uses: actions/cache@v5
-      with:
-        path: ${{ runner.os == 'Windows' && '~/AppData/Local/Yarn/Berry/cache' || '~/.yarn/berry/cache' }}
-        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-${{ runner.os }}-
-    - run: yarn --immutable
+    - uses: ./.github/actions/setupPnpm
+    - run: pnpm install --frozen-lockfile
       env:
         MUSETRIC_SKIP_PLAYWRIGHT_INSTALL: true
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -71,7 +66,7 @@ runs:
         restore-keys: cargo-${{ runner.os }}-${{ inputs.arch }}-
     - run: rm -rf packages/server/target/*/release/bundle packages/server/target/release/bundle 2>/dev/null
       shell: bash
-    - run: yarn workspace @musetric/app pack:installer -- --target ${{ inputs.rust-target }} --version ${{ inputs.version }} --build-number $((1000 + GITHUB_RUN_NUMBER))
+    - run: pnpm --filter @musetric/app pack:installer --target ${{ inputs.rust-target }} --version ${{ inputs.version }} --build-number $((1000 + GITHUB_RUN_NUMBER))
       env:
         TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.tauri-signing-private-key }}
         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.tauri-signing-private-key-password }}
@@ -118,7 +113,7 @@ runs:
           packages/server/target/**/release/bundle/appimage/*.AppImage
           packages/server/target/**/release/bundle/appimage/*.AppImage.sig
     - if: inputs.platform == 'Windows'
-      run: yarn workspace @musetric/app pack:msix --target ${{ inputs.rust-target }} --build $((1000 + GITHUB_RUN_NUMBER))
+      run: pnpm --filter @musetric/app pack:msix --target ${{ inputs.rust-target }} --build $((1000 + GITHUB_RUN_NUMBER))
       shell: bash
     - if: inputs.platform == 'Windows'
       uses: actions/upload-artifact@v7

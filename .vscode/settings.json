@@ -25,7 +25,6 @@
   },
   "files.watcherExclude": {
     "**/node_modules/**": true,
-    "**/.yarn/**": true,
     "**/.eslintcache": true,
     "**/.tsbuildinfo/**": true,
     "**/dist/**": true,
@@ -35,7 +34,6 @@
   },
   "search.exclude": {
     "**/node_modules/**": true,
-    "**/.yarn/**": true,
     "**/.eslintcache": true,
     "**/.tsbuildinfo/**": true,
     "**/dist/**": true,

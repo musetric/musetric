@@ -9,40 +9,35 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setupYarn
-    - uses: actions/cache@v5
-      with:
-        path: ~/.yarn/berry/cache
-        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-${{ runner.os }}-
-    - run: yarn --immutable
+    - uses: ./.github/actions/setupPnpm
+    - run: pnpm install --frozen-lockfile
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
     - if: inputs.part == 'static'
       run: |
-        yarn check:deps:security
-        yarn check:deps:dupe
-        yarn check:unused
-        yarn check:format
-        yarn check:translations
-        yarn check:comments
+        pnpm check:deps:security
+        pnpm check:deps:dupe
+        pnpm check:unused
+        pnpm check:format
+        pnpm check:translations
+        pnpm check:comments
       shell: bash
     - if: inputs.part == 'types'
       run: |
-        yarn check:ts
-        yarn workspace @musetric/app build:ui
+        pnpm check:ts
+        pnpm --filter @musetric/app build:ui
       shell: bash
     - if: inputs.part == 'lint'
       uses: actions/cache@v5
       with:
         path: packages/*/.eslintcache
-        key: eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
+        key: eslint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-${{ github.sha }}
         restore-keys: |
-          eslint-${{ runner.os }}-${{ hashFiles('yarn.lock', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
+          eslint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'packages/*/eslint.config.ts', 'packages/eslint-config/src/**') }}-
     - if: inputs.part == 'lint'
-      run: yarn check:lint
+      run: pnpm check:lint
       shell: bash
     - if: inputs.part == 'test'
-      run: yarn test
+      run: pnpm test
       shell: bash
