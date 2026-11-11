@@ -1,0 +1,19 @@
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+reason = "Unsound glib 0.18 of the GTK 3 stack that Tauri 2 needs on Linux; glib 0.20 comes only with GTK 4."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "Unmaintained proc-macro-error of glib-macros 0.18 in the GTK 3 stack that Tauri 2 needs on Linux."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+reason = "Unmaintained zvariant, merged into zbus 6; tauri-plugin-single-instance 2.5 needs zbus 5 on Linux."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+reason = "Unmaintained zbus_names, merged into zbus 6; tauri-plugin-single-instance 2.5 needs zbus 5 on Linux."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+reason = "Unmaintained zvariant_derive, merged into zbus 6; tauri-plugin-single-instance 2.5 needs zbus 5 on Linux."

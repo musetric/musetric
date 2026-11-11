@@ -1,5 +1,5 @@
 name: Base Quality
-description: Duplicate-code, EditorConfig, English, notices and link checks
+description: Duplicate-code, EditorConfig, English, notices, link and Rust advisory checks
 
 runs:
   using: composite
@@ -9,10 +9,13 @@ runs:
       env:
         JSCPD_VERSION: 5.1.2
         EDITORCONFIG_CHECKER_VERSION: v4.0.1
+        OSV_SCANNER_VERSION: v2.7.1
       run: |
         mkdir -p "$RUNNER_TEMP/bin"
         curl -fsSL "https://github.com/kucherenko/jscpd/releases/download/v$JSCPD_VERSION/jscpd-linux-x64-gnu.tar.gz" | tar -xz -C "$RUNNER_TEMP/bin" jscpd
         curl -fsSL "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/$EDITORCONFIG_CHECKER_VERSION/editorconfig-checker-linux-amd64.tar.gz" | tar -xz -C "$RUNNER_TEMP/bin" editorconfig-checker
+        curl -fsSL -o "$RUNNER_TEMP/bin/osv-scanner" "https://github.com/google/osv-scanner/releases/download/$OSV_SCANNER_VERSION/osv-scanner_linux_amd64"
+        chmod +x "$RUNNER_TEMP/bin/osv-scanner"
         echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
     - uses: actions/setup-node@v5
       with:
@@ -33,3 +36,6 @@ runs:
     - name: Check links
       shell: bash
       run: bash -c "$(jq -r '.scripts["check:links"]' package.json)"
+    - name: Check Rust advisories
+      shell: bash
+      run: bash -c "$(jq -r '.scripts["check:deps:security:rust"]' package.json)"
