@@ -41,22 +41,6 @@ const targets: Target[] = [
     installer: '.dmg',
     updater: '.app.tar.gz',
   },
-  {
-    os: 'Linux',
-    cpu: 'x64',
-    tauri: 'linux-x86_64',
-    installer: '.deb',
-    updater: '.AppImage',
-    updaterArtifact: 'appimage',
-  },
-  {
-    os: 'Linux',
-    cpu: 'arm64',
-    tauri: 'linux-aarch64',
-    installer: '.deb',
-    updater: '.AppImage',
-    updaterArtifact: 'appimage',
-  },
 ];
 
 const isBinary = (name: string, ext: string): boolean =>
