@@ -24,17 +24,12 @@
     "@ast-grep/cli": "catalog:",
     "@huggingface/transformers": "catalog:",
     "@musetric/ai": "workspace:*",
-    "@musetric/cqt": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/fft": "workspace:*",
-    "@musetric/spectrogram": "workspace:*",
-    "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "onnxruntime-web": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "zod": "catalog:"
+    "vite": "catalog:"
   }
 }

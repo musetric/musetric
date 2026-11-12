@@ -437,24 +437,12 @@ importers:
       '@musetric/ai':
         specifier: workspace:*
         version: link:../ai
-      '@musetric/cqt':
-        specifier: workspace:*
-        version: link:../cqt
       '@musetric/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@musetric/fft':
-        specifier: workspace:*
-        version: link:../fft
       '@musetric/script':
         specifier: workspace:*
         version: link:../script
-      '@musetric/spectrogram':
-        specifier: workspace:*
-        version: link:../spectrogram
-      '@musetric/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@resvg/resvg-js':
         specifier: 'catalog:'
         version: 2.6.2
@@ -1069,21 +1057,9 @@ importers:
       '@musetric/ai':
         specifier: workspace:*
         version: link:../ai
-      '@musetric/cqt':
-        specifier: workspace:*
-        version: link:../cqt
       '@musetric/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@musetric/fft':
-        specifier: workspace:*
-        version: link:../fft
-      '@musetric/spectrogram':
-        specifier: workspace:*
-        version: link:../spectrogram
-      '@musetric/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -1102,9 +1078,6 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
 
   packages/spa-router:
     devDependencies:
