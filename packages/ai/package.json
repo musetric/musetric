@@ -4,15 +4,33 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "dist/library/**",
+    "dist/**/*.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/musetric/musetric.git",
+    "directory": "packages/ai"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./package.json": "./package.json",
+    "./separation": {
+      "monorepo": "./src/separation/index.ts",
+      "types": "./dist/separation/index.d.ts",
+      "import": "./dist/library/separation.js",
+      "default": "./dist/library/separation.js"
+    },
     "./vite": {
       "monorepo": "./src/browserBundle.vite.ts",
       "default": "./src/browserBundle.vite.ts"
     }
   },
   "scripts": {
-    "build:project": "tsc --build",
+    "build:project": "tsc --build && vite build --config vite.library.config.ts",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
@@ -22,12 +40,7 @@
   },
   "peerDependencies": {
     "@huggingface/transformers": "catalog:",
-    "@musetric/cqt": "workspace:*",
-    "@musetric/fft": "workspace:*",
-    "@musetric/spectrogram": "workspace:*",
-    "@musetric/utils": "workspace:*",
-    "onnxruntime-web": "catalog:",
-    "zod": "catalog:"
+    "onnxruntime-web": "catalog:"
   },
   "devDependencies": {
     "@huggingface/transformers": "catalog:",

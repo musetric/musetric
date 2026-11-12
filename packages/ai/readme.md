@@ -59,6 +59,27 @@ WebGPU except the key, and the voice range from the pitch tracker of
   from the tokenizer to the word times. Its price is its cache layout, reaching
   into its internals for the pacer, and a pinned version.
 
+## The separation entry
+
+`@musetric/ai/separation` is what the site runs to separate a song in the
+visitor's browser, with the same code as the app
+([#1115](https://github.com/musetric/musetric/issues/1115)). It is published
+to npm as one bundle, `dist/library/separation.js`, that carries the code of
+`@musetric/fft` and `@musetric/utils`, so that only `@musetric/ai` is
+published. `onnxruntime-web` and `@huggingface/transformers`, which
+transcription runs on, stay peers at the versions of the catalog.
+
+- `separationSupported` says whether the browser has a WebGPU adapter with the
+  storage buffers the core needs, before anything is downloaded.
+- `separationModelFiles` gives the URL of each model file on Hugging Face at
+  the pinned revision, with its size and SHA-256. The caller downloads and
+  caches them, and `loadSeparationModel` checks them against the pin before
+  it builds the core, then releases their bytes.
+- `separateTrack` takes `separationTrack`, a source of the mixture at its
+  sample rate, and a commit that stores each unit's stems.
+- The caller points `onnxruntime-web` at its wasm, since the package does not
+  bundle it.
+
 ## Parity run
 
 ```sh

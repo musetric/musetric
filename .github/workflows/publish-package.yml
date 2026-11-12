@@ -11,6 +11,7 @@ on:
         options:
           - '@musetric/eslint-config'
           - '@musetric/checks'
+          - '@musetric/ai'
       mode:
         description: 'dev publishes with --tag dev (testing); release is a normal publish'
         type: choice

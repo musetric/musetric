@@ -7,6 +7,7 @@ const config: KnipConfig = {
     'packages/engine/src/engine.ts': ['exports'],
     'packages/api/src/routes/audio.ts': ['exports'],
     'packages/api/src/routes/preview.ts': ['exports'],
+    'packages/ai/src/separation/separationModel.ts': ['exports'],
   },
   ignoreBinaries: [
     'xcodegen',

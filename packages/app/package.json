@@ -30,12 +30,8 @@
   "devDependencies": {
     "@huggingface/transformers": "catalog:",
     "@musetric/ai": "workspace:*",
-    "@musetric/cqt": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
-    "@musetric/fft": "workspace:*",
     "@musetric/script": "workspace:*",
-    "@musetric/spectrogram": "workspace:*",
-    "@musetric/utils": "workspace:*",
     "@resvg/resvg-js": "catalog:",
     "@tauri-apps/cli": "catalog:",
     "@types/node": "catalog:",
