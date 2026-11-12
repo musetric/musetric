@@ -85,14 +85,6 @@ jobs:
             platform: macOS
             arch: arm64
             rustTarget: aarch64-apple-darwin
-          - os: ubuntu-22.04
-            platform: Linux
-            arch: x64
-            rustTarget: x86_64-unknown-linux-gnu
-          - os: ubuntu-22.04-arm
-            platform: Linux
-            arch: arm64
-            rustTarget: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
