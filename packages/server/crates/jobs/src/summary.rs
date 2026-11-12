@@ -151,9 +151,9 @@ fn step_index(step: ProcessingStep) -> usize {
     match step {
         ProcessingStep::Separation => 0,
         ProcessingStep::Transcription => 1,
-        ProcessingStep::Rhythm => 2,
-        ProcessingStep::Key => 3,
-        ProcessingStep::Chords => 4,
-        ProcessingStep::VoiceRange => 5,
+        ProcessingStep::VoiceRange => 2,
+        ProcessingStep::Rhythm => 3,
+        ProcessingStep::Key => 4,
+        ProcessingStep::Chords => 5,
     }
 }

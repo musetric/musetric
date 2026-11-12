@@ -6,8 +6,8 @@ export const stepTitles = (
 ): Record<api.project.ProcessingStepName, string> => ({
   separation: t('pages.project.progress.steps.separation'),
   transcription: t('pages.project.progress.steps.transcription'),
+  voiceRange: t('pages.project.progress.steps.voiceRange'),
   rhythm: t('pages.project.progress.steps.rhythm'),
   key: t('pages.project.progress.steps.key'),
   chords: t('pages.project.progress.steps.chords'),
-  voiceRange: t('pages.project.progress.steps.voiceRange'),
 });

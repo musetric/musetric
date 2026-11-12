@@ -138,6 +138,7 @@ mod tests {
                             unit_count: 12,
                         }),
                     ),
+                    create_step(StepStatus::Pending, None),
                     create_step(StepStatus::Processing, Some(StepPhase::Saving)),
                     create_step(
                         StepStatus::Processing,
@@ -151,7 +152,6 @@ mod tests {
                         attempt: 2,
                         limit: Some(5),
                     }),
-                    create_step(StepStatus::Pending, None),
                 ],
             },
         };
