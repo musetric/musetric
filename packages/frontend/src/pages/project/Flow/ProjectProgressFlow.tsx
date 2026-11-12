@@ -5,6 +5,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProcessingPause } from '../../processing/ProcessingPause.js';
 import { doneCount, stepOrder } from '../../processing/queue.js';
+import { stepTitles } from '../../processing/stepTitles.js';
 import { ProjectHomeButton } from '../buttons/ProjectHomeButton.js';
 import { ProjectLayout } from '../ProjectPageLayout.js';
 import { FlowPause } from './FlowPause.js';
@@ -68,42 +69,15 @@ export const ProjectProgressFlow: FC<ProjectProgressFlowProps> = (props) => {
             </Typography>
           </Stack>
           <Stack sx={{ gap: 3 }}>
-            <FlowStep
-              projectId={project.id}
-              stepName='separation'
-              title={t('pages.project.progress.steps.separation')}
-              step={project.processing.steps.separation}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='transcription'
-              title={t('pages.project.progress.steps.transcription')}
-              step={project.processing.steps.transcription}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='rhythm'
-              title={t('pages.project.progress.steps.rhythm')}
-              step={project.processing.steps.rhythm}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='key'
-              title={t('pages.project.progress.steps.key')}
-              step={project.processing.steps.key}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='chords'
-              title={t('pages.project.progress.steps.chords')}
-              step={project.processing.steps.chords}
-            />
-            <FlowStep
-              projectId={project.id}
-              stepName='voiceRange'
-              title={t('pages.project.progress.steps.voiceRange')}
-              step={project.processing.steps.voiceRange}
-            />
+            {stepOrder.map((stepName) => (
+              <FlowStep
+                key={stepName}
+                projectId={project.id}
+                stepName={stepName}
+                title={stepTitles(t)[stepName]}
+                step={project.processing.steps[stepName]}
+              />
+            ))}
           </Stack>
           <Stack direction='row' sx={{ gap: 2, alignItems: 'center' }}>
             <MemoryOutlinedIcon

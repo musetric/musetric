@@ -8,19 +8,19 @@ use crate::audio::MasterType;
 pub enum ProcessingStep {
     Separation,
     Transcription,
+    VoiceRange,
     Rhythm,
     Key,
     Chords,
-    VoiceRange,
 }
 
 pub const PROCESSING_STEPS: [ProcessingStep; 6] = [
     ProcessingStep::Separation,
     ProcessingStep::Transcription,
+    ProcessingStep::VoiceRange,
     ProcessingStep::Rhythm,
     ProcessingStep::Key,
     ProcessingStep::Chords,
-    ProcessingStep::VoiceRange,
 ];
 
 impl ProcessingStep {
@@ -29,10 +29,10 @@ impl ProcessingStep {
         match value {
             "separation" => Some(Self::Separation),
             "transcription" => Some(Self::Transcription),
+            "voiceRange" => Some(Self::VoiceRange),
             "rhythm" => Some(Self::Rhythm),
             "key" => Some(Self::Key),
             "chords" => Some(Self::Chords),
-            "voiceRange" => Some(Self::VoiceRange),
             _ => None,
         }
     }
@@ -42,10 +42,10 @@ impl ProcessingStep {
         match self {
             Self::Separation => "separation",
             Self::Transcription => "transcription",
+            Self::VoiceRange => "voiceRange",
             Self::Rhythm => "rhythm",
             Self::Key => "key",
             Self::Chords => "chords",
-            Self::VoiceRange => "voiceRange",
         }
     }
 
