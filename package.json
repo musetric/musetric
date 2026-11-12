@@ -17,7 +17,7 @@
     "project:start": "pnpm -r --parallel --if-present run project:start",
     "check:deps:security": "pnpm audit --audit-level high",
     "check:deps:security:rust": "osv-scanner scan source --lockfile packages/server/Cargo.lock",
-    "check:deps:dupe": "node packages/checks/scripts/checkDeps.ts && pnpm dedupe --check",
+    "check:deps:dupe": "node packages/checks/src/deps.ts && pnpm dedupe --check",
     "fix:deps:dupe": "pnpm install && pnpm dedupe",
     "check:dupe": "jscpd packages --config .jscpd.json",
     "check:editorconfig": "editorconfig-checker",
@@ -42,6 +42,12 @@
     "prettier": "catalog:"
   },
   "checks": {
+    "deps": {
+      "except": [
+        "packages/checks/package.json",
+        "packages/eslint-config/package.json"
+      ]
+    },
     "english": {
       "except": [
         "packages/ai/src/transcription/hallucinationFilter.ts",

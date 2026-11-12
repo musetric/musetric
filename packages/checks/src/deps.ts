@@ -1,6 +1,7 @@
+#!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, matchesGlob } from 'node:path';
 
 const dependencyFields = [
   'dependencies',
@@ -128,22 +129,46 @@ const checkRanges = (
     ),
   );
 
-const dependencyOwners = new Set([
-  '@musetric/eslint-config',
-  '@musetric/checks',
-]);
+const readDependencyOwners = (): string[] => {
+  const rawPackage: unknown = JSON.parse(readFileSync('package.json', 'utf8'));
+  const rawDeps: unknown =
+    typeof rawPackage === 'object' &&
+    rawPackage &&
+    'checks' in rawPackage &&
+    typeof rawPackage.checks === 'object' &&
+    rawPackage.checks &&
+    'deps' in rawPackage.checks
+      ? rawPackage.checks.deps
+      : undefined;
+  if (rawDeps === undefined) {
+    return [];
+  }
+  const rawExcept: unknown =
+    typeof rawDeps === 'object' && rawDeps && 'except' in rawDeps
+      ? rawDeps.except
+      : undefined;
+  const globs: unknown[] = Array.isArray(rawExcept) ? rawExcept : [];
+  const owners = globs.filter((glob) => typeof glob === 'string');
+  if (!Array.isArray(rawExcept) || owners.length !== globs.length) {
+    throw new Error('package.json: checks.deps must be { "except": [glob] }');
+  }
+  return owners;
+};
 
-const checkDependencyOwners = (manifests: Manifest[]): Finding[] =>
+const checkDependencyOwners = (
+  manifests: Manifest[],
+  owners: string[],
+): Finding[] =>
   manifests
     .filter(
       (manifest) =>
         rangesOf(manifest, 'dependencies').size > 0 &&
-        !dependencyOwners.has(manifest.name),
+        !owners.some((glob) => matchesGlob(manifest.file, glob)),
     )
     .map((manifest) => ({
       file: manifest.file,
       line: fieldLine(manifest, 'dependencies'),
-      message: `${manifest.name} has dependencies, which only ${[...dependencyOwners].join(' and ')} ship`,
+      message: `${manifest.name} lists dependencies`,
     }));
 
 const checkPeersOf = (
@@ -241,10 +266,14 @@ const workspaces = new Map(
 );
 
 const findings = [
-  ...checkRanges(manifests, workspaces),
-  ...checkDependencyOwners(manifests),
-  ...checkWorkspacePeers(manifests, workspaces),
-  ...checkOverrides(),
+  ...checkDependencyOwners(manifests, readDependencyOwners()),
+  ...(existsSync(workspaceFile)
+    ? [
+        ...checkRanges(manifests, workspaces),
+        ...checkWorkspacePeers(manifests, workspaces),
+        ...checkOverrides(),
+      ]
+    : []),
 ];
 
 for (const finding of findings) {
@@ -253,6 +282,6 @@ for (const finding of findings) {
 console.log(
   findings.length === 0
     ? 'deps: ok'
-    : `deps: ${findings.length} found. Take a version from the catalog with catalog: in every dependency, peer and override, and a workspace package with workspace:*. Only ${[...dependencyOwners].join(' and ')} ship dependencies; another package lists peerDependencies and devDependencies, and lists the peers of the workspace packages it depends on.`,
+    : `deps: ${findings.length} found. A package takes what it needs as peerDependencies and devDependencies; only a package.json listed in checks.deps.except of the root package.json ships dependencies. In a pnpm workspace, every dependency, peer and override takes catalog: for an external package and workspace:* for a workspace one, and a package lists the peers of the workspace packages it depends on.`,
 );
 process.exitCode = findings.length === 0 ? 0 : 1;

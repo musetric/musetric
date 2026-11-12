@@ -23,7 +23,7 @@
 - `packages/utils`: low-level shared utilities used across packages.
 - `packages/spa-router`: shared SPA routing utilities.
 - `packages/eslint-config`: the repository ESLint rules.
-- `packages/checks`: repository checks published to npm for the other repositories of the organization: English letters only, the paths of the notices, and markdown links.
+- `packages/checks`: repository checks published to npm for the other repositories of the organization: English letters only, the paths of the notices, markdown links, comments, and the dependencies of `package.json`.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
 - `packages/measure`: measurements of recording on a real device (timing, delay, sound) over the Chrome DevTools protocol.
 - `packages/script`: build tooling shared by the packages, such as the favicons plugin.
@@ -95,7 +95,7 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `pnpm fix:format`: apply repository formatting.
 - `pnpm check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
 - `pnpm test`: the tests of every package.
-- `pnpm check:deps:dupe` and `pnpm check:deps:security`, when dependencies changed: `catalog:` for every external version, `dependencies` only in `@musetric/eslint-config` and `@musetric/checks`, and the peers of the workspace packages, which `packages/checks/scripts/checkDeps.ts` checks, duplicate versions in the lockfile, which `pnpm fix:deps:dupe` fixes, and advisories of high severity.
+- `pnpm check:deps:dupe` and `pnpm check:deps:security`, when dependencies changed: `catalog:` for every external version, `dependencies` only in the packages that `checks.deps.except` of the root `package.json` lists, and the peers of the workspace packages, which `musetric-deps` of `@musetric/checks` checks, duplicate versions in the lockfile, which `pnpm fix:deps:dupe` fixes, and advisories of high severity.
 - `pnpm check:deps:security:rust`: every advisory against `packages/server/Cargo.lock` in the OSV database, which holds those of GitHub and RustSec, through the global osv-scanner binary at the version `.github/actions/baseQuality` pins. CI runs it on every pull request, since a new advisory needs no change of ours; one that no release can fix yet goes to `packages/server/osv-scanner.toml` with its reason.
 - `pnpm check:english`, `pnpm check:notices` and `pnpm check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
 - `pnpm check:comments`: comments and docstrings in any language, beyond tool directives and `@see`, `@todo` and `@fixme`; third-party code goes to `checks.comments.except` of the root `package.json`.

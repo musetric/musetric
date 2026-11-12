@@ -17,7 +17,6 @@ const config: KnipConfig = {
     'editorconfig-checker',
     'osv-scanner',
   ],
-  ignoreUnresolved: ['vite/client'],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: [
     '**/i18next.config.ts',
@@ -38,7 +37,6 @@ const config: KnipConfig = {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],
     },
     'packages/checks': {
-      entry: ['scripts/**/*.ts'],
       ignoreDependencies: ['@ast-grep/cli'],
     },
     'packages/cqt': {

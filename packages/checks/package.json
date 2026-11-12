@@ -1,6 +1,6 @@
 {
   "name": "@musetric/checks",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Repository checks shared by the Musetric repositories.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,8 @@
     "directory": "packages/checks"
   },
   "bin": {
-    "musetric-checks": "./dist/cli.js"
+    "musetric-checks": "./dist/cli.js",
+    "musetric-deps": "./dist/deps.js"
   },
   "publishConfig": {
     "access": "public"
