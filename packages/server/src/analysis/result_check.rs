@@ -286,9 +286,16 @@ fn check_span(name: &str, start: f64, end: f64, limit: f64) -> Result<(), String
 }
 
 fn check_time(name: &str, time: f64, limit: f64) -> Result<(), String> {
-    if (0.0..=limit).contains(&time) {
+    if (0.0..=millisecond_ceiling(limit)).contains(&time) {
         Ok(())
     } else {
         Err(format!("the {name} time {time} s is outside the audio"))
     }
 }
+
+fn millisecond_ceiling(seconds: f64) -> f64 {
+    (seconds * 1000.0).ceil() / 1000.0
+}
+
+#[cfg(test)]
+mod tests;
