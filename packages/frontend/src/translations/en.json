@@ -1,4 +1,7 @@
 {
+  "app.receivedSong.add": "Add",
+  "app.receivedSong.close": "Close",
+  "app.receivedSong.message": "A song was shared with Musetric",
   "common.queryView.error": "Unexpected error",
   "common.units.bytes.b": "B",
   "common.units.bytes.gb": "GB",
