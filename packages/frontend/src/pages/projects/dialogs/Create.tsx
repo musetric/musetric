@@ -13,11 +13,18 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type TFunction } from 'i18next';
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState, useSyncExternalStore } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { endpoints } from '../../../api/index.js';
+import {
+  dismissReceivedSong,
+  isReceivedSongApplying,
+  subscribeReceivedSongApplying,
+  subscribeReceivedSongs,
+  takeReceivedSong,
+} from '../../../app/receivedSong.js';
 import { routes } from '../../../app/router/routes.js';
 import { stripExt } from '../../../common/stripExt.js';
 import { SongPlayer } from '../common/SongPlayer.js';
@@ -51,9 +58,16 @@ export const CreateDialog: FC = () => {
   const models = useQuery(endpoints.models.download());
   const missingBytes = models.data?.missingBytes ?? 0;
   const [coverOpen, setCoverOpen] = useState(false);
+  const [shareVersion, setShareVersion] = useState(0);
+  const receiving = useSyncExternalStore(
+    subscribeReceivedSongApplying,
+    isReceivedSongApplying,
+  );
 
   const {
     setValue,
+    setError,
+    clearErrors,
     control,
     handleSubmit,
     formState: { errors },
@@ -61,7 +75,10 @@ export const CreateDialog: FC = () => {
     resolver: zodResolver(schema(t)),
   });
 
-  const close = () => routes.home.navigate();
+  const close = () => {
+    dismissReceivedSong();
+    routes.home.navigate();
+  };
   const onSubmit = (value: SubmitValue) => {
     create.mutate(
       {
@@ -86,6 +103,50 @@ export const CreateDialog: FC = () => {
     name: 'name',
   });
 
+  useEffect(
+    () =>
+      subscribeReceivedSongs(() => {
+        setShareVersion((version) => version + 1);
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    if (create.isPending) return undefined;
+    const controller = new AbortController();
+    const taken = takeReceivedSong(controller.signal);
+    if (!taken) return undefined;
+    void taken.received.then((received) => {
+      if (controller.signal.aborted) return;
+      if ('failed' in received) {
+        setError('song', {
+          type: 'received',
+          message: t('pages.projects.dialogs.create.failed'),
+        });
+      } else {
+        clearErrors('song');
+        setValue('song', {
+          file: received.file,
+          url: URL.createObjectURL(received.file),
+        });
+        setValue('name', stripExt(received.file.name));
+      }
+      taken.release();
+    });
+    return () => {
+      controller.abort();
+      taken.giveBack();
+    };
+  }, [shareVersion, create.isPending, setValue, setError, clearErrors, t]);
+
+  useEffect(() => {
+    if (!song) return undefined;
+    const { url } = song;
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [song]);
+
   return (
     <Dialog
       open
@@ -98,6 +159,9 @@ export const CreateDialog: FC = () => {
       <DialogTitle>{t('pages.projects.dialogs.create.title')}</DialogTitle>
       <DialogContent>
         <Stack sx={{ gap: 4, pt: 1 }}>
+          {errors.song?.type === 'received' && (
+            <Alert severity='error'>{errors.song.message}</Alert>
+          )}
           {!song && (
             <Controller
               name='song'
@@ -108,10 +172,11 @@ export const CreateDialog: FC = () => {
                   <SongField
                     value={field.value}
                     setValue={(newSong) => {
+                      clearErrors('song');
                       field.onChange(newSong);
                       setValue('name', stripExt(newSong.file.name));
                     }}
-                    disabled={create.isPending}
+                    disabled={create.isPending || receiving}
                   />
                 );
               }}
@@ -134,7 +199,7 @@ export const CreateDialog: FC = () => {
                   );
                 }}
               />
-              <SongPlayer url={song.url} />
+              <SongPlayer key={song.url} url={song.url} />
               {coverOpen ? (
                 <Controller
                   name='preview'
@@ -198,7 +263,7 @@ export const CreateDialog: FC = () => {
           color='primary'
           variant='contained'
           disabled={!song || create.isPending}
-          loading={create.isPending}
+          loading={create.isPending || receiving}
         >
           {t('pages.projects.dialogs.create.create')}
         </Button>

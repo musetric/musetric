@@ -1,5 +1,6 @@
 package com.musetric.client
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -10,6 +11,7 @@ import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
   private var mainWebView: WebView? = null
+  private val receivedSongs by lazy { ReceivedSongs(this) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     if (!BuildConfig.PUBLISHED) {
@@ -17,7 +19,18 @@ class MainActivity : TauriActivity() {
     }
     installSplashScreen()
     super.onCreate(savedInstanceState)
+    receivedSongs.start(intent, savedInstanceState)
     enableEdgeToEdge()
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    receivedSongs.receive(intent)
+  }
+
+  override fun onSaveInstanceState(outState: Bundle) {
+    super.onSaveInstanceState(outState)
+    receivedSongs.save(outState)
   }
 
   override fun onDestroy() {
@@ -38,6 +51,7 @@ class MainActivity : TauriActivity() {
     attachHaptics(webView)
     attachSystemBack(this, webView)
     attachSystemGestures(webView)
+    receivedSongs.attach(webView)
   }
 
   private fun applyWebViewInsets(webView: WebView) {
