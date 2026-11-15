@@ -5,7 +5,7 @@ const skipPlaywrightInstall =
 
 if (process.platform !== 'linux' && !skipPlaywrightInstall) {
   console.log('Installing Playwright browsers...');
-  execSync('npx playwright install', { stdio: 'inherit' });
+  execSync('pnpm exec playwright install', { stdio: 'inherit' });
 } else if (skipPlaywrightInstall) {
   console.log('Skipping Playwright install.');
 } else {

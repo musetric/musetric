@@ -4,6 +4,9 @@ savePrefix: ''
 nodeOptions: '--disable-warning=ExperimentalWarning --conditions=monorepo'
 autoInstallPeers: false
 strictPeerDependencies: true
+verifyDepsBeforeRun: install
+catalogMode: strict
+cleanupUnusedCatalogs: true
 allowBuilds:
   '@ast-grep/cli': true
   '@swc/core': true
