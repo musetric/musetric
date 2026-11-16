@@ -75,8 +75,14 @@ export const subscribeMediaSession = (
     });
   };
 
+  const publishPosition = () => {
+    if (!engine.store.get().frozen) {
+      publish();
+    }
+  };
+
   const follow = () => {
-    if (!published) {
+    if (!published || engine.store.get().frozen) {
       return;
     }
     const expected =
@@ -119,7 +125,8 @@ export const subscribeMediaSession = (
     engine.store.subscribe((state) => state.playing, publish),
     engine.store.subscribe((state) => state.recording, publish),
     engine.store.subscribe((state) => state.tempoRatio, publish),
-    engine.store.subscribe((state) => state.seekEvent, publish),
+    engine.store.subscribe((state) => state.seekEvent, publishPosition),
+    engine.store.subscribe((state) => state.frozen, publishPosition),
     engine.store.subscribe((state) => state.frameIndex, follow),
   ];
 

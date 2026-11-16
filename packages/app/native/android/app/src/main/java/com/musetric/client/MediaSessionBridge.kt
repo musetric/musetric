@@ -49,6 +49,7 @@ internal class MediaSessionBridge(
   private val webView: WebView,
 ) {
   private var session: MediaSession? = null
+  private var shown: MediaState? = null
   private var serviceStarted = false
   private val audioManager = activity.getSystemService(AudioManager::class.java)
   private val audioFocus =
@@ -98,6 +99,7 @@ internal class MediaSessionBridge(
   fun release() {
     val current = session ?: return
     session = null
+    shown = null
     current.isActive = false
     current.release()
     audioManager.abandonAudioFocusRequest(audioFocus)
@@ -117,15 +119,25 @@ internal class MediaSessionBridge(
   }
 
   private fun apply(state: MediaState) {
-    followAudioFocus(state.playing)
+    val previous = shown
+    shown = state
+    if (previous == null || state.playing != previous.playing) {
+      followAudioFocus(state.playing)
+    }
     val current = session ?: createSession()
-    current.setMetadata(
-      MediaMetadata.Builder()
-        .putString(MediaMetadata.METADATA_KEY_TITLE, state.title)
-        .putString(MediaMetadata.METADATA_KEY_ARTIST, activity.getString(R.string.app_name))
-        .putLong(MediaMetadata.METADATA_KEY_DURATION, state.durationMs)
-        .build(),
-    )
+    if (
+      previous == null ||
+        state.title != previous.title ||
+        state.durationMs != previous.durationMs
+    ) {
+      current.setMetadata(
+        MediaMetadata.Builder()
+          .putString(MediaMetadata.METADATA_KEY_TITLE, state.title)
+          .putString(MediaMetadata.METADATA_KEY_ARTIST, activity.getString(R.string.app_name))
+          .putLong(MediaMetadata.METADATA_KEY_DURATION, state.durationMs)
+          .build(),
+      )
+    }
     current.setPlaybackState(
       PlaybackState.Builder()
         .setActions(SESSION_ACTIONS)
@@ -138,6 +150,9 @@ internal class MediaSessionBridge(
         .build(),
     )
     current.isActive = true
+    if (previous != null && state.title == previous.title && state.playing == previous.playing) {
+      return
+    }
     val notification = buildNotification(current, state)
     if (serviceStarted) {
       activity.getSystemService(NotificationManager::class.java)
