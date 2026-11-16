@@ -149,6 +149,7 @@ export type SpectrogramProcessor = {
 export type CreateSpectrogramProcessorOptions = {
   device: GPUDevice;
   config?: Partial<SpectrogramConfig>;
+  framesInFlight?: number;
 
   onMetrics?: (metrics: SpectrogramProcessorMetrics) => void;
 };
@@ -156,7 +157,7 @@ export type CreateSpectrogramProcessorOptions = {
 export const createSpectrogramProcessor = (
   options: CreateSpectrogramProcessorOptions,
 ): SpectrogramProcessor => {
-  const { device, config, onMetrics } = options;
+  const { device, config, onMetrics, framesInFlight = 0 } = options;
 
   const timer = createSpectrogramProcessorTimer(device, onMetrics);
   const computeMarkers = createComputeMarkers(timer.markers.getGpuMarker);
@@ -169,10 +170,14 @@ export const createSpectrogramProcessor = (
     encodeRenderCommand(device, timer, computeMarkers),
   );
 
+  const submittedWork: Promise<undefined>[] = [];
   const submitCommand = timer.markers.submitCommand(
     async (command: GPUCommandBuffer) => {
       device.queue.submit([command]);
-      await device.queue.onSubmittedWorkDone();
+      submittedWork.push(device.queue.onSubmittedWorkDone());
+      while (submittedWork.length > framesInFlight) {
+        await submittedWork.shift();
+      }
     },
   );
 
