@@ -1,5 +1,6 @@
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { AppPage } from '../../app/AppPage.js';
+import { receivedSong } from '../../app/receivedSong.js';
 import { routes } from '../../app/router/routes.js';
 import { ProjectsContent } from './Content.js';
 import { CreateDialog } from './dialogs/Create.js';
@@ -10,6 +11,10 @@ import { ProjectsTitle } from './Title.js';
 
 export const ProjectsPage: FC = () => {
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    receivedSong.present();
+  }, []);
 
   return (
     <ProjectsDropZone>

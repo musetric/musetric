@@ -1,4 +1,8 @@
 {
+  "app.receivedSong.add": "Add",
+  "app.receivedSong.close": "Close",
+  "app.receivedSong.failed": "Could not open the shared file",
+  "app.receivedSong.message": "{{name}} was shared with Musetric",
   "common.queryView.error": "Unexpected error",
   "common.units.bytes.b": "B",
   "common.units.bytes.gb": "GB",

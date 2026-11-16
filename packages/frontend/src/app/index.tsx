@@ -4,6 +4,7 @@ import i18next from 'i18next';
 import { type FC } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { queryClient } from '../api/queryClient.js';
+import { ReceivedSongNotice } from './ReceivedSongNotice.js';
 import { AppRouter } from './router/AppRouter.js';
 import { appTheme } from './theme/index.js';
 
@@ -13,6 +14,7 @@ export const App: FC = () => (
       <ThemeProvider theme={appTheme}>
         <CssBaseline />
         <AppRouter />
+        <ReceivedSongNotice />
       </ThemeProvider>
     </QueryClientProvider>
   </I18nextProvider>
