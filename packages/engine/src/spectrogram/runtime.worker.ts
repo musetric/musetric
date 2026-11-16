@@ -49,6 +49,7 @@ export const createSpectrogramRuntime = async (
   const createProcessor = () =>
     createSpectrogramProcessor({
       device,
+      framesInFlight: 2,
       onMetrics: profiling
         ? (metrics) => {
             metricsBuffer.push(metrics);
