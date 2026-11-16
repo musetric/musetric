@@ -5,48 +5,51 @@ import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.OpenableColumns
-import android.util.Base64
-import android.webkit.JavascriptInterface
+import android.util.Log
 import android.webkit.WebView
 import androidx.core.content.IntentCompat
 import androidx.core.os.BundleCompat
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.util.UUID
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 import org.json.JSONObject
 
 private const val RECEIVED_BRIDGE_NAME = "MusetricReceivedSong"
-private const val RECEIVED_EVENT_SCRIPT =
-  "window.dispatchEvent(new Event('musetric:received-song'))"
 private const val RECEIVED_AREA = "received"
+private const val LOG_TAG = "MusetricReceivedSong"
 private const val SOURCE_URI_STATE = "musetric.receivedSong.uri"
 private const val SOURCE_TYPE_STATE = "musetric.receivedSong.type"
 private const val SIZE_LIMIT = 200L * 1024 * 1024
-private const val COPY_LIMIT = 2
 private const val BUFFER_BYTES = 8 * 1024
+private const val CHUNK_BYTES = 1024 * 1024
+private const val GONE_MESSAGE = """{"type":"gone"}"""
 
-private class Source(val uri: Uri?, val type: String?)
+private val chunkReader = Executors.newSingleThreadExecutor()
 
-private sealed interface Received {
-  class Song(val id: String, val name: String, val type: String, val file: File) : Received
+private class Copied(val file: File, val name: String, val type: String, val size: Long)
 
-  object Failed : Received
+private class Share(val id: String, val uri: Uri?, val type: String?) {
+  var input: InputStream? = null
+  var copied: Copied? = null
+  var failed = false
 }
 
-private class Taken(val received: Received, val generation: Long)
-
-internal class ReceivedSongs(private val activity: Activity) {
+internal class ReceivedSongs(private val activity: Activity) : WebViewCompat.WebMessageListener {
   private val area = File(activity.cacheDir, RECEIVED_AREA)
-  private var generation = 0L
-  private var source: Source? = null
-  private var pending: Received? = null
-  private var copies = 0
-  private var active: InputStream? = null
-  private val taken = mutableMapOf<String, Taken>()
-  private var webView: WebView? = null
+  private val mainHandler = Handler(Looper.getMainLooper())
+  private var share: Share? = null
+  private var page: JavaScriptReplyProxy? = null
 
   init {
     area.deleteRecursively()
@@ -54,7 +57,8 @@ internal class ReceivedSongs(private val activity: Activity) {
 
   fun start(intent: Intent, state: Bundle?) {
     if (state != null) {
-      restore(state)
+      val uri = BundleCompat.getParcelable(state, SOURCE_URI_STATE, Uri::class.java) ?: return
+      accept(uri, state.getString(SOURCE_TYPE_STATE))
       return
     }
     if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
@@ -64,108 +68,113 @@ internal class ReceivedSongs(private val activity: Activity) {
   }
 
   fun receive(intent: Intent) {
-    val next =
+    val uri =
       when (intent.action) {
         Intent.ACTION_SEND ->
-          Source(
-            IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java),
-            intent.type,
-          )
-        Intent.ACTION_VIEW -> Source(intent.data, intent.type)
+          IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+        Intent.ACTION_VIEW -> intent.data
         else -> return
       }
-    accept(next)
+    accept(uri, intent.type)
   }
 
   fun save(outState: Bundle) {
-    synchronized(this) {
-      val uri = source?.uri ?: return
-      outState.putParcelable(SOURCE_URI_STATE, uri)
-      outState.putString(SOURCE_TYPE_STATE, source?.type)
+    val current = synchronized(this) { share } ?: return
+    val uri = current.uri ?: return
+    outState.putParcelable(SOURCE_URI_STATE, uri)
+    outState.putString(SOURCE_TYPE_STATE, current.type)
+  }
+
+  fun attach(webView: WebView) {
+    val supported =
+      WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
+        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER)
+    if (supported) {
+      WebViewCompat.addWebMessageListener(webView, RECEIVED_BRIDGE_NAME, setOf("*"), this)
     }
   }
 
-  fun attach(view: WebView) {
-    synchronized(this) { webView = view }
-    view.addJavascriptInterface(Bridge(), RECEIVED_BRIDGE_NAME)
-  }
-
-  private fun restore(state: Bundle) {
-    val uri = BundleCompat.getParcelable(state, SOURCE_URI_STATE, Uri::class.java) ?: return
-    accept(Source(uri, state.getString(SOURCE_TYPE_STATE)))
-  }
-
-  private fun accept(next: Source) {
-    val current =
-      synchronized(this) {
-        supersede()
-        source = next
-        if (copies >= COPY_LIMIT) {
-          pending = Received.Failed
-          null
-        } else {
-          copies += 1
-          generation
-        }
-      }
-    if (current == null) {
-      notifyPage()
+  override fun onPostMessage(
+    view: WebView,
+    message: WebMessageCompat,
+    sourceOrigin: Uri,
+    isMainFrame: Boolean,
+    replyProxy: JavaScriptReplyProxy,
+  ) {
+    val data = message.data
+    if (!isMainFrame || message.type != WebMessageCompat.TYPE_STRING || data == null) {
       return
     }
-    thread(name = "received-song") { complete(current, copy(current, next)) }
+    val command = JSONObject(data)
+    when (command.getString("type")) {
+      "subscribe" -> {
+        page = replyProxy
+        replyProxy.postMessage(describe())
+      }
+      "read" -> read(replyProxy, command.getString("id"), command.getLong("offset"))
+      "finish" -> finish(command.getString("id"))
+    }
   }
 
-  private fun copy(current: Long, from: Source): Received {
-    val uri = from.uri ?: return Received.Failed
-    if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
-      return Received.Failed
+  private fun accept(uri: Uri?, type: String?) {
+    val next = Share(UUID.randomUUID().toString(), uri, type)
+    synchronized(this) {
+      share?.let(::discard)
+      share = next
     }
-    val resolver = activity.contentResolver
-    var file: File? = null
-    var input: InputStream? = null
-    try {
-      val name = displayName(uri) ?: uri.lastPathSegment ?: return Received.Failed
-      val type = resolver.getType(uri) ?: from.type ?: ""
-      val opened = resolver.openInputStream(uri) ?: return Received.Failed
-      input = opened
-      synchronized(this) {
-        if (current != generation) {
-          return Received.Failed
-        }
-        active = opened
-      }
-      val id = UUID.randomUUID().toString()
-      area.mkdirs()
-      val target = File(area, id)
-      file = target
-      var size = 0L
-      target.outputStream().use { output ->
-        val buffer = ByteArray(BUFFER_BYTES)
-        while (true) {
-          val count = opened.read(buffer)
-          if (count < 0) {
-            break
+    publish()
+    thread(name = "received-song") { complete(next, copy(next)) }
+  }
+
+  private fun copy(next: Share): Copied? {
+    val uri = next.uri ?: return null
+    if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
+      Log.w(LOG_TAG, "Refused a shared song that is not a content uri")
+      return null
+    }
+    val target = File(area, next.id)
+    return try {
+      val resolver = activity.contentResolver
+      val name = displayName(uri) ?: uri.lastPathSegment ?: return null
+      val type = resolver.getType(uri) ?: next.type ?: ""
+      val input = resolver.openInputStream(uri) ?: return null
+      input.use {
+        synchronized(this) {
+          if (share !== next) {
+            return null
           }
-          size += count
-          if (size > SIZE_LIMIT) {
-            target.delete()
-            return Received.Failed
-          }
-          output.write(buffer, 0, count)
+          next.input = input
+        }
+        area.mkdirs()
+        val size = target.outputStream().use { output -> transfer(input, output) }
+        if (size == null) {
+          Log.w(LOG_TAG, "Refused a shared song larger than the upload limit")
+          target.delete()
+          null
+        } else {
+          Copied(target, name, type, size)
         }
       }
-      file = null
-      return Received.Song(id, name, type, target)
-    } catch (_: Exception) {
-      return Received.Failed
-    } finally {
-      file?.delete()
-      closeQuietly(input)
-      synchronized(this) {
-        if (active === input) {
-          active = null
-        }
+    } catch (error: Exception) {
+      Log.w(LOG_TAG, "Could not copy a shared song", error)
+      target.delete()
+      null
+    }
+  }
+
+  private fun transfer(input: InputStream, output: OutputStream): Long? {
+    val buffer = ByteArray(BUFFER_BYTES)
+    var size = 0L
+    while (true) {
+      val count = input.read(buffer)
+      if (count < 0) {
+        return size
       }
+      size += count
+      if (size > SIZE_LIMIT) {
+        return null
+      }
+      output.write(buffer, 0, count)
     }
   }
 
@@ -180,122 +189,81 @@ internal class ReceivedSongs(private val activity: Activity) {
         if (column < 0) null else cursor.getString(column)
       }
 
-  private fun complete(current: Long, result: Received) {
+  private fun complete(next: Share, copied: Copied?) {
     synchronized(this) {
-      copies -= 1
-      if (current != generation) {
-        discard(result)
+      if (share !== next) {
+        copied?.file?.delete()
         return
       }
-      pending = result
+      next.input = null
+      next.copied = copied
+      next.failed = copied == null
     }
-    notifyPage()
+    publish()
   }
 
-  private fun notifyPage() {
-    activity.runOnUiThread {
-      val view = synchronized(this) { webView } ?: return@runOnUiThread
-      view.evaluateJavascript(RECEIVED_EVENT_SCRIPT, null)
-    }
-  }
-
-  private fun supersede() {
-    generation += 1
-    discard(pending)
-    pending = null
-    closeQuietly(active)
-    active = null
-  }
-
-  private fun discard(received: Received?) {
-    if (received is Received.Song) {
-      received.file.delete()
-    }
-  }
-
-  private fun closeQuietly(stream: InputStream?) {
+  private fun discard(old: Share) {
     try {
-      stream?.close()
+      old.input?.close()
     } catch (_: Exception) {}
+    old.copied?.file?.delete()
   }
 
-  private inner class Bridge {
-    @JavascriptInterface
-    fun waiting(): Boolean =
-      synchronized(this@ReceivedSongs) {
-        pending != null || (source != null && taken.values.none { it.generation == generation })
-      }
-
-    @JavascriptInterface
-    fun applying(): Boolean = synchronized(this@ReceivedSongs) { taken.isNotEmpty() }
-
-    @JavascriptInterface
-    fun take(): String? =
-      synchronized(this@ReceivedSongs) {
-        val result = pending ?: return null
-        pending = null
-        when (result) {
-          is Received.Song -> {
-            taken[result.id] = Taken(result, generation)
-            JSONObject()
-              .put("id", result.id)
-              .put("name", result.name)
-              .put("type", result.type)
-              .put("size", result.file.length())
-              .toString()
-          }
-          Received.Failed -> {
-            val id = UUID.randomUUID().toString()
-            taken[id] = Taken(result, generation)
-            JSONObject().put("id", id).put("failed", true).toString()
-          }
+  private fun describe(): String {
+    val described =
+      synchronized(this) {
+        val current = share ?: return@synchronized JSONObject.NULL
+        val copied = current.copied
+        val song = JSONObject().put("id", current.id)
+        when {
+          copied != null ->
+            song
+              .put("status", "ready")
+              .put("name", copied.name)
+              .put("type", copied.type)
+              .put("size", copied.size)
+          current.failed -> song.put("status", "failed")
+          else -> song.put("status", "copying")
         }
       }
+    return JSONObject().put("type", "share").put("share", described).toString()
+  }
 
-    @JavascriptInterface
-    fun read(id: String, offset: Long, length: Int): String? {
-      val song = synchronized(this@ReceivedSongs) { taken[id]?.received } as? Received.Song
-      val file = song?.file ?: return null
+  private fun publish() {
+    mainHandler.post { page?.postMessage(describe()) }
+  }
+
+  private fun read(proxy: JavaScriptReplyProxy, id: String, offset: Long) {
+    chunkReader.execute {
+      val chunk = readChunk(id, offset)
+      mainHandler.post {
+        if (chunk == null) proxy.postMessage(GONE_MESSAGE) else proxy.postMessage(chunk)
+      }
+    }
+  }
+
+  private fun readChunk(id: String, offset: Long): ByteArray? {
+    val file = synchronized(this) { share?.takeIf { it.id == id }?.copied?.file } ?: return null
+    return try {
       RandomAccessFile(file, "r").use { access ->
+        val length = (access.length() - offset).coerceIn(0L, CHUNK_BYTES.toLong()).toInt()
+        val chunk = ByteArray(length)
         access.seek(offset)
-        val bytes = ByteArray(length)
-        val count = access.read(bytes)
-        if (count < 0) {
-          return ""
-        }
-        return Base64.encodeToString(bytes, 0, count, Base64.NO_WRAP)
+        access.readFully(chunk)
+        chunk
       }
+    } catch (error: Exception) {
+      Log.w(LOG_TAG, "Could not read a shared song", error)
+      null
     }
+  }
 
-    @JavascriptInterface
-    fun dismiss() {
-      synchronized(this@ReceivedSongs) {
-        supersede()
-        source = null
-      }
+  private fun finish(id: String) {
+    synchronized(this) {
+      val current = share?.takeIf { it.id == id } ?: return
+      discard(current)
+      share = null
     }
-
-    @JavascriptInterface
-    fun giveBack(id: String) {
-      synchronized(this@ReceivedSongs) {
-        val entry = taken.remove(id) ?: return
-        if (entry.generation == generation) {
-          pending = entry.received
-        } else {
-          discard(entry.received)
-        }
-      }
-    }
-
-    @JavascriptInterface
-    fun release(id: String) {
-      synchronized(this@ReceivedSongs) {
-        val entry = taken.remove(id) ?: return
-        discard(entry.received)
-        if (entry.generation == generation) {
-          source = null
-        }
-      }
-    }
+    publish()
   }
 }

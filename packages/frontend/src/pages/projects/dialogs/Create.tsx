@@ -13,18 +13,12 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type TFunction } from 'i18next';
-import { type FC, useEffect, useState, useSyncExternalStore } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { endpoints } from '../../../api/index.js';
-import {
-  dismissReceivedSong,
-  isReceivedSongApplying,
-  subscribeReceivedSongApplying,
-  subscribeReceivedSongs,
-  takeReceivedSong,
-} from '../../../app/receivedSong.js';
+import { receivedSong, useReceivedSong } from '../../../app/receivedSong.js';
 import { routes } from '../../../app/router/routes.js';
 import { stripExt } from '../../../common/stripExt.js';
 import { SongPlayer } from '../common/SongPlayer.js';
@@ -58,11 +52,10 @@ export const CreateDialog: FC = () => {
   const models = useQuery(endpoints.models.download());
   const missingBytes = models.data?.missingBytes ?? 0;
   const [coverOpen, setCoverOpen] = useState(false);
-  const [shareVersion, setShareVersion] = useState(0);
-  const receiving = useSyncExternalStore(
-    subscribeReceivedSongApplying,
-    isReceivedSongApplying,
-  );
+  const creating = create.isPending;
+  const resetCreate = create.reset;
+  const received = useReceivedSong();
+  const receiving = received !== undefined && received.status !== 'failed';
 
   const {
     setValue,
@@ -76,7 +69,7 @@ export const CreateDialog: FC = () => {
   });
 
   const close = () => {
-    dismissReceivedSong();
+    if (received) receivedSong.finish(received.id);
     routes.home.navigate();
   };
   const onSubmit = (value: SubmitValue) => {
@@ -103,41 +96,39 @@ export const CreateDialog: FC = () => {
     name: 'name',
   });
 
-  useEffect(
-    () =>
-      subscribeReceivedSongs(() => {
-        setShareVersion((version) => version + 1);
-      }),
-    [],
-  );
-
   useEffect(() => {
-    if (create.isPending) return undefined;
+    if (!received || received.status === 'copying' || creating) {
+      return undefined;
+    }
     const controller = new AbortController();
-    const taken = takeReceivedSong(controller.signal);
-    if (!taken) return undefined;
-    void taken.received.then((received) => {
-      if (controller.signal.aborted) return;
-      if ('failed' in received) {
+    const reading =
+      received.status === 'ready'
+        ? receivedSong.read(received, controller.signal)
+        : Promise.reject(new Error('Received song could not be copied'));
+    reading.then(
+      (file) => {
+        if (controller.signal.aborted) return;
+        clearErrors('song');
+        resetCreate();
+        setValue('song', { file, url: URL.createObjectURL(file) });
+        setValue('name', stripExt(file.name));
+        receivedSong.finish(received.id);
+      },
+      () => {
+        if (controller.signal.aborted) return;
+        if (receivedSong.get()?.id !== received.id) return;
+        setValue('song', undefined);
         setError('song', {
           type: 'received',
-          message: t('pages.projects.dialogs.create.failed'),
+          message: t('app.receivedSong.failed'),
         });
-      } else {
-        clearErrors('song');
-        setValue('song', {
-          file: received.file,
-          url: URL.createObjectURL(received.file),
-        });
-        setValue('name', stripExt(received.file.name));
-      }
-      taken.release();
-    });
+        receivedSong.finish(received.id);
+      },
+    );
     return () => {
       controller.abort();
-      taken.giveBack();
     };
-  }, [shareVersion, create.isPending, setValue, setError, clearErrors, t]);
+  }, [received, creating, resetCreate, setValue, setError, clearErrors, t]);
 
   useEffect(() => {
     if (!song) return undefined;

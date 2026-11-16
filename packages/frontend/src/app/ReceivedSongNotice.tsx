@@ -1,65 +1,48 @@
 import CloseIcon from '@mui/icons-material/Close';
 import { Button, IconButton, Snackbar } from '@mui/material';
-import { type FC, useEffect, useState } from 'react';
+import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  isReceivedSongWaiting,
-  subscribeReceivedSongApplying,
-  subscribeReceivedSongs,
-} from './receivedSong.js';
+import { receivedSong, useReceivedSong } from './receivedSong.js';
 import { routes } from './router/routes.js';
 
 export const ReceivedSongNotice: FC = () => {
   const { t } = useTranslation();
-  const onProject = routes.project.useMatch() !== undefined;
-  const [waiting, setWaiting] = useState(isReceivedSongWaiting);
-  const [dismissed, setDismissed] = useState(false);
-  const [checkedOnProject, setCheckedOnProject] = useState(onProject);
+  const song = useReceivedSong();
+  const onList = routes.home.useMatch() !== undefined;
+  const adding = routes.projectsCreate.useMatch() !== undefined;
 
-  if (checkedOnProject !== onProject) {
-    setCheckedOnProject(onProject);
-    setWaiting(isReceivedSongWaiting());
+  if (!song || song.status === 'copying' || onList || adding) {
+    return undefined;
   }
-
-  useEffect(
-    () =>
-      subscribeReceivedSongs(() => {
-        setWaiting(isReceivedSongWaiting());
-        setDismissed(false);
-      }),
-    [],
-  );
-
-  useEffect(
-    () =>
-      subscribeReceivedSongApplying(() => {
-        setWaiting(isReceivedSongWaiting());
-      }),
-    [],
-  );
 
   return (
     <Snackbar
-      open={onProject && waiting && !dismissed}
+      open
       onClose={(_, reason) => {
         if (reason === 'clickaway') return;
-        setDismissed(true);
+        receivedSong.finish(song.id);
       }}
-      message={t('app.receivedSong.message')}
+      message={
+        song.status === 'ready'
+          ? t('app.receivedSong.message', { name: song.name })
+          : t('app.receivedSong.failed')
+      }
       action={
         <>
-          <Button
-            color='primary'
-            size='small'
-            onClick={() => routes.projectsCreate.navigate()}
-          >
-            {t('app.receivedSong.add')}
-          </Button>
+          {song.status === 'ready' && (
+            <Button
+              color='primary'
+              size='small'
+              onClick={() => routes.projectsCreate.navigate()}
+            >
+              {t('app.receivedSong.add')}
+            </Button>
+          )}
           <IconButton
             size='small'
             color='inherit'
             aria-label={t('app.receivedSong.close')}
-            onClick={() => setDismissed(true)}
+            onClick={() => receivedSong.finish(song.id)}
           >
             <CloseIcon fontSize='small' />
           </IconButton>

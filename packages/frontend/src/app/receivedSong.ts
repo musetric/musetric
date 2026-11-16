@@ -1,14 +1,30 @@
+import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 import { routes } from './router/routes.js';
 
+const songSchema = z.discriminatedUnion('status', [
+  z.object({ id: z.string(), status: z.literal('copying') }),
+  z.object({ id: z.string(), status: z.literal('failed') }),
+  z.object({
+    id: z.string(),
+    status: z.literal('ready'),
+    name: z.string(),
+    type: z.string(),
+    size: z.number(),
+  }),
+]);
+
+const messageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('share'), share: songSchema.nullable() }),
+  z.object({ type: z.literal('gone') }),
+]);
+
 type ReceivedSongBridge = {
-  waiting: () => boolean;
-  take: () => unknown;
-  read: (id: string, offset: number, length: number) => unknown;
-  release: (id: string) => void;
-  giveBack: (id: string) => void;
-  dismiss: () => void;
-  applying: () => boolean;
+  postMessage: (message: string) => void;
+  addEventListener: (
+    type: 'message',
+    listener: (event: MessageEvent<unknown>) => void,
+  ) => void;
 };
 
 type ReceivedSongWindow = Window & {
@@ -20,148 +36,104 @@ const findBridge = (): ReceivedSongBridge | undefined => {
   return target.MusetricReceivedSong;
 };
 
-const receivedEventName = 'musetric:received-song';
-const chunkBytes = 1024 * 1024;
-const applyingEventName = 'musetric:received-song-applying';
+export type ReceivedSong = z.infer<typeof songSchema>;
 
-const announceApplying = () => {
-  window.dispatchEvent(new Event(applyingEventName));
+type ChunkRequest = {
+  resolve: (chunk: Uint8Array<ArrayBuffer>) => void;
+  reject: (error: Error) => void;
 };
 
-const yieldToPage = async () =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  });
-
-const songSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.string(),
-  size: z.number(),
-});
-
-const takenSchema = z.union([
-  z.object({ id: z.string(), failed: z.literal(true) }),
-  songSchema,
-]);
-
-const readFile = async (
-  from: ReceivedSongBridge,
-  song: z.infer<typeof songSchema>,
-  signal: AbortSignal,
-): Promise<File> => {
-  const parts: Uint8Array<ArrayBuffer>[] = [];
-  for (let offset = 0; offset < song.size; offset += chunkBytes) {
-    await yieldToPage();
-    signal.throwIfAborted();
-    const chunk = from.read(song.id, offset, chunkBytes);
-    if (typeof chunk !== 'string') {
-      throw new Error('Received song is gone');
-    }
-    const text = atob(chunk);
-    const bytes = new Uint8Array(text.length);
-    for (let index = 0; index < text.length; index += 1) {
-      bytes[index] = text.charCodeAt(index);
-    }
-    parts.push(bytes);
-  }
-  return new File(parts, song.name, { type: song.type });
-};
-
-export const isReceivedSongWaiting = (): boolean =>
-  findBridge()?.waiting() ?? false;
-
-export type ReceivedSong = { file: File } | { failed: true };
-
-const readSong = async (
-  from: ReceivedSongBridge,
-  song: z.infer<typeof songSchema>,
-  signal: AbortSignal,
-): Promise<ReceivedSong> => {
-  try {
-    return { file: await readFile(from, song, signal) };
-  } catch {
-    return { failed: true };
-  }
-};
-
-export const isReceivedSongApplying = (): boolean =>
-  findBridge()?.applying() ?? false;
-
-export const subscribeReceivedSongApplying = (
-  listener: () => void,
-): (() => void) => {
-  window.addEventListener(applyingEventName, listener);
-  return () => {
-    window.removeEventListener(applyingEventName, listener);
-  };
-};
-
-export type TakenSong = {
-  received: Promise<ReceivedSong>;
-  release: () => void;
-  giveBack: () => void;
-};
-
-export const takeReceivedSong = (
-  signal: AbortSignal,
-): TakenSong | undefined => {
+const createReceivedSong = () => {
   const bridge = findBridge();
-  if (!bridge) {
-    return undefined;
-  }
-  const json = bridge.take();
-  if (typeof json !== 'string') {
-    return undefined;
-  }
-  const parsed = takenSchema.safeParse(JSON.parse(json));
-  if (!parsed.success) {
-    return {
-      received: Promise.resolve({ failed: true }),
-      release: () => undefined,
-      giveBack: () => undefined,
-    };
-  }
-  const taken = parsed.data;
-  announceApplying();
-  const release = () => {
-    bridge.release(taken.id);
-    announceApplying();
+  let received: ReceivedSong | undefined = undefined;
+  const listeners = new Set<() => void>();
+  const chunkRequests: ChunkRequest[] = [];
+  const finished = new Set<string>();
+
+  const present = () => {
+    if (received && routes.home.match()) {
+      routes.projectsCreate.navigate();
+    }
   };
-  const giveBack = () => {
-    bridge.giveBack(taken.id);
-    announceApplying();
+
+  const update = (next: ReceivedSong | undefined) => {
+    received = next;
+    for (const listener of listeners) {
+      listener();
+    }
   };
-  if ('failed' in taken) {
-    return { received: Promise.resolve({ failed: true }), release, giveBack };
-  }
-  return { received: readSong(bridge, taken, signal), release, giveBack };
-};
 
-export const dismissReceivedSong = (): void => {
-  findBridge()?.dismiss();
-};
-
-export const subscribeReceivedSongs = (listener: () => void): (() => void) => {
-  window.addEventListener(receivedEventName, listener);
-  return () => {
-    window.removeEventListener(receivedEventName, listener);
+  return {
+    get: () => received,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    present,
+    finish: (id: string) => {
+      finished.add(id);
+      if (received?.id === id) {
+        update(undefined);
+      }
+      bridge?.postMessage(JSON.stringify({ type: 'finish', id }));
+    },
+    read: async (
+      song: Extract<ReceivedSong, { status: 'ready' }>,
+      signal: AbortSignal,
+    ): Promise<File> => {
+      if (!bridge) {
+        throw new Error('Received songs are not supported here');
+      }
+      const parts: Uint8Array<ArrayBuffer>[] = [];
+      let offset = 0;
+      while (offset < song.size) {
+        signal.throwIfAborted();
+        const chunk = await new Promise<Uint8Array<ArrayBuffer>>(
+          (resolve, reject) => {
+            chunkRequests.push({ resolve, reject });
+            bridge.postMessage(
+              JSON.stringify({ type: 'read', id: song.id, offset }),
+            );
+          },
+        );
+        if (chunk.byteLength === 0) {
+          throw new Error('Received song ended early');
+        }
+        parts.push(chunk);
+        offset += chunk.byteLength;
+      }
+      return new File(parts, song.name, { type: song.type });
+    },
+    listen: () => {
+      if (!bridge) {
+        return;
+      }
+      bridge.addEventListener('message', (event) => {
+        const { data } = event;
+        if (data instanceof ArrayBuffer) {
+          chunkRequests.shift()?.resolve(new Uint8Array(data));
+          return;
+        }
+        if (typeof data !== 'string') {
+          return;
+        }
+        const message = messageSchema.parse(JSON.parse(data));
+        if (message.type === 'gone') {
+          chunkRequests.shift()?.reject(new Error('Received song is gone'));
+          return;
+        }
+        const { share } = message;
+        update(share && !finished.has(share.id) ? share : undefined);
+        present();
+      });
+      bridge.postMessage(JSON.stringify({ type: 'subscribe' }));
+    },
   };
 };
 
-export const presentReceivedSong = (): void => {
-  if (!isReceivedSongWaiting()) {
-    return;
-  }
-  if (routes.projectsCreate.match() || routes.project.match()) {
-    return;
-  }
-  routes.projectsCreate.navigate();
-};
+export const receivedSong = createReceivedSong();
 
-export const receiveSongsFromSystem = (): void => {
-  if (!findBridge()) {
-    return;
-  }
-  window.addEventListener(receivedEventName, presentReceivedSong);
-};
+export const useReceivedSong = (): ReceivedSong | undefined =>
+  useSyncExternalStore(receivedSong.subscribe, receivedSong.get);

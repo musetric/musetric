@@ -9,7 +9,7 @@ import { App } from './app/index.js';
 import { trackKeyboardInset } from './app/keyboardInset.js';
 import { blockMouseNavigation } from './app/mouseNavigation.js';
 import { blockPageZoom } from './app/pageZoom.js';
-import { receiveSongsFromSystem } from './app/receivedSong.js';
+import { receivedSong } from './app/receivedSong.js';
 import { holdScreenWhileWorking } from './app/screenWakeLock.js';
 import { closeOverlaysOnBack } from './app/systemBack.js';
 import { allowTextInteractionInFields } from './app/textInteraction.js';
@@ -23,7 +23,7 @@ const runApp = async () => {
   blockMouseNavigation();
   trackKeyboardInset();
   closeOverlaysOnBack();
-  receiveSongsFromSystem();
+  receivedSong.listen();
   const rootElement = assertDefined(
     document.getElementById('root'),
     'Root element not found',
