@@ -15,12 +15,16 @@ const stretchBlock = (
   position: number,
   source: Float32Array,
 ): number =>
-  processor.process([output], (inputs, inputFrameOffset, inputFrameCount) => {
-    const [input] = inputs;
-    for (let offset = 0; offset < inputFrameCount; offset += 1) {
-      input[offset] = source[position + inputFrameOffset + offset] ?? 0;
-    }
-  });
+  processor.process(
+    [output],
+    position,
+    (inputs, inputFrameOffset, inputFrameCount) => {
+      const [input] = inputs;
+      for (let offset = 0; offset < inputFrameCount; offset += 1) {
+        input[offset] = source[position + inputFrameOffset + offset] ?? 0;
+      }
+    },
+  );
 
 export type TakeStretch = {
   render: (

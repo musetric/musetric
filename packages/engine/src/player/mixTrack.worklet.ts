@@ -1,3 +1,9 @@
+import { type StemType, stemTypes } from '@musetric/audio/es';
+
+const accompanimentStemTypes = stemTypes.filter(
+  (stemType) => stemType !== 'lead',
+);
+
 export type MixTrackFrames = {
   songFrame: (frame: number) => number;
   gain: (songFrame: number) => number;
@@ -51,5 +57,25 @@ export const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
       const sample = samples[songFrame] ?? 0;
       input[offset] += sample * volume * frames.gain(songFrame);
     }
+  }
+};
+
+export type MixStemsIntoBuffersOptions = Omit<
+  MixTrackIntoBuffersOptions,
+  'track' | 'volume'
+> & {
+  tracks: Record<StemType, Float32Array[]>;
+  volumes: Partial<Record<StemType, number>>;
+  leadApart: boolean;
+};
+
+export const mixStemsIntoBuffers = (options: MixStemsIntoBuffersOptions) => {
+  const { tracks, volumes, leadApart } = options;
+  for (const stemType of leadApart ? accompanimentStemTypes : stemTypes) {
+    mixTrackIntoBuffers({
+      ...options,
+      track: tracks[stemType],
+      volume: volumes[stemType] ?? 1,
+    });
   }
 };
