@@ -47,6 +47,7 @@ private class MediaState(
 internal class MediaSessionBridge(
   private val activity: Activity,
   private val webView: WebView,
+  private val followPlaying: (Boolean) -> Unit,
 ) {
   private var session: MediaSession? = null
   private var shown: MediaState? = null
@@ -102,6 +103,7 @@ internal class MediaSessionBridge(
     shown = null
     current.isActive = false
     current.release()
+    followPlaying(false)
     audioManager.abandonAudioFocusRequest(audioFocus)
     activity.unregisterReceiver(commands)
     MediaPlaybackService.stop(activity)
@@ -123,6 +125,7 @@ internal class MediaSessionBridge(
     shown = state
     if (previous == null || state.playing != previous.playing) {
       followAudioFocus(state.playing)
+      followPlaying(state.playing)
     }
     val current = session ?: createSession()
     if (
@@ -249,8 +252,12 @@ internal class MediaSessionBridge(
     )
 }
 
-internal fun attachMediaSession(activity: AppCompatActivity, webView: WebView) {
-  val bridge = MediaSessionBridge(activity, webView)
+internal fun attachMediaSession(
+  activity: AppCompatActivity,
+  webView: WebView,
+  followPlaying: (Boolean) -> Unit,
+) {
+  val bridge = MediaSessionBridge(activity, webView, followPlaying)
   webView.addJavascriptInterface(bridge, BRIDGE_NAME)
   activity.lifecycle.addObserver(
     object : DefaultLifecycleObserver {

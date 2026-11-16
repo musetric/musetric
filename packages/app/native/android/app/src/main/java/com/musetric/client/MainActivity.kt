@@ -2,6 +2,7 @@ package com.musetric.client
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
@@ -12,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : TauriActivity() {
   private var mainWebView: WebView? = null
   private val receivedSongs by lazy { ReceivedSongs(this) }
+  private val refreshRate by lazy { PlaybackRefreshRate(this) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     if (!BuildConfig.PUBLISHED) {
@@ -21,6 +23,11 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
     receivedSongs.start(intent, savedInstanceState)
     enableEdgeToEdge()
+  }
+
+  override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+    refreshRate.touch(event)
+    return super.dispatchTouchEvent(event)
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -45,7 +52,7 @@ class MainActivity : TauriActivity() {
     mainWebView = webView
     applyWebViewInsets(webView)
     shareDownloads(this, webView)
-    attachMediaSession(this, webView)
+    attachMediaSession(this, webView, refreshRate::follow)
     attachSettings(this, webView)
     attachMicrophone(this, webView)
     attachHaptics(webView)
