@@ -25,37 +25,57 @@ export const PlayerProgress: FC = () => {
 
   useEffect(() => {
     const root = ref.current;
+    const track = root?.querySelector<HTMLElement>('.MuiSlider-track');
+    const thumb = root?.querySelector<HTMLElement>('.MuiSlider-thumb');
+    const input = root?.querySelector('input');
+    const currentTime = currentTimeRef.current;
+    if (!root || !track || !thumb || !input || !currentTime) {
+      return;
+    }
+
+    let devicePixels = 0;
+    let shownPixel: number | undefined = undefined;
+    let shownValue: string | undefined = undefined;
+    let shownTime: string | undefined = undefined;
 
     const apply = (progress: number) => {
-      const percent = `${progress * 100}%`;
-
-      const track = root?.querySelector<HTMLElement>('.MuiSlider-track');
-      if (track) {
-        track.style.width = percent;
+      if (devicePixels > 0) {
+        const pixel = Math.round(progress * devicePixels);
+        if (pixel !== shownPixel) {
+          shownPixel = pixel;
+          const percent = `${(pixel / devicePixels) * 100}%`;
+          track.style.width = percent;
+          thumb.style.left = percent;
+        }
       }
 
-      const thumb = root?.querySelector<HTMLElement>('.MuiSlider-thumb');
-      if (thumb) {
-        thumb.style.left = percent;
-      }
-
-      const input = root?.querySelector('input');
-      if (input) {
-        const value = String(Math.round(progress * progressScale));
+      const value = String(Math.round(progress * progressScale));
+      if (value !== shownValue) {
+        shownValue = value;
         input.value = value;
         input.setAttribute('aria-valuenow', value);
       }
 
-      if (currentTimeRef.current) {
-        currentTimeRef.current.textContent = formatDuration(
-          progress * duration,
-        );
+      const time = formatDuration(progress * duration);
+      if (time !== shownTime) {
+        shownTime = time;
+        currentTime.textContent = time;
       }
     };
 
-    apply(getTrackProgress(engine.store.get()));
+    const observer = new ResizeObserver(() => {
+      devicePixels = root.clientWidth * window.devicePixelRatio;
+      shownPixel = undefined;
+      apply(getTrackProgress(engine.store.get()));
+    });
+    observer.observe(root);
 
-    return engine.store.subscribe(getTrackProgress, apply);
+    const unsubscribe = engine.store.subscribe(getTrackProgress, apply);
+
+    return () => {
+      unsubscribe();
+      observer.disconnect();
+    };
   }, [duration]);
 
   useEffect(() => {
@@ -112,9 +132,11 @@ export const PlayerProgress: FC = () => {
           sx={{
             '& .MuiSlider-thumb': {
               color: 'primary.main',
+              transitionProperty: 'box-shadow',
             },
             '& .MuiSlider-track': {
               color: 'primary.main',
+              transitionProperty: 'none',
             },
           }}
           onChange={(_, value) => {
