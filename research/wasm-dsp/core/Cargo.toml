@@ -1,0 +1,33 @@
+[package]
+name = "musetric-wasm-dsp"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99.1"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["decode", "resample", "encode", "stretch"]
+decode = ["dep:symphonia", "resample"]
+resample = ["dep:rubato"]
+encode = ["dep:flacenc", "dep:rusty_aac", "dep:rusty_mp3"]
+stretch = ["dep:musetric-stretch"]
+
+[dependencies]
+flacenc = { git = "https://github.com/yotarok/flacenc-rs", rev = "f2ebcf85550ce337ceceed7ba25a1e84c034efc1", default-features = false, optional = true }
+musetric-stretch = { path = "../../../packages/server/crates/stretch", optional = true }
+rubato = { version = "=5.0.1", default-features = false, features = ["fft_resampler"], optional = true }
+rustfft = { version = "=6.4.1", features = ["wasm_simd"] }
+rusty_aac = { version = "=1.1.0", optional = true }
+rusty_mp3 = { version = "=1.0.0", optional = true }
+symphonia = { version = "=0.6.1", features = ["all"], optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+symphonia-adapter-libopus = "=0.3.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = "symbols"
