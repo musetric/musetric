@@ -1,9 +1,9 @@
-import { type StemType, stemTypes } from '@musetric/audio/es';
+import { type StemType } from '@musetric/audio/es';
 import { createTimePitchProcessor } from '@musetric/audio/player';
 import { createHeardPosition } from './heardPosition.worklet.js';
 import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
-import { mixTrackIntoBuffers } from './mixTrack.worklet.js';
+import { mixStemsIntoBuffers } from './mixTrack.worklet.js';
 import {
   createRangeFrames,
   processRangeMetronome,
@@ -25,10 +25,6 @@ import {
   type RecordingRuntime,
 } from './recording.worklet.js';
 import { createRecordingTrack } from './recordingTrack.worklet.js';
-
-const accompanimentStemTypes = stemTypes.filter(
-  (stemType) => stemType !== 'lead',
-);
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
@@ -86,6 +82,11 @@ export const createPlayerRuntime = async (
   const resetTimePitch = () => {
     timePitchProcessor.reset();
     leadVoice.reset();
+  };
+
+  const refillTimePitch = () => {
+    timePitchProcessor.refill();
+    leadVoice.refill();
   };
 
   const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
@@ -174,6 +175,7 @@ export const createPlayerRuntime = async (
       frameCount = message.frameCount;
       releaseTracks();
       tracks = message.tracks;
+      refillTimePitch();
       recordingTrack.clear();
       recordingTrack.setPieces({ pieces: message.recording });
       position.begin(0);
@@ -256,6 +258,7 @@ export const createPlayerRuntime = async (
       voiceOctave = message.voiceOctave;
       voiceShifted = message.shifted;
       applyLeadTranspose();
+      refillTimePitch();
     },
     setTempoRatio: (message) => {
       tempoRatio = message.tempoRatio;
@@ -264,6 +267,7 @@ export const createPlayerRuntime = async (
     },
     setTrackVolume: (message) => {
       trackVolumes[message.stemType] = message.volume;
+      refillTimePitch();
     },
     setRecordingVolume: (message) => {
       recordingVolume = message.volume;
@@ -275,6 +279,7 @@ export const createPlayerRuntime = async (
       range = message.range
         ? createRangeFrames(message.range, message.repeat, message.stopFrame)
         : undefined;
+      refillTimePitch();
     },
     startRecording: (message) => {
       revision = message.revision;
@@ -316,26 +321,19 @@ export const createPlayerRuntime = async (
       const leadApart = getVoiceShiftSemitones() !== 0;
       const processedFrameCount = timePitchProcessor.process(
         outputs,
+        currentOutputFrameIndex,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
-          const channelCount = outputs.length;
-          const baseOptions = {
+          mixStemsIntoBuffers({
             inputBuffers,
             outputFrameIndex: currentOutputFrameIndex,
             inputFrameOffset,
             inputFrameCount,
-            channelCount,
-          };
-
-          for (const stemType of leadApart
-            ? accompanimentStemTypes
-            : stemTypes) {
-            mixTrackIntoBuffers({
-              ...baseOptions,
-              track: currentTracks[stemType],
-              volume: trackVolumes[stemType] ?? 1,
-              frames: range,
-            });
-          }
+            channelCount: outputs.length,
+            tracks: currentTracks,
+            volumes: trackVolumes,
+            leadApart,
+            frames: range,
+          });
         },
       );
       if (leadApart) {

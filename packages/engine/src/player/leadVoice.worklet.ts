@@ -16,6 +16,7 @@ export type LeadVoice = {
   setTransposeSemitones: (transposeSemitones: number) => void;
   setTempoRatio: (tempoRatio: number) => void;
   reset: () => void;
+  refill: () => void;
   mixInto: (options: LeadVoiceMixOptions) => void;
 };
 
@@ -44,11 +45,13 @@ export const createLeadVoice = async (
     setTransposeSemitones: processor.setTransposeSemitones,
     setTempoRatio: processor.setTempoRatio,
     reset: processor.reset,
+    refill: processor.refill,
     mixInto: (options) => {
       const { outputs, outputFrameIndex, track, volume, frames } = options;
       const leadBuffers = getBuffers(outputs);
       processor.process(
         leadBuffers,
+        outputFrameIndex,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
           mixTrackIntoBuffers({
             inputBuffers,

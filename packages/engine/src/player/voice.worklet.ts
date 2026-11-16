@@ -76,12 +76,16 @@ export const createVoice = (stretcher: TimePitchProcessor): Voice => {
     }
     stretcher.setTempoRatio(ratio);
     stretcher.setTransposeSemitones(transposeSemitones);
-    stretcher.process([part.output], (inputs, inputFrameOffset, count) => {
-      const [input] = inputs;
-      for (let index = 0; index < count; index += 1) {
-        input[index] = samples[position + inputFrameOffset + index] ?? 0;
-      }
-    });
+    stretcher.process(
+      [part.output],
+      position,
+      (inputs, inputFrameOffset, count) => {
+        const [input] = inputs;
+        for (let index = 0; index < count; index += 1) {
+          input[index] = samples[position + inputFrameOffset + index] ?? 0;
+        }
+      },
+    );
   };
 
   return {
