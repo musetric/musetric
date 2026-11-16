@@ -23,10 +23,30 @@ const getAxisRatio = (
   return (coordinate - getAxisStart(rect, axis)) / axisSize;
 };
 
-export const getViewportAxisSize = (
+export type ViewportAxisSizes = {
+  get: (axis: GestureAxis) => number;
+  dispose: () => void;
+};
+
+export const observeViewportAxisSizes = (
   element: HTMLElement,
-  axis: GestureAxis,
-): number => getRectAxisSize(element.getBoundingClientRect(), axis);
+): ViewportAxisSizes => {
+  const sizes: Record<GestureAxis, number> = { x: 0, y: 0 };
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const [box] = entry.borderBoxSize;
+      sizes.x = box.inlineSize;
+      sizes.y = box.blockSize;
+    }
+  });
+  observer.observe(element);
+  return {
+    get: (axis) => sizes[axis],
+    dispose: () => {
+      observer.disconnect();
+    },
+  };
+};
 
 export const getViewportCoordinateAnchorRatio = (
   element: HTMLElement,

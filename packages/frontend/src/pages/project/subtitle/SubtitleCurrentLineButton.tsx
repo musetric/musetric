@@ -1,11 +1,12 @@
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import { Button } from '@mui/material';
-import { type FC, type RefObject, useLayoutEffect, useState } from 'react';
+import { type FC, type RefObject, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type SubtitleCursor } from './subtitleCursor.js';
 
 const showDelayMs = 500;
+const farMargin = '100000px';
 
 type LinePlace = {
   away: boolean;
@@ -18,51 +19,75 @@ const useCurrentLinePlace = (
 ): LinePlace => {
   const [place, setPlace] = useState<LinePlace>({ away: false, above: false });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const list = listRef.current;
     if (!list) {
       return;
     }
-    let frame: number | undefined = undefined;
+    let line: Element | undefined = undefined;
+    const outside = { above: false, below: false };
 
-    const update = () => {
-      frame = undefined;
-      const line = list.querySelector(
-        `[data-subtitle-segment-index="${cursor.getActiveSegmentIndex()}"]`,
-      );
-      if (!line) {
-        setPlace((value) => ({ ...value, away: false }));
-        return;
-      }
-      const rect = line.getBoundingClientRect();
-      const listRect = list.getBoundingClientRect();
-      const above = rect.bottom <= listRect.top;
-      const below = rect.top >= listRect.bottom;
+    const show = () => {
+      const away = outside.above || outside.below;
       setPlace((value) => {
-        const next = {
-          away: above || below,
-          above: above || below ? above : value.above,
-        };
+        const next = { away, above: away ? outside.above : value.above };
         return next.away === value.away && next.above === value.above
           ? value
           : next;
       });
     };
-    const schedule = () => {
-      frame ??= requestAnimationFrame(update);
+
+    const observeEdge = (edge: keyof typeof outside, rootMargin: string) =>
+      new IntersectionObserver(
+        (entries) => {
+          const entry = entries.filter((item) => item.target === line).at(-1);
+          if (!entry) {
+            return;
+          }
+          outside[edge] = !entry.isIntersecting;
+          show();
+        },
+        { root: list, rootMargin },
+      );
+
+    const observers = [
+      observeEdge('above', `0px 0px ${farMargin} 0px`),
+      observeEdge('below', `${farMargin} 0px 0px 0px`),
+    ];
+
+    const follow = () => {
+      const next =
+        list.querySelector(
+          `[data-subtitle-segment-index="${cursor.getActiveSegmentIndex()}"]`,
+        ) ?? undefined;
+      if (next === line) {
+        return;
+      }
+      for (const observer of observers) {
+        if (line) {
+          observer.unobserve(line);
+        }
+        if (next) {
+          observer.observe(next);
+        }
+      }
+      line = next;
+      if (!line) {
+        outside.above = false;
+        outside.below = false;
+        show();
+      }
     };
 
-    update();
-    const unsubscribe = cursor.subscribeActiveSegmentIndex(schedule);
-    const observer = new ResizeObserver(schedule);
-    observer.observe(list);
-    list.addEventListener('scroll', schedule, { passive: true });
+    follow();
+    const unsubscribe = cursor.subscribeActiveSegmentIndex(follow);
+    const lines = new MutationObserver(follow);
+    lines.observe(list, { childList: true });
     return () => {
       unsubscribe();
-      observer.disconnect();
-      list.removeEventListener('scroll', schedule);
-      if (frame !== undefined) {
-        cancelAnimationFrame(frame);
+      lines.disconnect();
+      for (const observer of observers) {
+        observer.disconnect();
       }
     };
   }, [listRef, cursor]);

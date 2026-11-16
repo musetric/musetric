@@ -12,10 +12,10 @@ import {
 } from './multiPointerGesture.js';
 import { isPointerInputType, isPrimaryPointerButton } from './pointerType.js';
 import {
-  getViewportAxisSize,
   getViewportCoordinateAnchorRatio,
   getViewportDragZoomScale,
   getViewportPointAnchorRatio,
+  observeViewportAxisSizes,
 } from './viewportGeometry.js';
 import {
   type ActiveDragZoom,
@@ -56,6 +56,7 @@ export const createViewportGesture = (
   let activeDragZoom: ActiveDragZoom | undefined = undefined;
   let activeCustomPan: ViewportCustomPan | undefined = undefined;
   let inertiaRunner: InertiaRunner<GestureAxis> | undefined = undefined;
+  const axisSizes = observeViewportAxisSizes(element);
 
   const freeze = () => {
     if (pointerFrozen) return;
@@ -85,13 +86,9 @@ export const createViewportGesture = (
     getViewportPointAnchorRatio({ element, state, axis, clientX, clientY });
 
   const applyPan = (pan: ActivePan, delta: number): boolean => {
-    const viewportSize = getViewportAxisSize(element, pan.axis);
+    const viewportSize = axisSizes.get(pan.axis);
     if (viewportSize <= 0) return true;
-    const result = panViewportState({
-      state: pan.state,
-      delta,
-      viewportSize,
-    });
+    const result = panViewportState({ state: pan.state, delta, viewportSize });
     pan.state = result.state;
     applyState(result.state);
     return result.clamped;
@@ -382,6 +379,7 @@ export const createViewportGesture = (
     abort,
     dispose: () => {
       abort();
+      axisSizes.dispose();
       multiPointer.dispose();
       wheel.dispose();
       element.removeEventListener('pointerdown', handlePointerDown, true);
