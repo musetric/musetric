@@ -1,7 +1,11 @@
 import { pitchParamsStruct } from './paramsStruct.wgsl.js';
 import { pitchSlotStruct } from './slots.wgsl.js';
 
+export const pitchSliceSamplesPerThread = 4;
+
 export const sliceShader = `
+const samplesPerThread = ${pitchSliceSamplesPerThread}u;
+
 ${pitchParamsStruct}
 ${pitchSlotStruct}
 
@@ -12,18 +16,28 @@ ${pitchSlotStruct}
 @group(0) @binding(4) var<uniform> params: PitchParams;
 
 @compute @workgroup_size(64)
-fn slice(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let sampleIndex = gid.x;
-  let slotIndex = gid.y;
-  if (sampleIndex >= params.fftSize || slotIndex >= params.slotCount) {
+fn slice(
+  @builtin(workgroup_id) groupId: vec3<u32>,
+  @builtin(local_invocation_id) localId: vec3<u32>,
+) {
+  let firstSample = groupId.x * 64u * samplesPerThread + localId.x;
+  let slotIndex = groupId.y;
+  if (slotIndex >= params.slotCount) {
     return;
   }
-  var value = 0.0;
-  if (sampleIndex < params.windowSize) {
-    let spanIndex = slots[slotIndex].spanOffset + params.support -
-      params.windowSize / 2u + params.windowOffset + sampleIndex;
-    value = span[spanIndex] * weights[sampleIndex];
+  let spanStart = slots[slotIndex].spanOffset + params.support -
+    params.windowSize / 2u + params.windowOffset;
+  let signalStart = slotIndex * (params.fftSize + 2u);
+  for (var repeat = 0u; repeat < samplesPerThread; repeat += 1u) {
+    let sampleIndex = firstSample + 64u * repeat;
+    if (sampleIndex >= params.fftSize) {
+      break;
+    }
+    var value = 0.0;
+    if (sampleIndex < params.windowSize) {
+      value = span[spanStart + sampleIndex] * weights[sampleIndex];
+    }
+    signal[signalStart + sampleIndex] = value;
   }
-  signal[slotIndex * (params.fftSize + 2u) + sampleIndex] = value;
 }
 `;

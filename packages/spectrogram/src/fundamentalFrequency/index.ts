@@ -12,6 +12,7 @@ import {
 } from './schedule.es.js';
 import { type PitchSampleRange } from './scheduleState.es.js';
 import { createPitchSettings, type PitchSettings } from './settings.es.js';
+import { pitchSliceSamplesPerThread } from './slice.wgsl.js';
 import {
   createPitchBindGroupsCell,
   createPitchBuffersCell,
@@ -168,7 +169,9 @@ export const createSpectrogramFundamentalFrequencyCell = (
         analysisStage('slice', (pass, state) => {
           bindAnalysis(pass, state, pipelines.slice, bindGroups.slice);
           pass.dispatchWorkgroups(
-            Math.ceil(settings.fftSize / workgroupSize),
+            Math.ceil(
+              settings.fftSize / (workgroupSize * pitchSliceSamplesPerThread),
+            ),
             state.plan.slots.length,
           );
         }),
