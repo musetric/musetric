@@ -7,7 +7,6 @@ import {
 } from './support.js';
 import { transformShader } from './transform.wgsl.js';
 import { transformInPlaceMixedShader } from './transformInPlaceMixed.wgsl.js';
-import { transformInPlaceRadix4Shader } from './transformInPlaceRadix4.wgsl.js';
 import { transformInPlaceRadix8Shader } from './transformInPlaceRadix8.wgsl.js';
 
 const selectStockhamThreadCount = (packedWindowSize: number): number => {
@@ -47,7 +46,7 @@ const createStockhamConstants = (
     : {}),
 });
 
-const createInPlaceRadix4Constants = (
+const createInPlaceRadix8Constants = (
   variant: PackedStockhamR2cVariant,
   inPlace: boolean,
 ) => ({
@@ -110,7 +109,7 @@ const createMultiPassKernelConstants = (
 };
 
 export type SinglePassPipeline = {
-  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  kind: 'stockham' | 'inPlaceRadix8' | 'inPlaceMixed';
   transform: GPUComputePipeline;
 };
 
@@ -119,19 +118,14 @@ const createSinglePassPipeline = (
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>,
   inPlace: boolean,
 ): SinglePassPipeline => {
-  const isPowerOfEight =
-    isPowerOfTwo(variant.packedWindowSize) &&
-    variant.log2PackedWindowSize % 3 === 0;
   let shader = transformShader;
   let constants: Record<string, number> = createStockhamConstants(
     variant,
     inPlace,
   );
-  if (variant.kind === 'inPlaceRadix4') {
-    shader = isPowerOfEight
-      ? transformInPlaceRadix8Shader
-      : transformInPlaceRadix4Shader;
-    constants = createInPlaceRadix4Constants(variant, inPlace);
+  if (variant.kind === 'inPlaceRadix8') {
+    shader = transformInPlaceRadix8Shader;
+    constants = createInPlaceRadix8Constants(variant, inPlace);
   } else if (variant.kind === 'inPlaceMixed') {
     shader = transformInPlaceMixedShader;
     constants = createInPlaceMixedConstants(variant, inPlace);

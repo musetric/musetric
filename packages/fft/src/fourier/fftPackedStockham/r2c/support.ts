@@ -120,7 +120,7 @@ type PackedStockhamR2cBaseVariant = {
 
 export type PackedStockhamR2cVariant =
   | (PackedStockhamR2cBaseVariant & {
-      kind: 'stockham' | 'inPlaceRadix4';
+      kind: 'stockham' | 'inPlaceRadix8';
     })
   | (PackedStockhamR2cBaseVariant & {
       kind: 'inPlaceMixed';
@@ -164,10 +164,10 @@ export const getPackedStockhamR2cVariant = (
   if (
     isPowerOfTwo(packedWindowSize) &&
     packedWindowSize <= maxInPlacePackedWindowSize &&
-    log2PackedWindowSize % 2 === 0
+    log2PackedWindowSize % 3 === 0
   ) {
     return {
-      kind: 'inPlaceRadix4',
+      kind: 'inPlaceRadix8',
       windowSize: config.windowSize,
       packedWindowSize,
       log2PackedWindowSize,

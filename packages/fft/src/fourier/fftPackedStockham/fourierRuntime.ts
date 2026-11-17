@@ -18,7 +18,7 @@ type MultiPassDispatchState = {
 };
 
 type SinglePassDispatchState = {
-  kind: 'singlePass' | 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  kind: 'singlePass' | 'stockham' | 'inPlaceRadix8' | 'inPlaceMixed';
   windowCount: number;
   params: ParamsRing;
   pipeline: { transform: GPUComputePipeline };
