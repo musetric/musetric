@@ -163,7 +163,6 @@ export const createPitchLineCell = (device: GPUDevice) =>
 export type PitchBindGroups = {
   slice: GPUBindGroup;
   spectrum: GPUBindGroup;
-  power: GPUBindGroup;
   periodicity: GPUBindGroup;
   salience: GPUBindGroup;
   observe: GPUBindGroup;
@@ -211,10 +210,6 @@ const createBindGroups = (
       { buffer: buffers.whitened },
       { buffer: buffers.frequencies },
       { buffer: buffers.levels },
-      uniform,
-    ]),
-    power: create(pipelines.power, 'power', [
-      { buffer: buffers.signal },
       uniform,
     ]),
     periodicity: create(pipelines.periodicity, 'periodicity', [

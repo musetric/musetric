@@ -8,6 +8,7 @@ override writeToSignal: u32 = 0u;
 override readBufferIndex: u32 = 0u;
 override writeBufferIndex: u32 = 0u;
 override inPlace: u32 = 1u;
+override squareSpectrum: u32 = 0u;
 
 override threadCount: u32 = 64u;
 const threadsPerGroup: u32 = 8u;
@@ -65,14 +66,22 @@ fn readSpectrumFloat(index: u32) -> f32 {
   return sourceSpectrum[windowSpectrumOffset + index];
 }
 
-fn readSpectrumBin(k: u32) -> vec2<f32> {
+fn readRawSpectrumBin(k: u32) -> vec2<f32> {
   let index = 2u * k;
   return vec2<f32>(readSpectrumFloat(index), readSpectrumFloat(index + 1u));
 }
 
+fn readSpectrumBin(k: u32) -> vec2<f32> {
+  let value = readRawSpectrumBin(k);
+  if (squareSpectrum == 1u) {
+    return vec2<f32>(dot(value, value), 0.0);
+  }
+  return value;
+}
+
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {
-  let dc = readSpectrumFloat(0u);
-  let nyquist = readSpectrumFloat(2u * packedWindowSize);
+  let dc = readSpectrumBin(0u).x;
+  let nyquist = readSpectrumBin(packedWindowSize).x;
   let dcBin = vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
 
   let mirrorK = packedWindowSize - k;

@@ -182,13 +182,6 @@ export const createSpectrogramFundamentalFrequencyCell = (
           bindAnalysis(pass, state, pipelines.spectrum, bindGroups.spectrum);
           pass.dispatchWorkgroups(state.plan.slots.length);
         }),
-        analysisStage('power', (pass, state) => {
-          bindAnalysis(pass, state, pipelines.power, bindGroups.power);
-          pass.dispatchWorkgroups(
-            Math.ceil((settings.halfSize + 1) / workgroupSize),
-            state.plan.slots.length,
-          );
-        }),
         analysisStage('autocorrelation', (pass, state) => {
           inverse.dispatch(pass, {
             batchOffset: 0,

@@ -87,7 +87,12 @@ export const createStateCell = (
       }
 
       const inPlace = arg.wave === arg.spectrum;
-      const pipeline = createPipeline(device, variant, inPlace);
+      const pipeline = createPipeline(
+        device,
+        variant,
+        inPlace,
+        arg.config.squareSpectrum === true,
+      );
       const tables = createTrigTables(device, variant);
       const params = createParamsRing(
         device,
@@ -174,5 +179,6 @@ export const createStateCell = (
       current.spectrum === next.spectrum &&
       current.wave === next.wave &&
       current.config.windowSize === next.config.windowSize &&
-      current.config.windowCount === next.config.windowCount,
+      current.config.windowCount === next.config.windowCount &&
+      current.config.squareSpectrum === next.config.squareSpectrum,
   });
