@@ -14,9 +14,6 @@ const selectStockhamThreadCount = (packedWindowSize: number): number => {
   if (packedWindowSize <= 768) {
     return 64;
   }
-  if (packedWindowSize <= 1024) {
-    return 128;
-  }
   return 256;
 };
 
@@ -71,7 +68,8 @@ const createInPlaceMixedConstants = (
     counts.radix2StageCount +
     counts.radix3StageCount +
     counts.radix5StageCount;
-  const threadCount = stageCount <= 4 ? 128 : 256;
+  const threadCount =
+    isPowerOfTwo(variant.packedWindowSize) || stageCount > 4 ? 256 : 128;
   return {
     packedWindowSize: variant.packedWindowSize,
     inPlace: inPlace ? 1 : 0,
