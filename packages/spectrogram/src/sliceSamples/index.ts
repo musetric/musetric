@@ -1,10 +1,8 @@
 import { type ResourceCell } from '@musetric/utils';
-import {
-  type SpectrogramColumnRange,
-  type SpectrogramSampleRange,
-} from '../common/extConfig.js';
+import { type SpectrogramColumnRange } from '../common/extConfig.js';
 import { type SpectrogramSource } from '../common/source.js';
 import { createPipeline } from './pipeline.js';
+import { type StateSamplesFrame, writeColumnOffsets } from './samples.js';
 import { sliceSamplesPerThread } from './sliceSamples.wgsl.js';
 import { createStateCell, type StateArg } from './state.js';
 
@@ -19,10 +17,7 @@ export type SpectrogramSliceSamples = {
   write: (options: {
     source: SpectrogramSource;
     baseColumn: number;
-    playheadRatio: number;
-    truncateAfterPlayhead: boolean;
-    forceFullUpload: boolean;
-    invalidations: readonly SpectrogramSampleRange[];
+    frame: StateSamplesFrame;
   }) => void;
 };
 
@@ -65,28 +60,20 @@ export const createSpectrogramSliceSamplesCell = (
         },
         dispatch,
         write: (options) => {
-          const {
-            source,
-            baseColumn,
-            playheadRatio,
-            truncateAfterPlayhead,
-            forceFullUpload,
-            invalidations,
-          } = options;
-          const writeResult = state.samples.write({
-            source,
-            baseColumn,
-            config: state.config,
-            playheadRatio,
-            truncateAfterPlayhead,
-            forceFullUpload,
-            invalidations,
-          });
+          const { source, baseColumn, frame } = options;
+          if (source.mapped) {
+            writeColumnOffsets(device, state.columnOffsets, {
+              source,
+              config: state.config,
+              baseColumn,
+              frame,
+            });
+          }
           state.params.setFrame({
             baseColumn,
-            baseWindowStart: writeResult.baseWindowStart,
-            ringStart: writeResult.ringStart,
-            ringLength: state.samples.array.length,
+            baseWindowStart: frame.baseWindowStart,
+            ringStart: frame.ringStart,
+            ringLength: frame.ringLength,
             mapped: source.mapped,
           });
         },

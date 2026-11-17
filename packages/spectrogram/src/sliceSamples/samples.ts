@@ -6,20 +6,26 @@ import {
 } from '../common/extConfig.js';
 import { type SpectrogramSource } from '../common/source.js';
 
+export type StateSamplesFrame = {
+  baseWindowStart: number;
+  ringStart: number;
+  ringLength: number;
+};
+
 type ColumnOffsetsWrite = {
   source: SpectrogramSource;
   config: ExtSpectrogramConfig;
   baseColumn: number;
-  windowStart: number;
-  ringLength: number;
+  frame: StateSamplesFrame;
 };
 
-const writeColumnOffsets = (
+export const writeColumnOffsets = (
   device: GPUDevice,
   target: GPUBuffer,
   options: ColumnOffsetsWrite,
 ): void => {
-  const { source, config, baseColumn, windowStart, ringLength } = options;
+  const { source, config, baseColumn, frame } = options;
+  const { baseWindowStart: windowStart, ringLength } = frame;
   const { windowCount, windowSize, columnStep } = config;
   const offsets = new Int32Array(windowCount);
   for (let column = 0; column < windowCount; column += 1) {
@@ -32,14 +38,8 @@ const writeColumnOffsets = (
   device.queue.writeBuffer(target, 0, offsets);
 };
 
-export type StateSamplesWriteResult = {
-  baseWindowStart: number;
-  ringStart: number;
-};
-
 export type StateSamples = {
   buffer: GPUBuffer;
-  columnOffsets: GPUBuffer;
   array: Float32Array;
 
   write: (options: {
@@ -50,12 +50,11 @@ export type StateSamples = {
     truncateAfterPlayhead: boolean;
     forceFullUpload: boolean;
     invalidations: readonly SpectrogramSampleRange[];
-  }) => StateSamplesWriteResult;
+  }) => StateSamplesFrame;
 };
 
 export type StateSamplesArg = {
   ringLength: number;
-  windowCount: number;
 };
 
 type ResidentState = {
@@ -69,16 +68,11 @@ type ResidentState = {
 export const createStateSamplesCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: StateSamplesArg): StateSamples => {
-      const { ringLength, windowCount } = arg;
+      const { ringLength } = arg;
       const array = new Float32Array(ringLength);
       const buffer = device.createBuffer({
         label: 'pipeline-samples-buffer',
         size: array.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      const columnOffsets = device.createBuffer({
-        label: 'pipeline-column-offsets-buffer',
-        size: windowCount * Int32Array.BYTES_PER_ELEMENT,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
 
@@ -92,7 +86,6 @@ export const createStateSamplesCell = (device: GPUDevice) =>
 
       return {
         buffer,
-        columnOffsets,
         array,
         write: (options) => {
           const {
@@ -206,16 +199,6 @@ export const createStateSamplesCell = (device: GPUDevice) =>
             }
           }
 
-          if (source.mapped) {
-            writeColumnOffsets(device, columnOffsets, {
-              source,
-              config,
-              baseColumn,
-              windowStart,
-              ringLength,
-            });
-          }
-
           resident.valid = true;
           resident.windowStart = windowStart;
           resident.sampleLength = source.length;
@@ -225,15 +208,13 @@ export const createStateSamplesCell = (device: GPUDevice) =>
           return {
             baseWindowStart: windowStart,
             ringStart,
+            ringLength,
           };
         },
       };
     },
     dispose: (stateSamples) => {
       stateSamples.buffer.destroy();
-      stateSamples.columnOffsets.destroy();
     },
-    equals: (current, next) =>
-      current.ringLength === next.ringLength &&
-      current.windowCount === next.windowCount,
+    equals: (current, next) => current.ringLength === next.ringLength,
   });

@@ -3,13 +3,16 @@ import { isSpectrogramSpectralBandsEqual } from '../common/configFieldEqual.js';
 import {
   type ExtSpectrogramConfig,
   type SpectrogramColumnRange,
-  type SpectrogramSampleRange,
 } from '../common/extConfig.js';
 import { type SpectrogramSource } from '../common/source.js';
 import {
   type SpectrogramSpectralBand,
   type TrackKey,
 } from '../config.cross.js';
+import {
+  type StateSamples,
+  type StateSamplesFrame,
+} from '../sliceSamples/samples.js';
 import {
   type BandPipelineCells,
   createBandPipelineCells,
@@ -33,9 +36,7 @@ type BandDispatchRange = (
 export type BandSampleWrite = {
   source: SpectrogramSource;
   baseColumn: number;
-  playheadRatio: number;
-  forceFullUpload: boolean;
-  invalidations: readonly SpectrogramSampleRange[];
+  frame: StateSamplesFrame;
 };
 
 export type BandSpectrumPipeline = {
@@ -56,6 +57,7 @@ export const buildBandSpectrumPipeline = (
   cells: BandPipelineCells,
   config: ExtSpectrogramConfig,
   label: TrackKey,
+  samples: StateSamples,
 ): BandSpectrumPipeline => {
   const paddedWindowSize = config.windowSize * config.zeroPaddingFactor;
   const laneConfig = config.lanes[label];
@@ -66,7 +68,7 @@ export const buildBandSpectrumPipeline = (
   const sliceSamples = cells.sliceSamplesCell.get({
     out: signal,
     config,
-    sourceStretch: laneConfig.sourceStretch,
+    samples,
   });
   const fourier = cells.fourierCell.get({ signal, config });
   const magnitudify = cells.magnitudifyCell.get({ signal, config });
@@ -82,12 +84,7 @@ export const buildBandSpectrumPipeline = (
     rawMagnitudeBuffer: magnitudify.magnitude,
     columnEnergyBuffer: decibelify.columnEnergy,
     windowSize: paddedWindowSize,
-    writeSamples: (write) => {
-      sliceSamples.write({
-        ...write,
-        truncateAfterPlayhead: laneConfig.truncateAfterPlayhead,
-      });
-    },
+    writeSamples: sliceSamples.write,
     dispatchSliceSamples: sliceSamples.dispatch,
     dispatchFourier: (pass, range) => {
       dispatchFourierColumnRange(fourier, pass, range, config.windowCount);
@@ -107,6 +104,7 @@ type BandSpectrumCellArg = {
   config: ExtSpectrogramConfig;
   band: SpectrogramSpectralBand;
   label: TrackKey;
+  samples: StateSamples;
 };
 
 export const createBandSpectrumCell = (
@@ -120,6 +118,7 @@ export const createBandSpectrumCell = (
         cells,
         createSpectralBandConfig(arg.config, arg.band),
         arg.label,
+        arg.samples,
       ),
     dispose: () => undefined,
     equals: (current, next) =>
@@ -134,9 +133,8 @@ export const createBandSpectrumCell = (
       current.config.windowCount === next.config.windowCount &&
       current.config.lanes[current.label].gainDb ===
         next.config.lanes[next.label].gainDb &&
-      current.config.lanes[current.label].truncateAfterPlayhead ===
-        next.config.lanes[next.label].truncateAfterPlayhead &&
       current.label === next.label &&
+      current.samples === next.samples &&
       isSpectrogramSpectralBandsEqual([current.band], [next.band]),
   });
 
