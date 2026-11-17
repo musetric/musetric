@@ -109,8 +109,8 @@ fn main(
     let butterflyCount = packedWindowSize / 4u;
 
     for (var j = t; j < butterflyCount; j += threadCount) {
-      let k = j % quarter;
-      let block = j / quarter;
+      let k = j & (quarter - 1u);
+      let block = j >> countTrailingZeros(quarter);
       let i0 = block * len + k;
       let i1 = i0 + quarter;
       let i2 = i1 + quarter;
