@@ -5,6 +5,7 @@ import {
 } from '../common/extConfig.js';
 import { type SpectrogramSource } from '../common/source.js';
 import { createPipeline } from './pipeline.js';
+import { sliceSamplesPerThread } from './sliceSamples.wgsl.js';
 import { createStateCell, type StateArg } from './state.js';
 
 const workgroupSize = 64;
@@ -45,7 +46,9 @@ export const createSpectrogramSliceSamplesCell = (
         }
         const { paddedWindowSize } = state.params.value;
         const byteOffset = state.params.writeRange(range);
-        const xGroups = Math.ceil(paddedWindowSize / workgroupSize);
+        const xGroups = Math.ceil(
+          paddedWindowSize / (workgroupSize * sliceSamplesPerThread),
+        );
         pass.setPipeline(state.pipeline);
         pass.setBindGroup(0, state.bindGroup, [byteOffset]);
         pass.dispatchWorkgroups(xGroups, range.columnCount);
