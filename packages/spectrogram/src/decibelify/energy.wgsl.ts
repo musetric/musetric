@@ -29,12 +29,8 @@ fn main(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local_invocation
   }
 
   let windowOffset = halfSize * windowIndex;
-  let chunkSize = (halfSize + 63u) / 64u;
-  let chunkStart = chunkSize * workerId;
-  let chunkEnd = min(chunkStart + chunkSize, halfSize);
-
   var sum = 0.0;
-  for (var i = chunkStart; i < chunkEnd; i += 1u) {
+  for (var i = workerId; i < halfSize; i += 64u) {
     sum += magnitude[windowOffset + i];
   }
 
