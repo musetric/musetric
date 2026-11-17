@@ -5,7 +5,6 @@ export const fragmentShader = `
 ${drawParamsStruct}
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
-@group(0) @binding(1) var valueSampler : sampler;
 @group(0) @binding(2) var spectrogramTextures : texture_2d_array<f32>;
 @group(0) @binding(3) var<storage, read> referenceLine : array<f32>;
 @group(0) @binding(4) var<storage, read> targetLine : array<f32>;
@@ -253,18 +252,8 @@ fn slotForScreenX(baseSlot: u32, screenX: u32, width: u32) -> u32 {
   return (baseSlot + screenX) % width;
 }
 
-fn sampleSpectrogram(slot: u32, y: u32, layer: u32, width: u32, height: u32) -> f32 {
-  let sampleUv = vec2f(
-    (f32(slot) + 0.5) / f32(width),
-    (f32(y) + 0.5) / f32(height),
-  );
-  return textureSampleLevel(
-    spectrogramTextures,
-    valueSampler,
-    sampleUv,
-    layer,
-    0.0,
-  ).r;
+fn sampleSpectrogram(slot: u32, y: u32, layer: u32) -> f32 {
+  return textureLoad(spectrogramTextures, vec2u(slot, y), layer, 0).r;
 }
 
 fn sampleBandSpectrogram(
@@ -272,7 +261,6 @@ fn sampleBandSpectrogram(
   bandY: u32,
   bandHeight: u32,
   layer: u32,
-  width: u32,
   textureHeight: u32,
 ) -> f32 {
   let rowsPerPixel = f32(textureHeight - 1u) / f32(max(bandHeight, 2u) - 1u);
@@ -287,7 +275,7 @@ fn sampleBandSpectrogram(
   );
   var value = 0.0;
   for (var row = firstRow; row < lastRow; row += 1u) {
-    value = max(value, sampleSpectrogram(slot, row, layer, width, textureHeight));
+    value = max(value, sampleSpectrogram(slot, row, layer));
   }
   return value;
 }
@@ -338,7 +326,6 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
       bandY,
       bandHeight,
       select(0u, 1u, recordingShown),
-      width,
       textureHeight,
     );
     color = min(color + drawParams.foreground.xyz * intensity, vec3f(1.0));

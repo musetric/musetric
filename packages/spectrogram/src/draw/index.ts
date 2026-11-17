@@ -30,12 +30,7 @@ export const createSpectrogramDrawCell = (
 ): ResourceCell<SpectrogramDrawArg, SpectrogramDraw> => {
   const canvasCell = createCanvasCell(device);
   const colorsCell = createColorsCell(device);
-  const sampler = device.createSampler({
-    label: 'draw-sampler',
-    magFilter: 'nearest',
-    minFilter: 'nearest',
-  });
-  const bindGroupCell = createBindGroupCell(device, sampler);
+  const bindGroupCell = createBindGroupCell(device);
   const columnsCell = createColumnsCell(device);
   const ringSlotsScratch = new Uint32Array(4);
 
