@@ -21,11 +21,11 @@ struct Params {
 
 @group(0) @binding(0) var<storage, read_write> scratch0: array<vec2<f32>>;
 @group(0) @binding(1) var<storage, read_write> scratch1: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
+@group(0) @binding(2) var<storage, read> fftTrigTable: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: Params;
-@group(0) @binding(4) var<storage, read> sourceSpectrum: array<f32>;
-@group(0) @binding(5) var<storage, read_write> signal: array<f32>;
-@group(0) @binding(6) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(4) var<storage, read> sourceSpectrum: array<vec2<f32>>;
+@group(0) @binding(5) var<storage, read_write> signal: array<vec2<f32>>;
+@group(0) @binding(6) var<storage, read> r2cTrigTable: array<vec2<f32>>;
 
 var<private> windowScratchOffset: u32;
 var<private> windowSpectrumOffset: u32;
@@ -38,22 +38,17 @@ fn getOutputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readSpectrumFloat(index: u32) -> f32 {
-  if (inPlace == 1u) {
-    return signal[windowSpectrumOffset + index];
-  }
-  return sourceSpectrum[windowSpectrumOffset + index];
-}
-
 fn readSpectrumBin(k: u32) -> vec2<f32> {
-  let index = 2u * k;
-  return vec2<f32>(readSpectrumFloat(index), readSpectrumFloat(index + 1u));
+  if (inPlace == 1u) {
+    return signal[windowSpectrumOffset / 2u + k];
+  }
+  return sourceSpectrum[windowSpectrumOffset / 2u + k];
 }
 
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {
   if (k == 0u) {
-    let dc = readSpectrumFloat(0u);
-    let nyquist = readSpectrumFloat(2u * packedWindowSize);
+    let dc = readSpectrumBin(0u).x;
+    let nyquist = readSpectrumBin(packedWindowSize).x;
     return vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
   }
 
@@ -63,7 +58,7 @@ fn loadPackedSpectrum(k: u32) -> vec2<f32> {
   let b = vec2<f32>(mirror.x, -mirror.y);
   let even = 0.5 * (a + b);
   let diff = 0.5 * (a - b);
-  let invTwiddle = vec2<f32>(r2cTrigTable[2u * k], r2cTrigTable[2u * k + 1u]);
+  let invTwiddle = r2cTrigTable[k];
   let odd = mul(diff, invTwiddle);
   return even + vec2<f32>(-odd.y, odd.x);
 }
@@ -82,8 +77,7 @@ fn writeScratch(index: u32, value: vec2<f32>) {
   if (writeToSignal == 1u) {
     let localIndex = index - windowScratchOffset;
     let scaled = value * (1.0 / f32(packedWindowSize));
-    signal[windowSignalOffset + 2u * localIndex] = scaled.x;
-    signal[windowSignalOffset + 2u * localIndex + 1u] = scaled.y;
+    signal[windowSignalOffset / 2u + localIndex] = scaled;
     return;
   }
   if (writeBufferIndex == 0u) {

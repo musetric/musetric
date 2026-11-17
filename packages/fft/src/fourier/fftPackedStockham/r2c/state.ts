@@ -18,7 +18,7 @@ import { createTrigTables } from './trigTables.js';
 const createDummyInputBuffer = (device: GPUDevice): GPUBuffer =>
   device.createBuffer({
     label: 'packed-stockham-r2c-dummy-input',
-    size: Float32Array.BYTES_PER_ELEMENT,
+    size: 2 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
 

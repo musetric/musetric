@@ -5,6 +5,7 @@ import {
   type MultiPassRadixStage,
   type RadixStageCounts,
 } from '../../factorization.es.js';
+import { maxPingPongPackedWindowSize } from '../workgroupStorage.es.js';
 
 const pairThreadsPerGroup = 8;
 const maxPairGroupSize = 64;
@@ -133,8 +134,8 @@ export const getPackedStockhamC2rVariant = (
     positiveWindowSize: packedWindowSize + 1,
   };
 
-  const maxSinglePassPacked = Math.floor(
-    device.limits.maxComputeWorkgroupStorageSize / 16,
+  const maxSinglePassPacked = maxPingPongPackedWindowSize(
+    device.limits.maxComputeWorkgroupStorageSize,
   );
   if (packedWindowSize <= maxSinglePassPacked) {
     return { kind: 'singlePass', ...base, radixStageCounts };

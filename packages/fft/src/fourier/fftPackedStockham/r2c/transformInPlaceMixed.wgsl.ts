@@ -19,10 +19,10 @@ struct Params {
 
 var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 
-@group(0) @binding(0) var<storage, read> wave: array<f32>;
-@group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
-@group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
-@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(0) var<storage, read> wave: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read_write> spectrum: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> fftTrigTable: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<vec2<f32>>;
 @group(0) @binding(4) var<uniform> params: Params;
 ${stockhamCombines}
 fn getFactorCount() -> u32 {
@@ -124,16 +124,11 @@ fn getInputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readInput(inputOffset: u32, sampleIndex: u32) -> f32 {
-  if (inPlace == 1u) {
-    return spectrum[inputOffset + sampleIndex];
-  }
-  return wave[inputOffset + sampleIndex];
-}
-
 fn loadPacked(inputOffset: u32, packedIndex: u32) -> vec2<f32> {
-  let s = packedIndex * 2u;
-  return vec2<f32>(readInput(inputOffset, s), readInput(inputOffset, s + 1u));
+  if (inPlace == 1u) {
+    return spectrum[inputOffset / 2u + packedIndex];
+  }
+  return wave[inputOffset / 2u + packedIndex];
 }
 
 fn getResult(index: u32) -> vec2<f32> {
@@ -153,8 +148,9 @@ fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
     0.5 * (value.y + mirrorValue.y),
     0.5 * (mirrorValue.x - value.x),
   );
-  let twiddleReal = r2cTrigTable[2u * k];
-  let twiddleImag = -r2cTrigTable[2u * k + 1u];
+  let twiddle = r2cTrigTable[k];
+  let twiddleReal = twiddle.x;
+  let twiddleImag = -twiddle.y;
   let product = vec2<f32>(
     odd.x * twiddleReal - odd.y * twiddleImag,
     odd.x * twiddleImag + odd.y * twiddleReal,
@@ -163,9 +159,7 @@ fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
 }
 
 fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
-  let index = spectrumOffset + 2u * k;
-  spectrum[index] = value.x;
-  spectrum[index + 1u] = value.y;
+  spectrum[spectrumOffset / 2u + k] = value;
 }
 
 @compute @workgroup_size(threadCount)
@@ -212,11 +206,7 @@ fn main(
     firstStage = 1u;
   } else {
     for (var i = t; i < packedWindowSize; i += threadCount) {
-      let sampleIndex = i * 2u;
-      let value = vec2<f32>(
-        readInput(inputOffset, sampleIndex),
-        readInput(inputOffset, sampleIndex + 1u),
-      );
+      let value = loadPacked(inputOffset, i);
       store(reverseMixed(i), value);
     }
     workgroupBarrier();

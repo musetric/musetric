@@ -1,4 +1,5 @@
 import { pitchParamsStruct } from './paramsStruct.wgsl.js';
+import { pitchSalienceFunctions } from './salience.wgsl.js';
 import { pitchObservationStruct, pitchSlotStruct } from './slots.wgsl.js';
 
 export const observeShader = `
@@ -17,16 +18,16 @@ ${pitchObservationStruct}
 const workgroupWidth = 64u;
 const latticeSize = 5u;
 const maxCandidateCount = 512u;
-const prominenceProbeRatio = 1.041243772;
-
-const harmonicWeights = array<f32, 11>(
-  0.0, 1.0, 0.5, 0.333333333, 0.25, 0.2,
-  0.166666667, 0.142857143, 0.125, 0.111111111, 0.1,
-);
+const maxRefineHarmonics = 40u;
 
 var<workgroup> salience: array<f32, 512>;
 var<workgroup> picked: array<vec2<f32>, 5>;
+var<workgroup> chosen: array<u32, 5>;
+var<workgroup> coarse: array<f32, 5>;
 var<workgroup> pickedCount: u32;
+var<workgroup> pickDone: u32;
+var<workgroup> bestKey: atomic<u32>;
+var<workgroup> bestIndex: atomic<u32>;
 var<workgroup> peakPeriodicity: array<f32, 64>;
 
 fn frequencyAtCandidate(candidate: u32) -> f32 {
@@ -38,124 +39,68 @@ fn binFrequency() -> f32 {
   return params.sampleRate / f32(params.fftSize);
 }
 
-fn whitenedAt(slotIndex: u32, frequency: f32) -> f32 {
-  let rawIndex = frequency / binFrequency();
-  let lowerIndex = u32(floor(rawIndex));
-  if (frequency <= 0.0 || lowerIndex + 1u >= params.spectrumBins) {
-    return 0.0;
-  }
-  let base = slotIndex * params.spectrumBins;
-  return mix(
-    whitened[base + lowerIndex],
-    whitened[base + lowerIndex + 1u],
-    fract(rawIndex),
-  );
-}
-
-fn loudnessAt(slotIndex: u32, frequency: f32) -> f32 {
-  let center = whitenedAt(slotIndex, frequency);
-  let lower = whitenedAt(slotIndex, frequency / prominenceProbeRatio);
-  let upper = whitenedAt(slotIndex, frequency * prominenceProbeRatio);
-  let prominence = max(center - 0.5 * max(lower, upper), 0.0);
-  if (prominence <= 0.0) {
-    return 0.0;
-  }
-  return pow(prominence, params.loudnessExponent);
-}
-
-fn combSalience(slotIndex: u32, frequency: f32) -> f32 {
-  var weighted = 0.0;
-  var antiWeighted = 0.0;
-  var totalWeight = 0.0;
-  var fundamental = 0.0;
-  for (var harmonic = 1u; harmonic <= params.harmonicCount; harmonic += 1u) {
-    let weight = harmonicWeights[harmonic];
-    let order = f32(harmonic);
-    totalWeight += weight;
-    let loudness = loudnessAt(slotIndex, frequency * order);
-    weighted += loudness * weight;
-    if (harmonic == 1u) {
-      fundamental = loudness;
-    }
-    let anti =
-      0.5 * loudnessAt(slotIndex, frequency * (order + 0.5)) +
-      0.25 * loudnessAt(slotIndex, frequency * (order + 0.333333333)) +
-      0.25 * loudnessAt(slotIndex, frequency * (order + 0.666666667));
-    antiWeighted += anti * weight;
-  }
-  if (totalWeight <= 0.0) {
-    return 0.0;
-  }
-  return (weighted - params.antiWeight * antiWeighted) / totalWeight +
-    params.fundamentalWeight * fundamental;
-}
-
-fn periodicityAt(slotIndex: u32, frequency: f32) -> f32 {
-  let rawIndex = params.sampleRate / frequency - f32(params.minimumLag);
-  if (rawIndex < 0.0) {
-    return 0.0;
-  }
-  let lowerIndex = u32(floor(rawIndex));
-  if (lowerIndex + 1u >= params.lagCount) {
-    return 0.0;
-  }
-  let base = slotIndex * params.lagCount;
-  return mix(
-    periodicity[base + lowerIndex],
-    periodicity[base + lowerIndex + 1u],
-    fract(rawIndex),
-  );
-}
-
-fn candidateSalience(slotIndex: u32, frequency: f32, gate: f32) -> f32 {
-  let spectral = combSalience(slotIndex, frequency);
-  if (spectral <= 0.0) {
-    return 0.0;
-  }
-  let period = clamp(periodicityAt(slotIndex, frequency), 0.0, 1.0);
-  let agreement = params.periodicityFloor + (1.0 - params.periodicityFloor) * period;
-  let neutral = params.periodicityFloor + (1.0 - params.periodicityFloor) * 0.5;
-  let factor = min(agreement / neutral, params.agreementBoostCap);
-  return spectral * factor * gate;
-}
-
-fn refineWith(
+${pitchSalienceFunctions}
+fn refineTerm(
   slotIndex: u32,
   frequency: f32,
-  harmonics: u32,
+  harmonic: u32,
   tolerance: f32,
-) -> f32 {
+) -> vec2<f32> {
   let binWidth = binFrequency();
   let maxFrequency = f32(params.phaseBins - 1u) * binWidth;
+  let expected = frequency * f32(harmonic);
+  if (expected >= maxFrequency) {
+    return vec2<f32>(0.0, 0.0);
+  }
   let spectrumBase = slotIndex * params.spectrumBins;
   let frequencyBase = slotIndex * params.phaseBins;
+  let center = expected / binWidth;
+  let reach = max(params.refineSearchBins, tolerance * center);
+  let low = u32(max(1.0, floor(center - reach)));
+  let high = min(params.phaseBins - 1u, u32(ceil(center + reach)));
+  var bestBin = low;
+  var bestValue = -1.0;
+  for (var bin = low; bin <= high; bin += 1u) {
+    let value = whitened[spectrumBase + bin];
+    if (value > bestValue) {
+      bestValue = value;
+      bestBin = bin;
+    }
+  }
+  let measured = frequencies[frequencyBase + bestBin];
+  if (measured <= 0.0 || abs(measured - expected) > tolerance * expected) {
+    return vec2<f32>(0.0, 0.0);
+  }
+  let weight = max(bestValue, 0.0);
+  return vec2<f32>(weight * measured / f32(harmonic), weight);
+}
+
+fn fillRefineTerms(
+  slotIndex: u32,
+  threadIndex: u32,
+  count: u32,
+  harmonics: u32,
+  tolerance: f32,
+  fine: bool,
+) {
+  for (var item = threadIndex; item < count * harmonics; item += workgroupWidth) {
+    let pick = item / harmonics;
+    let harmonic = item % harmonics + 1u;
+    let frequency = select(picked[pick].x, coarse[pick], fine);
+    let term = refineTerm(slotIndex, frequency, harmonic, tolerance);
+    let slot = 2u * (pick * maxRefineHarmonics + harmonic - 1u);
+    salience[slot] = term.x;
+    salience[slot + 1u] = term.y;
+  }
+}
+
+fn refinedFrequency(pick: u32, harmonics: u32, frequency: f32) -> f32 {
   var weighted = 0.0;
   var total = 0.0;
-  for (var harmonic = 1u; harmonic <= harmonics; harmonic += 1u) {
-    let expected = frequency * f32(harmonic);
-    if (expected >= maxFrequency) {
-      break;
-    }
-    let center = expected / binWidth;
-    let reach = max(params.refineSearchBins, tolerance * center);
-    let low = u32(max(1.0, floor(center - reach)));
-    let high = min(params.phaseBins - 1u, u32(ceil(center + reach)));
-    var bestBin = low;
-    var bestValue = -1.0;
-    for (var bin = low; bin <= high; bin += 1u) {
-      let value = whitened[spectrumBase + bin];
-      if (value > bestValue) {
-        bestValue = value;
-        bestBin = bin;
-      }
-    }
-    let measured = frequencies[frequencyBase + bestBin];
-    if (measured <= 0.0 || abs(measured - expected) > tolerance * expected) {
-      continue;
-    }
-    let weight = max(bestValue, 0.0);
-    weighted += weight * measured / f32(harmonic);
-    total += weight;
+  for (var harmonic = 0u; harmonic < harmonics; harmonic += 1u) {
+    let slot = 2u * (pick * maxRefineHarmonics + harmonic);
+    weighted += salience[slot];
+    total += salience[slot + 1u];
   }
   if (total <= 0.0) {
     return frequency;
@@ -163,28 +108,13 @@ fn refineWith(
   return weighted / total;
 }
 
-fn refine(slotIndex: u32, frequency: f32) -> f32 {
-  let coarse = refineWith(
-    slotIndex,
-    frequency,
-    params.coarseRefineHarmonics,
-    params.coarseRefineTolerance,
-  );
-  return refineWith(
-    slotIndex,
-    coarse,
-    params.refineHarmonics,
-    params.refineTolerance,
-  );
-}
-
-fn harmonicShare(slotIndex: u32, frequency: f32) -> f32 {
+fn harmonicSharePart(slotIndex: u32, frequency: f32, threadIndex: u32) -> vec2<f32> {
   let binWidth = binFrequency();
   let bins = min(params.phaseBins, params.spectrumBins);
   let base = slotIndex * params.spectrumBins;
   var harmonic = 0.0;
   var total = 0.0;
-  for (var bin = 1u; bin < bins; bin += 1u) {
+  for (var bin = 1u + threadIndex; bin < bins; bin += workgroupWidth) {
     let value = whitened[base + bin];
     let energy = value * value;
     total += energy;
@@ -193,10 +123,7 @@ fn harmonicShare(slotIndex: u32, frequency: f32) -> f32 {
       harmonic += energy;
     }
   }
-  if (total <= 0.0) {
-    return 0.0;
-  }
-  return harmonic / total;
+  return vec2<f32>(harmonic, total);
 }
 
 @compute @workgroup_size(64)
@@ -213,6 +140,12 @@ fn observe(
   let level = levels[slotIndex];
   let gate = clamp((level - params.levelFloorDb) / max(params.levelRangeDb, 0.001), 0.0, 1.0);
 
+  if (threadIndex == 0u) {
+    pickedCount = 0u;
+    pickDone = 0u;
+    atomicStore(&bestKey, 0u);
+    atomicStore(&bestIndex, candidateCount);
+  }
   for (var candidate = threadIndex; candidate < candidateCount; candidate += workgroupWidth) {
     salience[candidate] = candidateSalience(slotIndex, frequencyAtCandidate(candidate), gate);
   }
@@ -223,58 +156,89 @@ fn observe(
   peakPeriodicity[threadIndex] = peak;
   workgroupBarrier();
 
-  if (threadIndex == 0u) {
-    let separation = u32(max(1.0, params.peakSeparationCents / params.candidateStepCents));
-    var chosen = array<u32, 5>(0u, 0u, 0u, 0u, 0u);
-    var count = 0u;
-    for (var rank = 0u; rank < latticeSize; rank += 1u) {
-      var bestScore = 0.0;
-      var bestCandidate = candidateCount;
-      for (var candidate = 0u; candidate < candidateCount; candidate += 1u) {
-        let score = salience[candidate];
-        if (score <= bestScore) {
-          continue;
+  let separation = u32(max(1.0, params.peakSeparationCents / params.candidateStepCents));
+  for (var rank = 0u; rank < latticeSize; rank += 1u) {
+    var bestScore = 0.0;
+    var bestCandidate = candidateCount;
+    for (var candidate = threadIndex; candidate < candidateCount; candidate += workgroupWidth) {
+      let score = salience[candidate];
+      if (score <= bestScore) {
+        continue;
+      }
+      let previous = select(-1.0, salience[candidate - 1u], candidate > 0u);
+      let next = select(-1.0, salience[candidate + 1u], candidate + 1u < candidateCount);
+      if (score < previous || score <= next) {
+        continue;
+      }
+      var tooClose = false;
+      for (var prior = 0u; prior < rank; prior += 1u) {
+        if (u32(abs(i32(candidate) - i32(chosen[prior]))) < separation) {
+          tooClose = true;
         }
-        let previous = select(-1.0, salience[candidate - 1u], candidate > 0u);
-        let next = select(-1.0, salience[candidate + 1u], candidate + 1u < candidateCount);
-        if (score < previous || score <= next) {
-          continue;
-        }
-        var tooClose = false;
-        for (var prior = 0u; prior < count; prior += 1u) {
-          if (u32(abs(i32(candidate) - i32(chosen[prior]))) < separation) {
-            tooClose = true;
+      }
+      if (!tooClose) {
+        bestScore = score;
+        bestCandidate = candidate;
+      }
+    }
+    if (bestCandidate < candidateCount) {
+      atomicMax(&bestKey, bitcast<u32>(bestScore));
+    }
+    workgroupBarrier();
+    if (bestCandidate < candidateCount && bitcast<u32>(bestScore) == atomicLoad(&bestKey)) {
+      atomicMin(&bestIndex, bestCandidate);
+    }
+    workgroupBarrier();
+    if (threadIndex == 0u) {
+      let winner = atomicLoad(&bestIndex);
+      if (winner == candidateCount) {
+        pickDone = 1u;
+      } else {
+        let score = bitcast<f32>(atomicLoad(&bestKey));
+        var frequency = frequencyAtCandidate(winner);
+        if (winner > 0u && winner + 1u < candidateCount) {
+          let previous = salience[winner - 1u];
+          let next = salience[winner + 1u];
+          let denominator = previous - 2.0 * score + next;
+          if (abs(denominator) > 0.000001) {
+            let offset = clamp(0.5 * (previous - next) / denominator, -1.0, 1.0);
+            frequency *= exp2(offset * params.candidateStepCents / 1200.0);
           }
         }
-        if (!tooClose) {
-          bestScore = score;
-          bestCandidate = candidate;
-        }
+        chosen[rank] = winner;
+        picked[rank] = vec2<f32>(frequency, score);
+        pickedCount = rank + 1u;
       }
-      if (bestCandidate == candidateCount) {
-        break;
-      }
-      var frequency = frequencyAtCandidate(bestCandidate);
-      if (bestCandidate > 0u && bestCandidate + 1u < candidateCount) {
-        let previous = salience[bestCandidate - 1u];
-        let next = salience[bestCandidate + 1u];
-        let denominator = previous - 2.0 * bestScore + next;
-        if (abs(denominator) > 0.000001) {
-          let offset = clamp(0.5 * (previous - next) / denominator, -1.0, 1.0);
-          frequency *= exp2(offset * params.candidateStepCents / 1200.0);
-        }
-      }
-      chosen[count] = bestCandidate;
-      picked[count] = vec2<f32>(frequency, bestScore);
-      count += 1u;
+      atomicStore(&bestKey, 0u);
+      atomicStore(&bestIndex, candidateCount);
     }
-    pickedCount = count;
+    if (workgroupUniformLoad(&pickDone) == 1u) {
+      break;
+    }
+  }
+
+  let count = workgroupUniformLoad(&pickedCount);
+  let coarseHarmonics = min(params.coarseRefineHarmonics, maxRefineHarmonics);
+  let fineHarmonics = min(params.refineHarmonics, maxRefineHarmonics);
+  fillRefineTerms(slotIndex, threadIndex, count, coarseHarmonics, params.coarseRefineTolerance, false);
+  workgroupBarrier();
+  if (threadIndex < count) {
+    coarse[threadIndex] = refinedFrequency(threadIndex, coarseHarmonics, picked[threadIndex].x);
   }
   workgroupBarrier();
-
-  if (threadIndex < latticeSize && threadIndex < pickedCount) {
-    let entry = picked[threadIndex];
-    picked[threadIndex] = vec2<f32>(refine(slotIndex, entry.x), entry.y);
+  fillRefineTerms(slotIndex, threadIndex, count, fineHarmonics, params.refineTolerance, true);
+  workgroupBarrier();
+  if (threadIndex < count) {
+    picked[threadIndex] = vec2<f32>(
+      refinedFrequency(threadIndex, fineHarmonics, coarse[threadIndex]),
+      picked[threadIndex].y,
+    );
+  }
+  workgroupBarrier();
+  if (count > 0u) {
+    let part = harmonicSharePart(slotIndex, picked[0].x, threadIndex);
+    salience[2u * threadIndex] = part.x;
+    salience[2u * threadIndex + 1u] = part.y;
   }
   workgroupBarrier();
 
@@ -289,15 +253,21 @@ fn observe(
   var observation: PitchObservation;
   for (var index = 0u; index < latticeSize; index += 1u) {
     observation.candidates[index] = vec2<f32>(0.0, 0.0);
-    if (index < pickedCount) {
+    if (index < count) {
       observation.candidates[index] = picked[index];
     }
   }
   var best = 0.0;
   var share = 0.0;
-  if (pickedCount > 0u) {
+  if (count > 0u) {
     best = picked[0].y;
-    share = harmonicShare(slotIndex, picked[0].x);
+    var harmonicEnergy = 0.0;
+    var totalEnergy = 0.0;
+    for (var index = 0u; index < workgroupWidth; index += 1u) {
+      harmonicEnergy += salience[2u * index];
+      totalEnergy += salience[2u * index + 1u];
+    }
+    share = select(0.0, harmonicEnergy / totalEnergy, totalEnergy > 0.0);
   }
   let z = params.voicingBias +
     params.voicingPeriodicity * periodicityPeak +
