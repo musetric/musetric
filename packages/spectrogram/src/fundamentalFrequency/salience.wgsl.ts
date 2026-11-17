@@ -1,4 +1,19 @@
-export const pitchSalienceFunctions = `
+import { pitchParamsStruct } from './paramsStruct.wgsl.js';
+
+export const pitchCandidateFunctions = `
+const maxCandidateCount = 512u;
+
+fn frequencyAtCandidate(candidate: u32) -> f32 {
+  return params.minimumFrequency *
+    exp2(f32(candidate) * params.candidateStepCents / 1200.0);
+}
+
+fn binFrequency() -> f32 {
+  return params.sampleRate / f32(params.fftSize);
+}
+`;
+
+const pitchSalienceFunctions = `
 const prominenceProbeRatio = 1.041243772;
 
 const harmonicWeights = array<f32, 11>(
@@ -85,5 +100,30 @@ fn candidateSalience(slotIndex: u32, frequency: f32, gate: f32) -> f32 {
   let neutral = params.periodicityFloor + (1.0 - params.periodicityFloor) * 0.5;
   let factor = min(agreement / neutral, params.agreementBoostCap);
   return spectral * factor * gate;
+}
+`;
+
+export const salienceShader = `
+${pitchParamsStruct}
+
+@group(0) @binding(0) var<storage, read> whitened: array<f32>;
+@group(0) @binding(1) var<storage, read> levels: array<f32>;
+@group(0) @binding(2) var<storage, read> periodicity: array<f32>;
+@group(0) @binding(3) var<storage, read_write> salienceValues: array<f32>;
+@group(0) @binding(4) var<uniform> params: PitchParams;
+${pitchCandidateFunctions}
+${pitchSalienceFunctions}
+@compute @workgroup_size(64)
+fn salience(@builtin(global_invocation_id) id: vec3<u32>) {
+  let candidate = id.x;
+  let slotIndex = id.y;
+  let candidateCount = min(params.candidateCount, maxCandidateCount);
+  if (slotIndex >= params.slotCount || candidate >= candidateCount) {
+    return;
+  }
+  let level = levels[slotIndex];
+  let gate = clamp((level - params.levelFloorDb) / max(params.levelRangeDb, 0.001), 0.0, 1.0);
+  salienceValues[slotIndex * candidateCount + candidate] =
+    candidateSalience(slotIndex, frequencyAtCandidate(candidate), gate);
 }
 `;

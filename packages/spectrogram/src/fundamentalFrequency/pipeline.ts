@@ -8,6 +8,7 @@ import { observeShader } from './observe.wgsl.js';
 import { periodicityShader } from './periodicity.wgsl.js';
 import { powerShader } from './power.wgsl.js';
 import { projectShader } from './project.wgsl.js';
+import { salienceShader } from './salience.wgsl.js';
 import { sliceShader } from './slice.wgsl.js';
 import { smoothShader } from './smooth.wgsl.js';
 import { spectrumShader } from './spectrum.wgsl.js';
@@ -48,6 +49,7 @@ export type PitchPipelines = {
   spectrum: GPUComputePipeline;
   power: GPUComputePipeline;
   periodicity: GPUComputePipeline;
+  salience: GPUComputePipeline;
   observe: GPUComputePipeline;
   decode: GPUComputePipeline;
   fold: GPUComputePipeline;
@@ -98,11 +100,24 @@ export const createPitchPipelines = (device: GPUDevice): PitchPipelines => ({
       'dynamic-uniform',
     ],
   }),
+  salience: createPipeline(device, {
+    label: 'salience',
+    code: salienceShader,
+    entryPoint: 'salience',
+    kinds: [
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+      'dynamic-uniform',
+    ],
+  }),
   observe: createPipeline(device, {
     label: 'observe',
     code: observeShader,
     entryPoint: 'observe',
     kinds: [
+      'read-only-storage',
       'read-only-storage',
       'read-only-storage',
       'read-only-storage',

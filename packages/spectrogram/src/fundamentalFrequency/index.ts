@@ -207,6 +207,13 @@ export const createSpectrogramFundamentalFrequencyCell = (
             state.plan.slots.length,
           );
         }),
+        analysisStage('salience', (pass, state) => {
+          bindAnalysis(pass, state, pipelines.salience, bindGroups.salience);
+          pass.dispatchWorkgroups(
+            Math.ceil(settings.candidateCount / workgroupSize),
+            state.plan.slots.length,
+          );
+        }),
         analysisStage('observe', (pass, state) => {
           bindAnalysis(pass, state, pipelines.observe, bindGroups.observe);
           pass.dispatchWorkgroups(state.plan.slots.length);

@@ -1,5 +1,5 @@
 import { pitchParamsStruct } from './paramsStruct.wgsl.js';
-import { pitchSalienceFunctions } from './salience.wgsl.js';
+import { pitchCandidateFunctions } from './salience.wgsl.js';
 import { pitchObservationStruct, pitchSlotStruct } from './slots.wgsl.js';
 
 export const observeShader = `
@@ -12,12 +12,12 @@ ${pitchObservationStruct}
 @group(0) @binding(2) var<storage, read> frequencies: array<f32>;
 @group(0) @binding(3) var<storage, read> levels: array<f32>;
 @group(0) @binding(4) var<storage, read> periodicity: array<f32>;
-@group(0) @binding(5) var<storage, read_write> observations: array<PitchObservation>;
-@group(0) @binding(6) var<uniform> params: PitchParams;
+@group(0) @binding(5) var<storage, read> salienceValues: array<f32>;
+@group(0) @binding(6) var<storage, read_write> observations: array<PitchObservation>;
+@group(0) @binding(7) var<uniform> params: PitchParams;
 
 const workgroupWidth = 64u;
 const latticeSize = 5u;
-const maxCandidateCount = 512u;
 const maxRefineHarmonics = 40u;
 
 var<workgroup> salience: array<f32, 512>;
@@ -30,16 +30,7 @@ var<workgroup> bestKey: atomic<u32>;
 var<workgroup> bestIndex: atomic<u32>;
 var<workgroup> peakPeriodicity: array<f32, 64>;
 
-fn frequencyAtCandidate(candidate: u32) -> f32 {
-  return params.minimumFrequency *
-    exp2(f32(candidate) * params.candidateStepCents / 1200.0);
-}
-
-fn binFrequency() -> f32 {
-  return params.sampleRate / f32(params.fftSize);
-}
-
-${pitchSalienceFunctions}
+${pitchCandidateFunctions}
 fn refineTerm(
   slotIndex: u32,
   frequency: f32,
@@ -138,7 +129,6 @@ fn observe(
   }
   let candidateCount = min(params.candidateCount, maxCandidateCount);
   let level = levels[slotIndex];
-  let gate = clamp((level - params.levelFloorDb) / max(params.levelRangeDb, 0.001), 0.0, 1.0);
 
   if (threadIndex == 0u) {
     pickedCount = 0u;
@@ -147,7 +137,7 @@ fn observe(
     atomicStore(&bestIndex, candidateCount);
   }
   for (var candidate = threadIndex; candidate < candidateCount; candidate += workgroupWidth) {
-    salience[candidate] = candidateSalience(slotIndex, frequencyAtCandidate(candidate), gate);
+    salience[candidate] = salienceValues[slotIndex * candidateCount + candidate];
   }
   var peak = 0.0;
   for (var lag = threadIndex; lag < params.lagCount; lag += workgroupWidth) {

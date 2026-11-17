@@ -18,6 +18,7 @@ export type PitchBuffers = {
   frequencies: GPUBuffer;
   levels: GPUBuffer;
   periodicity: GPUBuffer;
+  salience: GPUBuffer;
   observations: GPUBuffer;
   decoded: GPUBuffer;
   folded: GPUBuffer;
@@ -102,6 +103,11 @@ const createPitchBuffers = (
       slots * settings.lagCount * Float32Array.BYTES_PER_ELEMENT,
       GPUBufferUsage.STORAGE,
     ),
+    salience: create(
+      'salience',
+      slots * settings.candidateCount * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
     observations: create(
       'observations',
       settings.ringFrames * pitchObservationBytes,
@@ -159,6 +165,7 @@ export type PitchBindGroups = {
   spectrum: GPUBindGroup;
   power: GPUBindGroup;
   periodicity: GPUBindGroup;
+  salience: GPUBindGroup;
   observe: GPUBindGroup;
   decode: GPUBindGroup;
   fold: GPUBindGroup;
@@ -216,12 +223,20 @@ const createBindGroups = (
       { buffer: buffers.periodicity },
       uniform,
     ]),
+    salience: create(pipelines.salience, 'salience', [
+      { buffer: buffers.whitened },
+      { buffer: buffers.levels },
+      { buffer: buffers.periodicity },
+      { buffer: buffers.salience },
+      uniform,
+    ]),
     observe: create(pipelines.observe, 'observe', [
       { buffer: buffers.slots },
       { buffer: buffers.whitened },
       { buffer: buffers.frequencies },
       { buffer: buffers.levels },
       { buffer: buffers.periodicity },
+      { buffer: buffers.salience },
       { buffer: buffers.observations },
       uniform,
     ]),
