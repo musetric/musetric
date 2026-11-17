@@ -45,10 +45,15 @@ fn spectrum(
   let chunkStart = min(threadIndex * chunk, bins);
   let chunkEnd = min(chunkStart + chunk, bins);
 
+  for (var bin = threadIndex; bin < bins; bin += workgroupWidth) {
+    cumulative[bin + 1u] = magnitudeAt(slotIndex, bin);
+  }
+  workgroupBarrier();
+
   var running = 0.0;
   var power = 0.0;
   for (var bin = chunkStart; bin < chunkEnd; bin += 1u) {
-    let value = magnitudeAt(slotIndex, bin);
+    let value = cumulative[bin + 1u];
     running += value;
     power += value * value;
     cumulative[bin + 1u] = running;
@@ -57,24 +62,29 @@ fn spectrum(
   powerTotals[threadIndex] = power;
   workgroupBarrier();
 
-  if (threadIndex == 0u) {
-    var total = 0.0;
-    var totalPower = 0.0;
-    for (var index = 0u; index < workgroupWidth; index += 1u) {
-      let chunkTotal = chunkTotals[index];
-      chunkTotals[index] = total;
-      total += chunkTotal;
-      totalPower += powerTotals[index];
+  for (var stride = 1u; stride < workgroupWidth; stride *= 2u) {
+    var chunkAddend = 0.0;
+    var powerAddend = 0.0;
+    if (threadIndex >= stride) {
+      chunkAddend = chunkTotals[threadIndex - stride];
+      powerAddend = powerTotals[threadIndex - stride];
     }
-    cumulative[0] = 0.0;
-    let level = 3.01029996 * log2(totalPower + 1.0e-30) -
-      params.levelOffsetDb;
-    levels[slotIndex] = level;
-    powerTotals[0] = level;
+    workgroupBarrier();
+    chunkTotals[threadIndex] += chunkAddend;
+    powerTotals[threadIndex] += powerAddend;
+    workgroupBarrier();
   }
-  workgroupBarrier();
 
-  let offset = chunkTotals[threadIndex];
+  let level = 3.01029996 * log2(powerTotals[workgroupWidth - 1u] + 1.0e-30) -
+    params.levelOffsetDb;
+  if (threadIndex == 0u) {
+    cumulative[0] = 0.0;
+    levels[slotIndex] = level;
+  }
+  var offset = 0.0;
+  if (threadIndex > 0u) {
+    offset = chunkTotals[threadIndex - 1u];
+  }
   for (var bin = chunkStart; bin < chunkEnd; bin += 1u) {
     cumulative[bin + 1u] += offset;
   }
@@ -82,7 +92,7 @@ fn spectrum(
 
   let ratio = exp2(params.envelopeHalfOctaves) - 1.0;
   let whitenedBase = slotIndex * params.spectrumBins;
-  for (var bin = chunkStart; bin < chunkEnd; bin += 1u) {
+  for (var bin = threadIndex; bin < bins; bin += workgroupWidth) {
     let center = f32(bin);
     let halfWidth = max(center * ratio, params.envelopeMinHalfBins);
     let low = u32(max(center - halfWidth, 0.0));
@@ -104,7 +114,6 @@ fn spectrum(
     );
   }
   let fftSize = f32(params.fftSize);
-  let level = powerTotals[0];
   let minimumPower = exp2(
     (level + params.levelOffsetDb - params.refineRangeDb) / 3.01029996,
   );
