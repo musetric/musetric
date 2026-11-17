@@ -8,6 +8,7 @@ import {
   type Radix8PreferredStageCounts,
   type RadixStageCounts,
 } from '../../factorization.es.js';
+import { maxPingPongPackedWindowSize } from '../workgroupStorage.es.js';
 
 const minPackedWindowSize = 2;
 const pairThreadsPerGroup = 8;
@@ -143,8 +144,8 @@ export const getPackedStockhamR2cVariant = (
     return undefined;
   }
 
-  const maxStockhamPackedWindowSize = Math.floor(
-    device.limits.maxComputeWorkgroupStorageSize / 16,
+  const maxStockhamPackedWindowSize = maxPingPongPackedWindowSize(
+    device.limits.maxComputeWorkgroupStorageSize,
   );
   if (packedWindowSize <= maxStockhamPackedWindowSize) {
     return {
