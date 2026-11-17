@@ -110,10 +110,11 @@ fn readRawSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
 
 fn readSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
   let value = readRawSpectrumBin(spectrumOffset, k);
-  if (squareSpectrum == 1u) {
-    return vec2<f32>(dot(value, value), 0.0);
-  }
-  return value;
+  return select(
+    value,
+    vec2<f32>(dot(value, value), 0.0),
+    squareSpectrum == 1u,
+  );
 }
 
 fn loadPackedSpectrum(spectrumOffset: u32, k: u32) -> vec2<f32> {
