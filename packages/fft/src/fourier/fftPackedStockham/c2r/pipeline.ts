@@ -62,11 +62,13 @@ const createTransformConstants = (
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
   inPlace: boolean,
+  squareSpectrum: boolean,
 ) => {
   const counts = selectTransformStageCounts(variant);
   return {
     packedWindowSize: variant.packedWindowSize,
     inPlace: inPlace ? 1 : 0,
+    squareSpectrum: squareSpectrum ? 1 : 0,
     threadCount: selectTransformThreadCount(variant, counts),
     ...counts,
     ...(variant.kind === 'singlePass'
@@ -79,6 +81,7 @@ const createKernelConstants = (
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
   kernel: PackedStockhamC2rKernel,
   inPlace: boolean,
+  squareSpectrum: boolean,
 ): Record<string, number> => {
   const base = {
     packedWindowSize: variant.packedWindowSize,
@@ -88,6 +91,7 @@ const createKernelConstants = (
     readFromPrepack: kernel.readFromPrepack ? 1 : 0,
     writeToSignal: kernel.writeToSignal ? 1 : 0,
     inPlace: inPlace ? 1 : 0,
+    squareSpectrum: squareSpectrum ? 1 : 0,
     threadCount: kernel.threadCount,
   };
   if (kernel.kind === 'pair') {
@@ -118,6 +122,7 @@ const createSinglePassPipeline = (
     { kind: 'singlePass' | 'inPlaceMixed' }
   >,
   inPlace: boolean,
+  squareSpectrum: boolean,
 ): SinglePassPipeline => {
   const module = device.createShaderModule({
     label: 'packed-stockham-c2r-transform-shader',
@@ -134,7 +139,7 @@ const createSinglePassPipeline = (
       compute: {
         module,
         entryPoint: 'main',
-        constants: createTransformConstants(variant, inPlace),
+        constants: createTransformConstants(variant, inPlace, squareSpectrum),
       },
     }),
   };
@@ -149,6 +154,7 @@ const createMultiPassPipeline = (
   device: GPUDevice,
   variant: Extract<PackedStockhamC2rVariant, { kind: 'multiPass' }>,
   inPlace: boolean,
+  squareSpectrum: boolean,
 ): MultiPassPipeline => {
   const stageModule = device.createShaderModule({
     label: 'packed-stockham-c2r-multipass-stage-shader',
@@ -168,7 +174,12 @@ const createMultiPassPipeline = (
         compute: {
           module: kernel.kind === 'pair' ? pairModule : stageModule,
           entryPoint: 'main',
-          constants: createKernelConstants(variant, kernel, inPlace),
+          constants: createKernelConstants(
+            variant,
+            kernel,
+            inPlace,
+            squareSpectrum,
+          ),
         },
       }),
     ),
@@ -181,9 +192,10 @@ export const createPipeline = (
   device: GPUDevice,
   variant: PackedStockhamC2rVariant,
   inPlace: boolean,
+  squareSpectrum: boolean,
 ): Pipeline => {
   if (variant.kind === 'multiPass') {
-    return createMultiPassPipeline(device, variant, inPlace);
+    return createMultiPassPipeline(device, variant, inPlace, squareSpectrum);
   }
-  return createSinglePassPipeline(device, variant, inPlace);
+  return createSinglePassPipeline(device, variant, inPlace, squareSpectrum);
 };

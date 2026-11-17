@@ -5,11 +5,12 @@ export type DrawBindGroupArg = {
   referenceLine: GPUBuffer;
   targetLine: GPUBuffer;
   verdict: GPUBuffer;
+  lineColumns: GPUBuffer;
   colors: GPUBuffer;
   layout: GPUBindGroupLayout;
 };
 
-export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
+export const createBindGroupCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: DrawBindGroupArg): GPUBindGroup =>
       device.createBindGroup({
@@ -17,11 +18,11 @@ export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
         layout: arg.layout,
         entries: [
           { binding: 0, resource: { buffer: arg.colors } },
-          { binding: 1, resource: sampler },
           { binding: 2, resource: arg.arrayView },
           { binding: 3, resource: { buffer: arg.referenceLine } },
           { binding: 4, resource: { buffer: arg.targetLine } },
           { binding: 5, resource: { buffer: arg.verdict } },
+          { binding: 6, resource: { buffer: arg.lineColumns } },
         ],
       }),
     dispose: () => undefined,
@@ -30,6 +31,7 @@ export const createBindGroupCell = (device: GPUDevice, sampler: GPUSampler) =>
       current.referenceLine === next.referenceLine &&
       current.targetLine === next.targetLine &&
       current.verdict === next.verdict &&
+      current.lineColumns === next.lineColumns &&
       current.colors === next.colors &&
       current.layout === next.layout,
   });

@@ -10,4 +10,5 @@ export type IFourierMode = (typeof allIFourierModes)[number];
 export type FourierConfig = {
   windowSize: number;
   windowCount: number;
+  squareSpectrum?: boolean;
 };

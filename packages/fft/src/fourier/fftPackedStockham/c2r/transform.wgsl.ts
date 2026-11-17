@@ -12,6 +12,7 @@ override radix2StageCount: u32 = 0u;
 override radix3StageCount: u32 = 0u;
 override radix5StageCount: u32 = 0u;
 override inPlace: u32 = 1u;
+override squareSpectrum: u32 = 0u;
 override threadCount: u32 = 64u;
 override smSize: u32 = 2048u;
 override twiddleSign: f32 = 1.0;
@@ -41,11 +42,20 @@ fn getOutputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
+fn readRawSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
   if (inPlace == 1u) {
     return signal[spectrumOffset / 2u + k];
   }
   return sourceSpectrum[spectrumOffset / 2u + k];
+}
+
+fn readSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
+  let value = readRawSpectrumBin(spectrumOffset, k);
+  return select(
+    value,
+    vec2<f32>(dot(value, value), 0.0),
+    squareSpectrum == 1u,
+  );
 }
 
 fn loadPackedSpectrum(spectrumOffset: u32, k: u32) -> vec2<f32> {

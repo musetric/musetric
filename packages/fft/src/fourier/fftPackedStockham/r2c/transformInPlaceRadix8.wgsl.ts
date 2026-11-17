@@ -158,19 +158,23 @@ fn main(
     let twiddleStep = packedWindowSize / len;
 
     for (var j = t; j < butterflyCount; j += threadCount) {
-      let k = j % quarter;
-      let block = j / quarter;
+      let k = j & (quarter - 1u);
+      let block = j >> countTrailingZeros(quarter);
       let base = block * len + k;
       let tw = k * twiddleStep;
 
       let a0 = getResult(base);
-      let a1 = mul(getResult(base + quarter), getFftTwiddle(tw));
-      let a2 = mul(getResult(base + 2u * quarter), getFftTwiddle(2u * tw));
-      let a3 = mul(getResult(base + 3u * quarter), getFftTwiddle(3u * tw));
-      let a4 = mul(getResult(base + 4u * quarter), getFftTwiddle(4u * tw));
-      let a5 = mul(getResult(base + 5u * quarter), getFftTwiddle(5u * tw));
-      let a6 = mul(getResult(base + 6u * quarter), getFftTwiddle(6u * tw));
-      let a7 = mul(getResult(base + 7u * quarter), getFftTwiddle(7u * tw));
+      let w1 = getFftTwiddle(tw);
+      let w2 = getFftTwiddle(2u * tw);
+      let w4 = getFftTwiddle(4u * tw);
+      let w3 = mul(w2, w1);
+      let a1 = mul(getResult(base + quarter), w1);
+      let a2 = mul(getResult(base + 2u * quarter), w2);
+      let a3 = mul(getResult(base + 3u * quarter), w3);
+      let a4 = mul(getResult(base + 4u * quarter), w4);
+      let a5 = mul(getResult(base + 5u * quarter), mul(w4, w1));
+      let a6 = mul(getResult(base + 6u * quarter), mul(w4, w2));
+      let a7 = mul(getResult(base + 7u * quarter), mul(w4, w3));
 
       let e0 = a0 + a4;
       let e1 = a0 - a4;

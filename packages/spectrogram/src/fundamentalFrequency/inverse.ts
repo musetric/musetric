@@ -17,6 +17,7 @@ export const createPitchInverseCell = (device: GPUDevice): PitchInverseCell => {
         config: {
           windowSize: settings.fftSize,
           windowCount: settings.batchSlots,
+          squareSpectrum: true,
         },
       }),
     dispose: () => {

@@ -12,6 +12,7 @@ import {
 } from './schedule.es.js';
 import { type PitchSampleRange } from './scheduleState.es.js';
 import { createPitchSettings, type PitchSettings } from './settings.es.js';
+import { pitchSliceSamplesPerThread } from './slice.wgsl.js';
 import {
   createPitchBindGroupsCell,
   createPitchBuffersCell,
@@ -168,7 +169,9 @@ export const createSpectrogramFundamentalFrequencyCell = (
         analysisStage('slice', (pass, state) => {
           bindAnalysis(pass, state, pipelines.slice, bindGroups.slice);
           pass.dispatchWorkgroups(
-            Math.ceil(settings.fftSize / workgroupSize),
+            Math.ceil(
+              settings.fftSize / (workgroupSize * pitchSliceSamplesPerThread),
+            ),
             state.plan.slots.length,
           );
         }),
@@ -181,13 +184,6 @@ export const createSpectrogramFundamentalFrequencyCell = (
         analysisStage('spectrum', (pass, state) => {
           bindAnalysis(pass, state, pipelines.spectrum, bindGroups.spectrum);
           pass.dispatchWorkgroups(state.plan.slots.length);
-        }),
-        analysisStage('power', (pass, state) => {
-          bindAnalysis(pass, state, pipelines.power, bindGroups.power);
-          pass.dispatchWorkgroups(
-            Math.ceil((settings.halfSize + 1) / workgroupSize),
-            state.plan.slots.length,
-          );
         }),
         analysisStage('autocorrelation', (pass, state) => {
           inverse.dispatch(pass, {
@@ -204,6 +200,13 @@ export const createSpectrogramFundamentalFrequencyCell = (
           );
           pass.dispatchWorkgroups(
             Math.ceil(settings.lagCount / workgroupSize),
+            state.plan.slots.length,
+          );
+        }),
+        analysisStage('salience', (pass, state) => {
+          bindAnalysis(pass, state, pipelines.salience, bindGroups.salience);
+          pass.dispatchWorkgroups(
+            Math.ceil(settings.candidateCount / workgroupSize),
             state.plan.slots.length,
           );
         }),

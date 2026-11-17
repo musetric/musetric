@@ -18,6 +18,7 @@ export type PitchBuffers = {
   frequencies: GPUBuffer;
   levels: GPUBuffer;
   periodicity: GPUBuffer;
+  salience: GPUBuffer;
   observations: GPUBuffer;
   decoded: GPUBuffer;
   folded: GPUBuffer;
@@ -102,6 +103,11 @@ const createPitchBuffers = (
       slots * settings.lagCount * Float32Array.BYTES_PER_ELEMENT,
       GPUBufferUsage.STORAGE,
     ),
+    salience: create(
+      'salience',
+      slots * settings.candidateCount * Float32Array.BYTES_PER_ELEMENT,
+      GPUBufferUsage.STORAGE,
+    ),
     observations: create(
       'observations',
       settings.ringFrames * pitchObservationBytes,
@@ -157,8 +163,8 @@ export const createPitchLineCell = (device: GPUDevice) =>
 export type PitchBindGroups = {
   slice: GPUBindGroup;
   spectrum: GPUBindGroup;
-  power: GPUBindGroup;
   periodicity: GPUBindGroup;
+  salience: GPUBindGroup;
   observe: GPUBindGroup;
   decode: GPUBindGroup;
   fold: GPUBindGroup;
@@ -206,14 +212,17 @@ const createBindGroups = (
       { buffer: buffers.levels },
       uniform,
     ]),
-    power: create(pipelines.power, 'power', [
-      { buffer: buffers.signal },
-      uniform,
-    ]),
     periodicity: create(pipelines.periodicity, 'periodicity', [
       { buffer: buffers.signal },
       { buffer: buffers.windowCorrelation },
       { buffer: buffers.periodicity },
+      uniform,
+    ]),
+    salience: create(pipelines.salience, 'salience', [
+      { buffer: buffers.whitened },
+      { buffer: buffers.levels },
+      { buffer: buffers.periodicity },
+      { buffer: buffers.salience },
       uniform,
     ]),
     observe: create(pipelines.observe, 'observe', [
@@ -222,6 +231,7 @@ const createBindGroups = (
       { buffer: buffers.frequencies },
       { buffer: buffers.levels },
       { buffer: buffers.periodicity },
+      { buffer: buffers.salience },
       { buffer: buffers.observations },
       uniform,
     ]),

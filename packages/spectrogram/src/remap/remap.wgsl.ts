@@ -177,6 +177,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     params.decibelFactor,
   );
   let finalIntensity = pow(intensity, max(params.displayGamma, 0.001));
-  textureStore(texture, vec2u(x, y), vec4f(finalIntensity, 0.0, 0.0, 1.0));
+  let storedIntensity = round(finalIntensity * 255.0) / 255.0;
+  textureStore(texture, vec2u(x, y), vec4f(storedIntensity, 0.0, 0.0, 1.0));
 }
 `;

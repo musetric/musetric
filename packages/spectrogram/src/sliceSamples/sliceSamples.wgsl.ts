@@ -1,4 +1,8 @@
+export const sliceSamplesPerThread = 4;
+
 export const shader = `
+const samplesPerThread = ${sliceSamplesPerThread}u;
+
 struct SliceSamplesParams {
   windowSize : u32,
   paddedWindowSize : u32,
@@ -25,7 +29,10 @@ fn roundToI32(value: f32) -> i32 {
 }
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+fn main(
+  @builtin(workgroup_id) groupId : vec3<u32>,
+  @builtin(local_invocation_id) localId : vec3<u32>,
+) {
   let windowSize = params.windowSize;
   let paddedWindowSize = params.paddedWindowSize;
   let signalStride = params.signalStride;
@@ -33,9 +40,9 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let visibleSamples = params.visibleSamples;
   let step = params.step;
 
-  let sampleIndex = gid.x;
-  let localColumn = gid.y;
-  if (sampleIndex >= paddedWindowSize) {
+  let firstSample = groupId.x * 64u * samplesPerThread + localId.x;
+  let localColumn = groupId.y;
+  if (firstSample >= paddedWindowSize) {
     return;
   }
 
@@ -51,12 +58,18 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   }
   let localOffset = u32(max(signedOffset, 0));
 
-  var value = 0.0;
-  if (sampleIndex < windowSize && signedOffset >= 0) {
-    let localIndex = localOffset + sampleIndex;
-    let ringIndex = (params.ringStart + localIndex) % visibleSamples;
-    value = samples[ringIndex] * windowFunction[sampleIndex];
+  for (var repeat = 0u; repeat < samplesPerThread; repeat += 1u) {
+    let sampleIndex = firstSample + 64u * repeat;
+    if (sampleIndex >= paddedWindowSize) {
+      break;
+    }
+    var value = 0.0;
+    if (sampleIndex < windowSize && signedOffset >= 0) {
+      let localIndex = localOffset + sampleIndex;
+      let ringIndex = (params.ringStart + localIndex) % visibleSamples;
+      value = samples[ringIndex] * windowFunction[sampleIndex];
+    }
+    signal[signalStride * slot + sampleIndex] = value;
   }
-  signal[signalStride * slot + sampleIndex] = value;
 }
 `;

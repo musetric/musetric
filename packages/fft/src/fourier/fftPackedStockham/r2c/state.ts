@@ -53,7 +53,7 @@ type CreateSinglePassBindGroupOptions = {
   device: GPUDevice;
   pipeline: Extract<
     Pipeline,
-    { kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed' }
+    { kind: 'stockham' | 'inPlaceRadix8' | 'inPlaceMixed' }
   >;
   tables: TrigTables;
   arg: FourierArg;
@@ -125,7 +125,7 @@ type BaseState = {
 };
 
 type SinglePassState = BaseState & {
-  kind: 'stockham' | 'inPlaceRadix4' | 'inPlaceMixed';
+  kind: 'stockham' | 'inPlaceRadix8' | 'inPlaceMixed';
   variant: Exclude<PackedStockhamR2cVariant, { kind: 'multiPass' }>;
   pipeline: SinglePassPipeline;
   getBindGroup: (slot: number) => GPUBindGroup;

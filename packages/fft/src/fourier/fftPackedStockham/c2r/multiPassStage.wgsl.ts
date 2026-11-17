@@ -9,6 +9,7 @@ override writeBufferIndex: u32 = 0u;
 override readFromPrepack: u32 = 0u;
 override writeToSignal: u32 = 0u;
 override inPlace: u32 = 1u;
+override squareSpectrum: u32 = 0u;
 override twiddleSign: f32 = 1.0;
 
 override threadCount: u32 = 64u;
@@ -38,11 +39,20 @@ fn getOutputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readSpectrumBin(k: u32) -> vec2<f32> {
+fn readRawSpectrumBin(k: u32) -> vec2<f32> {
   if (inPlace == 1u) {
     return signal[windowSpectrumOffset / 2u + k];
   }
   return sourceSpectrum[windowSpectrumOffset / 2u + k];
+}
+
+fn readSpectrumBin(k: u32) -> vec2<f32> {
+  let value = readRawSpectrumBin(k);
+  return select(
+    value,
+    vec2<f32>(dot(value, value), 0.0),
+    squareSpectrum == 1u,
+  );
 }
 
 fn loadPackedSpectrum(k: u32) -> vec2<f32> {

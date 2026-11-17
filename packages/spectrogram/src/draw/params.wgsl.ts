@@ -1,0 +1,17 @@
+export const drawParamsStruct = `struct DrawParams {
+  foreground : vec4f,
+  background : vec4f,
+  primary : vec4f,
+  frequencyMap : vec4f,
+  recordingMatchColor : vec4f,
+  recordingCloseColor : vec4f,
+  recordingMissColor : vec4f,
+  recordingTimingMissColor : vec4f,
+  comparisonThresholds : vec4f,
+  lineWidths : vec4f,
+  overlayTuning : vec4f,
+  laneLayout : vec4f,
+  visibility : vec4u,
+  noteVisibility : vec4u,
+  ringSlots : vec4u,
+};`;
