@@ -442,6 +442,6 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
     f32(bandTop + bandHeight),
     f32(width),
   );
-  return vec4f(color * coverage, coverage);
+  return round(vec4f(color * coverage, coverage) * 255.0) / 255.0;
 }
 `;
