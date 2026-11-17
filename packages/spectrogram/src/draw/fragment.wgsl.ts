@@ -43,6 +43,34 @@ fn pixelYAtFrequency(frequency: f32, height: f32) -> f32 {
 
 ${centsDistanceWgsl}
 
+fn lineReachesPixel(
+  pointY: f32,
+  height: f32,
+  centerFrequency: f32,
+  previousFrequency: f32,
+  nextFrequency: f32,
+  reachPixels: f32,
+) -> bool {
+  let center = log(centerFrequency);
+  var low = center;
+  var high = center;
+  if (previousFrequency > 0.0) {
+    let previous = log(previousFrequency);
+    low = min(low, previous);
+    high = max(high, previous);
+  }
+  if (nextFrequency > 0.0) {
+    let next = log(nextFrequency);
+    low = min(low, next);
+    high = max(high, next);
+  }
+  let logPerPixel = drawParams.frequencyMap.y / max(1.0, height - 1.0);
+  let reach = reachPixels * logPerPixel;
+  let pixel = drawParams.frequencyMap.x +
+    drawParams.frequencyMap.y * (1.0 - pointY / max(1.0, height - 1.0));
+  return pixel >= low - reach && pixel <= high + reach;
+}
+
 fn distanceToSegment(point: vec2f, start: vec2f, end: vec2f) -> f32 {
   let offset = point - start;
   let segment = end - start;
@@ -126,6 +154,12 @@ fn lineMaskAtPixel(
   if (centerFrequency <= 0.0) {
     return 0.0;
   }
+  let centsPerPixel = 1200.0 * drawParams.frequencyMap.y /
+    (log(2.0) * max(1.0, height - 1.0));
+  let reachPixels = 7.0 * max(1.0, widthCents / centsPerPixel) + 1.0;
+  if (!lineReachesPixel(point.y, height, centerFrequency, previousFrequency, nextFrequency, reachPixels)) {
+    return 0.0;
+  }
 
   let frequency = frequencyAtPixel(u32(point.y), height);
   let distance = centsDistance(frequency, centerFrequency);
@@ -203,6 +237,10 @@ fn lineDistanceAtPixel(
   nextFrequency: f32,
 ) -> f32 {
   if (centerFrequency <= 0.0) {
+    return height;
+  }
+  let reachPixels = 0.5 * drawParams.lineWidths.z + drawParams.lineWidths.w + 2.0;
+  if (!lineReachesPixel(point.y, height, centerFrequency, previousFrequency, nextFrequency, reachPixels)) {
     return height;
   }
 
