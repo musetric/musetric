@@ -24,10 +24,10 @@ struct Params {
 
 var<workgroup> sm: array<vec2<f32>, smSize>;
 
-@group(0) @binding(0) var<storage, read> sourceSpectrum: array<f32>;
-@group(0) @binding(1) var<storage, read_write> signal: array<f32>;
-@group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
-@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(0) var<storage, read> sourceSpectrum: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read_write> signal: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> fftTrigTable: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<vec2<f32>>;
 @group(0) @binding(4) var<uniform> params: Params;
 ${stockhamCombines}${stockhamLadderHelpers}
 fn complexStride() -> u32 {
@@ -41,25 +41,17 @@ fn getOutputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readSpectrumFloat(spectrumOffset: u32, index: u32) -> f32 {
-  if (inPlace == 1u) {
-    return signal[spectrumOffset + index];
-  }
-  return sourceSpectrum[spectrumOffset + index];
-}
-
 fn readSpectrumBin(spectrumOffset: u32, k: u32) -> vec2<f32> {
-  let index = 2u * k;
-  return vec2<f32>(
-    readSpectrumFloat(spectrumOffset, index),
-    readSpectrumFloat(spectrumOffset, index + 1u),
-  );
+  if (inPlace == 1u) {
+    return signal[spectrumOffset / 2u + k];
+  }
+  return sourceSpectrum[spectrumOffset / 2u + k];
 }
 
 fn loadPackedSpectrum(spectrumOffset: u32, k: u32) -> vec2<f32> {
   if (k == 0u) {
-    let dc = readSpectrumFloat(spectrumOffset, 0u);
-    let nyquist = readSpectrumFloat(spectrumOffset, 2u * packedWindowSize);
+    let dc = readSpectrumBin(spectrumOffset, 0u).x;
+    let nyquist = readSpectrumBin(spectrumOffset, packedWindowSize).x;
     return vec2<f32>(0.5 * (dc + nyquist), 0.5 * (dc - nyquist));
   }
 
@@ -69,7 +61,7 @@ fn loadPackedSpectrum(spectrumOffset: u32, k: u32) -> vec2<f32> {
   let b = vec2<f32>(mirror.x, -mirror.y);
   let even = 0.5 * (a + b);
   let diff = 0.5 * (a - b);
-  let invTwiddle = vec2<f32>(r2cTrigTable[2u * k], r2cTrigTable[2u * k + 1u]);
+  let invTwiddle = r2cTrigTable[k];
   let odd = mul(diff, invTwiddle);
   return even + vec2<f32>(-odd.y, odd.x);
 }
@@ -102,10 +94,7 @@ fn main(
     let b = vec2<f32>(mirror.x, -mirror.y);
     let even = 0.5 * (a + b);
     let diff = 0.5 * (a - b);
-    let invTwiddle = vec2<f32>(
-      r2cTrigTable[2u * k],
-      r2cTrigTable[2u * k + 1u],
-    );
+    let invTwiddle = r2cTrigTable[k];
     let odd = mul(diff, invTwiddle);
     sm[k] = vec2<f32>(even.x - odd.y, even.y + odd.x);
     sm[mirrorK] = vec2<f32>(even.x + odd.y, odd.x - even.y);
@@ -118,8 +107,7 @@ ${stockhamLadderStages}
   let scale = 1.0 / f32(packedWindowSize);
   for (var i = t; i < packedWindowSize; i += threadCount) {
     let value = getResult(i) * scale;
-    signal[signalOffset + 2u * i] = value.x;
-    signal[signalOffset + 2u * i + 1u] = value.y;
+    signal[signalOffset / 2u + i] = value;
   }
 }
 `;

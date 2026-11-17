@@ -14,10 +14,10 @@ struct Params {
 
 var<workgroup> sm: array<vec2<f32>, packedWindowSize>;
 
-@group(0) @binding(0) var<storage, read> wave: array<f32>;
-@group(0) @binding(1) var<storage, read_write> spectrum: array<f32>;
-@group(0) @binding(2) var<storage, read> fftTrigTable: array<f32>;
-@group(0) @binding(3) var<storage, read> r2cTrigTable: array<f32>;
+@group(0) @binding(0) var<storage, read> wave: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read_write> spectrum: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> fftTrigTable: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> r2cTrigTable: array<vec2<f32>>;
 @group(0) @binding(4) var<uniform> params: Params;
 
 fn reverseRadix8(index: u32) -> u32 {
@@ -51,16 +51,11 @@ fn getInputWindowOffset(windowIndex: u32) -> u32 {
   return params.windowSize * windowIndex;
 }
 
-fn readInput(inputOffset: u32, sampleIndex: u32) -> f32 {
-  if (inPlace == 1u) {
-    return spectrum[inputOffset + sampleIndex];
-  }
-  return wave[inputOffset + sampleIndex];
-}
-
 fn loadPacked(inputOffset: u32, packedIndex: u32) -> vec2<f32> {
-  let s = packedIndex * 2u;
-  return vec2<f32>(readInput(inputOffset, s), readInput(inputOffset, s + 1u));
+  if (inPlace == 1u) {
+    return spectrum[inputOffset / 2u + packedIndex];
+  }
+  return wave[inputOffset / 2u + packedIndex];
 }
 
 fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
@@ -71,7 +66,8 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
 }
 
 fn getFftTwiddle(index: u32) -> vec2<f32> {
-  return vec2<f32>(fftTrigTable[2u * index], -fftTrigTable[2u * index + 1u]);
+  let value = fftTrigTable[index];
+  return vec2<f32>(value.x, -value.y);
 }
 
 fn getResult(index: u32) -> vec2<f32> {
@@ -87,17 +83,13 @@ fn r2cBin(k: u32, value: vec2<f32>, mirrorValue: vec2<f32>) -> vec2<f32> {
     0.5 * (value.y + mirrorValue.y),
     0.5 * (mirrorValue.x - value.x),
   );
-  let twiddle = vec2<f32>(
-    r2cTrigTable[2u * k],
-    -r2cTrigTable[2u * k + 1u],
-  );
+  let table = r2cTrigTable[k];
+  let twiddle = vec2<f32>(table.x, -table.y);
   return even + mul(odd, twiddle);
 }
 
 fn writeBin(spectrumOffset: u32, k: u32, value: vec2<f32>) {
-  let index = spectrumOffset + 2u * k;
-  spectrum[index] = value.x;
-  spectrum[index + 1u] = value.y;
+  spectrum[spectrumOffset / 2u + k] = value;
 }
 
 @compute @workgroup_size(threadCount)

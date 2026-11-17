@@ -212,10 +212,8 @@ fn mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
 }
 
 fn getTwiddle(index: u32) -> vec2<f32> {
-  return vec2<f32>(
-    fftTrigTable[2u * index],
-    twiddleSign * fftTrigTable[2u * index + 1u],
-  );
+  let value = fftTrigTable[index];
+  return vec2<f32>(value.x, twiddleSign * value.y);
 }
 
 fn jmul(v: vec2<f32>) -> vec2<f32> {
