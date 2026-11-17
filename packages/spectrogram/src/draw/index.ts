@@ -8,6 +8,7 @@ import {
 import { createBindGroupCell } from './bindGroup.js';
 import { createCanvasCell } from './canvas.js';
 import { createColorsCell, drawRingSlotsByteOffset } from './colors.js';
+import { createColumnsCell } from './columns.js';
 
 export type SpectrogramDraw = {
   run: (
@@ -35,6 +36,7 @@ export const createSpectrogramDrawCell = (
     minFilter: 'nearest',
   });
   const bindGroupCell = createBindGroupCell(device, sampler);
+  const columnsCell = createColumnsCell(device);
   const ringSlotsScratch = new Uint32Array(4);
 
   return {
@@ -44,11 +46,18 @@ export const createSpectrogramDrawCell = (
       const canvas = canvasCell.get(config.canvas);
       setOffscreenCanvasSize(config.canvas, config.viewSize);
       const colors = colorsCell.get(config);
+      const columns = columnsCell.get({
+        width: config.viewSize.width,
+        colors: colors.buffer,
+        referenceLine: fundamentalLines[reference],
+        targetLine: fundamentalLines[target],
+      });
       const bindGroup = bindGroupCell.get({
         arrayView,
         referenceLine: fundamentalLines[reference],
         targetLine: fundamentalLines[target],
         verdict,
+        lineColumns: columns.buffer,
         colors: colors.buffer,
         layout: canvas.pipeline.getBindGroupLayout(0),
       });
@@ -64,6 +73,16 @@ export const createSpectrogramDrawCell = (
             drawRingSlotsByteOffset,
             ringSlotsScratch,
           );
+          const marker = getMarker?.();
+          const columnsPass = encoder.beginComputePass({
+            label: 'draw-columns-pass',
+            timestampWrites: marker && {
+              querySet: marker.querySet,
+              beginningOfPassWriteIndex: marker.beginningOfPassWriteIndex,
+            },
+          });
+          columns.dispatch(columnsPass);
+          columnsPass.end();
           const targetView = canvas.context.getCurrentTexture().createView({
             label: 'draw-view',
           });
@@ -77,7 +96,10 @@ export const createSpectrogramDrawCell = (
                 storeOp: 'store',
               },
             ],
-            timestampWrites: getMarker?.(),
+            timestampWrites: marker && {
+              querySet: marker.querySet,
+              endOfPassWriteIndex: marker.endOfPassWriteIndex,
+            },
           });
           pass.setPipeline(canvas.pipeline);
           pass.setBindGroup(0, bindGroup);
@@ -89,6 +111,7 @@ export const createSpectrogramDrawCell = (
     dispose: () => {
       canvasCell.dispose();
       bindGroupCell.dispose();
+      columnsCell.dispose();
       colorsCell.dispose();
     },
   };

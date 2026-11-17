@@ -1,23 +1,8 @@
 import { centsDistanceWgsl } from '../common/centsDistance.wgsl.js';
+import { drawParamsStruct } from './params.wgsl.js';
 
 export const fragmentShader = `
-struct DrawParams {
-  foreground : vec4f,
-  background : vec4f,
-  primary : vec4f,
-  frequencyMap : vec4f,
-  recordingMatchColor : vec4f,
-  recordingCloseColor : vec4f,
-  recordingMissColor : vec4f,
-  recordingTimingMissColor : vec4f,
-  comparisonThresholds : vec4f,
-  lineWidths : vec4f,
-  overlayTuning : vec4f,
-  laneLayout : vec4f,
-  visibility : vec4u,
-  noteVisibility : vec4u,
-  ringSlots : vec4u,
-};
+${drawParamsStruct}
 
 @group(0) @binding(0) var<uniform> drawParams : DrawParams;
 @group(0) @binding(1) var valueSampler : sampler;
@@ -25,6 +10,7 @@ struct DrawParams {
 @group(0) @binding(3) var<storage, read> referenceLine : array<f32>;
 @group(0) @binding(4) var<storage, read> targetLine : array<f32>;
 @group(0) @binding(5) var<storage, read> targetVerdicts : array<vec2f>;
+@group(0) @binding(6) var<storage, read> lineColumns : array<vec4f>;
 
 fn midiAtFrequency(frequency: f32) -> f32 {
   return 69.0 + 12.0 * log2(frequency / 440.0);
@@ -43,32 +29,18 @@ fn pixelYAtFrequency(frequency: f32, height: f32) -> f32 {
 
 ${centsDistanceWgsl}
 
-fn lineReachesPixel(
-  pointY: f32,
-  height: f32,
-  centerFrequency: f32,
-  previousFrequency: f32,
-  nextFrequency: f32,
-  reachPixels: f32,
-) -> bool {
-  let center = log(centerFrequency);
-  var low = center;
-  var high = center;
-  if (previousFrequency > 0.0) {
-    let previous = log(previousFrequency);
-    low = min(low, previous);
-    high = max(high, previous);
-  }
-  if (nextFrequency > 0.0) {
-    let next = log(nextFrequency);
-    low = min(low, next);
-    high = max(high, next);
-  }
+fn spanReachesPixel(span: vec2f, pointY: f32, height: f32, reachPixels: f32) -> bool {
   let logPerPixel = drawParams.frequencyMap.y / max(1.0, height - 1.0);
   let reach = reachPixels * logPerPixel;
   let pixel = drawParams.frequencyMap.x +
     drawParams.frequencyMap.y * (1.0 - pointY / max(1.0, height - 1.0));
-  return pixel >= low - reach && pixel <= high + reach;
+  return pixel >= span.x - reach && pixel <= span.y + reach;
+}
+
+fn maskReachPixels(widthCents: f32, height: f32) -> f32 {
+  let centsPerPixel = 1200.0 * drawParams.frequencyMap.y /
+    (log(2.0) * max(1.0, height - 1.0));
+  return 7.0 * max(1.0, widthCents / centsPerPixel) + 1.0;
 }
 
 fn distanceToSegment(point: vec2f, start: vec2f, end: vec2f) -> f32 {
@@ -154,12 +126,6 @@ fn lineMaskAtPixel(
   if (centerFrequency <= 0.0) {
     return 0.0;
   }
-  let centsPerPixel = 1200.0 * drawParams.frequencyMap.y /
-    (log(2.0) * max(1.0, height - 1.0));
-  let reachPixels = 7.0 * max(1.0, widthCents / centsPerPixel) + 1.0;
-  if (!lineReachesPixel(point.y, height, centerFrequency, previousFrequency, nextFrequency, reachPixels)) {
-    return 0.0;
-  }
 
   let frequency = frequencyAtPixel(u32(point.y), height);
   let distance = centsDistance(frequency, centerFrequency);
@@ -237,10 +203,6 @@ fn lineDistanceAtPixel(
   nextFrequency: f32,
 ) -> f32 {
   if (centerFrequency <= 0.0) {
-    return height;
-  }
-  let reachPixels = 0.5 * drawParams.lineWidths.z + drawParams.lineWidths.w + 2.0;
-  if (!lineReachesPixel(point.y, height, centerFrequency, previousFrequency, nextFrequency, reachPixels)) {
     return height;
   }
 
@@ -341,10 +303,7 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let layer1Slot = slotForScreenX(drawParams.ringSlots.y, x, width);
   let referenceSlot = slotForScreenX(drawParams.ringSlots.z, x, width);
   let targetSlot = slotForScreenX(drawParams.ringSlots.w, x, width);
-
-  let referenceFrequency = referenceLine[referenceSlot];
-  let targetFrequency = targetLine[targetSlot];
-  let targetVerdict = targetVerdicts[targetSlot];
+  let lineColumn = lineColumns[x];
 
   let stacked = drawParams.visibility.x != 0u && drawParams.visibility.y != 0u;
   let laneGap = min(u32(drawParams.laneLayout.x), textureHeight);
@@ -392,8 +351,15 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
 
   var referenceMask = 0.0;
   let referenceVisible =
-    !recordingSpectrumShown && drawParams.visibility.z != 0u;
+    !recordingSpectrumShown && drawParams.visibility.z != 0u &&
+    spanReachesPixel(
+      lineColumn.xy,
+      bandPoint.y,
+      bandPixelHeight,
+      maskReachPixels(referenceLineWidthCents, bandPixelHeight),
+    );
   if (referenceVisible) {
+    let referenceFrequency = referenceLine[referenceSlot];
     var referencePrev = 0.0;
     if (x > 0u) {
       referencePrev = referenceLine[
@@ -420,8 +386,16 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
 
   var targetMask = 0.0;
   var targetOutlineMask = 0.0;
-  let targetVisible = !recordingSpectrumShown && drawParams.visibility.w != 0u;
+  let targetReachPixels = select(
+    maskReachPixels(targetLineWidthCents, bandPixelHeight),
+    0.5 * drawParams.lineWidths.z + drawParams.lineWidths.w + 2.0,
+    laneVisible != 0u,
+  );
+  let targetVisible = !recordingSpectrumShown && drawParams.visibility.w != 0u &&
+    spanReachesPixel(lineColumn.zw, bandPoint.y, bandPixelHeight, targetReachPixels);
+  var targetFrequency = 0.0;
   if (targetVisible) {
+    targetFrequency = targetLine[targetSlot];
     var targetPrev = 0.0;
     if (x > 0u) {
       targetPrev = targetLine[
@@ -467,11 +441,13 @@ fn main(@location(0) uv: vec2f, @builtin(position) position: vec4f) -> @location
   let referenceLineColor = vec3f(1.0);
   color = mix(color, referenceLineColor, referenceMask);
   color = mix(color, drawParams.background.xyz, targetOutlineMask);
-  var targetLineColor = drawParams.primary.xyz;
-  if (targetFrequency > 0.0) {
-    targetLineColor = targetTint(targetVerdict);
+  if (targetMask > 0.0) {
+    var targetLineColor = drawParams.primary.xyz;
+    if (targetFrequency > 0.0) {
+      targetLineColor = targetTint(targetVerdicts[targetSlot]);
+    }
+    color = mix(color, targetLineColor, targetMask);
   }
-  color = mix(color, targetLineColor, targetMask);
 
   let coverage = bandCornerCoverage(
     position.xy,
