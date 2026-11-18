@@ -4,7 +4,7 @@ import { type PickerSide } from './pickerPlacement.js';
 
 export type DetailsView = 'text' | 'tracks';
 
-export type CalibrationPrompt = 'record' | 'recordTry' | 'settings';
+export type CalibrationPrompt = 'record' | 'recordTry' | 'settings' | 'menu';
 
 export type ProjectState = {
   detailsView?: DetailsView;
