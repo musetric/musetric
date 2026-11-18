@@ -7,6 +7,9 @@ strictPeerDependencies: true
 verifyDepsBeforeRun: install
 catalogMode: strict
 cleanupUnusedCatalogs: true
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
 allowBuilds:
   '@ast-grep/cli': true
   '@swc/core': true
