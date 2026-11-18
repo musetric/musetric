@@ -15,6 +15,7 @@ import {
   type PitchPrepareInput,
 } from '../fundamentalFrequency/index.js';
 import { type PitchSettings } from '../fundamentalFrequency/settings.es.js';
+import { createStateSamplesCell } from '../sliceSamples/samples.js';
 import {
   type BandPipelineCells,
   createBandPipelineCells,
@@ -53,6 +54,7 @@ export type SpectrogramLaneOptions = {
 
 type BuildSpectrogramLaneArgs = {
   cells: BandPipelineCells;
+  samplesCell: ReturnType<typeof createStateSamplesCell>;
   columnScaleCell: ReturnType<typeof createColumnScaleCell>;
   fundamentalFrequencyCell: ReturnType<
     typeof createSpectrogramFundamentalFrequencyCell
@@ -107,6 +109,7 @@ const buildSpectrogramLane = (
 ): SpectrogramLane => {
   const {
     cells,
+    samplesCell,
     columnScaleCell,
     fundamentalFrequencyCell,
     getBandSpectrumCells,
@@ -114,11 +117,27 @@ const buildSpectrogramLane = (
     config,
   } = args;
   const laneConfig = config.lanes[options.label];
-  const baseBandPipeline = laneConfig.showSpectrogram
-    ? buildBandSpectrumPipeline(cells, config, options.label)
+  const sampleConfig = {
+    ...config,
+    windowSize: Math.max(
+      config.windowSize,
+      ...config.spectralBands.map((band) => band.windowSize),
+    ),
+  };
+  const samples = laneConfig.showSpectrogram
+    ? samplesCell.get({
+        ringLength:
+          Math.ceil(
+            config.visibleTime * config.sampleRate + sampleConfig.windowSize,
+          ) * Math.ceil(laneConfig.sourceStretch),
+      })
+    : undefined;
+  const baseBandPipeline = samples
+    ? buildBandSpectrumPipeline(cells, config, options.label, samples)
     : undefined;
   if (!baseBandPipeline) {
     disposeBandPipelineCells(cells);
+    samplesCell.dispose();
   }
   const columnScale = columnScaleCell.get(config.windowCount);
   const fundamentalFrequency = fundamentalFrequencyCell.get({
@@ -134,14 +153,17 @@ const buildSpectrogramLane = (
         (band) => band.windowSize !== config.windowSize,
       )
     : [];
-  const externalPipelines = getBandSpectrumCells(externalSpectralBands).map(
-    (cell, index) =>
-      cell.get({
-        config,
-        band: externalSpectralBands[index],
-        label: options.label,
-      }),
-  );
+  const externalCells = getBandSpectrumCells(externalSpectralBands);
+  const externalPipelines = samples
+    ? externalCells.map((cell, index) =>
+        cell.get({
+          config,
+          band: externalSpectralBands[index],
+          label: options.label,
+          samples,
+        }),
+      )
+    : [];
 
   let externalIndex = 0;
   const bandPipelines: {
@@ -180,8 +202,20 @@ const buildSpectrogramLane = (
     pitchPending: fundamentalFrequency.pending,
     writeSamples: (writeSamplesOptions) => {
       const { work, ...write } = writeSamplesOptions;
+      if (!work.spectrogram || !samples) {
+        return;
+      }
+      const frame = samples.write({
+        ...write,
+        config: sampleConfig,
+        truncateAfterPlayhead: laneConfig.truncateAfterPlayhead,
+      });
       forEachWorkPipeline(work, spectrogramBandPipelines, (pipeline) => {
-        pipeline.writeSamples(write);
+        pipeline.writeSamples({
+          source: write.source,
+          baseColumn: write.baseColumn,
+          frame,
+        });
       });
     },
     dispatchSliceSamples: (pass, work, range) => {
@@ -224,6 +258,7 @@ export const createSpectrogramLaneCell = (
   options: SpectrogramLaneOptions,
 ): SpectrogramLaneCell => {
   const cells = createBandPipelineCells(device);
+  const samplesCell = createStateSamplesCell(device);
   const columnScaleCell = createColumnScaleCell(device);
   const fundamentalFrequencyCell =
     createSpectrogramFundamentalFrequencyCell(device);
@@ -245,6 +280,7 @@ export const createSpectrogramLaneCell = (
     create: (config) =>
       buildSpectrogramLane({
         cells,
+        samplesCell,
         columnScaleCell,
         fundamentalFrequencyCell,
         getBandSpectrumCells,
@@ -286,6 +322,7 @@ export const createSpectrogramLaneCell = (
       fundamentalFrequencyCell.dispose();
       columnScaleCell.dispose();
       disposeBandPipelineCells(cells);
+      samplesCell.dispose();
     },
   };
 };

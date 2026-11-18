@@ -89,7 +89,7 @@ export type RecordingSource = {
   appendLiveTake: (chunk: LiveTakeChunk) => SongRange | undefined;
   previewLiveTake: (preview: LiveTakePreview) => SongRange | undefined;
   liveEnd: () => number | undefined;
-  get: (songLength: number) => SpectrogramSource;
+  get: (songLength: number) => SpectrogramSource | undefined;
   clear: () => void;
 };
 
@@ -105,7 +105,8 @@ type LiveTake = LiveTakeStart & {
 export const createRecordingSource = (): RecordingSource => {
   let pieces: RecordingPiece[] = [];
   let live: LiveTake | undefined = undefined;
-  let cached: { songLength: number; source: SpectrogramSource } | undefined =
+  let cached:
+    { songLength: number; source: SpectrogramSource | undefined } | undefined =
     undefined;
   let knownSongLength = 0;
 
@@ -200,7 +201,8 @@ export const createRecordingSource = (): RecordingSource => {
         return cached.source;
       }
       const layers = live ? [...pieces, ...liveRunPieces(live.runs)] : pieces;
-      const source = buildSource(layers, songLength);
+      const source =
+        layers.length > 0 ? buildSource(layers, songLength) : undefined;
       cached = { songLength, source };
       return source;
     },

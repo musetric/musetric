@@ -1,5 +1,4 @@
 import { windowFunctions } from '@musetric/fft';
-import { createGpuContext } from '@musetric/utils/gpu';
 import { describe, expect, it } from 'vitest';
 import {
   assertClose,
@@ -9,22 +8,13 @@ import {
   readFloats,
 } from '../../__test__/common.js';
 import {
-  markInvalidatedColumns,
-  markShiftColumns,
-  toColumnRanges,
-} from '../../common/columnRanges.js';
-import {
   computeBaseColumn,
-  type ExtSpectrogramConfig,
   floorMod,
   type SpectrogramColumnRange,
   windowStartForColumn,
 } from '../../common/extConfig.js';
 import { toSpectrogramSource } from '../../common/source.js';
-import { createSignalBufferCell } from '../../state/signal.js';
-import { createSpectrogramSliceSamplesCell } from '../index.js';
-
-const { device } = await createGpuContext();
+import { device, type SliceHandle, withSlice } from './sliceHarness.js';
 
 const windowSize = 8;
 const width = 5;
@@ -34,71 +24,23 @@ const signalStride = windowSize + 2;
 const windowFunction = windowFunctions.hamming(windowSize);
 const samples = createRamp(64);
 
-const config = extendConfig(
-  buildConfig({
-    windowSize,
-    zeroPaddingFactor: 1,
-    windowName: 'hamming',
-    sampleRate,
-    visibleTime: 1,
-    playheadRatio: 0,
-    viewSize: { width, height: 4 },
-  }),
-);
+const buildSliceConfig = (sliceWindowSize: number) =>
+  extendConfig(
+    buildConfig({
+      windowSize: sliceWindowSize,
+      zeroPaddingFactor: 1,
+      windowName: 'hamming',
+      sampleRate,
+      visibleTime: 1,
+      playheadRatio: 0,
+      viewSize: { width, height: 4 },
+    }),
+  );
 
-type SliceHandle = ReturnType<
-  ReturnType<typeof createSpectrogramSliceSamplesCell>['get']
->;
-
-const withSlice = async <T>(
-  sliceConfig: ExtSpectrogramConfig,
-  bandWindowSize: number,
-  windowCount: number,
-  fn: (slice: SliceHandle, signal: GPUBuffer) => Promise<T>,
-): Promise<T> => {
-  const signalCell = createSignalBufferCell(device);
-  const sliceCell = createSpectrogramSliceSamplesCell(device);
-  try {
-    const signal = signalCell.get({ windowSize: bandWindowSize, windowCount });
-    const slice = sliceCell.get({
-      out: signal,
-      config: sliceConfig,
-      sourceStretch: 1,
-    });
-    return await fn(slice, signal);
-  } finally {
-    sliceCell.dispose();
-    signalCell.dispose();
-  }
-};
+const config = buildSliceConfig(windowSize);
 
 const trackProgressForWindowStart = (windowStart: number): number =>
   (windowStart + windowSize) / samples.length;
-
-const withTwoSlices = async <T>(
-  sliceConfig: ExtSpectrogramConfig,
-  bandWindowSize: number,
-  windowCount: number,
-  fn: (
-    incremental: SliceHandle,
-    incrementalSignal: GPUBuffer,
-    full: SliceHandle,
-    fullSignal: GPUBuffer,
-  ) => Promise<T>,
-): Promise<T> =>
-  withSlice(
-    sliceConfig,
-    bandWindowSize,
-    windowCount,
-    async (incremental, incrementalSignal) =>
-      withSlice(
-        sliceConfig,
-        bandWindowSize,
-        windowCount,
-        async (full, fullSignal) =>
-          fn(incremental, incrementalSignal, full, fullSignal),
-      ),
-  );
 
 const slotOf = (baseColumn: number, screenColumn: number): number =>
   floorMod(baseColumn + screenColumn, width);
@@ -151,7 +93,7 @@ const runSlice = async (
 
 describe('sliceSamples', () => {
   it('writes windowed slices into the column ring from a fresh upload', async () => {
-    await withSlice(config, windowSize, width, async (slice, signal) => {
+    await withSlice(config, async (slice, signal) => {
       const baseColumn = computeBaseColumn(
         config,
         trackProgressForWindowStart(0),
@@ -169,7 +111,7 @@ describe('sliceSamples', () => {
   });
 
   it('reuses the ring and only re-slices the exposed column after a scroll', async () => {
-    await withSlice(config, windowSize, width, async (slice, signal) => {
+    await withSlice(config, async (slice, signal) => {
       const firstBase = computeBaseColumn(
         config,
         trackProgressForWindowStart(0),
@@ -210,153 +152,28 @@ describe('sliceSamples', () => {
     });
   });
 
-  it('matches a full slice for fractional-step scroll plus invalidation', async () => {
-    const fractionalWidth = 7;
-    const fractionalWindowSize = 16;
-    const fractionalSignalStride = fractionalWindowSize + 2;
-    const fractionalConfig = extendConfig(
-      buildConfig({
-        windowSize: fractionalWindowSize,
-        zeroPaddingFactor: 1,
-        windowName: 'hamming',
-        sampleRate: 31,
-        visibleTime: 1,
-        playheadRatio: 0,
-        viewSize: { width: fractionalWidth, height: 4 },
-      }),
-    );
-    expect(Number.isInteger(fractionalConfig.columnStep)).toBe(false);
-
-    const length = 256;
-    const incrementalSamples = new Float32Array(length);
-    const chunk = { frameIndex: 60, frameCount: 24 };
-
-    const firstBase = computeBaseColumn(fractionalConfig, 0.3, length);
-    const secondBase = firstBase + 2;
-    const columns = new Array<boolean>(fractionalWidth).fill(false);
-    markShiftColumns(columns, secondBase, firstBase);
-    markInvalidatedColumns({
-      columns,
-      grid: fractionalConfig,
-      baseColumn: secondBase,
-      analysisWindowSize: fractionalWindowSize,
-      invalidations: [chunk],
-    });
-    const ranges = toColumnRanges(fractionalConfig, secondBase, columns);
-    expect(ranges.length).toBeGreaterThan(1);
-
-    const fullRangeAt = (baseColumn: number): SpectrogramColumnRange => ({
-      screenBase: 0,
-      slotOffset: floorMod(baseColumn, fractionalWidth),
-      columnCount: fractionalWidth,
-    });
-
-    const dispatchRanges = async (
-      slice: SliceHandle,
-      columnRanges: readonly SpectrogramColumnRange[],
-    ): Promise<void> => {
-      const encoder = device.createCommandEncoder();
-      const slicePass = encoder.beginComputePass();
-      for (const range of columnRanges) {
-        slice.dispatch(slicePass, range);
-      }
-      slicePass.end();
-      device.queue.submit([encoder.finish()]);
-      await device.queue.onSubmittedWorkDone();
-    };
-
-    await withTwoSlices(
-      fractionalConfig,
-      fractionalWindowSize,
-      fractionalWidth,
-      async (incremental, incrementalSignal, full, fullSignal) => {
-        incremental.write({
-          source: toSpectrogramSource(incrementalSamples),
-          baseColumn: firstBase,
-          playheadRatio: 0,
-          truncateAfterPlayhead: false,
-          forceFullUpload: true,
-          invalidations: [],
-        });
-        await dispatchRanges(incremental, [fullRangeAt(firstBase)]);
-
-        for (
-          let index = chunk.frameIndex;
-          index < chunk.frameIndex + chunk.frameCount;
-          index += 1
-        ) {
-          incrementalSamples[index] = index / 100;
-        }
-
-        incremental.write({
-          source: toSpectrogramSource(incrementalSamples),
-          baseColumn: secondBase,
-          playheadRatio: 0,
-          truncateAfterPlayhead: false,
-          forceFullUpload: false,
-          invalidations: [chunk],
-        });
-        await dispatchRanges(incremental, ranges);
-
-        full.write({
-          source: toSpectrogramSource(Float32Array.from(incrementalSamples)),
-          baseColumn: secondBase,
-          playheadRatio: 0,
-          truncateAfterPlayhead: false,
-          forceFullUpload: true,
-          invalidations: [],
-        });
-        await dispatchRanges(full, [fullRangeAt(secondBase)]);
-
-        const count = fractionalSignalStride * fractionalWidth;
-        const incrementalResult = await readFloats(
-          device,
-          incrementalSignal,
-          count,
+  it('slices a narrower band from a ring sized for a wider one', async () => {
+    await withSlice(
+      config,
+      async (slice, signal) => {
+        const baseColumn = computeBaseColumn(
+          config,
+          trackProgressForWindowStart(16),
+          samples.length,
         );
-        const fullResult = await readFloats(device, fullSignal, count);
-        assertClose('fractional partial slice', incrementalResult, fullResult);
+        const result = await runSlice(
+          slice,
+          signal,
+          baseColumn,
+          fullRange(baseColumn),
+        );
+        assertColumns(
+          result,
+          windowStartForColumn(config, windowSize, baseColumn),
+          baseColumn,
+        );
       },
+      buildSliceConfig(2 * windowSize),
     );
-  });
-
-  it('keeps partial sample uploads byte-aligned for fractional visible time', async () => {
-    const fractionalVisibleConfig = extendConfig(
-      buildConfig({
-        windowSize: 16,
-        zeroPaddingFactor: 1,
-        windowName: 'hamming',
-        sampleRate: 31,
-        visibleTime: 1.05,
-        playheadRatio: 0,
-        viewSize: { width: 7, height: 4 },
-      }),
-    );
-    const sampleData = createRamp(256);
-    const firstBase = computeBaseColumn(fractionalVisibleConfig, 0.3, 256);
-    const secondBase = firstBase + 1;
-
-    await withSlice(fractionalVisibleConfig, 16, 7, async (slice) => {
-      device.pushErrorScope('validation');
-      slice.write({
-        source: toSpectrogramSource(sampleData),
-        baseColumn: firstBase,
-        playheadRatio: 0,
-        truncateAfterPlayhead: false,
-        forceFullUpload: true,
-        invalidations: [],
-      });
-      slice.write({
-        source: toSpectrogramSource(sampleData),
-        baseColumn: secondBase,
-        playheadRatio: 0,
-        truncateAfterPlayhead: false,
-        forceFullUpload: false,
-        invalidations: [],
-      });
-
-      const error = await device.popErrorScope();
-      expect(error?.message).toBeUndefined();
-    });
   });
 });

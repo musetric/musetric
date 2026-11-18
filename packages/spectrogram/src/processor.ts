@@ -37,6 +37,7 @@ import {
   createTrackWork,
   drainPendingInvalidations,
   hasPendingPitch,
+  isRemapConfigInvalidated,
   isRenderNoop,
   type RenderResult,
   type TrackRenderPlan,
@@ -213,7 +214,7 @@ export const createSpectrogramProcessor = (
       const configInvalidationScope = configChanged
         ? createConfigInvalidationScope(lastConfig, runtime.config)
         : noConfigInvalidations;
-      const work = createTrackWork(runtime);
+      const work = createTrackWork(runtime, samples);
       const columns = ensureColumns(runtime.config.windowCount);
       const invalidatedSamples = drainPendingInvalidations(
         pendingInvalidations,
@@ -223,6 +224,8 @@ export const createSpectrogramProcessor = (
       const plans = createRenderPlans({
         columns,
         configInvalidationScope,
+        remapInvalidated:
+          configChanged && isRemapConfigInvalidated(lastConfig, runtime.config),
         invalidatedSamples,
         residents,
         runtime,

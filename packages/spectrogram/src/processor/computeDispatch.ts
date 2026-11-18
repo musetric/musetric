@@ -26,7 +26,9 @@ const hasFundamentalWork = (ctx: DispatchContext, key: TrackKey): boolean =>
 
 const hasRemapWork = (ctx: DispatchContext, key: TrackKey): boolean =>
   ctx.runtime.config.lanes[key].showSpectrogram &&
-  (ctx.plans[key].ranges.length > 0 || ctx.plans[key].clearMissing);
+  (ctx.plans[key].ranges.length > 0 ||
+    ctx.plans[key].clearMissing ||
+    ctx.plans[key].remapAll);
 
 const stageDispatchKeys = {
   sliceSamples: 'dispatchSliceSamples',
@@ -65,7 +67,7 @@ const dispatchColor = (
   const { runtime } = ctx;
   const color = runtime.comparisonColor;
   const { reference, target } = runtime.config.comparison;
-  if (!colorLaneShown(ctx, target)) {
+  if (!colorLaneShown(ctx, target) || !ctx.plans[target].present) {
     return;
   }
 
@@ -93,6 +95,19 @@ const dispatchFundamental = (
   dispatchColor(pass, ctx);
 };
 
+const remapRanges = (
+  plan: TrackRenderPlan,
+  config: SpectrogramRuntime['config'],
+): readonly SpectrogramColumnRange[] => {
+  if (plan.clearMissing) {
+    return [fullColumnRange(config, 0)];
+  }
+  if (plan.remapAll) {
+    return [fullColumnRange(config, plan.baseColumn)];
+  }
+  return plan.ranges;
+};
+
 const dispatchRemap = (
   pass: GPUComputePassEncoder,
   ctx: DispatchContext,
@@ -102,11 +117,7 @@ const dispatchRemap = (
     if (!hasRemapWork(ctx, key)) {
       continue;
     }
-    const plan = plans[key];
-    const ranges = plan.clearMissing
-      ? [fullColumnRange(runtime.config, 0)]
-      : plan.ranges;
-    for (const range of ranges) {
+    for (const range of remapRanges(plans[key], runtime.config)) {
       runtime.tracks[key].remap?.dispatch(pass, range);
     }
   }

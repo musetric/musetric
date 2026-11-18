@@ -36,9 +36,12 @@ const computeInvalidatingConfigKeys: readonly (keyof SpectrogramConfig)[] = [
   'windowName',
   'minDecibel',
   'visual',
+  'viewSize',
+];
+
+const remapInvalidatingConfigKeys: readonly (keyof SpectrogramConfig)[] = [
   'minFrequency',
   'maxFrequency',
-  'viewSize',
 ];
 
 const isLaneComputeConfigEqual = (
@@ -80,14 +83,21 @@ export const createTrackResidents = (): Record<TrackKey, TrackResident> =>
     baseColumn: 0,
   }));
 
+export type TrackSources = Partial<Record<TrackKey, SpectrogramSource>>;
+
 export const createTrackWork = (
   runtime: SpectrogramRuntime,
+  samples: TrackSources,
 ): Record<TrackKey, SpectrogramLaneWork> =>
   mapTrackKeys((key) => {
     const lane = runtime.config.lanes[key];
     return {
       spectrogram: lane.showSpectrogram,
-      fundamental: isFundamentalNeeded(runtime.config, key),
+      fundamental: isFundamentalNeeded(
+        runtime.config,
+        key,
+        (track) => samples[track] !== undefined,
+      ),
     };
   });
 
@@ -157,11 +167,17 @@ export const createConfigInvalidationScope = (
   return changedTracks;
 };
 
-export type TrackSources = Partial<Record<TrackKey, SpectrogramSource>>;
+export const isRemapConfigInvalidated = (
+  current: SpectrogramRuntime['config'] | undefined,
+  next: SpectrogramRuntime['config'],
+): boolean =>
+  current !== undefined &&
+  remapInvalidatingConfigKeys.some((key) => current[key] !== next[key]);
 
 type CreateRenderPlansOptions = {
   columns: boolean[];
   configInvalidationScope: ConfigInvalidationScope;
+  remapInvalidated: boolean;
   invalidatedSamples: readonly SpectrogramSampleInvalidation[];
   residents: Record<TrackKey, TrackResident>;
   runtime: SpectrogramRuntime;
@@ -173,6 +189,7 @@ type CreateRenderPlansOptions = {
 export type TrackRenderPlan = {
   present: boolean;
   clearMissing: boolean;
+  remapAll: boolean;
   baseColumn: number;
   baseSlot: number;
   ranges: readonly SpectrogramColumnRange[];
@@ -186,6 +203,7 @@ export const createRenderPlans = (
   const {
     columns,
     configInvalidationScope,
+    remapInvalidated,
     invalidatedSamples,
     residents,
     runtime,
@@ -236,6 +254,7 @@ export const createRenderPlans = (
     return {
       present,
       clearMissing: !present && resident.valid,
+      remapAll: present && remapInvalidated,
       baseColumn,
       baseSlot,
       ranges,

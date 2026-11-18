@@ -1,7 +1,7 @@
 import { createResourceCell, type ResourceCell } from '@musetric/utils';
 import { type ExtSpectrogramConfig } from '../common/extConfig.js';
 import { createParamsCell, type StateParams } from './params.js';
-import { createStateSamplesCell, type StateSamples } from './samples.js';
+import { type StateSamples } from './samples.js';
 import {
   createWindowFunctionCell,
   type StateWindowFunction,
@@ -10,7 +10,7 @@ import {
 export type StateArg = {
   out: GPUBuffer;
   config: ExtSpectrogramConfig;
-  sourceStretch: number;
+  samples: StateSamples;
 };
 
 export type State = {
@@ -19,6 +19,7 @@ export type State = {
   out: GPUBuffer;
   params: StateParams;
   samples: StateSamples;
+  columnOffsets: GPUBuffer;
   windowFunction: StateWindowFunction;
   bindGroup: GPUBindGroup;
 };
@@ -28,7 +29,18 @@ export const createStateCell = (
   pipeline: GPUComputePipeline,
 ): ResourceCell<StateArg, State> => {
   const paramsCell = createParamsCell(device);
-  const samplesCell = createStateSamplesCell(device);
+  const columnOffsetsCell = createResourceCell({
+    create: (windowCount: number): GPUBuffer =>
+      device.createBuffer({
+        label: 'slice-samples-column-offsets-buffer',
+        size: windowCount * Int32Array.BYTES_PER_ELEMENT,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }),
+    dispose: (buffer) => {
+      buffer.destroy();
+    },
+    equals: (current, next) => current === next,
+  });
   const windowFunctionCell = createWindowFunctionCell(device);
   type SliceSamplesBindGroupArg = {
     out: GPUBuffer;
@@ -67,18 +79,15 @@ export const createStateCell = (
 
   return {
     get: (arg) => {
-      const { out, config, sourceStretch } = arg;
+      const { out, config, samples } = arg;
       const params = paramsCell.get(config);
-      const samples = samplesCell.get({
-        ringLength: params.value.visibleSamples * Math.ceil(sourceStretch),
-        windowCount: params.value.windowCount,
-      });
+      const columnOffsets = columnOffsetsCell.get(params.value.windowCount);
       const windowFunction = windowFunctionCell.get(config);
       const bindGroup = bindGroupCell.get({
         out,
         params,
         samples: samples.buffer,
-        columnOffsets: samples.columnOffsets,
+        columnOffsets,
         windowFunction: windowFunction.buffer,
       });
 
@@ -88,6 +97,7 @@ export const createStateCell = (
         out,
         params,
         samples,
+        columnOffsets,
         windowFunction,
         bindGroup,
       };
@@ -95,7 +105,7 @@ export const createStateCell = (
     dispose: () => {
       bindGroupCell.dispose();
       windowFunctionCell.dispose();
-      samplesCell.dispose();
+      columnOffsetsCell.dispose();
       paramsCell.dispose();
     },
   };

@@ -111,9 +111,11 @@ const isFundamentalShown = (lane: SpectrogramLaneConfig): boolean =>
 export const isFundamentalNeeded = (
   config: Pick<SpectrogramConfig, 'lanes' | 'comparison'>,
   key: TrackKey,
+  hasTrack: (track: TrackKey) => boolean = () => true,
 ): boolean =>
   isFundamentalShown(config.lanes[key]) ||
   (key === config.comparison.reference &&
+    hasTrack(config.comparison.target) &&
     isFundamentalShown(config.lanes[config.comparison.target]));
 
 const isConfigComplete = (
