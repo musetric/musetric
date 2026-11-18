@@ -44,7 +44,8 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         figure={
           <CalibrationFigure
             spot={spot}
-            headphones={headphones}
+            place={place}
+            animated={phase !== 'measuring' && phase !== 'done'}
             label={texts.figure}
           />
         }

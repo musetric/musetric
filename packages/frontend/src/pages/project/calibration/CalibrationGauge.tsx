@@ -166,7 +166,7 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
             justifyContent: 'center',
             opacity: figureOpacities[phase],
             transition: 'opacity 300ms',
-            '& > svg': { maxWidth: '78%', height: 'auto' },
+            '& > svg': { width: '86%', height: '86%' },
           })}
         >
           {figure}
