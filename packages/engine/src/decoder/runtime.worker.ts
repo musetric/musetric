@@ -14,6 +14,7 @@ import {
   createProjectRealtime,
   type ProjectRealtime,
 } from './realtime.worker.js';
+import { createRecordingBatch } from './recordingBatch.worker.js';
 import {
   createRecordingController,
   type RecordingController,
@@ -24,7 +25,6 @@ import {
   isRecordingListEvent,
 } from './recordingList.worker.js';
 import {
-  createRecordingPacket,
   createRecordingStream,
   readRecordingPacket,
   type RecordingStream,
@@ -243,12 +243,17 @@ export const createDecoderWorkerRuntime = (
         transpose: message.transpose,
         octave: message.octave,
       });
+      const batch = createRecordingBatch({
+        sampleRate: message.sampleRate,
+        realtime,
+      });
       recordingStream = createRecordingStream({
         port: recordingStreamChannel.outbound(message.port),
         onChunk: (chunk) => {
           audioDecode.patchLiveTake(chunk);
-          realtime.sendBinary(createRecordingPacket(chunk));
+          batch.push(chunk);
         },
+        onFlush: batch.flush,
       });
       realtime.sendJson({
         type: 'recording.start',

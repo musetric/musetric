@@ -79,6 +79,7 @@ const resolveFlushWaiters = (
 export type RecordingStreamOptions = {
   port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
   onChunk: (chunk: LiveTakeChunk) => void;
+  onFlush?: () => void;
 };
 
 export type RecordingStream = {
@@ -93,7 +94,7 @@ export type RecordingStream = {
 export const createRecordingStream = (
   options: RecordingStreamOptions,
 ): RecordingStream => {
-  const { port, onChunk } = options;
+  const { port, onChunk, onFlush } = options;
   const start = createControlledPromise();
   const finish = createControlledPromise();
   let processedFlushSequence = 0;
@@ -116,6 +117,7 @@ export const createRecordingStream = (
 
   port.bindHandlers({
     flush: (message) => {
+      onFlush?.();
       processedFlushSequence = Math.max(
         processedFlushSequence,
         message.sequence,
