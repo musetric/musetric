@@ -2,7 +2,12 @@
   "extends": "../../tsconfigs/tsconfig.test.json",
   "references": [
     { "path": "./tsconfig.cross.json" },
+    { "path": "./tsconfig.src.json" },
     { "path": "./tsconfig.worklet.json" },
     { "path": "./tsconfig.worker.json" }
-  ]
+  ],
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "types": ["vite/client"]
+  }
 }

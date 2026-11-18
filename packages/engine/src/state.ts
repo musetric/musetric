@@ -1,6 +1,7 @@
 import { type api } from '@musetric/api';
 import { type StemType } from '@musetric/audio';
 import {
+  defaultSpectrogramConfig,
   type SpectrogramColors,
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
@@ -259,3 +260,88 @@ export const clampToRange = (
   range
     ? Math.min(range.toFrame - 1, Math.max(range.fromFrame, frameIndex))
     : frameIndex;
+
+const notesMaxFrequency = 1100;
+
+export const defaultFrequencyRanges: Record<
+  SpectrogramViewMode,
+  FrequencyRange
+> = {
+  notes: {
+    minFrequency: defaultSpectrogramConfig.minFrequency,
+    maxFrequency: notesMaxFrequency,
+  },
+  spectrum: {
+    minFrequency: defaultSpectrogramConfig.minFrequency,
+    maxFrequency: defaultSpectrogramConfig.maxFrequency,
+  },
+};
+
+export const initialEngineState: EngineState = {
+  statuses: {
+    decoder: 'pending',
+    realtime: 'pending',
+    spectrogram: 'pending',
+    waveform: {
+      lead: 'pending',
+      backing: 'pending',
+      instrumental: 'pending',
+      recording: 'pending',
+    },
+  },
+  colors: defaultSpectrogramConfig.colors,
+  spectrogramView: 'notes',
+  expandedSpectrumLane: 'none',
+  frequencyRanges: defaultFrequencyRanges,
+  duration: 0,
+  playing: false,
+  frozen: false,
+  recording: false,
+  recordings: [],
+  isSlave: false,
+  playerCommandPending: false,
+  playerFrameIndexPending: false,
+  backendRevision: 0,
+  frameIndex: 0,
+  seekEvent: {
+    revision: 0,
+    frameIndex: 0,
+    origin: 'player',
+  },
+  transposeSemitones: 0,
+  voiceOctave: 0,
+  singerVoice: 'original',
+  tempoRatio: 1,
+  audioDevices: [],
+  outputLatencyFrameCount: 0,
+  outputLatencyFloorFrameCount: 0,
+  latencyCorrectionFrameCount: 0,
+  inputLatencyFrameCount: 0,
+  latencySource: 'estimated',
+  calibrating: false,
+  calibrationClickCount: 0,
+  calibrationSkippedPairKeys: [],
+  microphoneDenialOpen: false,
+  inputLevel: 0,
+  recordingGain: 1,
+  sourceGainDb: 0,
+  leadSpectrogramGainDb: defaultSpectrogramConfig.lanes.lead.gainDb,
+  trackVolumes: {
+    lead: 1,
+    backing: 1,
+    instrumental: 1,
+    recording: 1,
+  },
+  audibleTrackVolumes: {
+    lead: 1,
+    backing: 1,
+    instrumental: 1,
+    recording: 1,
+  },
+  metronomeEnabled: false,
+  metronomeVolume: 0.3,
+  metronomeBeats: [],
+  metronomeDownbeats: [],
+  rangeRepeat: 'cycle',
+  loopTries: [],
+};

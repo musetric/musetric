@@ -1,4 +1,5 @@
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
+import { waitWithTimeout } from '@musetric/utils/cross/waitWithTimeout';
 import { type engineDecoderChannel } from './protocol.cross.js';
 import { type ProjectRealtime } from './realtime.worker.js';
 import { type RecordingStream } from './recordingStream.worker.js';
@@ -16,17 +17,6 @@ const sanitizeLogMessage = (message: string) =>
 
 const getErrorMessage = (error: unknown): string =>
   sanitizeLogMessage(error instanceof Error ? error.message : String(error));
-
-export const waitWithTimeout = async (
-  promise: Promise<void>,
-  timeoutMs: number,
-): Promise<boolean> =>
-  await Promise.race([
-    promise.then(() => true),
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, timeoutMs);
-    }).then(() => false),
-  ]);
 
 export type RecordingController = {
   clearRecordingStream: () => void;
@@ -50,10 +40,7 @@ export const createRecordingController = (
     stream: RecordingStream,
   ): Promise<void> => {
     await waitWithTimeout(deps.realtime.ready(), 1000);
-    const started = await waitWithTimeout(stream.start, 3000);
-    if (!started) {
-      throw new Error('Recording stream was not accepted by the backend');
-    }
+    await stream.start;
     deps.realtime.flush();
     deps.realtime.sendJson({ type: 'recording.finish' });
     await waitWithTimeout(stream.finish, 5000);

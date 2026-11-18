@@ -1,54 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProjectRealtime } from '../realtime.worker.js';
-
-type Listener = (event: unknown) => void;
-
-type FakeSocket = {
-  readyState: number;
-  binaryType: string;
-  sent: (string | ArrayBuffer)[];
-  addEventListener: (type: string, listener: Listener) => void;
-  send: (message: string | ArrayBuffer) => void;
-  close: () => void;
-  open: () => void;
-};
-
-const createFakeSocket = (): FakeSocket => {
-  const listeners = new Map<string, Listener[]>();
-  const socket: FakeSocket = {
-    readyState: WebSocket.CONNECTING,
-    binaryType: 'blob',
-    sent: [],
-    addEventListener: (type, listener) => {
-      listeners.set(type, [...(listeners.get(type) ?? []), listener]);
-    },
-    send: (message) => {
-      socket.sent.push(message);
-    },
-    close: () => {
-      socket.readyState = WebSocket.CLOSED;
-    },
-    open: () => {
-      socket.readyState = WebSocket.OPEN;
-      for (const listener of listeners.get('open') ?? []) {
-        listener({});
-      }
-    },
-  };
-  return socket;
-};
-
-const stubSockets = (): FakeSocket[] => {
-  const created: FakeSocket[] = [];
-  const constructor = function createSocket() {
-    const socket = createFakeSocket();
-    created.push(socket);
-    return socket;
-  };
-  vi.stubGlobal('self', { location: { href: 'http://127.0.0.1:47205/' } });
-  vi.stubGlobal('WebSocket', Object.setPrototypeOf(constructor, WebSocket));
-  return created;
-};
+import { stubSockets } from './fakeSocket.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
