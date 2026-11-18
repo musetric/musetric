@@ -87,4 +87,12 @@ describe('calibration outcome', () => {
     );
     expect(outcome).toEqual({ kind: 'silent' });
   });
+
+  it('calls a muted microphone silence', () => {
+    const outcome = getRecordingLatencyCalibrationOutcome(
+      toPeaks([0, 0, 0, 0, 0], 0, 0),
+      rate,
+    );
+    expect(outcome).toEqual({ kind: 'silent' });
+  });
 });

@@ -16,7 +16,9 @@ const getClickFrameCounts = (
   ratio: number,
 ) =>
   peaks
-    .filter((peak) => peak.peakValue >= peak.noiseValue * ratio)
+    .filter(
+      (peak) => peak.peakValue > 0 && peak.peakValue >= peak.noiseValue * ratio,
+    )
     .map((peak) => Math.max(0, peak.onsetFrame - peak.clickFrame));
 
 export const getMedianFrameCount = (frameCounts: number[]) => {
