@@ -44,13 +44,10 @@ type PortMessage<Methods extends PortMethods> = {
   };
 }[keyof Methods];
 
-const bindHandlers = <Handlers extends PortMethods>(
-  instance: MessagePortLike,
-  handlers: Handlers,
-) => {
-  const onmessage = async (event: MessageEvent<PortMessage<Handlers>>) => {
+const listen = (instance: MessagePortLike, getHandlers: () => PortMethods) => {
+  const onmessage = async (event: MessageEvent<PortMessage<PortMethods>>) => {
     const message = event.data;
-    const handler = handlers[message.type];
+    const handler = getHandlers()[message.type];
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!handler) {
       console.error('Unhandled port method', message);
@@ -84,9 +81,22 @@ export const createMessagePort = <
   instance: Port,
   methodKeys: readonly (keyof Methods)[],
   methodTransfers: PortTransfers<Methods> = {},
-): TypedMessagePort<Port, Handlers, Methods> => ({
-  instance,
-  methods: createMethods(instance, methodKeys, methodTransfers),
-  bindBoot: (boot) => bindHandlers(instance, { boot }),
-  bindHandlers: (handlers) => bindHandlers(instance, handlers),
-});
+): TypedMessagePort<Port, Handlers, Methods> => {
+  let handlers: PortMethods = {};
+  let listening = false;
+  const bind = (next: PortMethods) => {
+    handlers = next;
+    if (!listening) {
+      listening = true;
+      listen(instance, () => handlers);
+    }
+  };
+  return {
+    instance,
+    methods: createMethods(instance, methodKeys, methodTransfers),
+    bindBoot: (boot) => {
+      bind({ boot });
+    },
+    bindHandlers: bind,
+  };
+};
