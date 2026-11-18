@@ -9,6 +9,7 @@ import {
 
 const floorDb = 8;
 const ceilingDb = 32;
+const attackSeconds = 0.03;
 const releasePerSecond = 2.5;
 
 const toLevel = (message: RecordingLatencyCalibrationLevel) => {
@@ -37,7 +38,12 @@ export const createCalibrationMeter = (
     const elapsedSeconds =
       lastTime === undefined ? 0 : (time - lastTime) / 1000;
     lastTime = time;
-    level = Math.max(pendingLevel, level - releasePerSecond * elapsedSeconds);
+    level =
+      pendingLevel > level
+        ? level +
+          (pendingLevel - level) *
+            (1 - Math.exp(-elapsedSeconds / attackSeconds))
+        : Math.max(pendingLevel, level - releasePerSecond * elapsedSeconds);
     pendingLevel = 0;
     store.update((draft) => {
       draft.calibrationLevel = level;
