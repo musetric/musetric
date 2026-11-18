@@ -43,6 +43,11 @@ impl Conversion {
         })
     }
 
+    #[must_use]
+    pub fn output_frames(&self, input_frames: usize) -> usize {
+        expected_frames(input_frames, self.ratio)
+    }
+
     pub fn convert(&mut self, frames: &[f32]) -> Result<&[f32], BoxedError> {
         self.ready.clear();
         if self.resampler.is_none() {

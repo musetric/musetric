@@ -1,6 +1,5 @@
 import { createAudioDecoder } from '@musetric/audio/decoder';
 import { stemTypes } from '@musetric/audio/es';
-import { getDeliveryAudioContent } from '../audioRequest/audioRequest.worker.js';
 import {
   type LiveTakeChunk,
   type LiveTakeStart,
@@ -133,16 +132,13 @@ export const createAudioDecode = (
   return {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
-      const stemOptions = { extension: 'mp4', sampleRate, keepChannels: false };
       const recordingId = activeRecordingId;
       stemDecoders ??= createStemDecoders(stemTypes.length);
       const decoders = stemDecoders;
       const [[lead, backing, instrumental], pieces] = await Promise.all([
         Promise.all(
           stemTypes.map(async (stem, slot) =>
-            getDeliveryAudioContent(projectId, stem).then(async (content) =>
-              decoders.decode(slot, content.buffer, stemOptions),
-            ),
+            decoders.decode(slot, { projectId, stem, sampleRate }),
           ),
         ),
         loadPieces({ projectId, sampleRate }, recordingId),

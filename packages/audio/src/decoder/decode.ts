@@ -1,4 +1,4 @@
-import init, { Decoder } from '@musetric/dsp';
+import init, { aacEncoderDelay, Decoder, FlacFeed } from '@musetric/dsp';
 
 const toPlanar = (
   chunks: Float32Array[],
@@ -28,16 +28,66 @@ export type DecodedAudio = {
   frameCount: number;
 };
 
+const createPlanarSink = (feed: FlacFeed) => {
+  let channels: Float32Array<ArrayBuffer>[] = [];
+  let frameCount = 0;
+  return {
+    write: (samples: Float32Array) => {
+      if (samples.length === 0) {
+        return;
+      }
+      if (channels.length === 0) {
+        const capacity = feed.frameCount;
+        const channelCount = feed.channels;
+        if (capacity === undefined || channelCount === undefined) {
+          throw new Error('The flac stream declares no frame count');
+        }
+        channels = Array.from(
+          { length: channelCount },
+          () => new Float32Array(capacity),
+        );
+      }
+      const channelCount = channels.length;
+      const frames = Math.min(
+        samples.length / channelCount,
+        channels[0].length - frameCount,
+      );
+      for (let frame = 0; frame < frames; frame++) {
+        for (let channel = 0; channel < channelCount; channel++) {
+          channels[channel][frameCount + frame] =
+            samples[frame * channelCount + channel];
+        }
+      }
+      frameCount += frames;
+    },
+    finish: (): DecodedAudio => ({
+      channels: channels.map((channel) =>
+        channel.length === frameCount ? channel : channel.slice(0, frameCount),
+      ),
+      frameCount,
+    }),
+  };
+};
+
 export type DecodeOptions = {
   extension: string;
   sampleRate: number;
   keepChannels: boolean;
 };
 
+export type FlacStreamOptions = {
+  sampleRate: number;
+  keepAacDelay: boolean;
+};
+
 export type AudioDecoder = {
   decode: (
     buffer: ArrayBuffer,
     options: DecodeOptions,
+  ) => Promise<DecodedAudio>;
+  decodeFlacStream: (
+    stream: ReadableStream<Uint8Array>,
+    options: FlacStreamOptions,
   ) => Promise<DecodedAudio>;
 };
 
@@ -67,6 +117,31 @@ export const createAudioDecoder = (): AudioDecoder => {
         };
       } finally {
         decoder.free();
+      }
+    },
+    decodeFlacStream: async (stream, options) => {
+      loading ??= init();
+      await loading;
+      const feed = new FlacFeed(
+        options.sampleRate,
+        options.keepAacDelay ? aacEncoderDelay() : 0,
+      );
+      const reader = stream.getReader();
+      const sink = createPlanarSink(feed);
+      try {
+        let read = await reader.read();
+        while (!read.done) {
+          sink.write(feed.push(read.value));
+          read = await reader.read();
+        }
+        sink.write(feed.finish());
+        return sink.finish();
+      } catch (error) {
+        await reader.cancel(error).catch(() => undefined);
+        throw error;
+      } finally {
+        reader.releaseLock();
+        feed.free();
       }
     },
   };
