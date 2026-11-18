@@ -1,4 +1,3 @@
-import { defaultSpectrogramConfig } from '@musetric/spectrogram';
 import { defaultSampleRate } from '@musetric/utils';
 import {
   createEngineAudioOutput,
@@ -24,98 +23,13 @@ import {
 } from './spectrogram/index.js';
 import {
   type EngineState,
-  type FrequencyRange,
   getActiveRecording,
-  type SpectrogramViewMode,
+  initialEngineState,
 } from './state.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
-const notesMaxFrequency = 1100;
 const androidOutputBufferSeconds = 0.02;
 const measure = import.meta.env.frontendMeasure === 'true';
-
-export const defaultFrequencyRanges: Record<
-  SpectrogramViewMode,
-  FrequencyRange
-> = {
-  notes: {
-    minFrequency: defaultSpectrogramConfig.minFrequency,
-    maxFrequency: notesMaxFrequency,
-  },
-  spectrum: {
-    minFrequency: defaultSpectrogramConfig.minFrequency,
-    maxFrequency: defaultSpectrogramConfig.maxFrequency,
-  },
-};
-
-const initialState: EngineState = {
-  statuses: {
-    decoder: 'pending',
-    realtime: 'pending',
-    spectrogram: 'pending',
-    waveform: {
-      lead: 'pending',
-      backing: 'pending',
-      instrumental: 'pending',
-      recording: 'pending',
-    },
-  },
-  colors: defaultSpectrogramConfig.colors,
-  spectrogramView: 'notes',
-  expandedSpectrumLane: 'none',
-  frequencyRanges: defaultFrequencyRanges,
-  duration: 0,
-  playing: false,
-  frozen: false,
-  recording: false,
-  recordings: [],
-  isSlave: false,
-  playerCommandPending: false,
-  playerFrameIndexPending: false,
-  backendRevision: 0,
-  frameIndex: 0,
-  seekEvent: {
-    revision: 0,
-    frameIndex: 0,
-    origin: 'player',
-  },
-  transposeSemitones: 0,
-  voiceOctave: 0,
-  singerVoice: 'original',
-  tempoRatio: 1,
-  audioDevices: [],
-  outputLatencyFrameCount: 0,
-  outputLatencyFloorFrameCount: 0,
-  latencyCorrectionFrameCount: 0,
-  inputLatencyFrameCount: 0,
-  latencySource: 'estimated',
-  calibrating: false,
-  calibrationClickCount: 0,
-  calibrationSkippedPairKeys: [],
-  microphoneDenialOpen: false,
-  inputLevel: 0,
-  recordingGain: 1,
-  sourceGainDb: 0,
-  leadSpectrogramGainDb: defaultSpectrogramConfig.lanes.lead.gainDb,
-  trackVolumes: {
-    lead: 1,
-    backing: 1,
-    instrumental: 1,
-    recording: 1,
-  },
-  audibleTrackVolumes: {
-    lead: 1,
-    backing: 1,
-    instrumental: 1,
-    recording: 1,
-  },
-  metronomeEnabled: false,
-  metronomeVolume: 0.3,
-  metronomeBeats: [],
-  metronomeDownbeats: [],
-  rangeRepeat: 'cycle',
-  loopTries: [],
-};
 
 export type Engine = {
   context: AudioContext;
@@ -139,7 +53,7 @@ export const createEngine = (): Engine => {
   });
   const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
-  const store = createStore(initialState);
+  const store = createStore(initialEngineState);
   const spectrogramChannel = new MessageChannel();
   const spectrogramPlayheadChannel = new MessageChannel();
   const spectrogram = createEngineSpectrogram({
