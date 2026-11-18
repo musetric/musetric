@@ -142,6 +142,7 @@ export const createRecordingStream = (
       start.resolve();
     },
     notifyFinished: () => {
+      start.resolve();
       finish.resolve();
     },
     waitForFlush: async (sequence) => {

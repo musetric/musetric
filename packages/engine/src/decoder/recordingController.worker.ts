@@ -50,10 +50,7 @@ export const createRecordingController = (
     stream: RecordingStream,
   ): Promise<void> => {
     await waitWithTimeout(deps.realtime.ready(), 1000);
-    const started = await waitWithTimeout(stream.start, 3000);
-    if (!started) {
-      throw new Error('Recording stream was not accepted by the backend');
-    }
+    await stream.start;
     deps.realtime.flush();
     deps.realtime.sendJson({ type: 'recording.finish' });
     await waitWithTimeout(stream.finish, 5000);
