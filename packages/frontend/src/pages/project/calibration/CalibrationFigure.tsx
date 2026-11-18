@@ -202,12 +202,12 @@ const toPlacement = (pose: Pose) => {
 };
 
 const getRippleSources = (drawing: Drawing, place: CalibrationPlace) => {
-  if (place === 'headphones') {
-    const [x, y] = drawing.pose.target;
-    const [mx, my] = drawing.microphone;
-    return [[x + (mx - x) * 0.3, y + (my - y) * 0.3] satisfies FigurePoint];
+  if (place === 'speaker') {
+    return drawing.speakers;
   }
-  return place === 'speaker' ? drawing.speakers : [];
+  const [x, y] = drawing.pose.target;
+  const [mx, my] = drawing.microphone;
+  return [[x + (mx - x) * 0.3, y + (my - y) * 0.3] satisfies FigurePoint];
 };
 
 export type CalibrationFigureProps = {
@@ -225,9 +225,9 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
   const [centerX, centerY] = placement.locate(drawing.earphone.center);
   const [microphoneX, microphoneY] = drawing.microphone;
   const sources = getRippleSources(drawing, place);
-  const headphonesPlace = place === 'headphones';
+  const earphonePlace = place !== 'speaker';
   const mate =
-    headphonesPlace && drawing.mate
+    earphonePlace && drawing.mate
       ? toPlacement({
           ...drawing.pose,
           target: drawing.mate,
@@ -259,7 +259,7 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
             transformBox: 'fill-box',
             transformOrigin: 'center',
             opacity: 0,
-            animation: `${headphonesPlace ? ripple : speakerRipple} ${headphonesPlace ? loopSeconds : 1.8}s ease-out infinite`,
+            animation: `${earphonePlace ? ripple : speakerRipple} ${earphonePlace ? loopSeconds : 1.8}s ease-out infinite`,
           },
           '& .ripple.late': { animationDelay: '0.3s' },
         }),
@@ -295,7 +295,7 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
           <circle className='ripple late' cx={source[0]} cy={source[1]} r='6' />
         </g>
       ))}
-      {headphonesPlace && (
+      {earphonePlace && (
         <g
           className='earphone'
           style={{
