@@ -5,8 +5,9 @@ import { type CalibrationPrompt } from '../store.js';
 import { CalibrationActions } from './CalibrationActions.js';
 import { CalibrationDone } from './CalibrationDone.js';
 import { CalibrationFailureNote } from './CalibrationFailureNote.js';
+import { CalibrationFigure } from './CalibrationFigure.js';
+import { CalibrationGauge } from './CalibrationGauge.js';
 import { CalibrationHeader } from './CalibrationHeader.js';
-import { CalibrationProgress } from './CalibrationProgress.js';
 import { CalibrationSteps } from './CalibrationSteps.js';
 import { TimingDetails } from './TimingDetails.js';
 import { useCalibrationFlow } from './useCalibrationFlow.js';
@@ -38,16 +39,25 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         sheet={sheet}
         onClose={onClose}
       />
+      <CalibrationGauge
+        phase={phase}
+        figure={
+          <CalibrationFigure
+            spot={spot}
+            headphones={headphones}
+            label={texts.figure}
+          />
+        }
+        texts={texts}
+        gutter={gutter}
+      />
       {phase === 'ask' && (
         <CalibrationSteps
           bluetooth={kind === 'bluetooth'}
-          spot={spot}
-          headphones={headphones}
           texts={texts}
           gutter={gutter}
         />
       )}
-      {phase === 'measuring' && <CalibrationProgress gutter={gutter} />}
       {phase === 'done' && (
         <CalibrationDone
           headphones={headphones}
