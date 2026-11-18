@@ -59,19 +59,6 @@ export namespace masterContent {
   export type Response = z.infer<typeof base.responseSchema>;
 }
 
-export namespace deliveryContent {
-  export const base = createApiRoute({
-    method: 'get',
-    path: '/api/audio/project/:projectId/delivery/:stemType/content',
-    paramsSchema: deliveryParamsSchema,
-    requestSchema: z.void(),
-    responseSchema: z.instanceof(Uint8Array<ArrayBuffer>),
-  });
-  export type Params = z.infer<typeof base.paramsSchema>;
-  export type Request = z.infer<typeof base.requestSchema>;
-  export type Response = z.infer<typeof base.responseSchema>;
-}
-
 export namespace deliveryWave {
   export const base = createApiRoute({
     method: 'get',

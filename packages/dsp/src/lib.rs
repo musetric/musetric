@@ -3,7 +3,6 @@ pub mod decode;
 pub mod depth;
 pub mod flac;
 pub mod flac_feed;
-pub mod fmp4;
 pub mod loudness;
 pub mod m4a;
 pub mod mix;

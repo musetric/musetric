@@ -73,7 +73,6 @@ impl StemType {
 }
 
 pub struct AudioDelivery {
-    pub blob_id: String,
     pub wave_blob_id: String,
 }
 
@@ -98,12 +97,11 @@ pub(crate) fn read_delivery(
 ) -> Result<Option<AudioDelivery>> {
     connection
         .query_row(
-            "SELECT blobId, waveBlobId FROM AudioDelivery WHERE projectId = ?1 AND stemType = ?2",
+            "SELECT waveBlobId FROM AudioDelivery WHERE projectId = ?1 AND stemType = ?2",
             (project_id, stem.name()),
             |row| {
                 Ok(AudioDelivery {
-                    blob_id: row.get(0)?,
-                    wave_blob_id: row.get(1)?,
+                    wave_blob_id: row.get(0)?,
                 })
             },
         )

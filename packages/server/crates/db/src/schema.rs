@@ -73,7 +73,6 @@ const CREATE_AUDIO_DELIVERY: &str = "
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     projectId INTEGER NOT NULL,
     stemType TEXT NOT NULL CHECK (stemType IN ('lead', 'backing', 'instrumental')),
-    blobId TEXT NOT NULL UNIQUE,
     waveBlobId TEXT NOT NULL UNIQUE,
     UNIQUE(projectId, stemType),
     FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE

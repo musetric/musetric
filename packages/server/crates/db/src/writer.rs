@@ -34,7 +34,6 @@ pub struct NewProject {
 }
 
 pub struct NewDelivery {
-    pub blob_id: String,
     pub wave_blob_id: String,
 }
 
@@ -283,17 +282,10 @@ fn write_stem(transaction: &Transaction, project_id: i64, stem: &NewStem) -> Res
         return Ok(());
     };
     transaction.execute(
-        "INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
-         VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(projectId, stemType) DO UPDATE SET
-           blobId = excluded.blobId,
-           waveBlobId = excluded.waveBlobId",
-        (
-            project_id,
-            stem.stem.name(),
-            &delivery.blob_id,
-            &delivery.wave_blob_id,
-        ),
+        "INSERT INTO AudioDelivery (projectId, stemType, waveBlobId)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(projectId, stemType) DO UPDATE SET waveBlobId = excluded.waveBlobId",
+        (project_id, stem.stem.name(), &delivery.wave_blob_id),
     )?;
     Ok(())
 }

@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use musetric_db::{MasterType, NewDelivery, NewStem};
 use musetric_dsp::resample::SampleRates;
 use musetric_media::{
-    BoxedError, PcmRequest, PcmSource, WavePeaks, convert_to_fmp4, encode_flac_from_raw,
-    generate_wave_peaks, read_frame_count,
+    BoxedError, PcmRequest, PcmSource, WavePeaks, encode_flac_from_raw, generate_wave_peaks,
+    read_frame_count,
 };
 
 use crate::{
@@ -14,16 +14,11 @@ use crate::{
 
 const RAW_SUFFIX: &str = "raw";
 
-struct Delivered {
-    media: StagedBlob,
-    wave_peaks: StagedBlob,
-}
-
 pub(crate) struct StemFiles {
     stem: MasterType,
     master: StagedBlob,
     raw: PathBuf,
-    delivered: Option<Delivered>,
+    wave_peaks: Option<StagedBlob>,
 }
 
 impl StemFiles {
@@ -32,16 +27,13 @@ impl StemFiles {
             stem,
             master: stage_blob(area, blobs_path),
             raw: area.join(format!("{}.{RAW_SUFFIX}", stem.name())),
-            delivered: None,
+            wave_peaks: None,
         }
     }
 
     pub(crate) fn delivered(area: &Path, blobs_path: &Path, stem: MasterType) -> Self {
         Self {
-            delivered: Some(Delivered {
-                media: stage_blob(area, blobs_path),
-                wave_peaks: stage_blob(area, blobs_path),
-            }),
+            wave_peaks: Some(stage_blob(area, blobs_path)),
             ..Self::master(area, blobs_path, stem)
         }
     }
@@ -64,9 +56,8 @@ impl StemFiles {
 
     pub(crate) fn staged(&self) -> Vec<&StagedBlob> {
         let mut blobs = vec![&self.master];
-        if let Some(delivered) = self.delivered.as_ref() {
-            blobs.push(&delivered.media);
-            blobs.push(&delivered.wave_peaks);
+        if let Some(wave_peaks) = self.wave_peaks.as_ref() {
+            blobs.push(wave_peaks);
         }
         blobs
     }
@@ -75,9 +66,8 @@ impl StemFiles {
         NewStem {
             stem: self.stem,
             master_blob_id: self.master.blob_id().to_owned(),
-            delivery: self.delivered.as_ref().map(|delivered| NewDelivery {
-                blob_id: delivered.media.blob_id().to_owned(),
-                wave_blob_id: delivered.wave_peaks.blob_id().to_owned(),
+            delivery: self.wave_peaks.as_ref().map(|wave_peaks| NewDelivery {
+                wave_blob_id: wave_peaks.blob_id().to_owned(),
             }),
         }
     }
@@ -91,14 +81,13 @@ impl StemFiles {
         pcm: &dyn PcmSource,
         sample_rate: u32,
     ) -> Result<(), BoxedError> {
-        let Some(delivered) = self.delivered.as_ref() else {
+        let Some(wave_peaks) = self.wave_peaks.as_ref() else {
             return Ok(());
         };
         let master = self.master.path();
-        convert_to_fmp4(pcm, read_at(master, sample_rate), delivered.media.path()).await?;
         let request = WavePeaks {
             source: read_at(master, sample_rate),
-            to: delivered.wave_peaks.path(),
+            to: wave_peaks.path(),
             total_frames: read_frame_count(master).await?,
         };
         generate_wave_peaks(pcm, &request).await
@@ -144,7 +133,7 @@ mod tests {
 
         assert_eq!(vocals.staged().len(), 1);
         assert!(vocals.recorded().delivery.is_none());
-        assert_eq!(instrumental.staged().len(), 3);
+        assert_eq!(instrumental.staged().len(), 2);
         assert!(instrumental.recorded().delivery.is_some());
     }
 }

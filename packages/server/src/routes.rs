@@ -67,12 +67,10 @@ mod tests {
     const PEAKS: &str = "fixture peaks";
     const PREVIEW: &str = "fixture preview";
     const FLAC: &str = "audio/flac";
-    const FMP4: &str = "audio/mp4";
     const NO_STORE: &str = "no-store";
     const PEAKS_BYTE_LENGTH: usize = 3840 * 2 * 4;
     const SOURCE_URL: &str = "/api/audio/project/1/master/source/content";
     const LEAD_URL: &str = "/api/audio/project/1/master/lead/content";
-    const DELIVERY_URL: &str = "/api/audio/project/1/delivery/lead/content";
     const WAVE_URL: &str = "/api/audio/project/1/delivery/lead/wave";
     const RECORDING_PIECES_URL: &str = "/api/audio/project/1/recording/1/pieces";
     const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/1/wave";
@@ -94,9 +92,8 @@ mod tests {
              (1, 'lead', '5a6b7c8d-0000-4000-8000-000000000002');
     ";
     const CREATE_DELIVERY: &str = "
-      INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
-      VALUES (1, 'lead', '1f2e3d4c-0000-4000-8000-000000000001',
-                         '5a6b7c8d-0000-4000-8000-000000000002');
+      INSERT INTO AudioDelivery (projectId, stemType, waveBlobId)
+      VALUES (1, 'lead', '5a6b7c8d-0000-4000-8000-000000000002');
     ";
     const CREATE_PREVIEW: &str = "
       INSERT INTO Preview (projectId, blobId, filename, contentType)
@@ -439,22 +436,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reads_the_delivery_and_its_peaks_from_one_row() {
+    async fn sends_the_peaks_of_a_stem() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
         workspace.seed(CREATE_DELIVERY);
-        workspace.add_blob(BLOB_ID, AUDIO);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
         let router = create_test_router(&workspace).await;
 
-        let content = request(router.clone(), DELIVERY_URL).await;
         let wave = request(router, WAVE_URL).await;
 
-        assert_eq!(
-            read_header(&content, "content-disposition"),
-            Some("attachment; filename*=UTF-8''Fixture%20project_lead.mp4".to_owned())
-        );
-        assert_eq!(read_header(&content, "content-type"), Some(FMP4.to_owned()));
         assert_eq!(
             read_header(&wave, "content-disposition"),
             Some("attachment; filename*=UTF-8''waveform.bin".to_owned())
@@ -515,7 +505,7 @@ mod tests {
 
         let response = request(
             create_test_router(&workspace).await,
-            "/api/audio/project/1/delivery/vocals/content",
+            "/api/audio/project/1/delivery/vocals/wave",
         )
         .await;
 

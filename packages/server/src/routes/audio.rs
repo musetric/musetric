@@ -28,8 +28,6 @@ const PIECE_FILENAME: &str = "take.wav";
 
 const FLAC_FORMAT: &str = "flac";
 const FLAC_CONTENT_TYPE: &str = "audio/flac";
-const FMP4_FORMAT: &str = "mp4";
-const FMP4_CONTENT_TYPE: &str = "audio/mp4";
 const PEAKS_CONTENT_TYPE: &str = "application/octet-stream";
 const PEAKS_FILENAME: &str = "waveform.bin";
 const PEAK_COUNT: usize = 3840;
@@ -44,10 +42,6 @@ pub(crate) fn create_router() -> Router<RouteState> {
         .route(
             "/api/audio/project/{projectId}/master/{type}/content",
             get(master_content),
-        )
-        .route(
-            "/api/audio/project/{projectId}/delivery/{stemType}/content",
-            get(delivery_content),
         )
         .route(
             "/api/audio/project/{projectId}/delivery/{stemType}/wave",
@@ -95,18 +89,6 @@ fn read_stem(raw_project_id: &str, raw_stem: &str) -> Result<(i64, StemType), Fa
     let stem = StemType::parse(raw_stem)
         .ok_or_else(|| invalid_option(PARAMS, STEM_FIELD, &STEM_TYPES.map(StemType::name)))?;
     Ok((project_id, stem))
-}
-
-async fn delivery_content(
-    State(state): State<RouteState>,
-    Path((raw_project_id, raw_stem)): Path<(String, String)>,
-    request: Request<Body>,
-) -> Response<Body> {
-    let (project_id, stem) = match read_stem(&raw_project_id, &raw_stem) {
-        Ok(found) => found,
-        Err(failure) => return finish(Err(failure)),
-    };
-    finish(send_delivery(&state.storage, project_id, stem, request.headers()).await)
 }
 
 async fn delivery_wave(
@@ -194,36 +176,6 @@ async fn send_master(
         blob_id,
         filename: format!("{project_name}{suffix}.{FLAC_FORMAT}"),
         content_type: FLAC_CONTENT_TYPE.to_owned(),
-    };
-    send_cached(storage, request, blob).await
-}
-
-async fn send_delivery(
-    storage: &Arc<Storage>,
-    project_id: i64,
-    stem: StemType,
-    request: &HeaderMap,
-) -> Result<Response<Body>, Failure> {
-    let stem_name = stem.name();
-    let (found_delivery, found_project) = read(storage, move |database| {
-        Ok((
-            database.delivery(project_id, stem)?,
-            database.project_name(project_id)?,
-        ))
-    })
-    .await?;
-    let delivery = found_delivery.ok_or_else(|| {
-        Failure::NotFound(format!(
-            "Audio delivery for project {project_id} and stem type {stem_name} not found"
-        ))
-    })?;
-    let project_name = found_project
-        .ok_or_else(|| Failure::NotFound(format!("Project with id {project_id} not found")))?;
-    let blob = CachedBlob {
-        missing_message: format!("Audio delivery blob for id {} not found", delivery.blob_id),
-        blob_id: delivery.blob_id,
-        filename: format!("{project_name}_{stem_name}.{FMP4_FORMAT}"),
-        content_type: FMP4_CONTENT_TYPE.to_owned(),
     };
     send_cached(storage, request, blob).await
 }
