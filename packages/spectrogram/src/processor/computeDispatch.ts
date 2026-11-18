@@ -67,7 +67,7 @@ const dispatchColor = (
   const { runtime } = ctx;
   const color = runtime.comparisonColor;
   const { reference, target } = runtime.config.comparison;
-  if (!colorLaneShown(ctx, target)) {
+  if (!colorLaneShown(ctx, target) || !ctx.plans[target].present) {
     return;
   }
 

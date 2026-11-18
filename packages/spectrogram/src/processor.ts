@@ -214,7 +214,7 @@ export const createSpectrogramProcessor = (
       const configInvalidationScope = configChanged
         ? createConfigInvalidationScope(lastConfig, runtime.config)
         : noConfigInvalidations;
-      const work = createTrackWork(runtime);
+      const work = createTrackWork(runtime, samples);
       const columns = ensureColumns(runtime.config.windowCount);
       const invalidatedSamples = drainPendingInvalidations(
         pendingInvalidations,

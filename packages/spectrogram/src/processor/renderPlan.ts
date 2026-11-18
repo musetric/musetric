@@ -83,14 +83,21 @@ export const createTrackResidents = (): Record<TrackKey, TrackResident> =>
     baseColumn: 0,
   }));
 
+export type TrackSources = Partial<Record<TrackKey, SpectrogramSource>>;
+
 export const createTrackWork = (
   runtime: SpectrogramRuntime,
+  samples: TrackSources,
 ): Record<TrackKey, SpectrogramLaneWork> =>
   mapTrackKeys((key) => {
     const lane = runtime.config.lanes[key];
     return {
       spectrogram: lane.showSpectrogram,
-      fundamental: isFundamentalNeeded(runtime.config, key),
+      fundamental: isFundamentalNeeded(
+        runtime.config,
+        key,
+        (track) => samples[track] !== undefined,
+      ),
     };
   });
 
@@ -166,8 +173,6 @@ export const isRemapConfigInvalidated = (
 ): boolean =>
   current !== undefined &&
   remapInvalidatingConfigKeys.some((key) => current[key] !== next[key]);
-
-export type TrackSources = Partial<Record<TrackKey, SpectrogramSource>>;
 
 type CreateRenderPlansOptions = {
   columns: boolean[];
