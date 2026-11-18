@@ -13,7 +13,6 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "devDependencies": {
-    "@alexanderolsen/libsamplerate-js": "catalog:",
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@hookform/resolvers": "catalog:",
@@ -22,6 +21,7 @@
     "@musetric/api": "workspace:*",
     "@musetric/audio": "workspace:*",
     "@musetric/engine": "workspace:*",
+    "@musetric/dsp": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/interaction": "workspace:*",
@@ -42,7 +42,6 @@
     "i18next": "catalog:",
     "i18next-cli": "catalog:",
     "immer": "catalog:",
-    "mediabunny": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-hook-form": "catalog:",

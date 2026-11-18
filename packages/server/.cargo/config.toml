@@ -6,3 +6,4 @@ CLIPPY_CONF_DIR = { value = ".", relative = true }
 
 [target.wasm32-unknown-unknown]
 runner = "wasm-bindgen-test-runner"
+rustflags = ["-C", "target-feature=+simd128"]

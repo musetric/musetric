@@ -62,13 +62,12 @@
     "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
-    "@alexanderolsen/libsamplerate-js": "catalog:",
+    "@musetric/dsp": "workspace:*",
     "@musetric/utils": "workspace:*",
-    "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:"
   },
   "devDependencies": {
-    "@alexanderolsen/libsamplerate-js": "catalog:",
+    "@musetric/dsp": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/audioworklet": "catalog:",
@@ -76,7 +75,6 @@
     "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
-    "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"

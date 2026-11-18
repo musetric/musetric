@@ -1,6 +1,6 @@
 use rubato::{Fft, FixedSync, Indexing, Resampler, audioadapter_buffers::direct::InterleavedSlice};
 
-use crate::{BoxedError, CHANNELS};
+use crate::BoxedError;
 
 const CHUNK_FRAMES: usize = 1024;
 const STALLED: &str = "The resampler stopped producing frames before the stream ended";
@@ -13,6 +13,7 @@ pub struct SampleRates {
 
 pub struct Conversion {
     resampler: Option<Fft<f32>>,
+    channels: usize,
     input: Vec<f32>,
     produced: Vec<f32>,
     ready: Vec<f32>,
@@ -24,12 +25,13 @@ pub struct Conversion {
 }
 
 impl Conversion {
-    pub fn create(rates: SampleRates) -> Result<Self, BoxedError> {
+    pub fn create(rates: SampleRates, channels: usize) -> Result<Self, BoxedError> {
         let ratio = f64::from(rates.output) / f64::from(rates.input);
-        let resampler = create_resampler(rates)?;
+        let resampler = create_resampler(rates, channels)?;
         let delay_frames = resampler.as_ref().map_or(0, Resampler::output_delay);
         Ok(Self {
             resampler,
+            channels,
             input: Vec::new(),
             produced: Vec::new(),
             ready: Vec::new(),
@@ -73,9 +75,9 @@ impl Conversion {
     }
 
     fn filled(&self) -> bool {
-        self.resampler
-            .as_ref()
-            .is_some_and(|resampler| self.input.len() >= resampler.input_frames_next() * CHANNELS)
+        self.resampler.as_ref().is_some_and(|resampler| {
+            self.input.len() >= resampler.input_frames_next() * self.channels
+        })
     }
 
     fn step(&mut self) -> Result<(), BoxedError> {
@@ -84,13 +86,14 @@ impl Conversion {
             return Ok(());
         };
         let needed = resampler.input_frames_next();
-        let taken = (self.input.len() / CHANNELS).min(needed);
-        let mut chunk = vec![0.0_f32; needed * CHANNELS];
-        chunk[..taken * CHANNELS].copy_from_slice(&self.input[..taken * CHANNELS]);
-        let source = InterleavedSlice::new(&chunk, CHANNELS, needed)?;
+        let channels = self.channels;
+        let taken = (self.input.len() / channels).min(needed);
+        let mut chunk = vec![0.0_f32; needed * channels];
+        chunk[..taken * channels].copy_from_slice(&self.input[..taken * channels]);
+        let source = InterleavedSlice::new(&chunk, channels, needed)?;
         let capacity = resampler.output_frames_next();
-        self.produced.resize(capacity * CHANNELS, 0.0);
-        let mut target = InterleavedSlice::new_mut(&mut self.produced, CHANNELS, capacity)?;
+        self.produced.resize(capacity * channels, 0.0);
+        let mut target = InterleavedSlice::new_mut(&mut self.produced, channels, capacity)?;
         let indexing = Indexing {
             input_offset: 0,
             output_offset: 0,
@@ -98,13 +101,13 @@ impl Conversion {
             active_channels_mask: None,
         };
         let (_, written) = resampler.process_into_buffer(&source, &mut target, Some(&indexing))?;
-        self.produced.truncate(written * CHANNELS);
-        self.input.drain(..taken * CHANNELS);
+        self.produced.truncate(written * channels);
+        self.input.drain(..taken * channels);
         Ok(())
     }
 
     fn keep(&mut self) {
-        for frame in self.produced.as_chunks::<CHANNELS>().0 {
+        for frame in self.produced.chunks_exact(self.channels) {
             if self.dropped_frames < self.delay_frames {
                 self.dropped_frames += 1;
             } else if self
@@ -118,7 +121,7 @@ impl Conversion {
     }
 }
 
-fn create_resampler(rates: SampleRates) -> Result<Option<Fft<f32>>, BoxedError> {
+fn create_resampler(rates: SampleRates, channels: usize) -> Result<Option<Fft<f32>>, BoxedError> {
     if rates.input == rates.output {
         return Ok(None);
     }
@@ -126,7 +129,7 @@ fn create_resampler(rates: SampleRates) -> Result<Option<Fft<f32>>, BoxedError> 
         usize::try_from(rates.input)?,
         usize::try_from(rates.output)?,
         CHUNK_FRAMES,
-        CHANNELS,
+        channels,
         FixedSync::Input,
     )?;
     Ok(Some(resampler))

@@ -136,7 +136,7 @@ fn scale_samples<'scaled>(
 fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<(), BoxedError> {
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
-    let mut conversion = Conversion::create(rates)?;
+    let mut conversion = Conversion::create(rates, CHANNELS)?;
     let mut writer =
         FlacWriter::create(create_buffered(to)?, rates.output, SampleDepth::TwentyFour)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);

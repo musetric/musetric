@@ -1,4 +1,4 @@
-import { decodeWav } from '@musetric/audio/decoder';
+import { type AudioDecoder } from '@musetric/audio/decoder';
 import { isAxiosError } from 'axios';
 import {
   getRecordingPiece,
@@ -59,6 +59,7 @@ export type RecordingAssembly = {
 
 export const createRecordingAssembly = (
   sampleRate: number,
+  decoder: AudioDecoder,
 ): RecordingAssembly => {
   let decoded = new Map<string, Float32Array<ArrayBuffer>>();
 
@@ -73,7 +74,14 @@ export const createRecordingAssembly = (
     }
     try {
       const content = await getRecordingPiece(projectId, recordingId, blobId);
-      const { channels } = await decodeWav(content.buffer, sampleRate);
+      if (content.buffer.byteLength === 0) {
+        return new Float32Array(0);
+      }
+      const { channels } = await decoder.decode(content.buffer, {
+        extension: 'wav',
+        sampleRate,
+        keepChannels: true,
+      });
       return channels[0];
     } catch (error) {
       if (isMissing(error)) {

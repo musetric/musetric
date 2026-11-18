@@ -1,7 +1,9 @@
+import { type AudioDecoder } from '@musetric/audio/decoder';
 import { describe, expect, it, vi } from 'vitest';
 import { playerDataChannel } from '../../player/protocol.cross.js';
 import { spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
 import { createAudioDecode } from '../audioDecode.worker.js';
+import { type StemDecoders } from '../stemDecoders.worker.js';
 
 type Gate = {
   promise: Promise<void>;
@@ -42,15 +44,23 @@ vi.mock('../../audioRequest/audioRequest.worker.js', () => ({
 }));
 
 vi.mock('@musetric/audio/decoder', () => ({
-  decodeMp4: async () =>
-    Promise.resolve({
-      frameCount: 8,
-      channels: [new Float32Array(8), new Float32Array(8)],
-    }),
-  decodeWav: async (buffer: ArrayBuffer) =>
-    Promise.resolve({
-      channels: [new Float32Array(4).fill(buffer.byteLength)],
-    }),
+  createAudioDecoder: (): AudioDecoder => ({
+    decode: async (buffer) =>
+      Promise.resolve({
+        frameCount: 4,
+        channels: [new Float32Array(4).fill(buffer.byteLength)],
+      }),
+  }),
+}));
+
+vi.mock('../stemDecoders.worker.js', () => ({
+  createStemDecoders: (): StemDecoders => ({
+    decode: async () =>
+      Promise.resolve({
+        frameCount: 8,
+        channels: [new Float32Array(8), new Float32Array(8)],
+      }),
+  }),
 }));
 
 const settle = async (): Promise<void> => {
