@@ -17,3 +17,7 @@ reason = "Unmaintained zbus_names, merged into zbus 6; tauri-plugin-single-insta
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0372"
 reason = "Unmaintained zvariant_derive, merged into zbus 6; tauri-plugin-single-instance 2.5 needs zbus 5 on Linux."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+reason = "Unmaintained chrono, which serde_with 3 pulls in for tauri-utils of Tauri 2."
