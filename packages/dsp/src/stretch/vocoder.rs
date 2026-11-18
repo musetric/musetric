@@ -2,7 +2,7 @@ use std::ops::{Add, Mul, Sub};
 
 use rustfft::num_complex::Complex32;
 
-use crate::{Refusal, frames::Stft};
+use crate::stretch::{Refusal, frames::Stft};
 
 const NOISE_FLOOR: f32 = 1e-15;
 const TINY: f32 = 1e-30;

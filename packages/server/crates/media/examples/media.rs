@@ -4,8 +4,9 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
+use musetric_dsp::resample::SampleRates;
 use musetric_media::{
-    BoxedError, PcmRequest, SampleRates, SymphoniaPcm, WavePeaks, analyze_lead_visual_loudness,
+    BoxedError, PcmRequest, SymphoniaPcm, WavePeaks, analyze_lead_visual_loudness,
     analyze_loudness, convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks,
     read_frame_count,
 };

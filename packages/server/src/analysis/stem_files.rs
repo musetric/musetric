@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use musetric_db::{MasterType, NewDelivery, NewStem};
+use musetric_dsp::resample::SampleRates;
 use musetric_media::{
-    BoxedError, PcmRequest, PcmSource, SampleRates, WavePeaks, convert_to_fmp4,
-    encode_flac_from_raw, generate_wave_peaks, read_frame_count,
+    BoxedError, PcmRequest, PcmSource, WavePeaks, convert_to_fmp4, encode_flac_from_raw,
+    generate_wave_peaks, read_frame_count,
 };
 
 use crate::{

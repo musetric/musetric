@@ -5,13 +5,14 @@ use std::{
 };
 
 use musetric_db::{Analysis, PendingJob, blob_path};
+use musetric_dsp::mono::Downmix;
 use musetric_gpu::{
     Download, ExecutorFailure, ExecutorPass, ExecutorPhase, ExecutorProgress, ExecutorSession,
     ExecutorSessionOptions, ModelFile, PhaseSink, UnitSession, ensure_model_file,
 };
 use musetric_jobs::{ByteProgress, StepAnswer, StepPass, StepPhase, StepReport, StepWaiting};
 use musetric_media::{
-    Downmix, MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
+    MonoRequest, PcmRequest, decode_mono_pcm, read_flac_sample_rate, read_frame_count,
 };
 use serde_json::{Map, Value, json};
 use tokio::{fs::write, sync::mpsc};

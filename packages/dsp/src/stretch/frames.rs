@@ -1,6 +1,6 @@
 use rustfft::num_complex::Complex32;
 
-use crate::{
+use crate::stretch::{
     fourier::{HalfBinFft, fast_real_size_above},
     window::kaiser,
 };

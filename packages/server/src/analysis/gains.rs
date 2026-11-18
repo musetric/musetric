@@ -1,5 +1,5 @@
 use musetric_db::{MasterType, StemLoudness};
-use musetric_media::{LeadVisualLoudness, Loudness};
+use musetric_dsp::loudness::{LeadVisualLoudness, Loudness};
 
 const SOURCE_TARGET_LUFS: f64 = -16.0;
 const SOURCE_TRUE_PEAK_CEILING_DB: f64 = -1.0;

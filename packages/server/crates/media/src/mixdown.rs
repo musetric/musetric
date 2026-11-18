@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufWriter, Write},
+    io::BufWriter,
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -8,20 +8,25 @@ use std::{
     },
 };
 
-use musetric_stretch::{Refusal, Stretch};
-use rusty_mp3::{Error, Mp3Encoder, Mp3EncoderConfig};
+use musetric_dsp::{
+    aac::AacEncoder,
+    depth::SampleDepth,
+    flac::FlacWriter,
+    m4a::{M4aTrack, write_m4a},
+    mix::limit_peak,
+    mono::Downmix,
+    mp3::Mp3Encoder,
+    stretch::{Refusal, Stretch},
+    wav::WavWriter,
+};
 use tokio::task::{JoinHandle, spawn_blocking};
 
 use crate::{
-    AacEncoder, BoxedError, Downmix, MonoRequest, SampleDepth, decode_mono_pcm,
-    flac::FlacWriter,
-    m4a::{M4aTrack, write_m4a},
+    BoxedError, MonoRequest, decode_mono_pcm,
+    file::create_buffered,
     pcm::{CHANNELS, PcmRequest, PcmSource},
-    wav::WavWriter,
 };
 
-const PEAK_CEILING: f32 = 0.891_250_9;
-const KILOBIT: u32 = 1000;
 const ORIGINAL_TEMPO_PERCENT: usize = 100;
 const TOO_SHORT: &str = "The song is too short to change its tempo or key";
 const STOPPED: &str = "The mixdown was stopped";
@@ -395,19 +400,6 @@ fn add_frame(mixed: &mut [f32], frame: usize, track: &MixdownTrack, [left, right
     pair[1] += right * track.gain;
 }
 
-fn limit_peak(mixed: &mut [f32]) {
-    let peak = mixed
-        .iter()
-        .fold(0.0_f32, |peak, value| peak.max(value.abs()));
-    if peak <= PEAK_CEILING {
-        return;
-    }
-    let scale = PEAK_CEILING / peak;
-    for value in mixed {
-        *value *= scale;
-    }
-}
-
 fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
     let frames = mixed.as_chunks::<CHANNELS>().0;
     let chunks = frames.chunks(ENCODED_FRAMES);
@@ -420,7 +412,8 @@ fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
         MixdownFormat::M4a { bitrate } => encode_m4a(mixed, output, bitrate),
         MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, output, bitrate),
         MixdownFormat::Flac(depth) => {
-            let mut writer = FlacWriter::create(output.to, output.sample_rate, depth)?;
+            let mut writer =
+                FlacWriter::create(create_buffered(output.to)?, output.sample_rate, depth)?;
             for chunk in chunks {
                 watch.check()?;
                 for pair in chunk {
@@ -428,10 +421,16 @@ fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
                 }
                 watch.advance(MixdownStage::Encoding, chunk.len());
             }
-            writer.finish()
+            writer.finish()?;
+            Ok(())
         }
         MixdownFormat::Wav(depth) => {
-            let mut writer = WavWriter::create(output.to, output.sample_rate, depth, frames.len())?;
+            let mut writer = WavWriter::create(
+                create_buffered(output.to)?,
+                output.sample_rate,
+                depth,
+                frames.len(),
+            )?;
             for chunk in chunks {
                 watch.check()?;
                 for pair in chunk {
@@ -439,7 +438,8 @@ fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
                 }
                 watch.advance(MixdownStage::Encoding, chunk.len());
             }
-            writer.finish()
+            writer.finish()?;
+            Ok(())
         }
     }
 }
@@ -452,38 +452,27 @@ fn encode_m4a(mixed: &[f32], output: &Output<'_>, bitrate: u32) -> Result<(), Bo
     output.watch.check()?;
     let frame_count = u32::try_from(mixed.len() / CHANNELS)?;
     write_m4a(
-        output.to,
+        BufWriter::new(File::create(output.to)?),
         &M4aTrack {
             sample_rate: output.sample_rate,
             channels,
             packets: &packets,
             frame_count,
         },
-    )
+    )?;
+    Ok(())
 }
 
 fn encode_mp3(mixed: &[f32], output: &Output<'_>, bitrate: u32) -> Result<(), BoxedError> {
-    let mut encoder = Mp3Encoder::new(Mp3EncoderConfig {
-        bitrate_kbps: bitrate / KILOBIT,
-        vbr_quality: None,
-    });
+    let mut encoder = Mp3Encoder::create(output.sample_rate, bitrate);
     for chunk in mixed.chunks(ENCODED_FRAMES * CHANNELS) {
         output.watch.check()?;
-        encoder.push_pcm_f32(chunk, u16::try_from(CHANNELS)?, output.sample_rate)?;
+        encoder.push(chunk)?;
         output
             .watch
             .advance(MixdownStage::Encoding, chunk.len() / CHANNELS);
     }
-    encoder.finish();
-    let mut file = BufWriter::new(File::create(output.to)?);
-    loop {
-        match encoder.next_packet() {
-            Ok(packet) => file.write_all(&packet)?,
-            Err(Error::Eof) => break,
-            Err(failure) => return Err(failure.into()),
-        }
-    }
-    file.flush()?;
+    encoder.finish(BufWriter::new(File::create(output.to)?))?;
     Ok(())
 }
 
@@ -498,9 +487,11 @@ mod tests {
 
     use super::{
         Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownProgress,
-        MixdownStage, MixdownTrack, MixdownWatch, PEAK_CEILING, STOPPED, write_mixdown,
+        MixdownStage, MixdownTrack, MixdownWatch, STOPPED, write_mixdown,
     };
-    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SampleDepth, SymphoniaPcm};
+    use musetric_dsp::{depth::SampleDepth, mix::PEAK_CEILING};
+
+    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SymphoniaPcm};
 
     const RATE: u32 = 48_000;
     const WAV_HEADER_BYTES: usize = 44;

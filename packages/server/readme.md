@@ -29,19 +29,20 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
   take into runs by the same rule: a change to one is a change to both.
 - It is the host of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built): the units
   and checkpoints of a step are in `src/analysis/stage_attempt.rs`.
-- `crates/media` decodes and encodes all audio, and the import of
-  `src/routes/project.rs` refuses a format it cannot read with a message that
-  says so.
+- `crates/media` reads and writes the audio files of the host through
+  `musetric-dsp` of `packages/dsp`, which decodes and encodes all audio, and
+  the import of `src/routes/project.rs` refuses a format it cannot read with a
+  message that says so.
 - A silent stem goes to the absolute gate of BS.1770 instead of failing, as
   the test `puts_silence_on_the_absolute_gate_instead_of_failing` of
-  `crates/media/src/loudness.rs` checks.
+  `packages/dsp/src/loudness.rs` checks.
 - The database has one migration, `V001_INITIAL` of `crates/db/src/schema.rs`,
   edited in place until the app has users: nobody has data to keep yet, and a
   migration written now would be carried forever. A local database of an
   older schema is deleted, not migrated. This is revisited before the first
   release ([#1099](https://github.com/musetric/musetric/issues/1099)).
-- The export is stretched by `crates/stretch`, the host's own Rust port of
-  Signalsmith Stretch, which keeps it free of unsafe code and of a C++
+- The export is stretched by `stretch` of `packages/dsp`, the host's own Rust
+  port of Signalsmith Stretch, which keeps it free of unsafe code and of a C++
   toolchain on every target.
 - A column that names a blob ends in `blobId`: the collector keeps exactly the
   files those columns name. `crates/db/src/tests.rs` checks that every such

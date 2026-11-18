@@ -63,6 +63,8 @@ fn reconstruct_perfectly(window: &mut [f32], interval: usize) {
 #[cfg(test)]
 mod tests {
     use super::kaiser;
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     #[test]
     fn overlapping_squares_sum_to_one() {

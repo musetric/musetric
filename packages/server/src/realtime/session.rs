@@ -6,7 +6,7 @@ use std::{
 };
 
 use musetric_db::{BoxedError, RecordingLayer, RecordingPiece, blob_path};
-use musetric_media::WAVE_PEAK_COUNT;
+use musetric_dsp::peaks::WAVE_PEAK_COUNT;
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncSeekExt, AsyncWriteExt},

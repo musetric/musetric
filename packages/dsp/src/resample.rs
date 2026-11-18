@@ -1,6 +1,6 @@
 use rubato::{Fft, FixedSync, Indexing, Resampler, audioadapter_buffers::direct::InterleavedSlice};
 
-use crate::{BoxedError, pcm::CHANNELS};
+use crate::{BoxedError, CHANNELS};
 
 const CHUNK_FRAMES: usize = 1024;
 const STALLED: &str = "The resampler stopped producing frames before the stream ended";
@@ -11,7 +11,7 @@ pub struct SampleRates {
     pub output: u32,
 }
 
-pub(crate) struct Conversion {
+pub struct Conversion {
     resampler: Option<Fft<f32>>,
     input: Vec<f32>,
     produced: Vec<f32>,
@@ -24,7 +24,7 @@ pub(crate) struct Conversion {
 }
 
 impl Conversion {
-    pub(crate) fn create(rates: SampleRates) -> Result<Self, BoxedError> {
+    pub fn create(rates: SampleRates) -> Result<Self, BoxedError> {
         let ratio = f64::from(rates.output) / f64::from(rates.input);
         let resampler = create_resampler(rates)?;
         let delay_frames = resampler.as_ref().map_or(0, Resampler::output_delay);
@@ -41,7 +41,7 @@ impl Conversion {
         })
     }
 
-    pub(crate) fn convert(&mut self, frames: &[f32]) -> Result<&[f32], BoxedError> {
+    pub fn convert(&mut self, frames: &[f32]) -> Result<&[f32], BoxedError> {
         self.ready.clear();
         if self.resampler.is_none() {
             self.ready.extend_from_slice(frames);
@@ -55,7 +55,7 @@ impl Conversion {
         Ok(&self.ready)
     }
 
-    pub(crate) fn flush(&mut self, input_frames: usize) -> Result<&[f32], BoxedError> {
+    pub fn flush(&mut self, input_frames: usize) -> Result<&[f32], BoxedError> {
         self.ready.clear();
         if self.resampler.is_none() {
             return Ok(&self.ready);

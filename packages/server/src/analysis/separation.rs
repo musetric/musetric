@@ -9,11 +9,12 @@ use std::{
 };
 
 use musetric_db::{MasterType, NewStems, PendingJob, blob_path};
+use musetric_dsp::{loudness::Loudness, resample::SampleRates};
 use musetric_gpu::{
     ExecutorPhase, ExecutorSession, ExecutorSessionOptions, PhaseSink, UnitSession,
 };
 use musetric_jobs::{StepAnswer, StepPhase, StepReport};
-use musetric_media::{Loudness, SampleRates, analyze_lead_visual_loudness, analyze_loudness};
+use musetric_media::{analyze_lead_visual_loudness, analyze_loudness};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};

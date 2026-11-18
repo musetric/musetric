@@ -1,44 +1,38 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::io::Write;
 
-use crate::{BoxedError, SampleDepth, pcm::CHANNELS};
+use crate::{BoxedError, CHANNELS, depth::SampleDepth};
 
-const WRITE_BUFFER_BYTE_LENGTH: usize = 256 * 1024;
 const PCM_FORMAT: u16 = 1;
 const FORMAT_CHUNK_BYTES: u32 = 16;
 const HEADER_TAIL_BYTES: u32 = 36;
 
-pub(crate) struct WavWriter {
-    file: BufWriter<File>,
+pub struct WavWriter<W: Write> {
+    writer: W,
     depth: SampleDepth,
 }
 
-impl WavWriter {
-    pub(crate) fn create(
-        to: &Path,
+impl<W: Write> WavWriter<W> {
+    pub fn create(
+        mut writer: W,
         sample_rate: u32,
         depth: SampleDepth,
         frame_count: usize,
     ) -> Result<Self, BoxedError> {
-        let mut file = BufWriter::with_capacity(WRITE_BUFFER_BYTE_LENGTH, File::create(to)?);
-        file.write_all(&header(sample_rate, depth, frame_count)?)?;
-        Ok(Self { file, depth })
+        writer.write_all(&header(sample_rate, depth, frame_count)?)?;
+        Ok(Self { writer, depth })
     }
 
-    pub(crate) fn push(&mut self, left: f32, right: f32) -> Result<(), BoxedError> {
+    pub fn push(&mut self, left: f32, right: f32) -> Result<(), BoxedError> {
         for value in [left, right] {
             let bytes = self.depth.quantize(value).to_le_bytes();
-            self.file.write_all(&bytes[..self.depth.bytes()])?;
+            self.writer.write_all(&bytes[..self.depth.bytes()])?;
         }
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Result<(), BoxedError> {
-        self.file.flush()?;
-        Ok(())
+    pub fn finish(mut self) -> Result<W, BoxedError> {
+        self.writer.flush()?;
+        Ok(self.writer)
     }
 }
 
