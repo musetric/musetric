@@ -1,9 +1,11 @@
 import {
   createRecordingLatencyCalibrationClick,
   createRecordingLatencyCalibrationSchedule,
+  getRecordingLatencyCalibrationClickVerdicts,
   getRecordingLatencyCalibrationOutcome,
   getRecordingLatencyFrameCount,
   recordingLatencyCalibrationClickFrequencyHz,
+  type RecordingLatencyCalibrationClickVerdict,
   recordingLatencyCalibrationTimeoutSeconds,
 } from '@musetric/audio/calibration';
 import {
@@ -12,6 +14,8 @@ import {
 } from '../audioSession/engineAudioSession.js';
 import {
   microphoneCalibrationChannel,
+  type RecordingLatencyCalibrationClickPeak,
+  type RecordingLatencyCalibrationLevel,
   type RecordingLatencyCalibrationPeak,
 } from './protocol.cross.js';
 
@@ -41,9 +45,15 @@ type WorkletResult = {
   peaks: RecordingLatencyCalibrationPeak[];
 };
 
+export type CalibrationMeasurementListeners = {
+  onLevel?: (message: RecordingLatencyCalibrationLevel) => void;
+  onHeard?: (message: RecordingLatencyCalibrationClickPeak) => void;
+  onClosed?: (message: RecordingLatencyCalibrationClickPeak) => void;
+};
+
 const waitForResult = async (
   port: ReturnType<typeof microphoneCalibrationChannel.outbound<MessagePort>>,
-  onProgress: ((clickCount: number) => void) | undefined,
+  listeners: CalibrationMeasurementListeners,
   timeoutSeconds: number,
 ): Promise<WorkletResult | undefined> =>
   new Promise<WorkletResult | undefined>((resolve) => {
@@ -60,9 +70,19 @@ const waitForResult = async (
     );
 
     port.bindHandlers({
-      progress: (message) => {
+      level: (message) => {
         if (!settled) {
-          onProgress?.(message.clickCount);
+          listeners.onLevel?.(message);
+        }
+      },
+      heard: (message) => {
+        if (!settled) {
+          listeners.onHeard?.(message);
+        }
+      },
+      closed: (message) => {
+        if (!settled) {
+          listeners.onClosed?.(message);
         }
       },
       done: (message) => {
@@ -76,7 +96,7 @@ const waitForResult = async (
     });
   });
 
-export type CalibrationMeasurementOptions = {
+export type CalibrationMeasurementOptions = CalibrationMeasurementListeners & {
   context: AudioContext;
   audioSession: EngineAudioSession;
   outputNode: AudioNode;
@@ -85,10 +105,9 @@ export type CalibrationMeasurementOptions = {
   processorName: string;
   deviceId?: string;
   microphone?: EngineMicrophone;
-  onProgress?: (clickCount: number) => void;
 };
 
-export type CalibrationMeasurementResult =
+export type CalibrationMeasurementResult = (
   | {
       kind: 'measured';
       latencyFrameCount: number;
@@ -96,7 +115,8 @@ export type CalibrationMeasurementResult =
     }
   | { kind: 'noisy' }
   | { kind: 'quiet' }
-  | { kind: 'silent' };
+  | { kind: 'silent' }
+) & { verdicts: RecordingLatencyCalibrationClickVerdict[] };
 
 export const measureRecordingLatency = async (
   options: CalibrationMeasurementOptions,
@@ -145,7 +165,7 @@ export const measureRecordingLatency = async (
     const port = microphoneCalibrationChannel.outbound(calibrationNode.port);
     const resultPromise = waitForResult(
       port,
-      options.onProgress,
+      options,
       recordingLatencyCalibrationTimeoutSeconds + searchOffsetSeconds,
     );
     port.methods.start({
@@ -173,12 +193,17 @@ export const measureRecordingLatency = async (
       peaks,
       context.sampleRate,
     );
+    const verdicts = getRecordingLatencyCalibrationClickVerdicts(
+      peaks,
+      context.sampleRate,
+    );
     if (outcome.kind !== 'measured') {
-      return outcome;
+      return { ...outcome, verdicts };
     }
 
     return {
       kind: 'measured',
+      verdicts,
       latencyFrameCount: getRecordingLatencyFrameCount({
         measuredLatencyFrameCounts: outcome.measuredLatencyFrameCounts,
         sampleRate: context.sampleRate,

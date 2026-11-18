@@ -1,4 +1,7 @@
-import { clampRecordingLatencyFrameCount } from '@musetric/audio/calibration';
+import {
+  clampRecordingLatencyFrameCount,
+  recordingLatencyCalibrationClickCount,
+} from '@musetric/audio/calibration';
 import {
   getRecordingLatencyDevicePairKey,
   resolveAudioInputDevice,
@@ -19,6 +22,7 @@ import {
 import { createCalibrationDevices } from './devices.js';
 import { applyInputLatencyEstimate } from './estimate.js';
 import { measureRecordingLatency } from './measurement.js';
+import { createCalibrationMeter } from './meter.js';
 import microphoneCalibrationWorkletUrl from './microphone.worklet.ts?worker&url';
 import {
   type CalibrationPreview,
@@ -236,9 +240,15 @@ export const createEngineCalibration = (
 
     store.update((draft) => {
       draft.calibrating = true;
-      draft.calibrationClickCount = 0;
+      draft.calibrationClicks = Array.from(
+        { length: recordingLatencyCalibrationClickCount },
+        () => 'pending',
+      );
+      draft.calibrationClickIndex = -1;
+      draft.calibrationLevelDb = 0;
       draft.calibrationError = undefined;
     });
+    const meter = createCalibrationMeter(store);
 
     try {
       await outputClock.wake();
@@ -256,11 +266,12 @@ export const createEngineCalibration = (
         processorName: microphoneCalibrationProcessorName,
         deviceId: inputDevice?.deviceId,
         microphone,
-        onProgress: (clickCount) => {
-          store.update((draft) => {
-            draft.calibrationClickCount = clickCount;
-          });
-        },
+        onLevel: meter.onLevel,
+        onHeard: meter.onHeard,
+        onClosed: meter.onClosed,
+      });
+      store.update((draft) => {
+        draft.calibrationClicks = result.verdicts;
       });
 
       if (result.kind !== 'measured') {
@@ -285,8 +296,10 @@ export const createEngineCalibration = (
       });
       return false;
     } finally {
+      meter.stop();
       store.update((draft) => {
         draft.calibrating = false;
+        draft.calibrationLevelDb = 0;
       });
     }
   };

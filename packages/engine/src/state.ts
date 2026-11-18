@@ -1,5 +1,6 @@
 import { type api } from '@musetric/api';
 import { type StemType } from '@musetric/audio';
+import { type RecordingLatencyCalibrationClickVerdict } from '@musetric/audio/es';
 import {
   defaultSpectrogramConfig,
   type SpectrogramColors,
@@ -10,6 +11,9 @@ export type PortStatus = 'pending' | 'success' | 'error';
 
 export type CalibrationErrorCode =
   'preview' | 'output' | 'calibration' | 'noisy' | 'quiet' | 'silent';
+
+export type CalibrationClick =
+  RecordingLatencyCalibrationClickVerdict | 'pending';
 
 export type MicrophoneDenial = 'app' | 'system' | 'page';
 
@@ -123,7 +127,9 @@ export type EngineState = {
   latencySource: RecordingLatencySource;
   latencyDevicePairKey?: string;
   calibrating: boolean;
-  calibrationClickCount: number;
+  calibrationClicks: CalibrationClick[];
+  calibrationClickIndex: number;
+  calibrationLevelDb: number;
   calibrationError?: CalibrationErrorCode;
   calibrationSkippedPairKeys: string[];
   microphoneDenial?: MicrophoneDenial;
@@ -319,7 +325,9 @@ export const initialEngineState: EngineState = {
   inputLatencyFrameCount: 0,
   latencySource: 'estimated',
   calibrating: false,
-  calibrationClickCount: 0,
+  calibrationClicks: [],
+  calibrationClickIndex: -1,
+  calibrationLevelDb: 0,
   calibrationSkippedPairKeys: [],
   microphoneDenialOpen: false,
   inputLevel: 0,
