@@ -15,6 +15,9 @@ const read = (
   from: number,
   count: number,
 ): number[] => {
+  if (!source) {
+    throw new Error('the recording has no source');
+  }
   const target = new Float32Array(count);
   source.read(target, 0, from, count);
   return Array.from(target);
@@ -35,8 +38,8 @@ describe('recording source', () => {
       ],
     });
     const source = recording.get(12);
-    expect(source.position(4)).toBe(4);
-    expect(source.position(6)).toBe(8);
+    expect(source?.position(4)).toBe(4);
+    expect(source?.position(6)).toBe(8);
     expect(read(source, 4, 8)).toEqual([10, 11, 12, 13, 14, 15, 16, 17]);
   });
 
@@ -61,8 +64,8 @@ describe('recording source', () => {
       ],
     });
     const source = recording.get(8);
-    expect(source.transposeAt(1)).toBe(-14);
-    expect(source.transposeAt(5)).toBe(3);
+    expect(source?.transposeAt(1)).toBe(-14);
+    expect(source?.transposeAt(5)).toBe(3);
   });
 
   it('keeps a live take in place while it grows and reports the song it covers', () => {
@@ -105,7 +108,7 @@ describe('recording source', () => {
     });
     recording.appendLiveTake(chunk(0, 0, ramp(4, 1)));
     recording.setPieces({ pieces: [], finishedTakeId: 'take' });
-    expect(read(recording.get(20), 0, 4)).toEqual([0, 0, 0, 0]);
+    expect(recording.get(20)).toBeUndefined();
   });
 
   it('keeps a live take of another session until the pieces switch recordings', () => {
