@@ -10,7 +10,13 @@ import {
 export type PortStatus = 'pending' | 'success' | 'error';
 
 export type CalibrationErrorCode =
-  'preview' | 'output' | 'calibration' | 'noisy' | 'quiet' | 'silent';
+  | 'preview'
+  | 'output'
+  | 'calibration'
+  | 'noisy'
+  | 'quiet'
+  | 'unsteady'
+  | 'silent';
 
 export type CalibrationClick =
   RecordingLatencyCalibrationClickVerdict | 'pending';

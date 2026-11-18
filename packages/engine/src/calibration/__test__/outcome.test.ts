@@ -80,6 +80,14 @@ describe('calibration outcome', () => {
     expect(outcome).toEqual({ kind: 'silent' });
   });
 
+  it('calls clear clicks at scattered delays unsteady', () => {
+    const outcome = getRecordingLatencyCalibrationOutcome(
+      toPeaks([0.12, 0.48, 0.77, 0.3, 0.62], 0.2),
+      rate,
+    );
+    expect(outcome).toEqual({ kind: 'unsteady' });
+  });
+
   it('calls a quiet room silence', () => {
     const outcome = getRecordingLatencyCalibrationOutcome(
       toPeaks([0.38, 0.38, 0.38, 0.38, 0.38], 0.001),

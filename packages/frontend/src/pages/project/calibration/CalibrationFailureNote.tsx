@@ -19,12 +19,14 @@ export const CalibrationFailureNote: FC<CalibrationFailureNoteProps> = (
   const titles: Record<CalibrationFailure, string> = {
     noisy: t('pages.project.calibration.noisy.title'),
     quiet: t('pages.project.calibration.quiet.title'),
+    unsteady: t('pages.project.calibration.unsteady.title'),
     silent: t('pages.project.calibration.silent.title'),
     failed: t('pages.project.calibration.failed.title'),
   };
   const notes: Record<CalibrationFailure, string> = {
     noisy: t('pages.project.calibration.noisy.text'),
     quiet: texts.quiet,
+    unsteady: t('pages.project.calibration.unsteady.text'),
     silent: texts.silent,
     failed: t('pages.project.calibration.failed.text'),
   };

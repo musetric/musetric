@@ -115,6 +115,7 @@ export type CalibrationMeasurementResult = (
     }
   | { kind: 'noisy' }
   | { kind: 'quiet' }
+  | { kind: 'unsteady' }
   | { kind: 'silent' }
 ) & { verdicts: RecordingLatencyCalibrationClickVerdict[] };
 

@@ -138,6 +138,7 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
     done: 0,
     noisy: 1,
     quiet: 1,
+    unsteady: 1,
     silent: 1,
     failed: 1,
   };

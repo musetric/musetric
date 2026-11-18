@@ -120,6 +120,8 @@
   "pages.project.calibration.title.settings": "Calibrate the timing",
   "pages.project.calibration.title.take": "Calibrate before you record",
   "pages.project.calibration.tryAgain": "Try again",
+  "pages.project.calibration.unsteady.text": "The microphone heard them, but each at a different delay. Hold everything still, close other apps that play sound, and try again.",
+  "pages.project.calibration.unsteady.title": "The clicks arrived at uneven times",
   "pages.project.calibration.volume.label": "Media volume",
   "pages.project.calibration.volume.low": "This may be too quiet for the check: turn the volume up past the mark.",
   "pages.project.calibration.volume.ok": "Loud enough.",

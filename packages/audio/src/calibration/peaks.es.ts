@@ -80,6 +80,7 @@ export type RecordingLatencyCalibrationOutcome =
   | { kind: 'measured'; measuredLatencyFrameCounts: number[] }
   | { kind: 'noisy' }
   | { kind: 'quiet' }
+  | { kind: 'unsteady' }
   | { kind: 'silent' };
 
 export const getRecordingLatencyCalibrationOutcome = (
@@ -99,6 +100,9 @@ export const getRecordingLatencyCalibrationOutcome = (
   );
   if (faintFrameCounts.length >= minimumClickCount) {
     return { kind: 'quiet' };
+  }
+  if (getClickFrameCounts(peaks, clearClickRatio).length >= minimumClickCount) {
+    return { kind: 'unsteady' };
   }
   const noiseValues = peaks.map((peak) => peak.noiseValue);
   return noiseValues.length > 0 &&

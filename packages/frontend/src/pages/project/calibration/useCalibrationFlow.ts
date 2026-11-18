@@ -7,12 +7,16 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type CalibrationPrompt } from '../store.js';
 import { startTake } from './takeActions.js';
 
-export type CalibrationFailure = 'noisy' | 'quiet' | 'silent' | 'failed';
+export type CalibrationFailure =
+  'noisy' | 'quiet' | 'unsteady' | 'silent' | 'failed';
 
 const getFailure = (
   error: CalibrationErrorCode | undefined,
 ): CalibrationFailure =>
-  error === 'noisy' || error === 'quiet' || error === 'silent'
+  error === 'noisy' ||
+  error === 'quiet' ||
+  error === 'unsteady' ||
+  error === 'silent'
     ? error
     : 'failed';
 
@@ -110,6 +114,7 @@ export const useCalibrationFlow = (
     },
     noisy: { primary: retry, secondary: leave },
     quiet: { primary: retry, secondary: leave },
+    unsteady: { primary: retry, secondary: leave },
     silent: { primary: retry, secondary: leave },
     failed: { primary: retry, secondary: leave },
   };
@@ -121,6 +126,7 @@ export const useCalibrationFlow = (
     done: t('pages.project.calibration.title.done'),
     noisy: t('pages.project.calibration.title.failed'),
     quiet: t('pages.project.calibration.title.failed'),
+    unsteady: t('pages.project.calibration.title.failed'),
     silent: t('pages.project.calibration.title.failed'),
     failed: t('pages.project.calibration.title.failed'),
   };
