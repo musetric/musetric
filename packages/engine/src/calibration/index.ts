@@ -245,7 +245,7 @@ export const createEngineCalibration = (
         () => 'pending',
       );
       draft.calibrationClickIndex = -1;
-      draft.calibrationLevelDb = 0;
+      draft.calibrationLevel = 0;
       draft.calibrationError = undefined;
     });
     const meter = createCalibrationMeter(store);
@@ -299,7 +299,7 @@ export const createEngineCalibration = (
       meter.stop();
       store.update((draft) => {
         draft.calibrating = false;
-        draft.calibrationLevelDb = 0;
+        draft.calibrationLevel = 0;
       });
     }
   };

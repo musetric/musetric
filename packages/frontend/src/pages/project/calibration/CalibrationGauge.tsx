@@ -13,8 +13,6 @@ const center = 100;
 const arcRadius = 88;
 const innerRadius = 70;
 const arcGapDegrees = 7;
-const levelFloorDb = 8;
-const levelRangeDb = 24;
 const flashMs = 650;
 const wavePeriod = 70;
 
@@ -62,9 +60,6 @@ const pendingClicks: CalibrationClick[] = Array.from(
   { length: recordingLatencyCalibrationClickCount },
   () => 'pending',
 );
-
-const getLevelFill = (levelDb: number) =>
-  Math.min(1, Math.max(0, (levelDb - levelFloorDb) / levelRangeDb));
 
 const getLastJudged = (clicks: CalibrationClick[]) => {
   const index = clicks.findLastIndex((click) => click !== 'pending');
@@ -125,7 +120,7 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
   const { t } = useTranslation();
   const clicks = useEngineStore((state) => state.calibrationClicks);
   const clickIndex = useEngineStore((state) => state.calibrationClickIndex);
-  const levelDb = useEngineStore((state) => state.calibrationLevelDb);
+  const level = useEngineStore((state) => state.calibrationLevel);
   const flash = useClickFlash(clicks);
   const coach = useCoach(clicks, texts);
   const measuring = phase === 'measuring';
@@ -142,8 +137,7 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
     silent: 1,
     failed: 1,
   };
-  const liquidTop =
-    center + innerRadius - getLevelFill(levelDb) * 2 * innerRadius;
+  const liquidTop = center + innerRadius - level * 2 * innerRadius;
 
   return (
     <Stack sx={{ px: gutter, pt: 4, gap: 3, alignItems: 'center' }}>

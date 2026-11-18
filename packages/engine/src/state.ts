@@ -135,7 +135,7 @@ export type EngineState = {
   calibrating: boolean;
   calibrationClicks: CalibrationClick[];
   calibrationClickIndex: number;
-  calibrationLevelDb: number;
+  calibrationLevel: number;
   calibrationError?: CalibrationErrorCode;
   calibrationSkippedPairKeys: string[];
   microphoneDenial?: MicrophoneDenial;
@@ -333,7 +333,7 @@ export const initialEngineState: EngineState = {
   calibrating: false,
   calibrationClicks: [],
   calibrationClickIndex: -1,
-  calibrationLevelDb: 0,
+  calibrationLevel: 0,
   calibrationSkippedPairKeys: [],
   microphoneDenialOpen: false,
   inputLevel: 0,

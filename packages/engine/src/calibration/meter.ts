@@ -7,12 +7,17 @@ import {
   type RecordingLatencyCalibrationLevel,
 } from './protocol.cross.js';
 
-const releaseDbPerSecond = 60;
+const floorDb = 8;
+const ceilingDb = 32;
+const releasePerSecond = 2.5;
 
-const toLevelDb = (message: RecordingLatencyCalibrationLevel) =>
-  message.level > 0 && message.quiet > 0
-    ? Math.max(0, 20 * Math.log10(message.level / message.quiet))
-    : 0;
+const toLevel = (message: RecordingLatencyCalibrationLevel) => {
+  if (message.level <= 0 || message.quiet <= 0) {
+    return 0;
+  }
+  const levelDb = 20 * Math.log10(message.level / message.quiet);
+  return Math.min(1, Math.max(0, (levelDb - floorDb) / (ceilingDb - floorDb)));
+};
 
 export type CalibrationMeter = Required<CalibrationMeasurementListeners> & {
   stop: () => void;
@@ -21,8 +26,8 @@ export type CalibrationMeter = Required<CalibrationMeasurementListeners> & {
 export const createCalibrationMeter = (
   store: Store<EngineState>,
 ): CalibrationMeter => {
-  let levelDb = 0;
-  let pendingDb = 0;
+  let level = 0;
+  let pendingLevel = 0;
   let clickIndex = -1;
   let lastTime: number | undefined = undefined;
   let frame: number | undefined = undefined;
@@ -32,13 +37,10 @@ export const createCalibrationMeter = (
     const elapsedSeconds =
       lastTime === undefined ? 0 : (time - lastTime) / 1000;
     lastTime = time;
-    levelDb = Math.max(
-      pendingDb,
-      levelDb - releaseDbPerSecond * elapsedSeconds,
-    );
-    pendingDb = 0;
+    level = Math.max(pendingLevel, level - releasePerSecond * elapsedSeconds);
+    pendingLevel = 0;
     store.update((draft) => {
-      draft.calibrationLevelDb = levelDb;
+      draft.calibrationLevel = level;
       draft.calibrationClickIndex = clickIndex;
     });
   };
@@ -52,7 +54,7 @@ export const createCalibrationMeter = (
 
   return {
     onLevel: (message) => {
-      pendingDb = Math.max(pendingDb, toLevelDb(message));
+      pendingLevel = Math.max(pendingLevel, toLevel(message));
       clickIndex = message.clickIndex;
       frame ??= requestAnimationFrame(flush);
     },
