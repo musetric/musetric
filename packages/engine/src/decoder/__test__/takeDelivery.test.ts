@@ -76,6 +76,7 @@ describe('take delivery', () => {
     const sessionId = await host.record();
     host.socket().receive(started(sessionId));
     host.sing(0, takeRate / 16);
+    await flushPorts();
     await host.finish();
     host.socket().receive(finished(sessionId));
     await flushPorts();
