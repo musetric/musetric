@@ -1,6 +1,7 @@
 import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
+import { waitWithTimeout } from '@musetric/utils/cross/waitWithTimeout';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
 import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
@@ -18,7 +19,6 @@ import { createRecordingBatch } from './recordingBatch.worker.js';
 import {
   createRecordingController,
   type RecordingController,
-  waitWithTimeout,
 } from './recordingController.worker.js';
 import {
   createRecordingList,

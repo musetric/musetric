@@ -70,4 +70,17 @@ describe('take delivery', () => {
     expect(host.sent().at(-1)).toBe('recording.finish');
     expect(host.received).not.toContain('recordingStreamFailed');
   });
+
+  it('sends the frames it holds when the worklet never drains', async () => {
+    const host = await createTakeHost();
+    const sessionId = await host.record();
+    host.socket().receive(started(sessionId));
+    host.sing(0, takeRate / 16);
+    await host.finish();
+    host.socket().receive(finished(sessionId));
+    await flushPorts();
+
+    expect(host.delivered()).toBe(takeRate / 16);
+    expect(host.sent().at(-1)).toBe('recording.finish');
+  });
 });

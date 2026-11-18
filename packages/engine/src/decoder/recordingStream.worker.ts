@@ -117,7 +117,6 @@ export const createRecordingStream = (
 
   port.bindHandlers({
     flush: (message) => {
-      onFlush?.();
       processedFlushSequence = Math.max(
         processedFlushSequence,
         message.sequence,
@@ -146,12 +145,14 @@ export const createRecordingStream = (
       finish.resolve();
     },
     waitForFlush: async (sequence) => {
-      if (processedFlushSequence >= sequence) {
-        return;
+      if (processedFlushSequence < sequence) {
+        await new Promise<void>((resolve) => {
+          flushWaiters.push({ sequence, resolve });
+        });
       }
-      await new Promise<void>((resolve) => {
-        flushWaiters.push({ sequence, resolve });
-      });
+      if (!closed) {
+        onFlush?.();
+      }
     },
     close,
   };

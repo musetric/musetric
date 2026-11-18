@@ -1,3 +1,4 @@
+import { waitWithTimeout } from '@musetric/utils/cross/waitWithTimeout';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
   clearMicrophoneDenial,
@@ -21,6 +22,8 @@ import {
   resolvePreferredMicrophone,
 } from './microphone.js';
 import { type EnginePlayback } from './playback.js';
+
+const recordingFlushTimeoutMs = 2000;
 
 type RecordingSession = {
   projectId: number;
@@ -112,7 +115,10 @@ export const createEngineRecorder = (
     }
     session.decoderStreamClosed = true;
     const sequence = session.playerStreamStarted
-      ? await getEnginePlayback().flushRecording()
+      ? ((await waitWithTimeout(
+          getEnginePlayback().flushRecording(),
+          recordingFlushTimeoutMs,
+        )) ?? 0)
       : 0;
     await getDecoder().finishRecordingStream(sequence);
   };

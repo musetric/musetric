@@ -54,6 +54,7 @@ export type TakeHost = {
   record: () => Promise<string>;
   sing: (offset: number, length: number) => void;
   stop: () => Promise<void>;
+  finish: () => Promise<void>;
   sent: () => string[];
   delivered: () => number;
 };
@@ -132,6 +133,10 @@ export const createTakeHost = async (): Promise<TakeHost> => {
       sequence += 1;
       worklet?.methods.flush({ sequence });
       engine.methods.finishRecordingStream({ sequence });
+      await flushPorts();
+    },
+    finish: async () => {
+      engine.methods.finishRecordingStream({ sequence: 0 });
       await flushPorts();
     },
     sent: () => sent().map((message) => message.type),
