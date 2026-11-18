@@ -259,7 +259,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 - Source: https://github.com/Signalsmith-Audio/signalsmith-stretch
 - Usage: the time-stretch and pitch-shift algorithm, ported to Rust from the C++ release that the `signalsmith-stretch` 1.3.2 web build was made from (commit `222093b4`), including its offline `exact` processing, peak-based frequency map and formant compensation. The web build itself runs in the player.
-- Local files: `packages/server/crates/stretch/src/vocoder.rs`.
+- Local files: `packages/dsp/src/stretch/vocoder.rs`.
 - License: MIT.
 - License source: upstream `LICENSE.txt`.
 
@@ -289,7 +289,7 @@ SOFTWARE.
 
 - Source: https://github.com/Signalsmith-Audio/linear
 - Usage: the self-normalising STFT, the Kaiser window with its bandwidth heuristic and the half-bin-shifted real FFT of release 0.1.2, ported to Rust on top of `rustfft`.
-- Local files: `packages/server/crates/stretch/src/frames.rs`, `packages/server/crates/stretch/src/fourier.rs`, `packages/server/crates/stretch/src/window.rs`.
+- Local files: `packages/dsp/src/stretch/frames.rs`, `packages/dsp/src/stretch/fourier.rs`, `packages/dsp/src/stretch/window.rs`.
 - License: MIT.
 - License source: upstream `LICENSE.txt`.
 
@@ -319,7 +319,7 @@ SOFTWARE.
 
 - Source: https://opus-codec.org, built from the libopus 1.6.1 sources bundled in the `opusic-sys` crate (https://github.com/DoumanAsh/opusic-sys) and driven through `symphonia-adapter-libopus` (https://github.com/aschey/symphonia-adapters).
 - Usage: decodes Opus audio in uploaded files; the host links libopus statically.
-- Local files: `packages/server/crates/media/src/decode.rs`.
+- Local files: `packages/dsp/src/decode.rs`.
 - License: BSD-3-Clause, with the royalty-free patent licenses named below.
 - License source: upstream `COPYING`.
 

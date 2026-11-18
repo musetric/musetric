@@ -1,8 +1,4 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::io::Write;
 
 use crate::{
     BoxedError,
@@ -12,21 +8,20 @@ use crate::{
 
 const MDAT_HEADER_BYTES: usize = 8;
 
-pub(crate) struct M4aTrack<'track> {
-    pub(crate) sample_rate: u32,
-    pub(crate) channels: u8,
-    pub(crate) packets: &'track [Vec<u8>],
-    pub(crate) frame_count: u32,
+pub struct M4aTrack<'track> {
+    pub sample_rate: u32,
+    pub channels: u8,
+    pub packets: &'track [Vec<u8>],
+    pub frame_count: u32,
 }
 
-pub(crate) fn write_m4a(to: &Path, layout: &M4aTrack<'_>) -> Result<(), BoxedError> {
+pub fn write_m4a<W: Write>(mut writer: W, layout: &M4aTrack<'_>) -> Result<W, BoxedError> {
     rate_index(layout.sample_rate)?;
     let file_type = box_of(*b"ftyp", &file_type_body());
     let movie_length = box_of(*b"moov", &movie_body(layout, 0)?).len();
     let data_offset = u32::try_from(file_type.len() + movie_length + MDAT_HEADER_BYTES)?;
     let movie = box_of(*b"moov", &movie_body(layout, data_offset)?);
     let payload: usize = layout.packets.iter().map(Vec::len).sum();
-    let mut writer = BufWriter::new(File::create(to)?);
     writer.write_all(&file_type)?;
     writer.write_all(&movie)?;
     writer.write_all(&u32::try_from(payload + MDAT_HEADER_BYTES)?.to_be_bytes())?;
@@ -35,7 +30,7 @@ pub(crate) fn write_m4a(to: &Path, layout: &M4aTrack<'_>) -> Result<(), BoxedErr
         writer.write_all(packet)?;
     }
     writer.flush()?;
-    Ok(())
+    Ok(writer)
 }
 
 fn file_type_body() -> Vec<u8> {

@@ -3,7 +3,7 @@ use std::{collections::HashMap, io, path::Path, sync::Arc};
 use musetric_db::{
     BoxedError, Recording, RecordingAudio, RecordingLayer, RecordingPiece, blob_path,
 };
-use musetric_media::WAVE_PEAK_COUNT;
+use musetric_dsp::peaks::WAVE_PEAK_COUNT;
 use tokio::fs::{create_dir_all, read as read_file, rename, try_exists, write as write_file};
 
 use crate::{
@@ -622,7 +622,7 @@ pub(crate) async fn set_fresh_applied(
 mod tests {
     use musetric_db::{RecordingLayer, RecordingPiece};
 
-    use musetric_media::WAVE_PEAK_COUNT;
+    use musetric_dsp::peaks::WAVE_PEAK_COUNT;
 
     use super::{PcmCache, frames_per_peak, measure_peaks, peak_index, render, sample_value};
 

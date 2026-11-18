@@ -39,6 +39,8 @@ impl Stretch {
 #[cfg(test)]
 mod tests {
     use std::f64::consts::TAU;
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::{Refusal, Stretch};
 
@@ -46,6 +48,11 @@ mod tests {
 
     fn frames(milliseconds: u32) -> usize {
         usize::try_from(SAMPLE_RATE / 10 * milliseconds / 100).unwrap()
+    }
+
+    fn scaled(frame: usize, numerator: usize, denominator: usize) -> usize {
+        let wide = |value: usize| u64::try_from(value).unwrap();
+        usize::try_from(wide(frame) * wide(numerator) / wide(denominator)).unwrap()
     }
 
     fn time(index: usize) -> f64 {
@@ -126,7 +133,7 @@ mod tests {
         {
             let output = stretch(&[input.clone()], output_length, semitones);
             for beat in &beats[1..beats.len() - 1] {
-                let expected = beat * output_length / length;
+                let expected = scaled(*beat, output_length, length);
                 let window = &output[0][expected - frames(20)..expected + frames(20)];
                 let loudest = window
                     .iter()

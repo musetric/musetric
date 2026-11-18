@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use musetric_dsp::mono::Downmix;
 use musetric_gpu::{ModelFile, has_verified_copy, kept_files};
-use musetric_media::Downmix;
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use tokio::fs::{DirEntry, ReadDir, read_dir, remove_dir_all, remove_file, try_exists};

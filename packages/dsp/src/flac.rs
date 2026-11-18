@@ -1,8 +1,6 @@
 use std::{
     fmt::Display,
-    fs::File,
-    io::{BufWriter, Seek, SeekFrom, Write},
-    path::Path,
+    io::{Seek, SeekFrom, Write},
 };
 
 use flacenc::{
@@ -14,10 +12,9 @@ use flacenc::{
     source::{Context, Fill, FrameBuf},
 };
 
-use crate::{BoxedError, SampleDepth, pcm::CHANNELS};
+use crate::{BoxedError, CHANNELS, depth::SampleDepth};
 
 const BLOCK_FRAMES: usize = 4096;
-const WRITE_BUFFER_BYTE_LENGTH: usize = 256 * 1024;
 const HEADER_MOVED: &str = "The flac header changed length while the stream was written";
 const SEEK_SECONDS: u64 = 2;
 const SEEK_POINTS: usize = 512;
@@ -31,6 +28,37 @@ const STREAM_INFO_USIZE: usize = 34;
 const FRAME_OVERHEAD_BYTES: usize = 32;
 const NOT_A_MARKER: &str = "The flac stream info should serialize into bytes";
 const OVERFLOWED: &str = "The flac header value does not fit its field";
+const BLOCK_TYPE_MASK: u8 = 0x7f;
+const COUNTED_OFFSET: usize = 18;
+const COUNTED_BITS: u64 = (1 << 36) - 1;
+const SAMPLE_RATE_SHIFT: u32 = 44;
+const CHANNELS_SHIFT: u32 = 41;
+const CHANNELS_MASK: u64 = 0b111;
+const NOT_FLAC: &str = "The audio master is not a flac stream";
+
+pub const INFO_BYTE_LENGTH: usize = 42;
+
+pub struct FlacInfo {
+    pub sample_rate: u32,
+    pub channels: u32,
+    pub frame_count: u64,
+}
+
+pub fn read_info(header: &[u8; INFO_BYTE_LENGTH]) -> Result<FlacInfo, BoxedError> {
+    if header[..MAGIC.len()] != MAGIC[..] || header[4] & BLOCK_TYPE_MASK != STREAM_INFO_BLOCK {
+        return Err(NOT_FLAC.into());
+    }
+    let packed = header
+        .get(COUNTED_OFFSET..COUNTED_OFFSET + size_of::<u64>())
+        .and_then(|bytes| <[u8; 8]>::try_from(bytes).ok())
+        .map(u64::from_be_bytes)
+        .ok_or(NOT_FLAC)?;
+    Ok(FlacInfo {
+        sample_rate: u32::try_from(packed >> SAMPLE_RATE_SHIFT)?,
+        channels: u32::try_from((packed >> CHANNELS_SHIFT) & CHANNELS_MASK)? + 1,
+        frame_count: packed & COUNTED_BITS,
+    })
+}
 
 struct FramePosition {
     first_sample: u64,
@@ -38,13 +66,13 @@ struct FramePosition {
     samples: u16,
 }
 
-pub(crate) struct FlacWriter {
+pub struct FlacWriter<W: Write + Seek> {
     configuration: Verified<Configuration>,
     verbatim: Verified<Configuration>,
     stream: Stream,
     frames: FrameBuf,
     context: Context,
-    file: BufWriter<File>,
+    writer: W,
     pending: Vec<i32>,
     frame_positions: Vec<FramePosition>,
     header_byte_length: usize,
@@ -56,12 +84,8 @@ pub(crate) struct FlacWriter {
     failure: Option<BoxedError>,
 }
 
-impl FlacWriter {
-    pub(crate) fn create(
-        to: &Path,
-        sample_rate: u32,
-        depth: SampleDepth,
-    ) -> Result<Self, BoxedError> {
+impl<W: Write + Seek> FlacWriter<W> {
+    pub fn create(mut writer: W, sample_rate: u32, depth: SampleDepth) -> Result<Self, BoxedError> {
         let configuration = verify(Configuration::default())?;
         let verbatim = verify(verbatim_configuration())?;
         let mut stream =
@@ -71,15 +95,14 @@ impl FlacWriter {
             .set_block_sizes(BLOCK_FRAMES, BLOCK_FRAMES)
             .map_err(describe)?;
         let header = write_header(&stream, &placeholder_seek_table(sample_rate)?)?;
-        let mut file = BufWriter::with_capacity(WRITE_BUFFER_BYTE_LENGTH, File::create(to)?);
-        file.write_all(&header)?;
+        writer.write_all(&header)?;
         Ok(Self {
             configuration,
             verbatim,
             stream,
             frames: FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).map_err(describe)?,
             context: Context::new(depth.bits(), CHANNELS),
-            file,
+            writer,
             pending: Vec::with_capacity(BLOCK_FRAMES * CHANNELS),
             frame_positions: Vec::new(),
             header_byte_length: header.len(),
@@ -92,7 +115,7 @@ impl FlacWriter {
         })
     }
 
-    pub(crate) fn push(&mut self, left: f32, right: f32) {
+    pub fn push(&mut self, left: f32, right: f32) {
         if self.failure.is_some() {
             return;
         }
@@ -134,11 +157,11 @@ impl FlacWriter {
             samples: u16::try_from(self.pending.len() / CHANNELS)?,
         });
         self.written_bytes += encoded.len() as u64;
-        self.file.write_all(encoded)?;
+        self.writer.write_all(encoded)?;
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Result<(), BoxedError> {
+    pub fn finish(mut self) -> Result<W, BoxedError> {
         self.encode();
         if let Some(failure) = self.failure {
             return Err(failure);
@@ -157,11 +180,10 @@ impl FlacWriter {
         if header.len() != self.header_byte_length {
             return Err(HEADER_MOVED.into());
         }
-        let mut file = self.file.into_inner()?;
-        file.seek(SeekFrom::Start(0))?;
-        file.write_all(&header)?;
-        file.flush()?;
-        Ok(())
+        self.writer.seek(SeekFrom::Start(0))?;
+        self.writer.write_all(&header)?;
+        self.writer.flush()?;
+        Ok(self.writer)
     }
 }
 
@@ -271,7 +293,9 @@ fn describe(failure: impl Display) -> BoxedError {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
+    use std::io::{Cursor, Error, ErrorKind, Seek, SeekFrom, Write};
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use symphonia::core::{
         formats::{FormatOptions, SeekMode, SeekTo, TrackType, probe::Hint},
@@ -290,10 +314,50 @@ mod tests {
         BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
         containing_frame, encode_frame, raw_byte_length, seek_spacing, seek_table, verify,
     };
-    use crate::{SampleDepth, pcm::CHANNELS};
+    use crate::{CHANNELS, depth::SampleDepth};
 
     const RATE: u32 = 48_000;
     const NOISY_FRAMES: usize = 2944;
+    const HEADER_BYTES: usize =
+        MAGIC.len() + 4 + STREAM_INFO_USIZE + 4 + SEEK_POINTS * SEEK_POINT_BYTES;
+
+    struct Fragile {
+        taken: usize,
+    }
+
+    impl Write for Fragile {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if self.taken + bytes.len() > HEADER_BYTES {
+                return Err(Error::new(ErrorKind::PermissionDenied, "read only"));
+            }
+            self.taken += bytes.len();
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Seek for Fragile {
+        fn seek(&mut self, _position: SeekFrom) -> std::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    fn encode_noise(blocks: usize) -> Vec<u8> {
+        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE, SampleDepth::TwentyFour)
+            .expect("the writer should be created");
+        let mut state = 1;
+        for _ in 0..BLOCK_FRAMES * blocks {
+            let sample = noise(&mut state) / 8.0;
+            writer.push(sample, sample);
+        }
+        writer
+            .finish()
+            .expect("the stream should be finished")
+            .into_inner()
+    }
 
     struct Point<'point>(&'point [u8]);
 
@@ -335,23 +399,10 @@ mod tests {
     #[test]
     fn keeps_every_frame_within_its_raw_samples() {
         let blocks = 4;
-        let path = std::env::temp_dir().join(format!("musetric-flac-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
-            .expect("the writer should be created");
-        let mut state = 1;
-        for _ in 0..BLOCK_FRAMES * blocks {
-            let sample = noise(&mut state) / 8.0;
-            writer.push(sample, sample);
-        }
-        writer.finish().expect("the stream should be finished");
-        let written = std::fs::metadata(&path)
-            .expect("the stream should exist")
-            .len();
-        std::fs::remove_file(&path).expect("the stream should be removed");
+        let written = encode_noise(blocks).len();
 
-        let header = MAGIC.len() + 4 + STREAM_INFO_USIZE + 4 + SEEK_POINTS * SEEK_POINT_BYTES;
         let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS, SampleDepth::TwentyFour);
-        let limit = u64::try_from(header + raw * blocks).expect("the limit fits");
+        let limit = HEADER_BYTES + raw * blocks;
         assert!(
             written <= limit,
             "{written} bytes written for a {limit} byte limit"
@@ -398,9 +449,11 @@ mod tests {
         );
     }
 
-    fn first_sample_after_seek(path: &Path, target: i64) -> i64 {
-        let file = File::open(path).expect("the stream should open");
-        let source = MediaSourceStream::new(Box::new(file), MediaSourceStreamOptions::default());
+    fn first_sample_after_seek(bytes: &[u8], target: i64) -> i64 {
+        let source = MediaSourceStream::new(
+            Box::new(Cursor::new(bytes.to_vec())),
+            MediaSourceStreamOptions::default(),
+        );
         let mut reader = symphonia::default::get_probe()
             .probe(
                 &Hint::new(),
@@ -430,24 +483,13 @@ mod tests {
 
     #[test]
     fn lets_a_decoder_seek_to_the_frame_that_holds_a_sample() {
-        let blocks = 160;
-        let path =
-            std::env::temp_dir().join(format!("musetric-flac-seek-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
-            .expect("the writer should be created");
-        let mut state = 1;
-        for _ in 0..BLOCK_FRAMES * blocks {
-            let sample = noise(&mut state) / 8.0;
-            writer.push(sample, sample);
-        }
-        writer.finish().expect("the stream should be finished");
+        let bytes = encode_noise(160);
 
         let targets = [96_000, 200_000, 400_000, 600_000];
         let landed: Vec<_> = targets
             .iter()
-            .map(|&target| (target, first_sample_after_seek(&path, target)))
+            .map(|&target| (target, first_sample_after_seek(&bytes, target)))
             .collect();
-        std::fs::remove_file(&path).expect("the stream should be removed");
 
         let frame = i64::try_from(BLOCK_FRAMES).expect("the block fits");
         for (target, first) in landed {
@@ -460,12 +502,8 @@ mod tests {
 
     #[test]
     fn stops_taking_samples_once_a_write_fails() {
-        let path =
-            std::env::temp_dir().join(format!("musetric-flac-fail-{}.flac", std::process::id()));
-        let mut writer = FlacWriter::create(&path, RATE, SampleDepth::TwentyFour)
+        let mut writer = FlacWriter::create(Fragile { taken: 0 }, RATE, SampleDepth::TwentyFour)
             .expect("the writer should be created");
-        let read_only = File::open(&path).expect("the stream should reopen");
-        writer.file = std::io::BufWriter::with_capacity(0, read_only);
         let mut state = 1;
         for _ in 0..BLOCK_FRAMES * 64 {
             let sample = noise(&mut state) / 8.0;
@@ -473,7 +511,6 @@ mod tests {
         }
         let pending = writer.pending.len();
         let finished = writer.finish();
-        std::fs::remove_file(&path).expect("the stream should be removed");
 
         assert!(finished.is_err(), "the failed write should be reported");
         assert_eq!(pending, 0, "no samples should pile up after the failure");

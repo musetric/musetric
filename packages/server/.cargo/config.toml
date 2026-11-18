@@ -1,2 +1,8 @@
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
+
+[env]
+CLIPPY_CONF_DIR = { value = ".", relative = true }
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-bindgen-test-runner"

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use musetric_db::{Analysis, ProcessingStep};
-use musetric_media::Downmix;
+use musetric_dsp::mono::Downmix;
 use serde_json::{Value, json};
 
 use crate::analysis::{

@@ -136,9 +136,11 @@ impl HalfBinFft {
 #[cfg(test)]
 mod tests {
     use rustfft::num_complex::Complex32;
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::{HalfBinFft, fast_real_size_above};
-    use crate::test_signal::{signal, to_float};
+    use crate::stretch::test_signal::{signal, to_float};
 
     #[test]
     fn picks_the_size_of_the_original_for_a_default_block() {

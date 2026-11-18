@@ -17,6 +17,7 @@ const config: KnipConfig = {
     'jscpd',
     'editorconfig-checker',
     'osv-scanner',
+    'wasm-bindgen',
   ],
   ignoreDependencies: ['@vitest/browser'],
   ignoreFiles: [
@@ -33,6 +34,9 @@ const config: KnipConfig = {
         'src/**/*.parity.ts',
         'src/__test__/parity/parityPage.ts',
       ],
+    },
+    'packages/dsp': {
+      entry: ['scripts/**/*.ts'],
     },
     'packages/fft': {
       entry: ['scripts/**/*.ts', 'src/**/*.bench.ts'],

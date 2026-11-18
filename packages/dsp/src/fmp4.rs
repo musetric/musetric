@@ -1,8 +1,4 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::io::Write;
 
 use crate::{
     BoxedError,
@@ -21,18 +17,17 @@ struct Packet {
     duration: u32,
 }
 
-pub(crate) struct Fmp4Writer {
-    writer: BufWriter<File>,
+pub struct Fmp4Writer<W: Write> {
+    writer: W,
     sequence: u32,
     base_time: u32,
     fragment: Vec<Packet>,
     fragment_samples: u64,
 }
 
-impl Fmp4Writer {
-    pub(crate) fn create(to: &Path, sample_rate: u32, channels: u8) -> Result<Self, BoxedError> {
+impl<W: Write> Fmp4Writer<W> {
+    pub fn create(mut writer: W, sample_rate: u32, channels: u8) -> Result<Self, BoxedError> {
         rate_index(sample_rate)?;
-        let mut writer = BufWriter::new(File::create(to)?);
         writer.write_all(&box_of(*b"ftyp", &file_type_body()))?;
         writer.write_all(&box_of(*b"moov", &movie_body(sample_rate, channels)))?;
         writer.flush()?;
@@ -45,7 +40,7 @@ impl Fmp4Writer {
         })
     }
 
-    pub(crate) fn push(&mut self, packet: &[u8], samples: u32) -> Result<(), BoxedError> {
+    pub fn push(&mut self, packet: &[u8], samples: u32) -> Result<(), BoxedError> {
         self.fragment_samples += u64::from(samples);
         self.fragment.push(Packet {
             data: packet.to_vec(),
@@ -57,12 +52,12 @@ impl Fmp4Writer {
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Result<(), BoxedError> {
+    pub fn finish(mut self) -> Result<W, BoxedError> {
         if !self.fragment.is_empty() {
             self.emit()?;
         }
         self.writer.flush()?;
-        Ok(())
+        Ok(self.writer)
     }
 
     fn emit(&mut self) -> Result<(), BoxedError> {

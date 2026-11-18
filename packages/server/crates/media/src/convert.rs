@@ -1,25 +1,29 @@
 use std::{
     fs::File,
-    io::{BufReader, Read},
+    io::{BufReader, BufWriter, Read, Seek, Write},
     path::Path,
 };
 
+use musetric_dsp::{
+    aac::{AacEncoder, FRAME_SAMPLES},
+    depth::SampleDepth,
+    flac::FlacWriter,
+    fmp4::Fmp4Writer,
+    resample::{Conversion, SampleRates},
+};
 use tokio::{
     fs::{copy, create_dir_all},
     task::spawn_blocking,
 };
 
 use crate::{
-    AacEncoder, BoxedError, SampleDepth,
-    aac::FRAME_SAMPLES,
-    flac::FlacWriter,
-    fmp4::Fmp4Writer,
+    BoxedError,
+    file::create_buffered,
     frames::read_flac_info,
     pcm::{
         BYTES_PER_FRAME, CHANNELS, Frames, PcmRequest, PcmSource, READ_BUFFER_BYTE_LENGTH,
         SourceFailure,
     },
-    resample::{Conversion, SampleRates},
 };
 
 const DELIVERY_BITRATE: u32 = 256_000;
@@ -39,9 +43,14 @@ pub async fn convert_to_flac(
         }
         return Ok(());
     }
-    let mut writer = FlacWriter::create(to, request.sample_rate, SampleDepth::TwentyFour)?;
+    let mut writer = FlacWriter::create(
+        create_buffered(to)?,
+        request.sample_rate,
+        SampleDepth::TwentyFour,
+    )?;
     encode_source(source, request, &mut writer).await?;
-    writer.finish()
+    writer.finish()?;
+    Ok(())
 }
 
 async fn already_master(from: &Path, sample_rate: u32) -> bool {
@@ -53,7 +62,7 @@ async fn already_master(from: &Path, sample_rate: u32) -> bool {
 async fn encode_source(
     source: &dyn PcmSource,
     request: PcmRequest<'_>,
-    writer: &mut FlacWriter,
+    writer: &mut FlacWriter<BufWriter<File>>,
 ) -> Result<(), BoxedError> {
     let mut sink = |chunk: &[f32]| write_frames(writer, chunk);
     source
@@ -82,11 +91,16 @@ pub async fn convert_to_fmp4(
         return Err(error);
     }
     let frames = encoder.finish()?;
-    let mut writer = Fmp4Writer::create(to, request.sample_rate, DELIVERY_CHANNELS)?;
+    let mut writer = Fmp4Writer::create(
+        BufWriter::new(File::create(to)?),
+        request.sample_rate,
+        DELIVERY_CHANNELS,
+    )?;
     for packet in &frames {
         writer.push(packet, FRAME_SAMPLES)?;
     }
-    writer.finish()
+    writer.finish()?;
+    Ok(())
 }
 
 pub async fn encode_flac_from_raw(
@@ -123,7 +137,8 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
     let mut conversion = Conversion::create(rates)?;
-    let mut writer = FlacWriter::create(to, rates.output, SampleDepth::TwentyFour)?;
+    let mut writer =
+        FlacWriter::create(create_buffered(to)?, rates.output, SampleDepth::TwentyFour)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
@@ -144,10 +159,11 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<
         &mut writer,
         conversion.flush(usize::try_from(read_frames)?)?,
     );
-    writer.finish()
+    writer.finish()?;
+    Ok(())
 }
 
-fn write_frames(writer: &mut FlacWriter, frames: &[f32]) {
+fn write_frames<W: Write + Seek>(writer: &mut FlacWriter<W>, frames: &[f32]) {
     for frame in frames.as_chunks::<CHANNELS>().0 {
         writer.push(frame[0], frame[1]);
     }
@@ -164,11 +180,12 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
 mod tests {
     use std::fs::{create_dir_all, remove_dir_all, write};
 
-    use super::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
-    use crate::{
-        ENCODER_DELAY, PcmRequest, PcmSource, SampleDepth, SampleRates, SourceFailure,
-        SymphoniaPcm, wav::WavWriter,
+    use musetric_dsp::{
+        aac::ENCODER_DELAY, depth::SampleDepth, resample::SampleRates, wav::WavWriter,
     };
+
+    use super::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
+    use crate::{PcmRequest, PcmSource, SourceFailure, SymphoniaPcm, file::create_buffered};
 
     const RATE: u32 = 48_000;
     const CLICK_FRAME: usize = 20_001;
@@ -262,7 +279,8 @@ mod tests {
         let source = directory.join("click.wav");
         let delivery = directory.join("click.mp4");
         let frames = 48_000;
-        let mut writer = WavWriter::create(&source, RATE, SampleDepth::TwentyFour, frames)
+        let file = create_buffered(&source).expect("the source should be created");
+        let mut writer = WavWriter::create(file, RATE, SampleDepth::TwentyFour, frames)
             .expect("the source should be created");
         for frame in 0..frames {
             writer

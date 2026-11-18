@@ -1,5 +1,5 @@
 name: Rust Quality
-description: Rust ast, format, clippy, and test checks
+description: Rust ast, format, clippy and test checks, natively and for WebAssembly
 
 runs:
   using: composite
@@ -13,6 +13,13 @@ runs:
     - run: rustup toolchain install --no-self-update
       shell: bash
       working-directory: packages/server
+    - id: wasm-bindgen
+      run: echo "version=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p}' Cargo.lock)" >> "$GITHUB_OUTPUT"
+      shell: bash
+      working-directory: packages/server
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen@${{ steps.wasm-bindgen.outputs.version }}
     - run: echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
       shell: bash
     - uses: Swatinem/rust-cache@v2
@@ -33,4 +40,8 @@ runs:
     - run: pnpm --filter @musetric/server check:rust:clippy
       shell: bash
     - run: pnpm --filter @musetric/server check:rust:test
+      shell: bash
+    - run: pnpm --filter @musetric/server check:rust:wasm
+      shell: bash
+    - run: pnpm --filter @musetric/dsp build:wasm
       shell: bash
