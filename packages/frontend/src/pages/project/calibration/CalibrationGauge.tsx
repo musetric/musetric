@@ -8,7 +8,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { getLastJudgedClick } from './clicks.js';
 import { type CalibrationPhase } from './useCalibrationFlow.js';
 
-const size = 208;
+const size = 272;
 const center = 100;
 const arcRadius = 88;
 const innerRadius = 70;
@@ -113,7 +113,7 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
   const liquidTop = center + innerRadius - level * 2 * innerRadius;
 
   return (
-    <Stack sx={{ px: gutter, pt: 4, gap: 3, alignItems: 'center' }}>
+    <Stack sx={{ px: gutter, pt: 3, alignItems: 'center' }}>
       <Box
         role='progressbar'
         aria-label={t('pages.project.calibration.measuring.label')}
