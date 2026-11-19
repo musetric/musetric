@@ -3,11 +3,11 @@ import { type FC } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type CalibrationPrompt } from '../store.js';
 import { CalibrationActions } from './CalibrationActions.js';
-import { CalibrationDone } from './CalibrationDone.js';
-import { CalibrationFailureNote } from './CalibrationFailureNote.js';
+import { CalibrationFigure } from './CalibrationFigure.js';
+import { CalibrationGauge } from './CalibrationGauge.js';
 import { CalibrationHeader } from './CalibrationHeader.js';
-import { CalibrationProgress } from './CalibrationProgress.js';
-import { CalibrationSteps } from './CalibrationSteps.js';
+import { CalibrationMessage } from './CalibrationMessage.js';
+import { CalibrationVolume } from './CalibrationVolume.js';
 import { TimingDetails } from './TimingDetails.js';
 import { useCalibrationFlow } from './useCalibrationFlow.js';
 import { useCalibrationSetup } from './useCalibrationSetup.js';
@@ -24,8 +24,8 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
   const flow = useCalibrationFlow(prompt, onClose);
   const { phase } = flow;
   const { kind, place, spot, texts, outputLabel } = useCalibrationSetup();
-  const headphones = place === 'headphones';
   const gutter = sheet ? 5 : 6;
+  const measuring = phase === 'measuring';
 
   return (
     <Stack>
@@ -34,37 +34,35 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         kind={kind}
         outputLabel={outputLabel}
         calibrated={phase === 'done' || latencySource === 'calibrated'}
-        closeDisabled={phase === 'measuring'}
+        closeDisabled={measuring}
         sheet={sheet}
+        details={<TimingDetails disabled={measuring} />}
         onClose={onClose}
       />
-      {phase === 'ask' && (
-        <CalibrationSteps
-          bluetooth={kind === 'bluetooth'}
-          spot={spot}
-          headphones={headphones}
-          texts={texts}
-          gutter={gutter}
-        />
-      )}
-      {phase === 'measuring' && <CalibrationProgress gutter={gutter} />}
-      {phase === 'done' && (
-        <CalibrationDone
-          headphones={headphones}
-          outputLabel={outputLabel}
-          gutter={gutter}
-        />
-      )}
-      {phase !== 'ask' && phase !== 'measuring' && phase !== 'done' && (
-        <CalibrationFailureNote failure={phase} texts={texts} gutter={gutter} />
-      )}
+      <CalibrationGauge
+        phase={phase}
+        figure={
+          <CalibrationFigure
+            spot={spot}
+            place={place}
+            animated={!measuring && phase !== 'done'}
+            label={texts.figure}
+          />
+        }
+        gutter={gutter}
+      />
+      <CalibrationMessage
+        phase={phase}
+        texts={texts}
+        headphones={place === 'headphones'}
+        gutter={gutter}
+      />
+      <CalibrationVolume gutter={gutter} />
       <CalibrationActions
         primary={flow.primary}
         secondary={flow.secondary}
-        sheet={sheet}
         gutter={gutter}
       />
-      {phase !== 'measuring' && <TimingDetails gutter={gutter} />}
     </Stack>
   );
 };

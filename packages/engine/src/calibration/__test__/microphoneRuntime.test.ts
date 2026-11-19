@@ -27,13 +27,24 @@ const heardClick = (frame: number) => {
   return Math.sin((2 * Math.PI * frequency * frame) / rate) * swell * decay;
 };
 
+const levelPeriodFrameCount = 0.01 * rate;
+
 const measure = async (latencyFrameCount: number) => {
   const channel = new MessageChannel();
   let peaks: RecordingLatencyCalibrationPeak[] = [];
-  const clickCounts: number[] = [];
+  let levelCount = 0;
+  const closed: number[] = [];
+  const heardFrames: number[] = [];
   microphoneCalibrationChannel.outbound(channel.port2).bindHandlers({
-    progress: (message) => {
-      clickCounts.push(message.clickCount);
+    level: () => {
+      levelCount += 1;
+    },
+    heard: (message) => {
+      expect(closed).not.toContain(message.clickIndex);
+      heardFrames[message.clickIndex] = levelCount * levelPeriodFrameCount;
+    },
+    closed: (message) => {
+      closed.push(message.clickIndex);
     },
     done: (message) => {
       peaks = message.peaks;
@@ -64,7 +75,7 @@ const measure = async (latencyFrameCount: number) => {
   await settle();
   channel.port1.close();
   channel.port2.close();
-  return { peaks, clickCounts };
+  return { peaks, closed, heardFrames };
 };
 
 describe('microphone calibration runtime', () => {
@@ -79,8 +90,19 @@ describe('microphone calibration runtime', () => {
     }
   });
 
-  it('reports each click once its window has been heard', async () => {
-    const { clickCounts } = await measure(Math.round(0.3 * rate));
-    expect(clickCounts).toEqual([1, 2, 3]);
+  it('closes each window once', async () => {
+    const { closed } = await measure(Math.round(0.3 * rate));
+    expect(closed).toEqual([0, 1, 2]);
+  });
+
+  it('hears each click within 150 ms of its arrival', async () => {
+    const latencyFrameCount = Math.round(0.3 * rate);
+    const { heardFrames } = await measure(latencyFrameCount);
+    expect(heardFrames).toHaveLength(clickFrames.length);
+    clickFrames.forEach((clickFrame, index) => {
+      const delay = heardFrames[index] - clickFrame - latencyFrameCount;
+      expect(delay).toBeGreaterThan(0);
+      expect(delay).toBeLessThan(0.15 * rate);
+    });
   });
 });

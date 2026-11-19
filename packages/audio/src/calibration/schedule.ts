@@ -1,11 +1,11 @@
 import { getMedianFrameCount } from './peaks.es.js';
 
 const clickDelaySeconds = 0.25;
-const clickCount = 5;
 const clickIntervalSeconds = 1;
 const clickTailSeconds = 1.1;
 const clickDurationSeconds = 0.08;
 
+export const recordingLatencyCalibrationClickCount = 5;
 export const recordingLatencyCalibrationClickFrequencyHz = 1800;
 export const recordingLatencyCalibrationTimeoutSeconds = 6.2;
 export const minimumRecordingLatencyMs = 0;
@@ -48,8 +48,12 @@ export const createRecordingLatencyCalibrationSchedule = (
   const { context } = options;
   const startDelaySeconds = options.startDelaySeconds ?? clickDelaySeconds;
   const clickTime = context.currentTime + startDelaySeconds;
-  const clickFrames = Array.from({ length: clickCount }, (_, index) =>
-    Math.round((clickTime + index * clickIntervalSeconds) * context.sampleRate),
+  const clickFrames = Array.from(
+    { length: recordingLatencyCalibrationClickCount },
+    (_, index) =>
+      Math.round(
+        (clickTime + index * clickIntervalSeconds) * context.sampleRate,
+      ),
   );
   const endFrame =
     clickFrames[clickFrames.length - 1] +

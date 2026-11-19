@@ -1,12 +1,5 @@
-import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
-import {
-  Button,
-  Collapse,
-  Divider,
-  Slider,
-  Stack,
-  Typography,
-} from '@mui/material';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import { Button, Popover, Slider, Stack, Typography } from '@mui/material';
 import {
   maximumRecordingLatencyMs,
   minimumRecordingLatencyMs,
@@ -26,12 +19,12 @@ const toMs = (frameCount: number) =>
   Math.round((frameCount / engine.context.sampleRate) * 1000);
 
 export type TimingDetailsProps = {
-  gutter: number;
+  disabled: boolean;
 };
 
 export const TimingDetails: FC<TimingDetailsProps> = (props) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement>();
   const latencyMs = toMs(useEngineStore(getRecordingLatencyFrameCount));
   const outputLatencyMs = toMs(useEngineStore(getOutputLatencyFrameCount));
   const inputLatencyMs = toMs(useEngineStore(getInputShareFrameCount));
@@ -43,27 +36,30 @@ export const TimingDetails: FC<TimingDetailsProps> = (props) => {
   };
 
   return (
-    <Stack sx={{ px: props.gutter, pb: 3 }}>
-      <Divider />
+    <>
       <Button
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
+        aria-expanded={anchorEl !== undefined}
+        aria-haspopup='dialog'
+        disabled={props.disabled}
+        onClick={(event) => {
+          setAnchorEl(event.currentTarget);
         }}
-        startIcon={
-          <ChevronRightRoundedIcon
-            sx={{
-              transform: open ? 'rotate(90deg)' : undefined,
-              transition: 'transform 150ms',
-            }}
-          />
-        }
-        sx={{ alignSelf: 'flex-start', mt: 1, color: 'text.secondary' }}
+        endIcon={<ExpandMoreRoundedIcon />}
+        sx={{ ml: 'auto', color: 'text.secondary' }}
       >
         {t('pages.project.audioSettings.timing.details')}
       </Button>
-      <Collapse in={open}>
-        <Stack sx={{ gap: 2, pl: 5.5, pb: 2 }}>
+      <Popover
+        anchorEl={anchorEl}
+        open={anchorEl !== undefined}
+        onClose={() => {
+          setAnchorEl(undefined);
+        }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { width: 300, maxWidth: '90vw' } } }}
+      >
+        <Stack sx={{ p: 4, gap: 2 }}>
           <Stack sx={{ gap: 0.5 }}>
             <Typography variant='body2'>
               {t('pages.project.audioSettings.latency', { value: latencyMs })}
@@ -103,7 +99,7 @@ export const TimingDetails: FC<TimingDetailsProps> = (props) => {
             }}
           />
         </Stack>
-      </Collapse>
-    </Stack>
+      </Popover>
+    </>
   );
 };
