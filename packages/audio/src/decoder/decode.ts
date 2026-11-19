@@ -1,4 +1,4 @@
-import init, { Decoder, FlacFeed } from '@musetric/dsp';
+import init, { Decoder, FlacFeed } from '@musetric/dsp/decode';
 
 const toPlanar = (
   chunks: Float32Array[],
