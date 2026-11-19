@@ -88,8 +88,8 @@ const tabletBody = (top: number) => (
   </>
 );
 
-const phoneSize: FigurePoint = [110, 110];
-const wideSize: FigurePoint = [160, 128];
+const phoneSize: FigurePoint = [114, 114];
+const wideSize: FigurePoint = [172, 138];
 
 type Pose = {
   target: FigurePoint;
