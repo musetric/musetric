@@ -114,7 +114,7 @@
   "pages.project.calibration.silent.headphones.tablet": "The clicks play through the earphones. Check that they are connected to this tablet and held at its microphone, not in your ears.",
   "pages.project.calibration.silent.output": "Check that the sound is on and that nothing covers the speaker or the microphone.",
   "pages.project.calibration.silent.title": "No clicks reached the microphone",
-  "pages.project.calibration.skip": "Record without calibrating",
+  "pages.project.calibration.skip": "Skip and record",
   "pages.project.calibration.start": "Start recording",
   "pages.project.calibration.thisOutput": "this output",
   "pages.project.calibration.title.done": "Calibrated",

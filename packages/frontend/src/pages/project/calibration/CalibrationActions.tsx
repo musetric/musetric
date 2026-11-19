@@ -1,4 +1,4 @@
-import { Button, Stack } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { type FC } from 'react';
 import { type CalibrationAction } from './useCalibrationFlow.js';
 
@@ -11,23 +11,33 @@ export type CalibrationActionsProps = {
 export const CalibrationActions: FC<CalibrationActionsProps> = (props) => {
   const { primary, secondary, gutter } = props;
   return (
-    <Stack sx={{ px: gutter, pt: 4, pb: 6, gap: 2 }}>
+    <Box
+      sx={{
+        px: gutter,
+        pt: 3,
+        pb: 5,
+        gap: 2,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      }}
+    >
       <Button
-        variant='contained'
         size='large'
-        fullWidth
-        disabled={!primary.onClick}
-        onClick={primary.onClick}
-      >
-        {primary.label}
-      </Button>
-      <Button
-        fullWidth
         disabled={!secondary.onClick}
         onClick={secondary.onClick}
+        sx={{ whiteSpace: 'nowrap' }}
       >
         {secondary.label}
       </Button>
-    </Stack>
+      <Button
+        variant='contained'
+        size='large'
+        disabled={!primary.onClick}
+        onClick={primary.onClick}
+        sx={{ whiteSpace: 'nowrap' }}
+      >
+        {primary.label}
+      </Button>
+    </Box>
   );
 };
