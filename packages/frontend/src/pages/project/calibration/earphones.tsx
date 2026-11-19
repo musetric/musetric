@@ -39,28 +39,14 @@ export const headphones: Earphone = {
         strokeWidth='4'
         strokeLinecap='round'
       />
-      <rect
-        x='-25'
-        y='-9'
-        width='12'
-        height='20'
-        rx='6'
-        fill='#4a4a4a'
-        stroke='#d6d6d6'
-        strokeWidth='2'
-      />
-      <rect
-        x='13'
-        y='-9'
-        width='12'
-        height='20'
-        rx='6'
-        fill='#4a4a4a'
-        stroke='#d6d6d6'
-        strokeWidth='2'
-      />
-      <rect x='-13' y='-6' width='3.5' height='14' rx='1.75' fill='#262626' />
-      <rect x='9.5' y='-6' width='3.5' height='14' rx='1.75' fill='#262626' />
+      <g fill='#4a4a4a' stroke='#d6d6d6' strokeWidth='2'>
+        <rect x='-25' y='-9' width='12' height='20' rx='6' />
+        <rect x='13' y='-9' width='12' height='20' rx='6' />
+      </g>
+      <g fill='#262626'>
+        <rect x='-13' y='-6' width='3.5' height='14' rx='1.75' />
+        <rect x='9.5' y='-6' width='3.5' height='14' rx='1.75' />
+      </g>
     </>
   ),
   touch: [-19, 11],

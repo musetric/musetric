@@ -42,51 +42,31 @@ const ripple = keyframes`
   }
 `;
 
-const speakerRipple = keyframes`
-  0% {
-    transform: scale(0.4);
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.9;
-  }
-  70%, 100% {
-    transform: scale(2.6);
-    opacity: 0;
-  }
-`;
+type DeviceFrame = [x: number, y: number, width: number, height: number];
 
-const phoneBody = (top: number) => (
-  <>
-    <rect
-      x='58'
-      y={top}
-      width='44'
-      height='74'
-      rx='8'
-      fill='none'
-      stroke={outline}
-      strokeWidth='2'
-    />
-    <rect x='63' y={top + 8} width='34' height='58' rx='3' fill={screen} />
-  </>
-);
-
-const tabletBody = (top: number) => (
-  <>
-    <rect
-      x='10'
-      y={top}
-      width='140'
-      height='72'
-      rx='8'
-      fill='none'
-      stroke={outline}
-      strokeWidth='2'
-    />
-    <rect x='17' y={top + 7} width='126' height='58' rx='3' fill={screen} />
-  </>
-);
+const deviceBody = (frame: DeviceFrame, rim: FigurePoint) => {
+  const [x, y, width, height] = frame;
+  return (
+    <>
+      <rect
+        className='outline'
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx='8'
+      />
+      <rect
+        className='screen'
+        x={x + rim[0]}
+        y={y + rim[1]}
+        width={width - 2 * rim[0]}
+        height={height - 2 * rim[1]}
+        rx='3'
+      />
+    </>
+  );
+};
 
 const phoneSize: FigurePoint = [114, 114];
 const wideSize: FigurePoint = [172, 138];
@@ -113,7 +93,7 @@ const drawings: Record<CalibrationSpot, Drawing> = {
   phoneBottom: {
     size: phoneSize,
     centers: { earphone: [80, 54], speaker: [80, 41] },
-    body: phoneBody(4),
+    body: deviceBody([58, 4, 44, 74], [5, 8]),
     microphone: [72, 73],
     speakers: [[90, 73]],
     earphone: earbud,
@@ -123,7 +103,7 @@ const drawings: Record<CalibrationSpot, Drawing> = {
   phoneTop: {
     size: phoneSize,
     centers: { earphone: [80, 55], speaker: [80, 71] },
-    body: phoneBody(34),
+    body: deviceBody([58, 34, 44, 74], [5, 8]),
     microphone: [72, 39],
     speakers: [[90, 103]],
     earphone: earbud,
@@ -133,7 +113,7 @@ const drawings: Record<CalibrationSpot, Drawing> = {
   tabletTop: {
     size: wideSize,
     centers: { earphone: [80, 57], speaker: [80, 70] },
-    body: tabletBody(34),
+    body: deviceBody([10, 34, 140, 72], [7, 7]),
     microphone: [80, 39],
     speakers: [
       [14, 70],
@@ -146,7 +126,7 @@ const drawings: Record<CalibrationSpot, Drawing> = {
   tabletBottom: {
     size: wideSize,
     centers: { earphone: [80, 53], speaker: [80, 40] },
-    body: tabletBody(4),
+    body: deviceBody([10, 4, 140, 72], [7, 7]),
     microphone: [80, 71],
     speakers: [
       [14, 40],
@@ -162,24 +142,16 @@ const drawings: Record<CalibrationSpot, Drawing> = {
     body: (
       <>
         <rect
+          className='outline'
           x='26'
           y='34'
           width='108'
           height='68'
           rx='5'
-          fill='none'
-          stroke={outline}
-          strokeWidth='2'
         />
-        <rect x='32' y='43' width='96' height='53' rx='2' fill={screen} />
+        <rect className='screen' x='32' y='43' width='96' height='53' rx='2' />
         <circle cx='80' cy='38.5' r='1.6' fill='rgba(255,255,255,0.7)' />
-        <path
-          d='M14 106h132l-9 10H23z'
-          fill='none'
-          stroke={outline}
-          strokeWidth='2'
-          strokeLinejoin='round'
-        />
+        <path className='outline' d='M14 106h132l-9 10H23z' />
       </>
     ),
     microphone: [88, 38.5],
@@ -260,6 +232,13 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
         height: '100%',
         flex: 'none',
         overflow: 'visible',
+        '& .outline': {
+          fill: 'none',
+          stroke: outline,
+          strokeWidth: 2,
+          strokeLinejoin: 'round',
+        },
+        '& .screen': { fill: screen },
         '& .ripple': {
           transformBox: 'fill-box',
           transformOrigin: 'center',
@@ -273,7 +252,7 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
             transformBox: 'fill-box',
             transformOrigin: 'center',
             opacity: 0,
-            animation: `${earphonePlace ? ripple : speakerRipple} ${earphonePlace ? loopSeconds : 1.8}s ease-out infinite`,
+            animation: `${ripple} ${loopSeconds}s ease-out infinite`,
           },
           '& .ripple.late': { animationDelay: '0.3s' },
         }),
