@@ -44,14 +44,14 @@ const getPhase = (
 
 export type CalibrationAction = {
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
 };
 
 export type CalibrationFlow = {
   phase: CalibrationPhase;
   title: string;
-  primary?: CalibrationAction;
-  secondary?: CalibrationAction;
+  primary: CalibrationAction;
+  secondary: CalibrationAction;
 };
 
 export const useCalibrationFlow = (
@@ -102,7 +102,10 @@ export const useCalibrationFlow = (
       },
       secondary: leave,
     },
-    measuring: {},
+    measuring: {
+      primary: { label: t('pages.project.calibration.listening.button') },
+      secondary: { label: leave.label },
+    },
     done: {
       primary: take
         ? { label: t('pages.project.calibration.start'), onClick: finish }

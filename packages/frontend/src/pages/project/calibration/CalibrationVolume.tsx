@@ -6,7 +6,11 @@ import { useOutputVolume } from './useOutputVolume.js';
 
 const loudEnoughVolume = 1 / 3;
 
-export const CalibrationVolume: FC = () => {
+export type CalibrationVolumeProps = {
+  gutter: number;
+};
+
+export const CalibrationVolume: FC<CalibrationVolumeProps> = (props) => {
   const { t } = useTranslation();
   const { outputVolume, setVolume } = useOutputVolume();
   if (!outputVolume) {
@@ -15,7 +19,7 @@ export const CalibrationVolume: FC = () => {
   const { volume, steps } = outputVolume;
   const low = volume < loudEnoughVolume;
   return (
-    <Stack sx={{ gap: 0.5 }}>
+    <Stack sx={{ px: props.gutter, pt: 3, gap: 0.5 }}>
       <Stack direction='row' sx={{ gap: 3, alignItems: 'center' }}>
         <VolumeUpIcon fontSize='small' sx={{ color: 'text.secondary' }} />
         <Slider

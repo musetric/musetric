@@ -5,7 +5,7 @@ import { type CalibrationClick } from '@musetric/engine';
 import { type FC, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { type CalibrationTexts } from './calibrationTexts.js';
+import { getLastJudgedClick } from './clicks.js';
 import { type CalibrationPhase } from './useCalibrationFlow.js';
 
 const size = 208;
@@ -61,11 +61,6 @@ const pendingClicks: CalibrationClick[] = Array.from(
   () => 'pending',
 );
 
-const getLastJudged = (clicks: CalibrationClick[]) => {
-  const index = clicks.findLastIndex((click) => click !== 'pending');
-  return index < 0 ? undefined : { index, click: clicks[index] };
-};
-
 const useClickFlash = (clicks: CalibrationClick[]) => {
   const [flash, setFlash] = useState<CalibrationClick>();
   const judgedCountRef = useRef(0);
@@ -73,7 +68,7 @@ const useClickFlash = (clicks: CalibrationClick[]) => {
     const count = clicks.filter((click) => click !== 'pending').length;
     const previous = judgedCountRef.current;
     judgedCountRef.current = count;
-    const last = getLastJudged(clicks);
+    const last = getLastJudgedClick(clicks);
     if (count <= previous || !last) {
       return undefined;
     }
@@ -88,41 +83,19 @@ const useClickFlash = (clicks: CalibrationClick[]) => {
   return flash;
 };
 
-const useCoach = (clicks: CalibrationClick[], texts: CalibrationTexts) => {
-  const { t } = useTranslation();
-  const last = getLastJudged(clicks);
-  if (!last) {
-    return { text: texts.hold, color: 'text.secondary' };
-  }
-  const click = last.index + 1;
-  const coaches: Record<CalibrationClick, { text: string; color: string }> = {
-    pending: { text: texts.hold, color: 'text.secondary' },
-    clear: {
-      text: t('pages.project.calibration.listening.clear', { click }),
-      color: 'success.main',
-    },
-    faint: { text: texts.faint(click), color: 'warning.main' },
-    stray: { text: texts.hold, color: 'text.secondary' },
-    missed: { text: texts.missed(click), color: 'error.light' },
-  };
-  return coaches[last.click];
-};
-
 export type CalibrationGaugeProps = {
   phase: CalibrationPhase;
   figure: ReactNode;
-  texts: CalibrationTexts;
   gutter: number;
 };
 
 export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
-  const { phase, figure, texts, gutter } = props;
+  const { phase, figure, gutter } = props;
   const { t } = useTranslation();
   const clicks = useEngineStore((state) => state.calibrationClicks);
   const clickIndex = useEngineStore((state) => state.calibrationClickIndex);
   const level = useEngineStore((state) => state.calibrationLevel);
   const flash = useClickFlash(clicks);
-  const coach = useCoach(clicks, texts);
   const measuring = phase === 'measuring';
   const shownClicks =
     phase === 'ask' || clicks.length === 0 ? pendingClicks : clicks;
@@ -278,15 +251,6 @@ export const CalibrationGauge: FC<CalibrationGaugeProps> = (props) => {
           </Stack>
         )}
       </Box>
-      {measuring && (
-        <Typography
-          variant='body1'
-          aria-live='polite'
-          sx={{ color: coach.color, textAlign: 'center' }}
-        >
-          {coach.text}
-        </Typography>
-      )}
     </Stack>
   );
 };
