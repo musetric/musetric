@@ -21,3 +21,39 @@ reason = "Unmaintained zvariant_derive, merged into zbus 6; tauri-plugin-single-
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0543"
 reason = "Unmaintained chrono, which serde_with 3 pulls in for tauri-utils of Tauri 2."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0574"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0575"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0576"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0577"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0578"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0579"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0580"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0581"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0582"
+reason = "heapless 0.8 that flacenc needs up to its latest commit; flacenc uses only heapless::Vec of numbers, which the advisory leaves alone."
