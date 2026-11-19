@@ -7,8 +7,7 @@ use clap::{Parser, Subcommand};
 use musetric_dsp::resample::SampleRates;
 use musetric_media::{
     BoxedError, PcmRequest, SymphoniaPcm, WavePeaks, analyze_lead_visual_loudness,
-    analyze_loudness, convert_to_flac, convert_to_fmp4, encode_flac_from_raw, generate_wave_peaks,
-    read_frame_count,
+    analyze_loudness, convert_to_flac, encode_flac_from_raw, generate_wave_peaks, read_frame_count,
 };
 
 #[derive(Parser)]
@@ -39,14 +38,6 @@ enum Operation {
         output_sample_rate: u32,
         #[arg(long)]
         scale: f64,
-    },
-    Fmp4 {
-        #[arg(long)]
-        from: PathBuf,
-        #[arg(long)]
-        to: PathBuf,
-        #[arg(long)]
-        sample_rate: u32,
     },
     Peaks {
         #[arg(long)]
@@ -115,14 +106,6 @@ async fn run(media: &Media, operation: Operation) -> Result<String, BoxedError> 
                 output: output_sample_rate,
             };
             encode_flac_from_raw(&from, &to, rates, scale).await?;
-            Ok(String::new())
-        }
-        Operation::Fmp4 {
-            from,
-            to,
-            sample_rate,
-        } => {
-            convert_to_fmp4(&media.pcm, read_at(&from, sample_rate), &to).await?;
             Ok(String::new())
         }
         Operation::Peaks {

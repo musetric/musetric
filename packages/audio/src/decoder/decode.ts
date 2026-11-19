@@ -1,4 +1,4 @@
-import init, { aacEncoderDelay, Decoder, FlacFeed } from '@musetric/dsp';
+import init, { Decoder, FlacFeed } from '@musetric/dsp';
 
 const toPlanar = (
   chunks: Float32Array[],
@@ -75,11 +75,6 @@ export type DecodeOptions = {
   keepChannels: boolean;
 };
 
-export type FlacStreamOptions = {
-  sampleRate: number;
-  keepAacDelay: boolean;
-};
-
 export type AudioDecoder = {
   decode: (
     buffer: ArrayBuffer,
@@ -87,7 +82,7 @@ export type AudioDecoder = {
   ) => Promise<DecodedAudio>;
   decodeFlacStream: (
     stream: ReadableStream<Uint8Array>,
-    options: FlacStreamOptions,
+    sampleRate: number,
   ) => Promise<DecodedAudio>;
 };
 
@@ -119,22 +114,21 @@ export const createAudioDecoder = (): AudioDecoder => {
         decoder.free();
       }
     },
-    decodeFlacStream: async (stream, options) => {
+    decodeFlacStream: async (stream, sampleRate) => {
       loading ??= init();
-      await loading;
-      const feed = new FlacFeed(
-        options.sampleRate,
-        options.keepAacDelay ? aacEncoderDelay() : 0,
-      );
+      const { memory } = await loading;
+      const feed = new FlacFeed(sampleRate);
+      const ready = (count: number) =>
+        new Float32Array(memory.buffer, feed.readyPointer, count);
       const reader = stream.getReader();
       const sink = createPlanarSink(feed);
       try {
         let read = await reader.read();
         while (!read.done) {
-          sink.write(feed.push(read.value));
+          sink.write(ready(feed.push(read.value)));
           read = await reader.read();
         }
-        sink.write(feed.finish());
+        sink.write(ready(feed.finish()));
         return sink.finish();
       } catch (error) {
         await reader.cancel(error).catch(() => undefined);

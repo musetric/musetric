@@ -6,7 +6,7 @@ const port = waveformChannel.inbound(self);
 
 const reportError = () => {
   for (const stemType of stemTypes) {
-    port.methods.setDeliveryState({
+    port.methods.setStemState({
       stemType,
       status: 'error',
     });

@@ -45,7 +45,7 @@ use crate::{
 const LABEL: &str = "Headless stem separation";
 const API_NAME: &str = "musetricAiSeparate";
 const PASS: &str = "vocals";
-const CHECKPOINT_FORMAT: &str = "separation-stems-v1";
+const CHECKPOINT_FORMAT: &str = "separation-stems-v2";
 const MIXTURE_NAME: &str = "mixture.f32";
 const MODEL: &str = "model";
 const MODEL_DATA: &str = "modelData";
@@ -57,7 +57,6 @@ const UNFINISHED: &str = "the separation answered before its stems covered the t
 const NO_SCALES: &str = "the separation answered without the scales of its stems";
 
 struct Separated {
-    vocals: StemFiles,
     instrumental: StemFiles,
     lead: StemFiles,
     backing: StemFiles,
@@ -66,16 +65,14 @@ struct Separated {
 impl StepStems for Separated {
     fn create(area: &Path, blobs_path: &Path) -> Self {
         Self {
-            vocals: StemFiles::master(area, blobs_path, MasterType::Vocals),
-            instrumental: StemFiles::delivered(area, blobs_path, MasterType::Instrumental),
-            lead: StemFiles::delivered(area, blobs_path, MasterType::Lead),
-            backing: StemFiles::delivered(area, blobs_path, MasterType::Backing),
+            instrumental: StemFiles::create(area, blobs_path, MasterType::Instrumental),
+            lead: StemFiles::create(area, blobs_path, MasterType::Lead),
+            backing: StemFiles::create(area, blobs_path, MasterType::Backing),
         }
     }
 
     fn staged(&self) -> Vec<&StagedBlob> {
         [
-            self.vocals.staged(),
             self.instrumental.staged(),
             self.lead.staged(),
             self.backing.staged(),
@@ -86,7 +83,7 @@ impl StepStems for Separated {
 
 impl Separated {
     fn sink_stems(&self) -> Vec<SinkStem> {
-        [&self.vocals, &self.instrumental, &self.lead, &self.backing]
+        [&self.instrumental, &self.lead, &self.backing]
             .into_iter()
             .map(StemFiles::sink_stem)
             .collect()
@@ -95,7 +92,6 @@ impl Separated {
 
 #[derive(Deserialize)]
 struct StemScales {
-    vocals: f64,
     instrumental: f64,
     lead: f64,
     backing: f64,
@@ -161,27 +157,20 @@ async fn process_stems(
     let scales = separate_stems(running, job, stems).await?;
     (running.report)(StepPhase::Saving);
     let model_rate = running.context.pins.separation.model.sample_rate;
-    let delivered = SampleRates {
+    let rates = SampleRates {
         input: model_rate,
         output: sample_rate,
     };
     tokio::try_join!(
-        stems.vocals.encode(
-            SampleRates {
-                input: model_rate,
-                output: model_rate,
-            },
-            scales.vocals,
-        ),
-        stems.instrumental.encode(delivered, scales.instrumental),
-        stems.lead.encode(delivered, scales.lead),
-        stems.backing.encode(delivered, scales.backing),
+        stems.instrumental.encode(rates, scales.instrumental),
+        stems.lead.encode(rates, scales.lead),
+        stems.backing.encode(rates, scales.backing),
     )?;
     let pcm = running.context.storage.pcm.as_ref();
     tokio::try_join!(
-        stems.instrumental.deliver(pcm, sample_rate),
-        stems.lead.deliver(pcm, sample_rate),
-        stems.backing.deliver(pcm, sample_rate),
+        stems.instrumental.write_peaks(pcm, sample_rate),
+        stems.lead.write_peaks(pcm, sample_rate),
+        stems.backing.write_peaks(pcm, sample_rate),
     )?;
     Ok(())
 }
@@ -442,7 +431,6 @@ async fn store(
             plain_loudness(MasterType::Backing, backing),
         ],
         stems: vec![
-            stems.vocals.recorded(),
             stems.instrumental.recorded(),
             stems.lead.recorded(),
             stems.backing.recorded(),

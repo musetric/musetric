@@ -1,9 +1,8 @@
 pub mod aac;
 pub mod decode;
-pub mod depth;
+mod dither;
 pub mod flac;
 pub mod flac_feed;
-pub mod fmp4;
 pub mod loudness;
 pub mod m4a;
 pub mod mix;
@@ -20,3 +19,4 @@ pub mod web;
 pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 pub const CHANNELS: usize = 2;
+pub const SAMPLE_BITS: usize = 16;

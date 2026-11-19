@@ -19,7 +19,7 @@ export const playVolumeTick = (from: number, to: number) => {
 
 export type TrackVolumeTarget =
   | {
-      kind: 'delivery';
+      kind: 'stem';
       stemType: StemType;
     }
   | {

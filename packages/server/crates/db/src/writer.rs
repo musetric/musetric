@@ -33,15 +33,10 @@ pub struct NewProject {
     pub preview: Option<NewPreview>,
 }
 
-pub struct NewDelivery {
-    pub blob_id: String,
-    pub wave_blob_id: String,
-}
-
 pub struct NewStem {
     pub stem: MasterType,
     pub master_blob_id: String,
-    pub delivery: Option<NewDelivery>,
+    pub wave_blob_id: String,
 }
 
 pub struct NewStems {
@@ -275,24 +270,14 @@ impl Writer {
 
 fn write_stem(transaction: &Transaction, project_id: i64, stem: &NewStem) -> Result<()> {
     transaction.execute(
-        "INSERT INTO AudioMaster (projectId, type, blobId) VALUES (?1, ?2, ?3)
-         ON CONFLICT(projectId, type) DO UPDATE SET blobId = excluded.blobId",
-        (project_id, stem.stem.name(), &stem.master_blob_id),
-    )?;
-    let Some(delivery) = stem.delivery.as_ref() else {
-        return Ok(());
-    };
-    transaction.execute(
-        "INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
-         VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(projectId, stemType) DO UPDATE SET
-           blobId = excluded.blobId,
-           waveBlobId = excluded.waveBlobId",
+        "INSERT INTO AudioMaster (projectId, type, blobId, waveBlobId) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(projectId, type)
+         DO UPDATE SET blobId = excluded.blobId, waveBlobId = excluded.waveBlobId",
         (
             project_id,
             stem.stem.name(),
-            &delivery.blob_id,
-            &delivery.wave_blob_id,
+            &stem.master_blob_id,
+            &stem.wave_blob_id,
         ),
     )?;
     Ok(())

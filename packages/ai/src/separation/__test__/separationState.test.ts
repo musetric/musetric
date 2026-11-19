@@ -23,7 +23,7 @@ const state: SeparationState = {
     counter: Float32Array.from([0.25, 0.5, 0.75]),
   },
   mixtureScale: 0.9 / 1.3,
-  peaks: { vocals: 0.5, instrumental: 1.25, lead: 0.1, backing: 0 },
+  peaks: { instrumental: 1.25, lead: 0.1, backing: 0 },
 };
 
 describe('separation state', () => {
@@ -67,7 +67,7 @@ describe('separation state', () => {
 
   it('refuses a state of another version', () => {
     const bytes = writeSeparationState(layout, state);
-    new DataView(bytes.buffer).setUint32(0, 2, true);
+    new DataView(bytes.buffer).setUint32(0, 1, true);
     expect(readSeparationState(layout, bytes)).toBeUndefined();
   });
 });

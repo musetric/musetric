@@ -10,7 +10,7 @@ import {
 import { type ViewSize, waveformVisualPeakCeilingDb } from '@musetric/utils';
 import { setOffscreenCanvasSize } from '@musetric/utils/cross/offscreenCanvas';
 import {
-  getDeliveryAudioWave,
+  getMasterWave,
   getRecordingAudioWave,
 } from '../audioRequest/audioRequest.worker.js';
 import { type waveformChannel } from './protocol.cross.js';
@@ -33,7 +33,7 @@ export const createWaveformRuntime = (
 ) => {
   const { port } = options;
 
-  const deliveryWaveformItems: Partial<Record<StemType, WaveformItem>> = {};
+  const stemWaveformItems: Partial<Record<StemType, WaveformItem>> = {};
   let recordingWaveformItem: WaveformItem | undefined = undefined;
   let sourceGainDb = 0;
 
@@ -48,10 +48,10 @@ export const createWaveformRuntime = (
     return max;
   };
 
-  const getDeliveryPeakMax = (): number => {
+  const getStemPeakMax = (): number => {
     let max = 0;
     for (const stemType of stemTypes) {
-      const wavePeaks = deliveryWaveformItems[stemType]?.wavePeaks;
+      const wavePeaks = stemWaveformItems[stemType]?.wavePeaks;
       if (wavePeaks) {
         max = Math.max(max, getWavePeaksMax(wavePeaks));
       }
@@ -60,7 +60,7 @@ export const createWaveformRuntime = (
   };
 
   const getLimitedSourceGainDb = (): number => {
-    const peakMax = getDeliveryPeakMax();
+    const peakMax = getStemPeakMax();
     if (peakMax <= 0) {
       return sourceGainDb;
     }
@@ -79,27 +79,27 @@ export const createWaveformRuntime = (
     return true;
   };
 
-  const renderDeliveryItem = (item: WaveformItem | undefined): boolean =>
+  const renderStemItem = (item: WaveformItem | undefined): boolean =>
     renderItem(item, dbToGain(getLimitedSourceGainDb()));
 
-  const renderDeliveryItems = () => {
+  const renderStemItems = () => {
     for (const stemType of stemTypes) {
-      renderDeliveryItem(deliveryWaveformItems[stemType]);
+      renderStemItem(stemWaveformItems[stemType]);
     }
   };
 
   const renderAll = () => {
-    renderDeliveryItems();
+    renderStemItems();
     renderItem(recordingWaveformItem);
   };
 
-  const reloadDelivery = async (stemType: StemType): Promise<void> => {
-    const item = deliveryWaveformItems[stemType];
+  const reloadStem = async (stemType: StemType): Promise<void> => {
+    const item = stemWaveformItems[stemType];
     if (!item) {
       return;
     }
-    item.wavePeaks = await getDeliveryAudioWave(item.projectId, stemType);
-    renderDeliveryItems();
+    item.wavePeaks = await getMasterWave(item.projectId, stemType);
+    renderStemItems();
   };
 
   const reloadRecording = async (): Promise<void> => {
@@ -151,17 +151,17 @@ export const createWaveformRuntime = (
   };
 
   port.bindHandlers({
-    mountDelivery: async (message) => {
+    mountStem: async (message) => {
       try {
-        deliveryWaveformItems[message.stemType] = createWaveformItem(message);
-        await reloadDelivery(message.stemType);
-        port.methods.setDeliveryState({
+        stemWaveformItems[message.stemType] = createWaveformItem(message);
+        await reloadStem(message.stemType);
+        port.methods.setStemState({
           stemType: message.stemType,
           status: 'success',
         });
       } catch (error) {
         console.error('Failed to load project waveform', error);
-        port.methods.setDeliveryState({
+        port.methods.setStemState({
           stemType: message.stemType,
           status: 'error',
         });
@@ -184,31 +184,31 @@ export const createWaveformRuntime = (
         });
       }
     },
-    unmountDelivery: (message) => {
-      deliveryWaveformItems[message.stemType] = undefined;
+    unmountStem: (message) => {
+      stemWaveformItems[message.stemType] = undefined;
     },
     unmountRecording: () => {
       recordingWaveformItem = undefined;
     },
     setColors: (message) => {
       for (const stemType of stemTypes) {
-        deliveryWaveformItems[stemType]?.processor.setColors(message.colors);
+        stemWaveformItems[stemType]?.processor.setColors(message.colors);
       }
       recordingWaveformItem?.processor.setColors(message.colors);
       renderAll();
     },
     setSourceGainDb: (message) => {
       sourceGainDb = message.gainDb;
-      renderDeliveryItems();
+      renderStemItems();
     },
-    resizeDelivery: (message) => {
-      const item = deliveryWaveformItems[message.stemType];
+    resizeStem: (message) => {
+      const item = stemWaveformItems[message.stemType];
       if (!item) {
         return;
       }
 
       setOffscreenCanvasSize(item.canvas, message.viewSize);
-      renderDeliveryItem(item);
+      renderStemItem(item);
     },
     resizeRecording: (message) => {
       const item = recordingWaveformItem;
@@ -219,16 +219,16 @@ export const createWaveformRuntime = (
       setOffscreenCanvasSize(item.canvas, message.viewSize);
       renderItem(item);
     },
-    refreshDelivery: async (message) => {
+    refreshStem: async (message) => {
       try {
-        await reloadDelivery(message.stemType);
-        port.methods.setDeliveryState({
+        await reloadStem(message.stemType);
+        port.methods.setStemState({
           stemType: message.stemType,
           status: 'success',
         });
       } catch (error) {
         console.error('Failed to refresh project waveform', error);
-        port.methods.setDeliveryState({
+        port.methods.setStemState({
           stemType: message.stemType,
           status: 'error',
         });

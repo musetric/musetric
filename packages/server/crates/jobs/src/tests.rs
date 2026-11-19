@@ -101,8 +101,8 @@ fn result_statements(step: ProcessingStep) -> &'static str {
     match step {
         ProcessingStep::Separation => {
             "INSERT INTO AudioMaster (projectId, type, blobId)
-             VALUES (1, 'vocals', 'vocals-blob'), (1, 'instrumental', 'instrumental-blob'),
-                    (1, 'lead', 'lead-blob'), (1, 'backing', 'backing-blob');"
+             VALUES (1, 'instrumental', 'instrumental-blob'), (1, 'lead', 'lead-blob'),
+                    (1, 'backing', 'backing-blob');"
         }
         ProcessingStep::Transcription => {
             "INSERT INTO Subtitle (projectId, blobId) VALUES (1, 'subtitle-blob');"

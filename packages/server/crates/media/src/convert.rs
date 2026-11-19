@@ -5,10 +5,8 @@ use std::{
 };
 
 use musetric_dsp::{
-    aac::{AacEncoder, FRAME_SAMPLES},
-    depth::SampleDepth,
+    SAMPLE_BITS,
     flac::FlacWriter,
-    fmp4::Fmp4Writer,
     resample::{Conversion, SampleRates},
 };
 use tokio::{
@@ -26,11 +24,6 @@ use crate::{
     },
 };
 
-const DELIVERY_BITRATE: u32 = 256_000;
-const DELIVERY_CHANNELS: u8 = 2;
-
-const _: () = assert!(DELIVERY_CHANNELS as usize == CHANNELS);
-
 pub async fn convert_to_flac(
     source: &dyn PcmSource,
     request: PcmRequest<'_>,
@@ -43,11 +36,7 @@ pub async fn convert_to_flac(
         }
         return Ok(());
     }
-    let mut writer = FlacWriter::create(
-        create_buffered(to)?,
-        request.sample_rate,
-        SampleDepth::TwentyFour,
-    )?;
+    let mut writer = FlacWriter::create(create_buffered(to)?, request.sample_rate)?;
     encode_source(source, request, &mut writer).await?;
     writer.finish()?;
     Ok(())
@@ -55,7 +44,9 @@ pub async fn convert_to_flac(
 
 async fn already_master(from: &Path, sample_rate: u32) -> bool {
     read_flac_info(from).await.is_ok_and(|info| {
-        info.sample_rate == sample_rate && info.channels == u32::from(DELIVERY_CHANNELS)
+        info.sample_rate == sample_rate
+            && usize::try_from(info.channels) == Ok(CHANNELS)
+            && usize::try_from(info.sample_bits) == Ok(SAMPLE_BITS)
     })
 }
 
@@ -69,38 +60,6 @@ async fn encode_source(
         .read_pcm(request, &mut sink)
         .await
         .map_err(|failure| SourceFailure(failure).into())
-}
-
-pub async fn convert_to_fmp4(
-    source: &dyn PcmSource,
-    request: PcmRequest<'_>,
-    to: &Path,
-) -> Result<(), BoxedError> {
-    create_parent(to).await?;
-    let mut encoder = AacEncoder::create(request.sample_rate, DELIVERY_CHANNELS, DELIVERY_BITRATE)?;
-    let mut failure: Option<BoxedError> = None;
-    let mut sink = |chunk: &[f32]| {
-        if failure.is_none()
-            && let Err(error) = encoder.push(chunk)
-        {
-            failure = Some(error);
-        }
-    };
-    source.read_pcm(request, &mut sink).await?;
-    if let Some(error) = failure {
-        return Err(error);
-    }
-    let frames = encoder.finish()?;
-    let mut writer = Fmp4Writer::create(
-        BufWriter::new(File::create(to)?),
-        request.sample_rate,
-        DELIVERY_CHANNELS,
-    )?;
-    for packet in &frames {
-        writer.push(packet, FRAME_SAMPLES)?;
-    }
-    writer.finish()?;
-    Ok(())
 }
 
 pub async fn encode_flac_from_raw(
@@ -137,8 +96,7 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
     let mut conversion = Conversion::create(rates, CHANNELS)?;
-    let mut writer =
-        FlacWriter::create(create_buffered(to)?, rates.output, SampleDepth::TwentyFour)?;
+    let mut writer = FlacWriter::create(create_buffered(to)?, rates.output)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
@@ -180,27 +138,12 @@ async fn create_parent(to: &Path) -> Result<(), BoxedError> {
 mod tests {
     use std::fs::{create_dir_all, remove_dir_all, write};
 
-    use musetric_dsp::{
-        aac::ENCODER_DELAY, depth::SampleDepth, resample::SampleRates, wav::WavWriter,
-    };
+    use musetric_dsp::resample::SampleRates;
 
-    use super::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
-    use crate::{PcmRequest, PcmSource, SourceFailure, SymphoniaPcm, file::create_buffered};
+    use super::{convert_to_flac, encode_flac_from_raw};
+    use crate::{PcmRequest, PcmSource, SourceFailure, SymphoniaPcm};
 
     const RATE: u32 = 48_000;
-    const CLICK_FRAME: usize = 20_001;
-    const CLICK_FRAMES: usize = 64;
-    const SEARCH_FRAMES: usize = 4096;
-
-    fn click(frame: usize) -> f32 {
-        frame
-            .checked_sub(CLICK_FRAME)
-            .filter(|offset| *offset < CLICK_FRAMES)
-            .map_or(0.0, |offset| {
-                let phase = f32::from(u16::try_from(offset).expect("the offset is small"));
-                0.5 * (std::f32::consts::TAU * phase / 16.0).sin()
-            })
-    }
 
     #[tokio::test]
     async fn scales_the_raw_samples_before_it_encodes_them() {
@@ -241,7 +184,7 @@ mod tests {
 
         assert_eq!(decoded.len(), samples.len());
         for (found, sample) in decoded.iter().zip(&samples) {
-            assert!((found - sample * 0.5).abs() < 1e-6);
+            assert!((found - sample * 0.5).abs() <= 1.5 / 32_768.0);
         }
     }
 
@@ -269,54 +212,5 @@ mod tests {
 
         assert!(unreadable.is::<SourceFailure>());
         assert!(!refused.is::<SourceFailure>());
-    }
-
-    #[tokio::test]
-    async fn delays_the_delivery_by_the_encoder_delay() {
-        let directory =
-            std::env::temp_dir().join(format!("musetric-delivery-{}", std::process::id()));
-        create_dir_all(&directory).expect("the workspace should be created");
-        let source = directory.join("click.wav");
-        let delivery = directory.join("click.mp4");
-        let frames = 48_000;
-        let file = create_buffered(&source).expect("the source should be created");
-        let mut writer = WavWriter::create(file, RATE, SampleDepth::TwentyFour, frames)
-            .expect("the source should be created");
-        for frame in 0..frames {
-            writer
-                .push(click(frame), click(frame))
-                .expect("the source should take the frame");
-        }
-        writer.finish().expect("the source should be finished");
-        let request = PcmRequest {
-            from: &source,
-            sample_rate: RATE,
-        };
-        convert_to_fmp4(&SymphoniaPcm, request, &delivery)
-            .await
-            .expect("the delivery should be encoded");
-
-        let mut decoded = Vec::new();
-        let mut sink = |chunk: &[f32]| decoded.extend(chunk.iter().step_by(2));
-        let heard = PcmRequest {
-            from: &delivery,
-            sample_rate: RATE,
-        };
-        SymphoniaPcm
-            .read_pcm(heard, &mut sink)
-            .await
-            .expect("the delivery should be decoded");
-        remove_dir_all(&directory).expect("the workspace should be removed");
-
-        let score = |lag: &usize| -> f32 {
-            (CLICK_FRAME..CLICK_FRAME + CLICK_FRAMES)
-                .map(|frame| click(frame) * decoded.get(frame + lag).copied().unwrap_or(0.0))
-                .sum()
-        };
-        let lag = (0..SEARCH_FRAMES).max_by(|first, second| score(first).total_cmp(&score(second)));
-        assert_eq!(
-            lag,
-            Some(usize::try_from(ENCODER_DELAY).expect("the delay fits"))
-        );
     }
 }

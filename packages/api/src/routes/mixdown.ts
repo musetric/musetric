@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { createApiRoute } from '../common/apiRoute.js';
 
-export const bitDepthSchema = z.union([z.literal(16), z.literal(24)]);
-export type BitDepth = z.infer<typeof bitDepthSchema>;
-
 export const bitrateSchema = z.union([
   z.literal(128),
   z.literal(192),
@@ -14,8 +11,8 @@ export type Bitrate = z.infer<typeof bitrateSchema>;
 export const formatSchema = z.discriminatedUnion('format', [
   z.object({ format: z.literal('m4a'), bitrate: bitrateSchema }),
   z.object({ format: z.literal('mp3'), bitrate: bitrateSchema }),
-  z.object({ format: z.literal('flac'), bitDepth: bitDepthSchema }),
-  z.object({ format: z.literal('wav'), bitDepth: bitDepthSchema }),
+  z.object({ format: z.literal('flac') }),
+  z.object({ format: z.literal('wav') }),
 ]);
 export type Format = z.infer<typeof formatSchema>;
 

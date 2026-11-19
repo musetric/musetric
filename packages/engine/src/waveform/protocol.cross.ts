@@ -4,7 +4,7 @@ import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type WaveformOutboundMethods = {
   boot: () => void;
-  mountDelivery: (message: {
+  mountStem: (message: {
     projectId: number;
     stemType: StemType;
     canvas: OffscreenCanvas;
@@ -20,13 +20,13 @@ export type WaveformOutboundMethods = {
     viewSize: ViewSize;
     frameCount: number;
   }) => void;
-  unmountDelivery: (message: { stemType: StemType }) => void;
+  unmountStem: (message: { stemType: StemType }) => void;
   unmountRecording: () => void;
   setColors: (message: { colors: WaveformColors }) => void;
   setSourceGainDb: (message: { gainDb: number }) => void;
-  resizeDelivery: (message: { stemType: StemType; viewSize: ViewSize }) => void;
+  resizeStem: (message: { stemType: StemType; viewSize: ViewSize }) => void;
   resizeRecording: (message: { viewSize: ViewSize }) => void;
-  refreshDelivery: (message: { stemType: StemType }) => void;
+  refreshStem: (message: { stemType: StemType }) => void;
   refreshRecording: () => void;
   setRecording: (message: { recordingId?: number }) => void;
   applyRecordingPeakPatch: (message: {
@@ -38,7 +38,7 @@ export type WaveformOutboundMethods = {
 
 export type WaveformInboundMethods = {
   booted: () => void;
-  setDeliveryState: (message: {
+  setStemState: (message: {
     stemType: StemType;
     status: 'error' | 'success';
   }) => void;
@@ -50,26 +50,26 @@ export const waveformChannel = createMessageChannel<
   WaveformOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setDeliveryState', 'setRecordingState'],
+    keys: ['booted', 'setStemState', 'setRecordingState'],
   },
   outbound: {
     keys: [
       'boot',
-      'mountDelivery',
+      'mountStem',
       'mountRecording',
-      'unmountDelivery',
+      'unmountStem',
       'unmountRecording',
       'setColors',
       'setSourceGainDb',
-      'resizeDelivery',
+      'resizeStem',
       'resizeRecording',
-      'refreshDelivery',
+      'refreshStem',
       'refreshRecording',
       'setRecording',
       'applyRecordingPeakPatch',
     ],
     transfers: {
-      mountDelivery: (message) => [message.canvas],
+      mountStem: (message) => [message.canvas],
       mountRecording: (message) => [message.canvas],
     },
   },

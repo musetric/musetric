@@ -13,7 +13,6 @@ export const mixdownFormatNames = [
 const mixdownChoiceSchema = z.object({
   format: z.enum(mixdownFormatNames),
   bitrate: api.mixdown.bitrateSchema,
-  bitDepth: api.mixdown.bitDepthSchema,
 });
 
 export type MixdownChoice = z.infer<typeof mixdownChoiceSchema>;
@@ -21,7 +20,6 @@ export type MixdownChoice = z.infer<typeof mixdownChoiceSchema>;
 const firstMixdownChoice: MixdownChoice = {
   format: 'flac',
   bitrate: 256,
-  bitDepth: 16,
 };
 
 export const loadMixdownChoice = (): MixdownChoice => {

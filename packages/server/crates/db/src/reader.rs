@@ -6,7 +6,7 @@ use crate::{
     analysis::{
         Analysis, StemLoudness, read_all_stem_loudness, read_analysis_blob, read_stem_loudness,
     },
-    audio::{AudioDelivery, MasterType, StemType, read_delivery, read_master_blob},
+    audio::{MasterType, read_master_blob, read_wave_blob},
     blob::read_referenced_blob_ids,
     database::{OpenOptions, open_database},
     failure::BoxedError,
@@ -117,12 +117,12 @@ impl Reader {
         self.read(|connection| read_master_blob(connection, project_id, master))
     }
 
-    pub fn delivery(
+    pub fn wave_blob(
         &self,
         project_id: i64,
-        stem: StemType,
-    ) -> Result<Option<AudioDelivery>, BoxedError> {
-        self.read(|connection| read_delivery(connection, project_id, stem))
+        master: MasterType,
+    ) -> Result<Option<String>, BoxedError> {
+        self.read(|connection| read_wave_blob(connection, project_id, master))
     }
 
     pub fn recording(&self, recording_id: i64) -> Result<Option<Recording>, BoxedError> {

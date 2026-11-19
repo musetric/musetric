@@ -8,7 +8,7 @@ mod mono;
 mod pcm;
 mod peaks;
 
-pub use convert::{convert_to_flac, convert_to_fmp4, encode_flac_from_raw};
+pub use convert::{convert_to_flac, encode_flac_from_raw};
 pub use decode::SymphoniaPcm;
 pub use frames::{read_flac_sample_rate, read_frame_count};
 pub use loudness::{analyze_lead_visual_loudness, analyze_loudness};

@@ -49,14 +49,11 @@ export const getRecordingPiece = async (
     },
   });
 
-export const getDeliveryAudioWave = async (
-  projectId: number,
-  stemType: StemType,
-) =>
-  await requestWithAxios(axios, api.audio.deliveryWave.base, {
+export const getMasterWave = async (projectId: number, type: StemType) =>
+  await requestWithAxios(axios, api.audio.masterWave.base, {
     params: {
       projectId,
-      stemType,
+      type,
     },
   });
 

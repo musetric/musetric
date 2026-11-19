@@ -12,7 +12,7 @@ import { RecordingEmptyHint } from '../recording/RecordingEmptyHint.js';
 
 export type WaveformCanvasProps =
   | {
-      kind: 'delivery';
+      kind: 'stem';
       stemType: StemType;
     }
   | {
@@ -39,7 +39,7 @@ export const WaveformCanvas: FC<WaveformCanvasProps> = (props) => {
         canvas,
       });
     }
-    return engine.waveform.mountDelivery({
+    return engine.waveform.mountStem({
       projectId,
       stemType: props.stemType,
       canvas,

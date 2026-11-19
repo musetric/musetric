@@ -18,7 +18,6 @@ describe('separation stems', () => {
       ],
       offset: 1,
     });
-    expect(Array.from(stems.vocals)).toEqual([0.5, -0.5, 0.25, 0]);
     expect(Array.from(stems.backing)).toEqual([0.125, 0, 0, 0.5]);
     expect(Array.from(stems.instrumental)).toEqual([0.5, -0.5, 0.5, 0.5]);
     expect(Array.from(stems.lead)).toEqual([0.375, -0.5, 0.25, -0.5]);
@@ -45,7 +44,6 @@ describe('separation stems', () => {
     });
     const peaks = raisePeaks({ ...silentPeaks(), backing: 0.75 }, stems);
     expect(peaks).toEqual({
-      vocals: 1.5,
       instrumental: 1.5,
       lead: 2,
       backing: 0.75,
@@ -56,10 +54,7 @@ describe('separation stems', () => {
     expect(peakScale(0)).toBe(1);
     expect(peakScale(0.9)).toBe(1);
     expect(peakScale(1.8)).toBe(0.5);
-    expect(
-      stemScales({ vocals: 0.5, instrumental: 1.8, lead: 0, backing: 0.9 }),
-    ).toEqual({
-      vocals: 1,
+    expect(stemScales({ instrumental: 1.8, lead: 0, backing: 0.9 })).toEqual({
       instrumental: 0.5,
       lead: 1,
       backing: 1,

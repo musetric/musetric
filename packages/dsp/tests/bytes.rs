@@ -6,7 +6,6 @@ mod tests {
         CHANNELS,
         aac::AacEncoder,
         decode::{DecodeRequest, Layout, decode},
-        depth::SampleDepth,
         flac::FlacWriter,
         m4a::{M4aTrack, write_m4a},
         mp3::Mp3Encoder,
@@ -43,8 +42,8 @@ mod tests {
             })
     }
 
-    fn flac(depth: SampleDepth) -> Vec<u8> {
-        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE, depth)
+    fn flac() -> Vec<u8> {
+        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE)
             .expect("the writer should be created");
         for frame in signal().as_chunks::<CHANNELS>().0 {
             writer.push(frame[0], frame[1]);
@@ -58,8 +57,8 @@ mod tests {
     #[test]
     fn writes_the_same_flac_on_every_target() {
         assert_eq!(
-            digest(&flac(SampleDepth::TwentyFour)),
-            "31ccb539b711182b3e449bee5196a01c146c321e50099c064f18f9eddcea1f8d"
+            digest(&flac()),
+            "39314460d33bbafaf786da7c3563e1dd639cb7a03ee7a846f9757ab1ad5511e6"
         );
     }
 
@@ -67,7 +66,7 @@ mod tests {
     fn writes_the_same_wav_on_every_target() {
         let samples = signal();
         let frames = samples.as_chunks::<CHANNELS>().0;
-        let mut writer = WavWriter::create(Vec::new(), RATE, SampleDepth::Sixteen, frames.len())
+        let mut writer = WavWriter::create(Vec::new(), RATE, frames.len())
             .expect("the writer should be created");
         for frame in frames {
             writer
@@ -77,7 +76,7 @@ mod tests {
         let bytes = writer.finish().expect("the stream should be finished");
         assert_eq!(
             digest(&bytes),
-            "ed0f1d4be01254bebdad2fc01ae262f34316f25ac54baefa0f3790997efb1341"
+            "0c64ae105f84b1aa32f475177df7b9c110ce47b626b8128019b723f19bcadc39"
         );
     }
 
@@ -118,8 +117,8 @@ mod tests {
     }
 
     #[test]
-    fn decodes_its_own_flac_to_the_quantized_samples() {
-        let bytes = flac(SampleDepth::TwentyFour);
+    fn decodes_its_own_flac_within_a_dithered_step() {
+        let bytes = flac();
         let mut decoded = Vec::new();
         let request = DecodeRequest {
             source: Box::new(Cursor::new(bytes)),
@@ -133,12 +132,14 @@ mod tests {
         })
         .expect("the stream should decode");
 
-        let scale = 8_388_608.0_f32;
-        let expected: Vec<f32> = signal()
-            .iter()
-            .map(|value| (value * scale).round().clamp(-scale, scale - 1.0) / scale)
-            .collect();
+        let scale = 32_768.0_f32;
+        let signal = signal();
         assert_eq!(rate, RATE);
-        assert_eq!(decoded, expected);
+        assert_eq!(decoded.len(), signal.len());
+        for (got, value) in decoded.iter().zip(&signal) {
+            let step = got * scale;
+            assert_eq!(step, step.round());
+            assert!((step - value * scale).abs() <= 1.5);
+        }
     }
 }

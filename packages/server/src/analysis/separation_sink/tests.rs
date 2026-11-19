@@ -11,7 +11,7 @@ use super::{
 use crate::{checkpoint::CheckpointDir, storage::Storage, test_workspace::Workspace};
 
 const ATTEMPT: &str = "attempt";
-const STEMS: [&str; 4] = ["vocals", "instrumental", "lead", "backing"];
+const STEMS: [&str; 3] = ["instrumental", "lead", "backing"];
 const TRACK_FRAMES: u64 = 10;
 
 struct Fixture {
@@ -109,10 +109,13 @@ async fn appends_each_unit_at_the_committed_frames() {
         .await
         .expect("unit 1 should commit");
 
-    assert_eq!(fixture.raw("vocals"), [region(4, 1), region(3, 9)].concat());
+    assert_eq!(
+        fixture.raw("instrumental"),
+        [region(4, 1), region(3, 9)].concat()
+    );
     assert_eq!(
         fixture.raw("backing"),
-        [region(4, 4), region(3, 12)].concat()
+        [region(4, 3), region(3, 11)].concat()
     );
     let cursor = fixture
         .storage
@@ -138,11 +141,11 @@ async fn confirms_a_committed_unit_and_refuses_one_out_of_turn() {
         .expect("unit 1 should commit");
 
     assert!(matches!(
-        sink.target(ATTEMPT, 1, "vocals"),
+        sink.target(ATTEMPT, 1, "instrumental"),
         Ok(UnitTarget::Confirm)
     ));
     assert!(matches!(
-        sink.target(ATTEMPT, 3, "vocals"),
+        sink.target(ATTEMPT, 3, "instrumental"),
         Err(UnitReject::Bad(_))
     ));
     assert!(matches!(
@@ -150,11 +153,11 @@ async fn confirms_a_committed_unit_and_refuses_one_out_of_turn() {
         Err(UnitReject::Bad(_))
     ));
     assert!(matches!(
-        sink.target("other", 2, "vocals"),
+        sink.target("other", 2, "instrumental"),
         Err(UnitReject::Stale)
     ));
     assert!(matches!(
-        sink.target(ATTEMPT, 2, "vocals"),
+        sink.target(ATTEMPT, 2, "instrumental"),
         Ok(UnitTarget::Write(_))
     ));
 }
@@ -173,7 +176,7 @@ async fn starts_over_from_the_first_unit() {
         .await
         .expect("unit 0 should commit again");
 
-    assert_eq!(fixture.raw("lead"), region(2, 22));
+    assert_eq!(fixture.raw("lead"), region(2, 21));
     assert_eq!(sink.cursor().map(|found| found.next_unit).ok(), Some(1));
 }
 
@@ -181,7 +184,7 @@ async fn starts_over_from_the_first_unit() {
 async fn refuses_stems_that_differ_in_length_or_run_past_the_track() {
     let fixture = Fixture::new();
     let sink = fixture.sink(START);
-    for name in ["vocals", "instrumental", "lead"] {
+    for name in ["instrumental", "lead"] {
         put(&sink, 0, name, &region(4, 1))
             .await
             .expect("the stem should land");
@@ -220,7 +223,7 @@ async fn resumes_on_stems_cut_back_to_the_checkpoint() {
         .expect("unit 1 should commit");
 
     assert_eq!(
-        fixture.raw("vocals"),
+        fixture.raw("instrumental"),
         [region(4, 1), region(3, 30)].concat()
     );
     assert!(truncate_stems(&stems, 8).await.is_err());
@@ -272,10 +275,10 @@ async fn takes_the_outputs_of_a_unit_over_http() {
         2 * usize::try_from(TRACK_FRAMES).unwrap_or(0) + 2
     ]);
 
-    assert_eq!(fixture.raw("vocals"), stem);
+    assert_eq!(fixture.raw("instrumental"), stem);
     assert_eq!(sink.cursor().map(|found| found.frames).ok(), Some(2));
     assert_eq!(
-        put_over_http(&base, 1, "vocals", broken).await,
+        put_over_http(&base, 1, "instrumental", broken).await,
         StatusCode::BAD_REQUEST
     );
     assert_eq!(

@@ -294,10 +294,9 @@ fn shards_a_blob_path_by_the_first_two_byte_pairs() {
     );
 }
 
-const BLOB_COLUMNS: [&str; 11] = [
-    "AudioDelivery.blobId",
-    "AudioDelivery.waveBlobId",
+const BLOB_COLUMNS: [&str; 10] = [
     "AudioMaster.blobId",
+    "AudioMaster.waveBlobId",
     "Chords.blobId",
     "Key.blobId",
     "Preview.blobId",
@@ -310,10 +309,8 @@ const BLOB_COLUMNS: [&str; 11] = [
 
 const BLOB_SEED: &str = "
   INSERT INTO Project (name, sampleRate, frameCount) VALUES ('song', 44100, 100);
-  INSERT INTO AudioMaster (projectId, type, blobId)
-    VALUES (1, 'source', 'AudioMaster.blobId');
-  INSERT INTO AudioDelivery (projectId, stemType, blobId, waveBlobId)
-    VALUES (1, 'lead', 'AudioDelivery.blobId', 'AudioDelivery.waveBlobId');
+  INSERT INTO AudioMaster (projectId, type, blobId, waveBlobId)
+    VALUES (1, 'lead', 'AudioMaster.blobId', 'AudioMaster.waveBlobId');
   INSERT INTO Preview (projectId, blobId, filename, contentType)
     VALUES (1, 'Preview.blobId', 'cover.png', 'image/png');
   INSERT INTO Subtitle (projectId, blobId) VALUES (1, 'Subtitle.blobId');

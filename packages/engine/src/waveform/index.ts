@@ -22,7 +22,7 @@ type Unmount = () => void;
 export type EngineWaveform = {
   port: ReturnType<typeof waveformChannel.outbound<Worker>>;
   boot: () => Promise<void>;
-  mountDelivery: (options: {
+  mountStem: (options: {
     projectId: number;
     stemType: StemType;
     canvas: HTMLCanvasElement;
@@ -31,7 +31,7 @@ export type EngineWaveform = {
     projectId: number;
     canvas: HTMLCanvasElement;
   }) => Unmount;
-  refreshDelivery: (stemType: StemType) => void;
+  refreshStem: (stemType: StemType) => void;
   refreshRecording: () => void;
   applyRecordingPeakPatch: (message: {
     recordingId: number;
@@ -62,7 +62,7 @@ export const createEngineWaveform = (
     booted: () => {
       bootPromise.resolve();
     },
-    setDeliveryState: (message) => {
+    setStemState: (message) => {
       store.update((state) => {
         state.statuses.waveform[message.stemType] = message.status;
       });
@@ -104,7 +104,7 @@ export const createEngineWaveform = (
 
       return bootPromise.promise;
     },
-    mountDelivery: (options) => {
+    mountStem: (options) => {
       const { projectId, stemType, canvas } = options;
 
       resizeCanvas(canvas);
@@ -114,7 +114,7 @@ export const createEngineWaveform = (
       port.methods.setSourceGainDb({
         gainDb: getWaveformSourceGainDb(store.get().sourceGainDb),
       });
-      port.methods.mountDelivery({
+      port.methods.mountStem({
         projectId,
         stemType,
         canvas: offscreenCanvas,
@@ -124,7 +124,7 @@ export const createEngineWaveform = (
       });
 
       const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
-        port.methods.resizeDelivery({
+        port.methods.resizeStem({
           stemType,
           viewSize: getCanvasSize(canvas),
         });
@@ -132,7 +132,7 @@ export const createEngineWaveform = (
 
       return () => {
         unsubscribeResizeObserver();
-        port.methods.unmountDelivery({
+        port.methods.unmountStem({
           stemType,
         });
         store.update((state) => {
@@ -170,8 +170,8 @@ export const createEngineWaveform = (
         });
       };
     },
-    refreshDelivery: (stemType) => {
-      port.methods.refreshDelivery({ stemType });
+    refreshStem: (stemType) => {
+      port.methods.refreshStem({ stemType });
     },
     refreshRecording: () => {
       port.methods.refreshRecording();

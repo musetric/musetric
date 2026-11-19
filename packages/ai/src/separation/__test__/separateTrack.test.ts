@@ -111,7 +111,6 @@ describe('separateTrack', () => {
     );
     const scale = 0.9 / peak;
     const shares = {
-      vocals: 0.5,
       instrumental: 0.5,
       lead: 0.25,
       backing: 0.25,
@@ -127,7 +126,6 @@ describe('separateTrack', () => {
       }
     }
     expect(found.scales).toEqual({
-      vocals: 1,
       instrumental: 1,
       lead: 1,
       backing: 1,
