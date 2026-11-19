@@ -1,8 +1,15 @@
-import { type DecodedAudio, type DecodeOptions } from '@musetric/audio/decoder';
+import { type DecodedAudio } from '@musetric/audio/decoder';
+import { type StemType } from '@musetric/audio/es';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
+export type StemDecodeRequest = {
+  projectId: number;
+  stem: StemType;
+  sampleRate: number;
+};
+
 export type StemDecodeOutboundMethods = {
-  decode: (message: { buffer: ArrayBuffer; options: DecodeOptions }) => void;
+  decode: (message: StemDecodeRequest) => void;
 };
 
 export type StemDecodeInboundMethods = {
@@ -22,8 +29,5 @@ export const stemDecodeChannel = createMessageChannel<
   },
   outbound: {
     keys: ['decode'],
-    transfers: {
-      decode: (message) => [message.buffer],
-    },
   },
 });

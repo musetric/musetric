@@ -4,10 +4,11 @@ use wasm_bindgen::prelude::{JsError, wasm_bindgen};
 
 use crate::{
     BoxedError, CHANNELS,
-    aac::AacEncoder,
+    aac::{AacEncoder, ENCODER_DELAY},
     decode::{DecodeRequest, Decoder, Layout},
     depth::SampleDepth,
     flac::FlacWriter,
+    flac_feed,
     loudness::LoudnessMeter,
     m4a::{M4aTrack, write_m4a},
     mp3::Mp3Encoder,
@@ -81,6 +82,54 @@ impl StreamDecoder {
         self.decoder
             .read()
             .map(|frames| frames.map(<[f32]>::to_vec))
+            .map_err(|failure| failed(&failure))
+    }
+}
+
+#[wasm_bindgen(js_name = aacEncoderDelay)]
+#[must_use]
+pub fn aac_encoder_delay() -> u32 {
+    ENCODER_DELAY
+}
+
+#[wasm_bindgen]
+pub struct FlacFeed {
+    feed: flac_feed::FlacFeed,
+}
+
+#[wasm_bindgen]
+impl FlacFeed {
+    #[wasm_bindgen(constructor)]
+    #[must_use]
+    pub fn new(sample_rate: Option<u32>, lead_in_frames: usize) -> FlacFeed {
+        Self {
+            feed: flac_feed::FlacFeed::create(sample_rate, lead_in_frames),
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    #[must_use]
+    pub fn channels(&self) -> Option<usize> {
+        self.feed.channels()
+    }
+
+    #[wasm_bindgen(getter, js_name = frameCount)]
+    #[must_use]
+    pub fn frame_count(&self) -> Option<usize> {
+        self.feed.frame_count()
+    }
+
+    pub fn push(&mut self, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+        self.feed
+            .push(bytes)
+            .map(<[f32]>::to_vec)
+            .map_err(|failure| failed(&failure))
+    }
+
+    pub fn finish(&mut self) -> Result<Vec<f32>, JsError> {
+        self.feed
+            .finish()
+            .map(<[f32]>::to_vec)
             .map_err(|failure| failed(&failure))
     }
 }

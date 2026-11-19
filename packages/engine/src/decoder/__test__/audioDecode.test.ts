@@ -21,8 +21,6 @@ const createGate = (): Gate => {
 const gates = new Map<number, Gate>();
 
 vi.mock('../../audioRequest/audioRequest.worker.js', () => ({
-  getDeliveryAudioContent: async () =>
-    Promise.resolve({ buffer: new ArrayBuffer(0) }),
   getRecordingPieces: async (projectId: number, recordingId: number) => {
     await gates.get(recordingId)?.promise;
     return {
@@ -50,6 +48,8 @@ vi.mock('@musetric/audio/decoder', () => ({
         frameCount: 4,
         channels: [new Float32Array(4).fill(buffer.byteLength)],
       }),
+    decodeFlacStream: async () =>
+      Promise.reject(new Error('The stems decode in their own workers')),
   }),
 }));
 

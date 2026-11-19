@@ -3,16 +3,20 @@ import { requestWithAxios } from '@musetric/api/dom';
 import { type StemType } from '@musetric/audio/es';
 import axios from 'axios';
 
-export const getDeliveryAudioContent = async (
+export const getMasterAudioStream = async (
   projectId: number,
-  stemType: StemType,
-) =>
-  await requestWithAxios(axios, api.audio.deliveryContent.base, {
-    params: {
-      projectId,
-      stemType,
-    },
-  });
+  type: StemType,
+): Promise<ReadableStream<Uint8Array>> => {
+  const response = await fetch(
+    api.audio.masterContent.base.endpoint({ projectId, type }),
+  );
+  if (!response.ok || !response.body) {
+    throw new Error(
+      `The ${type} master of project ${projectId} answered ${response.status}`,
+    );
+  }
+  return response.body;
+};
 
 export const getRecordingList = async (projectId: number) =>
   await requestWithAxios(axios, api.recording.list.base, {

@@ -1,13 +1,12 @@
-import { type DecodedAudio, type DecodeOptions } from '@musetric/audio/decoder';
-import { stemDecodeChannel } from './stemDecode.cross.js';
+import { type DecodedAudio } from '@musetric/audio/decoder';
+import {
+  stemDecodeChannel,
+  type StemDecodeRequest,
+} from './stemDecode.cross.js';
 import stemDecodeWorkerUrl from './stemDecode.worker.ts?worker&url';
 
 export type StemDecoders = {
-  decode: (
-    slot: number,
-    buffer: ArrayBuffer,
-    options: DecodeOptions,
-  ) => Promise<DecodedAudio>;
+  decode: (slot: number, request: StemDecodeRequest) => Promise<DecodedAudio>;
 };
 
 export const createStemDecoders = (count: number): StemDecoders => {
@@ -19,7 +18,7 @@ export const createStemDecoders = (count: number): StemDecoders => {
   }));
 
   return {
-    decode: async (index, buffer, options) => {
+    decode: async (index, request) => {
       const slot = slots[index];
       const decoded = slot.queue.then(
         async () =>
@@ -30,7 +29,7 @@ export const createStemDecoders = (count: number): StemDecoders => {
                 reject(new Error(message.reason));
               },
             });
-            slot.port.methods.decode({ buffer, options });
+            slot.port.methods.decode(request);
           }),
       );
       slot.queue = decoded.then(

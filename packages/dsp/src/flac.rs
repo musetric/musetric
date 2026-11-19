@@ -29,6 +29,8 @@ const FRAME_OVERHEAD_BYTES: usize = 32;
 const NOT_A_MARKER: &str = "The flac stream info should serialize into bytes";
 const OVERFLOWED: &str = "The flac header value does not fit its field";
 const BLOCK_TYPE_MASK: u8 = 0x7f;
+const LAST_BLOCK: u8 = 0x80;
+const BLOCK_HEADER_BYTES: usize = 4;
 const COUNTED_OFFSET: usize = 18;
 const COUNTED_BITS: u64 = (1 << 36) - 1;
 const SAMPLE_RATE_SHIFT: u32 = 44;
@@ -58,6 +60,77 @@ pub fn read_info(header: &[u8; INFO_BYTE_LENGTH]) -> Result<FlacInfo, BoxedError
         channels: u32::try_from((packed >> CHANNELS_SHIFT) & CHANNELS_MASK)? + 1,
         frame_count: packed & COUNTED_BITS,
     })
+}
+
+pub struct FlacLayout {
+    pub info: FlacInfo,
+    pub info_header: [u8; INFO_BYTE_LENGTH],
+    pub frames_start: u64,
+    pub span_starts: Vec<u64>,
+}
+
+pub fn read_layout(prefix: &[u8]) -> Result<Option<FlacLayout>, BoxedError> {
+    let Some(head) = prefix.first_chunk::<INFO_BYTE_LENGTH>() else {
+        return Ok(None);
+    };
+    let info = read_info(head)?;
+    let mut position = MAGIC.len();
+    let mut seek_points: &[u8] = &[];
+    loop {
+        let Some(block) = prefix.get(position..position + BLOCK_HEADER_BYTES) else {
+            return Ok(None);
+        };
+        let length =
+            usize::from(block[1]) << 16 | usize::from(block[2]) << 8 | usize::from(block[3]);
+        let start = position + BLOCK_HEADER_BYTES;
+        let Some(body) = prefix.get(start..start + length) else {
+            return Ok(None);
+        };
+        if block[0] & BLOCK_TYPE_MASK == SEEK_TABLE_BLOCK {
+            seek_points = body;
+        }
+        position = start + length;
+        if block[0] & LAST_BLOCK != 0 {
+            break;
+        }
+    }
+    let frames_start = u64::try_from(position)?;
+    Ok(Some(FlacLayout {
+        info,
+        info_header: unsized_info_header(head)?,
+        frames_start,
+        span_starts: span_starts(seek_points, frames_start)?,
+    }))
+}
+
+fn unsized_info_header(
+    head: &[u8; INFO_BYTE_LENGTH],
+) -> Result<[u8; INFO_BYTE_LENGTH], BoxedError> {
+    let mut header = *head;
+    header[MAGIC.len()] |= LAST_BLOCK;
+    let counted = header
+        .get_mut(COUNTED_OFFSET..COUNTED_OFFSET + size_of::<u64>())
+        .ok_or(NOT_FLAC)?;
+    let packed = u64::from_be_bytes(<[u8; 8]>::try_from(&*counted)?) & !COUNTED_BITS;
+    counted.copy_from_slice(&packed.to_be_bytes());
+    Ok(header)
+}
+
+fn span_starts(seek_points: &[u8], frames_start: u64) -> Result<Vec<u64>, BoxedError> {
+    let mut starts = Vec::new();
+    for point in seek_points.as_chunks::<SEEK_POINT_BYTES>().0 {
+        let (sample, rest) = point.split_at(size_of::<u64>());
+        if u64::from_be_bytes(sample.try_into()?) == SEEK_PLACEHOLDER {
+            continue;
+        }
+        let offset = u64::from_be_bytes(rest[..size_of::<u64>()].try_into()?);
+        if offset > 0 {
+            starts.push(frames_start + offset);
+        }
+    }
+    starts.sort_unstable();
+    starts.dedup();
+    Ok(starts)
 }
 
 struct FramePosition {
@@ -229,7 +302,7 @@ fn write_header(stream: &Stream, seek_table: &[u8]) -> Result<Vec<u8>, BoxedErro
     header.extend_from_slice(MAGIC);
     header.extend_from_slice(&[STREAM_INFO_BLOCK, 0, 0, STREAM_INFO_BYTES]);
     header.extend_from_slice(info_bytes);
-    header.push(0x80 | SEEK_TABLE_BLOCK);
+    header.push(LAST_BLOCK | SEEK_TABLE_BLOCK);
     let seek_length = u32::try_from(seek_table.len()).map_err(|_| OVERFLOWED)?;
     header.extend_from_slice(&seek_length.to_be_bytes()[1..]);
     header.extend_from_slice(seek_table);

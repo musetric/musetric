@@ -167,7 +167,7 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
     })
 }
 
-fn codecs() -> CodecRegistry {
+pub(crate) fn codecs() -> CodecRegistry {
     let mut codecs = CodecRegistry::new();
     symphonia::default::register_enabled_codecs(&mut codecs);
     #[cfg(feature = "opus")]
@@ -210,7 +210,7 @@ fn probe(
     Ok(reader)
 }
 
-fn next_packet(reader: &mut dyn FormatReader) -> Result<Option<Packet>, BoxedError> {
+pub(crate) fn next_packet(reader: &mut dyn FormatReader) -> Result<Option<Packet>, BoxedError> {
     match reader.next_packet() {
         Ok(packet) => Ok(packet),
         Err(Error::ResetRequired) => Ok(None),
@@ -218,7 +218,7 @@ fn next_packet(reader: &mut dyn FormatReader) -> Result<Option<Packet>, BoxedErr
     }
 }
 
-fn decode_packet<'decoder>(
+pub(crate) fn decode_packet<'decoder>(
     decoder: &'decoder mut dyn AudioDecoder,
     packet: &Packet,
 ) -> Result<Option<GenericAudioBufferRef<'decoder>>, BoxedError> {
