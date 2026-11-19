@@ -53,6 +53,11 @@ impl FlacFeed {
         })
     }
 
+    #[must_use]
+    pub fn ready(&self) -> &[f32] {
+        &self.ready
+    }
+
     pub fn push(&mut self, bytes: &[u8]) -> Result<&[f32], BoxedError> {
         self.ready.clear();
         self.received.extend_from_slice(bytes);

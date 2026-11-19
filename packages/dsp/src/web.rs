@@ -103,17 +103,23 @@ impl FlacFeed {
         self.feed.frame_count()
     }
 
-    pub fn push(&mut self, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+    #[wasm_bindgen(getter, js_name = readyPointer)]
+    #[must_use]
+    pub fn ready_pointer(&self) -> usize {
+        self.feed.ready().as_ptr().addr()
+    }
+
+    pub fn push(&mut self, bytes: &[u8]) -> Result<usize, JsError> {
         self.feed
             .push(bytes)
-            .map(<[f32]>::to_vec)
+            .map(<[f32]>::len)
             .map_err(|failure| failed(&failure))
     }
 
-    pub fn finish(&mut self) -> Result<Vec<f32>, JsError> {
+    pub fn finish(&mut self) -> Result<usize, JsError> {
         self.feed
             .finish()
-            .map(<[f32]>::to_vec)
+            .map(<[f32]>::len)
             .map_err(|failure| failed(&failure))
     }
 }

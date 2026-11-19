@@ -116,17 +116,19 @@ export const createAudioDecoder = (): AudioDecoder => {
     },
     decodeFlacStream: async (stream, sampleRate) => {
       loading ??= init();
-      await loading;
+      const { memory } = await loading;
       const feed = new FlacFeed(sampleRate);
+      const ready = (count: number) =>
+        new Float32Array(memory.buffer, feed.readyPointer, count);
       const reader = stream.getReader();
       const sink = createPlanarSink(feed);
       try {
         let read = await reader.read();
         while (!read.done) {
-          sink.write(feed.push(read.value));
+          sink.write(ready(feed.push(read.value)));
           read = await reader.read();
         }
-        sink.write(feed.finish());
+        sink.write(ready(feed.finish()));
         return sink.finish();
       } catch (error) {
         await reader.cancel(error).catch(() => undefined);
