@@ -1,9 +1,9 @@
 import { type FoldTail } from './separationFold.js';
 import { type StemValues } from './separationStems.js';
 
-const stateVersion = 1;
+const stateVersion = 2;
 const headerWords = 8;
-const headerValues = 5;
+const headerValues = 4;
 const headerBytes = headerWords * 4 + headerValues * 8;
 
 export type SeparationLayout = {
@@ -44,7 +44,6 @@ export const writeSeparationState = (
   }
   const values = [
     state.mixtureScale,
-    state.peaks.vocals,
     state.peaks.instrumental,
     state.peaks.lead,
     state.peaks.backing,
@@ -113,10 +112,9 @@ export const readSeparationState = (
     },
     mixtureScale: value(0),
     peaks: {
-      vocals: value(1),
-      instrumental: value(2),
-      lead: value(3),
-      backing: value(4),
+      instrumental: value(1),
+      lead: value(2),
+      backing: value(3),
     },
   };
 };

@@ -149,7 +149,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
                   }}
                 >
                   <TrackLabel
-                    kind='delivery'
+                    kind='stem'
                     stemType='lead'
                     variant='spectrogram'
                   />

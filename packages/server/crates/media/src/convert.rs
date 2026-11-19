@@ -5,7 +5,7 @@ use std::{
 };
 
 use musetric_dsp::{
-    depth::SampleDepth,
+    SAMPLE_BITS,
     flac::FlacWriter,
     resample::{Conversion, SampleRates},
 };
@@ -36,11 +36,7 @@ pub async fn convert_to_flac(
         }
         return Ok(());
     }
-    let mut writer = FlacWriter::create(
-        create_buffered(to)?,
-        request.sample_rate,
-        SampleDepth::TwentyFour,
-    )?;
+    let mut writer = FlacWriter::create(create_buffered(to)?, request.sample_rate)?;
     encode_source(source, request, &mut writer).await?;
     writer.finish()?;
     Ok(())
@@ -48,7 +44,9 @@ pub async fn convert_to_flac(
 
 async fn already_master(from: &Path, sample_rate: u32) -> bool {
     read_flac_info(from).await.is_ok_and(|info| {
-        info.sample_rate == sample_rate && usize::try_from(info.channels) == Ok(CHANNELS)
+        info.sample_rate == sample_rate
+            && usize::try_from(info.channels) == Ok(CHANNELS)
+            && usize::try_from(info.sample_bits) == Ok(SAMPLE_BITS)
     })
 }
 
@@ -98,8 +96,7 @@ fn encode_raw(from: &Path, to: &Path, rates: SampleRates, scale: f64) -> Result<
     let file = File::open(from)?;
     let read_frames = file.metadata()?.len() / BYTES_PER_FRAME as u64;
     let mut conversion = Conversion::create(rates, CHANNELS)?;
-    let mut writer =
-        FlacWriter::create(create_buffered(to)?, rates.output, SampleDepth::TwentyFour)?;
+    let mut writer = FlacWriter::create(create_buffered(to)?, rates.output)?;
     let mut reader = BufReader::with_capacity(READ_BUFFER_BYTE_LENGTH, file);
     let mut frames = Frames::default();
     let mut buffer = vec![0_u8; READ_BUFFER_BYTE_LENGTH];
@@ -187,7 +184,7 @@ mod tests {
 
         assert_eq!(decoded.len(), samples.len());
         for (found, sample) in decoded.iter().zip(&samples) {
-            assert!((found - sample * 0.5).abs() < 1e-6);
+            assert!((found - sample * 0.5).abs() <= 1.5 / 32_768.0);
         }
     }
 

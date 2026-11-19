@@ -8,7 +8,7 @@ use axum::{
     response::Response,
     routing::get,
 };
-use musetric_db::{MASTER_TYPES, MasterType, STEM_TYPES, StemType};
+use musetric_db::{MASTER_TYPES, MasterType};
 use serde_json::json;
 
 use crate::{
@@ -35,7 +35,6 @@ const PEAK_BYTE_LENGTH: usize = PEAK_COUNT * 2 * size_of::<f32>();
 const PARAMS: &str = "params";
 const PROJECT_ID: &str = "projectId";
 const MASTER_FIELD: &str = "type";
-const STEM_FIELD: &str = "stemType";
 
 pub(crate) fn create_router() -> Router<RouteState> {
     Router::new()
@@ -44,8 +43,8 @@ pub(crate) fn create_router() -> Router<RouteState> {
             get(master_content),
         )
         .route(
-            "/api/audio/project/{projectId}/delivery/{stemType}/wave",
-            get(delivery_wave),
+            "/api/audio/project/{projectId}/master/{type}/wave",
+            get(master_wave),
         )
         .route(
             "/api/audio/project/{projectId}/recording/{recordingId}/pieces",
@@ -82,25 +81,16 @@ fn read_master(raw_project_id: &str, raw_type: &str) -> Result<(i64, MasterType)
     Ok((project_id, master))
 }
 
-fn read_stem(raw_project_id: &str, raw_stem: &str) -> Result<(i64, StemType), Failure> {
-    let project_id = raw_project_id
-        .parse::<i64>()
-        .map_err(|_| invalid_number(PROJECT_ID))?;
-    let stem = StemType::parse(raw_stem)
-        .ok_or_else(|| invalid_option(PARAMS, STEM_FIELD, &STEM_TYPES.map(StemType::name)))?;
-    Ok((project_id, stem))
-}
-
-async fn delivery_wave(
+async fn master_wave(
     State(state): State<RouteState>,
-    Path((raw_project_id, raw_stem)): Path<(String, String)>,
+    Path((raw_project_id, raw_type)): Path<(String, String)>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let (project_id, stem) = match read_stem(&raw_project_id, &raw_stem) {
+    let (project_id, master) = match read_master(&raw_project_id, &raw_type) {
         Ok(found) => found,
         Err(failure) => return finish(Err(failure)),
     };
-    finish(send_peaks(&state.storage, project_id, stem, request.headers()).await)
+    finish(send_peaks(&state.storage, project_id, master, request.headers()).await)
 }
 
 async fn recording_pieces(
@@ -183,19 +173,22 @@ async fn send_master(
 async fn send_peaks(
     storage: &Arc<Storage>,
     project_id: i64,
-    stem: StemType,
+    master: MasterType,
     request: &HeaderMap,
 ) -> Result<Response<Body>, Failure> {
-    let stem_name = stem.name();
-    let found = read(storage, move |database| database.delivery(project_id, stem)).await?;
-    let delivery = found.ok_or_else(|| {
+    let master_name = master.name();
+    let found = read(storage, move |database| {
+        database.wave_blob(project_id, master)
+    })
+    .await?;
+    let wave_blob_id = found.ok_or_else(|| {
         Failure::NotFound(format!(
-            "Wave peaks for project {project_id} and stem type {stem_name} not found"
+            "Wave peaks for project {project_id} and master type {master_name} not found"
         ))
     })?;
     let blob = CachedBlob {
-        missing_message: format!("Wave peaks blob for id {} not found", delivery.wave_blob_id),
-        blob_id: delivery.wave_blob_id,
+        missing_message: format!("Wave peaks blob for id {wave_blob_id} not found"),
+        blob_id: wave_blob_id,
         filename: PEAKS_FILENAME.to_owned(),
         content_type: PEAKS_CONTENT_TYPE.to_owned(),
     };

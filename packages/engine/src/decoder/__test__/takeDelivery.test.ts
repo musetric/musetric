@@ -9,8 +9,6 @@ import {
 vi.mock('../../audioRequest/audioRequest.worker.js', () => ({
   getRecordingList: async () =>
     Promise.resolve({ recordings: [activeRecording] }),
-  getDeliveryAudioContent: async () =>
-    Promise.reject(new Error('The test has no song')),
   getRecordingPieces: async () => new Promise(() => undefined),
   getRecordingPiece: async () => new Promise(() => undefined),
 }));

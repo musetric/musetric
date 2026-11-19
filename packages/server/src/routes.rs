@@ -71,7 +71,7 @@ mod tests {
     const PEAKS_BYTE_LENGTH: usize = 3840 * 2 * 4;
     const SOURCE_URL: &str = "/api/audio/project/1/master/source/content";
     const LEAD_URL: &str = "/api/audio/project/1/master/lead/content";
-    const WAVE_URL: &str = "/api/audio/project/1/delivery/lead/wave";
+    const WAVE_URL: &str = "/api/audio/project/1/master/lead/wave";
     const RECORDING_PIECES_URL: &str = "/api/audio/project/1/recording/1/pieces";
     const RECORDING_WAVE_URL: &str = "/api/audio/project/1/recording/1/wave";
     const RECORDINGS_URL: &str = "/api/project/1/recording";
@@ -91,9 +91,9 @@ mod tests {
       VALUES (1, 'source', '1f2e3d4c-0000-4000-8000-000000000001'),
              (1, 'lead', '5a6b7c8d-0000-4000-8000-000000000002');
     ";
-    const CREATE_DELIVERY: &str = "
-      INSERT INTO AudioDelivery (projectId, stemType, waveBlobId)
-      VALUES (1, 'lead', '5a6b7c8d-0000-4000-8000-000000000002');
+    const CREATE_STEM: &str = "
+      INSERT INTO AudioMaster (projectId, type, blobId, waveBlobId)
+      VALUES (1, 'lead', '1f2e3d4c-0000-4000-8000-000000000001', '5a6b7c8d-0000-4000-8000-000000000002');
     ";
     const CREATE_PREVIEW: &str = "
       INSERT INTO Preview (projectId, blobId, filename, contentType)
@@ -439,7 +439,7 @@ mod tests {
     async fn sends_the_peaks_of_a_stem() {
         let workspace = Workspace::new();
         workspace.seed(CREATE_PROJECT);
-        workspace.seed(CREATE_DELIVERY);
+        workspace.seed(CREATE_STEM);
         workspace.add_blob(OTHER_BLOB_ID, PEAKS);
         let router = create_test_router(&workspace).await;
 
@@ -500,19 +500,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refuses_a_stem_type_it_does_not_know() {
+    async fn refuses_a_master_type_it_does_not_know() {
         let workspace = Workspace::new();
 
         let response = request(
             create_test_router(&workspace).await,
-            "/api/audio/project/1/delivery/vocals/wave",
+            "/api/audio/project/1/master/vocals/wave",
         )
         .await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             read_body(response).await,
-            "{\"message\":\"params/stemType Invalid option: expected one of \\\"lead\\\"|\\\"backing\\\"|\\\"instrumental\\\"\"}"
+            "{\"message\":\"params/type Invalid option: expected one of \\\"source\\\"|\\\"lead\\\"|\\\"backing\\\"|\\\"instrumental\\\"\"}"
         );
     }
 

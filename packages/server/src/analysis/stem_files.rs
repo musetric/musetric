@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use musetric_db::{MasterType, NewDelivery, NewStem};
+use musetric_db::{MasterType, NewStem};
 use musetric_dsp::resample::SampleRates;
 use musetric_media::{
     BoxedError, PcmRequest, PcmSource, WavePeaks, encode_flac_from_raw, generate_wave_peaks,
@@ -17,24 +17,17 @@ const RAW_SUFFIX: &str = "raw";
 pub(crate) struct StemFiles {
     stem: MasterType,
     master: StagedBlob,
+    wave_peaks: StagedBlob,
     raw: PathBuf,
-    wave_peaks: Option<StagedBlob>,
 }
 
 impl StemFiles {
-    pub(crate) fn master(area: &Path, blobs_path: &Path, stem: MasterType) -> Self {
+    pub(crate) fn create(area: &Path, blobs_path: &Path, stem: MasterType) -> Self {
         Self {
             stem,
             master: stage_blob(area, blobs_path),
+            wave_peaks: stage_blob(area, blobs_path),
             raw: area.join(format!("{}.{RAW_SUFFIX}", stem.name())),
-            wave_peaks: None,
-        }
-    }
-
-    pub(crate) fn delivered(area: &Path, blobs_path: &Path, stem: MasterType) -> Self {
-        Self {
-            wave_peaks: Some(stage_blob(area, blobs_path)),
-            ..Self::master(area, blobs_path, stem)
         }
     }
 
@@ -55,20 +48,14 @@ impl StemFiles {
     }
 
     pub(crate) fn staged(&self) -> Vec<&StagedBlob> {
-        let mut blobs = vec![&self.master];
-        if let Some(wave_peaks) = self.wave_peaks.as_ref() {
-            blobs.push(wave_peaks);
-        }
-        blobs
+        vec![&self.master, &self.wave_peaks]
     }
 
     pub(crate) fn recorded(&self) -> NewStem {
         NewStem {
             stem: self.stem,
             master_blob_id: self.master.blob_id().to_owned(),
-            delivery: self.wave_peaks.as_ref().map(|wave_peaks| NewDelivery {
-                wave_blob_id: wave_peaks.blob_id().to_owned(),
-            }),
+            wave_blob_id: self.wave_peaks.blob_id().to_owned(),
         }
     }
 
@@ -76,18 +63,15 @@ impl StemFiles {
         encode_flac_from_raw(&self.raw, self.master.path(), rates, scale).await
     }
 
-    pub(crate) async fn deliver(
+    pub(crate) async fn write_peaks(
         &self,
         pcm: &dyn PcmSource,
         sample_rate: u32,
     ) -> Result<(), BoxedError> {
-        let Some(wave_peaks) = self.wave_peaks.as_ref() else {
-            return Ok(());
-        };
         let master = self.master.path();
         let request = WavePeaks {
             source: read_at(master, sample_rate),
-            to: wave_peaks.path(),
+            to: self.wave_peaks.path(),
             total_frames: read_frame_count(master).await?,
         };
         generate_wave_peaks(pcm, &request).await
@@ -110,8 +94,8 @@ mod tests {
     fn stores_every_stem_next_to_the_master_it_encodes() {
         let area = Path::new("/work/1/separation");
         let stems = [
-            StemFiles::master(area, Path::new("/blobs"), MasterType::Vocals),
-            StemFiles::delivered(area, Path::new("/blobs"), MasterType::Instrumental),
+            StemFiles::create(area, Path::new("/blobs"), MasterType::Lead),
+            StemFiles::create(area, Path::new("/blobs"), MasterType::Instrumental),
         ];
 
         for stem in &stems {
@@ -125,15 +109,19 @@ mod tests {
     }
 
     #[test]
-    fn keeps_an_internal_master_out_of_the_delivery_table() {
+    fn stages_the_master_and_its_peaks_under_the_ids_it_records() {
         let area = Path::new("/work/1/separation");
-        let vocals = StemFiles::master(area, Path::new("/blobs"), MasterType::Vocals);
-        let instrumental =
-            StemFiles::delivered(area, Path::new("/blobs"), MasterType::Instrumental);
+        let stem = StemFiles::create(area, Path::new("/blobs"), MasterType::Backing);
+        let recorded = stem.recorded();
 
-        assert_eq!(vocals.staged().len(), 1);
-        assert!(vocals.recorded().delivery.is_none());
-        assert_eq!(instrumental.staged().len(), 2);
-        assert!(instrumental.recorded().delivery.is_some());
+        let staged: Vec<_> = stem.staged().iter().map(|blob| blob.blob_id()).collect();
+
+        assert_eq!(
+            staged,
+            [
+                recorded.master_blob_id.as_str(),
+                recorded.wave_blob_id.as_str()
+            ]
+        );
     }
 }

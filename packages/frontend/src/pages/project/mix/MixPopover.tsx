@@ -22,7 +22,7 @@ export const MixPopover: FC = () => {
       <Stack sx={{ width: 260, p: 4, gap: 4 }}>
         <MixSlider target={{ kind: 'recording' }} />
         {stemTypes.map((stemType) => (
-          <MixSlider key={stemType} target={{ kind: 'delivery', stemType }} />
+          <MixSlider key={stemType} target={{ kind: 'stem', stemType }} />
         ))}
       </Stack>
     </Popover>

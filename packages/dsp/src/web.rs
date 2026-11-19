@@ -4,9 +4,8 @@ use wasm_bindgen::prelude::{JsError, wasm_bindgen};
 
 use crate::{
     BoxedError, CHANNELS,
-    aac::{AacEncoder, ENCODER_DELAY},
+    aac::AacEncoder,
     decode::{DecodeRequest, Decoder, Layout},
-    depth::SampleDepth,
     flac::FlacWriter,
     flac_feed,
     loudness::LoudnessMeter,
@@ -18,20 +17,11 @@ use crate::{
     wav::WavWriter,
 };
 
-const UNKNOWN_DEPTH: &str = "The bit depth is neither 16 nor 24";
 const TOO_SHORT: &str = "The audio is too short to change its tempo or key";
 const STOPPED: &str = "The stretch was stopped";
 
 fn failed(failure: &BoxedError) -> JsError {
     JsError::new(&failure.to_string())
-}
-
-fn depth_of(bits: u32) -> Result<SampleDepth, BoxedError> {
-    match bits {
-        16 => Ok(SampleDepth::Sixteen),
-        24 => Ok(SampleDepth::TwentyFour),
-        _ => Err(UNKNOWN_DEPTH.into()),
-    }
 }
 
 #[wasm_bindgen(js_name = Decoder)]
@@ -86,12 +76,6 @@ impl StreamDecoder {
     }
 }
 
-#[wasm_bindgen(js_name = aacEncoderDelay)]
-#[must_use]
-pub fn aac_encoder_delay() -> u32 {
-    ENCODER_DELAY
-}
-
 #[wasm_bindgen]
 pub struct FlacFeed {
     feed: flac_feed::FlacFeed,
@@ -101,9 +85,9 @@ pub struct FlacFeed {
 impl FlacFeed {
     #[wasm_bindgen(constructor)]
     #[must_use]
-    pub fn new(sample_rate: Option<u32>, lead_in_frames: usize) -> FlacFeed {
+    pub fn new(sample_rate: Option<u32>) -> FlacFeed {
         Self {
-            feed: flac_feed::FlacFeed::create(sample_rate, lead_in_frames),
+            feed: flac_feed::FlacFeed::create(sample_rate),
         }
     }
 
@@ -164,9 +148,9 @@ impl Resampler {
 }
 
 #[wasm_bindgen(js_name = encodeFlac)]
-pub fn encode_flac(samples: &[f32], sample_rate: u32, bits: u32) -> Result<Vec<u8>, JsError> {
+pub fn encode_flac(samples: &[f32], sample_rate: u32) -> Result<Vec<u8>, JsError> {
     let encoded = || -> Result<Vec<u8>, BoxedError> {
-        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), sample_rate, depth_of(bits)?)?;
+        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), sample_rate)?;
         for frame in samples.as_chunks::<CHANNELS>().0 {
             writer.push(frame[0], frame[1]);
         }
@@ -176,10 +160,10 @@ pub fn encode_flac(samples: &[f32], sample_rate: u32, bits: u32) -> Result<Vec<u
 }
 
 #[wasm_bindgen(js_name = encodeWav)]
-pub fn encode_wav(samples: &[f32], sample_rate: u32, bits: u32) -> Result<Vec<u8>, JsError> {
+pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Result<Vec<u8>, JsError> {
     let encoded = || -> Result<Vec<u8>, BoxedError> {
         let frames = samples.as_chunks::<CHANNELS>().0;
-        let mut writer = WavWriter::create(Vec::new(), sample_rate, depth_of(bits)?, frames.len())?;
+        let mut writer = WavWriter::create(Vec::new(), sample_rate, frames.len())?;
         for frame in frames {
             writer.push(frame[0], frame[1])?;
         }

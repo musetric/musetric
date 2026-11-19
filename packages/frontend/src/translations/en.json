@@ -169,7 +169,6 @@
   "pages.project.mix.title": "Mix",
   "pages.project.mix.trackVolume": "{{name}} volume",
   "pages.project.mix.unmute": "Unmute",
-  "pages.project.mixdown.bitDepth": "{{value}}-bit",
   "pages.project.mixdown.bitrate": "{{value}} kbps",
   "pages.project.mixdown.cancel": "Cancel",
   "pages.project.mixdown.close": "Close",

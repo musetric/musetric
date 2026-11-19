@@ -9,7 +9,6 @@ use axum::{
     routing::{get, post},
 };
 use musetric_db::{MasterType, ProjectItem, Reader, StemLoudness, blob_path};
-use musetric_dsp::{aac::ENCODER_DELAY, depth::SampleDepth};
 use musetric_media::{
     Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownStage,
     MixdownTrack, MixdownWatch, write_mixdown,
@@ -68,20 +67,10 @@ pub(crate) fn create_router() -> Router<RouteState> {
 #[derive(Deserialize)]
 #[serde(tag = "format", rename_all = "lowercase")]
 enum FormatBody {
-    M4a {
-        bitrate: u32,
-    },
-    Mp3 {
-        bitrate: u32,
-    },
-    Flac {
-        #[serde(rename = "bitDepth")]
-        bit_depth: u8,
-    },
-    Wav {
-        #[serde(rename = "bitDepth")]
-        bit_depth: u8,
-    },
+    M4a { bitrate: u32 },
+    Mp3 { bitrate: u32 },
+    Flac,
+    Wav,
 }
 
 #[derive(Deserialize)]
@@ -294,12 +283,10 @@ async fn prepare(
         .ok_or_else(|| Failure::NotFound(missing_message(project_id)))?;
     let mut mixdown = plan(state, &audio, &request.volumes, Target { format, change })?;
     if let Some(recording) = request.recording {
-        let delay = usize::try_from(ENCODER_DELAY).map_err(Failure::failed)?;
         mixdown.tracks.push(MixdownTrack {
             from: recording.staged.path().to_path_buf(),
             gain: read_volume(request.volumes.recording)?,
             channels: MixdownChannels::Mono,
-            lead_in: change.frame_count(delay),
             group: MixdownGroup::Ready,
         });
     }
@@ -337,19 +324,11 @@ fn read_format(body: &FormatBody) -> Result<MixdownFormat, Failure> {
         FormatBody::Mp3 { bitrate } if BITRATES.contains(bitrate) => Ok(MixdownFormat::Mp3 {
             bitrate: bitrate * KILOBIT,
         }),
-        FormatBody::Flac { bit_depth } => read_depth(*bit_depth).map(MixdownFormat::Flac),
-        FormatBody::Wav { bit_depth } => read_depth(*bit_depth).map(MixdownFormat::Wav),
+        FormatBody::Flac => Ok(MixdownFormat::Flac),
+        FormatBody::Wav => Ok(MixdownFormat::Wav),
         FormatBody::M4a { .. } | FormatBody::Mp3 { .. } => {
             Err(Failure::Invalid(INVALID_BODY.to_owned()))
         }
-    }
-}
-
-fn read_depth(bit_depth: u8) -> Result<SampleDepth, Failure> {
-    match bit_depth {
-        16 => Ok(SampleDepth::Sixteen),
-        24 => Ok(SampleDepth::TwentyFour),
-        _ => Err(Failure::Invalid(INVALID_BODY.to_owned())),
     }
 }
 
@@ -419,7 +398,6 @@ fn plan(
             from: blob_path(&state.storage.blobs_path, blob_id),
             gain: read_volume(volume)? * stem_scale,
             channels: MixdownChannels::Stereo,
-            lead_in: 0,
             group: if *stem == MasterType::Lead
                 && target.change.lead_semitones != target.change.semitones
             {
@@ -450,8 +428,8 @@ const fn describe(format: MixdownFormat) -> (&'static str, &'static str) {
     match format {
         MixdownFormat::M4a { .. } => ("m4a", "audio/mp4"),
         MixdownFormat::Mp3 { .. } => ("mp3", "audio/mpeg"),
-        MixdownFormat::Flac(_) => ("flac", "audio/flac"),
-        MixdownFormat::Wav(_) => ("wav", "audio/wav"),
+        MixdownFormat::Flac => ("flac", "audio/flac"),
+        MixdownFormat::Wav => ("wav", "audio/wav"),
     }
 }
 

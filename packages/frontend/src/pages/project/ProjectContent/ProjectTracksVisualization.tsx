@@ -16,7 +16,7 @@ const nameColumnWidth = 116;
 
 const tracks: readonly TrackVolumeTarget[] = [
   { kind: 'recording' },
-  ...stemTypes.map((stemType) => ({ kind: 'delivery' as const, stemType })),
+  ...stemTypes.map((stemType) => ({ kind: 'stem' as const, stemType })),
 ];
 
 const rowsSx = {

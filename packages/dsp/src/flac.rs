@@ -12,7 +12,10 @@ use flacenc::{
     source::{Context, Fill, FrameBuf},
 };
 
-use crate::{BoxedError, CHANNELS, depth::SampleDepth};
+use crate::{
+    BoxedError, CHANNELS, SAMPLE_BITS,
+    dither::{Dither, SAMPLE_BYTES},
+};
 
 const BLOCK_FRAMES: usize = 4096;
 const HEADER_MOVED: &str = "The flac header changed length while the stream was written";
@@ -36,6 +39,8 @@ const COUNTED_BITS: u64 = (1 << 36) - 1;
 const SAMPLE_RATE_SHIFT: u32 = 44;
 const CHANNELS_SHIFT: u32 = 41;
 const CHANNELS_MASK: u64 = 0b111;
+const BITS_SHIFT: u32 = 36;
+const BITS_MASK: u64 = 0b1_1111;
 const NOT_FLAC: &str = "The audio master is not a flac stream";
 
 pub const INFO_BYTE_LENGTH: usize = 42;
@@ -43,6 +48,7 @@ pub const INFO_BYTE_LENGTH: usize = 42;
 pub struct FlacInfo {
     pub sample_rate: u32,
     pub channels: u32,
+    pub sample_bits: u32,
     pub frame_count: u64,
 }
 
@@ -58,6 +64,7 @@ pub fn read_info(header: &[u8; INFO_BYTE_LENGTH]) -> Result<FlacInfo, BoxedError
     Ok(FlacInfo {
         sample_rate: u32::try_from(packed >> SAMPLE_RATE_SHIFT)?,
         channels: u32::try_from((packed >> CHANNELS_SHIFT) & CHANNELS_MASK)? + 1,
+        sample_bits: u32::try_from((packed >> BITS_SHIFT) & BITS_MASK)? + 1,
         frame_count: packed & COUNTED_BITS,
     })
 }
@@ -147,22 +154,22 @@ pub struct FlacWriter<W: Write + Seek> {
     context: Context,
     writer: W,
     pending: Vec<i32>,
+    dither: Dither,
     frame_positions: Vec<FramePosition>,
     header_byte_length: usize,
     written_bytes: u64,
     sample_rate: u32,
     smallest_frame: usize,
     largest_frame: usize,
-    depth: SampleDepth,
     failure: Option<BoxedError>,
 }
 
 impl<W: Write + Seek> FlacWriter<W> {
-    pub fn create(mut writer: W, sample_rate: u32, depth: SampleDepth) -> Result<Self, BoxedError> {
+    pub fn create(mut writer: W, sample_rate: u32) -> Result<Self, BoxedError> {
         let configuration = verify(Configuration::default())?;
         let verbatim = verify(verbatim_configuration())?;
         let mut stream =
-            Stream::new(usize::try_from(sample_rate)?, CHANNELS, depth.bits()).map_err(describe)?;
+            Stream::new(usize::try_from(sample_rate)?, CHANNELS, SAMPLE_BITS).map_err(describe)?;
         stream
             .stream_info_mut()
             .set_block_sizes(BLOCK_FRAMES, BLOCK_FRAMES)
@@ -174,16 +181,16 @@ impl<W: Write + Seek> FlacWriter<W> {
             verbatim,
             stream,
             frames: FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).map_err(describe)?,
-            context: Context::new(depth.bits(), CHANNELS),
+            context: Context::new(SAMPLE_BITS, CHANNELS),
             writer,
             pending: Vec::with_capacity(BLOCK_FRAMES * CHANNELS),
+            dither: Dither::create(),
             frame_positions: Vec::new(),
             header_byte_length: header.len(),
             written_bytes: 0,
             sample_rate,
             smallest_frame: usize::MAX,
             largest_frame: 0,
-            depth,
             failure: None,
         })
     }
@@ -192,8 +199,8 @@ impl<W: Write + Seek> FlacWriter<W> {
         if self.failure.is_some() {
             return;
         }
-        self.pending.push(self.depth.quantize(left));
-        self.pending.push(self.depth.quantize(right));
+        self.pending.push(i32::from(self.dither.quantize(left)));
+        self.pending.push(i32::from(self.dither.quantize(right)));
         if self.pending.len() >= BLOCK_FRAMES * CHANNELS {
             self.encode();
         }
@@ -218,7 +225,7 @@ impl<W: Write + Seek> FlacWriter<W> {
             .current_frame_number()
             .ok_or("The flac writer lost the frame number")?;
         let mut sink = encode_frame(&self.configuration, &self.frames, number, &self.stream)?;
-        if sink.as_slice().len() > raw_byte_length(self.pending.len(), self.depth) {
+        if sink.as_slice().len() > raw_byte_length(self.pending.len()) {
             sink = encode_frame(&self.verbatim, &self.frames, number, &self.stream)?;
         }
         let encoded = sink.as_slice();
@@ -286,8 +293,8 @@ fn encode_frame(
     Ok(sink)
 }
 
-const fn raw_byte_length(samples: usize, depth: SampleDepth) -> usize {
-    samples * depth.bytes() + FRAME_OVERHEAD_BYTES
+const fn raw_byte_length(samples: usize) -> usize {
+    samples * SAMPLE_BYTES + FRAME_OVERHEAD_BYTES
 }
 
 fn write_header(stream: &Stream, seek_table: &[u8]) -> Result<Vec<u8>, BoxedError> {
@@ -387,7 +394,7 @@ mod tests {
         BLOCK_FRAMES, FlacWriter, MAGIC, SEEK_POINT_BYTES, SEEK_POINTS, STREAM_INFO_USIZE,
         containing_frame, encode_frame, raw_byte_length, seek_spacing, seek_table, verify,
     };
-    use crate::{CHANNELS, depth::SampleDepth};
+    use crate::{CHANNELS, SAMPLE_BITS};
 
     const RATE: u32 = 48_000;
     const NOISY_FRAMES: usize = 2944;
@@ -419,7 +426,7 @@ mod tests {
     }
 
     fn encode_noise(blocks: usize) -> Vec<u8> {
-        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE, SampleDepth::TwentyFour)
+        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE)
             .expect("the writer should be created");
         let mut state = 1;
         for _ in 0..BLOCK_FRAMES * blocks {
@@ -474,7 +481,7 @@ mod tests {
         let blocks = 4;
         let written = encode_noise(blocks).len();
 
-        let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS, SampleDepth::TwentyFour);
+        let raw = raw_byte_length(BLOCK_FRAMES * CHANNELS);
         let limit = HEADER_BYTES + raw * blocks;
         assert!(
             written <= limit,
@@ -484,16 +491,15 @@ mod tests {
 
     fn full_scale(state: &mut u32) -> i32 {
         *state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
-        i32::try_from(*state >> 8).expect("the noise is 24 bits") - (1 << 23)
+        i32::try_from(*state >> 16).expect("the noise is 16 bits") - (1 << 15)
     }
 
     #[test]
     fn encodes_noise_that_falls_silent_within_its_raw_samples() {
-        let depth = SampleDepth::TwentyFour;
         let configuration =
             verify(Configuration::default()).expect("the configuration should be valid");
         let rate = usize::try_from(RATE).expect("the rate fits");
-        let stream = Stream::new(rate, CHANNELS, depth.bits()).expect("the stream should open");
+        let stream = Stream::new(rate, CHANNELS, SAMPLE_BITS).expect("the stream should open");
         let mut frames =
             FrameBuf::with_size(CHANNELS, BLOCK_FRAMES).expect("the block should be allocated");
         let mut state = 1;
@@ -515,7 +521,7 @@ mod tests {
             encode_frame(&configuration, &frames, 0, &stream).expect("the block should encode");
 
         let written = sink.as_slice().len();
-        let limit = raw_byte_length(samples.len(), depth);
+        let limit = raw_byte_length(samples.len());
         assert!(
             written <= limit,
             "{written} bytes encoded for a {limit} byte block"
@@ -575,8 +581,8 @@ mod tests {
 
     #[test]
     fn stops_taking_samples_once_a_write_fails() {
-        let mut writer = FlacWriter::create(Fragile { taken: 0 }, RATE, SampleDepth::TwentyFour)
-            .expect("the writer should be created");
+        let mut writer =
+            FlacWriter::create(Fragile { taken: 0 }, RATE).expect("the writer should be created");
         let mut state = 1;
         for _ in 0..BLOCK_FRAMES * 64 {
             let sample = noise(&mut state) / 8.0;

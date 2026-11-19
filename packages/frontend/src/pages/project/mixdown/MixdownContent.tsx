@@ -43,7 +43,6 @@ const formatLabels: Record<FormatName, string> = {
   wav: 'WAV',
 };
 const bitrates: api.mixdown.Bitrate[] = [128, 192, 256];
-const bitDepths: api.mixdown.BitDepth[] = [16, 24];
 
 export type MixdownContentProps = {
   sideAnchor?: HTMLElement;
@@ -62,7 +61,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
   const activeRecording = useEngineStore(getActiveRecording);
   const project = useQuery(endpoints.project.get(projectId));
   const [choice, setChoice] = useState(loadMixdownChoice);
-  const { format, bitrate, bitDepth } = choice;
+  const { format, bitrate } = choice;
   const progress = useMixdownExports((state) => state.running[projectId]);
   const failed = useMixdownExports((state) => state.failed[projectId] === true);
   const exporting = progress !== undefined;
@@ -120,7 +119,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
           <Typography variant='subtitle2'>
             {t('pages.project.mixdown.format')}
           </Typography>
-          {lossy ? (
+          {lossy && (
             <Select
               variant='standard'
               disableUnderline
@@ -140,29 +139,6 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               {bitrates.map((value) => (
                 <MenuItem key={value} value={value}>
                   {t('pages.project.mixdown.bitrate', { value })}
-                </MenuItem>
-              ))}
-            </Select>
-          ) : (
-            <Select
-              variant='standard'
-              disableUnderline
-              value={bitDepth}
-              disabled={exporting}
-              inputProps={{ 'aria-label': t('pages.project.mixdown.quality') }}
-              onChange={(event) => {
-                const value = bitDepths.find(
-                  (item) => item === event.target.value,
-                );
-                if (value) {
-                  setChoice({ ...choice, bitDepth: value });
-                }
-              }}
-              sx={{ fontSize: 13, color: 'text.secondary' }}
-            >
-              {bitDepths.map((value) => (
-                <MenuItem key={value} value={value}>
-                  {t('pages.project.mixdown.bitDepth', { value })}
                 </MenuItem>
               ))}
             </Select>
@@ -250,7 +226,7 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               const voiceShifted = state.singerVoice === 'shifted';
               startMixdownExport(projectId, {
                 request: {
-                  format: lossy ? { format, bitrate } : { format, bitDepth },
+                  format: lossy ? { format, bitrate } : { format },
                   volumes: state.trackVolumes,
                   playback: {
                     tempoRatio: state.tempoRatio,

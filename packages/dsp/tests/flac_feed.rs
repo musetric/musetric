@@ -4,10 +4,8 @@ mod tests {
 
     use musetric_dsp::{
         decode::{DecodeRequest, Decoder, Layout},
-        depth::SampleDepth,
         flac::{FlacWriter, read_layout},
         flac_feed::FlacFeed,
-        resample::{Conversion, SampleRates},
     };
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -26,7 +24,7 @@ mod tests {
     }
 
     fn master() -> Vec<u8> {
-        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE, SampleDepth::TwentyFour)
+        let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE)
             .expect("the writer should be created");
         let mut state = 3;
         for frame in 0..FRAMES {
@@ -66,7 +64,7 @@ mod tests {
     }
 
     fn feed(bytes: &[u8], sample_rate: Option<u32>, chunk_bytes: usize) -> Vec<f32> {
-        let mut feed = FlacFeed::create(sample_rate, 0);
+        let mut feed = FlacFeed::create(sample_rate);
         let mut samples = Vec::new();
         for chunk in bytes.chunks(chunk_bytes) {
             samples.extend_from_slice(feed.push(chunk).expect("the span should decode"));
@@ -103,7 +101,7 @@ mod tests {
     #[test]
     fn decodes_the_spans_before_the_master_ends() {
         let bytes = master();
-        let mut feed = FlacFeed::create(None, 0);
+        let mut feed = FlacFeed::create(None);
 
         let early = feed.push(&bytes).expect("the spans should decode").len();
         let late = feed.finish().expect("the last span should decode").len();
@@ -117,7 +115,7 @@ mod tests {
     fn decodes_a_master_without_a_seek_table_at_its_end() {
         let bytes = master();
         let stripped = without_seek_table(&bytes);
-        let mut feed = FlacFeed::create(None, 0);
+        let mut feed = FlacFeed::create(None);
 
         let early = feed
             .push(&stripped)
@@ -130,47 +128,9 @@ mod tests {
     }
 
     #[test]
-    fn leads_in_with_silence_before_resampling() {
-        let bytes = master();
-        let lead_in = 1024;
-        let mut conversion = Conversion::create(
-            SampleRates {
-                input: RATE,
-                output: 44_100,
-            },
-            2,
-        )
-        .expect("the conversion should be created");
-        let mut expected = conversion
-            .convert(&vec![0.0; lead_in * 2])
-            .expect("the silence should resample")
-            .to_vec();
-        for chunk in decode_whole(&bytes, None).chunks(CHUNK_BYTES) {
-            expected.extend_from_slice(
-                conversion
-                    .convert(chunk)
-                    .expect("the master should resample"),
-            );
-        }
-        expected.extend_from_slice(
-            conversion
-                .flush(FRAMES + lead_in)
-                .expect("the tail should resample"),
-        );
-        let mut feed = FlacFeed::create(Some(44_100), lead_in);
-
-        let mut streamed = feed.push(&bytes).expect("the spans should decode").to_vec();
-        let frame_count = feed.frame_count();
-        streamed.extend_from_slice(feed.finish().expect("the last span should decode"));
-
-        assert_eq!(frame_count, Some(expected.len() / 2));
-        assert_eq!(bits(&streamed), bits(&expected));
-    }
-
-    #[test]
     fn counts_the_frames_once_the_header_has_arrived() {
         let bytes = master();
-        let mut feed = FlacFeed::create(Some(44_100), 0);
+        let mut feed = FlacFeed::create(Some(44_100));
 
         feed.push(&bytes[..INFO_BYTES])
             .expect("the stream info should be read");
@@ -185,7 +145,7 @@ mod tests {
 
     #[test]
     fn refuses_a_stream_that_is_not_flac() {
-        let mut feed = FlacFeed::create(None, 0);
+        let mut feed = FlacFeed::create(None);
 
         let refused = feed.push(&[0; INFO_BYTES]);
 

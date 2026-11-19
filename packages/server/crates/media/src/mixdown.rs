@@ -10,7 +10,6 @@ use std::{
 
 use musetric_dsp::{
     aac::AacEncoder,
-    depth::SampleDepth,
     flac::FlacWriter,
     m4a::{M4aTrack, write_m4a},
     mix::limit_peak,
@@ -36,8 +35,8 @@ const ENCODED_FRAMES: usize = 65_536;
 pub enum MixdownFormat {
     M4a { bitrate: u32 },
     Mp3 { bitrate: u32 },
-    Flac(SampleDepth),
-    Wav(SampleDepth),
+    Flac,
+    Wav,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -84,7 +83,6 @@ pub struct MixdownTrack {
     pub from: PathBuf,
     pub gain: f32,
     pub channels: MixdownChannels,
-    pub lead_in: usize,
     pub group: MixdownGroup,
 }
 
@@ -390,10 +388,7 @@ async fn add_mono(
 }
 
 fn add_frame(mixed: &mut [f32], frame: usize, track: &MixdownTrack, [left, right]: [f32; 2]) {
-    let Some(target) = frame.checked_sub(track.lead_in) else {
-        return;
-    };
-    let Some(pair) = mixed.get_mut(target * CHANNELS..(target + 1) * CHANNELS) else {
+    let Some(pair) = mixed.get_mut(frame * CHANNELS..(frame + 1) * CHANNELS) else {
         return;
     };
     pair[0] += left * track.gain;
@@ -411,9 +406,8 @@ fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
     match output.format {
         MixdownFormat::M4a { bitrate } => encode_m4a(mixed, output, bitrate),
         MixdownFormat::Mp3 { bitrate } => encode_mp3(mixed, output, bitrate),
-        MixdownFormat::Flac(depth) => {
-            let mut writer =
-                FlacWriter::create(create_buffered(output.to)?, output.sample_rate, depth)?;
+        MixdownFormat::Flac => {
+            let mut writer = FlacWriter::create(create_buffered(output.to)?, output.sample_rate)?;
             for chunk in chunks {
                 watch.check()?;
                 for pair in chunk {
@@ -424,11 +418,10 @@ fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
             writer.finish()?;
             Ok(())
         }
-        MixdownFormat::Wav(depth) => {
+        MixdownFormat::Wav => {
             let mut writer = WavWriter::create(
                 create_buffered(output.to)?,
                 output.sample_rate,
-                depth,
                 frames.len(),
             )?;
             for chunk in chunks {
@@ -489,13 +482,13 @@ mod tests {
         Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownProgress,
         MixdownStage, MixdownTrack, MixdownWatch, STOPPED, write_mixdown,
     };
-    use musetric_dsp::{depth::SampleDepth, mix::PEAK_CEILING};
+    use musetric_dsp::mix::PEAK_CEILING;
 
     use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SymphoniaPcm};
 
     const RATE: u32 = 48_000;
     const WAV_HEADER_BYTES: usize = 44;
-    const TOLERANCE: f32 = 1e-5;
+    const TOLERANCE: f32 = 1e-4;
 
     struct Fixture(Vec<(PathBuf, Vec<f32>)>);
 
@@ -523,24 +516,17 @@ mod tests {
             from: from.to_owned(),
             gain,
             channels: MixdownChannels::Stereo,
-            lead_in: 0,
             group: MixdownGroup::Song,
         }
     }
 
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "a 24-bit sample fits the f32 mantissa"
-    )]
     fn read_wav(path: &Path) -> Vec<f32> {
         let bytes = read(path).expect("the mixdown should be written");
         bytes[WAV_HEADER_BYTES..]
-            .as_chunks::<3>()
+            .as_chunks::<2>()
             .0
             .iter()
-            .map(|sample| {
-                (i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8) as f32 / 8_388_608.0
-            })
+            .map(|sample| f32::from(i16::from_le_bytes(*sample)) / 32_768.0)
             .collect()
     }
 
@@ -559,18 +545,27 @@ mod tests {
         render(name, fixture, scene).await
     }
 
-    async fn render(name: &str, fixture: &Fixture, scene: Scene) -> Vec<f32> {
+    fn workspace(name: &str) -> PathBuf {
         let directory =
             std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
         create_dir_all(&directory).expect("the workspace should be created");
-        let to = directory.join("mix.wav");
-        let mixdown = Mixdown {
+        directory
+    }
+
+    fn wav_mixdown(scene: Scene) -> Mixdown {
+        Mixdown {
             sample_rate: RATE,
             frame_count: scene.frame_count,
             tracks: scene.tracks,
-            format: MixdownFormat::Wav(SampleDepth::TwentyFour),
+            format: MixdownFormat::Wav,
             change: scene.change,
-        };
+        }
+    }
+
+    async fn render(name: &str, fixture: &Fixture, scene: Scene) -> Vec<f32> {
+        let directory = workspace(name);
+        let to = directory.join("mix.wav");
+        let mixdown = wav_mixdown(scene);
         write_mixdown(fixture, mixdown, &to, &Arc::new(MixdownWatch::default()))
             .await
             .expect("the mixdown should be written");
@@ -669,7 +664,6 @@ mod tests {
                 from: take,
                 gain: 2.0,
                 channels: MixdownChannels::Mono,
-                lead_in: 3,
                 group: MixdownGroup::Ready,
             },
         ];
@@ -677,7 +671,7 @@ mod tests {
         let mixed = mix("timeline", &fixture, tracks).await;
 
         for (frame, pair) in (0..8_u16).zip(mixed.as_chunks::<2>().0) {
-            let sung = 0.02 * f32::from(frame + 3);
+            let sung = 0.02 * f32::from(frame);
             assert!(
                 (pair[0] - (0.05 + sung)).abs() < TOLERANCE,
                 "{frame}: {pair:?}"
@@ -740,7 +734,6 @@ mod tests {
                 from: take,
                 gain: 1.0,
                 channels: MixdownChannels::Mono,
-                lead_in: 0,
                 group: MixdownGroup::Ready,
             },
         ];
@@ -792,17 +785,9 @@ mod tests {
             samples: [0.25, -0.25].repeat(scene.frame_count),
             watch: Arc::clone(&watch),
         };
-        let directory =
-            std::env::temp_dir().join(format!("musetric-mixdown-{name}-{}", std::process::id()));
-        create_dir_all(&directory).expect("the workspace should be created");
+        let directory = workspace(name);
         let to = directory.join("mix.wav");
-        let mixdown = Mixdown {
-            sample_rate: RATE,
-            frame_count: scene.frame_count,
-            tracks: scene.tracks,
-            format: MixdownFormat::Wav(SampleDepth::Sixteen),
-            change: scene.change,
-        };
+        let mixdown = wav_mixdown(scene);
         let written = write_mixdown(&source, mixdown, &to, &watch).await;
         assert_eq!(
             written.map_err(|failure| failure.to_string()),
@@ -869,7 +854,7 @@ mod tests {
             std::env::temp_dir().join(format!("musetric-mixdown-stages-{}", std::process::id()));
         create_dir_all(&directory).expect("the workspace should be created");
         for (format, done) in [
-            (MixdownFormat::Flac(SampleDepth::Sixteen), Some(1.0)),
+            (MixdownFormat::Flac, Some(1.0)),
             (MixdownFormat::Mp3 { bitrate: 128_000 }, Some(1.0)),
             (MixdownFormat::M4a { bitrate: 128_000 }, None),
         ] {
@@ -940,7 +925,7 @@ mod tests {
                     ..stem(&lead, 1.0)
                 },
             ],
-            format: MixdownFormat::Wav(SampleDepth::Sixteen),
+            format: MixdownFormat::Wav,
             change: MixdownChange {
                 tempo_percent: 80,
                 semitones: -2,

@@ -21,7 +21,6 @@ const NO_PARAMETERS: &str = "The flac stream info declares no audio";
 
 pub struct FlacFeed {
     sample_rate: Option<u32>,
-    lead_in_frames: usize,
     received: Vec<u8>,
     received_from: u64,
     opened: Option<Opened>,
@@ -30,10 +29,9 @@ pub struct FlacFeed {
 
 impl FlacFeed {
     #[must_use]
-    pub fn create(sample_rate: Option<u32>, lead_in_frames: usize) -> Self {
+    pub fn create(sample_rate: Option<u32>) -> Self {
         Self {
             sample_rate,
-            lead_in_frames,
             received: Vec::new(),
             received_from: 0,
             opened: None,
@@ -64,9 +62,7 @@ impl FlacFeed {
             };
             self.received.drain(..usize::try_from(layout.frames_start)?);
             self.received_from = layout.frames_start;
-            let mut opened = Opened::create(layout, self.sample_rate)?;
-            opened.lead_in(self.lead_in_frames, &mut self.ready)?;
-            self.opened = Some(opened);
+            self.opened = Some(Opened::create(layout, self.sample_rate)?);
         }
         let Some(opened) = self.opened.as_mut() else {
             return Ok(&self.ready);
@@ -132,14 +128,6 @@ impl Opened {
             interleaved: Vec::new(),
             input_frames: 0,
         })
-    }
-
-    fn lead_in(&mut self, frames: usize, ready: &mut Vec<f32>) -> Result<(), BoxedError> {
-        self.counted_frames = self.counted_frames.map(|counted| counted + frames);
-        self.input_frames += frames;
-        let silence = vec![0.0; frames * self.channels];
-        ready.extend_from_slice(self.conversion.convert(&silence)?);
-        Ok(())
     }
 
     fn decode(&mut self, span: &[u8], ready: &mut Vec<f32>) -> Result<(), BoxedError> {

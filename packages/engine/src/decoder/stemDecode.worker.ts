@@ -10,12 +10,7 @@ port.bindHandlers({
     const { projectId, stem, sampleRate } = message;
     try {
       const stream = await getMasterAudioStream(projectId, stem);
-      port.methods.decoded(
-        await decoder.decodeFlacStream(stream, {
-          sampleRate,
-          keepAacDelay: true,
-        }),
-      );
+      port.methods.decoded(await decoder.decodeFlacStream(stream, sampleRate));
     } catch (error) {
       port.methods.failed({
         reason: error instanceof Error ? error.message : String(error),
