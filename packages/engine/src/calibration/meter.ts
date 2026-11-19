@@ -9,8 +9,9 @@ import {
 
 const floorDb = 8;
 const ceilingDb = 32;
-const attackSeconds = 0.03;
-const releasePerSecond = 2.5;
+const averageLength = 10;
+const riseSeconds = 0.05;
+const fallSeconds = 0.35;
 
 const toLevel = (message: RecordingLatencyCalibrationLevel) => {
   if (message.level <= 0 || message.quiet <= 0) {
@@ -28,7 +29,7 @@ export const createCalibrationMeter = (
   store: Store<EngineState>,
 ): CalibrationMeter => {
   let level = 0;
-  let pendingLevel = 0;
+  const recentLevels: number[] = [];
   let clickIndex = -1;
   let lastTime: number | undefined = undefined;
   let frame: number | undefined = undefined;
@@ -38,13 +39,10 @@ export const createCalibrationMeter = (
     const elapsedSeconds =
       lastTime === undefined ? 0 : (time - lastTime) / 1000;
     lastTime = time;
-    level =
-      pendingLevel > level
-        ? level +
-          (pendingLevel - level) *
-            (1 - Math.exp(-elapsedSeconds / attackSeconds))
-        : Math.max(pendingLevel, level - releasePerSecond * elapsedSeconds);
-    pendingLevel = 0;
+    const average =
+      recentLevels.reduce((sum, value) => sum + value, 0) / recentLevels.length;
+    const seconds = average > level ? riseSeconds : fallSeconds;
+    level += (average - level) * (1 - Math.exp(-elapsedSeconds / seconds));
     store.update((draft) => {
       draft.calibrationLevel = level;
       draft.calibrationClickIndex = clickIndex;
@@ -60,7 +58,10 @@ export const createCalibrationMeter = (
 
   return {
     onLevel: (message) => {
-      pendingLevel = Math.max(pendingLevel, toLevel(message));
+      recentLevels.push(toLevel(message));
+      if (recentLevels.length > averageLength) {
+        recentLevels.shift();
+      }
       clickIndex = message.clickIndex;
       frame ??= requestAnimationFrame(flush);
     },
