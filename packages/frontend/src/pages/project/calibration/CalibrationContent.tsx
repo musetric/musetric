@@ -55,7 +55,6 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         phase={phase}
         texts={texts}
         headphones={place === 'headphones'}
-        outputLabel={outputLabel}
         gutter={gutter}
       />
       <CalibrationVolume gutter={gutter} />

@@ -11,7 +11,7 @@ import { type CalibrationTexts } from './calibrationTexts.js';
 import { getLastJudgedClick } from './clicks.js';
 import { type CalibrationPhase } from './useCalibrationFlow.js';
 
-const bodyLines = 4;
+const bodyLines = 3;
 const bodyLineHeight = 1.43;
 
 type Message = {
@@ -70,12 +70,11 @@ export type CalibrationMessageProps = {
   phase: CalibrationPhase;
   texts: CalibrationTexts;
   headphones: boolean;
-  outputLabel: string;
   gutter: number;
 };
 
 export const CalibrationMessage: FC<CalibrationMessageProps> = (props) => {
-  const { phase, texts, headphones, outputLabel, gutter } = props;
+  const { phase, texts, headphones, gutter } = props;
   const { t } = useTranslation();
   const listening = useListeningMessage(texts);
   const outputFrameCount = useEngineStore(getOutputLatencyFrameCount);
@@ -83,9 +82,6 @@ export const CalibrationMessage: FC<CalibrationMessageProps> = (props) => {
   const result = headphones
     ? t('pages.project.calibration.result.headphones', { seconds })
     : t('pages.project.calibration.result.output', { seconds });
-  const saved = t('pages.project.calibration.result.saved', {
-    output: outputLabel,
-  });
   const failure = (headline: string, body: string): Message => ({
     headline,
     body,
@@ -100,7 +96,7 @@ export const CalibrationMessage: FC<CalibrationMessageProps> = (props) => {
     measuring: listening,
     done: {
       headline: t('pages.project.calibration.result.title'),
-      body: `${result} ${saved}`,
+      body: result,
       color: 'success.main',
     },
     noisy: failure(

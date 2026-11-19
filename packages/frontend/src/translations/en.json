@@ -107,7 +107,6 @@
   "pages.project.calibration.recordHint": "This output is not calibrated yet. Recording asks for a short check first.",
   "pages.project.calibration.result.headphones": "These headphones play {{seconds}} s late. The playhead and your takes are shifted by that much.",
   "pages.project.calibration.result.output": "This output plays {{seconds}} s late. The playhead and your takes are shifted by that much.",
-  "pages.project.calibration.result.saved": "Saved for {{output}}. Other outputs get their own check.",
   "pages.project.calibration.result.title": "Your takes will land on the beat",
   "pages.project.calibration.silent.headphones.computer": "The clicks play through the headphones. Check that they are connected to this computer and held at its microphone, not on your head.",
   "pages.project.calibration.silent.headphones.phone": "The clicks play through the earphones. Check that they are connected to this phone and held at its microphone, not in your ears.",
