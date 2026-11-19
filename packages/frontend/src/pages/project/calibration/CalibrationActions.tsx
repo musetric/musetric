@@ -1,50 +1,43 @@
-import { Button, Stack } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { type FC } from 'react';
 import { type CalibrationAction } from './useCalibrationFlow.js';
 
 export type CalibrationActionsProps = {
-  primary?: CalibrationAction;
-  secondary?: CalibrationAction;
-  sheet: boolean;
+  primary: CalibrationAction;
+  secondary: CalibrationAction;
   gutter: number;
 };
 
 export const CalibrationActions: FC<CalibrationActionsProps> = (props) => {
-  const { primary, secondary, sheet, gutter } = props;
-  if (sheet) {
-    return (
-      <Stack sx={{ px: gutter, pt: 5, pb: 6, gap: 2 }}>
-        {primary && (
-          <Button
-            variant='contained'
-            size='large'
-            fullWidth
-            onClick={primary.onClick}
-          >
-            {primary.label}
-          </Button>
-        )}
-        {secondary && (
-          <Button fullWidth onClick={secondary.onClick}>
-            {secondary.label}
-          </Button>
-        )}
-      </Stack>
-    );
-  }
+  const { primary, secondary, gutter } = props;
   return (
-    <Stack
-      direction='row'
-      sx={{ px: gutter, py: 5, gap: 2, justifyContent: 'flex-end' }}
+    <Box
+      sx={{
+        px: gutter,
+        pt: 3,
+        pb: 5,
+        gap: 2,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      }}
     >
-      {secondary && (
-        <Button onClick={secondary.onClick}>{secondary.label}</Button>
-      )}
-      {primary && (
-        <Button variant='contained' onClick={primary.onClick}>
-          {primary.label}
-        </Button>
-      )}
-    </Stack>
+      <Button
+        size='large'
+        disabled={!secondary.onClick}
+        onClick={secondary.onClick}
+        sx={{ whiteSpace: 'nowrap' }}
+      >
+        {secondary.label}
+      </Button>
+      <Button
+        variant='contained'
+        size='large'
+        disabled={!primary.onClick}
+        onClick={primary.onClick}
+        sx={{ whiteSpace: 'nowrap' }}
+      >
+        {primary.label}
+      </Button>
+    </Box>
   );
 };

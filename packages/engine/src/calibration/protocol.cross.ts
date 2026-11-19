@@ -14,8 +14,21 @@ export type RecordingLatencyCalibrationStart = {
   sampleRate: number;
 };
 
+export type RecordingLatencyCalibrationLevel = {
+  clickIndex: number;
+  level: number;
+  quiet: number;
+};
+
+export type RecordingLatencyCalibrationClickPeak = {
+  clickIndex: number;
+  peak: RecordingLatencyCalibrationPeak;
+};
+
 export type RecordingLatencyCalibrationInboundMethods = {
-  progress: (message: { clickCount: number }) => void;
+  level: (message: RecordingLatencyCalibrationLevel) => void;
+  heard: (message: RecordingLatencyCalibrationClickPeak) => void;
+  closed: (message: RecordingLatencyCalibrationClickPeak) => void;
   done: (message: { peaks: RecordingLatencyCalibrationPeak[] }) => void;
 };
 
@@ -28,7 +41,7 @@ export const microphoneCalibrationChannel = createMessageChannel<
   RecordingLatencyCalibrationOutboundMethods
 >({
   inbound: {
-    keys: ['progress', 'done'],
+    keys: ['level', 'heard', 'closed', 'done'],
   },
   outbound: {
     keys: ['start'],

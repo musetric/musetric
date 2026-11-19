@@ -8,6 +8,9 @@ import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { canPressRecord, pressRecord } from '../calibration/takeActions.js';
 import { getBeatsToFrom } from '../loop/loopCountdown.js';
+import { useProjectStore } from '../store.js';
+import { HoldRing } from './HoldRing.js';
+import { useLongPress } from './useLongPress.js';
 
 export const PlaybackRecordButton: FC = () => {
   const { projectId } = routes.project.useAssertMatch();
@@ -26,6 +29,13 @@ export const PlaybackRecordButton: FC = () => {
     (state) => getActiveRecording(state)?.name,
   );
   const disabled = !useEngineStore(canPressRecord);
+  const settingsOpen = useProjectStore((state) => state.audioSettingsOpen);
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
+  );
+  const longPress = useLongPress(() => {
+    setAudioSettingsOpen(true);
+  });
 
   const getTitle = () => {
     if (looping) {
@@ -44,21 +54,29 @@ export const PlaybackRecordButton: FC = () => {
     calibrationNeeded && !pressed
       ? t('pages.project.calibration.recordHint')
       : undefined;
+  const holdHint = pressed
+    ? undefined
+    : t('pages.project.player.controls.holdHint');
+  const hints = [calibrationHint, holdHint].filter(
+    (hint) => hint !== undefined,
+  );
 
   return (
     <Tooltip
       enterTouchDelay={0}
       title={
-        calibrationHint ? (
+        settingsOpen || longPress.holding ? (
+          ''
+        ) : (
           <Box
             component='span'
             sx={{ display: 'flex', flexDirection: 'column' }}
           >
             <span>{title}</span>
-            <span>{calibrationHint}</span>
+            {hints.map((hint) => (
+              <span key={hint}>{hint}</span>
+            ))}
           </Box>
-        ) : (
-          title
         )
       }
     >
@@ -67,15 +85,25 @@ export const PlaybackRecordButton: FC = () => {
         sx={{ flex: 1, alignSelf: 'stretch', display: 'flex', ml: -1 }}
       >
         <IconButton
-          aria-label={calibrationHint ? `${title}. ${calibrationHint}` : title}
+          aria-label={[title, ...hints].join('. ')}
           aria-pressed={pressed}
+          aria-haspopup='dialog'
           color={writing ? 'inherit' : 'error'}
           disabled={disabled}
+          {...longPress.handlers}
           onClick={() => {
             pressRecord(projectId);
           }}
-          sx={{ borderRadius: '999px 0 0 999px', flex: 1 }}
+          sx={{
+            borderRadius: '999px 0 0 999px',
+            flex: 1,
+            position: 'relative',
+            touchAction: 'manipulation',
+            userSelect: 'none',
+            WebkitTouchCallout: 'none',
+          }}
         >
+          <HoldRing holding={longPress.holding} />
           {phase === 'armed' ? (
             <Badge
               badgeContent={beats}

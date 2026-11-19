@@ -22,6 +22,7 @@ export type CalibrationHeaderProps = {
   calibrated: boolean;
   closeDisabled: boolean;
   sheet: boolean;
+  details: ReactNode;
   onClose: () => void;
 };
 
@@ -54,7 +55,13 @@ export const CalibrationHeader: FC<CalibrationHeaderProps> = (props) => {
       </Stack>
       <Stack
         direction='row'
-        sx={{ px: gutter, gap: 2.5, alignItems: 'center', flexWrap: 'wrap' }}
+        sx={{
+          pl: gutter,
+          pr: sheet ? 1 : 3,
+          gap: 2.5,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
       >
         <Box sx={{ display: 'flex', color: 'text.secondary' }}>
           {outputIconByKind[kind]}
@@ -74,6 +81,7 @@ export const CalibrationHeader: FC<CalibrationHeaderProps> = (props) => {
             return { bgcolor: alpha(color, 0.18), color, fontWeight: 500 };
           }}
         />
+        {props.details}
       </Stack>
     </>
   );

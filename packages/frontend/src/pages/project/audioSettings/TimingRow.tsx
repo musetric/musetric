@@ -1,16 +1,11 @@
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { Box, ButtonBase, Stack, Typography } from '@mui/material';
-import {
-  getOutputLatencyFrameCount,
-  getRecordingLatencyFrameCount,
-  type RecordingLatencySource,
-} from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
+import { useTimingStatus } from './useTimingStatus.js';
 
 export const TimingRow: FC = () => {
   const { t } = useTranslation();
@@ -20,21 +15,9 @@ export const TimingRow: FC = () => {
   const setCalibrationPrompt = useProjectStore(
     (state) => state.setCalibrationPrompt,
   );
-  const source = useEngineStore((state) => state.latencySource);
-  const outputFrameCount = useEngineStore(getOutputLatencyFrameCount);
-  const latencyFrameCount = useEngineStore(getRecordingLatencyFrameCount);
+  const { source, text: status } = useTimingStatus();
   const recording = useEngineStore((state) => state.recording);
   const calibrating = useEngineStore((state) => state.calibrating);
-  const { sampleRate } = engine.context;
-  const statuses: Record<RecordingLatencySource, string> = {
-    calibrated: t('pages.project.audioSettings.timing.calibrated', {
-      seconds: (outputFrameCount / sampleRate).toFixed(2),
-    }),
-    estimated: t('pages.project.audioSettings.timing.needed'),
-    manual: t('pages.project.audioSettings.timing.manual', {
-      value: Math.round((latencyFrameCount / sampleRate) * 1000),
-    }),
-  };
 
   return (
     <Stack sx={{ gap: 1 }}>
@@ -74,7 +57,7 @@ export const TimingRow: FC = () => {
               />
             )}
             <Typography variant='body2' sx={{ color: 'text.secondary' }}>
-              {statuses[source]}
+              {status}
             </Typography>
           </Stack>
         </Stack>

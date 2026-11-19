@@ -64,6 +64,9 @@ export type CalibrationTexts = {
   figure: string;
   quiet: string;
   silent: string;
+  hold: string;
+  faint: string;
+  missed: string;
 };
 
 export const useCalibrationTexts = (
@@ -128,5 +131,14 @@ export const useCalibrationTexts = (
     silent: headphones
       ? silentTexts[device]
       : t('pages.project.calibration.silent.output'),
+    hold: headphones
+      ? t('pages.project.calibration.listening.hold.headphones')
+      : t('pages.project.calibration.measuring.hint'),
+    faint: headphones
+      ? t('pages.project.calibration.listening.faint.headphones')
+      : t('pages.project.calibration.listening.faint.output'),
+    missed: headphones
+      ? t('pages.project.calibration.listening.missed.headphones')
+      : t('pages.project.calibration.listening.missed.output'),
   };
 };

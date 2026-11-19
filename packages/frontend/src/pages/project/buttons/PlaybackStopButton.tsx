@@ -4,16 +4,27 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { useProjectStore } from '../store.js';
+import { HoldRing } from './HoldRing.js';
 import { canStop } from './playback.js';
+import { useLongPress } from './useLongPress.js';
 
 export const PlaybackStopButton: FC = () => {
   const { t } = useTranslation();
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
+  );
+  const longPress = useLongPress(() => {
+    setAudioSettingsOpen(true);
+  });
   const disabled = !useEngineStore(canStop);
 
   return (
     <IconButton
       color='inherit'
       disabled={disabled}
+      aria-haspopup='dialog'
+      {...longPress.handlers}
       onClick={() => {
         void engine.player.stop();
       }}
@@ -23,9 +34,14 @@ export const PlaybackStopButton: FC = () => {
         flex: 1,
         mr: -1,
         p: 0,
+        position: 'relative',
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
       title={t('pages.project.player.controls.stop')}
     >
+      <HoldRing holding={longPress.holding} />
       <StopRoundedIcon fontSize='large' />
     </IconButton>
   );
