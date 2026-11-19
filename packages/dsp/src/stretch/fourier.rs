@@ -1,6 +1,6 @@
 use std::{f64::consts::PI, sync::Arc};
 
-use rustfft::{Fft, FftPlanner, num_complex::Complex32};
+use rustfft::{Fft, FftPlannerScalar, num_complex::Complex32};
 
 const SMALL_POWER: usize = 16;
 const LARGEST_MULTIPLE: usize = 8;
@@ -36,11 +36,11 @@ pub(crate) struct HalfBinFft {
 
 #[expect(
     clippy::cast_possible_truncation,
-    reason = "the phase is rounded to f32 before cos and sin, like the original"
+    reason = "the phase is rounded to f32 like the original, and its cos and sin are stored as f32"
 )]
 fn unit(phase: f64) -> Complex32 {
-    let rounded = phase as f32;
-    Complex32::new(rounded.cos(), rounded.sin())
+    let rounded = f64::from(phase as f32);
+    Complex32::new(rounded.cos() as f32, rounded.sin() as f32)
 }
 
 #[expect(
@@ -54,7 +54,7 @@ fn to_f64(value: usize) -> f64 {
 impl HalfBinFft {
     pub(crate) fn new(size: usize) -> Self {
         let half = size / 2;
-        let mut planner = FftPlanner::new();
+        let mut planner = FftPlannerScalar::new();
         let forward = planner.plan_fft_forward(half);
         let inverse = planner.plan_fft_inverse(half);
         let scratch_length = forward
