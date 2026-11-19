@@ -1,5 +1,5 @@
 import { Stack } from '@mui/material';
-import { type FC } from 'react';
+import { type FC, useState } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type CalibrationPrompt } from '../store.js';
 import { CalibrationActions } from './CalibrationActions.js';
@@ -27,6 +27,8 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
   const { kind, place, spot, texts, outputLabel } = useCalibrationSetup();
   const headphones = place === 'headphones';
   const gutter = sheet ? 5 : 6;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const showsDetails = phase !== 'measuring';
 
   return (
     <Stack>
@@ -37,8 +39,13 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         calibrated={phase === 'done' || latencySource === 'calibrated'}
         closeDisabled={phase === 'measuring'}
         sheet={sheet}
+        detailsOpen={showsDetails ? detailsOpen : undefined}
         onClose={onClose}
+        onToggleDetails={() => {
+          setDetailsOpen(!detailsOpen);
+        }}
       />
+      {showsDetails && <TimingDetails open={detailsOpen} gutter={gutter} />}
       <CalibrationGauge
         phase={phase}
         figure={
@@ -75,7 +82,6 @@ export const CalibrationContent: FC<CalibrationContentProps> = (props) => {
         sheet={sheet}
         gutter={gutter}
       />
-      {phase !== 'measuring' && <TimingDetails gutter={gutter} />}
     </Stack>
   );
 };

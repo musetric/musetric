@@ -1,9 +1,18 @@
 import BluetoothIcon from '@mui/icons-material/Bluetooth';
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import CloseIcon from '@mui/icons-material/Close';
 import HeadphonesIcon from '@mui/icons-material/Headphones';
 import SpeakerIcon from '@mui/icons-material/Speaker';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import { alpha, Box, Chip, IconButton, Stack, Typography } from '@mui/material';
+import {
+  alpha,
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  Stack,
+  Typography,
+} from '@mui/material';
 import { type AudioOutputSourceKind } from '@musetric/audio/recording';
 import { type FC, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,11 +31,14 @@ export type CalibrationHeaderProps = {
   calibrated: boolean;
   closeDisabled: boolean;
   sheet: boolean;
+  detailsOpen?: boolean;
   onClose: () => void;
+  onToggleDetails: () => void;
 };
 
 export const CalibrationHeader: FC<CalibrationHeaderProps> = (props) => {
   const { title, kind, outputLabel, calibrated, closeDisabled, sheet } = props;
+  const { detailsOpen } = props;
   const { t } = useTranslation();
   const gutter = sheet ? 5 : 6;
   return (
@@ -54,7 +66,13 @@ export const CalibrationHeader: FC<CalibrationHeaderProps> = (props) => {
       </Stack>
       <Stack
         direction='row'
-        sx={{ px: gutter, gap: 2.5, alignItems: 'center', flexWrap: 'wrap' }}
+        sx={{
+          pl: gutter,
+          pr: sheet ? 1 : 3,
+          gap: 2.5,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
       >
         <Box sx={{ display: 'flex', color: 'text.secondary' }}>
           {outputIconByKind[kind]}
@@ -74,6 +92,23 @@ export const CalibrationHeader: FC<CalibrationHeaderProps> = (props) => {
             return { bgcolor: alpha(color, 0.18), color, fontWeight: 500 };
           }}
         />
+        {detailsOpen !== undefined && (
+          <Button
+            aria-expanded={detailsOpen}
+            onClick={props.onToggleDetails}
+            endIcon={
+              <ChevronRightRoundedIcon
+                sx={{
+                  transform: detailsOpen ? 'rotate(90deg)' : undefined,
+                  transition: 'transform 150ms',
+                }}
+              />
+            }
+            sx={{ ml: 'auto', color: 'text.secondary' }}
+          >
+            {t('pages.project.audioSettings.timing.details')}
+          </Button>
+        )}
       </Stack>
     </>
   );
