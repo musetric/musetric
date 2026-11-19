@@ -88,7 +88,8 @@ const tabletBody = (top: number) => (
   </>
 );
 
-const wideView = '0 -8 160 128';
+const phoneSize: FigurePoint = [110, 110];
+const wideSize: FigurePoint = [160, 128];
 
 type Pose = {
   target: FigurePoint;
@@ -98,7 +99,8 @@ type Pose = {
 };
 
 type Drawing = {
-  view: string;
+  size: FigurePoint;
+  centers: { earphone: FigurePoint; speaker: FigurePoint };
   body: ReactNode;
   microphone: FigurePoint;
   speakers: FigurePoint[];
@@ -109,7 +111,8 @@ type Drawing = {
 
 const drawings: Record<CalibrationSpot, Drawing> = {
   phoneBottom: {
-    view: '38 -2 110 110',
+    size: phoneSize,
+    centers: { earphone: [80, 54], speaker: [80, 41] },
     body: phoneBody(4),
     microphone: [72, 73],
     speakers: [[90, 73]],
@@ -118,7 +121,8 @@ const drawings: Record<CalibrationSpot, Drawing> = {
     mate: [114, 46],
   },
   phoneTop: {
-    view: '42 0 110 110',
+    size: phoneSize,
+    centers: { earphone: [80, 55], speaker: [80, 71] },
     body: phoneBody(34),
     microphone: [72, 39],
     speakers: [[90, 103]],
@@ -127,7 +131,8 @@ const drawings: Record<CalibrationSpot, Drawing> = {
     mate: [114, 66],
   },
   tabletTop: {
-    view: wideView,
+    size: wideSize,
+    centers: { earphone: [80, 57], speaker: [80, 70] },
     body: tabletBody(34),
     microphone: [80, 39],
     speakers: [
@@ -139,7 +144,8 @@ const drawings: Record<CalibrationSpot, Drawing> = {
     mate: [128, 10],
   },
   tabletBottom: {
-    view: wideView,
+    size: wideSize,
+    centers: { earphone: [80, 53], speaker: [80, 40] },
     body: tabletBody(4),
     microphone: [80, 71],
     speakers: [
@@ -151,7 +157,8 @@ const drawings: Record<CalibrationSpot, Drawing> = {
     mate: [128, 100],
   },
   computer: {
-    view: wideView,
+    size: wideSize,
+    centers: { earphone: [80, 54], speaker: [80, 75] },
     body: (
       <>
         <rect
@@ -210,6 +217,13 @@ const getRippleSources = (drawing: Drawing, place: CalibrationPlace) => {
   return [[x + (mx - x) * 0.3, y + (my - y) * 0.3] satisfies FigurePoint];
 };
 
+const getView = (drawing: Drawing, place: CalibrationPlace) => {
+  const [width, height] = drawing.size;
+  const [x, y] =
+    place === 'speaker' ? drawing.centers.speaker : drawing.centers.earphone;
+  return `${x - width / 2} ${y - height / 2} ${width} ${height}`;
+};
+
 export type CalibrationFigureProps = {
   spot: CalibrationSpot;
   place: CalibrationPlace;
@@ -238,7 +252,7 @@ export const CalibrationFigure: FC<CalibrationFigureProps> = (props) => {
   return (
     <Box
       component='svg'
-      viewBox={drawing.view}
+      viewBox={getView(drawing, place)}
       role='img'
       aria-label={label}
       sx={{
