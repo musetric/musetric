@@ -4,7 +4,7 @@ import { type PickerSide } from './pickerPlacement.js';
 
 export type DetailsView = 'text' | 'tracks';
 
-export type CalibrationPrompt = 'record' | 'recordTry' | 'settings' | 'menu';
+export type CalibrationPrompt = 'record' | 'recordTry' | 'settings';
 
 export type ProjectState = {
   detailsView?: DetailsView;
@@ -18,7 +18,6 @@ export type ProjectState = {
   transposeAnchorEl?: HTMLElement;
   tempoAnchorEl?: HTMLElement;
   recordingListAnchorEl?: HTMLElement;
-  playbackMenuAnchorEl?: HTMLElement;
   deletingRecordingId?: number;
   renamingRecordingId?: number;
   creatingRecordingId?: number;
@@ -55,7 +54,6 @@ export type ProjectActions = {
     side?: PickerSide,
   ) => void;
   setRecordingListAnchorEl: (anchorEl: HTMLElement | undefined) => void;
-  setPlaybackMenuAnchorEl: (anchorEl: HTMLElement | undefined) => void;
   setDeletingRecordingId: (recordingId: number | undefined) => void;
   setRenamingRecordingId: (recordingId: number | undefined) => void;
   setCreatingRecordingId: (recordingId: number | undefined) => void;
@@ -88,10 +86,6 @@ export const useProjectStore = create<State>()(
     setRecordingListAnchorEl: (recordingListAnchorEl) =>
       set({
         recordingListAnchorEl,
-      }),
-    setPlaybackMenuAnchorEl: (playbackMenuAnchorEl) =>
-      set({
-        playbackMenuAnchorEl,
       }),
     setDeletingRecordingId: (deletingRecordingId) =>
       set({

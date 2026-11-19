@@ -8,7 +8,7 @@ import { canPlay } from '../buttons/playback.js';
 import { lockLoop } from '../loop/loopActions.js';
 import { type CalibrationPrompt, useProjectStore } from '../store.js';
 
-export type TakeKind = Exclude<CalibrationPrompt, 'settings' | 'menu'>;
+export type TakeKind = Exclude<CalibrationPrompt, 'settings'>;
 
 export const startTake = (kind: TakeKind, projectId: number) => {
   if (kind === 'record') {

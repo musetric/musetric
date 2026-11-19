@@ -29,12 +29,13 @@ export const PlaybackRecordButton: FC = () => {
     (state) => getActiveRecording(state)?.name,
   );
   const disabled = !useEngineStore(canPressRecord);
-  const menuOpen = useProjectStore(
-    (state) => state.playbackMenuAnchorEl !== undefined,
+  const settingsOpen = useProjectStore((state) => state.audioSettingsOpen);
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
   );
-  const longPress = useLongPress(
-    useProjectStore((state) => state.setPlaybackMenuAnchorEl),
-  );
+  const longPress = useLongPress(() => {
+    setAudioSettingsOpen(true);
+  });
 
   const getTitle = () => {
     if (looping) {
@@ -53,7 +54,9 @@ export const PlaybackRecordButton: FC = () => {
     calibrationNeeded && !pressed
       ? t('pages.project.calibration.recordHint')
       : undefined;
-  const holdHint = pressed ? undefined : t('pages.project.playbackMenu.hint');
+  const holdHint = pressed
+    ? undefined
+    : t('pages.project.player.controls.holdHint');
   const hints = [calibrationHint, holdHint].filter(
     (hint) => hint !== undefined,
   );
@@ -62,7 +65,7 @@ export const PlaybackRecordButton: FC = () => {
     <Tooltip
       enterTouchDelay={0}
       title={
-        menuOpen || longPress.holding ? (
+        settingsOpen || longPress.holding ? (
           ''
         ) : (
           <Box
@@ -84,7 +87,7 @@ export const PlaybackRecordButton: FC = () => {
         <IconButton
           aria-label={[title, ...hints].join('. ')}
           aria-pressed={pressed}
-          aria-haspopup='menu'
+          aria-haspopup='dialog'
           color={writing ? 'inherit' : 'error'}
           disabled={disabled}
           {...longPress.handlers}

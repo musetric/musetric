@@ -64,8 +64,7 @@ export const useCalibrationFlow = (
   const error = useEngineStore((state) => state.calibrationError);
   const [result, setResult] = useState<Result>('none');
   const phase = getPhase(calibrating, result, error);
-  const take =
-    prompt === 'record' || prompt === 'recordTry' ? prompt : undefined;
+  const take = prompt === 'settings' ? undefined : prompt;
 
   const measure = () => {
     setResult('none');

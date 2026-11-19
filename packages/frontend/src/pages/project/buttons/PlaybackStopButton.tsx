@@ -11,16 +11,19 @@ import { useLongPress } from './useLongPress.js';
 
 export const PlaybackStopButton: FC = () => {
   const { t } = useTranslation();
-  const longPress = useLongPress(
-    useProjectStore((state) => state.setPlaybackMenuAnchorEl),
+  const setAudioSettingsOpen = useProjectStore(
+    (state) => state.setAudioSettingsOpen,
   );
+  const longPress = useLongPress(() => {
+    setAudioSettingsOpen(true);
+  });
   const disabled = !useEngineStore(canStop);
 
   return (
     <IconButton
       color='inherit'
       disabled={disabled}
-      aria-haspopup='menu'
+      aria-haspopup='dialog'
       {...longPress.handlers}
       onClick={() => {
         void engine.player.stop();
