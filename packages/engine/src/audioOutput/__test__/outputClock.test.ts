@@ -129,6 +129,23 @@ describe('engine output clock', () => {
     expectHeard(fakeContext, clock.read(), 0.2);
   });
 
+  it('keeps the delay when the timestamp after the resume comes near it only for a moment', () => {
+    const fakeContext = createFakeContext();
+    const clock = createEngineOutputClock(fakeContext.context);
+    vi.advanceTimersByTime(3000);
+    fakeContext.suspend();
+    vi.advanceTimersByTime(4500);
+    const resumedAtMs = performance.now();
+    fakeContext.report(
+      (currentTime, nowMs) =>
+        currentTime - heardDelay - (nowMs - resumedAtMs < 500 ? 0.004 : 0.009),
+    );
+    fakeContext.resume();
+    vi.advanceTimersByTime(20000);
+
+    expectHeard(fakeContext, clock.read(), heardDelay);
+  });
+
   it('follows a resume whose timestamp is right', () => {
     const fakeContext = createFakeContext();
     const clock = createEngineOutputClock(fakeContext.context);

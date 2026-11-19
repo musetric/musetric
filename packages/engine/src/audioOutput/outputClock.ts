@@ -9,7 +9,8 @@ const clockOffsetStepSeconds = 0.0005;
 const staleTimestampMs = 100;
 const settleMs = 1000;
 const stallMs = 500;
-const heldAgreementSeconds = 0.005;
+const heldAgreementSeconds = 0.002;
+const heldAgreementWindow = 30;
 const trimmedShare = 0.2;
 
 const median = (values: readonly number[]) => {
@@ -114,11 +115,11 @@ export const createEngineOutputClock = (
       heard.contextTime - (performance.timeOrigin + heard.performanceMs) / 1000;
     if (held) {
       reportedWhileHeld.push(renderAhead);
-      if (reportedWhileHeld.length > sampleWindow) {
+      if (reportedWhileHeld.length > heldAgreementWindow) {
         reportedWhileHeld.shift();
       }
       if (
-        reportedWhileHeld.length === sampleWindow &&
+        reportedWhileHeld.length === heldAgreementWindow &&
         Math.abs(median(reportedWhileHeld) - held.renderAhead) <
           heldAgreementSeconds
       ) {
