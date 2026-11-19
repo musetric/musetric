@@ -1,24 +1,16 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import { Badge, Box, IconButton, Tooltip } from '@mui/material';
-import { keyframes } from '@mui/material/styles';
 import { getActiveRecording, getCalibrationNeeded } from '@musetric/engine';
-import { type FC, useState } from 'react';
+import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { canPressRecord, pressRecord } from '../calibration/takeActions.js';
 import { getBeatsToFrom } from '../loop/loopCountdown.js';
-import { RecordMenu } from './RecordMenu.js';
+import { useProjectStore } from '../store.js';
+import { HoldRing } from './HoldRing.js';
 import { useLongPress } from './useLongPress.js';
-
-const holdRingLength = 132;
-
-const holdRing = keyframes`
-  to {
-    stroke-dashoffset: 0;
-  }
-`;
 
 export const PlaybackRecordButton: FC = () => {
   const { projectId } = routes.project.useAssertMatch();
@@ -37,8 +29,12 @@ export const PlaybackRecordButton: FC = () => {
     (state) => getActiveRecording(state)?.name,
   );
   const disabled = !useEngineStore(canPressRecord);
-  const [menuAnchor, setMenuAnchor] = useState<HTMLElement>();
-  const longPress = useLongPress(setMenuAnchor);
+  const menuOpen = useProjectStore(
+    (state) => state.playbackMenuAnchorEl !== undefined,
+  );
+  const longPress = useLongPress(
+    useProjectStore((state) => state.setPlaybackMenuAnchorEl),
+  );
 
   const getTitle = () => {
     if (looping) {
@@ -57,117 +53,86 @@ export const PlaybackRecordButton: FC = () => {
     calibrationNeeded && !pressed
       ? t('pages.project.calibration.recordHint')
       : undefined;
-  const holdHint = pressed ? undefined : t('pages.project.recordMenu.hint');
+  const holdHint = pressed ? undefined : t('pages.project.playbackMenu.hint');
   const hints = [calibrationHint, holdHint].filter(
     (hint) => hint !== undefined,
   );
 
   return (
-    <>
-      <Tooltip
-        enterTouchDelay={0}
-        title={
-          menuAnchor || longPress.holding ? (
-            ''
-          ) : (
-            <Box
-              component='span'
-              sx={{ display: 'flex', flexDirection: 'column' }}
-            >
-              <span>{title}</span>
-              {hints.map((hint) => (
-                <span key={hint}>{hint}</span>
-              ))}
-            </Box>
-          )
-        }
-      >
-        <Box
-          component='span'
-          sx={{ flex: 1, alignSelf: 'stretch', display: 'flex', ml: -1 }}
-        >
-          <IconButton
-            aria-label={[title, ...hints].join('. ')}
-            aria-pressed={pressed}
-            aria-haspopup='menu'
-            color={writing ? 'inherit' : 'error'}
-            disabled={disabled}
-            {...longPress.handlers}
-            onClick={() => {
-              pressRecord(projectId);
-            }}
-            sx={{
-              borderRadius: '999px 0 0 999px',
-              flex: 1,
-              position: 'relative',
-              touchAction: 'manipulation',
-              userSelect: 'none',
-              WebkitTouchCallout: 'none',
-            }}
+    <Tooltip
+      enterTouchDelay={0}
+      title={
+        menuOpen || longPress.holding ? (
+          ''
+        ) : (
+          <Box
+            component='span'
+            sx={{ display: 'flex', flexDirection: 'column' }}
           >
-            {longPress.holding && (
+            <span>{title}</span>
+            {hints.map((hint) => (
+              <span key={hint}>{hint}</span>
+            ))}
+          </Box>
+        )
+      }
+    >
+      <Box
+        component='span'
+        sx={{ flex: 1, alignSelf: 'stretch', display: 'flex', ml: -1 }}
+      >
+        <IconButton
+          aria-label={[title, ...hints].join('. ')}
+          aria-pressed={pressed}
+          aria-haspopup='menu'
+          color={writing ? 'inherit' : 'error'}
+          disabled={disabled}
+          {...longPress.handlers}
+          onClick={() => {
+            pressRecord(projectId);
+          }}
+          sx={{
+            borderRadius: '999px 0 0 999px',
+            flex: 1,
+            position: 'relative',
+            touchAction: 'manipulation',
+            userSelect: 'none',
+            WebkitTouchCallout: 'none',
+          }}
+        >
+          <HoldRing holding={longPress.holding} />
+          {phase === 'armed' ? (
+            <Badge
+              badgeContent={beats}
+              color='error'
+              invisible={beats === undefined}
+            >
               <Box
-                component='svg'
-                viewBox='0 0 48 48'
-                aria-hidden
                 sx={{
-                  position: 'absolute',
-                  width: 48,
-                  height: 48,
-                  transform: 'rotate(-90deg)',
-                  pointerEvents: 'none',
-                  '& circle': {
-                    fill: 'none',
-                    stroke: 'currentColor',
-                    strokeWidth: 3,
-                    strokeDasharray: holdRingLength,
-                    strokeDashoffset: holdRingLength,
-                    animation: `${holdRing} 500ms linear forwards`,
-                  },
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  border: 2,
+                  borderColor: 'error.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <circle cx='24' cy='24' r='21' />
+                <MicRoundedIcon fontSize='small' />
               </Box>
-            )}
-            {phase === 'armed' ? (
-              <Badge
-                badgeContent={beats}
-                color='error'
-                invisible={beats === undefined}
-              >
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    border: 2,
-                    borderColor: 'error.main',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <MicRoundedIcon fontSize='small' />
-                </Box>
-              </Badge>
-            ) : (
-              <Badge
-                variant='dot'
-                color='warning'
-                invisible={calibrationHint === undefined}
-              >
-                <MicRoundedIcon />
-              </Badge>
-            )}
-          </IconButton>
-        </Box>
-      </Tooltip>
-      <RecordMenu
-        anchorEl={menuAnchor}
-        onClose={() => {
-          setMenuAnchor(undefined);
-        }}
-      />
-    </>
+            </Badge>
+          ) : (
+            <Badge
+              variant='dot'
+              color='warning'
+              invisible={calibrationHint === undefined}
+            >
+              <MicRoundedIcon />
+            </Badge>
+          )}
+        </IconButton>
+      </Box>
+    </Tooltip>
   );
 };

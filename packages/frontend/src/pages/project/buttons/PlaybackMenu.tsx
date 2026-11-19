@@ -14,14 +14,13 @@ import { useTimingStatus } from '../audioSettings/useTimingStatus.js';
 import { AudioSettingsMenuItem } from '../menu/AudioSettingsMenuItem.js';
 import { useProjectStore } from '../store.js';
 
-export type RecordMenuProps = {
-  anchorEl?: HTMLElement;
-  onClose: () => void;
-};
-
-export const RecordMenu: FC<RecordMenuProps> = (props) => {
-  const { anchorEl, onClose } = props;
+export const PlaybackMenu: FC = () => {
   const { t } = useTranslation();
+  const anchorEl = useProjectStore((state) => state.playbackMenuAnchorEl);
+  const setAnchorEl = useProjectStore((state) => state.setPlaybackMenuAnchorEl);
+  const onClose = () => {
+    setAnchorEl(undefined);
+  };
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('sm'));
   const setCalibrationPrompt = useProjectStore(
     (state) => state.setCalibrationPrompt,
@@ -39,7 +38,7 @@ export const RecordMenu: FC<RecordMenuProps> = (props) => {
       }}
     >
       <ListItemText
-        primary={t('pages.project.recordMenu.calibrate')}
+        primary={t('pages.project.playbackMenu.calibrate')}
         secondary={status.text}
       />
     </MenuItem>,

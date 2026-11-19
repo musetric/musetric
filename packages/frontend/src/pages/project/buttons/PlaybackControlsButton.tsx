@@ -1,6 +1,7 @@
 import { Box } from '@mui/material';
 import { type FC } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
+import { PlaybackMenu } from './PlaybackMenu.js';
 import { PlaybackPlayButton } from './PlaybackPlayButton.js';
 import { PlaybackRecordButton } from './PlaybackRecordButton.js';
 import { PlaybackStopButton } from './PlaybackStopButton.js';
@@ -33,6 +34,7 @@ export const PlaybackControlsButton: FC = () => {
       <PlaybackRecordButton />
       {!active && <PlaybackPlayButton />}
       {active && <PlaybackStopButton />}
+      <PlaybackMenu />
     </Box>
   );
 };
