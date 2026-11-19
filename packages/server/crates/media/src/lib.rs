@@ -13,8 +13,8 @@ pub use decode::SymphoniaPcm;
 pub use frames::{read_flac_sample_rate, read_frame_count};
 pub use loudness::{analyze_lead_visual_loudness, analyze_loudness};
 pub use mixdown::{
-    Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownProgress,
-    MixdownStage, MixdownTrack, MixdownWatch, write_mixdown,
+    Mixdown, MixdownChange, MixdownFormat, MixdownGroup, MixdownProgress, MixdownStage,
+    MixdownTake, MixdownTrack, MixdownWatch, write_mixdown,
 };
 pub use mono::{MonoRequest, decode_mono_pcm};
 pub use pcm::{

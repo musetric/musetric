@@ -1,6 +1,5 @@
 import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
-import { type TakeTarget } from '../player/takeShift.cross.js';
 
 export type SettledLoopTry = {
   id: string;
@@ -39,7 +38,6 @@ export type EngineDecoderOutboundMethods = {
     sampleRate: number;
     frameCount: number;
   }) => void;
-  exportRecording: (message: { target: TakeTarget }) => void;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
@@ -69,8 +67,6 @@ export type EngineDecoderInboundMethods = {
   }) => void;
   recordingsChanged: (message: { recordings: api.recording.Item[] }) => void;
   recordingContentChanged: (message: { recordingId: number }) => void;
-  recordingExported: (message: { samples: Float32Array<ArrayBuffer> }) => void;
-  recordingExportFailed: () => void;
   loopTrySettled: (message: { loopTry?: SettledLoopTry }) => void;
   loopTryInserted: (message: { inserted: boolean }) => void;
   playerPlayRequested: () => void;
@@ -98,9 +94,6 @@ export const engineDecoderChannel = createMessageChannel<
   EngineDecoderOutboundMethods
 >({
   inbound: {
-    transfers: {
-      recordingExported: (message) => [message.samples.buffer],
-    },
     keys: [
       'booted',
       'setState',
@@ -112,8 +105,6 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingPeaksChanged',
       'recordingsChanged',
       'recordingContentChanged',
-      'recordingExported',
-      'recordingExportFailed',
       'loopTrySettled',
       'loopTryInserted',
       'playerPlayRequested',
@@ -136,7 +127,6 @@ export const engineDecoderChannel = createMessageChannel<
       'deleteLoopTry',
       'discardLoopTries',
       'insertLoopTry',
-      'exportRecording',
       'sendRecordingUndo',
       'sendRecordingRedo',
       'sendPlayerPlay',

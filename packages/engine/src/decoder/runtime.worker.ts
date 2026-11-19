@@ -1,7 +1,6 @@
 import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
-import { waitWithTimeout } from '@musetric/utils/cross/waitWithTimeout';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
 import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
@@ -29,8 +28,6 @@ import {
   readRecordingPacket,
   type RecordingStream,
 } from './recordingStream.worker.js';
-
-const takeFinishTimeoutMs = 10000;
 
 type TakeEvent = Extract<
   api.project.realtime.Event,
@@ -312,18 +309,6 @@ export const createDecoderWorkerRuntime = (
           frameCount: message.frameCount,
         }));
       port.methods.loopTryInserted({ inserted });
-    },
-    exportRecording: async (message) => {
-      try {
-        if (recordingStream) {
-          await waitWithTimeout(recordingStream.finish, takeFinishTimeoutMs);
-        }
-        const samples = await audioDecode.exportRecording(message.target);
-        port.methods.recordingExported({ samples });
-      } catch (error) {
-        console.error('Failed to export the recording', error);
-        port.methods.recordingExportFailed();
-      }
     },
     sendRecordingUndo: () => {
       const recordingId = recordingList.getActiveId();

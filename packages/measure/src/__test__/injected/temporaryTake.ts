@@ -1,5 +1,6 @@
 import { api } from '@musetric/api';
 import { requestWithAxios } from '@musetric/api/dom';
+import { createAudioDecoder } from '@musetric/audio/decoder';
 import {
   type Engine,
   type EngineState,
@@ -16,11 +17,39 @@ const streamSettleMs = 2500;
 const sliceLeadSeconds = 0.5;
 const sliceTailSeconds = 1;
 
-const exportTarget: Parameters<Engine['decoder']['exportRecording']>[0] = {
-  tempoRatio: 1,
-  transposeSemitones: 0,
-  voiceOctave: 0,
-  voiceShifted: false,
+const assembleTake = async (
+  projectId: number,
+  recordingId: number,
+  sampleRate: number,
+  frameCount: number,
+): Promise<Float32Array<ArrayBuffer>> => {
+  const { pieces } = await requestWithAxios(
+    axios,
+    api.audio.recordingPieces.base,
+    { params: { projectId, recordingId } },
+  );
+  const decoder = createAudioDecoder();
+  const samples = new Float32Array(frameCount);
+  for (const piece of pieces) {
+    const start = Math.round(
+      (piece.songStartFrame * sampleRate) / piece.sampleRate,
+    );
+    if (start >= frameCount) {
+      continue;
+    }
+    const content = await requestWithAxios(
+      axios,
+      api.audio.recordingPiece.base,
+      { params: { projectId, recordingId, blobId: piece.blobId } },
+    );
+    const { channels } = await decoder.decode(content.buffer, {
+      extension: 'wav',
+      sampleRate,
+      keepChannels: true,
+    });
+    samples.set(channels[0].subarray(0, frameCount - start), start);
+  }
+  return samples;
 };
 
 type SavedSettings = Pick<
@@ -136,7 +165,10 @@ export const recordTemporaryTake = async (
     }
     await wait(streamSettleMs);
     const { sampleRate } = engine.context;
-    const song = await engine.decoder.exportRecording(exportTarget);
+    const { frameCount } = engine.store.get();
+    if (frameCount === undefined) {
+      throw new Error('The project has no frame count');
+    }
     const firstFrame = Math.max(
       0,
       settings.startFrame - Math.round(sliceLeadSeconds * sampleRate),
@@ -146,6 +178,12 @@ export const recordTemporaryTake = async (
       Math.round(
         (settings.seconds * settings.tempo + sliceTailSeconds) * sampleRate,
       );
+    const song = await assembleTake(
+      projectId,
+      temporary.id,
+      sampleRate,
+      Math.min(frameCount, lastFrame),
+    );
     return { firstFrame, samples: song.slice(firstFrame, lastFrame) };
   } finally {
     applySettings(engine, saved);

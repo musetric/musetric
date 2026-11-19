@@ -18,8 +18,6 @@ import {
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { createStartPlayback } from './startPlayback.js';
-import { type TakeTarget } from './takeShift.cross.js';
-import { encodeMonoWav } from './wav.js';
 
 export type EnginePlayer = EnginePlayerLoop &
   EnginePlayerRange & {
@@ -30,7 +28,6 @@ export type EnginePlayer = EnginePlayerLoop &
     setFrozen: (frozen: boolean) => void;
     record: (projectId: number) => Promise<void>;
     stopRecording: () => Promise<void>;
-    exportRecording: (target: TakeTarget) => Promise<File | undefined>;
     applyRemoteStop: () => Promise<void>;
     applyRemoteFrameIndex: (
       frameIndex: number,
@@ -263,17 +260,6 @@ export const createEnginePlayer = (
         ref.setRange(range);
       },
     }),
-    exportRecording: async (target) => {
-      const samples = await getDecoderValue().exportRecording(target);
-      if (samples.every((sample) => sample === 0)) {
-        return undefined;
-      }
-      return new File(
-        [encodeMonoWav(samples, context.sampleRate)],
-        'recording.wav',
-        { type: 'audio/wav' },
-      );
-    },
     applyRemoteStop: async () => {
       const { recording: wasRecording } = store.get();
       store.update((state) => {

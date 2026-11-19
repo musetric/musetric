@@ -66,8 +66,7 @@ type ExportRun = {
 const runs = new Map<number, ExportRun>();
 
 export type MixdownCreation = {
-  request: Omit<api.mixdown.create.Request, 'recording'>;
-  renderRecording: () => Promise<File | undefined>;
+  request: api.mixdown.create.Request;
   onSaved: () => void;
 };
 
@@ -78,20 +77,14 @@ const runExport = async (
   report: Report,
 ) => {
   const { signal } = run.controller;
-  const recording = await creation.renderRecording();
-  signal.throwIfAborted();
   report({ stage: 'preparing', done: 0 });
-  const created = await endpoints.mixdown.create(
-    projectId,
-    { ...creation.request, recording },
-    {
-      signal: run.upload.signal,
-      onUploadProgress: (event) => {
-        run.uploaded = event.progress === 1;
-        report({ stage: 'preparing', done: event.progress });
-      },
+  const created = await endpoints.mixdown.create(projectId, creation.request, {
+    signal: run.upload.signal,
+    onUploadProgress: (event) => {
+      run.uploaded = event.progress === 1;
+      report({ stage: 'preparing', done: event.progress });
     },
-  );
+  });
   run.mixdownId = created.mixdownId;
   signal.throwIfAborted();
   await follow(created.mixdownId, signal, report);
