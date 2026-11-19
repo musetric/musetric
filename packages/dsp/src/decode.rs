@@ -16,7 +16,7 @@ use symphonia::core::{
 };
 
 use crate::{
-    BoxedError,
+    BoxedError, CHANNELS,
     resample::{Conversion, SampleRates},
 };
 
@@ -33,42 +33,105 @@ const MP4_BIG_ENDIAN_OPUS_HEAD_FIELDS: [Range<usize>; 3] = [10..12, 12..16, 16..
 
 pub type DecodedSink<'sink> = &'sink mut dyn FnMut(&[f32]) -> Result<(), BoxedError>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Layout {
+    Stereo,
+    Source,
+}
+
 pub struct DecodeRequest<'request> {
     pub source: Box<dyn MediaSource>,
     pub extension: Option<&'request str>,
     pub sample_rate: Option<u32>,
+    pub layout: Layout,
 }
 
 pub fn decode(request: DecodeRequest<'_>, sink: DecodedSink<'_>) -> Result<u32, BoxedError> {
-    let mut track = open(request.source, request.extension)?;
-    let rates = SampleRates {
-        input: track.sample_rate,
-        output: request.sample_rate.unwrap_or(track.sample_rate),
-    };
-    let mut conversion = Conversion::create(rates)?;
-    let mut interleaved = Vec::new();
-    let mut read_frames = 0_usize;
-    while let Some(packet) = next_packet(track.reader.as_mut())? {
-        if packet.track_id != track.id {
-            continue;
-        }
-        let Some(buffer) = decode_packet(track.decoder.as_mut(), &packet)? else {
-            continue;
-        };
-        read_frames += buffer.frames();
-        buffer.copy_to_vec_interleaved(&mut interleaved);
-        let frames = track.fold.apply(&interleaved);
-        sink(conversion.convert(frames)?)?;
+    let mut decoder = Decoder::open(request)?;
+    while let Some(frames) = decoder.read()? {
+        sink(frames)?;
     }
-    sink(conversion.flush(read_frames)?)?;
-    Ok(rates.output)
+    Ok(decoder.sample_rate())
+}
+
+pub struct Decoder {
+    reader: Box<dyn FormatReader>,
+    codec: Box<dyn AudioDecoder>,
+    id: u32,
+    fold: Option<Fold>,
+    channels: usize,
+    conversion: Conversion,
+    sample_rate: u32,
+    interleaved: Vec<f32>,
+    read_frames: usize,
+    finished: bool,
+}
+
+impl Decoder {
+    pub fn open(request: DecodeRequest<'_>) -> Result<Self, BoxedError> {
+        let track = open(request.source, request.extension)?;
+        let fold = match request.layout {
+            Layout::Stereo => Some(Fold::create(&track.channels)),
+            Layout::Source => None,
+        };
+        let channels = fold.as_ref().map_or(track.channels.count(), |_| CHANNELS);
+        let rates = SampleRates {
+            input: track.sample_rate,
+            output: request.sample_rate.unwrap_or(track.sample_rate),
+        };
+        Ok(Self {
+            reader: track.reader,
+            codec: track.decoder,
+            id: track.id,
+            fold,
+            channels,
+            conversion: Conversion::create(rates, channels)?,
+            sample_rate: rates.output,
+            interleaved: Vec::new(),
+            read_frames: 0,
+            finished: false,
+        })
+    }
+
+    #[must_use]
+    pub fn channels(&self) -> usize {
+        self.channels
+    }
+
+    #[must_use]
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub fn read(&mut self) -> Result<Option<&[f32]>, BoxedError> {
+        if self.finished {
+            return Ok(None);
+        }
+        while let Some(packet) = next_packet(self.reader.as_mut())? {
+            if packet.track_id != self.id {
+                continue;
+            }
+            let Some(buffer) = decode_packet(self.codec.as_mut(), &packet)? else {
+                continue;
+            };
+            self.read_frames += buffer.frames();
+            buffer.copy_to_vec_interleaved(&mut self.interleaved);
+            let frames = match self.fold.as_mut() {
+                Some(fold) => fold.apply(&self.interleaved),
+                None => &self.interleaved,
+            };
+            return Ok(Some(self.conversion.convert(frames)?));
+        }
+        self.finished = true;
+        Ok(Some(self.conversion.flush(self.read_frames)?))
+    }
 }
 
 struct Track {
     reader: Box<dyn FormatReader>,
     decoder: Box<dyn AudioDecoder>,
     id: u32,
-    fold: Fold,
+    channels: Channels,
     sample_rate: u32,
 }
 
@@ -99,7 +162,7 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
         reader,
         decoder,
         id,
-        fold: Fold::create(&channels),
+        channels,
         sample_rate,
     })
 }

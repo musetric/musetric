@@ -1,0 +1,18 @@
+name: Build DSP
+description: The Rust toolchain of packages/server with its WebAssembly target, wasm-bindgen at the version Cargo.lock locks, and @musetric/dsp built into packages/dsp/dist
+
+runs:
+  using: composite
+  steps:
+    - run: rustup toolchain install --no-self-update
+      shell: bash
+      working-directory: packages/server
+    - id: wasm-bindgen
+      run: echo "version=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p}' Cargo.lock)" >> "$GITHUB_OUTPUT"
+      shell: bash
+      working-directory: packages/server
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen@${{ steps.wasm-bindgen.outputs.version }}
+    - run: pnpm --filter @musetric/dsp build:project
+      shell: bash

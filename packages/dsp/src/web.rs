@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::{JsError, wasm_bindgen};
 use crate::{
     BoxedError, CHANNELS,
     aac::AacEncoder,
-    decode::{DecodeRequest, decode as decode_source},
+    decode::{DecodeRequest, Decoder, Layout},
     depth::SampleDepth,
     flac::FlacWriter,
     loudness::LoudnessMeter,
@@ -33,52 +33,56 @@ fn depth_of(bits: u32) -> Result<SampleDepth, BoxedError> {
     }
 }
 
-#[wasm_bindgen]
-pub struct Decoded {
-    samples: Vec<f32>,
-    sample_rate: u32,
+#[wasm_bindgen(js_name = Decoder)]
+pub struct StreamDecoder {
+    decoder: Decoder,
 }
 
-#[wasm_bindgen]
-impl Decoded {
+#[wasm_bindgen(js_class = Decoder)]
+impl StreamDecoder {
+    #[wasm_bindgen(constructor)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "wasm-bindgen hands an optional string over by value"
+    )]
+    pub fn new(
+        bytes: Vec<u8>,
+        extension: Option<String>,
+        sample_rate: Option<u32>,
+        keep_channels: bool,
+    ) -> Result<StreamDecoder, JsError> {
+        let request = DecodeRequest {
+            source: Box::new(Cursor::new(bytes)),
+            extension: extension.as_deref(),
+            sample_rate,
+            layout: if keep_channels {
+                Layout::Source
+            } else {
+                Layout::Stereo
+            },
+        };
+        let decoder = Decoder::open(request).map_err(|failure| failed(&failure))?;
+        Ok(Self { decoder })
+    }
+
+    #[wasm_bindgen(getter)]
+    #[must_use]
+    pub fn channels(&self) -> usize {
+        self.decoder.channels()
+    }
+
     #[wasm_bindgen(getter, js_name = sampleRate)]
     #[must_use]
     pub fn sample_rate(&self) -> u32 {
-        self.sample_rate
+        self.decoder.sample_rate()
     }
 
-    #[wasm_bindgen(js_name = intoSamples)]
-    #[must_use]
-    pub fn into_samples(self) -> Vec<f32> {
-        self.samples
+    pub fn read(&mut self) -> Result<Option<Vec<f32>>, JsError> {
+        self.decoder
+            .read()
+            .map(|frames| frames.map(<[f32]>::to_vec))
+            .map_err(|failure| failed(&failure))
     }
-}
-
-#[wasm_bindgen]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "wasm-bindgen hands an optional string over by value"
-)]
-pub fn decode(
-    bytes: Vec<u8>,
-    extension: Option<String>,
-    sample_rate: Option<u32>,
-) -> Result<Decoded, JsError> {
-    let mut samples = Vec::new();
-    let request = DecodeRequest {
-        source: Box::new(Cursor::new(bytes)),
-        extension: extension.as_deref(),
-        sample_rate,
-    };
-    let rate = decode_source(request, &mut |chunk| {
-        samples.extend_from_slice(chunk);
-        Ok(())
-    })
-    .map_err(|failure| failed(&failure))?;
-    Ok(Decoded {
-        samples,
-        sample_rate: rate,
-    })
 }
 
 #[wasm_bindgen]
@@ -89,8 +93,8 @@ pub struct Resampler {
 #[wasm_bindgen]
 impl Resampler {
     #[wasm_bindgen(constructor)]
-    pub fn new(input: u32, output: u32) -> Result<Resampler, JsError> {
-        let conversion = Conversion::create(SampleRates { input, output })
+    pub fn new(input: u32, output: u32, channels: usize) -> Result<Resampler, JsError> {
+        let conversion = Conversion::create(SampleRates { input, output }, channels)
             .map_err(|failure| failed(&failure))?;
         Ok(Self { conversion })
     }

@@ -1,4 +1,5 @@
-import { decodeMp4 } from '@musetric/audio/decoder';
+import { createAudioDecoder } from '@musetric/audio/decoder';
+import { stemTypes } from '@musetric/audio/es';
 import { getDeliveryAudioContent } from '../audioRequest/audioRequest.worker.js';
 import {
   type LiveTakeChunk,
@@ -14,6 +15,10 @@ import {
   type RecordingAssembly,
   renderPieces,
 } from './recordingAssembly.worker.js';
+import {
+  createStemDecoders,
+  type StemDecoders,
+} from './stemDecoders.worker.js';
 import { createTakeStretch, type TakeStretch } from './takeStretch.worker.js';
 
 export type CreateAudioDecodeOptions = {
@@ -58,6 +63,8 @@ export const createAudioDecode = (
   options: CreateAudioDecodeOptions,
 ): AudioDecode => {
   const { playerPort, spectrogramPort } = options;
+  const decoder = createAudioDecoder();
+  let stemDecoders: StemDecoders | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
   let recording: Recording | undefined = undefined;
   let activeRecordingId: number | undefined = undefined;
@@ -66,7 +73,7 @@ export const createAudioDecode = (
 
   const getRecording = (sampleRate: number): Recording => {
     recording ??= {
-      assembly: createRecordingAssembly(sampleRate),
+      assembly: createRecordingAssembly(sampleRate, decoder),
       stretch: createTakeStretch(sampleRate),
     };
     return recording;
@@ -126,16 +133,17 @@ export const createAudioDecode = (
   return {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
+      const stemOptions = { extension: 'mp4', sampleRate, keepChannels: false };
       const recordingId = activeRecordingId;
-      const [lead, backing, instrumental, pieces] = await Promise.all([
-        getDeliveryAudioContent(projectId, 'lead').then(async (content) =>
-          decodeMp4(content.buffer, sampleRate),
-        ),
-        getDeliveryAudioContent(projectId, 'backing').then(async (content) =>
-          decodeMp4(content.buffer, sampleRate),
-        ),
-        getDeliveryAudioContent(projectId, 'instrumental').then(
-          async (content) => decodeMp4(content.buffer, sampleRate),
+      stemDecoders ??= createStemDecoders(stemTypes.length);
+      const decoders = stemDecoders;
+      const [[lead, backing, instrumental], pieces] = await Promise.all([
+        Promise.all(
+          stemTypes.map(async (stem, slot) =>
+            getDeliveryAudioContent(projectId, stem).then(async (content) =>
+              decoders.decode(slot, content.buffer, stemOptions),
+            ),
+          ),
         ),
         loadPieces({ projectId, sampleRate }, recordingId),
       ]);

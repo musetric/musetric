@@ -14,6 +14,15 @@ runs:
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
+    - run: rustup toolchain install --no-self-update
+      shell: bash
+      working-directory: packages/server
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/server
+        shared-key: dsp
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - uses: ./.github/actions/buildDsp
     - if: inputs.part == 'static'
       run: |
         pnpm check:deps:security

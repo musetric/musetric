@@ -30,9 +30,9 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
-    "@alexanderolsen/libsamplerate-js": "catalog:",
     "@musetric/api": "workspace:*",
     "@musetric/audio": "workspace:*",
+    "@musetric/dsp": "workspace:*",
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
@@ -44,7 +44,6 @@
     "axios": "catalog:",
     "eslint": "catalog:",
     "immer": "catalog:",
-    "mediabunny": "catalog:",
     "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

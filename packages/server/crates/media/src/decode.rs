@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use musetric_dsp::decode::{DecodeRequest, decode as decode_source};
+use musetric_dsp::decode::{DecodeRequest, Layout, decode as decode_source};
 use tokio::{sync::mpsc, task::spawn_blocking};
 
 use crate::{
@@ -44,6 +44,7 @@ fn decode(
         source: Box::new(File::open(from)?),
         extension: from.extension().and_then(OsStr::to_str),
         sample_rate: Some(sample_rate),
+        layout: Layout::Stereo,
     };
     decode_source(request, &mut |frames| send(produced, frames))?;
     Ok(())

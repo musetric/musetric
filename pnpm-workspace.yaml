@@ -21,7 +21,6 @@ overrides:
   'browserslist': 'catalog:'
   'onnxruntime-web': 'catalog:'
 catalog:
-  '@alexanderolsen/libsamplerate-js': '2.1.2'
   '@ast-grep/cli': '0.50.0'
   '@emotion/react': '11.14.0'
   '@emotion/styled': '11.14.1'
@@ -59,7 +58,6 @@ catalog:
   'i18next': '26.4.5'
   'i18next-cli': '1.73.1'
   'immer': '11.1.21'
-  'mediabunny': '1.61.4'
   'jiti': '2.7.0'
   'knip': '6.41.0'
   'koffi': '3.3.3'

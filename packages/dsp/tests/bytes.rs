@@ -5,7 +5,7 @@ mod tests {
     use musetric_dsp::{
         CHANNELS,
         aac::AacEncoder,
-        decode::{DecodeRequest, decode},
+        decode::{DecodeRequest, Layout, decode},
         depth::SampleDepth,
         flac::FlacWriter,
         m4a::{M4aTrack, write_m4a},
@@ -125,6 +125,7 @@ mod tests {
             source: Box::new(Cursor::new(bytes)),
             extension: Some("flac"),
             sample_rate: None,
+            layout: Layout::Stereo,
         };
         let rate = decode(request, &mut |chunk| {
             decoded.extend_from_slice(chunk);

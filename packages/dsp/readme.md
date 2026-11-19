@@ -3,10 +3,10 @@
 Musetric's audio code in Rust: decoding, resampling, the FLAC, WAV, M4A and MP3 writers, loudness, wave peaks and stretch. The host links the crate `musetric-dsp` natively, and the same crate builds to WebAssembly as this npm package, so a page computes what the host computes.
 
 ```sh
-pnpm build:wasm
+pnpm build:project
 ```
 
-`build:wasm` builds the crate for `wasm32-unknown-unknown` and writes `dist/` with wasm-bindgen for the web target. It needs `wasm-bindgen-cli` at the version of `wasm-bindgen` in `packages/server/Cargo.lock`:
+`build:project` builds the crate for `wasm32-unknown-unknown` and writes `dist/` with wasm-bindgen for the web target. It needs `wasm-bindgen-cli` at the version of `wasm-bindgen` in `packages/server/Cargo.lock`:
 
 ```sh
 cargo install wasm-bindgen-cli --version <version> --locked
