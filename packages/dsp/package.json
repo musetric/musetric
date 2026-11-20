@@ -5,10 +5,10 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist/dsp.js",
-    "dist/dsp.d.ts",
-    "dist/dsp_bg.wasm",
-    "dist/dsp_bg.wasm.d.ts"
+    "dist/decode.js",
+    "dist/decode.d.ts",
+    "dist/decode_bg.wasm",
+    "dist/decode_bg.wasm.d.ts"
   ],
   "repository": {
     "type": "git",
@@ -20,12 +20,11 @@
   },
   "exports": {
     "./package.json": "./package.json",
-    ".": {
-      "types": "./dist/dsp.d.ts",
-      "import": "./dist/dsp.js",
-      "default": "./dist/dsp.js"
-    },
-    "./dsp.wasm": "./dist/dsp_bg.wasm"
+    "./decode": {
+      "types": "./dist/decode.d.ts",
+      "import": "./dist/decode.js",
+      "default": "./dist/decode.js"
+    }
   },
   "scripts": {
     "build:project": "node scripts/buildWasm.ts",

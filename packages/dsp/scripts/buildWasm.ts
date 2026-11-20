@@ -27,33 +27,40 @@ if (installed !== `wasm-bindgen ${bindgen}`) {
   );
 }
 
-execFileSync(
-  'cargo',
-  [
-    'rustc',
-    '--release',
-    '--locked',
-    '--package',
-    'musetric-dsp',
-    '--lib',
-    '--target',
-    target,
-    '--crate-type',
-    'cdylib',
-  ],
-  { cwd: workspace, stdio: 'inherit' },
-);
+const modules = [{ name: 'decode', features: ['web-decode'] }];
+
 rmSync(output, { recursive: true, force: true });
-execFileSync(
-  'wasm-bindgen',
-  [
-    '--target',
-    'web',
-    '--out-dir',
-    output,
-    '--out-name',
-    'dsp',
-    join(workspace, 'target', target, 'release', 'musetric_dsp.wasm'),
-  ],
-  { stdio: 'inherit' },
-);
+for (const { name, features } of modules) {
+  execFileSync(
+    'cargo',
+    [
+      'rustc',
+      '--release',
+      '--locked',
+      '--package',
+      'musetric-dsp',
+      '--lib',
+      '--target',
+      target,
+      '--crate-type',
+      'cdylib',
+      '--no-default-features',
+      '--features',
+      features.join(','),
+    ],
+    { cwd: workspace, stdio: 'inherit' },
+  );
+  execFileSync(
+    'wasm-bindgen',
+    [
+      '--target',
+      'web',
+      '--out-dir',
+      output,
+      '--out-name',
+      name,
+      join(workspace, 'target', target, 'release', 'musetric_dsp.wasm'),
+    ],
+    { stdio: 'inherit' },
+  );
+}
