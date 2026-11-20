@@ -38,6 +38,8 @@ runs:
       run: pnpm init:ios
       shell: bash
     - uses: ./.github/actions/buildDsp
+      with:
+        script: build:app
     - name: Build iOS app (unsigned)
       working-directory: packages/app
       run: |

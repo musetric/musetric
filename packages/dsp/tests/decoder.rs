@@ -129,4 +129,107 @@ mod tests {
         assert_eq!(rate, 44_100);
         assert_eq!(decoded.len(), 11_025);
     }
+
+    #[cfg(feature = "opus")]
+    const OPUS_PRE_SKIP: u16 = 312;
+    #[cfg(feature = "opus")]
+    const OPUS_PACKETS: u32 = 50;
+    #[cfg(feature = "opus")]
+    const OPUS_PACKET_FRAMES: u32 = 960;
+    #[cfg(feature = "opus")]
+    const CELT_FULLBAND_20_MS_STEREO: u8 = 0xFC;
+    #[cfg(feature = "opus")]
+    const OGG_CRC_POLYNOMIAL: u32 = 0x04C1_1DB7;
+    #[cfg(feature = "opus")]
+    const OGG_FIRST_PAGE: u8 = 2;
+    #[cfg(feature = "opus")]
+    const OGG_LAST_PAGE: u8 = 4;
+
+    #[cfg(feature = "opus")]
+    const fn ogg_crc_bit(value: u32) -> u32 {
+        if value & 0x8000_0000 == 0 {
+            value << 1
+        } else {
+            (value << 1) ^ OGG_CRC_POLYNOMIAL
+        }
+    }
+
+    #[cfg(feature = "opus")]
+    fn ogg_crc(bytes: &[u8]) -> u32 {
+        bytes.iter().fold(0, |crc, byte| {
+            (0..8).fold(crc ^ (u32::from(*byte) << 24), |value, _| {
+                ogg_crc_bit(value)
+            })
+        })
+    }
+
+    #[cfg(feature = "opus")]
+    fn ogg_page(kind: u8, granule: u64, sequence: u32, packets: &[Vec<u8>]) -> Vec<u8> {
+        let mut page = b"OggS\0".to_vec();
+        page.push(kind);
+        page.extend_from_slice(&granule.to_le_bytes());
+        page.extend_from_slice(&1_u32.to_le_bytes());
+        page.extend_from_slice(&sequence.to_le_bytes());
+        page.extend_from_slice(&[0; 4]);
+        page.push(u8::try_from(packets.len()).expect("a page holds few packets"));
+        for packet in packets {
+            page.push(u8::try_from(packet.len()).expect("a packet fits one segment"));
+        }
+        for packet in packets {
+            page.extend_from_slice(packet);
+        }
+        let crc = ogg_crc(&page);
+        page[22..26].copy_from_slice(&crc.to_le_bytes());
+        page
+    }
+
+    #[cfg(feature = "opus")]
+    fn ogg_opus() -> Vec<u8> {
+        let mut head = b"OpusHead\x01\x02".to_vec();
+        head.extend_from_slice(&OPUS_PRE_SKIP.to_le_bytes());
+        head.extend_from_slice(&RATE.to_le_bytes());
+        head.extend_from_slice(&[0; 3]);
+        let mut tags = b"OpusTags".to_vec();
+        tags.extend_from_slice(&[0; 8]);
+        let audio: Vec<Vec<u8>> = (0..OPUS_PACKETS)
+            .map(|_| vec![CELT_FULLBAND_20_MS_STEREO])
+            .collect();
+        let granule = u64::from(OPUS_PACKETS * OPUS_PACKET_FRAMES);
+        [
+            ogg_page(OGG_FIRST_PAGE, 0, 0, &[head]),
+            ogg_page(0, 0, 1, &[tags]),
+            ogg_page(OGG_LAST_PAGE, granule, 2, &audio),
+        ]
+        .concat()
+    }
+
+    #[cfg(feature = "opus")]
+    #[test]
+    fn decodes_ogg_opus_through_libopus_on_every_target() {
+        let decode = || {
+            let request = DecodeRequest {
+                source: Box::new(Cursor::new(ogg_opus())),
+                extension: Some("opus"),
+                sample_rate: None,
+                layout: Layout::Stereo,
+            };
+            let mut decoder = Decoder::open(request).expect("the stream should open");
+            let mut samples = Vec::new();
+            while let Some(frames) = decoder.read().expect("the stream should decode") {
+                samples.extend_from_slice(frames);
+            }
+            (decoder.sample_rate(), samples)
+        };
+
+        let (rate, first) = decode();
+        let (_, second) = decode();
+        let frames = OPUS_PACKETS * OPUS_PACKET_FRAMES - u32::from(OPUS_PRE_SKIP);
+        assert_eq!(rate, RATE);
+        assert_eq!(
+            first.len(),
+            usize::try_from(frames * 2).expect("the frames fit")
+        );
+        assert!(first.iter().all(|sample| sample.abs() <= 1.0));
+        assert_eq!(first, second);
+    }
 }

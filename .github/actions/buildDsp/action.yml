@@ -1,6 +1,11 @@
 name: Build DSP
 description: The Rust toolchain of packages/server with its WebAssembly target, wasm-bindgen at the version Cargo.lock locks, and @musetric/dsp built into packages/dsp/dist
 
+inputs:
+  script:
+    description: The script of @musetric/dsp that builds it, build:app for the modules the app imports
+    default: build:project
+
 runs:
   using: composite
   steps:
@@ -14,5 +19,7 @@ runs:
     - uses: taiki-e/install-action@v2
       with:
         tool: wasm-bindgen@${{ steps.wasm-bindgen.outputs.version }}
-    - run: pnpm --filter @musetric/dsp build:project
+    - run: pnpm --filter @musetric/dsp "$SCRIPT"
       shell: bash
+      env:
+        SCRIPT: ${{ inputs.script }}

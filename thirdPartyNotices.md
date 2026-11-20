@@ -318,8 +318,8 @@ SOFTWARE.
 ## Opus (libopus)
 
 - Source: https://opus-codec.org, built from the libopus 1.6.1 sources bundled in the `opusic-sys` crate (https://github.com/DoumanAsh/opusic-sys) and driven through `symphonia-adapter-libopus` (https://github.com/aschey/symphonia-adapters).
-- Usage: decodes Opus audio in uploaded files; the host links libopus statically.
-- Local files: `packages/dsp/src/decode.rs`.
+- Usage: decodes Opus audio in uploaded files; the host links libopus statically, and the module `songs` of `@musetric/dsp` carries it compiled to WebAssembly.
+- Local files: `packages/dsp/src/decode.rs`, `packages/dsp/opus-wasm/toolchain.cmake`.
 - License: BSD-3-Clause, with the royalty-free patent licenses named below.
 - License source: upstream `COPYING`.
 
