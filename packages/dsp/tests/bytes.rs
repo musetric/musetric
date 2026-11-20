@@ -9,6 +9,7 @@ mod tests {
         flac::FlacWriter,
         m4a::{M4aTrack, write_m4a},
         mp3::Mp3Encoder,
+        stretch::Stretch,
         wav::WavWriter,
     };
     use sha2::{Digest, Sha256};
@@ -113,6 +114,53 @@ mod tests {
         assert_eq!(
             digest(&bytes),
             "6d7e7ec52712f02c2a338931e4dbc06524b0b5655dec404191e5fa0bc9fc0d34"
+        );
+    }
+
+    #[test]
+    fn stretches_to_the_same_samples_on_every_target() {
+        let samples = signal();
+        let channels: Vec<Vec<f32>> = (0..CHANNELS)
+            .map(|channel| {
+                samples
+                    .iter()
+                    .skip(channel)
+                    .step_by(CHANNELS)
+                    .copied()
+                    .collect()
+            })
+            .collect();
+        let digests: Vec<String> = [
+            (RATE, 2, false, 48_000),
+            (RATE, -3, true, 60_000),
+            (22_050, 5, false, 40_000),
+        ]
+        .into_iter()
+        .map(|(sample_rate, semitones, keep_formants, frame_count)| {
+            let stretch = Stretch {
+                sample_rate,
+                frame_count,
+                semitones,
+                keep_formants,
+            };
+            let stretched = stretch
+                .apply(&channels, &mut |_| true)
+                .expect("the signal is long enough to stretch");
+            let bytes: Vec<u8> = stretched
+                .iter()
+                .flatten()
+                .flat_map(|sample| sample.to_le_bytes())
+                .collect();
+            digest(&bytes)
+        })
+        .collect();
+        assert_eq!(
+            digests,
+            [
+                "ce13b20621b2cf4a28712e2f155cd36371ede7766be6be57f1caf5645c268abc",
+                "161131439fca54dd31513b1130d8c6e24522b5064c233fe6cba167fd757506af",
+                "214207e9ee4be822ee8d7e6861b8ba127f47a4e2918add7cfeefdea0e1ec49c9"
+            ]
         );
     }
 
