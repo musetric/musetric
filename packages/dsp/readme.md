@@ -2,6 +2,66 @@
 
 Musetric's audio code in Rust: decoding, resampling, the FLAC, WAV, M4A and MP3 writers, loudness, wave peaks, stretch and the microphone's ring. The host links the crate `musetric-dsp` natively, and the same crate builds to WebAssembly as this npm package, so a page computes what the host computes.
 
+| Module                  | Features                      | What it holds                                                                                                                           |
+| ----------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `@musetric/dsp/decode`  | `web-decode`                  | `Decoder` and `FlacFeed` for FLAC and WAV, `Resampler` and `wavePeaks`                                                                  |
+| `@musetric/dsp/songs`   | `opus`, `songs`, `web-decode` | the bindings of `decode` for every format the host decodes, Opus included                                                               |
+| `@musetric/dsp/stretch` | `web-stretch`                 | the streaming stretch of the player's worklet: `openStretcher` and the functions that take its handle                                   |
+| `@musetric/dsp/capture` | `web-capture`                 | the ring of the microphone's worklets, read at any position through a sinc kernel: `openCapture` and the functions that take its handle |
+
+## API
+
+```sh
+npm install @musetric/dsp
+```
+
+```ts
+import init, { Decoder } from '@musetric/dsp/songs';
+
+await init();
+const decoder = new Decoder(bytes, 'mp3', 48_000, false);
+for (let chunk = decoder.read(); chunk; chunk = decoder.read()) {
+  consume(chunk);
+}
+decoder.free();
+```
+
+Each module is an ES module for the web. Its default export `init` fetches its WebAssembly from beside it, through `new URL(..., import.meta.url)`, which bundlers such as Vite follow, and returns the module's exports, `memory` among them; `initSync({ module })` takes a compiled `WebAssembly.Module` or its bytes instead. Samples are 32-bit floats, interleaved by frame, and a failure throws an `Error` with the message of Rust. A class holds memory of the module until `free()`, or the end of its `using` block. A pointer is a byte offset into `memory` and stays valid until the next call into the module, which may grow the memory and replace `memory.buffer`.
+
+### `songs` and `decode`
+
+- `new Decoder(bytes, extension, sampleRate, keepChannels)` opens a whole file. `extension`, such as `'mp3'`, is a hint to the probe of the format, and `null` leaves the probe to the content. `sampleRate` is the rate of the output, through the resampler below, and `null` keeps the file's own. `keepChannels` keeps the channels of the file; `false` folds them to stereo, a mono file to both sides at -3 dB. `channels` and `sampleRate` are those of the output. `read()` returns the next samples, an empty array while the resampler fills, and `undefined` after the end of the file.
+- `new FlacFeed(sampleRate)` decodes FLAC that arrives in parts, with the channels of the stream, at `sampleRate` or the stream's own rate. `push(bytes)` takes the next bytes and returns how many samples it has decoded, which wait at `readyPointer`; a part is decoded once the seek table says that all of it has arrived, so a stream without a seek table is decoded by `finish()`, which decodes what is left and returns the same. `channels` and `frameCount`, at the output rate, are known once the header has arrived, and `frameCount` only when the header counts the frames.
+- `new Resampler(input, output, channels)` converts between two rates with the FFT resampler of rubato, and passes the samples through when they are equal. `convert(samples)` returns the output ready so far, without the resampler's delay. `flush(inputFrames)`, given the count of every input frame, returns the rest, so that the whole output holds `round(inputFrames * output / input)` frames.
+- `wavePeaks(samples)` takes stereo samples and returns 3840 pairs of the minimum and the maximum of the mean of the two channels, each over an equal span of the frames, 7680 floats.
+
+### `stretch`
+
+The streaming stretch and pitch shift of Signalsmith Stretch, ported to Rust, on a handle that lives as long as the module. Its buffers are in `memory`, one channel after another.
+
+- `openStretcher(channels, sampleRate)` returns a handle.
+- `stretcherInputLatency(handle)` and `stretcherOutputLatency(handle)` are the latencies in frames, and `stretcherSeekLength(handle)` the frames of input a seek reads.
+- `setStretcherBuffers(handle, length)` makes `2 * channels` buffers of `length` floats, the input channels and then the output channels, and returns their pointer. `length` holds the largest input or output of a call and the seek length.
+- `seekStretcher(handle, inputFrames, rate)` primes the stream from `inputFrames` of the input buffers, for playback at `rate`.
+- `processStretcher(handle, inputFrames, outputFrames)` consumes `inputFrames` of the input buffers and writes `outputFrames` to the output buffers; their ratio is the tempo.
+- `setStretcherSemitones(handle, semitones)` shifts the pitch by whole semitones, `setStretcherFormants(handle, keep)` keeps the formants or not, and `resetStretcher(handle)` empties the stream.
+
+### `capture`
+
+A ring of the last 131 072 samples of one channel, read at any position between them through a windowed sinc kernel, on a handle that lives as long as the module.
+
+- `openCapture()` returns a handle.
+- `captureInput(handle, length)` returns the pointer where `length` samples go before `writeCapture(handle, frame, length)` stores them from the frame `frame` of the recording; the frames it skips are silence.
+- `setCaptureStep(handle, step)` sets the step of the reads to come: above 1, the kernel's cutoff falls to `1 / step`, against aliasing.
+- `renderCapture(handle, at, ratio, length)` reads `length` samples from the position `at`, `ratio` frames apart, into the buffer at `captureOutput(handle)`, and returns the position after the last.
+- `clearCapture(handle)` empties the ring.
+
+`@musetric/dsp/stretch.wasm` and `@musetric/dsp/capture.wasm` are their WebAssembly files, which a page compiles for an AudioWorklet, since a worklet can fetch nothing; the worklet passes the module to `initSync`.
+
+The package carries `license.md` and the project's `thirdPartyNotices.md`, with the notices of libopus and of the ports of Signalsmith Stretch and Signalsmith Linear that it builds in.
+
+## Development
+
 ```sh
 pnpm build:project
 ```
@@ -10,24 +70,6 @@ pnpm build:project
 
 ```sh
 cargo install wasm-bindgen-cli --version <version> --locked
-```
-
-| Module                  | Features                      | What it holds                                                                                                                           |
-| ----------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `@musetric/dsp/decode`  | `web-decode`                  | `Decoder` and `FlacFeed` for FLAC and WAV, `Resampler` and `wavePeaks`                                                                  |
-| `@musetric/dsp/songs`   | `opus`, `songs`, `web-decode` | the bindings of `decode` for every format the host decodes, Opus included                                                               |
-| `@musetric/dsp/stretch` | `web-stretch`                 | the streaming stretch of the player's worklet: `openStretcher` and the functions that take its handle                                   |
-| `@musetric/dsp/capture` | `web-capture`                 | the ring of the microphone's worklets, read at any position through a sinc kernel: `openCapture` and the functions that take its handle |
-
-```ts
-import init, { Decoder } from '@musetric/dsp/decode';
-
-await init();
-const decoder = new Decoder(bytes, 'wav', 48_000, false);
-for (let chunk = decoder.read(); chunk; chunk = decoder.read()) {
-  consume(chunk);
-}
-decoder.free();
 ```
 
 - The crate is a member of the Cargo workspace of `packages/server`: its toolchain, lockfile, lints and clippy settings are the host's, and `pnpm check:rust` of `packages/server` checks it natively and as WebAssembly with every feature.

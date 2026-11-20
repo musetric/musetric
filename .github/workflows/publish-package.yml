@@ -12,6 +12,7 @@ on:
           - '@musetric/eslint-config'
           - '@musetric/checks'
           - '@musetric/ai'
+          - '@musetric/dsp'
       mode:
         description: 'dev publishes with --tag dev (testing); release is a normal publish'
         type: choice
@@ -104,13 +105,18 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
+      - name: Build the WebAssembly of @musetric/dsp
+        if: inputs.package == '@musetric/dsp'
+        uses: ./.github/actions/buildDsp
+
       - name: Build
+        if: inputs.package != '@musetric/dsp'
         working-directory: ${{ needs.prepare.outputs.workspace }}
         run: pnpm run build:project
 
-      - name: Copy root license
+      - name: Copy root license and notices
         working-directory: ${{ needs.prepare.outputs.workspace }}
-        run: cp ../../license.md license.md
+        run: cp ../../license.md ../../thirdPartyNotices.md .
 
       - name: Publish to npm
         working-directory: ${{ needs.prepare.outputs.workspace }}
@@ -123,10 +129,10 @@ jobs:
             pnpm publish --access public --tag latest --no-git-checks
           fi
 
-      - name: Remove temporary license
+      - name: Remove temporary license and notices
         if: always()
         working-directory: ${{ needs.prepare.outputs.workspace }}
-        run: rm -f license.md
+        run: rm -f license.md thirdPartyNotices.md
 
       - name: Restore package.json
         if: always() && inputs.mode == 'dev'
