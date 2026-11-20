@@ -114,30 +114,16 @@ impl CaptureRing {
     }
 }
 
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the remainder of the capacity fits an index"
-)]
-const fn slot(frame: i64) -> usize {
-    frame.rem_euclid(CAPACITY as i64) as usize
+fn slot(frame: i64) -> usize {
+    to_index(frame.rem_euclid(to_signed(CAPACITY)))
 }
 
-#[expect(
-    clippy::cast_possible_wrap,
-    reason = "the capacity and a chunk's length are far below i64::MAX"
-)]
-const fn to_signed(value: usize) -> i64 {
-    value as i64
+fn to_signed(value: usize) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the offset is between zero and a chunk's length"
-)]
-const fn to_index(value: i64) -> usize {
-    value as usize
+fn to_index(value: i64) -> usize {
+    usize::try_from(value).unwrap_or(0)
 }
 
 #[expect(

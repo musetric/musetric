@@ -20,7 +20,11 @@ type Simulation = {
 };
 
 const simulate = (simulation: Simulation) => {
-  const runtime = createNativeMicrophoneRuntime(loadTestCapture(), rate, ignoreReady);
+  const runtime = createNativeMicrophoneRuntime(
+    loadTestCapture(),
+    rate,
+    ignoreReady,
+  );
   const blocks = Math.round((simulation.seconds * rate) / blockSize);
   const positions: number[] = [];
   const pending: Float32Array[] = [];
@@ -53,9 +57,13 @@ const simulate = (simulation: Simulation) => {
 describe('native microphone runtime', () => {
   it('delays samples by a constant number of frames', () => {
     let readyCount = 0;
-    const runtime = createNativeMicrophoneRuntime(loadTestCapture(), rate, () => {
-      readyCount += 1;
-    });
+    const runtime = createNativeMicrophoneRuntime(
+      loadTestCapture(),
+      rate,
+      () => {
+        readyCount += 1;
+      },
+    );
     const chunkSize = blockSize * 8;
     const output = new Float32Array(blockSize);
     const played: number[] = [];

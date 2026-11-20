@@ -128,7 +128,7 @@ export const createTimedMicrophones = (
       compileCapture(),
       context.audioWorklet.addModule(timedMicrophoneWorkletUrl),
     ])
-      .then(([captureModule]) => captureModule)
+      .then((loaded) => loaded[0])
       .catch((error: unknown) => {
         modulePromise = undefined;
         throw error;

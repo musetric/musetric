@@ -44,7 +44,11 @@ export const createSampleRing = (capture: InitOutput): SampleRing => {
         output.byteOffset !== pointer ||
         output.length !== target.length
       ) {
-        output = new Float32Array(capture.memory.buffer, pointer, target.length);
+        output = new Float32Array(
+          capture.memory.buffer,
+          pointer,
+          target.length,
+        );
       }
       target.set(output);
       return next;

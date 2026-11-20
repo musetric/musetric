@@ -1,11 +1,11 @@
 import { z } from 'zod';
+import { compileCapture } from './captureModule.js';
 import {
   type EngineAudioSession,
   type EngineMicrophone,
   microphoneAccessDenied,
   setAudioSessionType,
 } from './engineAudioSession.js';
-import { compileCapture } from './captureModule.js';
 import nativeMicrophoneWorkletUrl from './nativeMicrophone.worklet.ts?worker&url';
 import {
   nativeMicrophoneChannel,
@@ -140,7 +140,7 @@ export const createNativeAudioSession = (
       compileCapture(),
       context.audioWorklet.addModule(nativeMicrophoneWorkletUrl),
     ])
-      .then(([captureModule]) => captureModule)
+      .then((loaded) => loaded[0])
       .catch((error: unknown) => {
         modulePromise = undefined;
         throw error;

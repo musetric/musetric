@@ -1,4 +1,5 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
+import { fillMonoOutput } from './monoOutput.worklet.js';
 import { createNativeMicrophoneRuntime } from './nativeMicrophoneRuntime.worklet.js';
 import {
   nativeMicrophoneChannel,
@@ -40,12 +41,7 @@ export class NativeMicrophoneProcessor
   };
 
   process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
-    const [output] = outputs;
-    const [channel] = output;
-    this.handleProcess(channel);
-    for (let index = 1; index < output.length; index += 1) {
-      output[index].set(channel);
-    }
+    fillMonoOutput(outputs, this.handleProcess);
     return true;
   }
 }
