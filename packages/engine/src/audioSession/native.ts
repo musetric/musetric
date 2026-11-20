@@ -5,6 +5,7 @@ import {
   microphoneAccessDenied,
   setAudioSessionType,
 } from './engineAudioSession.js';
+import { compileCapture } from './captureModule.js';
 import nativeMicrophoneWorkletUrl from './nativeMicrophone.worklet.ts?worker&url';
 import {
   nativeMicrophoneChannel,
@@ -105,7 +106,7 @@ export const createNativeAudioSession = (
   const listeners = new Set<() => void>();
   const sources = new Map<EngineMicrophone, AudioNode[]>();
   let capture: NativeCapture | undefined = undefined;
-  let modulePromise: Promise<void> | undefined = undefined;
+  let modulePromise: Promise<WebAssembly.Module> | undefined = undefined;
   let opening = 0;
   let currentSession = -1;
   let minimumSession = 0;
@@ -135,16 +136,19 @@ export const createNativeAudioSession = (
   };
 
   const loadModule = async () => {
-    modulePromise ??= context.audioWorklet
-      .addModule(nativeMicrophoneWorkletUrl)
+    modulePromise ??= Promise.all([
+      compileCapture(),
+      context.audioWorklet.addModule(nativeMicrophoneWorkletUrl),
+    ])
+      .then(([captureModule]) => captureModule)
       .catch((error: unknown) => {
         modulePromise = undefined;
         throw error;
       });
-    await modulePromise;
+    return modulePromise;
   };
 
-  const createCapture = (): NativeCapture => {
+  const createCapture = (captureModule: WebAssembly.Module): NativeCapture => {
     const node = new AudioWorkletNode(context, nativeMicrophoneProcessorName, {
       numberOfInputs: 0,
       numberOfOutputs: 1,
@@ -155,6 +159,7 @@ export const createNativeAudioSession = (
     node.connect(keepAlive);
     keepAlive.connect(context.destination);
     const port = nativeMicrophoneChannel.outbound(node.port);
+    port.methods.boot({ captureModule });
     const ready = new Promise<void>((resolve) => {
       const timeout = window.setTimeout(resolve, readyTimeoutMs);
       port.bindHandlers({
@@ -188,7 +193,7 @@ export const createNativeAudioSession = (
       const { deviceId } = request;
       opening += 1;
       try {
-        await loadModule();
+        const captureModule = await loadModule();
         const reply = captureSchema.parse(
           await handler.postMessage({
             type: 'start',
@@ -196,7 +201,7 @@ export const createNativeAudioSession = (
             sampleRate: context.sampleRate,
           }),
         );
-        capture ??= createCapture();
+        capture ??= createCapture(captureModule);
         const { node, ready } = capture;
         await ready;
         const settings = {

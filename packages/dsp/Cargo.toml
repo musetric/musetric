@@ -1,6 +1,6 @@
 [package]
 name = "musetric-dsp"
-description = "Musetric dsp: decoding, resampling, encoding, loudness, peaks and stretch, natively and in WebAssembly"
+description = "Musetric dsp: decoding, resampling, encoding, loudness, peaks, stretch and the microphone's ring, natively and in WebAssembly"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99.1"
@@ -10,9 +10,10 @@ repository = "https://github.com/musetric/musetric"
 workspace = "../server"
 
 [features]
-default = ["songs", "web-decode", "web-stretch"]
+default = ["songs", "web-capture", "web-decode", "web-stretch"]
 opus = ["dep:symphonia-adapter-libopus"]
 songs = ["symphonia/all"]
+web-capture = []
 web-decode = []
 web-stretch = []
 

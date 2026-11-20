@@ -1,61 +1,56 @@
-const capacity = 1 << 17;
-const mask = capacity - 1;
+import {
+  captureInput,
+  captureOutput,
+  clearCapture,
+  type InitOutput,
+  initSync,
+  openCapture,
+  renderCapture,
+  setCaptureStep,
+  type SyncInitInput,
+  writeCapture,
+} from '@musetric/dsp/capture';
+
+export const loadCapture = (module: SyncInitInput): InitOutput =>
+  initSync({ module });
 
 export type SampleRing = {
   write: (frame: number, samples: Float32Array) => void;
-  sampleAt: (at: number) => number;
+  setStep: (step: number) => void;
+  render: (output: Float32Array, at: number, ratio: number) => number;
   clear: () => void;
 };
 
-export const createSampleRing = (): SampleRing => {
-  const ring = new Float32Array(capacity);
-  let end: number | undefined = undefined;
-
-  const read = (frame: number) =>
-    end !== undefined && frame < end && frame >= end - capacity
-      ? ring[frame & mask]
-      : 0;
+export const createSampleRing = (capture: InitOutput): SampleRing => {
+  const handle = openCapture();
+  let output = new Float32Array(0);
 
   return {
     write: (frame, samples) => {
-      const previousEnd = end ?? frame;
-      const nextEnd = Math.max(previousEnd, frame + samples.length);
-      const oldest = nextEnd - capacity;
-      for (let gap = Math.max(previousEnd, oldest); gap < frame; gap += 1) {
-        ring[gap & mask] = 0;
-      }
-      for (let index = 0; index < samples.length; index += 1) {
-        const target = frame + index;
-        if (target >= oldest) {
-          ring[target & mask] = samples[index];
-        }
-      }
-      end = nextEnd;
-    },
-    sampleAt: (at) => {
-      const index = Math.floor(at);
-      const offset = at - index;
-      const before = read(index - 1);
-      const current = read(index);
-      const next = read(index + 1);
-      const after = read(index + 2);
-      return (
-        current +
-        0.5 *
-          offset *
-          (next -
-            before +
-            offset *
-              (2 * before -
-                5 * current +
-                4 * next -
-                after +
-                offset * (3 * (current - next) + after - before)))
+      const pointer = captureInput(handle, samples.length);
+      new Float32Array(capture.memory.buffer, pointer, samples.length).set(
+        samples,
       );
+      writeCapture(handle, frame, samples.length);
+    },
+    setStep: (step) => {
+      setCaptureStep(handle, step);
+    },
+    render: (target, at, ratio) => {
+      const next = renderCapture(handle, at, ratio, target.length);
+      const pointer = captureOutput(handle);
+      if (
+        output.buffer !== capture.memory.buffer ||
+        output.byteOffset !== pointer ||
+        output.length !== target.length
+      ) {
+        output = new Float32Array(capture.memory.buffer, pointer, target.length);
+      }
+      target.set(output);
+      return next;
     },
     clear: () => {
-      ring.fill(0);
-      end = undefined;
+      clearCapture(handle);
     },
   };
 };

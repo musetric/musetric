@@ -9,7 +9,12 @@ export type NativeMicrophoneInboundMethods = {
   ready: () => void;
 };
 
+export type MicrophoneBoot = {
+  captureModule: WebAssembly.Module;
+};
+
 export type NativeMicrophoneOutboundMethods = {
+  boot: (message: MicrophoneBoot) => void;
   push: (message: NativeMicrophoneChunk) => void;
   reset: () => void;
 };
@@ -25,7 +30,7 @@ export const nativeMicrophoneChannel = createMessageChannel<
     transfers: {
       push: (message) => [message.samples.buffer],
     },
-    keys: ['push', 'reset'],
+    keys: ['boot', 'push', 'reset'],
   },
 });
 
@@ -45,6 +50,7 @@ export type TimedMicrophoneInboundMethods = {
 };
 
 export type TimedMicrophoneOutboundMethods = {
+  boot: (message: MicrophoneBoot) => void;
   push: (message: TimedMicrophoneChunk) => void;
 };
 
@@ -59,7 +65,7 @@ export const timedMicrophoneChannel = createMessageChannel<
     transfers: {
       push: (message) => [message.samples.buffer],
     },
-    keys: ['push'],
+    keys: ['boot', 'push'],
   },
 });
 

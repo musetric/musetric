@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createNativeMicrophoneRuntime } from '../nativeMicrophoneRuntime.worklet.js';
 import { nativeMicrophoneDelaySeconds } from '../protocol.cross.js';
+import { loadTestCapture } from './captureModule.js';
 
 const rate = 48000;
 const blockSize = 128;
@@ -19,7 +20,7 @@ type Simulation = {
 };
 
 const simulate = (simulation: Simulation) => {
-  const runtime = createNativeMicrophoneRuntime(rate, ignoreReady);
+  const runtime = createNativeMicrophoneRuntime(loadTestCapture(), rate, ignoreReady);
   const blocks = Math.round((simulation.seconds * rate) / blockSize);
   const positions: number[] = [];
   const pending: Float32Array[] = [];
@@ -52,7 +53,7 @@ const simulate = (simulation: Simulation) => {
 describe('native microphone runtime', () => {
   it('delays samples by a constant number of frames', () => {
     let readyCount = 0;
-    const runtime = createNativeMicrophoneRuntime(rate, () => {
+    const runtime = createNativeMicrophoneRuntime(loadTestCapture(), rate, () => {
       readyCount += 1;
     });
     const chunkSize = blockSize * 8;

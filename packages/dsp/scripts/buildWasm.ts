@@ -28,6 +28,7 @@ if (installed !== `wasm-bindgen ${bindgen}`) {
 }
 
 const modules = [
+  { name: 'capture', features: ['web-capture'] },
   { name: 'decode', features: ['web-decode'] },
   { name: 'stretch', features: ['web-stretch'] },
 ];

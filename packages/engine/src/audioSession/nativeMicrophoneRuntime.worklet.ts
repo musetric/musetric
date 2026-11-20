@@ -1,3 +1,4 @@
+import { type InitOutput } from '@musetric/dsp/capture';
 import { nativeMicrophoneDelaySeconds } from './protocol.cross.js';
 import { createSampleRing } from './sampleRing.worklet.js';
 
@@ -20,10 +21,11 @@ export type NativeMicrophoneRuntime = {
 };
 
 export const createNativeMicrophoneRuntime = (
+  capture: InitOutput,
   sampleRate: number,
   onReady: () => void,
 ): NativeMicrophoneRuntime => {
-  const ring = createSampleRing();
+  const ring = createSampleRing(capture);
   const delay = Math.round(nativeMicrophoneDelaySeconds * sampleRate);
   const bucketFrames = Math.round(bucketSeconds * sampleRate);
   const windowFrames = Math.round(windowSeconds * sampleRate);
@@ -86,12 +88,7 @@ export const createNativeMicrophoneRuntime = (
         output.fill(0);
         return;
       }
-      let at = position;
-      for (let index = 0; index < output.length; index += 1) {
-        output[index] = ring.sampleAt(at);
-        at += ratio;
-      }
-      position = at;
+      position = ring.render(output, position, ratio);
       if (!ready && clock - startClock >= warmupFrames) {
         ready = true;
         onReady();

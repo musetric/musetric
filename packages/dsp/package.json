@@ -5,6 +5,10 @@
   "type": "module",
   "sideEffects": false,
   "files": [
+    "dist/capture.js",
+    "dist/capture.d.ts",
+    "dist/capture_bg.wasm",
+    "dist/capture_bg.wasm.d.ts",
     "dist/decode.js",
     "dist/decode.d.ts",
     "dist/decode_bg.wasm",
@@ -24,6 +28,12 @@
   },
   "exports": {
     "./package.json": "./package.json",
+    "./capture": {
+      "types": "./dist/capture.d.ts",
+      "import": "./dist/capture.js",
+      "default": "./dist/capture.js"
+    },
+    "./capture.wasm": "./dist/capture_bg.wasm",
     "./decode": {
       "types": "./dist/decode.d.ts",
       "import": "./dist/decode.js",

@@ -1,4 +1,5 @@
 pub mod aac;
+pub mod capture;
 pub mod decode;
 mod dither;
 pub mod flac;

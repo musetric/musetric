@@ -3,34 +3,43 @@ import {
   timedMicrophoneChannel,
   timedMicrophoneProcessorName,
 } from './protocol.cross.js';
-import {
-  createTimedMicrophoneRuntime,
-  type TimedMicrophoneRuntime,
-} from './timedMicrophoneRuntime.worklet.js';
+import { loadCapture } from './sampleRing.worklet.js';
+import { createTimedMicrophoneRuntime } from './timedMicrophoneRuntime.worklet.js';
 
 export class TimedMicrophoneProcessor
   extends AudioWorkletProcessor
   implements AudioWorkletProcessorImpl
 {
-  runtime: TimedMicrophoneRuntime;
-
   constructor() {
     super();
     const port = timedMicrophoneChannel.inbound(this.port);
-    this.runtime = createTimedMicrophoneRuntime(sampleRate, () => {
-      port.methods.ready();
-    });
-    port.bindHandlers({
-      push: (message) => {
-        this.runtime.push(message);
-      },
+    port.bindBoot((message) => {
+      const runtime = createTimedMicrophoneRuntime(
+        loadCapture(message.captureModule),
+        sampleRate,
+        () => {
+          port.methods.ready();
+        },
+      );
+      port.bindHandlers({
+        push: (chunk) => {
+          runtime.push(chunk);
+        },
+      });
+      this.handleProcess = (channel) => {
+        runtime.process(channel, currentFrame);
+      };
     });
   }
+
+  handleProcess = (channel: Float32Array) => {
+    channel.fill(0);
+  };
 
   process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     const [output] = outputs;
     const [channel] = output;
-    this.runtime.process(channel, currentFrame);
+    this.handleProcess(channel);
     for (let index = 1; index < output.length; index += 1) {
       output[index].set(channel);
     }
