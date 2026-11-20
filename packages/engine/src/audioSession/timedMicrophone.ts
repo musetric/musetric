@@ -1,4 +1,5 @@
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
+import { compileCapture } from './captureModule.js';
 import {
   timedMicrophoneChannel,
   timedMicrophoneProcessorName,
@@ -120,21 +121,24 @@ export const createTimedMicrophones = (
   outputClock: EngineOutputClock,
   onCaptured: CapturedChunkListener,
 ): TimedMicrophones => {
-  let modulePromise: Promise<void> | undefined = undefined;
+  let modulePromise: Promise<WebAssembly.Module> | undefined = undefined;
 
   const loadModule = async () => {
-    modulePromise ??= context.audioWorklet
-      .addModule(timedMicrophoneWorkletUrl)
+    modulePromise ??= Promise.all([
+      compileCapture(),
+      context.audioWorklet.addModule(timedMicrophoneWorkletUrl),
+    ])
+      .then((loaded) => loaded[0])
       .catch((error: unknown) => {
         modulePromise = undefined;
         throw error;
       });
-    await modulePromise;
+    return modulePromise;
   };
 
   return {
     open: async (source) => {
-      await loadModule();
+      const captureModule = await loadModule();
       const node = new AudioWorkletNode(context, timedMicrophoneProcessorName, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
@@ -145,6 +149,7 @@ export const createTimedMicrophones = (
       node.connect(keepAlive);
       keepAlive.connect(context.destination);
       const port = timedMicrophoneChannel.outbound(node.port);
+      port.methods.boot({ captureModule });
       const ready = waitForReady(port);
       let settled = false;
       void outputClock.whenSettled().then(() => {

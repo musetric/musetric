@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTimedMicrophoneRuntime } from '../timedMicrophoneRuntime.worklet.js';
+import { loadTestCapture } from './captureModule.js';
 
 const rate = 48000;
 const blockSize = 128;
@@ -32,6 +33,7 @@ const simulate = (simulation: Simulation) => {
   const jitterFrames = simulation.jitterFrames ?? 0;
   const { shift } = simulation;
   const runtime = createTimedMicrophoneRuntime(
+    loadTestCapture(),
     rate,
     simulation.onReady ?? (() => undefined),
   );

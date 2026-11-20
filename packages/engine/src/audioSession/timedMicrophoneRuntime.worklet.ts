@@ -1,3 +1,4 @@
+import { type InitOutput } from '@musetric/dsp/capture';
 import { type TimedMicrophoneChunk } from './protocol.cross.js';
 import { createSampleRing } from './sampleRing.worklet.js';
 
@@ -17,10 +18,11 @@ export type TimedMicrophoneRuntime = {
 };
 
 export const createTimedMicrophoneRuntime = (
+  capture: InitOutput,
   sampleRate: number,
   onReady: () => void,
 ): TimedMicrophoneRuntime => {
-  const ring = createSampleRing();
+  const ring = createSampleRing(capture);
   const resyncFrames = resyncSeconds * sampleRate;
   const steerFrames = steerSeconds * sampleRate;
   const starts: number[] = [];
@@ -48,7 +50,10 @@ export const createTimedMicrophoneRuntime = (
 
   return {
     push: (chunk) => {
-      step = chunk.sampleRate / sampleRate;
+      if (chunk.sampleRate / sampleRate !== step) {
+        step = chunk.sampleRate / sampleRate;
+        ring.setStep(step);
+      }
       ring.write(chunk.frame, chunk.samples);
       firstFrame ??= chunk.frame;
       starts.push(chunk.at - chunk.frame / step);
@@ -63,12 +68,7 @@ export const createTimedMicrophoneRuntime = (
         return;
       }
       const ratio = steer((currentFrame - start) * step);
-      let at = position ?? 0;
-      for (let index = 0; index < output.length; index += 1) {
-        output[index] = ring.sampleAt(at);
-        at += ratio;
-      }
-      position = at;
+      position = ring.render(output, position ?? 0, ratio);
       if (!ready && firstFrame !== undefined && position >= firstFrame) {
         ready = true;
         onReady();
