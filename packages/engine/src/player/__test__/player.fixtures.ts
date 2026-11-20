@@ -7,6 +7,7 @@ import {
 } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
+import { loadStretch } from './stretchModule.js';
 
 export const rate = 48000;
 export const blockSize = 128;
@@ -160,11 +161,12 @@ export const createHarness = async (
   const control = new MessageChannel();
   let contextFrame = 0;
   const data = new MessageChannel();
-  const runtime = await createPlayerRuntime({
+  const runtime = createPlayerRuntime({
     port: playerChannel.inbound(control.port1),
     dataPort: playerDataChannel.inbound(data.port1),
     playheadPorts,
     sampleRate: rate,
+    stretch: loadStretch(),
     getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
   });

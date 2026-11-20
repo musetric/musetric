@@ -113,12 +113,28 @@ impl Stft {
         self.move_output(self.interval);
     }
 
-    pub(crate) fn write_input(&mut self, channel: usize, values: impl Iterator<Item = f32>) {
-        let start = channel * self.input_length;
-        for (index, value) in values.enumerate() {
-            let position = (self.input_position + index) % self.input_length;
-            self.input[start + position] = value;
-        }
+    const fn input_spans(&self, offset: usize, count: usize) -> [(usize, usize); 2] {
+        let begin = (self.input_position + offset) % self.input_length;
+        let first = if count < self.input_length - begin {
+            count
+        } else {
+            self.input_length - begin
+        };
+        [(begin, first), (0, count - first)]
+    }
+
+    pub(crate) fn write_input(&mut self, channel: usize, offset: usize, values: &[f32]) {
+        let [(begin, first), (_, rest)] = self.input_spans(offset, values.len());
+        let ring = &mut self.input[channel * self.input_length..][..self.input_length];
+        ring[begin..begin + first].copy_from_slice(&values[..first]);
+        ring[..rest].copy_from_slice(&values[first..]);
+    }
+
+    pub(crate) fn clear_input(&mut self, channel: usize, offset: usize, count: usize) {
+        let [(begin, first), (_, rest)] = self.input_spans(offset, count);
+        let ring = &mut self.input[channel * self.input_length..][..self.input_length];
+        ring[begin..begin + first].fill(0.0);
+        ring[..rest].fill(0.0);
     }
 
     pub(crate) fn move_input(&mut self, samples: usize) {

@@ -1,7 +1,20 @@
 import {
-  createTimeStretchWasmModule,
-  type TimeStretchWasmModule,
-} from './timeStretchWasmModule.js';
+  type InitOutput,
+  initSync,
+  openStretcher,
+  processStretcher,
+  resetStretcher,
+  seekStretcher,
+  setStretcherBuffers,
+  setStretcherFormants,
+  setStretcherSemitones,
+  stretcherInputLatency,
+  stretcherOutputLatency,
+  type SyncInitInput,
+} from '@musetric/dsp/stretch';
+
+export const loadTimePitch = (module: SyncInitInput): InitOutput =>
+  initSync({ module });
 
 const getFrameCounts = (
   outputFrameCount: number,
@@ -18,59 +31,70 @@ const getFrameCounts = (
   };
 };
 
-const tonalityLimitHz = 8000;
-
 type TimePitchProcessorState = {
+  handle: number;
+  semitones: number;
+  formants: boolean;
+  pointer: number;
   bufferLength: number;
   channelCount: number;
   inputLatency: number;
   outputLatency: number;
+  memoryBuffer: ArrayBuffer;
   inputBuffers: Float32Array[];
   outputBuffers: Float32Array[];
 };
 
+const viewBuffers = (
+  stretch: InitOutput,
+  state: TimePitchProcessorState,
+): boolean => {
+  const { buffer } = stretch.memory;
+  if (state.memoryBuffer === buffer) {
+    return false;
+  }
+  const lengthBytes = state.bufferLength * Float32Array.BYTES_PER_ELEMENT;
+  const view = (index: number) =>
+    new Float32Array(
+      buffer,
+      state.pointer + lengthBytes * index,
+      state.bufferLength,
+    );
+  state.memoryBuffer = buffer;
+  state.inputBuffers = Array.from({ length: state.channelCount }, (_, index) =>
+    view(index),
+  );
+  state.outputBuffers = Array.from({ length: state.channelCount }, (_, index) =>
+    view(index + state.channelCount),
+  );
+  return true;
+};
+
 const createState = (
-  wasmModule: TimeStretchWasmModule,
-  outputs: Float32Array[],
+  stretch: InitOutput,
+  channelCount: number,
   sampleRate: number,
   outputFrameCount: number,
 ): TimePitchProcessorState => {
-  wasmModule._presetDefault(outputs.length, sampleRate);
-  wasmModule._reset();
-
-  const inputLatency = wasmModule._inputLatency();
-  const outputLatency = wasmModule._outputLatency();
+  const handle = openStretcher(channelCount, sampleRate);
+  const inputLatency = stretcherInputLatency(handle);
+  const outputLatency = stretcherOutputLatency(handle);
   const bufferLength = Math.max(outputFrameCount, inputLatency + outputLatency);
-  const pointer = wasmModule._setBuffers(outputs.length, bufferLength);
-  const lengthBytes = bufferLength * Float32Array.BYTES_PER_ELEMENT;
-  const inputBuffers: Float32Array[] = [];
-  const outputBuffers: Float32Array[] = [];
-
-  for (let channelIndex = 0; channelIndex < outputs.length; channelIndex += 1) {
-    inputBuffers.push(
-      new Float32Array(
-        wasmModule.HEAP8.buffer,
-        pointer + lengthBytes * channelIndex,
-        bufferLength,
-      ),
-    );
-    outputBuffers.push(
-      new Float32Array(
-        wasmModule.HEAP8.buffer,
-        pointer + lengthBytes * (channelIndex + outputs.length),
-        bufferLength,
-      ),
-    );
-  }
-
-  return {
+  const state: TimePitchProcessorState = {
+    handle,
+    semitones: 0,
+    formants: false,
+    pointer: setStretcherBuffers(handle, bufferLength),
     bufferLength,
-    channelCount: outputs.length,
+    channelCount,
     inputLatency,
     outputLatency,
-    inputBuffers,
-    outputBuffers,
+    memoryBuffer: new ArrayBuffer(0),
+    inputBuffers: [],
+    outputBuffers: [],
   };
+  viewBuffers(stretch, state);
+  return state;
 };
 
 type TimePitchProcessorInputFiller = (
@@ -92,14 +116,10 @@ export type TimePitchProcessor = {
   setFormantCompensation: (formantCompensation: boolean) => void;
 };
 
-export const createTimePitchProcessor = async (
+export const createTimePitchProcessor = (
+  stretch: InitOutput,
   sampleRate: number,
-): Promise<TimePitchProcessor> => {
-  const wasmModule = await createTimeStretchWasmModule();
-  wasmModule._main();
-
-  const tonalityLimit = tonalityLimitHz / sampleRate;
-
+): TimePitchProcessor => {
   let state: TimePitchProcessorState | undefined = undefined;
   let windowStartFrame: number | undefined = undefined;
   const windowTails = new Map<number, Float32Array[]>();
@@ -177,18 +197,31 @@ export const createTimePitchProcessor = async (
         state.channelCount !== outputs.length ||
         state.bufferLength < outputFrameCount
       ) {
-        state = createState(wasmModule, outputs, sampleRate, outputFrameCount);
+        state = createState(
+          stretch,
+          outputs.length,
+          sampleRate,
+          outputFrameCount,
+        );
         windowStartFrame = undefined;
         windowTails.clear();
       }
+      if (viewBuffers(stretch, state)) {
+        windowTails.clear();
+      }
 
-      wasmModule._setTransposeSemitones(transposeSemitones, tonalityLimit);
-      wasmModule._setFormantSemitones(0, formantCompensation);
-      wasmModule._setFormantBase(0);
+      if (state.semitones !== transposeSemitones) {
+        setStretcherSemitones(state.handle, transposeSemitones);
+        state.semitones = transposeSemitones;
+      }
+      if (state.formants !== formantCompensation) {
+        setStretcherFormants(state.handle, formantCompensation);
+        state.formants = formantCompensation;
+      }
 
       fillWindow(state, inputFrame, fillInput);
-      wasmModule._seek(state.bufferLength, tempoRatio);
-      wasmModule._process(0, outputFrameCount);
+      seekStretcher(state.handle, state.bufferLength, tempoRatio);
+      processStretcher(state.handle, 0, outputFrameCount);
 
       for (
         let channelIndex = 0;
@@ -203,7 +236,10 @@ export const createTimePitchProcessor = async (
       return frameCounts.inputFrameCount;
     },
     reset: () => {
-      state = undefined;
+      if (state) {
+        resetStretcher(state.handle);
+      }
+      windowStartFrame = undefined;
       inputFrameFraction = 0;
     },
     refill: () => {

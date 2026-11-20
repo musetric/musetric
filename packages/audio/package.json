@@ -63,8 +63,7 @@
   },
   "peerDependencies": {
     "@musetric/dsp": "workspace:*",
-    "@musetric/utils": "workspace:*",
-    "signalsmith-stretch": "catalog:"
+    "@musetric/utils": "workspace:*"
   },
   "devDependencies": {
     "@musetric/dsp": "workspace:*",
@@ -75,7 +74,6 @@
     "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
-    "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

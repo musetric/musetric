@@ -6,6 +6,7 @@ mod vocoder;
 mod window;
 
 use vocoder::{Engine, Settings};
+pub use vocoder::{Planar, PlanarMut};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Refusal {
@@ -36,13 +37,61 @@ impl Stretch {
     }
 }
 
+pub struct StretchStream {
+    engine: Engine,
+}
+
+impl StretchStream {
+    #[must_use]
+    pub fn new(channels: usize, sample_rate: u32) -> Self {
+        Self {
+            engine: Engine::new(&Settings {
+                channels,
+                sample_rate,
+                semitones: 0,
+                keep_formants: false,
+            }),
+        }
+    }
+
+    #[must_use]
+    pub const fn input_latency(&self) -> usize {
+        self.engine.input_latency()
+    }
+
+    #[must_use]
+    pub const fn output_latency(&self) -> usize {
+        self.engine.output_latency()
+    }
+
+    pub fn reset(&mut self) {
+        self.engine.reset();
+    }
+
+    pub fn set_semitones(&mut self, semitones: i32) {
+        self.engine.set_semitones(semitones);
+    }
+
+    pub const fn set_keep_formants(&mut self, keep_formants: bool) {
+        self.engine.set_keep_formants(keep_formants);
+    }
+
+    pub fn seek(&mut self, window: &Planar<'_>, rate: f64) {
+        self.engine.seek_window(window, rate);
+    }
+
+    pub fn process(&mut self, input: &Planar<'_>, output: &mut PlanarMut<'_>) {
+        self.engine.process_stream(input, output);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f64::consts::TAU;
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
-    use super::{Refusal, Stretch};
+    use super::{Planar, PlanarMut, Refusal, Stretch, StretchStream};
 
     const SAMPLE_RATE: u32 = 44_100;
 
@@ -187,5 +236,112 @@ mod tests {
         });
         assert_eq!(stopped, Err(Refusal::Stopped));
         assert_eq!(blocks, 3);
+    }
+
+    const QUANTUM: usize = 128;
+
+    fn window_before(input: &[f32], end: usize, length: usize) -> Vec<f32> {
+        (0..length)
+            .map(|index| {
+                (end + index)
+                    .checked_sub(length)
+                    .and_then(|frame| input.get(frame))
+                    .copied()
+                    .unwrap_or(0.0)
+            })
+            .collect()
+    }
+
+    fn planar(samples: &[f32]) -> Planar<'_> {
+        Planar {
+            samples,
+            stride: samples.len(),
+            frames: samples.len(),
+        }
+    }
+
+    fn seek_every_quantum(input: &[f32], semitones: i32, quanta: usize) -> Vec<f32> {
+        let mut stream = StretchStream::new(1, SAMPLE_RATE);
+        stream.set_semitones(semitones);
+        let length = stream.input_latency() + stream.output_latency();
+        let mut output = vec![0.0; quanta * QUANTUM];
+        for (quantum, block) in output.as_chunks_mut::<QUANTUM>().0.iter_mut().enumerate() {
+            let window = window_before(input, quantum * QUANTUM + length, length);
+            stream.seek(&planar(&window), 1.0);
+            stream.process(
+                &planar(&[]),
+                &mut PlanarMut {
+                    samples: block,
+                    stride: QUANTUM,
+                    frames: QUANTUM,
+                },
+            );
+        }
+        output
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss,
+        reason = "a quantum's input is a few hundred frames"
+    )]
+    fn stream_at_tempo(
+        stream: &mut StretchStream,
+        input: &[f32],
+        tempo: f64,
+        quanta: usize,
+    ) -> Vec<f32> {
+        let primed = stream.input_latency();
+        let window = window_before(input, primed, primed + stream.output_latency());
+        stream.seek(&planar(&window), tempo);
+        let mut consumed = primed;
+        let mut fraction = 0.0;
+        let mut output = vec![0.0; quanta * QUANTUM];
+        for block in output.as_chunks_mut::<QUANTUM>().0 {
+            let wanted = QUANTUM as f64 * tempo + fraction;
+            let taken = wanted.floor() as usize;
+            fraction = wanted - taken as f64;
+            let piece = window_before(input, consumed + taken, taken);
+            consumed += taken;
+            stream.process(
+                &planar(&piece),
+                &mut PlanarMut {
+                    samples: block,
+                    stride: QUANTUM,
+                    frames: QUANTUM,
+                },
+            );
+        }
+        output
+    }
+
+    #[test]
+    fn moves_the_semitones_while_it_seeks_every_quantum() {
+        let input = sine(440.0, frames(2500));
+        let output = seek_every_quantum(&input, 2, frames(2000) / QUANTUM);
+        let expected = 440.0 * 2.0_f64.powf(2.0 / 12.0);
+        let measured = frequency(&output[frames(500)..frames(1500)]);
+        assert!((measured / expected - 1.0).abs() < 0.004, "{measured}");
+    }
+
+    #[test]
+    fn keeps_the_pitch_while_it_streams_at_another_tempo() {
+        let input = sine(440.0, frames(2500));
+        let mut stream = StretchStream::new(1, SAMPLE_RATE);
+        let output = stream_at_tempo(&mut stream, &input, 0.8, frames(2000) / QUANTUM);
+        let measured = frequency(&output[frames(500)..frames(1500)]);
+        assert!((measured / 440.0 - 1.0).abs() < 0.004, "{measured}");
+    }
+
+    #[test]
+    fn starts_over_after_a_reset() {
+        let input = sine(440.0, frames(1000));
+        let mut stream = StretchStream::new(1, SAMPLE_RATE);
+        stream.set_semitones(3);
+        let first = stream_at_tempo(&mut stream, &input, 0.75, frames(800) / QUANTUM);
+        stream.reset();
+        let again = stream_at_tempo(&mut stream, &input, 0.75, frames(800) / QUANTUM);
+        assert_eq!(first, again);
     }
 }

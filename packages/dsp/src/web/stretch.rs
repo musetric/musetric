@@ -1,62 +1,110 @@
-use wasm_bindgen::prelude::{JsError, wasm_bindgen};
+use std::cell::RefCell;
 
-use crate::{
-    CHANNELS,
-    stretch::{Refusal, Stretch},
-};
+use wasm_bindgen::prelude::wasm_bindgen;
 
-const TOO_SHORT: &str = "The audio is too short to change its tempo or key";
-const STOPPED: &str = "The stretch was stopped";
+use crate::stretch::{Planar, PlanarMut, StretchStream};
 
-#[wasm_bindgen]
-pub struct Stretcher {
-    sample_rate: u32,
-    semitones: i32,
-    keep_formants: bool,
+struct Stretcher {
+    stream: StretchStream,
+    channels: usize,
+    length: usize,
+    buffers: Vec<f32>,
 }
 
-#[wasm_bindgen]
-impl Stretcher {
-    #[wasm_bindgen(constructor)]
-    #[must_use]
-    pub fn new(sample_rate: u32, semitones: i32, keep_formants: bool) -> Stretcher {
-        Self {
-            sample_rate,
-            semitones,
-            keep_formants,
-        }
-    }
+thread_local! {
+    static STRETCHERS: RefCell<Vec<Stretcher>> = const { RefCell::new(Vec::new()) };
+}
 
-    pub fn apply(&self, samples: &[f32], frame_count: usize) -> Result<Vec<f32>, JsError> {
-        let channels: Vec<Vec<f32>> = (0..CHANNELS)
-            .map(|channel| {
-                samples
-                    .iter()
-                    .skip(channel)
-                    .step_by(CHANNELS)
-                    .copied()
-                    .collect()
-            })
-            .collect();
-        let stretch = Stretch {
-            sample_rate: self.sample_rate,
-            frame_count,
-            semitones: self.semitones,
-            keep_formants: self.keep_formants,
+fn with_stretcher<Value>(handle: usize, act: impl FnOnce(&mut Stretcher) -> Value) -> Value {
+    STRETCHERS.with_borrow_mut(|stretchers| act(&mut stretchers[handle]))
+}
+
+#[wasm_bindgen(js_name = openStretcher)]
+#[must_use]
+pub fn open_stretcher(channels: usize, sample_rate: u32) -> usize {
+    STRETCHERS.with_borrow_mut(|stretchers| {
+        stretchers.push(Stretcher {
+            stream: StretchStream::new(channels, sample_rate),
+            channels,
+            length: 0,
+            buffers: Vec::new(),
+        });
+        stretchers.len() - 1
+    })
+}
+
+#[wasm_bindgen(js_name = stretcherInputLatency)]
+#[must_use]
+pub fn stretcher_input_latency(handle: usize) -> usize {
+    with_stretcher(handle, |stretcher| stretcher.stream.input_latency())
+}
+
+#[wasm_bindgen(js_name = stretcherOutputLatency)]
+#[must_use]
+pub fn stretcher_output_latency(handle: usize) -> usize {
+    with_stretcher(handle, |stretcher| stretcher.stream.output_latency())
+}
+
+#[wasm_bindgen(js_name = setStretcherBuffers)]
+#[must_use]
+pub fn set_stretcher_buffers(handle: usize, length: usize) -> usize {
+    with_stretcher(handle, |stretcher| {
+        stretcher.length = length;
+        stretcher.buffers = vec![0.0; stretcher.channels * length * 2];
+        stretcher.buffers.as_ptr().addr()
+    })
+}
+
+#[wasm_bindgen(js_name = resetStretcher)]
+pub fn reset_stretcher(handle: usize) {
+    with_stretcher(handle, |stretcher| stretcher.stream.reset());
+}
+
+#[wasm_bindgen(js_name = setStretcherSemitones)]
+pub fn set_stretcher_semitones(handle: usize, semitones: i32) {
+    with_stretcher(handle, |stretcher| {
+        stretcher.stream.set_semitones(semitones);
+    });
+}
+
+#[wasm_bindgen(js_name = setStretcherFormants)]
+pub fn set_stretcher_formants(handle: usize, keep_formants: bool) {
+    with_stretcher(handle, |stretcher| {
+        stretcher.stream.set_keep_formants(keep_formants);
+    });
+}
+
+#[wasm_bindgen(js_name = seekStretcher)]
+pub fn seek_stretcher(handle: usize, input_frames: usize, rate: f64) {
+    with_stretcher(handle, |stretcher| {
+        let (inputs, _) = stretcher
+            .buffers
+            .split_at(stretcher.channels * stretcher.length);
+        let window = Planar {
+            samples: inputs,
+            stride: stretcher.length,
+            frames: input_frames,
         };
-        let stretched =
-            stretch
-                .apply(&channels, &mut |_| true)
-                .map_err(|refusal| match refusal {
-                    Refusal::TooShort => JsError::new(TOO_SHORT),
-                    Refusal::Stopped => JsError::new(STOPPED),
-                })?;
-        let mut interleaved = Vec::with_capacity(frame_count * CHANNELS);
-        for frame in 0..frame_count {
-            for channel in &stretched {
-                interleaved.push(channel[frame]);
-            }
-        }
-        Ok(interleaved)
-    }
+        stretcher.stream.seek(&window, rate);
+    });
+}
+
+#[wasm_bindgen(js_name = processStretcher)]
+pub fn process_stretcher(handle: usize, input_frames: usize, output_frames: usize) {
+    with_stretcher(handle, |stretcher| {
+        let (inputs, outputs) = stretcher
+            .buffers
+            .split_at_mut(stretcher.channels * stretcher.length);
+        let input = Planar {
+            samples: inputs,
+            stride: stretcher.length,
+            frames: input_frames,
+        };
+        let mut output = PlanarMut {
+            samples: outputs,
+            stride: stretcher.length,
+            frames: output_frames,
+        };
+        stretcher.stream.process(&input, &mut output);
+    });
 }

@@ -1,4 +1,5 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
+import stretchWasmUrl from '@musetric/dsp/stretch.wasm?url';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -77,7 +78,11 @@ export const createEnginePlayback = async (
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
   const playhead = createPlayhead(options.playheadPort, context.sampleRate);
+  const compiling = fetch(stretchWasmUrl)
+    .then(async (response) => response.arrayBuffer())
+    .then(WebAssembly.compile);
   await context.audioWorklet.addModule(playerWorkletUrl);
+  const stretchModule = await compiling;
   const node = new AudioWorkletNode(context, playerProcessorName, {
     numberOfInputs: 1,
     numberOfOutputs: 1,
@@ -296,6 +301,7 @@ export const createEnginePlayback = async (
       port.methods.boot({
         dataPort: decoderPort,
         playheadPorts,
+        stretchModule,
       });
 
       return bootPromise.promise;

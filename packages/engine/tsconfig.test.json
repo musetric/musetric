@@ -8,6 +8,6 @@
   ],
   "compilerOptions": {
     "lib": ["ES2024", "DOM"],
-    "types": ["vite/client"]
+    "types": ["node", "vite/client"]
   }
 }

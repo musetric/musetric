@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Range, Sub};
 
 use rustfft::num_complex::Complex32;
 
@@ -110,11 +110,54 @@ struct Steps {
     long_step: usize,
 }
 
+#[derive(Clone, Copy)]
 struct Cursor {
     copied: usize,
     previous_offset: i64,
     seeking: bool,
     seek_time_factor: f32,
+}
+
+impl Cursor {
+    const IDLE: Self = Self {
+        copied: 0,
+        previous_offset: -1,
+        seeking: false,
+        seek_time_factor: 0.0,
+    };
+}
+
+pub(crate) trait Frames {
+    fn channel(&self, channel: usize) -> &[f32];
+}
+
+struct Ahead<'samples> {
+    channels: &'samples [Vec<f32>],
+    lead: usize,
+}
+
+impl Frames for Ahead<'_> {
+    fn channel(&self, channel: usize) -> &[f32] {
+        self.channels[channel].get(self.lead..).unwrap_or_default()
+    }
+}
+
+pub struct Planar<'samples> {
+    pub samples: &'samples [f32],
+    pub stride: usize,
+    pub frames: usize,
+}
+
+impl Frames for Planar<'_> {
+    fn channel(&self, channel: usize) -> &[f32] {
+        &self.samples[channel * self.stride..][..self.frames]
+    }
+}
+
+pub struct PlanarMut<'samples> {
+    pub samples: &'samples mut [f32],
+    pub stride: usize,
+    pub frames: usize,
 }
 
 pub(crate) struct Settings {
@@ -142,6 +185,9 @@ pub(crate) struct Engine {
     estimate_weighted: f32,
     estimate_weight: f32,
     random: Random,
+    sample_rate: u32,
+    stream: Cursor,
+    since_block: usize,
 }
 
 #[expect(
@@ -204,7 +250,71 @@ impl Engine {
             estimate_weighted: 0.0,
             estimate_weight: 0.0,
             random: Random(1),
+            sample_rate: settings.sample_rate,
+            stream: Cursor::IDLE,
+            since_block: usize::MAX,
         }
+    }
+
+    pub(crate) const fn input_latency(&self) -> usize {
+        self.stft.analysis_latency()
+    }
+
+    pub(crate) const fn output_latency(&self) -> usize {
+        self.stft.synthesis_latency()
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.stft.reset(PRODUCT_WEIGHT);
+        self.bins.fill(Band::default());
+        self.stream = Cursor::IDLE;
+        self.since_block = usize::MAX;
+        self.estimate_weighted = 0.0;
+        self.estimate_weight = 0.0;
+    }
+
+    pub(crate) fn set_semitones(&mut self, semitones: i32) {
+        self.multiplier = semitones_to_multiplier(semitones);
+        self.tonality_limit = tonality_limit(self.sample_rate, self.multiplier);
+        self.mapped = semitones != 0;
+    }
+
+    pub(crate) const fn set_keep_formants(&mut self, keep_formants: bool) {
+        self.keep_formants = keep_formants;
+    }
+
+    pub(crate) fn seek_window(&mut self, window: &Planar<'_>, rate: f64) {
+        let length = self.stft.block() + self.stft.interval();
+        let start = window.frames.saturating_sub(length);
+        let pad = length + start - window.frames;
+        for channel in 0..self.channels {
+            self.write_channel(channel, &window.channel(channel)[start..], pad..length);
+        }
+        self.stft.move_input(length);
+        self.stream.seeking = true;
+        self.stream.seek_time_factor = self.seek_time_factor(rate);
+    }
+
+    pub(crate) fn process_stream(&mut self, input: &Planar<'_>, output: &mut PlanarMut<'_>) {
+        let interval = self.stft.interval();
+        let mut cursor = self.stream;
+        cursor.copied = 0;
+        for output_index in 0..output.frames {
+            if self.since_block >= interval {
+                self.since_block = 0;
+                let offset = input_position(output_index, input.frames, output.frames);
+                self.start_block(input, &mut cursor, offset);
+            }
+            self.since_block += 1;
+            for channel in 0..self.channels {
+                output.samples[channel * output.stride + output_index] =
+                    self.stft.read_output_sample(channel);
+            }
+            self.stft.move_output(1);
+        }
+        self.copy_input(input, &mut cursor.copied, input.frames);
+        cursor.previous_offset -= to_signed(input.frames);
+        self.stream = cursor;
     }
 
     pub(crate) fn exact(
@@ -229,29 +339,25 @@ impl Engine {
         Ok(output)
     }
 
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the time factor is stored as f32, like the original"
-    )]
     fn seek(&mut self, input: &[Vec<f32>], rate: f32) -> f32 {
         let samples = self.stft.analysis_latency();
         let length = self.stft.block() + self.stft.interval();
         let pad = length - samples;
         for (channel, source) in input.iter().enumerate() {
-            self.stft.write_input(
-                channel,
-                (0..length).map(|index| {
-                    index
-                        .checked_sub(pad)
-                        .and_then(|position| source.get(position).copied())
-                        .unwrap_or(0.0)
-                }),
-            );
+            self.write_channel(channel, source, pad..length);
         }
         self.stft.move_input(length);
+        self.seek_time_factor(f64::from(rate))
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the time factor is stored as f32, like the original"
+    )]
+    fn seek_time_factor(&self, rate: f64) -> f32 {
         let interval = to_float(self.stft.interval());
-        if f64::from(rate) * f64::from(interval) > 1.0 {
-            (1.0 / f64::from(rate)) as f32
+        if rate * f64::from(interval) > 1.0 {
+            (1.0 / rate) as f32
         } else {
             interval
         }
@@ -272,6 +378,10 @@ impl Engine {
             seeking: true,
             seek_time_factor: self.seek(input, rate),
         };
+        let ahead = Ahead {
+            channels: input,
+            lead: self.stft.analysis_latency(),
+        };
         for output_index in 0..output_length {
             let starts_block = output_index % self.stft.interval() == 0;
             if starts_block && !go_on(output_index) {
@@ -279,7 +389,7 @@ impl Engine {
             }
             if starts_block {
                 let offset = input_position(output_index, input_length, output_length);
-                self.start_block(input, &mut cursor, offset);
+                self.start_block(&ahead, &mut cursor, offset);
             }
             for (channel, samples) in output.iter_mut().enumerate() {
                 samples[output_index] = self.stft.read_output_sample(channel);
@@ -289,7 +399,7 @@ impl Engine {
         Ok(())
     }
 
-    fn start_block(&mut self, input: &[Vec<f32>], cursor: &mut Cursor, offset: usize) {
+    fn start_block(&mut self, input: &impl Frames, cursor: &mut Cursor, offset: usize) {
         let interval = self.stft.interval();
         let input_interval = to_signed(offset) - cursor.previous_offset;
         cursor.previous_offset = to_signed(offset);
@@ -308,15 +418,21 @@ impl Engine {
         self.process_block(&plan);
     }
 
-    fn copy_input(&mut self, input: &[Vec<f32>], copied: &mut usize, to_index: usize) {
-        let latency = self.stft.analysis_latency();
+    fn write_channel(&mut self, channel: usize, source: &[f32], span: Range<usize>) {
+        let copied = source.len().min(span.len());
+        self.stft.clear_input(channel, 0, span.start);
+        self.stft
+            .write_input(channel, span.start, &source[..copied]);
+        self.stft
+            .clear_input(channel, span.start + copied, span.len() - copied);
+    }
+
+    fn copy_input(&mut self, input: &impl Frames, copied: &mut usize, to_index: usize) {
         let length = (self.stft.block() + self.stft.interval()).min(to_index - *copied);
         let start = to_index - length;
-        for (channel, source) in input.iter().enumerate() {
-            self.stft.write_input(
-                channel,
-                (start..to_index).map(|index| source.get(latency + index).copied().unwrap_or(0.0)),
-            );
+        for channel in 0..self.channels {
+            let source = input.channel(channel).get(start..).unwrap_or_default();
+            self.write_channel(channel, source, 0..length);
         }
         self.stft.move_input(length);
         *copied = to_index;
