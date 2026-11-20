@@ -12,9 +12,10 @@ pnpm build:project
 cargo install wasm-bindgen-cli --version <version> --locked
 ```
 
-| Module                 | Features     | What it holds                                                          |
-| ---------------------- | ------------ | ---------------------------------------------------------------------- |
-| `@musetric/dsp/decode` | `web-decode` | `Decoder` and `FlacFeed` for FLAC and WAV, `Resampler` and `wavePeaks` |
+| Module                  | Features      | What it holds                                                                                         |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| `@musetric/dsp/decode`  | `web-decode`  | `Decoder` and `FlacFeed` for FLAC and WAV, `Resampler` and `wavePeaks`                                |
+| `@musetric/dsp/stretch` | `web-stretch` | the streaming stretch of the player's worklet: `openStretcher` and the functions that take its handle |
 
 ```ts
 import init, { Decoder } from '@musetric/dsp/decode';
@@ -28,6 +29,7 @@ decoder.free();
 ```
 
 - The crate is a member of the Cargo workspace of `packages/server`: its toolchain, lockfile, lints and clippy settings are the host's, and `pnpm check:rust` of `packages/server` checks it natively and as WebAssembly with every feature.
-- The default features turn everything on: every format Symphonia reads (`songs`), which the host decodes, and every binding, which the checks cover. `web-stretch` binds `Stretcher`, which no page calls yet, so no module carries it. The writers and loudness have no bindings, since the host writes every file.
+- The default features turn everything on: every format Symphonia reads (`songs`), which the host decodes, and every binding, which the checks cover. The writers and loudness have no bindings, since the host writes every file.
 - Every test runs on both targets; `tests/bytes.rs` holds the digests that both builds must write.
+- The stretch module imports nothing from JavaScript, so that it loads in an AudioWorklet, which has no `TextDecoder`: its bindings are functions of a handle, not a class, whose borrow checks would throw messages.
 - Opus is decoded only natively, through libopus with the `opus` feature.
