@@ -10,11 +10,14 @@ import {
   setStretcherSemitones,
   stretcherInputLatency,
   stretcherOutputLatency,
+  stretcherSeekLength,
   type SyncInitInput,
 } from '@musetric/dsp/stretch';
 
 export const loadTimePitch = (module: SyncInitInput): InitOutput =>
   initSync({ module });
+
+const continuityFrameCount = 4;
 
 const getFrameCounts = (
   outputFrameCount: number,
@@ -48,10 +51,10 @@ type TimePitchProcessorState = {
 const viewBuffers = (
   stretch: InitOutput,
   state: TimePitchProcessorState,
-): boolean => {
+): void => {
   const { buffer } = stretch.memory;
   if (state.memoryBuffer === buffer) {
-    return false;
+    return;
   }
   const lengthBytes = state.bufferLength * Float32Array.BYTES_PER_ELEMENT;
   const view = (index: number) =>
@@ -67,7 +70,6 @@ const viewBuffers = (
   state.outputBuffers = Array.from({ length: state.channelCount }, (_, index) =>
     view(index + state.channelCount),
   );
-  return true;
 };
 
 const createState = (
@@ -77,9 +79,7 @@ const createState = (
   outputFrameCount: number,
 ): TimePitchProcessorState => {
   const handle = openStretcher(channelCount, sampleRate);
-  const inputLatency = stretcherInputLatency(handle);
-  const outputLatency = stretcherOutputLatency(handle);
-  const bufferLength = Math.max(outputFrameCount, inputLatency + outputLatency);
+  const bufferLength = Math.max(outputFrameCount, stretcherSeekLength(handle));
   const state: TimePitchProcessorState = {
     handle,
     semitones: 0,
@@ -87,8 +87,8 @@ const createState = (
     pointer: setStretcherBuffers(handle, bufferLength),
     bufferLength,
     channelCount,
-    inputLatency,
-    outputLatency,
+    inputLatency: stretcherInputLatency(handle),
+    outputLatency: stretcherOutputLatency(handle),
     memoryBuffer: new ArrayBuffer(0),
     inputBuffers: [],
     outputBuffers: [],
@@ -116,64 +116,48 @@ export type TimePitchProcessor = {
   setFormantCompensation: (formantCompensation: boolean) => void;
 };
 
+type Stream = {
+  tempoRatio: number;
+  headFrame: number;
+  nextInputFrame: number;
+};
+
 export const createTimePitchProcessor = (
   stretch: InitOutput,
   sampleRate: number,
 ): TimePitchProcessor => {
   let state: TimePitchProcessorState | undefined = undefined;
-  let windowStartFrame: number | undefined = undefined;
-  const windowTails = new Map<number, Float32Array[]>();
+  let stream: Stream | undefined = undefined;
   let inputFrameFraction = 0;
   let transposeSemitones = 0;
   let tempoRatio = 1;
   let formantCompensation = false;
 
-  const getWindowTail = (current: TimePitchProcessorState, frames: number) => {
-    let tail = windowTails.get(frames);
-    if (!tail) {
-      tail = current.inputBuffers.map((buffer) =>
-        buffer.subarray(current.bufferLength - frames),
-      );
-      windowTails.set(frames, tail);
-    }
-    return tail;
-  };
+  const continues = (current: Stream, inputFrame: number) =>
+    current.tempoRatio === tempoRatio &&
+    Math.abs(inputFrame - current.nextInputFrame) <= continuityFrameCount;
 
-  const fillWindow = (
+  const prime = (
     current: TimePitchProcessorState,
     inputFrame: number,
     fillInput: TimePitchProcessorInputFiller,
-  ) => {
-    const inputEndFrameOffset =
+  ): Stream => {
+    const headOffset =
       Math.round(current.outputLatency * tempoRatio) + current.inputLatency;
-    const startFrame = inputFrame + inputEndFrameOffset - current.bufferLength;
-    const shift =
-      windowStartFrame === undefined
-        ? current.bufferLength
-        : startFrame - windowStartFrame;
-    windowStartFrame = startFrame;
-    if (shift === 0) {
-      return;
-    }
-    if (shift > 0 && shift < current.bufferLength) {
-      const tail = getWindowTail(current, shift);
-      for (const inputBuffer of current.inputBuffers) {
-        inputBuffer.copyWithin(0, shift);
-      }
-      for (const tailBuffer of tail) {
-        tailBuffer.fill(0);
-      }
-      fillInput(tail, inputEndFrameOffset - shift, shift);
-      return;
-    }
     for (const inputBuffer of current.inputBuffers) {
       inputBuffer.fill(0);
     }
     fillInput(
       current.inputBuffers,
-      inputEndFrameOffset - current.bufferLength,
+      headOffset - current.bufferLength,
       current.bufferLength,
     );
+    seekStretcher(current.handle, current.bufferLength, tempoRatio);
+    return {
+      tempoRatio,
+      headFrame: inputFrame + headOffset,
+      nextInputFrame: inputFrame,
+    };
   };
 
   return {
@@ -181,6 +165,7 @@ export const createTimePitchProcessor = (
       const outputFrameCount = outputs[0].length;
 
       if (transposeSemitones === 0 && tempoRatio === 1) {
+        stream = undefined;
         fillInput(outputs, 0, outputFrameCount);
         return outputFrameCount;
       }
@@ -191,24 +176,22 @@ export const createTimePitchProcessor = (
         inputFrameFraction,
       );
       inputFrameFraction = frameCounts.inputFrameFraction;
+      const { inputFrameCount } = frameCounts;
 
       if (
         !state ||
         state.channelCount !== outputs.length ||
-        state.bufferLength < outputFrameCount
+        state.bufferLength < Math.max(outputFrameCount, inputFrameCount)
       ) {
         state = createState(
           stretch,
           outputs.length,
           sampleRate,
-          outputFrameCount,
+          Math.max(outputFrameCount, inputFrameCount),
         );
-        windowStartFrame = undefined;
-        windowTails.clear();
+        stream = undefined;
       }
-      if (viewBuffers(stretch, state)) {
-        windowTails.clear();
-      }
+      viewBuffers(stretch, state);
 
       if (state.semitones !== transposeSemitones) {
         setStretcherSemitones(state.handle, transposeSemitones);
@@ -219,9 +202,18 @@ export const createTimePitchProcessor = (
         state.formants = formantCompensation;
       }
 
-      fillWindow(state, inputFrame, fillInput);
-      seekStretcher(state.handle, state.bufferLength, tempoRatio);
-      processStretcher(state.handle, 0, outputFrameCount);
+      if (!stream || !continues(stream, inputFrame)) {
+        stream = prime(state, inputFrame, fillInput);
+      }
+
+      const inputs = state.inputBuffers;
+      for (const inputBuffer of inputs) {
+        inputBuffer.fill(0, 0, inputFrameCount);
+      }
+      fillInput(inputs, stream.headFrame - inputFrame, inputFrameCount);
+      processStretcher(state.handle, inputFrameCount, outputFrameCount);
+      stream.headFrame += inputFrameCount;
+      stream.nextInputFrame = inputFrame + inputFrameCount;
 
       for (
         let channelIndex = 0;
@@ -233,17 +225,17 @@ export const createTimePitchProcessor = (
         );
       }
 
-      return frameCounts.inputFrameCount;
+      return inputFrameCount;
     },
     reset: () => {
       if (state) {
         resetStretcher(state.handle);
       }
-      windowStartFrame = undefined;
+      stream = undefined;
       inputFrameFraction = 0;
     },
     refill: () => {
-      windowStartFrame = undefined;
+      stream = undefined;
     },
     setTransposeSemitones: (nextTransposeSemitones) => {
       transposeSemitones = nextTransposeSemitones;

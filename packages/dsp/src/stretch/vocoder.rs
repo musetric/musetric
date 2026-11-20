@@ -264,6 +264,10 @@ impl Engine {
         self.stft.synthesis_latency()
     }
 
+    pub(crate) const fn seek_length(&self) -> usize {
+        self.stft.block() + self.stft.interval()
+    }
+
     pub(crate) fn reset(&mut self) {
         self.stft.reset(PRODUCT_WEIGHT);
         self.bins.fill(Band::default());
@@ -284,7 +288,7 @@ impl Engine {
     }
 
     pub(crate) fn seek_window(&mut self, window: &Planar<'_>, rate: f64) {
-        let length = self.stft.block() + self.stft.interval();
+        let length = self.seek_length();
         let start = window.frames.saturating_sub(length);
         let pad = length + start - window.frames;
         for channel in 0..self.channels {

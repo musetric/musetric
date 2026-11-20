@@ -45,6 +45,12 @@ pub fn stretcher_output_latency(handle: usize) -> usize {
     with_stretcher(handle, |stretcher| stretcher.stream.output_latency())
 }
 
+#[wasm_bindgen(js_name = stretcherSeekLength)]
+#[must_use]
+pub fn stretcher_seek_length(handle: usize) -> usize {
+    with_stretcher(handle, |stretcher| stretcher.stream.seek_length())
+}
+
 #[wasm_bindgen(js_name = setStretcherBuffers)]
 #[must_use]
 pub fn set_stretcher_buffers(handle: usize, length: usize) -> usize {
