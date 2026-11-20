@@ -33,6 +33,8 @@ const getFrameCounts = (
 
 type TimePitchProcessorState = {
   handle: number;
+  semitones: number;
+  formants: boolean;
   pointer: number;
   bufferLength: number;
   channelCount: number;
@@ -80,6 +82,8 @@ const createState = (
   const bufferLength = Math.max(outputFrameCount, inputLatency + outputLatency);
   const state: TimePitchProcessorState = {
     handle,
+    semitones: 0,
+    formants: false,
     pointer: setStretcherBuffers(handle, bufferLength),
     bufferLength,
     channelCount,
@@ -206,8 +210,14 @@ export const createTimePitchProcessor = (
         windowTails.clear();
       }
 
-      setStretcherSemitones(state.handle, transposeSemitones);
-      setStretcherFormants(state.handle, formantCompensation);
+      if (state.semitones !== transposeSemitones) {
+        setStretcherSemitones(state.handle, transposeSemitones);
+        state.semitones = transposeSemitones;
+      }
+      if (state.formants !== formantCompensation) {
+        setStretcherFormants(state.handle, formantCompensation);
+        state.formants = formantCompensation;
+      }
 
       fillWindow(state, inputFrame, fillInput);
       seekStretcher(state.handle, state.bufferLength, tempoRatio);

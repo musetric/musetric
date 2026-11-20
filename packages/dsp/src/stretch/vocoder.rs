@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Range, Sub};
 
 use rustfft::num_complex::Complex32;
 
@@ -288,15 +288,7 @@ impl Engine {
         let start = window.frames.saturating_sub(length);
         let pad = length + start - window.frames;
         for channel in 0..self.channels {
-            let source = window.channel(channel);
-            self.stft.write_input(
-                channel,
-                (0..length).map(|index| {
-                    index
-                        .checked_sub(pad)
-                        .map_or(0.0, |position| source[start + position])
-                }),
-            );
+            self.write_channel(channel, &window.channel(channel)[start..], pad..length);
         }
         self.stft.move_input(length);
         self.stream.seeking = true;
@@ -352,15 +344,7 @@ impl Engine {
         let length = self.stft.block() + self.stft.interval();
         let pad = length - samples;
         for (channel, source) in input.iter().enumerate() {
-            self.stft.write_input(
-                channel,
-                (0..length).map(|index| {
-                    index
-                        .checked_sub(pad)
-                        .and_then(|position| source.get(position).copied())
-                        .unwrap_or(0.0)
-                }),
-            );
+            self.write_channel(channel, source, pad..length);
         }
         self.stft.move_input(length);
         self.seek_time_factor(f64::from(rate))
@@ -434,15 +418,21 @@ impl Engine {
         self.process_block(&plan);
     }
 
+    fn write_channel(&mut self, channel: usize, source: &[f32], span: Range<usize>) {
+        let copied = source.len().min(span.len());
+        self.stft.clear_input(channel, 0, span.start);
+        self.stft
+            .write_input(channel, span.start, &source[..copied]);
+        self.stft
+            .clear_input(channel, span.start + copied, span.len() - copied);
+    }
+
     fn copy_input(&mut self, input: &impl Frames, copied: &mut usize, to_index: usize) {
         let length = (self.stft.block() + self.stft.interval()).min(to_index - *copied);
         let start = to_index - length;
         for channel in 0..self.channels {
-            let source = input.channel(channel);
-            self.stft.write_input(
-                channel,
-                (start..to_index).map(|index| source.get(index).copied().unwrap_or(0.0)),
-            );
+            let source = input.channel(channel).get(start..).unwrap_or_default();
+            self.write_channel(channel, source, 0..length);
         }
         self.stft.move_input(length);
         *copied = to_index;
