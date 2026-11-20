@@ -8,6 +8,10 @@ import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLo
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { type Playhead } from '../player/playhead.cross.js';
 import {
+  type CapturedPreview,
+  type ContextPreview,
+} from './livePreview.cross.js';
+import {
   type spectrogramChannel,
   type spectrogramDataChannel,
 } from './protocol.cross.js';
@@ -21,6 +25,7 @@ export type CreateSpectrogramRuntimeOptions = {
   >;
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
   playhead: Playhead;
+  convertPreview: (preview: CapturedPreview) => ContextPreview | undefined;
   profiling?: boolean;
   onRendered?: RenderListener;
 };
@@ -28,7 +33,8 @@ export type CreateSpectrogramRuntimeOptions = {
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
-  const { port, dataPort, playhead, profiling, onRendered } = options;
+  const { port, dataPort, playhead, convertPreview, profiling, onRendered } =
+    options;
 
   let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
   const setStatus = (status: 'pending' | 'error' | 'success') => {
@@ -240,9 +246,13 @@ export const createSpectrogramRuntime = async (
       }
     },
     previewLiveTake: (message) => {
+      const preview = convertPreview(message);
+      if (!preview) {
+        return;
+      }
       const range = recording.previewLiveTake({
-        songFrame: playhead.readFrameIndexAt(message.capturedAt),
-        samples: message.samples,
+        songFrame: playhead.readFrameIndexAt(preview.capturedAt),
+        samples: preview.samples,
       });
       if (range) {
         processor.invalidateSamples([{ trackKey: 'recording', ...range }]);

@@ -1,6 +1,6 @@
 import { type InitOutput } from '@musetric/dsp/capture';
 import { type TimedMicrophoneChunk } from './protocol.cross.js';
-import { createSampleRing } from './sampleRing.worklet.js';
+import { createSampleRing } from './sampleRing.cross.js';
 
 const anchorCount = 15;
 const steerSeconds = 4;

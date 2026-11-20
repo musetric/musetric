@@ -7,6 +7,7 @@ import {
   recordingDataKeys,
   type RecordingDataMethods,
 } from '../player/protocol.cross.js';
+import { type CapturedPreview } from './livePreview.cross.js';
 
 export type SpectrogramViewWindow = {
   startFrame: number;
@@ -18,6 +19,7 @@ export type SpectrogramOutboundMethods = {
     dataPort: MessagePort;
     playheadPort: MessagePort;
     sampleRate: number;
+    captureModule: WebAssembly.Module;
   }) => void;
   mount: (message: {
     config: Partial<SpectrogramConfig>;
@@ -29,10 +31,7 @@ export type SpectrogramOutboundMethods = {
   setPlaying: (message: { playing: boolean }) => void;
   updateConfig: (message: { patch: Partial<SpectrogramConfig> }) => void;
   setViewWindow: (message: { window?: SpectrogramViewWindow }) => void;
-  previewLiveTake: (message: {
-    capturedAt: number;
-    samples: Float32Array<ArrayBuffer>;
-  }) => void;
+  previewLiveTake: (message: CapturedPreview) => void;
 };
 
 export type SpectrogramInboundMethods = {
