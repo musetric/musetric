@@ -223,7 +223,6 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
               }
               saveMixdownChoice(choice);
               const state = engine.store.get();
-              const voiceShifted = state.singerVoice === 'shifted';
               startMixdownExport(projectId, {
                 request: {
                   format: lossy ? { format, bitrate } : { format },
@@ -231,17 +230,13 @@ export const MixdownContent: FC<MixdownContentProps> = (props) => {
                   playback: {
                     tempoRatio: state.tempoRatio,
                     transposeSemitones: state.transposeSemitones,
-                    leadOctave: voiceShifted ? state.voiceOctave : 0,
+                    voiceOctave:
+                      state.singerVoice === 'shifted'
+                        ? state.voiceOctave
+                        : undefined,
                   },
                   label,
                 },
-                renderRecording: async () =>
-                  engine.player.exportRecording({
-                    tempoRatio: state.tempoRatio,
-                    transposeSemitones: state.transposeSemitones,
-                    voiceOctave: state.voiceOctave,
-                    voiceShifted,
-                  }),
                 onSaved: () => {
                   if (routes.project.match()?.projectId === projectId) {
                     setOpen(false);

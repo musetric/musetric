@@ -5,7 +5,6 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
-import { type TakeTarget } from '../player/takeShift.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
@@ -36,7 +35,6 @@ export type EngineDecoder = {
   deleteLoopTry: (tryId: string) => void;
   discardLoopTries: () => void;
   insertLoopTry: (projectId: number, tryId: string) => Promise<boolean>;
-  exportRecording: (target: TakeTarget) => Promise<Float32Array<ArrayBuffer>>;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
   sendPlayerPlay: () => void;
@@ -109,9 +107,6 @@ export const createEngineDecoder = (
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let mountPromise: ControlledPromise<void> | undefined = undefined;
   let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
-  let recordingExportPromise:
-    ControlledPromise<Float32Array<ArrayBuffer> | undefined> | undefined =
-    undefined;
   let loopTrySettlePromise:
     ControlledPromise<SettledLoopTry | undefined> | undefined = undefined;
   let loopTryInsertPromise: ControlledPromise<boolean> | undefined = undefined;
@@ -187,14 +182,6 @@ export const createEngineDecoder = (
     },
     recordingContentChanged: (message) => {
       onRecordingContentChanged(message.recordingId);
-    },
-    recordingExported: (message) => {
-      recordingExportPromise?.resolve(message.samples);
-      recordingExportPromise = undefined;
-    },
-    recordingExportFailed: () => {
-      recordingExportPromise?.resolve(undefined);
-      recordingExportPromise = undefined;
     },
     loopTrySettled: (message) => {
       loopTrySettlePromise?.resolve(message.loopTry);
@@ -282,18 +269,6 @@ export const createEngineDecoder = (
         frameCount: store.get().frameCount ?? 0,
       });
       return await promise;
-    },
-    exportRecording: async (target) => {
-      recordingExportPromise ??= createControlledPromise<
-        Float32Array<ArrayBuffer> | undefined
-      >();
-      const { promise } = recordingExportPromise;
-      port.methods.exportRecording({ target });
-      const samples = await promise;
-      if (!samples) {
-        throw new Error('Failed to export the recording');
-      }
-      return samples;
     },
     sendRecordingUndo: () => {
       port.methods.sendRecordingUndo();

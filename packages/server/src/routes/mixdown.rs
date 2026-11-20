@@ -1,29 +1,34 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use axum::{
     Router,
     body::Body,
-    extract::{DefaultBodyLimit, Multipart, Path, State},
+    extract::{Multipart, Path, State},
     http::StatusCode,
     response::Response,
     routing::{get, post},
 };
-use musetric_db::{MasterType, ProjectItem, Reader, StemLoudness, blob_path};
+use musetric_db::{MasterType, ProjectItem, Reader, RecordingPiece, StemLoudness, blob_path};
 use musetric_media::{
-    Mixdown, MixdownChange, MixdownChannels, MixdownFormat, MixdownGroup, MixdownStage,
-    MixdownTrack, MixdownWatch, write_mixdown,
+    Mixdown, MixdownChange, MixdownFormat, MixdownGroup, MixdownStage, MixdownTake, MixdownTrack,
+    MixdownWatch, write_mixdown,
 };
 use serde::Deserialize;
 use serde_json::json;
-use tokio::{fs::remove_file, spawn};
+use tokio::{
+    fs::remove_file,
+    spawn,
+    time::{Instant, sleep},
+};
 
 use crate::{
     analysis::read_gains,
     blob_response::{NamedFile, send_named},
     blobs::upload_area,
     failure::{Failure, finish, invalid_number},
-    form::{Field, Form, UploadTarget, UploadedFile, read_form},
+    form::{Field, Form, UploadTarget, read_form},
     mixdown::{MixdownFile, MixdownState, Removal},
+    recording::{Sounding, read_sounding},
     routes::{
         RouteState,
         item::{json_response, missing_message},
@@ -31,13 +36,14 @@ use crate::{
     storage::read,
 };
 
-const UPLOAD_LIMIT: usize = 200 * 1024 * 1024;
 const FORMAT_FIELD: &str = "format";
 const VOLUMES_FIELD: &str = "volumes";
 const PLAYBACK_FIELD: &str = "playback";
 const LABEL_FIELD: &str = "label";
-const RECORDING_FIELD: &str = "recording";
 const PROJECT_ID: &str = "projectId";
+const TAKE_WAIT: Duration = Duration::from_secs(10);
+const TAKE_POLL: Duration = Duration::from_millis(100);
+const BUSY: &str = "A take is being recorded or saved in this project";
 const INVALID_BODY: &str = "body Invalid mixdown request";
 const KILOBIT: u32 = 1000;
 const BITRATES: [u32; 3] = [128, 192, 256];
@@ -61,7 +67,6 @@ pub(crate) fn create_router() -> Router<RouteState> {
             get(handle_status).delete(handle_remove),
         )
         .route("/api/mixdown/{mixdownId}/content", get(handle_content))
-        .layer(DefaultBodyLimit::max(UPLOAD_LIMIT))
 }
 
 #[derive(Deserialize)]
@@ -86,7 +91,7 @@ struct Volumes {
 struct Playback {
     tempo_ratio: f64,
     transpose_semitones: i32,
-    lead_octave: i32,
+    voice_octave: Option<i32>,
 }
 
 struct MixdownRequest<'form> {
@@ -94,7 +99,6 @@ struct MixdownRequest<'form> {
     volumes: Volumes,
     playback: Playback,
     label: &'form str,
-    recording: Option<&'form UploadedFile>,
 }
 
 struct Prepared {
@@ -190,17 +194,11 @@ fn read_request(form: &Form) -> Result<MixdownRequest<'_>, Failure> {
     let Field::Text(label) = form.field(LABEL_FIELD) else {
         return Err(invalid());
     };
-    let recording = match form.field(RECORDING_FIELD) {
-        Field::Missing => None,
-        Field::File(file) => Some(file),
-        Field::Text(_) => return Err(invalid()),
-    };
     Ok(MixdownRequest {
         format: serde_json::from_str(format).map_err(|_| invalid())?,
         volumes: serde_json::from_str(volumes).map_err(|_| invalid())?,
         playback: serde_json::from_str(playback).map_err(|_| invalid())?,
         label,
-        recording,
     })
 }
 
@@ -282,13 +280,8 @@ async fn prepare(
         .await?
         .ok_or_else(|| Failure::NotFound(missing_message(project_id)))?;
     let mut mixdown = plan(state, &audio, &request.volumes, Target { format, change })?;
-    if let Some(recording) = request.recording {
-        mixdown.tracks.push(MixdownTrack {
-            from: recording.staged.path().to_path_buf(),
-            gain: read_volume(request.volumes.recording)?,
-            channels: MixdownChannels::Mono,
-            group: MixdownGroup::Ready,
-        });
+    if let Some(sounding) = read_settled_sounding(state, project_id).await? {
+        mixdown.takes = plan_takes(state, &sounding, &request.volumes, &request.playback)?;
     }
     let (extension, content_type) = describe(format);
     Ok(Prepared {
@@ -296,6 +289,72 @@ async fn prepare(
         filename: format!("{} ({label}).{extension}", audio.project.name),
         content_type,
     })
+}
+
+async fn read_settled_sounding(
+    state: &RouteState,
+    project_id: i64,
+) -> Result<Option<Sounding>, Failure> {
+    let waited = Instant::now();
+    let editor = loop {
+        if let Some(editor) = state.rooms.begin_edit(project_id) {
+            break editor;
+        }
+        if waited.elapsed() >= TAKE_WAIT {
+            return Err(Failure::Conflict(BUSY.to_owned()));
+        }
+        sleep(TAKE_POLL).await;
+    };
+    let sounding = read_active_sounding(state, project_id).await;
+    state.rooms.end_session(project_id, editor);
+    sounding
+}
+
+async fn read_active_sounding(
+    state: &RouteState,
+    project_id: i64,
+) -> Result<Option<Sounding>, Failure> {
+    let recordings = read(&state.storage, move |reader| reader.recordings(project_id)).await?;
+    let Some(active) = recordings.iter().find(|recording| recording.active) else {
+        return Ok(None);
+    };
+    read_sounding(&state.storage, project_id, active.id)
+        .await
+        .map_err(Failure::failed)
+}
+
+fn plan_takes(
+    state: &RouteState,
+    sounding: &Sounding,
+    volumes: &Volumes,
+    playback: &Playback,
+) -> Result<Vec<MixdownTake>, Failure> {
+    let gain = read_volume(volumes.recording)?;
+    let sample_rate = u32::try_from(sounding.sample_rate).map_err(Failure::failed)?;
+    sounding
+        .pieces
+        .iter()
+        .map(|piece| {
+            Ok(MixdownTake {
+                from: blob_path(&state.storage.blobs_path, &piece.blob_id),
+                gain,
+                sample_rate,
+                song_start_frame: usize::try_from(piece.song_start_frame)
+                    .map_err(Failure::failed)?,
+                tempo: piece.tempo,
+                semitones: take_semitones(playback, piece)?,
+            })
+        })
+        .collect()
+}
+
+fn take_semitones(playback: &Playback, piece: &RecordingPiece) -> Result<i32, Failure> {
+    let transpose = i32::try_from(piece.transpose).map_err(Failure::failed)?;
+    let octave = i32::try_from(piece.octave).map_err(Failure::failed)?;
+    let shifted = playback
+        .voice_octave
+        .map_or(0, |voice_octave| voice_octave - octave);
+    Ok(playback.transpose_semitones - transpose + SEMITONES_PER_OCTAVE * shifted)
 }
 
 fn read_audio(
@@ -349,14 +408,17 @@ fn read_change(playback: &Playback) -> Result<MixdownChange, Failure> {
     if !TEMPO_PERCENTS.contains(&tempo_percent)
         || !tempo_percent.is_multiple_of(TEMPO_PERCENT_STEP)
         || !SEMITONES.contains(&playback.transpose_semitones)
-        || !OCTAVES.contains(&playback.lead_octave)
+        || playback
+            .voice_octave
+            .is_some_and(|octave| !OCTAVES.contains(&octave))
     {
         return Err(invalid());
     }
     Ok(MixdownChange {
         tempo_percent,
         semitones: playback.transpose_semitones,
-        lead_semitones: playback.transpose_semitones + SEMITONES_PER_OCTAVE * playback.lead_octave,
+        lead_semitones: playback.transpose_semitones
+            + SEMITONES_PER_OCTAVE * playback.voice_octave.unwrap_or(0),
     })
 }
 
@@ -397,7 +459,6 @@ fn plan(
         tracks.push(MixdownTrack {
             from: blob_path(&state.storage.blobs_path, blob_id),
             gain: read_volume(volume)? * stem_scale,
-            channels: MixdownChannels::Stereo,
             group: if *stem == MasterType::Lead
                 && target.change.lead_semitones != target.change.semitones
             {
@@ -411,6 +472,7 @@ fn plan(
         sample_rate: u32::try_from(audio.project.sample_rate).map_err(Failure::failed)?,
         frame_count: usize::try_from(audio.project.frame_count).map_err(Failure::failed)?,
         tracks,
+        takes: Vec::new(),
         format: target.format,
         change: target.change,
     })
@@ -435,22 +497,39 @@ const fn describe(format: MixdownFormat) -> (&'static str, &'static str) {
 
 #[cfg(test)]
 mod tests {
+    use musetric_db::{RecordingLayer, RecordingPiece};
     use musetric_media::MixdownChange;
 
-    use super::{Playback, read_change, read_label};
+    use super::{Playback, read_change, read_label, take_semitones};
 
-    const fn playback(tempo_ratio: f64, transpose_semitones: i32, lead_octave: i32) -> Playback {
+    const fn playback(
+        tempo_ratio: f64,
+        transpose_semitones: i32,
+        voice_octave: Option<i32>,
+    ) -> Playback {
         Playback {
             tempo_ratio,
             transpose_semitones,
-            lead_octave,
+            voice_octave,
+        }
+    }
+
+    fn piece(transpose: i64, octave: i64) -> RecordingPiece {
+        RecordingPiece {
+            blob_id: "take".to_owned(),
+            layer: RecordingLayer::Base,
+            song_start_frame: 0,
+            frame_count: 1,
+            tempo: 1.0,
+            transpose,
+            octave,
         }
     }
 
     #[test]
-    fn reads_the_tempo_as_a_percent_and_the_lead_octave_as_semitones() {
+    fn reads_the_tempo_as_a_percent_and_the_voice_octave_as_semitones() {
         assert_eq!(
-            read_change(&playback(0.95, 1, -1)).ok(),
+            read_change(&playback(0.95, 1, Some(-1))).ok(),
             Some(MixdownChange {
                 tempo_percent: 95,
                 semitones: 1,
@@ -458,19 +537,35 @@ mod tests {
             })
         );
         assert_eq!(
-            read_change(&playback(1.0, 0, 0)).ok(),
+            read_change(&playback(1.0, 0, None)).ok(),
             Some(MixdownChange::ORIGINAL)
+        );
+    }
+
+    #[test]
+    fn shifts_a_take_by_the_octave_of_the_voice_only_when_it_is_shifted() {
+        assert_eq!(
+            take_semitones(&playback(1.0, 2, None), &piece(-1, 1)).ok(),
+            Some(3)
+        );
+        assert_eq!(
+            take_semitones(&playback(1.0, 2, Some(0)), &piece(-1, 1)).ok(),
+            Some(-9)
+        );
+        assert_eq!(
+            take_semitones(&playback(1.0, -2, Some(1)), &piece(0, 0)).ok(),
+            Some(10)
         );
     }
 
     #[test]
     fn refuses_values_the_player_cannot_reach() {
         for wrong in [
-            playback(0.33, 0, 0),
-            playback(2.05, 0, 0),
-            playback(0.15, 0, 0),
-            playback(1.0, 7, 0),
-            playback(1.0, 0, 2),
+            playback(0.33, 0, None),
+            playback(2.05, 0, None),
+            playback(0.15, 0, None),
+            playback(1.0, 7, None),
+            playback(1.0, 0, Some(2)),
         ] {
             assert!(read_change(&wrong).is_err());
         }

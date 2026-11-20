@@ -6,19 +6,16 @@ import {
   type playerDataChannel,
   type PlayerRecordingPiece,
 } from '../player/protocol.cross.js';
-import { type TakeTarget } from '../player/takeShift.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import {
   copyPieces,
   createRecordingAssembly,
   type RecordingAssembly,
-  renderPieces,
 } from './recordingAssembly.worker.js';
 import {
   createStemDecoders,
   type StemDecoders,
 } from './stemDecoders.worker.js';
-import { createTakeStretch, type TakeStretch } from './takeStretch.worker.js';
 
 export type CreateAudioDecodeOptions = {
   playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
@@ -36,7 +33,6 @@ export type AudioDecode = {
   patchLiveTake: (chunk: LiveTakeChunk) => void;
   clearLiveTake: (takeId: string) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
-  exportRecording: (target: TakeTarget) => Promise<Float32Array<ArrayBuffer>>;
   unmount: () => void;
 };
 
@@ -46,11 +42,6 @@ type MountedAudio = {
   frameCount: number;
   recordingId: number | undefined;
   pieces: PlayerRecordingPiece[];
-};
-
-type Recording = {
-  assembly: RecordingAssembly;
-  stretch: Promise<TakeStretch>;
 };
 
 type Reload = {
@@ -65,17 +56,14 @@ export const createAudioDecode = (
   const decoder = createAudioDecoder();
   let stemDecoders: StemDecoders | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
-  let recording: Recording | undefined = undefined;
+  let assembly: RecordingAssembly | undefined = undefined;
   let activeRecordingId: number | undefined = undefined;
   let reloading: Promise<void> = Promise.resolve();
   let reloadOnMount: Reload | undefined = undefined;
 
-  const getRecording = (sampleRate: number): Recording => {
-    recording ??= {
-      assembly: createRecordingAssembly(sampleRate, decoder),
-      stretch: createTakeStretch(sampleRate),
-    };
-    return recording;
+  const getAssembly = (sampleRate: number): RecordingAssembly => {
+    assembly ??= createRecordingAssembly(sampleRate, decoder);
+    return assembly;
   };
 
   const loadPieces = async (
@@ -85,7 +73,7 @@ export const createAudioDecode = (
     if (recordingId === undefined) {
       return [];
     }
-    return await getRecording(current.sampleRate).assembly.load(
+    return await getAssembly(current.sampleRate).load(
       current.projectId,
       recordingId,
     );
@@ -212,15 +200,6 @@ export const createAudioDecode = (
       });
     },
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
-    exportRecording: async (target) => {
-      await reloading.catch(() => undefined);
-      const current = mounted;
-      if (!current) {
-        return new Float32Array(0);
-      }
-      const stretch = await getRecording(current.sampleRate).stretch;
-      return renderPieces(current.pieces, current.frameCount, stretch, target);
-    },
     unmount: () => {
       mounted = undefined;
       reloadOnMount = undefined;
