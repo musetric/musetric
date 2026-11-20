@@ -1,13 +1,13 @@
 import { type SpectrogramConfig } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
-import { type CapturedPreview } from './livePreview.cross.js';
 import {
   pieceBuffers,
   type PlayerRecordingPiece,
   recordingDataKeys,
   type RecordingDataMethods,
 } from '../player/protocol.cross.js';
+import { type CapturedPreview } from './livePreview.cross.js';
 
 export type SpectrogramViewWindow = {
   startFrame: number;

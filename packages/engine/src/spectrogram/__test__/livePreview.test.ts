@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadTestCapture } from '../../audioSession/__test__/captureModule.js';
-import { type ContextPreview, createLivePreview } from '../livePreview.cross.js';
+import {
+  type ContextPreview,
+  createLivePreview,
+} from '../livePreview.cross.js';
 
 const contextRate = 48000;
 const microphoneRate = 44100;
