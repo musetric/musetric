@@ -10,7 +10,11 @@ repository = "https://github.com/musetric/musetric"
 workspace = "../server"
 
 [features]
+default = ["songs", "web-decode", "web-stretch"]
 opus = ["dep:symphonia-adapter-libopus"]
+songs = ["symphonia/all"]
+web-decode = []
+web-stretch = []
 
 [dependencies]
 ebur128 = "=0.1.10"
@@ -19,7 +23,7 @@ rubato = { version = "=5.0.1", default-features = false, features = ["fft_resamp
 rustfft = "=6.4.1"
 rusty_aac = "=1.1.0"
 rusty_mp3 = "=1.0.0"
-symphonia = { version = "=0.6.1", features = ["all"] }
+symphonia = { version = "=0.6.1", default-features = false, features = ["flac", "opt-simd", "pcm", "wav"] }
 symphonia-adapter-libopus = { version = "=0.3.0", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
