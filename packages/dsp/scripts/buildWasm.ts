@@ -30,11 +30,24 @@ if (installed !== `wasm-bindgen ${bindgen}`) {
 const modules = [
   { name: 'capture', features: ['web-capture'] },
   { name: 'decode', features: ['web-decode'] },
+  { name: 'songs', features: ['opus', 'songs', 'web-decode'] },
   { name: 'stretch', features: ['web-stretch'] },
 ];
 
+const requested = process.argv.slice(2);
+const unknown = requested.filter(
+  (name) => !modules.some((module) => module.name === name),
+);
+if (unknown.length > 0) {
+  throw new Error(`@musetric/dsp has no module ${unknown.join(', ')}`);
+}
+const built =
+  requested.length === 0
+    ? modules
+    : modules.filter((module) => requested.includes(module.name));
+
 rmSync(output, { recursive: true, force: true });
-for (const { name, features } of modules) {
+for (const { name, features } of built) {
   execFileSync(
     'cargo',
     [

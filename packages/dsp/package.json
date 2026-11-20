@@ -13,6 +13,10 @@
     "dist/decode.d.ts",
     "dist/decode_bg.wasm",
     "dist/decode_bg.wasm.d.ts",
+    "dist/songs.js",
+    "dist/songs.d.ts",
+    "dist/songs_bg.wasm",
+    "dist/songs_bg.wasm.d.ts",
     "dist/stretch.js",
     "dist/stretch.d.ts",
     "dist/stretch_bg.wasm",
@@ -39,6 +43,11 @@
       "import": "./dist/decode.js",
       "default": "./dist/decode.js"
     },
+    "./songs": {
+      "types": "./dist/songs.d.ts",
+      "import": "./dist/songs.js",
+      "default": "./dist/songs.js"
+    },
     "./stretch": {
       "types": "./dist/stretch.d.ts",
       "import": "./dist/stretch.js",
@@ -48,6 +57,7 @@
   },
   "scripts": {
     "build:project": "node scripts/buildWasm.ts",
+    "build:app": "node scripts/buildWasm.ts capture decode stretch",
     "dev": "node scripts/buildWasm.ts",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
