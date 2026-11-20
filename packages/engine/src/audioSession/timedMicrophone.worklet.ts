@@ -4,7 +4,7 @@ import {
   timedMicrophoneChannel,
   timedMicrophoneProcessorName,
 } from './protocol.cross.js';
-import { loadCapture } from './sampleRing.worklet.js';
+import { loadCapture } from './sampleRing.cross.js';
 import { createTimedMicrophoneRuntime } from './timedMicrophoneRuntime.worklet.js';
 
 export class TimedMicrophoneProcessor

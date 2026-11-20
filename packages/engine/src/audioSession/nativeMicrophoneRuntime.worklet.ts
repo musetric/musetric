@@ -1,6 +1,6 @@
 import { type InitOutput } from '@musetric/dsp/capture';
 import { nativeMicrophoneDelaySeconds } from './protocol.cross.js';
-import { createSampleRing } from './sampleRing.worklet.js';
+import { createSampleRing } from './sampleRing.cross.js';
 
 const bucketSeconds = 0.5;
 const windowSeconds = 3;

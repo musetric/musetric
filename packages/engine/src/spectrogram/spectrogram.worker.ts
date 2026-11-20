@@ -1,8 +1,10 @@
+import { loadCapture } from '../audioSession/sampleRing.cross.js';
 import { createPlayhead } from '../player/playhead.cross.js';
 import {
   spectrogramChannel,
   spectrogramDataChannel,
 } from './protocol.cross.js';
+import { createLivePreview } from './livePreview.cross.js';
 import { createRenderHook } from './renderHook.worker.js';
 import { createSpectrogramRuntime } from './runtime.worker.js';
 
@@ -31,6 +33,10 @@ port.bindBoot(async (message) => {
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
     playhead: createPlayhead(message.playheadPort, message.sampleRate),
+    convertPreview: createLivePreview(
+      loadCapture(message.captureModule),
+      message.sampleRate,
+    ),
     profiling,
     onRendered: renderHook?.notify,
   });

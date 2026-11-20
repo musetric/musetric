@@ -5,7 +5,7 @@ import {
   nativeMicrophoneChannel,
   nativeMicrophoneProcessorName,
 } from './protocol.cross.js';
-import { loadCapture } from './sampleRing.worklet.js';
+import { loadCapture } from './sampleRing.cross.js';
 
 export class NativeMicrophoneProcessor
   extends AudioWorkletProcessor
