@@ -64,6 +64,11 @@ impl StretchStream {
         self.engine.output_latency()
     }
 
+    #[must_use]
+    pub const fn seek_length(&self) -> usize {
+        self.engine.seek_length()
+    }
+
     pub fn reset(&mut self) {
         self.engine.reset();
     }
@@ -293,7 +298,7 @@ mod tests {
         quanta: usize,
     ) -> Vec<f32> {
         let primed = stream.input_latency();
-        let window = window_before(input, primed, primed + stream.output_latency());
+        let window = window_before(input, primed, stream.seek_length());
         stream.seek(&planar(&window), tempo);
         let mut consumed = primed;
         let mut fraction = 0.0;
