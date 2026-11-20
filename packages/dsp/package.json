@@ -8,7 +8,11 @@
     "dist/decode.js",
     "dist/decode.d.ts",
     "dist/decode_bg.wasm",
-    "dist/decode_bg.wasm.d.ts"
+    "dist/decode_bg.wasm.d.ts",
+    "dist/stretch.js",
+    "dist/stretch.d.ts",
+    "dist/stretch_bg.wasm",
+    "dist/stretch_bg.wasm.d.ts"
   ],
   "repository": {
     "type": "git",
@@ -24,7 +28,13 @@
       "types": "./dist/decode.d.ts",
       "import": "./dist/decode.js",
       "default": "./dist/decode.js"
-    }
+    },
+    "./stretch": {
+      "types": "./dist/stretch.d.ts",
+      "import": "./dist/stretch.js",
+      "default": "./dist/stretch.js"
+    },
+    "./stretch.wasm": "./dist/stretch_bg.wasm"
   },
   "scripts": {
     "build:project": "node scripts/buildWasm.ts",

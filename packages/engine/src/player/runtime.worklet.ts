@@ -31,6 +31,7 @@ export type CreatePlayerRuntimeOptions = {
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
   playheadPorts: MessagePort[];
   sampleRate: number;
+  stretch: Parameters<typeof createTimePitchProcessor>[0];
   getCurrentTime: () => number;
   getCurrentFrame: () => number;
 };
@@ -40,10 +41,10 @@ export type PlayerRuntime = {
   process: (inputs: Float32Array[][], outputs: Float32Array[]) => void;
 };
 
-export const createPlayerRuntime = async (
+export const createPlayerRuntime = (
   options: CreatePlayerRuntimeOptions,
-): Promise<PlayerRuntime> => {
-  const { port, dataPort, sampleRate } = options;
+): PlayerRuntime => {
+  const { port, dataPort, sampleRate, stretch } = options;
   const playhead: PlayheadPublisher = createPlayheadPublisher(
     options.playheadPorts,
     options.getCurrentTime,
@@ -65,9 +66,9 @@ export const createPlayerRuntime = async (
   const trackVolumes: Partial<Record<StemType, number>> = {};
   let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
-  const timePitchProcessor = await createTimePitchProcessor(sampleRate);
-  const leadVoice = await createLeadVoice(sampleRate);
-  const recordingTrack = await createRecordingTrack(sampleRate);
+  const timePitchProcessor = createTimePitchProcessor(stretch, sampleRate);
+  const leadVoice = createLeadVoice(stretch, sampleRate);
+  const recordingTrack = createRecordingTrack(stretch, sampleRate);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
 

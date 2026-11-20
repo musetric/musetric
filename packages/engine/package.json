@@ -44,7 +44,6 @@
     "axios": "catalog:",
     "eslint": "catalog:",
     "immer": "catalog:",
-    "signalsmith-stretch": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

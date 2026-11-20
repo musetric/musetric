@@ -15,6 +15,7 @@ export type PlayerOutboundMethods = {
   boot: (message: {
     dataPort: MessagePort;
     playheadPorts: MessagePort[];
+    stretchModule: WebAssembly.Module;
   }) => void;
   play: (message: {
     revision: number;

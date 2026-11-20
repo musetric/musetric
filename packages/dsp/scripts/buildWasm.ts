@@ -27,7 +27,10 @@ if (installed !== `wasm-bindgen ${bindgen}`) {
   );
 }
 
-const modules = [{ name: 'decode', features: ['web-decode'] }];
+const modules = [
+  { name: 'decode', features: ['web-decode'] },
+  { name: 'stretch', features: ['web-stretch'] },
+];
 
 rmSync(output, { recursive: true, force: true });
 for (const { name, features } of modules) {

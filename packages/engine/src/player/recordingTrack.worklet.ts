@@ -1,4 +1,5 @@
 import { createTimePitchProcessor } from '@musetric/audio/player';
+import { type InitOutput } from '@musetric/dsp/stretch';
 import {
   continuesRun,
   createLiveRun,
@@ -54,10 +55,11 @@ export type RecordingTrack = {
   mixInto: (mix: RecordingMix) => void;
 };
 
-export const createRecordingTrack = async (
+export const createRecordingTrack = (
+  stretch: InitOutput,
   sampleRate: number,
-): Promise<RecordingTrack> => {
-  const voice = createVoice(await createTimePitchProcessor(sampleRate));
+): RecordingTrack => {
+  const voice = createVoice(createTimePitchProcessor(stretch, sampleRate));
   let pieces: RecordingPiece[] = [];
   let live: LiveTake | undefined = undefined;
   let scratch = new Float32Array(128);

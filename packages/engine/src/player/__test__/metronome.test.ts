@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { playerChannel, playerDataChannel } from '../protocol.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
+import { loadStretch } from './stretchModule.js';
 
 const rate = 48000;
 const blockSize = 128;
@@ -21,11 +22,12 @@ const createPlayer = async () => {
   const control = new MessageChannel();
   const data = new MessageChannel();
   let contextFrame = 0;
-  const runtime = await createPlayerRuntime({
+  const runtime = createPlayerRuntime({
     port: playerChannel.inbound(control.port1),
     dataPort: playerDataChannel.inbound(data.port1),
     playheadPorts: [],
     sampleRate: rate,
+    stretch: loadStretch(),
     getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
   });

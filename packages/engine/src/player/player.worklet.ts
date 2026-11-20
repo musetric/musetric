@@ -1,4 +1,5 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
+import { loadTimePitch } from '@musetric/audio/player';
 import {
   playerChannel,
   playerDataChannel,
@@ -13,12 +14,13 @@ export class PlayerProcessor
   constructor() {
     super();
     const port = playerChannel.inbound(this.port);
-    port.bindBoot(async (message) => {
-      const runtime = await createPlayerRuntime({
+    port.bindBoot((message) => {
+      const runtime = createPlayerRuntime({
         port,
         dataPort: playerDataChannel.inbound(message.dataPort),
         playheadPorts: message.playheadPorts,
         sampleRate,
+        stretch: loadTimePitch(message.stretchModule),
         getCurrentTime: () => currentTime,
         getCurrentFrame: () => currentFrame,
       });

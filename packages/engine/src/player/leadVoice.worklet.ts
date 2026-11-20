@@ -1,4 +1,5 @@
 import { createTimePitchProcessor } from '@musetric/audio/player';
+import { type InitOutput } from '@musetric/dsp/stretch';
 import {
   type MixTrackFrames,
   mixTrackIntoBuffers,
@@ -20,10 +21,11 @@ export type LeadVoice = {
   mixInto: (options: LeadVoiceMixOptions) => void;
 };
 
-export const createLeadVoice = async (
+export const createLeadVoice = (
+  stretch: InitOutput,
   sampleRate: number,
-): Promise<LeadVoice> => {
-  const processor = await createTimePitchProcessor(sampleRate);
+): LeadVoice => {
+  const processor = createTimePitchProcessor(stretch, sampleRate);
   processor.setFormantCompensation(true);
   let buffers: Float32Array[] = [];
 
