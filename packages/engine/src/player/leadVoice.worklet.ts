@@ -4,11 +4,12 @@ import {
   type MixTrackFrames,
   mixTrackIntoBuffers,
 } from './mixTrack.worklet.js';
+import { type TrackPages } from './trackPages.worklet.js';
 
 export type LeadVoiceMixOptions = {
   outputs: Float32Array[];
   outputFrameIndex: number;
-  track: Float32Array[] | undefined;
+  track: TrackPages | undefined;
   volume: number;
   frames?: MixTrackFrames;
 };

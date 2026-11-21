@@ -1,6 +1,5 @@
 import { type StemType } from '@musetric/audio/es';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
-import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 
 export const playerProcessorName = 'player-processor';
 
@@ -126,7 +125,30 @@ export const recordingDataKeys = [
   'appendLiveTake',
 ] as const;
 
-export type PlayerTracks = Record<StemType, Float32Array<ArrayBuffer>[]>;
+export type PlayerStemLayout = {
+  frameCount: number;
+  pageStarts: number[];
+};
+
+export type PlayerStemLayouts = Record<StemType, PlayerStemLayout>;
+
+export type PlayerPage = {
+  stem: StemType;
+  index: number;
+  frameCount: number;
+  channelCount: number;
+  samples: Float32Array<ArrayBuffer>;
+};
+
+export type PlayerPageKey = {
+  stem: StemType;
+  index: number;
+};
+
+export type PlayerWindow = {
+  frameIndex: number;
+  loop?: PlayerRange;
+};
 
 export type LiveTakeStart = {
   takeId: string;
@@ -156,28 +178,30 @@ export type RecordingDataMethods = {
 export type PlayerDataMethods = RecordingDataMethods & {
   mount: (message: {
     frameCount: number;
-    tracks: PlayerTracks;
+    layouts: PlayerStemLayouts;
     recording: PlayerRecordingPiece[];
   }) => void;
+  putPage: (message: PlayerPage) => void;
+  dropPages: (message: { pages: PlayerPageKey[] }) => void;
   unmount: () => void;
 };
 
+export type PlayerDataInboundMethods = {
+  requestWindow: (message: PlayerWindow) => void;
+};
+
 export const playerDataChannel = createMessageChannel<
-  EmptyPortMethods,
+  PlayerDataInboundMethods,
   PlayerDataMethods
 >({
   inbound: {
-    keys: [],
+    keys: ['requestWindow'],
   },
   outbound: {
-    keys: ['mount', 'unmount', ...recordingDataKeys],
+    keys: ['mount', 'putPage', 'dropPages', 'unmount', ...recordingDataKeys],
     transfers: {
-      mount: (message) => [
-        ...Object.values(message.tracks).flatMap((channels) =>
-          channels.map((channel) => channel.buffer),
-        ),
-        ...pieceBuffers(message.recording),
-      ],
+      mount: (message) => pieceBuffers(message.recording),
+      putPage: (message) => [message.samples.buffer],
       setRecordingPieces: (message) => pieceBuffers(message.pieces),
       appendLiveTake: (message) => [message.samples.buffer],
     },

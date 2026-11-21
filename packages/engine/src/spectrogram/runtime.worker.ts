@@ -7,6 +7,7 @@ import {
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { type Playhead } from '../player/playhead.cross.js';
+import { createLeadPages, type LeadPages } from './leadPages.worker.js';
 import {
   type CapturedPreview,
   type ContextPreview,
@@ -65,7 +66,7 @@ export const createSpectrogramRuntime = async (
     });
 
   let processor = createProcessor();
-  let lead: Float32Array | undefined = undefined;
+  let lead: LeadPages | undefined = undefined;
   const recording = createRecordingSource();
   let trackProgress = 0;
   let frameCount = 0;
@@ -74,7 +75,12 @@ export const createSpectrogramRuntime = async (
   const viewWindow = createViewWindowState();
 
   const render = async () => {
-    const samples = lead ? { lead, recording: recording.get(lead.length) } : {};
+    const samples = lead
+      ? {
+          lead: lead.source,
+          recording: recording.get(lead.source.length),
+        }
+      : {};
     const view = viewWindow.view(trackProgress * frameCount);
     if (view) {
       processor.updateConfig(view);
@@ -85,6 +91,13 @@ export const createSpectrogramRuntime = async (
       trackProgress,
       liveEnd === undefined ? {} : { recording: liveEnd },
     );
+    if (lead) {
+      lead.sweep();
+      const indices = lead.takeWanted();
+      if (indices.length > 0) {
+        dataPort.methods.requestLeadPages({ indices });
+      }
+    }
     if (!ok || !lead) {
       return;
     }
@@ -146,10 +159,20 @@ export const createSpectrogramRuntime = async (
 
   dataPort.bindHandlers({
     mount: async (message) => {
-      lead = message.lead;
+      lead = createLeadPages(message.lead);
       recording.clear();
       recording.setPieces({ pieces: message.recording });
       await render();
+    },
+    putLeadPage: (message) => {
+      const range = lead?.put(message.index, message.samples);
+      if (!range) {
+        return;
+      }
+      processor.invalidateSamples([{ trackKey: 'lead', ...range }]);
+      if (!playing) {
+        renderPaused();
+      }
     },
     unmount: async () => {
       lead = undefined;

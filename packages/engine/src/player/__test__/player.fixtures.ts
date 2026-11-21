@@ -1,3 +1,4 @@
+import { type StemType, stemTypes } from '@musetric/audio/es';
 import { createRecordingStream } from '../../decoder/recordingStream.worker.js';
 import {
   type LiveTakeChunk,
@@ -148,6 +149,34 @@ export const createTakeStream = (): TakeStream => {
   return { chunks, notification: stream.port1 };
 };
 
+export const mountTracks = (
+  data: ReturnType<typeof playerDataChannel.outbound<MessagePort>>,
+  frameCount: number,
+  tracks: Record<StemType, Float32Array[]>,
+  recording: PlayerRecordingPiece[],
+): void => {
+  const layout = { frameCount, pageStarts: [0] };
+  data.methods.mount({
+    frameCount,
+    layouts: { lead: layout, backing: layout, instrumental: layout },
+    recording,
+  });
+  for (const stem of stemTypes) {
+    const channels = tracks[stem];
+    const samples = new Float32Array(frameCount * channels.length);
+    for (const [index, channel] of channels.entries()) {
+      samples.set(channel, index * frameCount);
+    }
+    data.methods.putPage({
+      stem,
+      index: 0,
+      frameCount,
+      channelCount: channels.length,
+      samples,
+    });
+  }
+};
+
 export type Harness = TakeStream & {
   process: (input: Float32Array) => Float32Array;
   player: ReturnType<typeof playerChannel.outbound<MessagePort>>;
@@ -173,15 +202,16 @@ export const createHarness = async (
   const take = createTakeStream();
   const frameCount = songSeconds * rate;
   const dataPort = playerDataChannel.outbound(data.port2);
-  dataPort.methods.mount({
+  mountTracks(
+    dataPort,
     frameCount,
-    tracks: {
+    {
       lead: [burstTrack(burstSeconds, frameCount)],
       backing: [new Float32Array(frameCount)],
       instrumental: [new Float32Array(frameCount)],
     },
     recording,
-  });
+  );
   await settle();
   return {
     process: (input) => {

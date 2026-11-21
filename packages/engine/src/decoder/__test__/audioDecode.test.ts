@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { playerDataChannel } from '../../player/protocol.cross.js';
 import { spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
 import { createAudioDecode } from '../audioDecode.worker.js';
-import { type StemDecoders } from '../stemDecoders.worker.js';
+import {
+  type StemPageReader,
+  type StemPageReaders,
+} from '../stemPageReaders.worker.js';
 
 type Gate = {
   promise: Promise<void>;
@@ -48,20 +51,32 @@ vi.mock('@musetric/audio/decoder', () => ({
         frameCount: 4,
         channels: [new Float32Array(4).fill(buffer.byteLength)],
       }),
-    decodeFlacStream: async () =>
-      Promise.reject(new Error('The stems decode in their own workers')),
   }),
 }));
 
-vi.mock('../stemDecoders.worker.js', () => ({
-  createStemDecoders: (): StemDecoders => ({
-    decode: async () =>
+const pageStarts = [0, 4];
+
+vi.mock('../stemPageReaders.worker.js', () => {
+  const reader: StemPageReader = {
+    open: async () =>
+      Promise.resolve({ frameCount: 8, channelCount: 2, pageStarts }),
+    read: async (index, mono) =>
       Promise.resolve({
-        frameCount: 8,
-        channels: [new Float32Array(8), new Float32Array(8)],
+        id: index,
+        index,
+        startFrame: pageStarts[index],
+        frameCount: 4,
+        samples: new Float32Array(mono ? 4 : 8).fill(index + 1),
       }),
-  }),
-}));
+  };
+  return {
+    createStemPageReaders: (): StemPageReaders => ({
+      lead: reader,
+      backing: reader,
+      instrumental: reader,
+    }),
+  };
+});
 
 const settle = async (): Promise<void> => {
   for (let index = 0; index < 8; index += 1) {
@@ -76,14 +91,32 @@ type Received = {
   switched: boolean;
 };
 
+type ReceivedPage = {
+  stem: string;
+  index: number;
+  sample: number | undefined;
+};
+
 const createHarness = () => {
   const player = new MessageChannel();
   const spectrogram = new MessageChannel();
   const received: Received[] = [];
+  const pages: ReceivedPage[] = [];
+  const leadPages: ReceivedPage[] = [];
   const ignore = () => undefined;
-  playerDataChannel.inbound(player.port2).bindHandlers({
+  const playerSide = playerDataChannel.inbound(player.port2);
+  const spectrogramSide = spectrogramDataChannel.inbound(spectrogram.port2);
+  playerSide.bindHandlers({
     mount: ignore,
     unmount: ignore,
+    putPage: (message) => {
+      pages.push({
+        stem: message.stem,
+        index: message.index,
+        sample: message.samples[0],
+      });
+    },
+    dropPages: ignore,
     beginLiveTake: ignore,
     appendLiveTake: ignore,
     setRecordingPieces: (message) => {
@@ -93,9 +126,16 @@ const createHarness = () => {
       });
     },
   });
-  spectrogramDataChannel.inbound(spectrogram.port2).bindHandlers({
+  spectrogramSide.bindHandlers({
     mount: ignore,
     unmount: ignore,
+    putLeadPage: (message) => {
+      leadPages.push({
+        stem: 'lead',
+        index: message.index,
+        sample: message.samples[0],
+      });
+    },
     beginLiveTake: ignore,
     appendLiveTake: ignore,
     setRecordingPieces: ignore,
@@ -107,6 +147,10 @@ const createHarness = () => {
   return {
     audioDecode,
     received,
+    pages,
+    leadPages,
+    playerSide,
+    spectrogramSide,
     close: () => {
       player.port1.close();
       spectrogram.port1.close();
@@ -155,6 +199,41 @@ describe('audio decode', () => {
     await settle();
 
     expect(harness.received).toEqual([{ recording: 2, switched: false }]);
+    harness.close();
+  });
+
+  it('sends the player the pages around the frame it asks for', async () => {
+    const harness = createHarness();
+    await harness.audioDecode.mount({ projectId: 1, sampleRate: 48000 });
+
+    harness.playerSide.methods.requestWindow({ frameIndex: 0 });
+    await settle();
+
+    expect(
+      harness.pages
+        .map(
+          (page) => `${page.stem}:${String(page.index)}:${String(page.sample)}`,
+        )
+        .sort((left, right) => left.localeCompare(right)),
+    ).toEqual([
+      'backing:0:1',
+      'backing:1:2',
+      'instrumental:0:1',
+      'instrumental:1:2',
+      'lead:0:1',
+      'lead:1:2',
+    ]);
+    harness.close();
+  });
+
+  it('sends the spectrogram the pages of the lead it asks for', async () => {
+    const harness = createHarness();
+    await harness.audioDecode.mount({ projectId: 1, sampleRate: 48000 });
+
+    harness.spectrogramSide.methods.requestLeadPages({ indices: [1] });
+    await settle();
+
+    expect(harness.leadPages).toEqual([{ stem: 'lead', index: 1, sample: 2 }]);
     harness.close();
   });
 });

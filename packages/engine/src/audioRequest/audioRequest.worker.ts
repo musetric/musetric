@@ -3,19 +3,29 @@ import { requestWithAxios } from '@musetric/api/dom';
 import { type StemType } from '@musetric/audio/es';
 import axios from 'axios';
 
-export const getMasterAudioStream = async (
+export const getMasterAudioRange = async (
   projectId: number,
   type: StemType,
-): Promise<ReadableStream<Uint8Array>> => {
+  from: number,
+  to: number | undefined,
+): Promise<Uint8Array> => {
   const response = await fetch(
     api.audio.masterContent.base.endpoint({ projectId, type }),
+    {
+      headers: {
+        range:
+          to === undefined
+            ? `bytes=${String(from)}-`
+            : `bytes=${String(from)}-${String(to - 1)}`,
+      },
+    },
   );
-  if (!response.ok || !response.body) {
+  if (response.status !== 206) {
     throw new Error(
-      `The ${type} master of project ${projectId} answered ${response.status}`,
+      `The ${type} master of project ${projectId} answered ${response.status} to a range`,
     );
   }
-  return response.body;
+  return new Uint8Array(await response.arrayBuffer());
 };
 
 export const getRecordingList = async (projectId: number) =>
