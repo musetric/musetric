@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::{JsError, wasm_bindgen};
 use crate::{
     BoxedError,
     decode::{DecodeRequest, Decoder, Layout},
-    flac_feed,
+    flac_feed, flac_pages,
     peaks::WavePeaks,
     resample::{Conversion, SampleRates},
 };
@@ -171,5 +171,91 @@ impl WavePeakTrace {
     #[must_use]
     pub fn peaks(&self) -> Vec<f32> {
         self.peaks.peaks().to_vec()
+    }
+}
+
+#[wasm_bindgen]
+pub struct FlacPages {
+    pages: flac_pages::FlacPages,
+}
+
+fn to_index(value: u64) -> usize {
+    usize::try_from(value).unwrap_or(usize::MAX)
+}
+
+#[wasm_bindgen]
+impl FlacPages {
+    pub fn read(prefix: &[u8]) -> Result<Option<FlacPages>, JsError> {
+        flac_pages::FlacPages::read(prefix)
+            .map(|found| found.map(|pages| Self { pages }))
+            .map_err(|failure| failed(&failure))
+    }
+
+    #[wasm_bindgen(getter)]
+    #[must_use]
+    pub fn channels(&self) -> usize {
+        self.pages.channels()
+    }
+
+    #[wasm_bindgen(getter, js_name = sampleRate)]
+    #[must_use]
+    pub fn sample_rate(&self) -> u32 {
+        self.pages.sample_rate()
+    }
+
+    #[wasm_bindgen(getter, js_name = frameCount)]
+    #[must_use]
+    pub fn frame_count(&self) -> usize {
+        to_index(self.pages.frame_count())
+    }
+
+    #[wasm_bindgen(getter, js_name = pageCount)]
+    #[must_use]
+    pub fn page_count(&self) -> usize {
+        self.pages.pages().len()
+    }
+
+    #[wasm_bindgen(js_name = pageStart)]
+    #[must_use]
+    pub fn page_start(&self, index: usize) -> Option<usize> {
+        self.pages
+            .pages()
+            .get(index)
+            .map(|page| to_index(page.first_frame))
+    }
+
+    #[wasm_bindgen(js_name = pageFrames)]
+    #[must_use]
+    pub fn page_frames(&self, index: usize) -> Option<usize> {
+        self.pages
+            .pages()
+            .get(index)
+            .map(|page| to_index(page.frames))
+    }
+
+    #[wasm_bindgen(js_name = byteStart)]
+    #[must_use]
+    pub fn byte_start(&self, index: usize) -> Option<usize> {
+        self.pages
+            .pages()
+            .get(index)
+            .map(|page| to_index(page.byte_start))
+    }
+
+    #[wasm_bindgen(js_name = byteEnd)]
+    #[must_use]
+    pub fn byte_end(&self, index: usize) -> Option<usize> {
+        self.pages
+            .pages()
+            .get(index)
+            .and_then(|page| page.byte_end)
+            .map(to_index)
+    }
+
+    pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+        self.pages
+            .decode(index, bytes)
+            .map(<[f32]>::to_vec)
+            .map_err(|failure| failed(&failure))
     }
 }

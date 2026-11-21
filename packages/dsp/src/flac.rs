@@ -69,10 +69,17 @@ pub fn read_info(header: &[u8; INFO_BYTE_LENGTH]) -> Result<FlacInfo, BoxedError
     })
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SeekPoint {
+    pub frame: u64,
+    pub byte: u64,
+}
+
 pub struct FlacLayout {
     pub info: FlacInfo,
     pub info_header: [u8; INFO_BYTE_LENGTH],
     pub frames_start: u64,
+    pub seek_points: Vec<SeekPoint>,
     pub span_starts: Vec<u64>,
 }
 
@@ -82,7 +89,7 @@ pub fn read_layout(prefix: &[u8]) -> Result<Option<FlacLayout>, BoxedError> {
     };
     let info = read_info(head)?;
     let mut position = MAGIC.len();
-    let mut seek_points: &[u8] = &[];
+    let mut seek_block: &[u8] = &[];
     loop {
         let Some(block) = prefix.get(position..position + BLOCK_HEADER_BYTES) else {
             return Ok(None);
@@ -94,7 +101,7 @@ pub fn read_layout(prefix: &[u8]) -> Result<Option<FlacLayout>, BoxedError> {
             return Ok(None);
         };
         if block[0] & BLOCK_TYPE_MASK == SEEK_TABLE_BLOCK {
-            seek_points = body;
+            seek_block = body;
         }
         position = start + length;
         if block[0] & LAST_BLOCK != 0 {
@@ -102,11 +109,18 @@ pub fn read_layout(prefix: &[u8]) -> Result<Option<FlacLayout>, BoxedError> {
         }
     }
     let frames_start = u64::try_from(position)?;
+    let seek_points = read_seek_points(seek_block, frames_start)?;
+    let span_starts = seek_points
+        .iter()
+        .map(|point| point.byte)
+        .filter(|byte| *byte > frames_start)
+        .collect();
     Ok(Some(FlacLayout {
         info,
         info_header: unsized_info_header(head)?,
         frames_start,
-        span_starts: span_starts(seek_points, frames_start)?,
+        seek_points,
+        span_starts,
     }))
 }
 
@@ -123,21 +137,26 @@ fn unsized_info_header(
     Ok(header)
 }
 
-fn span_starts(seek_points: &[u8], frames_start: u64) -> Result<Vec<u64>, BoxedError> {
-    let mut starts = Vec::new();
-    for point in seek_points.as_chunks::<SEEK_POINT_BYTES>().0 {
+fn read_seek_points(seek_block: &[u8], frames_start: u64) -> Result<Vec<SeekPoint>, BoxedError> {
+    let mut points = vec![SeekPoint {
+        frame: 0,
+        byte: frames_start,
+    }];
+    for point in seek_block.as_chunks::<SEEK_POINT_BYTES>().0 {
         let (sample, rest) = point.split_at(size_of::<u64>());
-        if u64::from_be_bytes(sample.try_into()?) == SEEK_PLACEHOLDER {
+        let frame = u64::from_be_bytes(sample.try_into()?);
+        if frame == SEEK_PLACEHOLDER {
             continue;
         }
         let offset = u64::from_be_bytes(rest[..size_of::<u64>()].try_into()?);
-        if offset > 0 {
-            starts.push(frames_start + offset);
-        }
+        points.push(SeekPoint {
+            frame,
+            byte: frames_start + offset,
+        });
     }
-    starts.sort_unstable();
-    starts.dedup();
-    Ok(starts)
+    points.sort_unstable_by_key(|point| point.byte);
+    points.dedup_by_key(|point| point.byte);
+    Ok(points)
 }
 
 struct FramePosition {

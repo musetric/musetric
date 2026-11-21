@@ -4,6 +4,7 @@ pub mod decode;
 mod dither;
 pub mod flac;
 pub mod flac_feed;
+pub mod flac_pages;
 pub mod loudness;
 pub mod m4a;
 pub mod mix;

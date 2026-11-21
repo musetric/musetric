@@ -6,6 +6,7 @@ mod tests {
         decode::{DecodeRequest, Decoder, Layout},
         flac::{FlacWriter, read_layout},
         flac_feed::FlacFeed,
+        flac_pages::FlacPages,
     };
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -150,5 +151,105 @@ mod tests {
         let refused = feed.push(&[0; INFO_BYTES]);
 
         assert!(refused.is_err(), "zeros should not read as flac");
+    }
+
+    fn page_bytes(bytes: &[u8], pages: &FlacPages, index: usize) -> Vec<u8> {
+        let page = pages.pages()[index];
+        let start = usize::try_from(page.byte_start).expect("the page starts within the master");
+        let end = page.byte_end.map_or(bytes.len(), |end| {
+            usize::try_from(end).expect("the page ends within the master")
+        });
+        bytes[start..end].to_vec()
+    }
+
+    fn interleave(planar: &[f32], channels: usize) -> Vec<f32> {
+        let frames = planar.len() / channels;
+        (0..frames)
+            .flat_map(|frame| (0..channels).map(move |channel| planar[channel * frames + frame]))
+            .collect()
+    }
+
+    #[test]
+    fn cuts_the_master_into_pages_at_its_seek_points() {
+        let bytes = master();
+
+        let pages = FlacPages::read(&bytes)
+            .expect("the header should be read")
+            .expect("the header should be whole");
+
+        let found = pages.pages();
+        assert!(found.len() > 1, "the master should have more than one page");
+        assert_eq!(found[0].first_frame, 0);
+        for pair in found.windows(2) {
+            assert_eq!(pair[1].first_frame, pair[0].first_frame + pair[0].frames);
+            assert_eq!(pair[0].byte_end, Some(pair[1].byte_start));
+            assert_eq!(
+                pair[1].first_frame % u64::try_from(BLOCK_FRAMES).expect("fits"),
+                0
+            );
+        }
+        let last = found.last().expect("the master should have a page");
+        assert_eq!(last.byte_end, None);
+        assert_eq!(
+            last.first_frame + last.frames,
+            u64::try_from(FRAMES).expect("the frames fit")
+        );
+    }
+
+    #[test]
+    fn decodes_each_page_as_the_whole_master_decodes_it() {
+        let bytes = master();
+        let mut pages = FlacPages::read(&bytes)
+            .expect("the header should be read")
+            .expect("the header should be whole");
+        let whole = decode_whole(&bytes, None);
+        let count = pages.pages().len();
+
+        let mut order: Vec<usize> = (0..count).rev().collect();
+        order.push(0);
+        for index in order {
+            let page = pages.pages()[index];
+            let span = page_bytes(&bytes, &pages, index);
+            let planar = pages
+                .decode(index, &span)
+                .expect("the page should decode")
+                .to_vec();
+            let first = usize::try_from(page.first_frame).expect("the page fits") * 2;
+            let frames = usize::try_from(page.frames).expect("the page fits");
+
+            assert_eq!(planar.len(), frames * 2);
+            assert_eq!(
+                bits(&interleave(&planar, 2)),
+                bits(&whole[first..first + frames * 2])
+            );
+        }
+    }
+
+    #[test]
+    fn makes_one_page_of_a_master_without_a_seek_table() {
+        let stripped = without_seek_table(&master());
+        let mut pages = FlacPages::read(&stripped)
+            .expect("the header should be read")
+            .expect("the header should be whole");
+
+        assert_eq!(pages.pages().len(), 1);
+        let span = page_bytes(&stripped, &pages, 0);
+        let planar = pages
+            .decode(0, &span)
+            .expect("the page should decode")
+            .to_vec();
+        assert_eq!(
+            bits(&interleave(&planar, 2)),
+            bits(&decode_whole(&stripped, None))
+        );
+    }
+
+    #[test]
+    fn waits_for_the_whole_header_before_it_cuts_pages() {
+        let bytes = master();
+
+        let early = FlacPages::read(&bytes[..INFO_BYTES]).expect("the stream info should be read");
+
+        assert!(early.is_none(), "the seek table has not arrived");
     }
 }
