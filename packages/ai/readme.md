@@ -80,6 +80,10 @@ transcription runs on, stay peers at the versions of the catalog.
 - The caller points `onnxruntime-web` at its wasm, since the package does not
   bundle it.
 
+The package carries `license.md` and the project's `thirdPartyNotices.md`,
+with the notice of BS-RoFormer, whose Mel-Band RoFormer architecture and model
+contract the separation follows, and those of the models it runs.
+
 ## Parity run
 
 ```sh

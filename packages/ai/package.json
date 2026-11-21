@@ -1,12 +1,13 @@
 {
   "name": "@musetric/ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist/library/**",
-    "dist/**/*.d.ts"
+    "dist/**/*.d.ts",
+    "thirdPartyNotices.md"
   ],
   "repository": {
     "type": "git",
