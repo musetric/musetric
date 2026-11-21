@@ -3,7 +3,6 @@ linker = "aarch64-linux-gnu-gcc"
 
 [env]
 CLIPPY_CONF_DIR = { value = ".", relative = true }
-CMAKE_TOOLCHAIN_FILE_wasm32_unknown_unknown = { value = "../dsp/opus-wasm/toolchain.cmake", relative = true }
 
 [target.wasm32-unknown-unknown]
 runner = "wasm-bindgen-test-runner"

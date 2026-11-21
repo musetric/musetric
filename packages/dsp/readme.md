@@ -66,7 +66,7 @@ A ring of the last 131 072 samples of one channel, read at any position between 
 
 `@musetric/dsp/stretch.wasm` and `@musetric/dsp/capture.wasm` are their WebAssembly files, which a page compiles for an AudioWorklet, since a worklet can fetch nothing; the worklet passes the module to `initSync`.
 
-The package carries `license.md`, the project's `thirdPartyNotices.md`, with the notices of libopus and of the ports of Signalsmith Stretch and Signalsmith Linear that it builds in, and `notices/crates.md`, with the licenses of the Rust crates compiled into its WebAssembly modules.
+The package carries `license.md`, the project's `thirdPartyNotices.md`, with the notices of `symphonia-opus` and of the ports of Signalsmith Stretch and Signalsmith Linear that it builds in, and `notices/crates.md`, with the licenses of the Rust crates compiled into its WebAssembly modules.
 
 ## Development
 
@@ -84,4 +84,4 @@ cargo install wasm-bindgen-cli --version <version> --locked
 - The default features turn everything on: every format Symphonia reads (`songs`) and Opus (`opus`), which the host decodes, and every binding, which the checks cover. The writers and loudness have no bindings, since the host writes every file.
 - Every test runs on both targets; `tests/bytes.rs` holds the digests that both builds must write.
 - The stretch and capture modules import nothing from JavaScript, so that they load in an AudioWorklet, which has no `TextDecoder`: their bindings are functions of a handle, not a class, whose borrow checks would throw messages.
-- Opus is decoded through libopus, which `opusic-sys` builds with CMake from the sources it bundles. For WebAssembly, `packages/server/.cargo/config.toml` points CMake at `opus-wasm/toolchain.cmake`, which compiles it with `clang` for `wasm32-unknown-unknown` against the headers of `opus-wasm/include`: the few functions of the C library that libopus calls, with `malloc` and `free` on the allocator of Rust through wasm-bindgen. The module `songs` and the checks for WebAssembly need a `clang` that has the WebAssembly target, which the `clang` of Xcode lacks, with `llvm-ar` beside it, and on Windows Ninja, since the generator of Visual Studio that CMake falls back to cannot drive that `clang`.
+- Opus is decoded by `symphonia-opus`, in Rust, which `packages/server/Cargo.toml` takes through `[patch.crates-io]` from its fork [musetric/symphonia-opus](https://github.com/musetric/symphonia-opus) at one commit: the decoder computes its cosines, sines, exponentials and powers through `libm`, so that the host and WebAssembly decode the same samples. `decode.rs` trims the pre-skip and the end padding of an Opus stream, which `symphonia-opus` leaves to the reader, so that a song decodes to as many frames as `frame_count` gives.

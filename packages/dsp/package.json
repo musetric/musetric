@@ -1,6 +1,6 @@
 {
   "name": "@musetric/dsp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Musetric's audio code in Rust, built to WebAssembly: decoding, resampling, wave peaks, stretch and the microphone's ring.",
   "license": "MIT",
   "type": "module",

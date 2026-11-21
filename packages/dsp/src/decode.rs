@@ -30,6 +30,8 @@ const OPUS_HEAD_VERSION_OFFSET: usize = 8;
 const MP4_OPUS_HEAD_VERSION: u8 = 0;
 const OGG_OPUS_HEAD_VERSION: u8 = 1;
 const MP4_BIG_ENDIAN_OPUS_HEAD_FIELDS: [Range<usize>; 3] = [10..12, 12..16, 16..18];
+const OPUS_HEAD_PRE_SKIP: Range<usize> = 10..12;
+const OPUS_PRE_SKIP_RATE: u64 = 48_000;
 
 pub type DecodedSink<'sink> = &'sink mut dyn FnMut(&[f32]) -> Result<(), BoxedError>;
 
@@ -64,6 +66,8 @@ pub struct Decoder {
     sample_rate: u32,
     counted_frames: Option<u64>,
     interleaved: Vec<f32>,
+    skip_frames: usize,
+    end_frame: Option<usize>,
     read_frames: usize,
     finished: bool,
 }
@@ -80,6 +84,14 @@ impl Decoder {
             input: track.sample_rate,
             output: request.sample_rate.unwrap_or(track.sample_rate),
         };
+        let skip_frames = track.opus_pre_skip.unwrap_or(0);
+        let counted_frames = track
+            .frames
+            .map(|counted| counted.saturating_sub(u64::try_from(skip_frames).unwrap_or(u64::MAX)));
+        let end_frame = track
+            .opus_pre_skip
+            .and(counted_frames)
+            .and_then(|counted| usize::try_from(counted).ok());
         Ok(Self {
             reader: track.reader,
             codec: track.decoder,
@@ -88,8 +100,10 @@ impl Decoder {
             channels,
             conversion: Conversion::create(rates, channels)?,
             sample_rate: rates.output,
-            counted_frames: track.frames,
+            counted_frames,
             interleaved: Vec::new(),
+            skip_frames,
+            end_frame,
             read_frames: 0,
             finished: false,
         })
@@ -124,8 +138,13 @@ impl Decoder {
             let Some(buffer) = decode_packet(self.codec.as_mut(), &packet)? else {
                 continue;
             };
-            self.read_frames += buffer.frames();
+            let decoded = buffer.frames();
             buffer.copy_to_vec_interleaved(&mut self.interleaved);
+            let kept = self.trim(decoded);
+            if kept == 0 && decoded > 0 {
+                continue;
+            }
+            self.read_frames += kept;
             let frames = match self.fold.as_mut() {
                 Some(fold) => fold.apply(&self.interleaved),
                 None => &self.interleaved,
@@ -134,6 +153,21 @@ impl Decoder {
         }
         self.finished = true;
         Ok(Some(self.conversion.flush(self.read_frames)?))
+    }
+
+    fn trim(&mut self, decoded: usize) -> usize {
+        if decoded == 0 {
+            return 0;
+        }
+        let width = self.interleaved.len() / decoded;
+        let skipped = self.skip_frames.min(decoded);
+        self.skip_frames -= skipped;
+        self.interleaved.drain(..skipped * width);
+        let kept = self.end_frame.map_or(decoded - skipped, |end| {
+            (decoded - skipped).min(end.saturating_sub(self.read_frames))
+        });
+        self.interleaved.truncate(kept * width);
+        kept
     }
 }
 
@@ -144,6 +178,7 @@ struct Track {
     channels: Channels,
     sample_rate: u32,
     frames: Option<u64>,
+    opus_pre_skip: Option<usize>,
 }
 
 fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, BoxedError> {
@@ -166,10 +201,10 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
         .clone()
         .filter(|found| found.count() > 0)
         .ok_or(BoxedError::from(NO_CHANNELS))?;
-    let decoder = codecs().make_audio_decoder(
-        &ogg_opus_head_from_mp4(parameters.clone()),
-        &AudioDecoderOptions::default(),
-    )?;
+    let codec_parameters = ogg_opus_head_from_mp4(parameters.clone());
+    let opus_pre_skip = opus_pre_skip(&codec_parameters, sample_rate);
+    let decoder =
+        codecs().make_audio_decoder(&codec_parameters, &AudioDecoderOptions::default())?;
     Ok(Track {
         reader,
         decoder,
@@ -177,6 +212,7 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
         channels,
         sample_rate,
         frames,
+        opus_pre_skip,
     })
 }
 
@@ -184,7 +220,7 @@ pub(crate) fn codecs() -> CodecRegistry {
     let mut codecs = CodecRegistry::new();
     symphonia::default::register_enabled_codecs(&mut codecs);
     #[cfg(feature = "opus")]
-    codecs.register_audio_decoder::<symphonia_adapter_libopus::OpusDecoder>();
+    codecs.register_audio_decoder::<symphonia_opus::OpusDecoder>();
     codecs
 }
 
@@ -203,6 +239,22 @@ fn ogg_opus_head_from_mp4(mut parameters: AudioCodecParameters) -> AudioCodecPar
         head[field].reverse();
     }
     parameters
+}
+
+fn opus_pre_skip(parameters: &AudioCodecParameters, sample_rate: u32) -> Option<usize> {
+    if parameters.codec != CODEC_ID_OPUS {
+        return None;
+    }
+    let pre_skip = parameters
+        .extra_data
+        .as_deref()
+        .and_then(|head| head.get(OPUS_HEAD_PRE_SKIP))
+        .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
+        .map_or(0, u16::from_le_bytes);
+    Some(
+        usize::try_from(u64::from(pre_skip) * u64::from(sample_rate) / OPUS_PRE_SKIP_RATE)
+            .unwrap_or(usize::MAX),
+    )
 }
 
 fn probe(

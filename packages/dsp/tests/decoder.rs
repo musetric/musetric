@@ -152,6 +152,8 @@ mod tests {
     #[cfg(feature = "opus")]
     const OPUS_PACKET_FRAMES: u32 = 960;
     #[cfg(feature = "opus")]
+    const OPUS_END_PADDING: u32 = 500;
+    #[cfg(feature = "opus")]
     const CELT_FULLBAND_20_MS_STEREO: u8 = 0xFC;
     #[cfg(feature = "opus")]
     const OGG_CRC_POLYNOMIAL: u32 = 0x04C1_1DB7;
@@ -199,7 +201,7 @@ mod tests {
     }
 
     #[cfg(feature = "opus")]
-    fn ogg_opus() -> Vec<u8> {
+    fn ogg_opus(granule: u32) -> Vec<u8> {
         let mut head = b"OpusHead\x01\x02".to_vec();
         head.extend_from_slice(&OPUS_PRE_SKIP.to_le_bytes());
         head.extend_from_slice(&RATE.to_le_bytes());
@@ -209,42 +211,58 @@ mod tests {
         let audio: Vec<Vec<u8>> = (0..OPUS_PACKETS)
             .map(|_| vec![CELT_FULLBAND_20_MS_STEREO])
             .collect();
-        let granule = u64::from(OPUS_PACKETS * OPUS_PACKET_FRAMES);
         [
             ogg_page(OGG_FIRST_PAGE, 0, 0, &[head]),
             ogg_page(0, 0, 1, &[tags]),
-            ogg_page(OGG_LAST_PAGE, granule, 2, &audio),
+            ogg_page(OGG_LAST_PAGE, u64::from(granule), 2, &audio),
         ]
         .concat()
     }
 
     #[cfg(feature = "opus")]
-    #[test]
-    fn decodes_ogg_opus_through_libopus_on_every_target() {
-        let decode = || {
-            let request = DecodeRequest {
-                source: Box::new(Cursor::new(ogg_opus())),
-                extension: Some("opus"),
-                sample_rate: None,
-                layout: Layout::Stereo,
-            };
-            let mut decoder = Decoder::open(request).expect("the stream should open");
-            let mut samples = Vec::new();
-            while let Some(frames) = decoder.read().expect("the stream should decode") {
-                samples.extend_from_slice(frames);
-            }
-            (decoder.sample_rate(), samples)
+    fn decode_ogg_opus(granule: u32) -> (u32, Option<usize>, Vec<f32>) {
+        let request = DecodeRequest {
+            source: Box::new(Cursor::new(ogg_opus(granule))),
+            extension: Some("opus"),
+            sample_rate: None,
+            layout: Layout::Stereo,
         };
+        let mut decoder = Decoder::open(request).expect("the stream should open");
+        let counted = decoder.frame_count();
+        let mut samples = Vec::new();
+        while let Some(frames) = decoder.read().expect("the stream should decode") {
+            samples.extend_from_slice(frames);
+        }
+        (decoder.sample_rate(), counted, samples)
+    }
 
-        let (rate, first) = decode();
-        let (_, second) = decode();
-        let frames = OPUS_PACKETS * OPUS_PACKET_FRAMES - u32::from(OPUS_PRE_SKIP);
+    #[cfg(feature = "opus")]
+    #[test]
+    fn decodes_ogg_opus_on_every_target() {
+        let granule = OPUS_PACKETS * OPUS_PACKET_FRAMES;
+        let (rate, counted, first) = decode_ogg_opus(granule);
+        let (_, _, second) = decode_ogg_opus(granule);
+        let frames = granule - u32::from(OPUS_PRE_SKIP);
         assert_eq!(rate, RATE);
+        assert_eq!(
+            counted,
+            Some(usize::try_from(frames).expect("the frames fit"))
+        );
         assert_eq!(
             first.len(),
             usize::try_from(frames * 2).expect("the frames fit")
         );
         assert!(first.iter().all(|sample| sample.abs() <= 1.0));
         assert_eq!(first, second);
+    }
+
+    #[cfg(feature = "opus")]
+    #[test]
+    fn trims_the_end_padding_of_ogg_opus() {
+        let granule = OPUS_PACKETS * OPUS_PACKET_FRAMES - OPUS_END_PADDING;
+        let (_, counted, samples) = decode_ogg_opus(granule);
+        let frames = usize::try_from(granule - u32::from(OPUS_PRE_SKIP)).expect("the frames fit");
+        assert_eq!(counted, Some(frames));
+        assert_eq!(samples.len(), frames * 2);
     }
 }

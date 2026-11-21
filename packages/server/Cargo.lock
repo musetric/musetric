@@ -2911,14 +2911,13 @@ version = "0.1.0"
 dependencies = [
  "ebur128",
  "flacenc",
- "opusic-sys",
  "rubato",
  "rustfft",
  "rusty_aac",
  "rusty_mp3",
  "sha2 0.11.1",
  "symphonia",
- "symphonia-adapter-libopus",
+ "symphonia-opus",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -3384,15 +3383,6 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
-
-[[package]]
-name = "opusic-sys"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d1ecdf206421bc74343ab3bb2f30ad2abbfee41fa341f7181fecbaf957769a"
-dependencies = [
- "cmake",
-]
 
 [[package]]
 name = "ordered-stream"
@@ -4828,17 +4818,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symphonia-adapter-libopus"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6febe6f88f9a9483db7e5b72a2dad916d8f8eb588d18905a39c861319fc7fa1"
-dependencies = [
- "log",
- "opusic-sys",
- "symphonia-core",
-]
-
-[[package]]
 name = "symphonia-bundle-flac"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5011,6 +4990,17 @@ dependencies = [
  "regex-lite",
  "smallvec",
  "symphonia-core",
+]
+
+[[package]]
+name = "symphonia-opus"
+version = "0.1.3"
+source = "git+https://github.com/musetric/symphonia-opus?rev=e7272663ddd5a77741c252b8c44ae026374e1092#e7272663ddd5a77741c252b8c44ae026374e1092"
+dependencies = [
+ "libm",
+ "log",
+ "symphonia-core",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
