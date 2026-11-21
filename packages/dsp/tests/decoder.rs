@@ -130,6 +130,21 @@ mod tests {
         assert_eq!(decoded.len(), 11_025);
     }
 
+    #[test]
+    fn counts_the_frames_of_a_take_before_it_decodes() {
+        for (sample_rate, frames) in [(None, usize::from(FRAMES)), (Some(44_100), 11_025)] {
+            let request = DecodeRequest {
+                source: Box::new(Cursor::new(mono_wav(&samples()))),
+                extension: Some("wav"),
+                sample_rate,
+                layout: Layout::Stereo,
+            };
+            let decoder = Decoder::open(request).expect("the take should open");
+
+            assert_eq!(decoder.frame_count(), Some(frames));
+        }
+    }
+
     #[cfg(feature = "opus")]
     const OPUS_PRE_SKIP: u16 = 312;
     #[cfg(feature = "opus")]
