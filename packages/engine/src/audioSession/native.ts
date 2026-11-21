@@ -40,7 +40,7 @@ const captureSchema = z.object({
 
 type NativeMicrophoneCommand =
   | { type: 'devices' }
-  | { type: 'start'; deviceId?: string; sampleRate: number }
+  | { type: 'start'; deviceId?: string }
   | { type: 'stop' }
   | { type: 'openSettings' };
 
@@ -49,7 +49,12 @@ export type NativeMicrophoneHandler = {
 };
 
 type NativeMicrophoneReceiver = {
-  receive: (session: number, frame: number, samples: string) => void;
+  receive: (
+    session: number,
+    frame: number,
+    sampleRate: number,
+    samples: string,
+  ) => void;
   devicechange: () => void;
 };
 
@@ -115,7 +120,7 @@ export const createNativeAudioSession = (
   setAudioSessionType('playback');
 
   readWindow().musetricMicrophone = {
-    receive: (session, frame, samples) => {
+    receive: (session, frame, sampleRate, samples) => {
       if (!capture || session < minimumSession) {
         return;
       }
@@ -123,7 +128,11 @@ export const createNativeAudioSession = (
         currentSession = session;
         capture.port.methods.reset();
       }
-      capture.port.methods.push({ frame, samples: decodeSamples(samples) });
+      capture.port.methods.push({
+        frame,
+        sampleRate,
+        samples: decodeSamples(samples),
+      });
     },
     devicechange: () => {
       window.clearTimeout(deviceChangeTimeout);
@@ -195,11 +204,7 @@ export const createNativeAudioSession = (
       try {
         const captureModule = await loadModule();
         const reply = captureSchema.parse(
-          await handler.postMessage({
-            type: 'start',
-            deviceId,
-            sampleRate: context.sampleRate,
-          }),
+          await handler.postMessage({ type: 'start', deviceId }),
         );
         capture ??= createCapture(captureModule);
         const { node, ready } = capture;

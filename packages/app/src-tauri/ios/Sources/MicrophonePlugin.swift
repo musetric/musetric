@@ -12,8 +12,9 @@ class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
 
   override func load(webview: WKWebView) {
     page = webview
-    capture.onChunk = { [weak self] session, frame, samples in
-      self?.page?.evaluateJavaScript("\(receiver)?.receive(\(session),\(frame),'\(samples)')")
+    capture.onChunk = { [weak self] session, frame, rate, samples in
+      self?.page?.evaluateJavaScript(
+        "\(receiver)?.receive(\(session),\(frame),\(rate),'\(samples)')")
     }
     capture.onDeviceChange = { [weak self] in
       self?.page?.evaluateJavaScript("\(receiver)?.devicechange()")
@@ -34,8 +35,7 @@ class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
     case "devices":
       replyHandler(capture.devices(), nil)
     case "start":
-      let sampleRate = body["sampleRate"] as? Double ?? 48000
-      capture.start(deviceId: body["deviceId"] as? String, sampleRate: sampleRate) { result in
+      capture.start(deviceId: body["deviceId"] as? String) { result in
         switch result {
         case .success(let description):
           replyHandler(description, nil)

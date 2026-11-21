@@ -24,7 +24,7 @@ export class NativeMicrophoneProcessor
       );
       port.bindHandlers({
         push: (chunk) => {
-          runtime.push(chunk.frame, chunk.samples);
+          runtime.push(chunk);
         },
         reset: () => {
           runtime.reset();
