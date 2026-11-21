@@ -9,7 +9,7 @@ export const tsConfig: Linter.Config = {
     ...jsConfig.languageOptions,
     parser: tsEslint.parser,
     parserOptions: {
-      projectService: true,
+      projectService: { EXPERIMENTAL_backend: 'tsgo' },
       tsconfigRootDir: process.cwd(),
     },
   },
