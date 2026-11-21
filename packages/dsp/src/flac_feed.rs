@@ -153,7 +153,7 @@ impl Opened {
     }
 }
 
-fn make_codec(reader: &FlacReader<'_>) -> Result<Box<dyn AudioDecoder>, BoxedError> {
+pub(crate) fn make_codec(reader: &FlacReader<'_>) -> Result<Box<dyn AudioDecoder>, BoxedError> {
     let parameters = reader
         .tracks()
         .first()
@@ -163,7 +163,7 @@ fn make_codec(reader: &FlacReader<'_>) -> Result<Box<dyn AudioDecoder>, BoxedErr
     Ok(codecs().make_audio_decoder(parameters, &AudioDecoderOptions::default())?)
 }
 
-fn open_span(
+pub(crate) fn open_span(
     info_header: &[u8; INFO_BYTE_LENGTH],
     span: &[u8],
 ) -> Result<FlacReader<'static>, BoxedError> {
