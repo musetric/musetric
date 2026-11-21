@@ -66,7 +66,7 @@ A ring of the last 131 072 samples of one channel, read at any position between 
 
 `@musetric/dsp/stretch.wasm` and `@musetric/dsp/capture.wasm` are their WebAssembly files, which a page compiles for an AudioWorklet, since a worklet can fetch nothing; the worklet passes the module to `initSync`.
 
-The package carries `license.md` and the project's `thirdPartyNotices.md`, with the notices of libopus and of the ports of Signalsmith Stretch and Signalsmith Linear that it builds in.
+The package carries `license.md`, the project's `thirdPartyNotices.md`, with the notices of libopus and of the ports of Signalsmith Stretch and Signalsmith Linear that it builds in, and `notices/crates.md`, with the licenses of the Rust crates compiled into its WebAssembly modules.
 
 ## Development
 

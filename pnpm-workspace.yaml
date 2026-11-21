@@ -4,6 +4,9 @@ savePrefix: ''
 nodeOptions: '--disable-warning=ExperimentalWarning --conditions=monorepo'
 autoInstallPeers: false
 strictPeerDependencies: true
+peerDependencyRules:
+  ignoreMissing:
+    - 'rollup'
 verifyDepsBeforeRun: install
 catalogMode: strict
 cleanupUnusedCatalogs: true
@@ -68,6 +71,7 @@ catalog:
   'react': '19.3.0'
   'react-dom': '19.3.0'
   'react-hook-form': '7.90.0'
+  'rollup-plugin-license': '3.7.2'
   'react-i18next': '17.0.16'
   'typescript': 'npm:@typescript/typescript6@6.0.2'
   'typescript-eslint': '8.73.0'

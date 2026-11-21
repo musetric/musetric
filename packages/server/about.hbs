@@ -1,0 +1,18 @@
+# Notices of crates
+
+The Rust crates compiled into this build, each under the license given for it, as cargo-about finds them from `packages/server/Cargo.lock`. The source of each crate is published at `https://crates.io/crates/<name>/<version>`. `pnpm fix:notices` writes this file again.
+
+{{#each licenses}}
+## {{{name}}}
+
+{{#each used_by}}
+{{#if crate.source}}
+- `{{crate.name}}` {{crate.version}}
+{{/if}}
+{{/each}}
+
+````text
+{{{text}}}
+````
+
+{{/each}}

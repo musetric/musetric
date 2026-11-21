@@ -4,3 +4,5 @@ target
 /legacy/
 /packages/mobile/src-tauri/gen/
 pnpm-lock.yaml
+packages/*/notices/
+packages/server/about.hbs
