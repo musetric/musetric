@@ -9,6 +9,7 @@ import {
   processRangeMetronome,
   type RangeFrames,
 } from './playerRange.worklet.js';
+import { createPlayerTracks } from './playerTracks.worklet.js';
 import { createHeldPlayheadValue } from './playhead.cross.js';
 import {
   createPlayheadPublisher,
@@ -17,7 +18,6 @@ import {
 import {
   type playerChannel,
   type playerDataChannel,
-  type PlayerTracks,
 } from './protocol.cross.js';
 import {
   createRecordingRuntime,
@@ -51,7 +51,6 @@ export const createPlayerRuntime = (
   );
 
   let frameCount = 0;
-  let tracks: PlayerTracks | undefined = undefined;
   let clockOffset: number | undefined = undefined;
   let revision = 0;
   let playing = false;
@@ -71,6 +70,7 @@ export const createPlayerRuntime = (
   const recordingTrack = createRecordingTrack(stretch, sampleRate);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
+  const tracks = createPlayerTracks(dataPort, () => range);
 
   const getVoiceShiftSemitones = () => (voiceShifted ? 12 * voiceOctave : 0);
 
@@ -162,20 +162,10 @@ export const createPlayerRuntime = (
     });
   };
 
-  const releaseTracks = () => {
-    for (const channels of Object.values(tracks ?? {})) {
-      for (const channel of channels) {
-        channel.buffer.transfer(0);
-      }
-    }
-    tracks = undefined;
-  };
-
   dataPort.bindHandlers({
     mount: (message) => {
       frameCount = message.frameCount;
-      releaseTracks();
-      tracks = message.tracks;
+      tracks.mount(message.layouts);
       refillTimePitch();
       recordingTrack.clear();
       recordingTrack.setPieces({ pieces: message.recording });
@@ -184,6 +174,13 @@ export const createPlayerRuntime = (
       recordingRuntime.resetInputOffset();
       publishHeld();
       setPlaying();
+      tracks.requestWindow(0, true);
+    },
+    putPage: (message) => {
+      tracks.put(message);
+    },
+    dropPages: (message) => {
+      tracks.drop(message.pages);
     },
     setRecordingPieces: (message) => {
       recordingTrack.setPieces(message);
@@ -196,7 +193,7 @@ export const createPlayerRuntime = (
     },
     unmount: () => {
       frameCount = 0;
-      releaseTracks();
+      tracks.release();
       recordingTrack.clear();
       position.begin(0);
       playing = false;
@@ -210,7 +207,7 @@ export const createPlayerRuntime = (
   port.bindHandlers({
     play: (message) => {
       revision = message.revision;
-      if (!tracks) {
+      if (!tracks.get()) {
         setPlaying();
         return;
       }
@@ -228,6 +225,7 @@ export const createPlayerRuntime = (
       metronome.clear();
       publishHeld();
       setPlaying();
+      tracks.requestWindow(message.frameIndex, true);
     },
     setFrozen: (message) => {
       frozen = message.frozen;
@@ -243,6 +241,7 @@ export const createPlayerRuntime = (
       metronome.reset(message.frameIndex);
       metronome.clear();
       publishHeld();
+      tracks.requestWindow(message.frameIndex, true);
     },
     setLatency: (message) => {
       applyLatencyFrameCounts(message);
@@ -281,6 +280,7 @@ export const createPlayerRuntime = (
         ? createRangeFrames(message.range, message.repeat, message.stopFrame)
         : undefined;
       refillTimePitch();
+      tracks.requestWindow(position.getFrameIndex(), true);
     },
     startRecording: (message) => {
       revision = message.revision;
@@ -298,7 +298,8 @@ export const createPlayerRuntime = (
         output.fill(0);
       }
 
-      if (!tracks || !playing) {
+      const currentTracks = tracks.get();
+      if (!currentTracks || !playing) {
         recordingRuntime.processDrain(inputs);
         return;
       }
@@ -315,10 +316,20 @@ export const createPlayerRuntime = (
         return;
       }
 
+      const currentOutputFrameIndex = position.getRenderFrameIndex();
+      tracks.requestWindow(currentOutputFrameIndex);
+      if (
+        !recordingRuntime.isActive() &&
+        !tracks.ready(currentTracks, currentOutputFrameIndex)
+      ) {
+        recordingRuntime.processDrain(inputs);
+        position.hold(contextFrame, outputFrameCount);
+        playhead.publish(getValue());
+        return;
+      }
+
       recordingRuntime.processInput(inputs);
 
-      const currentTracks = tracks;
-      const currentOutputFrameIndex = position.getRenderFrameIndex();
       const leadApart = getVoiceShiftSemitones() !== 0;
       const processedFrameCount = timePitchProcessor.process(
         outputs,

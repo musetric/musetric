@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { playerChannel, playerDataChannel } from '../protocol.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
+import { mountTracks } from './player.fixtures.js';
 import { loadStretch } from './stretchModule.js';
 
 const rate = 48000;
@@ -32,11 +33,12 @@ const createPlayer = async () => {
     getCurrentFrame: () => contextFrame,
   });
   const silence = () => [new Float32Array(2 * rate)];
-  playerDataChannel.outbound(data.port2).methods.mount({
-    frameCount: 2 * rate,
-    tracks: { lead: silence(), backing: silence(), instrumental: silence() },
-    recording: [],
-  });
+  mountTracks(
+    playerDataChannel.outbound(data.port2),
+    2 * rate,
+    { lead: silence(), backing: silence(), instrumental: silence() },
+    [],
+  );
   await settle();
   const player = playerChannel.outbound(control.port2).methods;
   player.setMetronome({

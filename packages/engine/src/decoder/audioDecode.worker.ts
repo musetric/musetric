@@ -1,5 +1,4 @@
 import { createAudioDecoder } from '@musetric/audio/decoder';
-import { stemTypes } from '@musetric/audio/es';
 import {
   type LiveTakeChunk,
   type LiveTakeStart,
@@ -7,15 +6,16 @@ import {
   type PlayerRecordingPiece,
 } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
+import { createPlayerPages, type PlayerPages } from './playerPages.worker.js';
 import {
   copyPieces,
   createRecordingAssembly,
   type RecordingAssembly,
 } from './recordingAssembly.worker.js';
 import {
-  createStemDecoders,
-  type StemDecoders,
-} from './stemDecoders.worker.js';
+  createStemPageReaders,
+  type StemPageReaders,
+} from './stemPageReaders.worker.js';
 
 export type CreateAudioDecodeOptions = {
   playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
@@ -54,7 +54,8 @@ export const createAudioDecode = (
 ): AudioDecode => {
   const { playerPort, spectrogramPort } = options;
   const decoder = createAudioDecoder();
-  let stemDecoders: StemDecoders | undefined = undefined;
+  let readers: StemPageReaders | undefined = undefined;
+  let playerPages: PlayerPages | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
   let assembly: RecordingAssembly | undefined = undefined;
   let activeRecordingId: number | undefined = undefined;
@@ -117,18 +118,49 @@ export const createAudioDecode = (
     await next;
   };
 
+  playerPort.bindHandlers({
+    requestWindow: (message) => {
+      playerPages?.requestWindow(message);
+    },
+  });
+
+  spectrogramPort.bindHandlers({
+    requestLeadPages: (message) => {
+      const lead = readers?.lead;
+      if (!lead || !mounted) {
+        return;
+      }
+      for (const index of message.indices) {
+        lead
+          .read(index, true)
+          .then((page) => {
+            spectrogramPort.methods.putLeadPage({
+              index,
+              startFrame: page.startFrame,
+              samples: page.samples,
+            });
+          })
+          .catch((error: unknown) => {
+            console.error('Failed to read a page of the lead', error);
+          });
+      }
+    },
+  });
+
   return {
     mount: async (message) => {
       const { projectId, sampleRate } = message;
       const recordingId = activeRecordingId;
-      stemDecoders ??= createStemDecoders(stemTypes.length);
-      const decoders = stemDecoders;
+      readers ??= createStemPageReaders();
+      const current = readers;
+      playerPages?.close();
+      playerPages = undefined;
       const [[lead, backing, instrumental], pieces] = await Promise.all([
-        Promise.all(
-          stemTypes.map(async (stem, slot) =>
-            decoders.decode(slot, { projectId, stem, sampleRate }),
-          ),
-        ),
+        Promise.all([
+          current.lead.open(projectId, sampleRate),
+          current.backing.open(projectId, sampleRate),
+          current.instrumental.open(projectId, sampleRate),
+        ]),
         loadPieces({ projectId, sampleRate }, recordingId),
       ]);
       const frameCount = Math.max(
@@ -136,18 +168,39 @@ export const createAudioDecode = (
         backing.frameCount,
         instrumental.frameCount,
       );
+      const layouts = {
+        lead: { frameCount: lead.frameCount, pageStarts: lead.pageStarts },
+        backing: {
+          frameCount: backing.frameCount,
+          pageStarts: backing.pageStarts,
+        },
+        instrumental: {
+          frameCount: instrumental.frameCount,
+          pageStarts: instrumental.pageStarts,
+        },
+      };
       mounted = { projectId, sampleRate, frameCount, recordingId, pieces };
+      playerPages = createPlayerPages({
+        readers: current,
+        layouts,
+        sampleRate,
+        putPage: (page) => {
+          playerPort.methods.putPage(page);
+        },
+        dropPages: (pages) => {
+          playerPort.methods.dropPages({ pages });
+        },
+        failed: (error) => {
+          console.error('Failed to read a page of a stem', error);
+        },
+      });
       spectrogramPort.methods.mount({
-        lead: lead.channels[0].slice(),
+        lead: layouts.lead,
         recording: copyPieces(pieces),
       });
       playerPort.methods.mount({
         frameCount,
-        tracks: {
-          lead: lead.channels,
-          backing: backing.channels,
-          instrumental: instrumental.channels,
-        },
+        layouts,
         recording: copyPieces(pieces),
       });
       const pending = reloadOnMount;
@@ -202,6 +255,8 @@ export const createAudioDecode = (
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
     unmount: () => {
       mounted = undefined;
+      playerPages?.close();
+      playerPages = undefined;
       reloadOnMount = undefined;
       activeRecordingId = undefined;
       playerPort.methods.unmount();

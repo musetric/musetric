@@ -1,4 +1,8 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
+import {
+  createTrackPageReader,
+  type TrackPages,
+} from './trackPages.worklet.js';
 
 const accompanimentStemTypes = stemTypes.filter(
   (stemType) => stemType !== 'lead',
@@ -15,7 +19,7 @@ export type MixTrackIntoBuffersOptions = {
   inputFrameOffset: number;
   inputFrameCount: number;
   channelCount: number;
-  track: Float32Array[] | undefined;
+  track: TrackPages | undefined;
   volume: number;
   frames?: MixTrackFrames;
 };
@@ -35,27 +39,20 @@ export const mixTrackIntoBuffers = (options: MixTrackIntoBuffersOptions) => {
     return;
   }
 
+  const read = createTrackPageReader(track);
   for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
     const input = inputBuffers[channelIndex];
-
-    const samples = track[channelIndex] ?? track[0];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!samples) {
-      continue;
-    }
-
     const frameBase = outputFrameIndex + inputFrameOffset;
     if (!frames) {
       for (let offset = 0; offset < inputFrameCount; offset += 1) {
-        const sample = samples[frameBase + offset] ?? 0;
-        input[offset] += sample * volume;
+        input[offset] += read(channelIndex, frameBase + offset) * volume;
       }
       continue;
     }
     for (let offset = 0; offset < inputFrameCount; offset += 1) {
       const songFrame = frames.songFrame(frameBase + offset);
-      const sample = samples[songFrame] ?? 0;
-      input[offset] += sample * volume * frames.gain(songFrame);
+      input[offset] +=
+        read(channelIndex, songFrame) * volume * frames.gain(songFrame);
     }
   }
 };
@@ -64,7 +61,7 @@ export type MixStemsIntoBuffersOptions = Omit<
   MixTrackIntoBuffersOptions,
   'track' | 'volume'
 > & {
-  tracks: Record<StemType, Float32Array[]>;
+  tracks: Record<StemType, TrackPages>;
   volumes: Partial<Record<StemType, number>>;
   leadApart: boolean;
 };
