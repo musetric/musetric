@@ -666,24 +666,31 @@ mod tests {
         socket
     }
 
+    async fn receive_data(socket: &mut ClientSocket) -> ClientMessage {
+        loop {
+            let received_message = socket
+                .next()
+                .await
+                .expect("the server should send a message")
+                .expect("the message should be valid");
+            if !matches!(
+                received_message,
+                ClientMessage::Ping(_) | ClientMessage::Pong(_)
+            ) {
+                return received_message;
+            }
+        }
+    }
+
     async fn receive_json(socket: &mut ClientSocket) -> Value {
-        let received_message = socket
-            .next()
-            .await
-            .expect("the server should send an event")
-            .expect("the event should be valid");
-        let ClientMessage::Text(event_text) = received_message else {
+        let ClientMessage::Text(event_text) = receive_data(socket).await else {
             panic!("the server should send a text event");
         };
         serde_json::from_str(&event_text).expect("the event should be json")
     }
 
     async fn receive_binary(socket: &mut ClientSocket) -> Vec<u8> {
-        let received_message = socket
-            .next()
-            .await
-            .expect("the server should send a packet")
-            .expect("the packet should be valid");
+        let received_message = receive_data(socket).await;
         let ClientMessage::Binary(payload) = received_message else {
             panic!("the server should send a binary packet");
         };
@@ -1920,8 +1927,8 @@ mod tests {
         let storage = workspace.create_storage();
         let mut state = create_route_state(&workspace, Arc::clone(&storage)).await;
         state.rooms = Arc::new(Rooms::with_heartbeat(Heartbeat {
-            interval: Duration::from_millis(50),
-            silence: Duration::from_millis(300),
+            interval: Duration::from_millis(100),
+            silence: Duration::from_secs(1),
         }));
         let (base, _server) = serve_state(state).await;
         let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
