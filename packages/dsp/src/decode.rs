@@ -62,6 +62,7 @@ pub struct Decoder {
     channels: usize,
     conversion: Conversion,
     sample_rate: u32,
+    counted_frames: Option<u64>,
     interleaved: Vec<f32>,
     read_frames: usize,
     finished: bool,
@@ -87,6 +88,7 @@ impl Decoder {
             channels,
             conversion: Conversion::create(rates, channels)?,
             sample_rate: rates.output,
+            counted_frames: track.frames,
             interleaved: Vec::new(),
             read_frames: 0,
             finished: false,
@@ -101,6 +103,14 @@ impl Decoder {
     #[must_use]
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
+    }
+
+    #[must_use]
+    pub fn frame_count(&self) -> Option<usize> {
+        self.counted_frames
+            .filter(|counted| *counted > 0)
+            .and_then(|counted| usize::try_from(counted).ok())
+            .map(|counted| self.conversion.output_frames(counted))
     }
 
     pub fn read(&mut self) -> Result<Option<&[f32]>, BoxedError> {
@@ -133,6 +143,7 @@ struct Track {
     id: u32,
     channels: Channels,
     sample_rate: u32,
+    frames: Option<u64>,
 }
 
 fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, BoxedError> {
@@ -141,6 +152,7 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
         .default_track(TrackType::Audio)
         .ok_or(BoxedError::from(NO_TRACK))?;
     let id = track.id;
+    let frames = track.num_frames;
     let parameters = track
         .codec_params
         .as_ref()
@@ -164,6 +176,7 @@ fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Track, 
         id,
         channels,
         sample_rate,
+        frames,
     })
 }
 

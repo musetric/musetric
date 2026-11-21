@@ -3,7 +3,7 @@ use std::io::Cursor;
 use wasm_bindgen::prelude::{JsError, wasm_bindgen};
 
 use crate::{
-    BoxedError, CHANNELS,
+    BoxedError,
     decode::{DecodeRequest, Decoder, Layout},
     flac_feed,
     peaks::WavePeaks,
@@ -56,6 +56,12 @@ impl StreamDecoder {
     #[must_use]
     pub fn sample_rate(&self) -> u32 {
         self.decoder.sample_rate()
+    }
+
+    #[wasm_bindgen(getter, js_name = frameCount)]
+    #[must_use]
+    pub fn frame_count(&self) -> Option<usize> {
+        self.decoder.frame_count()
     }
 
     pub fn read(&mut self) -> Result<Option<Vec<f32>>, JsError> {
@@ -143,10 +149,27 @@ impl Resampler {
     }
 }
 
-#[wasm_bindgen(js_name = wavePeaks)]
-#[must_use]
-pub fn wave_peaks(samples: &[f32]) -> Vec<f32> {
-    let mut peaks = WavePeaks::create((samples.len() / CHANNELS) as u64);
-    peaks.push(samples);
-    peaks.finish()
+#[wasm_bindgen(js_name = WavePeaks)]
+pub struct WavePeakTrace {
+    peaks: WavePeaks,
+}
+
+#[wasm_bindgen(js_class = WavePeaks)]
+impl WavePeakTrace {
+    #[wasm_bindgen(constructor)]
+    #[must_use]
+    pub fn new(frame_count: usize) -> WavePeakTrace {
+        Self {
+            peaks: WavePeaks::create(frame_count as u64),
+        }
+    }
+
+    pub fn push(&mut self, samples: &[f32]) {
+        self.peaks.push(samples);
+    }
+
+    #[must_use]
+    pub fn peaks(&self) -> Vec<f32> {
+        self.peaks.peaks().to_vec()
+    }
 }

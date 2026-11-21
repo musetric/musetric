@@ -56,6 +56,11 @@ impl WavePeaks {
     }
 
     #[must_use]
+    pub fn peaks(&self) -> &[f32] {
+        &self.peaks
+    }
+
+    #[must_use]
     pub fn finish(self) -> Vec<f32> {
         self.peaks
     }
