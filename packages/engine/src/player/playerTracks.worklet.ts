@@ -1,4 +1,15 @@
-import { type StemType } from '@musetric/audio/es';
+import { type StemType, stemTypes } from '@musetric/audio/es';
+import {
+  dropMixerPage,
+  type InitOutput,
+  mixerPageInput,
+  mixerReady,
+  mixStems,
+  openMixer,
+  setMixerRange,
+  setMixerStem,
+  setMixerVolumes,
+} from '@musetric/dsp/stretch';
 import { type RangeFrames } from './playerRange.worklet.js';
 import {
   type playerDataChannel,
@@ -6,88 +17,145 @@ import {
   type PlayerPageKey,
   type PlayerStemLayouts,
 } from './protocol.cross.js';
-import {
-  createTrackPages,
-  dropTrackPage,
-  hasTrackFrame,
-  putTrackPage,
-  type TrackPages,
-} from './trackPages.worklet.js';
 
-const readyMarginFrameCount = 16384;
-const readyStepFrameCount = 4096;
 const windowReportFrameCount = 12000;
+const mixerChannelCount = 2;
 
-export type StemTracks = Record<StemType, TrackPages>;
+const stemIndices: Record<StemType, number> = {
+  lead: 0,
+  backing: 1,
+  instrumental: 2,
+};
+
+export const allStemsMask = 0b111;
+export const accompanimentMask = 0b110;
+export const leadMask = 0b001;
 
 export type PlayerTracks = {
-  get: () => StemTracks | undefined;
+  mounted: () => boolean;
   mount: (layouts: PlayerStemLayouts) => void;
   put: (page: PlayerPage) => void;
   drop: (pages: PlayerPageKey[]) => void;
   release: () => void;
-  ready: (tracks: StemTracks, frameIndex: number) => boolean;
+  ready: (frameIndex: number) => boolean;
+  setRange: (range: RangeFrames | undefined) => void;
+  setVolumes: (volumes: Partial<Record<StemType, number>>) => void;
+  mixInto: (
+    inputBuffers: Float32Array[],
+    firstFrame: number,
+    frameCount: number,
+    mask: number,
+  ) => void;
   requestWindow: (frameIndex: number, force?: true) => void;
 };
 
 export const createPlayerTracks = (
+  stretch: InitOutput,
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>,
   getRange: () => RangeFrames | undefined,
 ): PlayerTracks => {
-  let tracks: StemTracks | undefined = undefined;
+  const handle = openMixer(mixerChannelCount, stemTypes.length);
+  let mixedViews: Float32Array[] = [];
+  let mounted = false;
+
+  const viewMixed = (pointer: number, frameCount: number): Float32Array[] => {
+    const first = mixedViews.at(0);
+    if (
+      !first ||
+      first.buffer !== stretch.memory.buffer ||
+      first.byteOffset !== pointer ||
+      first.length !== frameCount
+    ) {
+      mixedViews = Array.from(
+        { length: mixerChannelCount },
+        (_, channel) =>
+          new Float32Array(
+            stretch.memory.buffer,
+            pointer + channel * frameCount * Float32Array.BYTES_PER_ELEMENT,
+            frameCount,
+          ),
+      );
+    }
+    return mixedViews;
+  };
   let reportedFrameIndex: number | undefined = undefined;
 
   const release = () => {
-    for (const track of Object.values(tracks ?? {})) {
-      for (let index = 0; index < track.pages.length; index += 1) {
-        dropTrackPage(track, index);
-      }
+    for (const stem of stemTypes) {
+      setMixerStem(handle, stemIndices[stem], 0, new Uint32Array(0));
     }
-    tracks = undefined;
+    mounted = false;
     reportedFrameIndex = undefined;
   };
 
   return {
-    get: () => tracks,
+    mounted: () => mounted,
     mount: (layouts) => {
-      release();
-      tracks = {
-        lead: createTrackPages(layouts.lead),
-        backing: createTrackPages(layouts.backing),
-        instrumental: createTrackPages(layouts.instrumental),
-      };
+      for (const stem of stemTypes) {
+        const layout = layouts[stem];
+        setMixerStem(
+          handle,
+          stemIndices[stem],
+          layout.frameCount,
+          Uint32Array.from(layout.pageStarts),
+        );
+      }
+      mounted = true;
+      reportedFrameIndex = undefined;
     },
     put: (page) => {
-      const track = tracks?.[page.stem];
-      if (track) {
-        putTrackPage(track, page);
+      const pointer = mixerPageInput(
+        handle,
+        stemIndices[page.stem],
+        page.index,
+        page.samples.length,
+      );
+      if (pointer === 0) {
+        return;
       }
+      new Float32Array(stretch.memory.buffer, pointer, page.samples.length).set(
+        page.samples,
+      );
     },
     drop: (pages) => {
       for (const page of pages) {
-        const track = tracks?.[page.stem];
-        if (track) {
-          dropTrackPage(track, page.index);
-        }
+        dropMixerPage(handle, stemIndices[page.stem], page.index);
       }
     },
     release,
-    ready: (current, frameIndex) => {
-      const range = getRange();
-      const from = frameIndex - readyMarginFrameCount;
-      const to = frameIndex + readyMarginFrameCount;
-      for (let frame = from; frame <= to; frame += readyStepFrameCount) {
-        const songFrame = range ? range.songFrame(frame) : frame;
-        for (const track of Object.values(current)) {
-          if (!hasTrackFrame(track, songFrame)) {
-            return false;
-          }
-        }
+    ready: (frameIndex) => mixerReady(handle, frameIndex),
+    setRange: (range) => {
+      setMixerRange(
+        handle,
+        range?.repeat === 'cycle',
+        range
+          ? Float64Array.of(
+              range.range.fromFrame,
+              range.range.toFrame,
+              range.endFrame,
+            )
+          : new Float64Array(0),
+      );
+    },
+    setVolumes: (volumes) => {
+      setMixerVolumes(
+        handle,
+        Float32Array.from(stemTypes, (stem) => volumes[stem] ?? 1),
+      );
+    },
+    mixInto: (inputBuffers, firstFrame, frameCount, mask) => {
+      const mixed = viewMixed(
+        mixStems(handle, firstFrame, frameCount, mask),
+        frameCount,
+      );
+      for (let channel = 0; channel < inputBuffers.length; channel += 1) {
+        inputBuffers[channel].set(
+          mixed[Math.min(channel, mixerChannelCount - 1)],
+        );
       }
-      return true;
     },
     requestWindow: (frameIndex, force) => {
-      if (!tracks) {
+      if (!mounted) {
         return;
       }
       if (

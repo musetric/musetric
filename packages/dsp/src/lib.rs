@@ -11,6 +11,7 @@ pub mod mix;
 pub mod mono;
 pub mod mp3;
 mod mp4box;
+pub mod page_mix;
 pub mod peaks;
 pub mod resample;
 pub mod stretch;

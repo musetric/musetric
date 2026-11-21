@@ -12,3 +12,9 @@ pub fn limit_peak(mixed: &mut [f32]) {
         *value *= scale;
     }
 }
+
+pub fn add_gained(target: &mut [f32], source: &[f32], gain: f32) {
+    for (sum, sample) in target.iter_mut().zip(source) {
+        *sum += *sample * gain;
+    }
+}

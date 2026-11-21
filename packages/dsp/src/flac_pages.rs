@@ -5,11 +5,13 @@ use crate::{
     decode::{decode_packet, next_packet},
     flac::{INFO_BYTE_LENGTH, read_layout},
     flac_feed::{make_codec, open_span},
+    mono::Downmix,
 };
 
 const NO_COUNT: &str = "The flac master does not count its frames";
 const NO_PAGE: &str = "The flac master has no such page";
 const WRONG_LENGTH: &str = "The flac page decoded to another length than its seek table gives";
+const NOT_STEREO: &str = "Only a stereo page folds to the mean of its channels";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FlacPage {
@@ -87,7 +89,38 @@ impl FlacPages {
         &self.pages
     }
 
+    pub fn decode_mean(&mut self, index: usize, bytes: &[u8]) -> Result<&[f32], BoxedError> {
+        if self.channels != 2 {
+            return Err(NOT_STEREO.into());
+        }
+        self.decode_interleaved(index, bytes)?;
+        self.planar.clear();
+        self.planar.extend(
+            self.decoded
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|[left, right]| Downmix::Mean.apply(*left, *right)),
+        );
+        Ok(&self.planar)
+    }
+
     pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<&[f32], BoxedError> {
+        self.decode_interleaved(index, bytes)?;
+        self.planar.clear();
+        for channel in 0..self.channels {
+            self.planar.extend(
+                self.decoded
+                    .iter()
+                    .skip(channel)
+                    .step_by(self.channels)
+                    .copied(),
+            );
+        }
+        Ok(&self.planar)
+    }
+
+    fn decode_interleaved(&mut self, index: usize, bytes: &[u8]) -> Result<(), BoxedError> {
         let page = *self.pages.get(index).ok_or(NO_PAGE)?;
         let mut reader = open_span(&self.info_header, bytes)?;
         let codec = match self.codec.as_mut() {
@@ -109,16 +142,6 @@ impl FlacPages {
         if u64::try_from(frames)? != page.frames {
             return Err(WRONG_LENGTH.into());
         }
-        self.planar.clear();
-        for channel in 0..self.channels {
-            self.planar.extend(
-                self.decoded
-                    .iter()
-                    .skip(channel)
-                    .step_by(self.channels)
-                    .copied(),
-            );
-        }
-        Ok(&self.planar)
+        Ok(())
     }
 }

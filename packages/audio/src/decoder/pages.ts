@@ -45,7 +45,7 @@ export type MasterPages = {
   sampleRate: number;
   channelCount: number;
   pageStarts: number[];
-  read: (index: number) => Promise<MasterPage>;
+  read: (index: number, mean: boolean) => Promise<MasterPage>;
   free: () => void;
 };
 
@@ -64,7 +64,7 @@ export const openMasterPages = async (
     sampleRate: pages.sampleRate,
     channelCount,
     pageStarts,
-    read: async (index) => {
+    read: async (index, mean) => {
       const from = pages.byteStart(index);
       const frameCount = pages.pageFrames(index);
       if (from === undefined || frameCount === undefined) {
@@ -75,7 +75,9 @@ export const openMasterPages = async (
         index,
         startFrame: pageStarts[index],
         frameCount,
-        samples: ownBuffer(pages.decode(index, bytes)),
+        samples: ownBuffer(
+          mean ? pages.decodeMean(index, bytes) : pages.decode(index, bytes),
+        ),
       };
     },
     free: () => {

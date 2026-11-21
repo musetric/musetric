@@ -3,13 +3,16 @@ import { createTimePitchProcessor } from '@musetric/audio/player';
 import { createHeardPosition } from './heardPosition.worklet.js';
 import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
-import { mixStemsIntoBuffers } from './mixTrack.worklet.js';
 import {
   createRangeFrames,
   processRangeMetronome,
   type RangeFrames,
 } from './playerRange.worklet.js';
-import { createPlayerTracks } from './playerTracks.worklet.js';
+import {
+  accompanimentMask,
+  allStemsMask,
+  createPlayerTracks,
+} from './playerTracks.worklet.js';
 import { createHeldPlayheadValue } from './playhead.cross.js';
 import {
   createPlayheadPublisher,
@@ -70,7 +73,7 @@ export const createPlayerRuntime = (
   const recordingTrack = createRecordingTrack(stretch, sampleRate);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
-  const tracks = createPlayerTracks(dataPort, () => range);
+  const tracks = createPlayerTracks(stretch, dataPort, () => range);
 
   const getVoiceShiftSemitones = () => (voiceShifted ? 12 * voiceOctave : 0);
 
@@ -207,7 +210,7 @@ export const createPlayerRuntime = (
   port.bindHandlers({
     play: (message) => {
       revision = message.revision;
-      if (!tracks.get()) {
+      if (!tracks.mounted()) {
         setPlaying();
         return;
       }
@@ -267,6 +270,7 @@ export const createPlayerRuntime = (
     },
     setTrackVolume: (message) => {
       trackVolumes[message.stemType] = message.volume;
+      tracks.setVolumes(trackVolumes);
       refillTimePitch();
     },
     setRecordingVolume: (message) => {
@@ -279,6 +283,7 @@ export const createPlayerRuntime = (
       range = message.range
         ? createRangeFrames(message.range, message.repeat, message.stopFrame)
         : undefined;
+      tracks.setRange(range);
       refillTimePitch();
       tracks.requestWindow(position.getFrameIndex(), true);
     },
@@ -298,8 +303,7 @@ export const createPlayerRuntime = (
         output.fill(0);
       }
 
-      const currentTracks = tracks.get();
-      if (!currentTracks || !playing) {
+      if (!tracks.mounted() || !playing) {
         recordingRuntime.processDrain(inputs);
         return;
       }
@@ -320,7 +324,7 @@ export const createPlayerRuntime = (
       tracks.requestWindow(currentOutputFrameIndex);
       if (
         !recordingRuntime.isActive() &&
-        !tracks.ready(currentTracks, currentOutputFrameIndex)
+        !tracks.ready(currentOutputFrameIndex)
       ) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
@@ -335,26 +339,19 @@ export const createPlayerRuntime = (
         outputs,
         currentOutputFrameIndex,
         (inputBuffers, inputFrameOffset, inputFrameCount) => {
-          mixStemsIntoBuffers({
+          tracks.mixInto(
             inputBuffers,
-            outputFrameIndex: currentOutputFrameIndex,
-            inputFrameOffset,
+            currentOutputFrameIndex + inputFrameOffset,
             inputFrameCount,
-            channelCount: outputs.length,
-            tracks: currentTracks,
-            volumes: trackVolumes,
-            leadApart,
-            frames: range,
-          });
+            leadApart ? accompanimentMask : allStemsMask,
+          );
         },
       );
       if (leadApart) {
         leadVoice.mixInto({
           outputs,
           outputFrameIndex: currentOutputFrameIndex,
-          track: currentTracks.lead,
-          volume: trackVolumes.lead ?? 1,
-          frames: range,
+          tracks,
         });
       }
       mixRecording(outputs, currentOutputFrameIndex);
