@@ -519,11 +519,11 @@ mod tests {
     #[tokio::test]
     async fn keeps_the_preferred_port_when_it_is_free() {
         let workspace = Workspace::new();
-        let listen = std::net::TcpListener::bind("127.0.0.1:0")
-            .expect("the port should bind")
-            .local_addr()
-            .expect("the port should have an address")
-            .to_string();
+        let listen = (20_000..30_000)
+            .step_by(97)
+            .map(|port| format!("127.0.0.1:{port}"))
+            .find(|address| std::net::TcpListener::bind(address).is_ok())
+            .expect("a port below the ephemeral range should be free");
         let server = start_embedded(EmbeddedServerOptions {
             listen: listen.clone(),
             ..workspace.options()
