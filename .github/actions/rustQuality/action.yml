@@ -1,5 +1,5 @@
 name: Rust Quality
-description: Rust ast, format, clippy and test checks, natively and for WebAssembly
+description: Rust ast, format, clippy and test checks, natively and for WebAssembly, and the notices of the crates
 
 runs:
   using: composite
@@ -21,6 +21,14 @@ runs:
         shared-key: rust-quality
         save-if: ${{ github.ref == 'refs/heads/main' }}
     - uses: ./.github/actions/buildDsp
+    - name: Install cargo-about
+      shell: bash
+      env:
+        CARGO_ABOUT_VERSION: 0.9.3
+      run: |
+        mkdir -p "$RUNNER_TEMP/bin"
+        curl -fsSL "https://github.com/EmbarkStudios/cargo-about/releases/download/$CARGO_ABOUT_VERSION/cargo-about-$CARGO_ABOUT_VERSION-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$RUNNER_TEMP/bin" --strip-components=1 "cargo-about-$CARGO_ABOUT_VERSION-x86_64-unknown-linux-musl/cargo-about"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
     - run: |
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
@@ -36,4 +44,6 @@ runs:
     - run: pnpm --filter @musetric/server check:rust:test
       shell: bash
     - run: pnpm --filter @musetric/server check:rust:wasm
+      shell: bash
+    - run: pnpm check:notices:crates
       shell: bash

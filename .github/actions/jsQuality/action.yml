@@ -3,7 +3,7 @@ description: JS dependency, format, TypeScript, lint, and test checks, one part 
 
 inputs:
   part:
-    description: static (dependencies, unused code, format, translations, comments), types (TypeScript and the frontend build), lint or test
+    description: static (dependencies, unused code, format, translations, comments), types (TypeScript, and the frontend build with the notices of its packages), lint or test
     required: true
 
 runs:
@@ -35,7 +35,7 @@ runs:
     - if: inputs.part == 'types'
       run: |
         pnpm check:ts
-        pnpm --filter @musetric/app build:ui
+        pnpm check:notices:packages
       shell: bash
     - if: inputs.part == 'lint'
       uses: actions/cache@v5

@@ -1,6 +1,10 @@
 # Third-party Notices
 
-This project includes or adapts portions of the following third-party works.
+This file names the works whose code Musetric adapts, the models it runs and the libraries whose notices no package manifest carries. The licenses of the Rust crates and npm packages compiled into each build are generated from the lockfiles by `pnpm fix:notices` and ship with that build:
+
+- `packages/app/notices/crates.md`: the Rust crates of the app, in its host on every platform and in its WebAssembly modules.
+- `packages/app/notices/interface.md` and `packages/app/notices/executor.md`: the npm packages of the app's interface and of its model executor.
+- `packages/dsp/notices/crates.md`: the Rust crates of the WebAssembly modules of `@musetric/dsp`.
 
 ## Ultimate Vocal Remover GUI / MDX-Net
 
@@ -367,3 +371,33 @@ https://datatracker.ietf.org/ipr/1914/
 
 Broadcom Corporation:
 https://datatracker.ietf.org/ipr/1526/
+
+## ONNX Runtime Web
+
+- Source: https://onnxruntime.ai, the npm packages `onnxruntime-web` and `onnxruntime-common` 1.30.0.
+- Usage: runs the models in the model executor of the app, whose bundle carries its JavaScript and its WebAssembly module.
+- Local files: `packages/app/notices/onnxruntime.txt`, the third-party notices that ONNX Runtime 1.30.0 publishes for the libraries compiled into it, since neither npm package ships its license or those notices.
+- License: MIT.
+- License source: upstream `LICENSE`.
+
+MIT License
+
+Copyright (c) Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -18,6 +18,7 @@
     "**/index.html",
     "**/package.json",
     "**/*.bench.*",
-    "**/*.test.*"
+    "**/*.test.*",
+    "**/notices/**"
   ]
 }

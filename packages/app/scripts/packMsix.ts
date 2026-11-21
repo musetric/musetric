@@ -79,6 +79,11 @@ copyFileSync(
 for (const name of resources) {
   copyFileSync(join(repositoryDir, name), join(stageDir, name));
 }
+const noticesDir = join(packageDir, 'notices');
+mkdirSync(join(stageDir, 'notices'));
+for (const name of readdirSync(noticesDir)) {
+  copyFileSync(join(noticesDir, name), join(stageDir, 'notices', name));
+}
 for (const name of assets) {
   copyFileSync(
     join(tauriDir, 'gen-assets', name),

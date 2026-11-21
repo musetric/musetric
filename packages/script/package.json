@@ -26,6 +26,7 @@
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
     "png-to-ico": "catalog:",
+    "rollup-plugin-license": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

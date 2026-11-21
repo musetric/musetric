@@ -27,7 +27,7 @@
 - `packages/checks`: repository checks published to npm for the other repositories of the organization: English letters only, the paths of the notices, markdown links, comments, and the dependencies of `package.json`.
 - `packages/performance`: performance-focused playground and measurement app for audio work.
 - `packages/measure`: measurements of recording on a real device (timing, delay, sound) over the Chrome DevTools protocol.
-- `packages/script`: build tooling shared by the packages, such as the favicons plugin.
+- `packages/script`: build tooling shared by the packages, such as the favicons plugin and the notices plugin.
 - `packages/server`: the Rust host: http api, storage, processing queue and gpu executor, a self-contained Cargo workspace with its own toolchain pin and lockfile.
 
 ## Ground Rules
@@ -98,6 +98,7 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `pnpm test`: the tests of every package.
 - `pnpm check:deps:dupe` and `pnpm check:deps:security`, when dependencies changed: `catalog:` for every external version, `dependencies` only in the packages that `checks.deps.except` of the root `package.json` lists, and the peers of the workspace packages, which `musetric-deps` of `@musetric/checks` checks, duplicate versions in the lockfile, which `pnpm fix:deps:dupe` fixes, and advisories of high severity; one that no release can fix yet goes to `auditConfig.ignoreGhsas` of `pnpm-workspace.yaml`, with its reason in the commit that adds it.
 - `pnpm check:deps:security:rust`: every advisory against `packages/server/Cargo.lock` in the OSV database, which holds those of GitHub and RustSec, through the global osv-scanner binary at the version `.github/actions/baseQuality` pins. CI runs it on every pull request, since a new advisory needs no change of ours; one that no release can fix yet goes to `packages/server/osv-scanner.toml` with its reason.
+- `pnpm check:notices:crates` and `pnpm check:notices:packages`, when dependencies changed: the licenses of the Rust crates and npm packages compiled into each build, which `pnpm fix:notices` writes into the `notices` folders of `packages/app` and `packages/dsp`, through the global cargo-about binary at the version `.github/actions/rustQuality` pins and the notices plugin of the app's Vite builds; a license missing from `accepted` of `packages/server/about.toml` or from `allowedLicenses` of `packages/script/src/noticesPlugin.ts` fails them.
 - `pnpm check:english`, `pnpm check:notices` and `pnpm check:links`: letters outside English, files the notices name that are gone, and links that do not resolve; a file where another language is part of its meaning goes to `checks.english.except` of the root `package.json`.
 - `pnpm check:comments`: comments and docstrings in any language, beyond tool directives and `@see`, `@todo` and `@fixme`; third-party code goes to `checks.comments.except` of the root `package.json`.
 - `pnpm check:dupe` and `pnpm check:editorconfig`: duplicated code and editor settings, through the global jscpd and editorconfig-checker binaries at the versions `.github/actions/baseQuality` pins.

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { favicons } from '@musetric/script/faviconsPlugin';
+import { notices } from '@musetric/script/noticesPlugin';
 import react from '@vitejs/plugin-react';
 import { defaultClientConditions, defineConfig } from 'vite';
 
@@ -18,6 +19,7 @@ export default defineConfig({
       svgPath: fileURLToPath(new URL('./src/favicon.svg', import.meta.url)),
       name: 'Musetric',
     }),
+    notices(fileURLToPath(new URL('./notices/interface.md', import.meta.url))),
   ],
   resolve: {
     conditions: defaultClientConditions.concat('monorepo'),

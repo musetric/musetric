@@ -23,6 +23,11 @@
     "check:editorconfig": "editorconfig-checker",
     "check:english": "node packages/checks/src/cli.ts english",
     "check:notices": "node packages/checks/src/cli.ts notices",
+    "check:notices:crates": "pnpm fix:notices:crates && git diff --exit-code -- packages/app/notices/crates.md packages/dsp/notices/crates.md || (echo Run pnpm fix:notices and commit the notices && exit 1)",
+    "fix:notices:crates": "pnpm --filter @musetric/server fix:notices",
+    "check:notices:packages": "pnpm fix:notices:packages && git diff --exit-code -- packages/app/notices/interface.md packages/app/notices/executor.md || (echo Run pnpm fix:notices and commit the notices && exit 1)",
+    "fix:notices:packages": "pnpm --filter @musetric/app build:ui",
+    "fix:notices": "pnpm fix:notices:crates && pnpm fix:notices:packages",
     "check:links": "node packages/checks/src/cli.ts links",
     "check:comments": "node packages/checks/src/cli.ts comments",
     "check:unused": "knip",
@@ -53,7 +58,8 @@
         "packages/ai/src/transcription/hallucinationFilter.ts",
         "packages/ai/src/transcription/__test__/filters.test.ts",
         "packages/ai/src/transcription/__test__/wordPieces.test.ts",
-        "packages/server/src/cached_file.rs"
+        "packages/server/src/cached_file.rs",
+        "packages/*/notices/*"
       ]
     }
   }

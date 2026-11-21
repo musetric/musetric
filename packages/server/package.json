@@ -19,7 +19,8 @@
     "check:rust:test": "cargo test --workspace --locked",
     "check:rust:wasm": "cargo clippy -p musetric-dsp --target wasm32-unknown-unknown --all-targets --locked -- -D warnings && cargo test -p musetric-dsp --target wasm32-unknown-unknown --locked",
     "check:rust": "pnpm check:rust:ast && pnpm check:rust:fmt && pnpm check:rust:clippy && pnpm check:rust:test && pnpm check:rust:wasm",
-    "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
+    "fix:rust": "cargo fmt --all && cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged",
+    "fix:notices": "node scripts/notices.ts"
   },
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
