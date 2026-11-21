@@ -10,12 +10,23 @@ const delay = Math.round(nativeMicrophoneDelaySeconds * rate);
 const createRamp = (frame: number, length: number) =>
   Float32Array.from({ length }, (_, index) => frame + index);
 
+const createTone = (
+  frequency: number,
+  sampleRate: number,
+  frame: number,
+  length: number,
+) =>
+  Float32Array.from({ length }, (_, index) =>
+    Math.sin((2 * Math.PI * frequency * (frame + index)) / sampleRate),
+  );
+
 const ignoreReady = () => undefined;
 
 type Simulation = {
   seconds: number;
   clockRatio: number;
   chunkSize: number;
+  microphoneRate?: number;
   stall?: { at: number; frames: number };
 };
 
@@ -25,6 +36,8 @@ const simulate = (simulation: Simulation) => {
     rate,
     ignoreReady,
   );
+  const microphoneRate = simulation.microphoneRate ?? rate;
+  const step = microphoneRate / rate;
   const blocks = Math.round((simulation.seconds * rate) / blockSize);
   const positions: number[] = [];
   const pending: Float32Array[] = [];
@@ -33,7 +46,7 @@ const simulate = (simulation: Simulation) => {
   let stallUntil = -1;
   for (let block = 0; block < blocks; block += 1) {
     const now = block * blockSize;
-    const target = Math.floor(now * simulation.clockRatio);
+    const target = Math.floor(now * simulation.clockRatio * step);
     while (produced + simulation.chunkSize <= target) {
       pending.push(createRamp(produced, simulation.chunkSize));
       produced += simulation.chunkSize;
@@ -42,16 +55,16 @@ const simulate = (simulation: Simulation) => {
       stallUntil = now + simulation.stall.frames;
     }
     if (now >= stallUntil) {
-      for (const chunk of pending.splice(0)) {
-        runtime.push(sent, chunk);
-        sent += chunk.length;
+      for (const samples of pending.splice(0)) {
+        runtime.push({ frame: sent, sampleRate: microphoneRate, samples });
+        sent += samples.length;
       }
     }
     const output = new Float32Array(blockSize);
     runtime.process(output);
     positions.push(output[blockSize - 1]);
   }
-  return { positions, blocks };
+  return { positions, blocks, step };
 };
 
 describe('native microphone runtime', () => {
@@ -68,7 +81,11 @@ describe('native microphone runtime', () => {
     const output = new Float32Array(blockSize);
     const played: number[] = [];
     for (let chunk = 0; chunk < 40; chunk += 1) {
-      runtime.push(chunk * chunkSize, createRamp(chunk * chunkSize, chunkSize));
+      runtime.push({
+        frame: chunk * chunkSize,
+        sampleRate: rate,
+        samples: createRamp(chunk * chunkSize, chunkSize),
+      });
       for (let block = 0; block < 8; block += 1) {
         runtime.process(output);
         played.push(...output);
@@ -110,6 +127,61 @@ describe('native microphone runtime', () => {
       expect(lag).toBeGreaterThan(delay - 1000);
       expect(lag).toBeLessThan(delay + 1000);
     }
+  });
+
+  it.each([44100, 96000])(
+    'keeps the delay with a microphone at %i Hz',
+    (microphoneRate) => {
+      const clockRatio = 1.0002;
+      const { positions, blocks, step } = simulate({
+        seconds: 120,
+        clockRatio,
+        chunkSize: microphoneRate / 100,
+        microphoneRate,
+      });
+      const from = Math.round(blocks * 0.75);
+      for (const [offset, position] of positions.slice(from).entries()) {
+        const index = from + offset;
+        const produced = Math.floor(index * blockSize * clockRatio * step);
+        const lag = (produced - position) / step;
+        expect(lag).toBeGreaterThan(delay - 1000);
+        expect(lag).toBeLessThan(delay + 1000);
+      }
+      const advance = positions[blocks - 1] - positions[from];
+      const elapsed = (blocks - 1 - from) * blockSize * step;
+      expect(Math.abs(advance / elapsed - clockRatio)).toBeLessThan(1e-4);
+    },
+  );
+
+  it('drops what a faster microphone carries above the context Nyquist', () => {
+    const microphoneRate = 96000;
+    const chunkSize = blockSize * 12;
+    const runtime = createNativeMicrophoneRuntime(
+      loadTestCapture(),
+      rate,
+      ignoreReady,
+    );
+    const output = new Float32Array(blockSize);
+    let loudest = 0;
+    for (let chunk = 0; chunk < 200; chunk += 1) {
+      runtime.push({
+        frame: chunk * chunkSize,
+        sampleRate: microphoneRate,
+        samples: createTone(
+          36000,
+          microphoneRate,
+          chunk * chunkSize,
+          chunkSize,
+        ),
+      });
+      for (let block = 0; block < 6; block += 1) {
+        runtime.process(output);
+        if (chunk >= 100) {
+          loudest = Math.max(loudest, ...output.map(Math.abs));
+        }
+      }
+    }
+    expect(loudest).toBeLessThan(1e-3);
   });
 
   it('keeps the timeline across a delivery stall', () => {

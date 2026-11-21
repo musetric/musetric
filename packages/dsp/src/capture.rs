@@ -75,7 +75,7 @@ impl CaptureRing {
         let index = at.floor();
         let fraction = at - index;
         let base = index as i64;
-        if fraction == 0.0 {
+        if fraction == 0.0 && self.cutoff >= 1.0 {
             return self.read(base);
         }
         let place = fraction * to_float(PHASES);
@@ -271,5 +271,17 @@ mod tests {
         let kept = peak_through(1.0);
         let filtered = peak_through(48_000.0 / 44_100.0);
         assert!(filtered * 10.0 < kept, "{kept} {filtered}");
+    }
+
+    #[test]
+    fn filters_the_whole_frames_of_a_faster_microphone() {
+        let mut ring = filled(&tone(18_000.0, 8192));
+        ring.set_step(2.0);
+        let mut output = vec![0.0; 2048];
+        ring.render(&mut output, 3000.0, 2.0);
+        let peak = output
+            .iter()
+            .fold(0.0_f32, |peak, value| peak.max(value.abs()));
+        assert!(peak < 1e-3, "{peak}");
     }
 }

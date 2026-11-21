@@ -29,21 +29,20 @@ enum MicrophoneError: LocalizedError {
 }
 
 final class MicrophoneCapture: NSObject {
-  var onChunk: ((Int, Int, String) -> Void)?
+  var onChunk: ((Int, Int, Double, String) -> Void)?
   var onDeviceChange: (() -> Void)?
 
   private let engine = AVAudioEngine()
   private let ring = SampleRing(capacity: ringCapacity)
   private var sink: AVAudioSinkNode?
-  private var inputFormat: AVAudioFormat?
-  private var converter: AVAudioConverter?
+  private var inputRate: Double?
+  private var chunk = [Float](repeating: 0, count: chunkFrameLimit)
   private var timer: DispatchSourceTimer?
   private var running = false
   private var generation = 0
   private var deviceId: String?
   private var session = 0
   private var frame = 0
-  private var outputRate = 48000.0
   private var silentTicks = 0
 
   override init() {
@@ -76,7 +75,7 @@ final class MicrophoneCapture: NSObject {
   }
 
   func start(
-    deviceId: String?, sampleRate: Double,
+    deviceId: String?,
     completion: @escaping (Result<[String: Any], Error>) -> Void
   ) {
     let requested = generation
@@ -90,12 +89,8 @@ final class MicrophoneCapture: NSObject {
           completion(.failure(MicrophoneError.permissionDenied))
           return
         }
-        if !self.running || self.outputRate != sampleRate {
-          self.halt()
-          self.session += 1
-          self.frame = 0
-          self.outputRate = sampleRate
-          self.ring.reset()
+        if !self.running {
+          self.startSession()
         }
         self.deviceId = deviceId
         self.running = true
@@ -143,8 +138,7 @@ final class MicrophoneCapture: NSObject {
     timer = nil
     engine.stop()
     detachSink()
-    converter = nil
-    inputFormat = nil
+    inputRate = nil
     try? AVAudioSession.sharedInstance().setActive(false)
   }
 
@@ -163,19 +157,15 @@ final class MicrophoneCapture: NSObject {
     detachSink()
     let input = engine.inputNode
     let format = input.outputFormat(forBus: 0)
-    guard format.sampleRate > 0, format.channelCount > 0,
-      let mono = AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: 1),
-      let target = AVAudioFormat(standardFormatWithSampleRate: outputRate, channels: 1)
-    else {
+    guard format.sampleRate > 0, format.channelCount > 0 else {
       throw MicrophoneError.inputUnavailable
     }
-    if inputFormat?.sampleRate != format.sampleRate {
-      inputFormat = mono
-      converter = format.sampleRate == outputRate ? nil : AVAudioConverter(from: mono, to: target)
-      converter?.sampleRateConverterQuality = AVAudioQuality.high.rawValue
-    }
-    let ring = self.ring
     let rate = format.sampleRate
+    if let previous = inputRate, previous != rate {
+      startSession()
+    }
+    inputRate = rate
+    let ring = self.ring
     let created = AVAudioSinkNode { timestamp, frameCount, list in
       ring.write(list, frameCount: Int(frameCount), timestamp: timestamp.pointee, rate: rate)
       return noErr
@@ -185,6 +175,12 @@ final class MicrophoneCapture: NSObject {
     sink = created
     engine.prepare()
     try engine.start()
+  }
+
+  private func startSession() {
+    session += 1
+    frame = 0
+    ring.reset()
   }
 
   private func detachSink() {
@@ -211,18 +207,12 @@ final class MicrophoneCapture: NSObject {
   }
 
   private func drain() {
-    guard let format = inputFormat else {
+    guard let rate = inputRate else {
       return
     }
-    while let buffer = AVAudioPCMBuffer(
-      pcmFormat: format, frameCapacity: AVAudioFrameCount(chunkFrameLimit)),
-      let channel = buffer.floatChannelData?[0]
-    {
-      let taken = ring.read(into: channel, limit: chunkFrameLimit)
-      if taken.skipped > 0 {
-        frame += Int((Double(taken.skipped) * outputRate / format.sampleRate).rounded())
-        converter?.reset()
-      }
+    while true {
+      let taken = ring.read(into: &chunk, limit: chunkFrameLimit)
+      frame += taken.skipped
       guard taken.count > 0 else {
         silentTicks += 1
         if silentTicks >= stallTicks {
@@ -231,48 +221,16 @@ final class MicrophoneCapture: NSObject {
         return
       }
       silentTicks = 0
-      buffer.frameLength = AVAudioFrameCount(taken.count)
-      if let converted = convert(buffer) {
-        send(converted)
-      }
+      send(count: taken.count, rate: rate)
       if taken.count < chunkFrameLimit {
         return
       }
     }
   }
 
-  private func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
-    guard let converter else {
-      return buffer
-    }
-    let capacity = Double(buffer.frameLength) * outputRate / buffer.format.sampleRate
-    guard
-      let output = AVAudioPCMBuffer(
-        pcmFormat: converter.outputFormat, frameCapacity: AVAudioFrameCount(capacity) + 64)
-    else {
-      return nil
-    }
-    var consumed = false
-    var error: NSError?
-    converter.convert(to: output, error: &error) { _, status in
-      if consumed {
-        status.pointee = .noDataNow
-        return nil
-      }
-      consumed = true
-      status.pointee = .haveData
-      return buffer
-    }
-    return error == nil ? output : nil
-  }
-
-  private func send(_ buffer: AVAudioPCMBuffer) {
-    let count = Int(buffer.frameLength)
-    guard count > 0, let channel = buffer.floatChannelData?[0] else {
-      return
-    }
-    let samples = Data(bytes: channel, count: count * MemoryLayout<Float>.size)
-    onChunk?(session, frame, samples.base64EncodedString())
+  private func send(count: Int, rate: Double) {
+    let samples = chunk.withUnsafeBytes { Data($0.prefix(count * MemoryLayout<Float>.size)) }
+    onChunk?(session, frame, rate, samples.base64EncodedString())
     frame += count
   }
 

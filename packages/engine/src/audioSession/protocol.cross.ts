@@ -2,6 +2,7 @@ import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type NativeMicrophoneChunk = {
   frame: number;
+  sampleRate: number;
   samples: Float32Array;
 };
 

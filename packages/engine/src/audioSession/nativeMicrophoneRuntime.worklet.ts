@@ -1,5 +1,8 @@
 import { type InitOutput } from '@musetric/dsp/capture';
-import { nativeMicrophoneDelaySeconds } from './protocol.cross.js';
+import {
+  type NativeMicrophoneChunk,
+  nativeMicrophoneDelaySeconds,
+} from './protocol.cross.js';
 import { createSampleRing } from './sampleRing.cross.js';
 
 const bucketSeconds = 0.5;
@@ -15,7 +18,7 @@ type LatenessBucket = {
 };
 
 export type NativeMicrophoneRuntime = {
-  push: (frame: number, samples: Float32Array) => void;
+  push: (chunk: NativeMicrophoneChunk) => void;
   reset: () => void;
   process: (output: Float32Array) => void;
 };
@@ -34,10 +37,11 @@ export const createNativeMicrophoneRuntime = (
   const steerFrames = steerSeconds * sampleRate;
   let buckets: LatenessBucket[] = [];
   let clock = 0;
+  let step = 1;
   let position: number | undefined = undefined;
   let startClock = 0;
   let ready = false;
-  let ratio = 1;
+  let correction = 1;
 
   const trackLateness = (lateness: number) => {
     const last = buckets.at(-1);
@@ -57,30 +61,36 @@ export const createNativeMicrophoneRuntime = (
       return;
     }
     const error = target - position;
-    if (!ready || Math.abs(error) > resyncFrames) {
+    if (!ready || Math.abs(error) > resyncFrames * step) {
       position = target;
-      ratio = 1;
+      correction = 1;
       return;
     }
-    const correction = error / steerFrames;
-    ratio = 1 + Math.max(-maxCorrection, Math.min(maxCorrection, correction));
+    const relative = error / (steerFrames * step);
+    correction =
+      1 + Math.max(-maxCorrection, Math.min(maxCorrection, relative));
   };
 
   return {
-    push: (frame, samples) => {
+    push: (chunk) => {
+      const { frame, samples } = chunk;
       if (samples.length === 0) {
         return;
       }
+      if (chunk.sampleRate / sampleRate !== step) {
+        step = chunk.sampleRate / sampleRate;
+        ring.setStep(step);
+      }
       ring.write(frame, samples);
-      const lowest = trackLateness(clock - frame - samples.length);
-      steer(clock - lowest - delay);
+      const lowest = trackLateness(clock - (frame + samples.length) / step);
+      steer((clock - lowest - delay) * step);
     },
     reset: () => {
       ring.clear();
       buckets = [];
       position = undefined;
       ready = false;
-      ratio = 1;
+      correction = 1;
     },
     process: (output) => {
       clock += output.length;
@@ -88,7 +98,7 @@ export const createNativeMicrophoneRuntime = (
         output.fill(0);
         return;
       }
-      position = ring.render(output, position, ratio);
+      position = ring.render(output, position, step * correction);
       if (!ready && clock - startClock >= warmupFrames) {
         ready = true;
         onReady();
