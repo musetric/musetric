@@ -90,12 +90,18 @@ opt-level = 3
 [profile.dev.package.rustfft]
 opt-level = 3
 
+[profile.dev.package.symphonia-opus]
+opt-level = 3
+
 [lints]
 workspace = true
 
 [workspace]
 members = ["crates/*", "../app/src-tauri", "../dsp"]
 resolver = "3"
+
+[patch.crates-io]
+symphonia-opus = { git = "https://github.com/musetric/symphonia-opus", rev = "e7272663ddd5a77741c252b8c44ae026374e1092" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

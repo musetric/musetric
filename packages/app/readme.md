@@ -135,7 +135,7 @@ development build is an app of its own: on Android its folder is
 ## Toolchain
 
 - Android: `ANDROID_HOME`, `NDK_HOME` and `ANDROID_NDK_HOME` at the same NDK,
-  JDK 21 in `JAVA_HOME`, and on Windows Ninja on `PATH`.
+  and JDK 21 in `JAVA_HOME`.
 - Android on Windows: `sdk.dir` in forward slashes, the NDK's LLVM `bin` on
   `PATH`, and its `clang.exe`, not the `.cmd` wrapper, as Cargo's linker for
   `aarch64-linux-android` with `-Clink-arg=--target=aarch64-linux-android31`.

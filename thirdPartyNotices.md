@@ -319,49 +319,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Opus (libopus)
+## Opus (symphonia-opus)
 
-- Source: https://opus-codec.org, built from the libopus 1.6.1 sources bundled in the `opusic-sys` crate (https://github.com/DoumanAsh/opusic-sys) and driven through `symphonia-adapter-libopus` (https://github.com/aschey/symphonia-adapters).
-- Usage: decodes Opus audio in uploaded files; the host links libopus statically, and the module `songs` of `@musetric/dsp` carries it compiled to WebAssembly.
-- Local files: `packages/dsp/src/decode.rs`, `packages/dsp/opus-wasm/toolchain.cmake`.
-- License: BSD-3-Clause, with the royalty-free patent licenses named below.
-- License source: upstream `COPYING`.
+- Source: https://github.com/jiztastamablastamarang/symphonia-opus, the crate `symphonia-opus` 0.1.3, a decoder of Opus (RFC 6716) in Rust, built from its fork https://github.com/musetric/symphonia-opus at the commit `e7272663ddd5a77741c252b8c44ae026374e1092`, which computes the cosines, sines, exponentials and powers of `src/celt/mdct.rs`, `src/celt/synthesis.rs`, `src/celt/vq.rs` and `src/header.rs` through the crate `libm`, so that every target decodes the same samples.
+- Usage: decodes Opus audio in uploaded files, in the host and in the module `songs` of `@musetric/dsp`.
+- Local files: `packages/dsp/src/decode.rs`, `packages/server/Cargo.toml`.
+- License: MPL-2.0, whose text the notices of the crates carry; the source of every file of the crate, those the fork changes among them, is published in the fork named above.
+- License source: upstream `LICENSE`.
 
-Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic,
-Jean-Marc Valin, Timothy B. Terriberry,
-CSIRO, Gregory Maxwell, Mark Borgerding,
-Erik de Castro Lopo, Mozilla, Amazon
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-- Redistributions of source code must retain the above copyright
-  notice, this list of conditions and the following disclaimer.
-
-- Redistributions in binary form must reproduce the above copyright
-  notice, this list of conditions and the following disclaimer in the
-  documentation and/or other materials provided with the distribution.
-
-- Neither the name of Internet Society, IETF or IETF Trust, nor the
-  names of specific contributors, may be used to endorse or promote
-  products derived from this software without specific prior written
-  permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
-OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Opus is subject to the royalty-free patent licenses which are
-specified at:
+Opus is subject to the royalty-free patent licenses which are specified at:
 
 Xiph.Org Foundation:
 https://datatracker.ietf.org/ipr/1524/
