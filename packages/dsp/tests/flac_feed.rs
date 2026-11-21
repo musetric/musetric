@@ -7,6 +7,7 @@ mod tests {
         flac::{FlacWriter, read_layout},
         flac_feed::FlacFeed,
         flac_pages::FlacPages,
+        mono::Downmix,
     };
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -223,6 +224,30 @@ mod tests {
                 bits(&whole[first..first + frames * 2])
             );
         }
+    }
+
+    #[test]
+    fn decodes_a_page_to_the_mean_of_its_channels() {
+        let bytes = master();
+        let mut pages = FlacPages::read(&bytes)
+            .expect("the header should be read")
+            .expect("the header should be whole");
+        let span = page_bytes(&bytes, &pages, 1);
+
+        let planar = pages
+            .decode(1, &span)
+            .expect("the page should decode")
+            .to_vec();
+        let mean = pages
+            .decode_mean(1, &span)
+            .expect("the page should decode")
+            .to_vec();
+
+        let frames = planar.len() / 2;
+        let expected: Vec<f32> = (0..frames)
+            .map(|frame| Downmix::Mean.apply(planar[frame], planar[frames + frame]))
+            .collect();
+        assert_eq!(bits(&mean), bits(&expected));
     }
 
     #[test]

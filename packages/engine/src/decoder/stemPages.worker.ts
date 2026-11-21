@@ -5,24 +5,6 @@ import { stemPagesChannel } from './stemPages.cross.js';
 const describe = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-const meanOf = (
-  samples: Float32Array,
-  channelCount: number,
-  frameCount: number,
-): Float32Array<ArrayBuffer> => {
-  const mono = new Float32Array(frameCount);
-  for (let channel = 0; channel < channelCount; channel += 1) {
-    const offset = channel * frameCount;
-    for (let frame = 0; frame < frameCount; frame += 1) {
-      mono[frame] += samples[offset + frame];
-    }
-  }
-  for (let frame = 0; frame < frameCount; frame += 1) {
-    mono[frame] /= channelCount;
-  }
-  return mono;
-};
-
 const serveStemPages = (): void => {
   const port = stemPagesChannel.inbound(self);
   let opened: MasterPages | undefined = undefined;
@@ -60,15 +42,13 @@ const serveStemPages = (): void => {
         return;
       }
       try {
-        const page = await pages.read(index);
+        const page = await pages.read(index, mono);
         port.methods.page({
           id,
           index,
           startFrame: page.startFrame,
           frameCount: page.frameCount,
-          samples: mono
-            ? meanOf(page.samples, pages.channelCount, page.frameCount)
-            : page.samples,
+          samples: page.samples,
         });
       } catch (error) {
         port.methods.failed({ id, reason: describe(error) });

@@ -1,5 +1,4 @@
 import { type Metronome } from './metronome.worklet.js';
-import { type MixTrackFrames } from './mixTrack.worklet.js';
 import { type PlayerRange, type PlayerRangeRepeat } from './protocol.cross.js';
 
 export const rangeFadeFrameCount = 256;
@@ -8,6 +7,11 @@ const ramp = (distance: number) =>
   distance < rangeFadeFrameCount
     ? Math.max(0, distance) / rangeFadeFrameCount
     : 1;
+
+export type MixTrackFrames = {
+  songFrame: (frame: number) => number;
+  gain: (songFrame: number) => number;
+};
 
 export type RangeFrames = MixTrackFrames & {
   range: PlayerRange;

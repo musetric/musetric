@@ -258,4 +258,12 @@ impl FlacPages {
             .map(<[f32]>::to_vec)
             .map_err(|failure| failed(&failure))
     }
+
+    #[wasm_bindgen(js_name = decodeMean)]
+    pub fn decode_mean(&mut self, index: usize, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+        self.pages
+            .decode_mean(index, bytes)
+            .map(<[f32]>::to_vec)
+            .map_err(|failure| failed(&failure))
+    }
 }

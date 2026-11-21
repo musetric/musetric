@@ -12,7 +12,7 @@ use musetric_dsp::{
     aac::AacEncoder,
     flac::FlacWriter,
     m4a::{M4aTrack, write_m4a},
-    mix::limit_peak,
+    mix::{add_gained, limit_peak},
     mono::Downmix,
     mp3::Mp3Encoder,
     stretch::{Refusal, Stretch},
@@ -457,24 +457,17 @@ async fn add_track(
         from: &track.from,
         sample_rate: reading.sample_rate,
     };
-    let mut frame = 0_usize;
+    let mut sample = 0_usize;
     let mut sink = |chunk: &[f32]| {
-        for pair in chunk.as_chunks::<CHANNELS>().0 {
-            add_frame(mixed, frame, track, [pair[0], pair[1]]);
-            frame += 1;
-        }
+        let whole = chunk.len() / CHANNELS * CHANNELS;
+        let start = sample.min(mixed.len());
+        let end = (sample + whole).min(mixed.len());
+        add_gained(&mut mixed[start..end], &chunk[..end - start], track.gain);
+        sample += whole;
     };
     reading.source.read_pcm(request, &mut sink).await?;
     reading.watch.advance(MixdownStage::Mixing, 1);
     Ok(())
-}
-
-fn add_frame(mixed: &mut [f32], frame: usize, track: &MixdownTrack, [left, right]: [f32; 2]) {
-    let Some(pair) = mixed.get_mut(frame * CHANNELS..(frame + 1) * CHANNELS) else {
-        return;
-    };
-    pair[0] += left * track.gain;
-    pair[1] += right * track.gain;
 }
 
 fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
