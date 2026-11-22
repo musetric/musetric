@@ -77,6 +77,7 @@ const createPlayer = async (paging: Paging, withheld: number[] = []) => {
     dataPort.methods.mount({
       frameCount: songFrames,
       layouts: { lead: layout, backing: layout, instrumental: layout },
+      residentPageLimit: stemTypes.length * pageStarts.length,
       recording: [],
     });
     putPages(

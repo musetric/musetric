@@ -186,6 +186,13 @@ pub fn mixer_page_input(handle: usize, stem: usize, index: usize, sample_count: 
     })
 }
 
+#[wasm_bindgen(js_name = reserveMixerPages)]
+pub fn reserve_mixer_pages(handle: usize, count: usize) {
+    with_mixer(handle, |mixer| {
+        mixer.mixer.reserve_pages(count);
+    });
+}
+
 #[wasm_bindgen(js_name = dropMixerPage)]
 pub fn drop_mixer_page(handle: usize, stem: usize, index: usize) {
     with_mixer(handle, |mixer| {

@@ -6,6 +6,7 @@ import {
   mixerReady,
   mixStems,
   openMixer,
+  reserveMixerPages,
   setMixerRange,
   setMixerStem,
   setMixerVolumes,
@@ -33,7 +34,7 @@ export const leadMask = 0b001;
 
 export type PlayerTracks = {
   mounted: () => boolean;
-  mount: (layouts: PlayerStemLayouts) => void;
+  mount: (layouts: PlayerStemLayouts, residentPageLimit: number) => void;
   put: (page: PlayerPage) => void;
   drop: (pages: PlayerPageKey[]) => void;
   release: () => void;
@@ -90,7 +91,7 @@ export const createPlayerTracks = (
 
   return {
     mounted: () => mounted,
-    mount: (layouts) => {
+    mount: (layouts, residentPageLimit) => {
       for (const stem of stemTypes) {
         const layout = layouts[stem];
         setMixerStem(
@@ -100,6 +101,7 @@ export const createPlayerTracks = (
           Uint32Array.from(layout.pageStarts),
         );
       }
+      reserveMixerPages(handle, residentPageLimit);
       mounted = true;
       reportedFrameIndex = undefined;
     },

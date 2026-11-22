@@ -168,7 +168,7 @@ export const createPlayerRuntime = (
   dataPort.bindHandlers({
     mount: (message) => {
       frameCount = message.frameCount;
-      tracks.mount(message.layouts);
+      tracks.mount(message.layouts, message.residentPageLimit);
       refillTimePitch();
       recordingTrack.clear();
       recordingTrack.setPieces({ pieces: message.recording });

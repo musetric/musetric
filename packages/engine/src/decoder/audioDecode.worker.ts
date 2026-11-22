@@ -201,6 +201,7 @@ export const createAudioDecode = (
       playerPort.methods.mount({
         frameCount,
         layouts,
+        residentPageLimit: playerPages.residentLimit,
         recording: copyPieces(pieces),
       });
       const pending = reloadOnMount;
