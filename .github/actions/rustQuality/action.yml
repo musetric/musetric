@@ -1,5 +1,10 @@
 name: Rust Quality
-description: Rust ast, format, clippy and test checks, natively and for WebAssembly, and the notices of the crates
+description: Rust ast, format, clippy and test checks, natively and for WebAssembly, and the notices of the crates, one part at a time
+
+inputs:
+  part:
+    description: native (ast, format, clippy and tests of the workspace), wasm (clippy and tests of musetric-dsp for WebAssembly) or notices (the notices of the crates each build compiles)
+    required: true
 
 runs:
   using: composite
@@ -15,13 +20,75 @@ runs:
       working-directory: packages/server
     - run: echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
       shell: bash
-    - uses: Swatinem/rust-cache@v2
+    - if: inputs.part == 'native'
+      uses: Swatinem/rust-cache@v2
       with:
         workspaces: packages/server
         shared-key: rust-quality
         save-if: ${{ github.ref == 'refs/heads/main' }}
-    - uses: ./.github/actions/buildDsp
-    - name: Install cargo-about
+    - if: inputs.part == 'wasm'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/server
+        shared-key: rust-wasm
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - if: inputs.part == 'notices'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/server
+        shared-key: rust-notices
+        cache-targets: false
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - if: inputs.part == 'native'
+      uses: ./.github/actions/buildDsp
+      with:
+        script: build:app
+    - if: inputs.part == 'native'
+      id: image
+      run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - if: inputs.part == 'native'
+      id: debs
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/aptArchives
+        key: apt-${{ steps.image.outputs.version }}-gtk-webkit
+    - if: inputs.part == 'native'
+      name: Install the GTK and WebKit headers, from the cached packages where they are current
+      run: |
+        mkdir -p ~/aptArchives
+        find ~/aptArchives -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t ~/aptArchives {} +
+      shell: bash
+    - if: inputs.part == 'native' && steps.debs.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+      uses: actions/cache/save@v5
+      with:
+        path: ~/aptArchives
+        key: ${{ steps.debs.outputs.cache-primary-key }}
+    - if: inputs.part == 'native'
+      run: pnpm --filter @musetric/app build:ui
+      shell: bash
+    - if: inputs.part == 'native'
+      run: pnpm --filter @musetric/server check:rust:ast
+      shell: bash
+    - if: inputs.part == 'native'
+      run: pnpm --filter @musetric/server check:rust:fmt
+      shell: bash
+    - if: inputs.part == 'native'
+      run: pnpm --filter @musetric/server check:rust:clippy
+      shell: bash
+    - if: inputs.part == 'native'
+      run: pnpm --filter @musetric/server check:rust:test
+      shell: bash
+    - if: inputs.part == 'wasm'
+      uses: ./.github/actions/setupWasmBindgen
+    - if: inputs.part == 'wasm'
+      run: pnpm --filter @musetric/server check:rust:wasm
+      shell: bash
+    - if: inputs.part == 'notices'
+      name: Install cargo-about
       shell: bash
       env:
         CARGO_ABOUT_VERSION: 0.9.3
@@ -29,21 +96,6 @@ runs:
         mkdir -p "$RUNNER_TEMP/bin"
         curl -fsSL "https://github.com/EmbarkStudios/cargo-about/releases/download/$CARGO_ABOUT_VERSION/cargo-about-$CARGO_ABOUT_VERSION-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$RUNNER_TEMP/bin" --strip-components=1 "cargo-about-$CARGO_ABOUT_VERSION-x86_64-unknown-linux-musl/cargo-about"
         echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-    - run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
-      shell: bash
-    - run: pnpm --filter @musetric/app build:ui
-      shell: bash
-    - run: pnpm --filter @musetric/server check:rust:ast
-      shell: bash
-    - run: pnpm --filter @musetric/server check:rust:fmt
-      shell: bash
-    - run: pnpm --filter @musetric/server check:rust:clippy
-      shell: bash
-    - run: pnpm --filter @musetric/server check:rust:test
-      shell: bash
-    - run: pnpm --filter @musetric/server check:rust:wasm
-      shell: bash
-    - run: pnpm check:notices:crates
+    - if: inputs.part == 'notices'
+      run: pnpm check:notices:crates
       shell: bash

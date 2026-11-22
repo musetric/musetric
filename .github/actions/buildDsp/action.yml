@@ -9,16 +9,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - run: rustup toolchain install --no-self-update
-      shell: bash
-      working-directory: packages/server
-    - id: wasm-bindgen
-      run: echo "version=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p}' Cargo.lock)" >> "$GITHUB_OUTPUT"
-      shell: bash
-      working-directory: packages/server
-    - uses: taiki-e/install-action@v2
-      with:
-        tool: wasm-bindgen@${{ steps.wasm-bindgen.outputs.version }}
+    - uses: ./.github/actions/setupWasmBindgen
     - run: pnpm --filter @musetric/dsp "$SCRIPT"
       shell: bash
       env:
