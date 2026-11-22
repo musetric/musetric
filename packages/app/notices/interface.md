@@ -351,7 +351,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## @hookform/resolvers 5.9.1
+## @hookform/resolvers 7.0.8
 
 - License: MIT
 - Source: git+https://github.com/react-hook-form/resolvers.git
@@ -582,7 +582,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-## @tanstack/query-core 5.104.2
+## @tanstack/query-core 5.108.2
 
 - License: MIT
 - Source: git+https://github.com/TanStack/query.git
@@ -611,7 +611,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## @tanstack/react-query 5.104.2
+## @tanstack/react-query 5.108.2
 
 - License: MIT
 - Source: git+https://github.com/TanStack/query.git
@@ -640,7 +640,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## axios 1.20.0
+## axios 1.21.1
 
 - License: MIT
 - Source: https://github.com/axios/axios.git
@@ -672,7 +672,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-## framer-motion 14.2.0
+## framer-motion 14.14.0
 
 - License: MIT
 - Source: https://github.com/motiondivision/motion/
@@ -738,7 +738,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-## i18next 26.4.5
+## i18next 27.2.2
 
 - License: MIT
 - Source: https://github.com/i18next/i18next.git
@@ -767,7 +767,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## immer 11.1.21
+## immer 11.2.10
 
 - License: MIT
 - Source: https://github.com/immerjs/immer.git
@@ -796,7 +796,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## motion-dom 14.2.0
+## motion-dom 14.14.0
 
 - License: MIT
 - Source: https://github.com/motiondivision/motion
@@ -825,7 +825,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## motion-utils 14.1.1
+## motion-utils 14.7.0
 
 - License: MIT
 - Source: https://github.com/motiondivision/motion
@@ -854,7 +854,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## react-dom 19.3.0
+## react-dom 19.3.1
 
 - License: MIT
 - Source: https://github.com/react/react.git
@@ -883,7 +883,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## react-hook-form 7.90.0
+## react-hook-form 7.92.0
 
 - License: MIT
 - Source: https://github.com/react-hook-form/react-hook-form
@@ -912,7 +912,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## react-i18next 17.0.16
+## react-i18next 18.0.3
 
 - License: MIT
 - Source: https://github.com/i18next/react-i18next.git
@@ -1037,7 +1037,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-## react 19.3.0
+## react 19.3.1
 
 - License: MIT
 - Source: https://github.com/react/react.git
@@ -1124,35 +1124,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## use-sync-external-store 1.6.0
-
-- License: MIT
-- Source: https://github.com/facebook/react.git
-
-````text
-MIT License
-
-Copyright (c) Meta Platforms, Inc. and affiliates.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
 ## zod 4.6.7
 
 - License: MIT
@@ -1182,7 +1153,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## zustand 5.0.15
+## zustand 5.1.0
 
 - License: MIT
 - Source: git+https://github.com/pmndrs/zustand.git

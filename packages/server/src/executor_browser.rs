@@ -142,11 +142,9 @@ fn browser_candidates() -> Vec<PathBuf> {
         "chromium-browser",
         "microsoft-edge",
     ];
-    std::env::var_os("PATH")
-        .map(|paths| {
-            std::env::split_paths(&paths)
-                .flat_map(|directory| names.map(|name| directory.join(name)))
-                .collect()
-        })
-        .unwrap_or_default()
+    std::env::var_os("PATH").map_or_default(|paths| {
+        std::env::split_paths(&paths)
+            .flat_map(|directory| names.map(|name| directory.join(name)))
+            .collect()
+    })
 }

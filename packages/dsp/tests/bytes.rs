@@ -98,7 +98,7 @@ mod tests {
         let bytes = write_m4a(Vec::new(), &track).expect("the file should be written");
         assert_eq!(
             digest(&bytes),
-            "2dadac6bc1b8d274f481e284655112da4ea6c04e3e65a1c546d090de39e38454"
+            "619f212fefbeb9113b280c7d6e89eb7be309cc26c3f0212ada351e4ffd741b95"
         );
     }
 
@@ -113,7 +113,7 @@ mod tests {
             .expect("the stream should be finished");
         assert_eq!(
             digest(&bytes),
-            "6d7e7ec52712f02c2a338931e4dbc06524b0b5655dec404191e5fa0bc9fc0d34"
+            "87de8b4bd1b62f0c4cabb30781653bf5e60a72f0ac9ccced40120ee39d640a37"
         );
     }
 

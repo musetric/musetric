@@ -2,7 +2,7 @@
   "name": "@musetric/monorepo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@12.21.0",
   "scripts": {
     "dev": "pnpm -r --parallel --no-bail run dev",
     "build:project": "pnpm -r run build:project",

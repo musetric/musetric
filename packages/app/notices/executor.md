@@ -2,7 +2,7 @@
 
 The npm packages compiled into this bundle, each under the license given for it, as rollup-plugin-license finds them. `pnpm fix:notices` writes this file again.
 
-## @huggingface/transformers 4.3.1
+## @huggingface/transformers 4.3.2
 
 - License: Apache-2.0
 - Source: git+https://github.com/huggingface/transformers.js.git
@@ -211,7 +211,7 @@ Apache License
    limitations under the License.
 ````
 
-## onnxruntime-common 1.30.0
+## onnxruntime-common 1.31.1
 
 - License: MIT
 - Source: https://github.com/Microsoft/onnxruntime.git
@@ -220,7 +220,7 @@ Apache License
 The package ships no license file.
 ````
 
-## onnxruntime-web 1.30.0
+## onnxruntime-web 1.31.1
 
 - License: MIT
 - Source: https://github.com/Microsoft/onnxruntime.git
