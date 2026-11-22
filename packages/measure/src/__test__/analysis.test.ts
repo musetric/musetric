@@ -27,23 +27,25 @@ const addClick = (samples: Float32Array, start: number) => {
   }
 };
 
-const createTimingRun = (
-  playheadAheadMs: number,
-  takeLateMs: number,
-): TimingRun => {
+const heardSeconds = 14;
+
+type TimingScene = {
+  tempo: number;
+  playheadAheadMs: number;
+  takeLateMs: number;
+};
+
+const createTimingRun = (scene: TimingScene): TimingRun => {
+  const { tempo, playheadAheadMs, takeLateMs } = scene;
   const beatFrames = Array.from({ length: 40 }, (_, index) =>
     Math.round((10 + index * beatSeconds) * sampleRate),
   );
   const startFrame = beatFrames[0] - 0.15 * sampleRate;
   const playEpoch = 1_000_000;
-  const heardMs = (frame: number) =>
-    playEpoch + ((frame - startFrame) / sampleRate) * 1000;
-  const captured = new Float32Array(12 * sampleRate);
+  const heardFrame = (frame: number) => (frame - startFrame) / tempo;
+  const captured = new Float32Array(heardSeconds * sampleRate);
   for (const beat of beatFrames.slice(0, 20)) {
-    addClick(
-      captured,
-      Math.round(((heardMs(beat) - playEpoch) / 1000) * sampleRate),
-    );
+    addClick(captured, Math.round(heardFrame(beat)));
   }
   const chunkFrames = 480;
   const chunks: [number, number][] = Array.from(
@@ -54,26 +56,24 @@ const createTimingRun = (
     ],
   );
   const playhead: [number, number, number][] = Array.from(
-    { length: 12 * 60 },
+    { length: heardSeconds * 60 },
     (_, index) => {
       const epochMs = playEpoch + (index * 1000) / 60;
       const frame =
         startFrame +
-        ((epochMs - playEpoch + playheadAheadMs) / 1000) * sampleRate;
+        ((epochMs - playEpoch + playheadAheadMs) / 1000) * sampleRate * tempo;
       return [epochMs, frame, 1];
     },
   );
   const firstFrame = startFrame - 0.5 * sampleRate;
   const take = new Float32Array(12 * sampleRate);
   for (const beat of beatFrames.slice(0, 20)) {
-    addClick(
-      take,
-      beat - firstFrame + Math.round((takeLateMs / 1000) * sampleRate),
-    );
+    const sungFrame = heardFrame(beat) + (takeLateMs / 1000) * sampleRate;
+    addClick(take, Math.round(startFrame + sungFrame * tempo - firstFrame));
   }
   return {
     sampleRate,
-    tempo: 1,
+    tempo,
     startFrame,
     beatFrames,
     playhead,
@@ -84,14 +84,19 @@ const createTimingRun = (
 };
 
 describe('timing analysis', () => {
-  it('reads how far the playhead and the take sit from the beats', () => {
-    const result = analyzeTiming(createTimingRun(12, -3));
-    expect(result.heardClickCount).toBe(20);
-    expect(result.playhead.count).toBe(20);
-    expect(result.playhead.median).toBeCloseTo(12, 0);
-    expect(result.take.count).toBe(20);
-    expect(result.take.median).toBeCloseTo(-3, 0);
-  });
+  it.each([1, 0.8, 0.75])(
+    'reads how far the playhead and a take sung at tempo %f sit from the beats',
+    (tempo) => {
+      const result = analyzeTiming(
+        createTimingRun({ tempo, playheadAheadMs: 12, takeLateMs: -4 }),
+      );
+      expect(result.heardClickCount).toBe(20);
+      expect(result.playhead.count).toBe(20);
+      expect(result.playhead.median).toBeCloseTo(12, 0);
+      expect(result.take.count).toBe(20);
+      expect(result.take.median).toBeCloseTo(-4 * tempo, 0);
+    },
+  );
 });
 
 const createDelayTake = (behindMs: number, view: 'notes' | 'spectrum') => {
