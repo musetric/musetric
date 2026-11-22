@@ -214,8 +214,8 @@ The Rust crates compiled into this build, each under the license given for it, a
 
 ## Apache License 2.0
 
-- `rusty_aac` 1.1.0
-- `rusty_mp3` 1.0.0
+- `rusty_aac` 2.1.2
+- `rusty_mp3` 1.2.0
 
 ````text
                                  Apache License
@@ -540,7 +540,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- `ebur128` 0.1.10
+- `ebur128` 0.1.11
 
 ````text
 Copyright (c) 2011 Jan Kokemüller
@@ -569,10 +569,10 @@ THE SOFTWARE.
 ## MIT License
 
 - `cfg-if` 1.0.5
-- `wasm-bindgen-macro-support` 0.2.129
-- `wasm-bindgen-macro` 0.2.129
-- `wasm-bindgen-shared` 0.2.129
-- `wasm-bindgen` 0.2.129
+- `wasm-bindgen-macro-support` 0.2.130
+- `wasm-bindgen-macro` 0.2.130
+- `wasm-bindgen-shared` 0.2.130
+- `wasm-bindgen` 0.2.130
 
 ````text
 Copyright (c) 2014 Alex Crichton
@@ -639,7 +639,7 @@ DEALINGS IN THE SOFTWARE.
 
 - `bitflags` 1.3.2
 - `bitflags` 2.13.2
-- `log` 0.4.34
+- `log` 0.4.35
 - `num-complex` 0.4.6
 - `num-integer` 0.1.47
 - `num-traits` 0.2.19
@@ -835,7 +835,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- `smallvec` 1.16.3
+- `smallvec` 1.16.6
 
 ````text
 Copyright (c) 2018 The Servo Project Developers
@@ -901,7 +901,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- `bumpalo` 3.20.3
+- `bumpalo` 3.20.4
 
 ````text
 Copyright (c) 2019 Nick Fitzgerald
@@ -934,7 +934,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- `rubato` 5.0.1
+- `rubato` 5.1.0
 
 ````text
 Copyright (c) 2020 Henrik Enquist
@@ -1183,6 +1183,35 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## MIT License
 
+- `realfft` 3.5.1
+
+````text
+MIT License
+
+Copyright (c) 2020 Henrik Enquist and RealFFT contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+````
+
+## MIT License
+
 - `visibility` 0.1.1
 
 ````text
@@ -1215,7 +1244,6 @@ SOFTWARE.
 - `dasp_frame` 0.11.0
 - `dasp_sample` 0.11.0
 - `libm` 0.2.16
-- `realfft` 3.5.0
 
 ````text
 MIT License
@@ -1242,13 +1270,12 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 ## MIT License
 
 - `lazy_static` 1.5.1
-- `once_cell` 1.21.4
 - `proc-macro2` 1.0.107
 - `quote` 1.0.47
 - `rustversion` 1.0.23
 - `seq-macro` 0.3.6
 - `syn` 2.0.119
-- `syn` 3.0.9
+- `syn` 3.0.10
 - `thiserror-impl` 1.0.69
 - `thiserror` 1.0.69
 - `unicode-ident` 1.0.27

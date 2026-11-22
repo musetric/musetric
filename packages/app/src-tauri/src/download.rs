@@ -66,8 +66,7 @@ fn finish<R: Runtime>(webview: &Webview<R>, url: &str, success: bool) {
     }
     let name = staged
         .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .map_or_default(|name| name.to_string_lossy().into_owned());
     webview
         .dialog()
         .file()

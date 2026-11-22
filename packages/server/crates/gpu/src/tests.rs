@@ -915,10 +915,7 @@ impl log::Log for CapturedLog {
 }
 
 fn captured() -> Vec<(log::Level, String)> {
-    CAPTURED
-        .lock()
-        .map(|lines| lines.clone())
-        .unwrap_or_default()
+    CAPTURED.lock().map_or_default(|lines| lines.clone())
 }
 
 #[tokio::test]

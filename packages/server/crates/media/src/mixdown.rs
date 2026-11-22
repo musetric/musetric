@@ -577,8 +577,7 @@ mod tests {
                 .0
                 .iter()
                 .find(|(path, _)| path == request.from)
-                .map(|(_, samples)| samples.clone())
-                .unwrap_or_default();
+                .map_or_default(|(_, samples)| samples.clone());
             Box::pin(async move {
                 sink(&found);
                 Ok(())
