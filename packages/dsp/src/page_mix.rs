@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::{BoxedError, mix::add_gained};
 
 pub const FADE_FRAMES: i64 = 256;
@@ -106,9 +108,57 @@ impl Stem {
     }
 }
 
-fn page_channel(slots: &[Vec<f32>], page: Resident, channel: usize) -> &[f32] {
+#[derive(Clone, Copy)]
+struct SlotPlace {
+    block: usize,
+    start: usize,
+}
+
+#[derive(Default)]
+struct Slots {
+    samples: usize,
+    blocks: Vec<Vec<f32>>,
+    places: Vec<SlotPlace>,
+}
+
+impl Slots {
+    fn reset(&mut self, samples: usize) {
+        self.samples = samples;
+        self.blocks.clear();
+        self.places.clear();
+    }
+
+    fn count(&self) -> usize {
+        self.places.len()
+    }
+
+    fn add(&mut self, count: usize) -> Range<usize> {
+        let first = self.places.len();
+        if count > 0 {
+            let block = self.blocks.len();
+            self.blocks.push(vec![0.0; count * self.samples]);
+            self.places.extend((0..count).map(|index| SlotPlace {
+                block,
+                start: index * self.samples,
+            }));
+        }
+        first..self.places.len()
+    }
+
+    fn slot(&self, slot: usize) -> &[f32] {
+        let place = self.places[slot];
+        &self.blocks[place.block][place.start..place.start + self.samples]
+    }
+
+    fn slot_mut(&mut self, slot: usize) -> &mut [f32] {
+        let place = self.places[slot];
+        &mut self.blocks[place.block][place.start..place.start + self.samples]
+    }
+}
+
+fn page_channel(slots: &Slots, page: Resident, channel: usize) -> &[f32] {
     let source = channel.min(page.channels - 1);
-    &slots[page.slot][source * page.frames..(source + 1) * page.frames]
+    &slots.slot(page.slot)[source * page.frames..(source + 1) * page.frames]
 }
 
 #[derive(Clone, Copy)]
@@ -127,7 +177,7 @@ struct Span {
 struct Output<'mixed> {
     samples: &'mixed mut [f32],
     channels: usize,
-    slots: &'mixed [Vec<f32>],
+    slots: &'mixed Slots,
 }
 
 impl Output<'_> {
@@ -191,7 +241,7 @@ impl Output<'_> {
 pub struct PageMixer {
     channels: usize,
     slot_frames: usize,
-    slots: Vec<Vec<f32>>,
+    slots: Slots,
     free: Vec<usize>,
     stems: Vec<Stem>,
     range: Option<LoopRange>,
@@ -204,7 +254,7 @@ impl PageMixer {
         Self {
             channels,
             slot_frames: 0,
-            slots: Vec::new(),
+            slots: Slots::default(),
             free: Vec::new(),
             stems: (0..stem_count).map(|_| Stem::default()).collect(),
             range: None,
@@ -226,7 +276,7 @@ impl PageMixer {
         let longest = usize::try_from(target.longest_page())?;
         if longest > self.slot_frames {
             self.slot_frames = longest;
-            self.slots.clear();
+            self.slots.reset(longest * self.channels);
             self.free.clear();
             for other in &mut self.stems {
                 other.pages.iter_mut().for_each(|page| *page = None);
@@ -236,10 +286,8 @@ impl PageMixer {
     }
 
     pub fn reserve_pages(&mut self, count: usize) {
-        while self.slots.len() < count {
-            self.free.push(self.slots.len());
-            self.slots.push(vec![0.0; self.slot_frames * self.channels]);
-        }
+        let missing = count.saturating_sub(self.slots.count());
+        self.free.extend(self.slots.add(missing));
     }
 
     fn release_stem(&mut self, stem: usize) -> Result<(), BoxedError> {
@@ -261,8 +309,7 @@ impl PageMixer {
         let slot = if let Some(slot) = self.free.pop() {
             slot
         } else {
-            self.slots.push(vec![0.0; self.slot_frames * self.channels]);
-            self.slots.len() - 1
+            self.slots.add(1).start
         };
         let target = self.stems.get_mut(shape.stem).ok_or(NO_STEM)?;
         *target.pages.get_mut(shape.index).ok_or(NO_PAGE)? = Some(Resident {
@@ -270,7 +317,7 @@ impl PageMixer {
             frames: shape.frames,
             channels: shape.channels,
         });
-        Ok(&mut self.slots[slot][..shape.frames * shape.channels])
+        Ok(&mut self.slots.slot_mut(slot)[..shape.frames * shape.channels])
     }
 
     #[must_use]
