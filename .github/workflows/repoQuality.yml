@@ -28,7 +28,11 @@ jobs:
         run: |
           echo "the parts of the JS checks: $RESULT"
           test "$RESULT" = success
-  check-rust-quality:
+  rust-quality:
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [native, wasm, notices]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,7 +50,7 @@ jobs:
             exit 0
           fi
           changed=$(git diff --name-only HEAD^1 HEAD)
-          if printf '%s\n' "$changed" | grep -Eq '^(packages/server/|packages/dsp/|packages/app/notices/crates\.md$|packages/ai/src/runtime/[^/]+/pin\.json$|packages/app/src-tauri/|packages/app/rust-toolchain\.toml$|\.github/actions/rustQuality/|\.github/workflows/repoQuality\.yml$)'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(packages/server/|packages/dsp/|packages/app/notices/crates\.md$|packages/ai/src/runtime/[^/]+/pin\.json$|packages/app/src-tauri/|packages/app/rust-toolchain\.toml$|\.github/actions/(rustQuality|buildDsp|setupWasmBindgen)/|\.github/workflows/repoQuality\.yml$)'; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           else
             echo "The pull request changes nothing the Rust checks read:"
@@ -55,6 +59,18 @@ jobs:
           fi
       - if: steps.changes.outputs.rust == 'true'
         uses: ./.github/actions/rustQuality
+        with:
+          part: ${{ matrix.part }}
+  check-rust-quality:
+    if: always()
+    needs: rust-quality
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULT: ${{ needs.rust-quality.result }}
+        run: |
+          echo "the parts of the Rust checks: $RESULT"
+          test "$RESULT" = success
   check-base-quality:
     runs-on: ubuntu-latest
     steps:
