@@ -112,22 +112,25 @@ mod tests {
     fn mixes_pages_from_slots_reserved_before_them_to_the_same_bits() {
         let stems = stems();
         let frames = i64::try_from(FRAMES).expect("fits");
-        let mut reserved = PageMixer::new(2, 3);
-        for index in 0..stems.len() {
-            reserved
-                .set_stem(index, frames, &STARTS)
-                .expect("the stem should be set");
-        }
-        reserved.reserve_pages(stems.len() * STARTS.len());
-        load(&mut reserved, &stems, &STARTS, &[]);
         let mut pages = PageMixer::new(2, 3);
         load(&mut pages, &stems, &STARTS, &[]);
 
-        for (first, count) in [(-100, 5_000), (71_990, 30_000)] {
-            assert_eq!(
-                mixed(&mut reserved, first, count),
-                mixed(&mut pages, first, count)
-            );
+        for reservation in [stems.len() * STARTS.len(), 4] {
+            let mut reserved = PageMixer::new(2, 3);
+            for index in 0..stems.len() {
+                reserved
+                    .set_stem(index, frames, &STARTS)
+                    .expect("the stem should be set");
+            }
+            reserved.reserve_pages(reservation);
+            load(&mut reserved, &stems, &STARTS, &[]);
+
+            for (first, count) in [(-100, 5_000), (71_990, 30_000)] {
+                assert_eq!(
+                    mixed(&mut reserved, first, count),
+                    mixed(&mut pages, first, count)
+                );
+            }
         }
     }
 
