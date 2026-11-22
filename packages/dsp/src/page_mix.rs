@@ -235,6 +235,13 @@ impl PageMixer {
         Ok(())
     }
 
+    pub fn reserve_pages(&mut self, count: usize) {
+        while self.slots.len() < count {
+            self.free.push(self.slots.len());
+            self.slots.push(vec![0.0; self.slot_frames * self.channels]);
+        }
+    }
+
     fn release_stem(&mut self, stem: usize) -> Result<(), BoxedError> {
         let target = self.stems.get_mut(stem).ok_or(NO_STEM)?;
         for page in target.pages.iter_mut().filter_map(Option::take) {

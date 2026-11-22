@@ -34,6 +34,28 @@ const pagesOf = (layout: PlayerStemLayout, spans: FrameSpan[]): number[] => {
   return [...found];
 };
 
+const spanPageCount = (layout: PlayerStemLayout, frameCount: number) => {
+  let shortest = Infinity;
+  for (let index = 0; index + 1 < layout.pageStarts.length; index += 1) {
+    shortest = Math.min(
+      shortest,
+      pageEndFrame(layout, index) - layout.pageStarts[index],
+    );
+  }
+  return shortest === Infinity
+    ? layout.pageStarts.length
+    : Math.ceil(frameCount / shortest) + 1;
+};
+
+const residentPageCount = (layout: PlayerStemLayout, sampleRate: number) =>
+  Math.min(
+    layout.pageStarts.length,
+    spanPageCount(
+      layout,
+      (behindSeconds + aheadSeconds + 2 * keepSeconds) * sampleRate,
+    ) + spanPageCount(layout, aheadSeconds * sampleRate),
+  );
+
 const aheadSpans = (
   frameIndex: number,
   frameCount: number,
@@ -65,6 +87,7 @@ export type PlayerPagesOptions = {
 };
 
 export type PlayerPages = {
+  residentLimit: number;
   requestWindow: (window: PlayerWindow) => void;
   close: () => void;
 };
@@ -128,6 +151,10 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
   };
 
   return {
+    residentLimit: stemTypes.reduce(
+      (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
+      0,
+    ),
     requestWindow: (window) => {
       const { frameIndex, loop } = window;
       const wantSpans = [

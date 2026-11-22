@@ -159,6 +159,7 @@ export const mountTracks = (
   data.methods.mount({
     frameCount,
     layouts: { lead: layout, backing: layout, instrumental: layout },
+    residentPageLimit: stemTypes.length,
     recording,
   });
   for (const stem of stemTypes) {

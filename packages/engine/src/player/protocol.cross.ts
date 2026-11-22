@@ -179,6 +179,7 @@ export type PlayerDataMethods = RecordingDataMethods & {
   mount: (message: {
     frameCount: number;
     layouts: PlayerStemLayouts;
+    residentPageLimit: number;
     recording: PlayerRecordingPiece[];
   }) => void;
   putPage: (message: PlayerPage) => void;
