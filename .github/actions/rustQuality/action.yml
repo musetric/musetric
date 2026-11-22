@@ -61,6 +61,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
         find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t ~/aptArchives {} +
+        echo "$(find ~/aptArchives -maxdepth 1 -name '*.deb' | wc -l) packages kept for the cache"
       shell: bash
     - if: inputs.part == 'native' && steps.debs.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v5
