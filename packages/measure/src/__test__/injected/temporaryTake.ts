@@ -8,12 +8,11 @@ import {
   type SpectrogramViewMode,
 } from '@musetric/engine';
 import axios from 'axios';
+import { createTakeWindow, layTakePiece, type TakeWindow } from '../take.js';
 import { epochNow, wait } from './samples.js';
 
 const activePollMs = 100;
 const activeTimeoutMs = 5000;
-const exportPollMs = 250;
-const exportTimeoutMs = 60000;
 const seekSettleMs = 300;
 const streamSettleMs = 2500;
 const sliceLeadSeconds = 0.5;
@@ -23,22 +22,15 @@ const layPieces = async (
   projectId: number,
   recordingId: number,
   sampleRate: number,
-  frameCount: number,
-): Promise<Float32Array<ArrayBuffer>> => {
+  take: TakeWindow,
+): Promise<void> => {
   const { pieces } = await requestWithAxios(
     axios,
     api.audio.recordingPieces.base,
     { params: { projectId, recordingId } },
   );
   const decoder = createAudioDecoder();
-  const samples = new Float32Array(frameCount);
   for (const piece of pieces) {
-    const start = Math.round(
-      (piece.songStartFrame * sampleRate) / piece.sampleRate,
-    );
-    if (start >= frameCount) {
-      continue;
-    }
     const content = await requestWithAxios(
       axios,
       api.audio.recordingPiece.base,
@@ -49,57 +41,10 @@ const layPieces = async (
       sampleRate,
       keepChannels: true,
     });
-    samples.set(channels[0].subarray(0, frameCount - start), start);
-  }
-  return samples;
-};
-
-const waitForExport = async (mixdownId: string) => {
-  for (let waited = 0; waited < exportTimeoutMs; waited += exportPollMs) {
-    const status = await requestWithAxios(axios, api.mixdown.get.base, {
-      params: { mixdownId },
-    });
-    if (status.state === 'ready') {
-      return;
-    }
-    if (status.state === 'failed') {
-      throw new Error(
-        `The export of the temporary take failed: ${status.error}`,
-      );
-    }
-    await wait(exportPollMs);
-  }
-  throw new Error('The export of the temporary take did not finish');
-};
-
-const exportTake = async (
-  projectId: number,
-  transposeSemitones: number,
-  sampleRate: number,
-): Promise<Float32Array<ArrayBuffer>> => {
-  const { mixdownId } = await requestWithAxios(axios, api.mixdown.create.base, {
-    params: { projectId },
-    data: {
-      format: { format: 'wav' },
-      volumes: { lead: 0, backing: 0, instrumental: 0, recording: 1 },
-      playback: { tempoRatio: 1, transposeSemitones },
-      label: 'measure',
-    },
-  });
-  try {
-    await waitForExport(mixdownId);
-    const content = await requestWithAxios(axios, api.mixdown.content.base, {
-      params: { mixdownId },
-    });
-    const { channels } = await createAudioDecoder().decode(content.buffer, {
-      extension: 'wav',
-      sampleRate,
-      keepChannels: true,
-    });
-    return channels[0];
-  } finally {
-    await requestWithAxios(axios, api.mixdown.remove.base, {
-      params: { mixdownId },
+    layTakePiece(take, {
+      songStartFrame: (piece.songStartFrame * sampleRate) / piece.sampleRate,
+      tempo: piece.tempo,
+      samples: channels[0],
     });
   }
 };
@@ -217,7 +162,7 @@ export const recordTemporaryTake = async (
     }
     await wait(streamSettleMs);
     const { sampleRate } = engine.context;
-    const { frameCount, transposeSemitones } = engine.store.get();
+    const { frameCount } = engine.store.get();
     if (frameCount === undefined) {
       throw new Error('The project has no frame count');
     }
@@ -230,16 +175,13 @@ export const recordTemporaryTake = async (
       Math.round(
         (settings.seconds * settings.tempo + sliceTailSeconds) * sampleRate,
       );
-    const song =
-      settings.tempo === 1
-        ? await layPieces(
-            projectId,
-            temporary.id,
-            sampleRate,
-            Math.min(frameCount, lastFrame),
-          )
-        : await exportTake(projectId, transposeSemitones, sampleRate);
-    return { firstFrame, samples: song.slice(firstFrame, lastFrame) };
+    const take = createTakeWindow(
+      firstFrame,
+      Math.min(frameCount, lastFrame),
+      settings.tempo,
+    );
+    await layPieces(projectId, temporary.id, sampleRate, take);
+    return { firstFrame, samples: take.samples };
   } finally {
     applySettings(engine, saved);
     await requestWithAxios(axios, api.recording.activate.base, {

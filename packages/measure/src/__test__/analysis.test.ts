@@ -4,6 +4,7 @@ import { analyzeHoles, analyzeSound } from './analysis/sound.js';
 import { analyzeTiming } from './analysis/timing.js';
 import { decodeSamples, type PageLatency, type TimingRun } from './runs.js';
 import { createSibilantTest } from './signals.js';
+import { createTakeWindow, layTakePiece } from './take.js';
 
 const sampleRate = 48000;
 const beatSeconds = 0.5;
@@ -27,8 +28,6 @@ const addClick = (samples: Float32Array, start: number) => {
   }
 };
 
-const heardSeconds = 14;
-
 type TimingScene = {
   tempo: number;
   playheadAheadMs: number;
@@ -43,6 +42,7 @@ const createTimingRun = (scene: TimingScene): TimingRun => {
   const startFrame = beatFrames[0] - 0.15 * sampleRate;
   const playEpoch = 1_000_000;
   const heardFrame = (frame: number) => (frame - startFrame) / tempo;
+  const heardSeconds = Math.ceil(11 / tempo);
   const captured = new Float32Array(heardSeconds * sampleRate);
   for (const beat of beatFrames.slice(0, 20)) {
     addClick(captured, Math.round(heardFrame(beat)));
@@ -66,11 +66,15 @@ const createTimingRun = (scene: TimingScene): TimingRun => {
     },
   );
   const firstFrame = startFrame - 0.5 * sampleRate;
-  const take = new Float32Array(12 * sampleRate);
+  const sung = new Float32Array(Math.ceil(heardFrame(beatFrames[20])));
   for (const beat of beatFrames.slice(0, 20)) {
-    const sungFrame = heardFrame(beat) + (takeLateMs / 1000) * sampleRate;
-    addClick(take, Math.round(startFrame + sungFrame * tempo - firstFrame));
+    addClick(
+      sung,
+      Math.round(heardFrame(beat) + (takeLateMs / 1000) * sampleRate),
+    );
   }
+  const take = createTakeWindow(firstFrame, beatFrames[21], tempo);
+  layTakePiece(take, { songStartFrame: startFrame, tempo, samples: sung });
   return {
     sampleRate,
     tempo,
@@ -78,13 +82,13 @@ const createTimingRun = (scene: TimingScene): TimingRun => {
     beatFrames,
     playhead,
     captured: { sampleRate, samples: captured, chunks },
-    take: { firstFrame, samples: take },
+    take: { firstFrame, samples: take.samples },
     latency,
   };
 };
 
 describe('timing analysis', () => {
-  it.each([1, 0.8, 0.75])(
+  it.each([0.3, 0.5, 0.75, 1, 1.25, 1.5, 2])(
     'reads how far the playhead and a take sung at tempo %f sit from the beats',
     (tempo) => {
       const result = analyzeTiming(
@@ -94,7 +98,7 @@ describe('timing analysis', () => {
       expect(result.playhead.count).toBe(20);
       expect(result.playhead.median).toBeCloseTo(12, 0);
       expect(result.take.count).toBe(20);
-      expect(result.take.median).toBeCloseTo(-4 * tempo, 0);
+      expect(result.take.median).toBeCloseTo(-4, 0);
     },
   );
 });
