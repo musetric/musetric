@@ -41,7 +41,6 @@ export const jsConfig: Linter.Config = {
   },
   rules: {
     ...eslint.configs.recommended.rules,
-    ...importX.flatConfigs.recommended.rules,
     ...musetricRecommendedRules,
     ...sonarjs.configs.recommended.rules,
     'arrow-body-style': ['error', 'as-needed'],
