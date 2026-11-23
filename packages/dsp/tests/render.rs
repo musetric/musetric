@@ -226,21 +226,34 @@ mod tests {
                 ..Target::ORIGINAL
             },
             recording_volume: 0.5,
-            pieces: vec![Piece {
-                song_start: 48_000.0,
-                tempo: 1.0,
-                transpose: 0,
-                octave: 0,
-                samples: clicks(4),
-            }],
+            pieces: vec![
+                Piece {
+                    song_start: 48_000.0,
+                    tempo: 1.0,
+                    transpose: 0,
+                    octave: 0,
+                    samples: clicks(4),
+                },
+                Piece {
+                    song_start: 168_000.0,
+                    tempo: 1.0,
+                    transpose: 0,
+                    octave: 0,
+                    samples: clicks(2),
+                },
+            ],
         };
         let played = render(&mut Stems::silent(240_000), &song, Parts::ALL);
         let left: Vec<f32> = played.iter().step_by(CHANNELS).copied().collect();
-        let peaks: Vec<f32> = (0..4)
-            .map(|click| click_peak(&left, 60_000 + click * 60_000))
+        let peaks: Vec<f32> = [60_000, 120_000, 180_000, 210_000, 270_000]
+            .into_iter()
+            .map(|center| click_peak(&left, center))
             .collect();
-        let quietest = peaks[1..].iter().copied().fold(f32::MAX, f32::min);
+        let quietest = [peaks[1], peaks[2], peaks[4]]
+            .into_iter()
+            .fold(f32::MAX, f32::min);
         assert!(peaks[0] > quietest / 2.0, "{peaks:?}");
+        assert!(peaks[3] > quietest / 2.0, "{peaks:?}");
     }
 
     fn scene(target: Target) -> Song {
@@ -363,9 +376,9 @@ mod tests {
         assert_eq!(
             digests,
             [
-                "77165639cd99239a195914b3799a8e548099a9f0f58f0a78446e365a68627d7c",
-                "900f7d7bc7e3cc15a6e2743893c6eeea933774a0160d6256a76407d3a8098afe",
-                "ef536715b220159dfd80c180579816f9a453257c42dbfaab964239cb78c90d69"
+                "d6902102008faaf03785c3880a0d0aaf948a78a0a1da577495ed7470692473ab",
+                "892fd06a35f5c43109d8b7068a7d8dab6919624ecf2d4977922cd3e68f58bbeb",
+                "3742719f0e23685fe80368e66ed512cdd42b22ea27cc541982dea2cb43667114"
             ]
         );
     }

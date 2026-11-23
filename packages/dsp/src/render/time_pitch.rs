@@ -1,9 +1,6 @@
-use std::ops::Range;
-
 use crate::stretch::{Planar, PlanarMut, StretchStream};
 
 const CONTINUITY_FRAMES: i64 = 4;
-const WARM_STEP: usize = 128;
 
 pub struct Block<'block> {
     pub samples: &'block mut [f32],
@@ -53,7 +50,6 @@ struct Stretcher {
     length: usize,
     semitones: i32,
     formants: bool,
-    warm: usize,
     input: Vec<f32>,
     output: Vec<f32>,
 }
@@ -68,7 +64,6 @@ impl Stretcher {
             length,
             semitones: 0,
             formants: false,
-            warm: 0,
             input: vec![0.0; channels * length],
             output: vec![0.0; channels * length],
         }
@@ -85,14 +80,12 @@ impl Stretcher {
         let latency = js_round(frames_to_f64(self.stream.output_latency()) * tempo);
         let head_offset =
             whole_to_i64(latency) + i64::try_from(self.stream.input_latency()).unwrap_or(0);
-        let warm_input = whole_to_i64(js_round(frames_to_f64(self.warm) * tempo));
-        let warm_from = head_offset - warm_input;
         self.input.fill(0.0);
         let length = i64::try_from(self.length).unwrap_or(i64::MAX);
         fill(Block {
             samples: &mut self.input,
             stride: self.length,
-            offset: warm_from - length,
+            offset: head_offset - length,
             count: self.length,
         });
         self.stream.seek(
@@ -103,48 +96,10 @@ impl Stretcher {
             },
             tempo,
         );
-        self.warm_up(warm_from..head_offset, tempo, fill);
         Cursor {
             tempo,
             head: input_frame + head_offset,
             next_input: input_frame,
-        }
-    }
-
-    fn warm_up(&mut self, span: Range<i64>, tempo: f64, fill: Fill<'_>) {
-        let mut produced = 0;
-        let mut taken = span.start;
-        while produced < self.warm {
-            let frames = WARM_STEP.min(self.warm - produced);
-            let left = span.end - taken;
-            let wanted = whole_to_i64(js_round(frames_to_f64(frames) * tempo));
-            let count = if produced + frames == self.warm {
-                left
-            } else {
-                wanted.min(left)
-            };
-            let input = usize::try_from(count).unwrap_or(0);
-            self.clear_input(input);
-            fill(Block {
-                samples: &mut self.input,
-                stride: self.length,
-                offset: taken,
-                count: input,
-            });
-            self.stream.process(
-                &Planar {
-                    samples: &self.input,
-                    stride: self.length,
-                    frames: input,
-                },
-                &mut PlanarMut {
-                    samples: &mut self.output,
-                    stride: self.length,
-                    frames,
-                },
-            );
-            produced += frames;
-            taken += count;
         }
     }
 }
@@ -158,7 +113,6 @@ pub struct TimePitch {
     semitones: i32,
     tempo: f64,
     formants: bool,
-    warm_start: bool,
 }
 
 impl TimePitch {
@@ -173,12 +127,7 @@ impl TimePitch {
             semitones: 0,
             tempo: 1.0,
             formants: false,
-            warm_start: false,
         }
-    }
-
-    pub const fn set_warm_start(&mut self, warm_start: bool) {
-        self.warm_start = warm_start;
     }
 
     pub fn reset(&mut self) {
@@ -231,11 +180,6 @@ impl TimePitch {
         }
         let (semitones, formants) = (self.semitones, self.formants);
         if let Some(stretcher) = self.stretcher.as_mut() {
-            stretcher.warm = if self.warm_start {
-                stretcher.stream.overlap_length()
-            } else {
-                0
-            };
             if stretcher.semitones != semitones {
                 stretcher.stream.set_semitones(semitones);
                 stretcher.semitones = semitones;

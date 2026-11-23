@@ -268,10 +268,6 @@ impl Engine {
         self.stft.block() + self.stft.interval()
     }
 
-    pub(crate) const fn overlap_length(&self) -> usize {
-        self.stft.block() - self.stft.interval()
-    }
-
     pub(crate) fn reset(&mut self) {
         self.stft.reset(PRODUCT_WEIGHT);
         self.bins.fill(Band::default());

@@ -2,8 +2,10 @@ use super::{
     CHANNELS,
     time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64},
 };
+use crate::stretch::StretchStream;
 
 const UNIT_RATIO_TOLERANCE: f64 = 1e-6;
+const LANES: usize = 2;
 const CONTINUITY_FRAMES: f64 = 4.0;
 const SEMITONES_PER_OCTAVE: i32 = 12;
 
@@ -142,16 +144,53 @@ struct Part {
     to: usize,
     segment: Segment,
     song_frame: f64,
+    stretched: bool,
+    sounding: bool,
+}
+
+impl Part {
+    fn continues(&self, last: Option<Played>) -> bool {
+        last.is_some_and(|played| {
+            played.piece == self.segment.piece
+                && played.stretched == self.stretched
+                && (played.song_end - self.song_frame).abs() <= CONTINUITY_FRAMES
+        })
+    }
+
+    fn played(&self, position: i64, tempo: f64) -> Played {
+        let length = self.to - self.from;
+        Played {
+            piece: self.segment.piece,
+            stretched: self.stretched,
+            song_end: self.song_frame + frames_to_f64(length) * tempo,
+            raw_end: position + i64::try_from(length).unwrap_or(0),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Routed {
+    part: Part,
+    lane: usize,
+    continued: bool,
+}
+
+struct Lane {
+    stretcher: TimePitch,
+    previous: Option<Played>,
+    current: Option<Played>,
 }
 
 pub struct Takes {
     pieces: Vec<Piece>,
     live: Option<Live>,
     segments: Vec<Segment>,
-    stretcher: TimePitch,
-    previous: Option<Played>,
-    current: Option<Played>,
+    lanes: [Lane; LANES],
+    raw_previous: Option<Played>,
+    raw_current: Option<Played>,
+    lead: usize,
     scratch: Vec<f32>,
+    lead_scratch: Vec<f32>,
 }
 
 fn piece_at<'pieces>(
@@ -179,10 +218,33 @@ pub fn stretches(target: Target, pieces: &[Piece]) -> bool {
     target.tempo != 1.0
         || target.transpose != 0
         || shift != 0
-        || pieces.iter().any(|piece| {
-            let (ratio, semitones) = target.shift(piece);
-            (ratio - 1.0).abs() >= UNIT_RATIO_TOLERANCE || semitones != 0
-        })
+        || pieces.iter().any(|piece| is_stretched(target, piece))
+}
+
+fn is_stretched(target: Target, piece: &Piece) -> bool {
+    let (ratio, semitones) = target.shift(piece);
+    (ratio - 1.0).abs() >= UNIT_RATIO_TOLERANCE || semitones != 0
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "an offset into a quantum is a small whole number that is not negative"
+)]
+const fn to_index(offset: f64) -> usize {
+    offset as usize
+}
+
+fn free_lane(last: &[Option<Played>; LANES], later: &[Part]) -> usize {
+    let reserved = |lane: usize| {
+        later
+            .iter()
+            .any(|part| part.stretched && part.continues(last[lane]))
+    };
+    (0..LANES)
+        .filter(|lane| !reserved(*lane))
+        .min_by_key(|lane| last[*lane].is_some())
+        .unwrap_or(0)
 }
 
 fn add_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
@@ -207,17 +269,22 @@ fn raw_sample(samples: &[f32], frame: i64) -> f32 {
 
 impl Takes {
     #[must_use]
-    pub const fn new(sample_rate: u32) -> Self {
-        let mut stretcher = TimePitch::new(1, sample_rate);
-        stretcher.set_warm_start(true);
+    pub fn new(sample_rate: u32) -> Self {
+        let lane = || Lane {
+            stretcher: TimePitch::new(1, sample_rate),
+            previous: None,
+            current: None,
+        };
         Self {
             pieces: Vec::new(),
             live: None,
             segments: Vec::new(),
-            stretcher,
-            previous: None,
-            current: None,
+            lanes: [lane(), lane()],
+            raw_previous: None,
+            raw_current: None,
+            lead: StretchStream::new(1, sample_rate).output_latency(),
             scratch: Vec::new(),
+            lead_scratch: Vec::new(),
         }
     }
 
@@ -303,52 +370,13 @@ impl Takes {
         &self.segments
     }
 
-    fn render_part(&mut self, output: &mut [f32], part: Part, target: Target) {
-        let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
-            return;
-        };
-        let (ratio, semitones) = target.shift(piece);
-        let stretched = (ratio - 1.0).abs() >= UNIT_RATIO_TOLERANCE || semitones != 0;
-        let length = part.to - part.from;
-        let continued = self.previous.is_some_and(|previous| {
-            previous.piece == part.segment.piece
-                && previous.stretched == stretched
-                && (previous.song_end - part.song_frame).abs() <= CONTINUITY_FRAMES
-        });
-        let mapped = whole_to_i64(js_round((part.song_frame - piece.song_start) / piece.tempo));
-        let position = match self.previous {
-            Some(previous) if continued && !stretched => previous.raw_end,
-            _ => mapped,
-        };
-        self.current = Some(Played {
-            piece: part.segment.piece,
-            stretched,
-            song_end: part.song_frame + frames_to_f64(length) * target.tempo,
-            raw_end: position + i64::try_from(length).unwrap_or(0),
-        });
-        let block = &mut output[part.from..part.to];
-        let samples = piece.samples.as_slice();
-        if !stretched {
-            for (index, sample) in block.iter_mut().enumerate() {
-                *sample = raw_sample(samples, position + i64::try_from(index).unwrap_or(0));
-            }
-            return;
-        }
-        if !continued {
-            self.stretcher.reset();
-        }
-        self.stretcher.set_tempo(ratio);
-        self.stretcher.set_semitones(semitones);
-        self.stretcher
-            .process(block, position, &mut |fill: Block<'_>| {
-                for index in 0..fill.count {
-                    let frame = position + fill.offset + i64::try_from(index).unwrap_or(0);
-                    fill.samples[index] = raw_sample(samples, frame);
-                }
-            });
+    fn stretched(&self, piece: usize, target: Target) -> bool {
+        piece_at(&self.pieces, self.live.as_ref(), piece)
+            .is_some_and(|found| is_stretched(target, found))
     }
 
-    fn parts(&self, song_frame: f64, tempo: f64, frames: usize) -> Vec<Part> {
+    fn sounding_parts(&self, song_frame: f64, target: Target, frames: usize) -> Vec<Part> {
+        let tempo = target.tempo;
         let mut parts = Vec::new();
         let mut offset = 0.0_f64;
         let length = frames_to_f64(frames);
@@ -363,10 +391,12 @@ impl Takes {
             }
             if end > start {
                 parts.push(Part {
-                    from: usize::try_from(whole_to_i64(start)).unwrap_or(0),
-                    to: usize::try_from(whole_to_i64(end)).unwrap_or(0),
+                    from: to_index(start),
+                    to: to_index(end),
                     segment: *segment,
                     song_frame: song_frame + start * tempo,
+                    stretched: self.stretched(segment.piece, target),
+                    sounding: true,
                 });
             }
             offset = offset.max(end);
@@ -374,15 +404,131 @@ impl Takes {
         parts
     }
 
-    pub fn render(&mut self, output: &mut [f32], song_frame: f64, target: Target) -> bool {
-        self.previous = self.current;
-        self.current = None;
-        output.fill(0.0);
-        let parts = self.parts(song_frame, target.tempo, output.len());
-        for part in &parts {
-            self.render_part(output, *part, target);
+    fn lead_ins(&self, song_frame: f64, target: Target, frames: usize) -> Vec<Part> {
+        let tempo = target.tempo;
+        let length = frames_to_f64(frames);
+        let span = frames_to_f64(self.lead) * tempo;
+        let reach = song_frame + length * tempo + span;
+        let first = self
+            .segments
+            .partition_point(|segment| segment.start <= song_frame);
+        self.segments[first..]
+            .iter()
+            .take_while(|segment| segment.start < reach)
+            .filter(|segment| self.stretched(segment.piece, target))
+            .filter_map(|segment| {
+                let start = ((segment.start - span - song_frame) / tempo)
+                    .ceil()
+                    .max(0.0);
+                let end = length.min(((segment.start - song_frame) / tempo).ceil());
+                (end > start).then(|| Part {
+                    from: to_index(start),
+                    to: to_index(end),
+                    segment: *segment,
+                    song_frame: song_frame + start * tempo,
+                    stretched: true,
+                    sounding: false,
+                })
+            })
+            .collect()
+    }
+
+    fn route(&self, parts: &[Part], target: Target) -> Vec<Option<Routed>> {
+        let mut last = self.lanes.each_ref().map(|lane| lane.previous);
+        let mut planned = Vec::with_capacity(parts.len());
+        for (index, part) in parts.iter().enumerate() {
+            if !part.stretched {
+                planned.push(None);
+                continue;
+            }
+            let routed = match (0..LANES).find(|lane| part.continues(last[*lane])) {
+                Some(lane) => Routed {
+                    part: *part,
+                    lane,
+                    continued: true,
+                },
+                None => Routed {
+                    part: *part,
+                    lane: free_lane(&last, &parts[index + 1..]),
+                    continued: false,
+                },
+            };
+            last[routed.lane] = Some(part.played(0, target.tempo));
+            planned.push(Some(routed));
         }
-        !parts.is_empty()
+        planned
+    }
+
+    fn render_stretched(&mut self, block: &mut [f32], routed: Routed, target: Target) {
+        let Routed {
+            part,
+            lane: chosen,
+            continued,
+        } = routed;
+        let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
+            return;
+        };
+        let (ratio, semitones) = target.shift(piece);
+        let position = whole_to_i64(js_round((part.song_frame - piece.song_start) / piece.tempo));
+        let lane = &mut self.lanes[chosen];
+        lane.current = Some(part.played(position, target.tempo));
+        if !continued {
+            lane.stretcher.reset();
+        }
+        lane.stretcher.set_tempo(ratio);
+        lane.stretcher.set_semitones(semitones);
+        let samples = piece.samples.as_slice();
+        lane.stretcher
+            .process(block, position, &mut |fill: Block<'_>| {
+                for index in 0..fill.count {
+                    let frame = position + fill.offset + i64::try_from(index).unwrap_or(0);
+                    fill.samples[index] = raw_sample(samples, frame);
+                }
+            });
+    }
+
+    fn render_raw(&mut self, block: &mut [f32], part: Part, target: Target) {
+        let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
+            return;
+        };
+        let mapped = whole_to_i64(js_round((part.song_frame - piece.song_start) / piece.tempo));
+        let position = match self.raw_previous {
+            Some(previous) if part.continues(Some(previous)) => previous.raw_end,
+            _ => mapped,
+        };
+        self.raw_current = Some(part.played(position, target.tempo));
+        for (index, sample) in block.iter_mut().enumerate() {
+            *sample = raw_sample(&piece.samples, position + i64::try_from(index).unwrap_or(0));
+        }
+    }
+
+    pub fn render(&mut self, output: &mut [f32], song_frame: f64, target: Target) -> bool {
+        for lane in &mut self.lanes {
+            lane.previous = lane.current.take();
+        }
+        self.raw_previous = self.raw_current.take();
+        output.fill(0.0);
+        let frames = output.len();
+        let mut parts = self.sounding_parts(song_frame, target, frames);
+        let written = !parts.is_empty();
+        parts.extend(self.lead_ins(song_frame, target, frames));
+        parts.sort_by_key(|part| part.from);
+        let plan = self.route(&parts, target);
+        let mut lead = std::mem::take(&mut self.lead_scratch);
+        lead.resize(frames, 0.0);
+        for (part, step) in parts.iter().zip(plan) {
+            let block = if part.sounding {
+                &mut output[part.from..part.to]
+            } else {
+                &mut lead[part.from..part.to]
+            };
+            match step {
+                Some(routed) => self.render_stretched(block, routed, target),
+                None => self.render_raw(block, *part, target),
+            }
+        }
+        self.lead_scratch = lead;
+        written
     }
 
     #[must_use]
