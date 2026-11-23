@@ -6,6 +6,7 @@ use crate::stretch::StretchStream;
 
 const UNIT_RATIO_TOLERANCE: f64 = 1e-6;
 const LANES: usize = 2;
+const QUANTUM: usize = 128;
 const CONTINUITY_FRAMES: f64 = 4.0;
 const SEMITONES_PER_OCTAVE: i32 = 12;
 
@@ -270,10 +271,14 @@ fn raw_sample(samples: &[f32], frame: i64) -> f32 {
 impl Takes {
     #[must_use]
     pub fn new(sample_rate: u32) -> Self {
-        let lane = || Lane {
-            stretcher: TimePitch::new(1, sample_rate),
-            previous: None,
-            current: None,
+        let lane = || {
+            let mut stretcher = TimePitch::new(1, sample_rate);
+            stretcher.reserve(QUANTUM);
+            Lane {
+                stretcher,
+                previous: None,
+                current: None,
+            }
         };
         Self {
             pieces: Vec::new(),

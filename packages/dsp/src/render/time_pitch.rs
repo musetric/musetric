@@ -169,6 +169,10 @@ impl TimePitch {
         usize::try_from(whole_to_i64(count)).unwrap_or(0)
     }
 
+    pub fn reserve(&mut self, frames: usize) {
+        self.prepare(frames);
+    }
+
     fn prepare(&mut self, frames: usize) {
         if self
             .stretcher
