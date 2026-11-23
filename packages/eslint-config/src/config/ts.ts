@@ -23,7 +23,6 @@ export const tsConfig: Linter.Config = {
       (acc, config) => ({ ...acc, ...config.rules }),
       {},
     ),
-    'import-x/no-unresolved': ['error', { ignore: ['\\?(raw|worker&url)$'] }],
     '@typescript-eslint/consistent-type-assertions': [
       'error',
       { assertionStyle: 'never' },
@@ -67,6 +66,5 @@ export const tsConfig: Linter.Config = {
     '@typescript-eslint/await-thenable': 'error',
     '@typescript-eslint/promise-function-async': 'error',
     '@typescript-eslint/require-await': 'error',
-    'import-x/named': 'off',
   },
 };
