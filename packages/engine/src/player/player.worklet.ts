@@ -1,5 +1,5 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
-import { loadTimePitch } from '@musetric/audio/player';
+import { initSync } from '@musetric/dsp/stretch';
 import {
   playerChannel,
   playerDataChannel,
@@ -20,7 +20,7 @@ export class PlayerProcessor
         dataPort: playerDataChannel.inbound(message.dataPort),
         playheadPorts: message.playheadPorts,
         sampleRate,
-        stretch: loadTimePitch(message.stretchModule),
+        stretch: initSync({ module: message.stretchModule }),
         getCurrentTime: () => currentTime,
         getCurrentFrame: () => currentFrame,
       });

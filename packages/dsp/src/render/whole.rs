@@ -56,7 +56,11 @@ struct Pager {
 }
 
 impl Pager {
-    fn open(stems: &dyn StemPages, mixer: &mut PageMixer, sample_rate: u32) -> Result<Self, BoxedError> {
+    fn open(
+        stems: &dyn StemPages,
+        mixer: &mut PageMixer,
+        sample_rate: u32,
+    ) -> Result<Self, BoxedError> {
         let layouts: Vec<StemLayout> = (0..STEM_COUNT).map(|stem| stems.layout(stem)).collect();
         for (stem, layout) in layouts.iter().enumerate() {
             mixer.set_stem(stem, layout.frame_count, &layout.page_starts)?;
@@ -68,7 +72,12 @@ impl Pager {
         })
     }
 
-    fn feed(&mut self, stems: &mut dyn StemPages, mixer: &mut PageMixer, frame: i64) -> Result<(), BoxedError> {
+    fn feed(
+        &mut self,
+        stems: &mut dyn StemPages,
+        mixer: &mut PageMixer,
+        frame: i64,
+    ) -> Result<(), BoxedError> {
         for (stem, layout) in self.layouts.iter().enumerate() {
             let wanted = layout.pages_over(frame - self.kept, frame + self.kept);
             let held = self.resident[stem].clone();
@@ -150,7 +159,8 @@ pub fn render_song(
         let count = QUANTUM.min(frames - written);
         for channel in 0..CHANNELS {
             let at = channel * frames + written;
-            output[at..at + count].copy_from_slice(&block[channel * QUANTUM..channel * QUANTUM + count]);
+            output[at..at + count]
+                .copy_from_slice(&block[channel * QUANTUM..channel * QUANTUM + count]);
         }
         written += count;
         frame += i64::try_from(processed)?;

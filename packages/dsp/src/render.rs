@@ -2,7 +2,7 @@ mod takes;
 mod time_pitch;
 mod whole;
 
-pub use takes::{Piece, Segment, TakeKey, TakeMix, Takes, Target, lay_out};
+pub use takes::{Piece, Segment, TakeKey, TakeMix, Takes, Target, lay_out, stretches};
 pub use time_pitch::{Block, Fill, TimePitch, js_round};
 pub use whole::{QUANTUM, Song, StemLayout, StemPages, render_song};
 
@@ -201,7 +201,9 @@ impl Renderer {
                 frame,
                 mask,
             };
-            processed = song.process(output, frame, &mut |mut block: Block<'_>| stems.fill(&mut block));
+            processed = song.process(output, frame, &mut |mut block: Block<'_>| {
+                stems.fill(&mut block);
+            });
         }
         if parts.takes
             && let Some(song_frame) = take_frame
@@ -225,7 +227,9 @@ impl Renderer {
                 frame,
                 mask: LEAD,
             };
-            let taken = lead.process(lead_output, frame, &mut |mut block: Block<'_>| stems.fill(&mut block));
+            let taken = lead.process(lead_output, frame, &mut |mut block: Block<'_>| {
+                stems.fill(&mut block);
+            });
             if parts.song || parts.takes {
                 add_into(output, lead_output);
             } else {

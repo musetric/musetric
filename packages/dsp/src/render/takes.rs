@@ -48,6 +48,19 @@ impl Target {
         voice_octave: 0,
         voice_shifted: false,
     };
+
+    #[must_use]
+    pub fn shift(self, piece: &Piece) -> (f64, i32) {
+        let octaves = if self.voice_shifted {
+            self.voice_octave - piece.octave
+        } else {
+            0
+        };
+        (
+            self.tempo / piece.tempo,
+            self.transpose - piece.transpose + SEMITONES_PER_OCTAVE * octaves,
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -138,18 +151,6 @@ pub struct Takes {
     scratch: Vec<f32>,
 }
 
-fn shift_of(target: Target, piece: &Piece) -> (f64, i32) {
-    let octaves = if target.voice_shifted {
-        target.voice_octave - piece.octave
-    } else {
-        0
-    };
-    (
-        target.tempo / piece.tempo,
-        target.transpose - piece.transpose + SEMITONES_PER_OCTAVE * octaves,
-    )
-}
-
 fn piece_at<'pieces>(
     pieces: &'pieces [Piece],
     live: Option<&'pieces Live>,
@@ -159,6 +160,26 @@ fn piece_at<'pieces>(
         return pieces.get(index);
     }
     live?.runs.get(index - pieces.len()).map(|run| &run.piece)
+}
+
+#[must_use]
+#[expect(
+    clippy::float_cmp,
+    reason = "the song is stretched unless its tempo is exactly the original one, as the player bypasses it"
+)]
+pub fn stretches(target: Target, pieces: &[Piece]) -> bool {
+    let shift = if target.voice_shifted {
+        target.voice_octave
+    } else {
+        0
+    };
+    target.tempo != 1.0
+        || target.transpose != 0
+        || shift != 0
+        || pieces.iter().any(|piece| {
+            let (ratio, semitones) = target.shift(piece);
+            (ratio - 1.0).abs() >= UNIT_RATIO_TOLERANCE || semitones != 0
+        })
 }
 
 fn add_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
@@ -200,7 +221,6 @@ impl Takes {
     fn update(&mut self) {
         self.segments = lay_out(&self.layers());
     }
-
 
     pub fn set_pieces(&mut self, pieces: Vec<Piece>, finished_take: Option<&str>, switched: bool) {
         let keep_live = !switched
@@ -276,7 +296,7 @@ impl Takes {
         let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
             return;
         };
-        let (ratio, semitones) = shift_of(target, piece);
+        let (ratio, semitones) = target.shift(piece);
         let stretched = (ratio - 1.0).abs() >= UNIT_RATIO_TOLERANCE || semitones != 0;
         let length = part.to - part.from;
         let continued = self.previous.is_some_and(|previous| {
@@ -308,12 +328,13 @@ impl Takes {
         }
         self.stretcher.set_tempo(ratio);
         self.stretcher.set_semitones(semitones);
-        self.stretcher.process(block, position, &mut |fill: Block<'_>| {
-            for index in 0..fill.count {
-                let frame = position + fill.offset + i64::try_from(index).unwrap_or(0);
-                fill.samples[index] = raw_sample(samples, frame);
-            }
-        });
+        self.stretcher
+            .process(block, position, &mut |fill: Block<'_>| {
+                for index in 0..fill.count {
+                    let frame = position + fill.offset + i64::try_from(index).unwrap_or(0);
+                    fill.samples[index] = raw_sample(samples, frame);
+                }
+            });
     }
 
     fn parts(&self, song_frame: f64, tempo: f64, frames: usize) -> Vec<Part> {

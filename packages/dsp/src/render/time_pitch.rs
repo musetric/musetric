@@ -78,7 +78,8 @@ impl Stretcher {
 
     fn prime(&mut self, input_frame: i64, tempo: f64, fill: Fill<'_>) -> Cursor {
         let latency = js_round(frames_to_f64(self.stream.output_latency()) * tempo);
-        let head_offset = whole_to_i64(latency) + i64::try_from(self.stream.input_latency()).unwrap_or(0);
+        let head_offset =
+            whole_to_i64(latency) + i64::try_from(self.stream.input_latency()).unwrap_or(0);
         self.input.fill(0.0);
         let length = i64::try_from(self.length).unwrap_or(i64::MAX);
         fill(Block {

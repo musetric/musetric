@@ -42,6 +42,30 @@ mod tests {
             .collect()
     }
 
+    fn keyed(transpose: i32, octave: i32) -> Piece {
+        Piece {
+            transpose,
+            octave,
+            ..piece(0.0, 1, 1.0)
+        }
+    }
+
+    fn shifted(transpose: i32, voice_octave: Option<i32>) -> Target {
+        Target {
+            transpose,
+            voice_octave: voice_octave.unwrap_or(0),
+            voice_shifted: voice_octave.is_some(),
+            ..Target::ORIGINAL
+        }
+    }
+
+    #[test]
+    fn shifts_a_take_by_the_octave_of_the_voice_only_when_it_is_shifted() {
+        assert_eq!(shifted(2, None).shift(&keyed(-1, 1)).1, 3);
+        assert_eq!(shifted(2, Some(0)).shift(&keyed(-1, 1)).1, -9);
+        assert_eq!(shifted(-2, Some(1)).shift(&keyed(0, 0)).1, 10);
+    }
+
     #[test]
     fn lets_a_later_piece_cover_the_middle_of_an_earlier_one() {
         assert_eq!(
@@ -93,6 +117,12 @@ mod tests {
         assert_eq!(live(&[(10.0, 8.0)], 0.5), [(14.0, 16.0, 0)]);
     }
 
+    fn stem_channels(stem: usize, frames: usize) -> Vec<Vec<f32>> {
+        (0..CHANNELS)
+            .map(|channel| noise(frames, u32::try_from(stem * 2 + channel + 1).unwrap()))
+            .collect()
+    }
+
     struct Stems {
         channels: Vec<Vec<Vec<f32>>>,
     }
@@ -100,13 +130,7 @@ mod tests {
     impl Stems {
         fn new(frames: usize) -> Self {
             Self {
-                channels: (0..3)
-                    .map(|stem| {
-                        (0..CHANNELS)
-                            .map(|channel| noise(frames, u32::try_from(stem * 2 + channel + 1).unwrap()))
-                            .collect()
-                    })
-                    .collect(),
+                channels: (0..3).map(|stem| stem_channels(stem, frames)).collect(),
             }
         }
 
@@ -189,21 +213,35 @@ mod tests {
         }
     }
 
+    fn voiced(tempo: f64, transpose: i32) -> [Target; 2] {
+        [(0, false), (1, true)].map(|(voice_octave, voice_shifted)| Target {
+            tempo,
+            transpose,
+            voice_octave,
+            voice_shifted,
+        })
+    }
+
     fn targets() -> Vec<Target> {
-        let mut targets = Vec::new();
-        for tempo in [1.0, 0.8, 1.25] {
-            for transpose in [0, -2] {
-                for (voice_octave, voice_shifted) in [(0, false), (1, true)] {
-                    targets.push(Target {
-                        tempo,
-                        transpose,
-                        voice_octave,
-                        voice_shifted,
-                    });
-                }
+        [1.0, 0.8, 1.25]
+            .into_iter()
+            .flat_map(|tempo| {
+                [0, -2]
+                    .into_iter()
+                    .flat_map(move |transpose| voiced(tempo, transpose))
+            })
+            .collect()
+    }
+
+    fn export(stems: &mut Stems, song: &Song) -> Vec<f32> {
+        let mut exported = render(stems, song, Parts::SONG_AND_TAKES);
+        if song.target.voice_shifted && song.target.voice_octave != 0 {
+            let lead = render(stems, song, Parts::LEAD);
+            for (sample, voice) in exported.iter_mut().zip(&lead) {
+                *sample += voice;
             }
         }
-        targets
+        exported
     }
 
     #[test]
@@ -212,13 +250,7 @@ mod tests {
         for target in targets() {
             let song = scene(target);
             let played = render(&mut stems, &song, Parts::ALL);
-            let mut exported = render(&mut stems, &song, Parts::SONG_AND_TAKES);
-            if target.voice_shifted {
-                let lead = render(&mut stems, &song, Parts::LEAD);
-                for (sample, voice) in exported.iter_mut().zip(&lead) {
-                    *sample += voice;
-                }
-            }
+            let exported = export(&mut stems, &song);
             let equal = played
                 .iter()
                 .zip(&exported)
@@ -229,7 +261,10 @@ mod tests {
     }
 
     fn digest(samples: &[f32]) -> String {
-        let bytes: Vec<u8> = samples.iter().flat_map(|sample| sample.to_le_bytes()).collect();
+        let bytes: Vec<u8> = samples
+            .iter()
+            .flat_map(|sample| sample.to_le_bytes())
+            .collect();
         Sha256::digest(&bytes)
             .iter()
             .fold(String::new(), |mut hex, byte| {

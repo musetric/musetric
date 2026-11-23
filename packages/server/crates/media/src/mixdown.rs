@@ -12,10 +12,12 @@ use musetric_dsp::{
     aac::AacEncoder,
     flac::FlacWriter,
     m4a::{M4aTrack, write_m4a},
-    mix::{add_gained, limit_peak},
+    mix::limit_peak,
     mono::Downmix,
     mp3::Mp3Encoder,
-    stretch::{Refusal, Stretch},
+    render::{
+        LEAD, Parts, Piece, STEM_COUNT, Song, StemLayout, StemPages, Target, render_song, stretches,
+    },
     wav::WavWriter,
 };
 use tokio::task::{JoinHandle, spawn_blocking};
@@ -23,14 +25,15 @@ use tokio::task::{JoinHandle, spawn_blocking};
 use crate::{
     BoxedError, MonoRequest, decode_mono_pcm,
     file::create_buffered,
-    pcm::{CHANNELS, PcmRequest, PcmSource},
+    pcm::{CHANNELS, PcmChunks, PcmRequest, PcmSource},
 };
 
 const ORIGINAL_TEMPO_PERCENT: usize = 100;
-const UNIT_TEMPO_TOLERANCE: f64 = 1e-6;
-const TOO_SHORT: &str = "The song is too short to change its tempo or key";
 const STOPPED: &str = "The mixdown was stopped";
+const NO_STEM: &str = "The mixdown reads no such stem";
+const OUT_OF_ORDER: &str = "A stem is read page after page";
 const ENCODED_FRAMES: usize = 65_536;
+const PAGE_FRAMES: usize = 65_536;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MixdownFormat {
@@ -41,23 +44,17 @@ pub enum MixdownFormat {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MixdownGroup {
-    Song,
-    Lead,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MixdownChange {
     pub tempo_percent: usize,
     pub semitones: i32,
-    pub lead_semitones: i32,
+    pub voice_octave: Option<i32>,
 }
 
 impl MixdownChange {
     pub const ORIGINAL: Self = Self {
         tempo_percent: ORIGINAL_TEMPO_PERCENT,
         semitones: 0,
-        lead_semitones: 0,
+        voice_octave: None,
     };
 
     #[must_use]
@@ -65,10 +62,21 @@ impl MixdownChange {
         (source_frames * ORIGINAL_TEMPO_PERCENT + self.tempo_percent / 2) / self.tempo_percent
     }
 
-    const fn semitones_of(self, group: MixdownGroup) -> i32 {
-        match group {
-            MixdownGroup::Lead => self.lead_semitones,
-            MixdownGroup::Song => self.semitones,
+    #[must_use]
+    pub const fn lead_apart(self) -> bool {
+        matches!(self.voice_octave, Some(octave) if octave != 0)
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "tempo percents are small integers"
+    )]
+    fn target(self) -> Target {
+        Target {
+            tempo: self.tempo_percent as f64 / ORIGINAL_TEMPO_PERCENT as f64,
+            transpose: self.semitones,
+            voice_octave: self.voice_octave.unwrap_or(0),
+            voice_shifted: self.voice_octave.is_some(),
         }
     }
 }
@@ -76,28 +84,26 @@ impl MixdownChange {
 pub struct MixdownTrack {
     pub from: PathBuf,
     pub gain: f32,
-    pub group: MixdownGroup,
 }
 
 pub struct MixdownTake {
     pub from: PathBuf,
-    pub gain: f32,
     pub sample_rate: u32,
     pub song_start_frame: usize,
     pub tempo: f64,
-    pub semitones: i32,
+    pub transpose: i32,
+    pub octave: i32,
 }
 
 pub struct Mixdown {
     pub sample_rate: u32,
     pub frame_count: usize,
-    pub tracks: Vec<MixdownTrack>,
+    pub stems: [Option<MixdownTrack>; STEM_COUNT],
     pub takes: Vec<MixdownTake>,
+    pub take_gain: f32,
     pub format: MixdownFormat,
     pub change: MixdownChange,
 }
-
-type Stretching = JoinHandle<Result<Vec<Vec<f32>>, Refusal>>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MixdownStage {
@@ -180,18 +186,99 @@ impl MixdownWatch {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Reading<'mixdown> {
-    source: &'mixdown dyn PcmSource,
-    sample_rate: u32,
-    watch: &'mixdown MixdownWatch,
-}
-
 struct Output<'mixdown> {
     sample_rate: u32,
     format: MixdownFormat,
     to: &'mixdown Path,
     watch: &'mixdown MixdownWatch,
+}
+
+struct StreamedStem {
+    chunks: PcmChunks,
+    carry: Vec<f32>,
+    next: usize,
+}
+
+impl StreamedStem {
+    fn page(&mut self, index: usize, frames: usize) -> Result<Vec<f32>, BoxedError> {
+        if index != self.next {
+            return Err(OUT_OF_ORDER.into());
+        }
+        self.next += 1;
+        let wanted = frames * CHANNELS;
+        while self.carry.len() < wanted {
+            match self.chunks.recv() {
+                Ok(chunk) => self.carry.extend_from_slice(&chunk?),
+                Err(_) => break,
+            }
+        }
+        let taken = wanted.min(self.carry.len());
+        let mut interleaved: Vec<f32> = self.carry.drain(..taken).collect();
+        interleaved.resize(wanted, 0.0);
+        Ok((0..CHANNELS)
+            .flat_map(|channel| interleaved.iter().skip(channel).step_by(CHANNELS).copied())
+            .collect())
+    }
+}
+
+struct Streams {
+    frame_count: usize,
+    stems: Vec<Option<StreamedStem>>,
+}
+
+impl Streams {
+    fn open(source: &dyn PcmSource, mixdown: &Mixdown, mask: u32) -> Result<Self, BoxedError> {
+        let mut stems = Vec::with_capacity(STEM_COUNT);
+        for (stem, track) in mixdown.stems.iter().enumerate() {
+            let read = track.as_ref().filter(|_| mask & (1 << stem) != 0);
+            stems.push(match read {
+                Some(opened) => Some(StreamedStem {
+                    chunks: source.stream_pcm(PcmRequest {
+                        from: &opened.from,
+                        sample_rate: mixdown.sample_rate,
+                    })?,
+                    carry: Vec::new(),
+                    next: 0,
+                }),
+                None => None,
+            });
+        }
+        Ok(Self {
+            frame_count: mixdown.frame_count,
+            stems,
+        })
+    }
+
+    fn page_frames(&self, index: usize) -> usize {
+        PAGE_FRAMES.min(self.frame_count.saturating_sub(index * PAGE_FRAMES))
+    }
+}
+
+impl StemPages for Streams {
+    fn layout(&self, stem: usize) -> StemLayout {
+        if self.stems.get(stem).is_none_or(Option::is_none) {
+            return StemLayout {
+                frame_count: 0,
+                page_starts: Vec::new(),
+            };
+        }
+        StemLayout {
+            frame_count: i64::try_from(self.frame_count).unwrap_or(i64::MAX),
+            page_starts: (0..self.frame_count)
+                .step_by(PAGE_FRAMES)
+                .map(|start| i64::try_from(start).unwrap_or(i64::MAX))
+                .collect(),
+        }
+    }
+
+    fn read(&mut self, stem: usize, index: usize) -> Result<Vec<f32>, BoxedError> {
+        let frames = self.page_frames(index);
+        self.stems
+            .get_mut(stem)
+            .and_then(Option::as_mut)
+            .ok_or(NO_STEM)?
+            .page(index, frames)
+    }
 }
 
 pub async fn write_mixdown(
@@ -207,57 +294,177 @@ pub async fn write_mixdown(
     written
 }
 
+struct Rendering {
+    streams: Streams,
+    song: Song,
+    parts: Parts,
+    reported: Option<MixdownStage>,
+}
+
+fn spawn_render(
+    rendering: Rendering,
+    watch: &Arc<MixdownWatch>,
+) -> JoinHandle<Result<Option<Vec<f32>>, BoxedError>> {
+    let shared = Arc::clone(watch);
+    spawn_blocking(move || {
+        let Rendering {
+            mut streams,
+            song,
+            parts,
+            reported,
+        } = rendering;
+        let mut done = 0;
+        let outcome = render_song(&mut streams, &song, parts, &mut |written| {
+            if let Some(stage) = reported {
+                shared.advance(stage, written - done);
+                done = written;
+            }
+            shared.going()
+        });
+        if outcome.is_err() {
+            shared.abandon();
+        }
+        outcome
+    })
+}
+
+async fn rendered(
+    task: JoinHandle<Result<Option<Vec<f32>>, BoxedError>>,
+    watch: &MixdownWatch,
+) -> Result<Vec<f32>, BoxedError> {
+    let outcome = task.await?;
+    if outcome.is_err() {
+        watch.abandon();
+    }
+    outcome?.ok_or_else(|| STOPPED.into())
+}
+
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "the frames of a song and the rates of audio are far below the f64 mantissa"
+)]
+fn song_frame(take: &MixdownTake, sample_rate: u32) -> f64 {
+    take.song_start_frame as f64 * f64::from(sample_rate) / f64::from(take.sample_rate)
+}
+
+async fn read_pieces(
+    source: &dyn PcmSource,
+    mixdown: &Mixdown,
+    watch: &MixdownWatch,
+) -> Result<Vec<Piece>, BoxedError> {
+    let mut pieces = Vec::with_capacity(mixdown.takes.len());
+    for take in &mixdown.takes {
+        watch.check()?;
+        let bytes = decode_mono_pcm(MonoRequest {
+            source,
+            request: PcmRequest {
+                from: &take.from,
+                sample_rate: mixdown.sample_rate,
+            },
+            downmix: Downmix::Power,
+            decoded: &mut |_| {},
+        })
+        .await?;
+        pieces.push(Piece {
+            song_start: song_frame(take, mixdown.sample_rate),
+            tempo: take.tempo,
+            transpose: take.transpose,
+            octave: take.octave,
+            samples: bytes
+                .as_chunks::<{ size_of::<f32>() }>()
+                .0
+                .iter()
+                .map(|value| f32::from_le_bytes(*value))
+                .collect(),
+        });
+    }
+    Ok(pieces)
+}
+
+fn interleave(planar: &[f32], frames: usize) -> Vec<f32> {
+    let (left, right) = planar.split_at(frames);
+    left.iter()
+        .zip(right)
+        .flat_map(|(first, second)| [*first, *second])
+        .collect()
+}
+
+fn add_voice(
+    main: Result<Vec<f32>, BoxedError>,
+    voice: Result<Vec<f32>, BoxedError>,
+) -> Result<Vec<f32>, BoxedError> {
+    match (main, voice) {
+        (Ok(mut planar), Ok(lead)) => {
+            for (sample, value) in planar.iter_mut().zip(lead) {
+                *sample += value;
+            }
+            Ok(planar)
+        }
+        (Err(failure), Ok(_)) | (Ok(_), Err(failure)) => Err(failure),
+        (Err(main_failure), Err(voice_failure)) => Err(if main_failure.to_string() == STOPPED {
+            voice_failure
+        } else {
+            main_failure
+        }),
+    }
+}
+
 async fn mix(
     source: &dyn PcmSource,
     mixdown: Mixdown,
     to: &Path,
     watch: &Arc<MixdownWatch>,
 ) -> Result<(), BoxedError> {
-    let reading = Reading {
-        source,
-        sample_rate: mixdown.sample_rate,
-        watch,
+    let pieces = read_pieces(source, &mixdown, watch).await?;
+    let target = mixdown.change.target();
+    let frames = mixdown.change.frame_count(mixdown.frame_count);
+    let stage = if stretches(target, &pieces) {
+        MixdownStage::Stretching
+    } else {
+        MixdownStage::Mixing
     };
-    let frame_count = mixdown.change.frame_count(mixdown.frame_count);
-    let mut mixed = vec![0.0_f32; frame_count * CHANNELS];
-    let mut stretching = Vec::new();
-    watch.plan(MixdownStage::Mixing, mixdown.tracks.len());
-    for group in [MixdownGroup::Song, MixdownGroup::Lead] {
-        let tracks: Vec<&MixdownTrack> = mixdown
-            .tracks
-            .iter()
-            .filter(|track| track.group == group)
-            .collect();
-        if tracks.is_empty() {
-            continue;
-        }
-        let semitones = mixdown.change.semitones_of(group);
-        if mixdown.change.tempo_percent == ORIGINAL_TEMPO_PERCENT && semitones == 0 {
-            for track in tracks {
-                add_track(reading, track, &mut mixed).await?;
-            }
-            continue;
-        }
-        let mut song = vec![0.0_f32; mixdown.frame_count * CHANNELS];
-        for track in tracks {
-            add_track(reading, track, &mut song).await?;
-        }
-        let stretch = Stretch {
-            sample_rate: mixdown.sample_rate,
-            frame_count,
-            semitones,
-            keep_formants: group == MixdownGroup::Lead,
+    watch.plan(stage, frames);
+    watch.enter(stage);
+    let lead_apart = mixdown.change.lead_apart();
+    let song = Song {
+        sample_rate: mixdown.sample_rate,
+        frame_count: frames,
+        volumes: mixdown
+            .stems
+            .each_ref()
+            .map(|track| track.as_ref().map_or(0.0, |found| found.gain)),
+        target,
+        recording_volume: mixdown.take_gain,
+        pieces,
+    };
+    let lead = if lead_apart {
+        let rendering = Rendering {
+            streams: Streams::open(source, &mixdown, LEAD)?,
+            song: song.clone(),
+            parts: Parts::LEAD,
+            reported: None,
         };
-        stretching.push(spawn_stretch(stretch, deinterleave(&song), watch));
-    }
-    let takes = render_takes(reading, &mixdown, frame_count, watch).await?;
-    if !stretching.is_empty() || takes.iter().any(TakeRender::stretched) {
-        watch.enter(MixdownStage::Stretching);
-    }
-    add_stretched(stretching, &mut mixed).await?;
-    add_takes(takes, &mut mixed).await?;
+        Some(spawn_render(rendering, watch))
+    } else {
+        None
+    };
+    let accompaniment = if lead_apart { !LEAD } else { u32::MAX };
+    let rendering = Rendering {
+        streams: Streams::open(source, &mixdown, accompaniment)?,
+        song,
+        parts: Parts::SONG_AND_TAKES,
+        reported: Some(stage),
+    };
+    let main = spawn_render(rendering, watch);
+    let main_outcome = rendered(main, watch).await;
+    let planar = match lead {
+        Some(task) => add_voice(main_outcome, rendered(task, watch).await)?,
+        None => main_outcome?,
+    };
+    let mut mixed = interleave(&planar, frames);
+    drop(planar);
     limit_peak(&mut mixed);
-    let target = to.to_owned();
+    let target_path = to.to_owned();
     let encoding = Arc::clone(watch);
     spawn_blocking(move || {
         encode(
@@ -265,209 +472,12 @@ async fn mix(
             &Output {
                 sample_rate: mixdown.sample_rate,
                 format: mixdown.format,
-                to: &target,
+                to: &target_path,
                 watch: &encoding,
             },
         )
     })
     .await?
-}
-
-fn spawn_stretch(
-    stretch: Stretch,
-    channels: Vec<Vec<f32>>,
-    watch: &Arc<MixdownWatch>,
-) -> Stretching {
-    let stretching = Arc::clone(watch);
-    watch.plan(MixdownStage::Stretching, stretch.frame_count);
-    spawn_blocking(move || {
-        let mut reported = 0;
-        stretch.apply(&channels, &mut |written| {
-            stretching.advance(MixdownStage::Stretching, written - reported);
-            reported = written;
-            stretching.going()
-        })
-    })
-}
-
-async fn stretched(task: Stretching) -> Result<Vec<Vec<f32>>, BoxedError> {
-    Ok(task.await?.map_err(|refusal| match refusal {
-        Refusal::TooShort => TOO_SHORT,
-        Refusal::Stopped => STOPPED,
-    })?)
-}
-
-async fn add_stretched(stretching: Vec<Stretching>, mixed: &mut [f32]) -> Result<(), BoxedError> {
-    for task in stretching {
-        let channels = stretched(task).await?;
-        for (frame, pair) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().enumerate() {
-            pair[0] += channels[0][frame];
-            pair[1] += channels[1][frame];
-        }
-    }
-    Ok(())
-}
-
-enum TakeSamples {
-    Kept(Vec<f32>),
-    Stretched(Stretching),
-}
-
-struct TakeRender {
-    start: usize,
-    length: usize,
-    gain: f32,
-    samples: TakeSamples,
-}
-
-impl TakeRender {
-    const fn stretched(&self) -> bool {
-        matches!(self.samples, TakeSamples::Stretched(_))
-    }
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "frame counts of a song fit the f64 mantissa and a scaled count is not negative"
-)]
-fn scaled(frames: usize, numerator: f64, denominator: f64) -> usize {
-    (frames as f64 * numerator / denominator).round() as usize
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "tempo percents are small integers"
-)]
-fn tempo_ratio(change: MixdownChange) -> f64 {
-    change.tempo_percent as f64 / ORIGINAL_TEMPO_PERCENT as f64
-}
-
-async fn read_take(reading: Reading<'_>, take: &MixdownTake) -> Result<Vec<f32>, BoxedError> {
-    let bytes = decode_mono_pcm(MonoRequest {
-        source: reading.source,
-        request: PcmRequest {
-            from: &take.from,
-            sample_rate: reading.sample_rate,
-        },
-        downmix: Downmix::Power,
-        decoded: &mut |_| {},
-    })
-    .await?;
-    Ok(bytes
-        .as_chunks::<{ size_of::<f32>() }>()
-        .0
-        .iter()
-        .map(|value| f32::from_le_bytes(*value))
-        .collect())
-}
-
-async fn render_takes(
-    reading: Reading<'_>,
-    mixdown: &Mixdown,
-    frame_count: usize,
-    watch: &Arc<MixdownWatch>,
-) -> Result<Vec<TakeRender>, BoxedError> {
-    let tempo = tempo_ratio(mixdown.change);
-    let shortest = usize::try_from(mixdown.sample_rate)?;
-    let mut renders = Vec::with_capacity(mixdown.takes.len());
-    for take in &mixdown.takes {
-        reading.watch.check()?;
-        let start = scaled(
-            take.song_start_frame,
-            f64::from(mixdown.sample_rate),
-            f64::from(take.sample_rate) * tempo,
-        );
-        if start >= frame_count {
-            continue;
-        }
-        let mut samples = read_take(reading, take).await?;
-        let ratio = tempo / take.tempo;
-        if (ratio - 1.0).abs() < UNIT_TEMPO_TOLERANCE && take.semitones == 0 {
-            renders.push(TakeRender {
-                start,
-                length: samples.len(),
-                gain: take.gain,
-                samples: TakeSamples::Kept(samples),
-            });
-            continue;
-        }
-        let length = scaled(samples.len(), 1.0, ratio);
-        samples.resize(samples.len().max(shortest), 0.0);
-        let stretch = Stretch {
-            sample_rate: mixdown.sample_rate,
-            frame_count: scaled(samples.len(), 1.0, ratio),
-            semitones: take.semitones,
-            keep_formants: false,
-        };
-        renders.push(TakeRender {
-            start,
-            length,
-            gain: take.gain,
-            samples: TakeSamples::Stretched(spawn_stretch(stretch, vec![samples], watch)),
-        });
-    }
-    Ok(renders)
-}
-
-async fn add_takes(renders: Vec<TakeRender>, mixed: &mut [f32]) -> Result<(), BoxedError> {
-    if renders.is_empty() {
-        return Ok(());
-    }
-    let mut sung = vec![0.0_f32; mixed.len() / CHANNELS];
-    for render in renders {
-        let samples = match render.samples {
-            TakeSamples::Kept(samples) => samples,
-            TakeSamples::Stretched(task) => stretched(task).await?.swap_remove(0),
-        };
-        for (slot, sample) in sung[render.start..]
-            .iter_mut()
-            .zip(&samples[..render.length])
-        {
-            *slot = sample * render.gain;
-        }
-    }
-    for (pair, sample) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().zip(&sung) {
-        pair[0] += sample;
-        pair[1] += sample;
-    }
-    Ok(())
-}
-
-fn deinterleave(song: &[f32]) -> Vec<Vec<f32>> {
-    (0..CHANNELS)
-        .map(|channel| {
-            song.iter()
-                .skip(channel)
-                .step_by(CHANNELS)
-                .copied()
-                .collect()
-        })
-        .collect()
-}
-
-async fn add_track(
-    reading: Reading<'_>,
-    track: &MixdownTrack,
-    mixed: &mut [f32],
-) -> Result<(), BoxedError> {
-    reading.watch.check()?;
-    let request = PcmRequest {
-        from: &track.from,
-        sample_rate: reading.sample_rate,
-    };
-    let mut sample = 0_usize;
-    let mut sink = |chunk: &[f32]| {
-        let whole = chunk.len() / CHANNELS * CHANNELS;
-        let start = sample.min(mixed.len());
-        let end = (sample + whole).min(mixed.len());
-        add_gained(&mut mixed[start..end], &chunk[..end - start], track.gain);
-        sample += whole;
-    };
-    reading.source.read_pcm(request, &mut sink).await?;
-    reading.watch.advance(MixdownStage::Mixing, 1);
-    Ok(())
 }
 
 fn encode(mixed: &[f32], output: &Output<'_>) -> Result<(), BoxedError> {
@@ -550,16 +560,22 @@ mod tests {
         f32::consts::FRAC_1_SQRT_2,
         fs::{create_dir_all, read, remove_dir_all},
         path::{Path, PathBuf},
-        sync::Arc,
+        sync::{Arc, mpsc::channel},
     };
 
     use super::{
-        Mixdown, MixdownChange, MixdownFormat, MixdownGroup, MixdownProgress, MixdownStage,
-        MixdownTake, MixdownTrack, MixdownWatch, STOPPED, write_mixdown,
+        Mixdown, MixdownChange, MixdownFormat, MixdownProgress, MixdownStage, MixdownTake,
+        MixdownTrack, MixdownWatch, STOPPED, write_mixdown,
     };
     use musetric_dsp::mix::PEAK_CEILING;
 
-    use crate::{PcmRequest, PcmSink, PcmSource, ReadingPcm, SymphoniaPcm};
+    use crate::{BoxedError, PcmChunks, PcmRequest, PcmSink, PcmSource, ReadingPcm, SymphoniaPcm};
+
+    fn chunks(samples: Result<Vec<f32>, BoxedError>) -> PcmChunks {
+        let (sent, received) = channel();
+        sent.send(samples).ok();
+        received
+    }
 
     const RATE: u32 = 48_000;
     const WAV_HEADER_BYTES: usize = 44;
@@ -583,24 +599,32 @@ mod tests {
                 Ok(())
             })
         }
+
+        fn stream_pcm(&self, request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError> {
+            let found = self
+                .0
+                .iter()
+                .find(|(path, _)| path == request.from)
+                .map_or_default(|(_, samples)| samples.clone());
+            Ok(chunks(Ok(found)))
+        }
     }
 
     fn stem(from: &Path, gain: f32) -> MixdownTrack {
         MixdownTrack {
             from: from.to_owned(),
             gain,
-            group: MixdownGroup::Song,
         }
     }
 
     fn take(from: &Path, song_start_frame: usize, tempo: f64) -> MixdownTake {
         MixdownTake {
             from: from.to_owned(),
-            gain: 1.0,
             sample_rate: RATE,
             song_start_frame,
             tempo,
-            semitones: 0,
+            transpose: 0,
+            octave: 0,
         }
     }
 
@@ -621,18 +645,22 @@ mod tests {
             .collect()
     }
 
+    type Stems = [Option<MixdownTrack>; 3];
+
     struct Scene {
         frame_count: usize,
-        tracks: Vec<MixdownTrack>,
+        stems: Stems,
         takes: Vec<MixdownTake>,
+        take_gain: f32,
         change: MixdownChange,
     }
 
-    async fn mix(name: &str, fixture: &Fixture, tracks: Vec<MixdownTrack>) -> Vec<f32> {
+    async fn mix(name: &str, fixture: &Fixture, stems: Stems) -> Vec<f32> {
         let scene = Scene {
             frame_count: 8,
-            tracks,
+            stems,
             takes: Vec::new(),
+            take_gain: 1.0,
             change: MixdownChange::ORIGINAL,
         };
         render(name, fixture, scene).await
@@ -649,8 +677,9 @@ mod tests {
         Mixdown {
             sample_rate: RATE,
             frame_count: scene.frame_count,
-            tracks: scene.tracks,
+            stems: scene.stems,
             takes: scene.takes,
+            take_gain: scene.take_gain,
             format: MixdownFormat::Wav,
             change: scene.change,
         }
@@ -691,7 +720,8 @@ mod tests {
             sample_rate: RATE,
             frame_count: TONE_FRAMES,
             takes: Vec::new(),
-            tracks: vec![stem(&song, 1.0)],
+            take_gain: 1.0,
+            stems: [None, None, Some(stem(&song, 1.0))],
             format,
             change: MixdownChange::ORIGINAL,
         };
@@ -753,11 +783,9 @@ mod tests {
         ]);
         let scene = Scene {
             frame_count: 8,
-            tracks: vec![stem(&instrumental, 0.5)],
-            takes: vec![MixdownTake {
-                gain: 2.0,
-                ..take(&recorded, 0, 1.0)
-            }],
+            stems: [None, None, Some(stem(&instrumental, 0.5))],
+            takes: vec![take(&recorded, 0, 1.0)],
+            take_gain: 2.0,
             change: MixdownChange::ORIGINAL,
         };
 
@@ -782,11 +810,12 @@ mod tests {
         let fixture = Fixture(vec![(sung.clone(), mono(&[0.5; 4]))]);
         let scene = Scene {
             frame_count: 16,
-            tracks: Vec::new(),
+            stems: [None, None, None],
             takes: vec![MixdownTake {
                 sample_rate: RATE / 2,
                 ..take(&sung, 2, 0.5)
             }],
+            take_gain: 1.0,
             change: MixdownChange {
                 tempo_percent: 50,
                 ..MixdownChange::ORIGINAL
@@ -815,8 +844,9 @@ mod tests {
         ]);
         let scene = Scene {
             frame_count: 8,
-            tracks: Vec::new(),
+            stems: [None, None, None],
             takes: vec![take(&first, 0, 1.0), take(&second, 2, 1.0)],
+            take_gain: 1.0,
             change: MixdownChange::ORIGINAL,
         };
 
@@ -841,11 +871,12 @@ mod tests {
         let fixture = Fixture(vec![(sung.clone(), mono(&tone))]);
         let scene = Scene {
             frame_count: 48_000,
-            tracks: Vec::new(),
+            stems: [None, None, None],
             takes: vec![MixdownTake {
-                semitones: 2,
+                transpose: -2,
                 ..take(&sung, 12_000, 1.0)
             }],
+            take_gain: 1.0,
             change: MixdownChange {
                 tempo_percent: 50,
                 ..MixdownChange::ORIGINAL
@@ -878,7 +909,7 @@ mod tests {
         let mixed = mix(
             "ceiling",
             &fixture,
-            vec![stem(&lead, 1.0), stem(&backing, 1.0)],
+            [Some(stem(&lead, 1.0)), Some(stem(&backing, 1.0)), None],
         )
         .await;
 
@@ -902,17 +933,11 @@ mod tests {
             })
             .collect();
         let fixture = Fixture(vec![(song.clone(), tone.clone()), (lead.clone(), tone)]);
-        let tracks = vec![
-            stem(&song, 1.0),
-            MixdownTrack {
-                group: MixdownGroup::Lead,
-                ..stem(&lead, 1.0)
-            },
-        ];
+        let stems = [Some(stem(&lead, 1.0)), None, Some(stem(&song, 1.0))];
         let change = MixdownChange {
             tempo_percent: 50,
             semitones: 2,
-            lead_semitones: -10,
+            voice_octave: Some(-1),
         };
 
         let mixed = render(
@@ -920,8 +945,9 @@ mod tests {
             &fixture,
             Scene {
                 frame_count: usize::from(frames),
-                tracks,
+                stems,
                 takes: Vec::new(),
+                take_gain: 1.0,
                 change,
             },
         )
@@ -949,9 +975,14 @@ mod tests {
                 Ok(())
             })
         }
+
+        fn stream_pcm(&self, _request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError> {
+            self.watch.stop();
+            Ok(chunks(Ok(self.samples.clone())))
+        }
     }
 
-    async fn stop_after_the_first_track(name: &str, scene: Scene) -> (bool, MixdownProgress) {
+    async fn stop_while_it_renders(name: &str, scene: Scene) -> (bool, MixdownProgress) {
         let watch = Arc::new(MixdownWatch::default());
         let source = Stopping {
             samples: [0.25, -0.25].repeat(scene.frame_count),
@@ -971,15 +1002,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stops_between_the_tracks_and_inside_the_stretch_and_writes_no_file() {
+    async fn stops_while_it_renders_and_writes_no_file() {
         let song = PathBuf::from("song.flac");
         let backing = PathBuf::from("backing.flac");
-        let mixed = stop_after_the_first_track(
+        let mixed = stop_while_it_renders(
             "stop-mixing",
             Scene {
                 frame_count: 48_000,
-                tracks: vec![stem(&song, 1.0), stem(&backing, 1.0)],
+                stems: [None, Some(stem(&backing, 1.0)), Some(stem(&song, 1.0))],
                 takes: Vec::new(),
+                take_gain: 1.0,
                 change: MixdownChange::ORIGINAL,
             },
         )
@@ -990,20 +1022,21 @@ mod tests {
                 false,
                 MixdownProgress {
                     stage: MixdownStage::Mixing,
-                    done: Some(0.5),
+                    done: Some(0.0),
                 }
             )
         );
-        let stretched = stop_after_the_first_track(
+        let stretched = stop_while_it_renders(
             "stop-stretch",
             Scene {
                 frame_count: 48_000,
-                tracks: vec![stem(&song, 1.0)],
+                stems: [None, None, Some(stem(&song, 1.0))],
                 takes: Vec::new(),
+                take_gain: 1.0,
                 change: MixdownChange {
                     tempo_percent: 80,
                     semitones: -2,
-                    lead_semitones: -2,
+                    voice_octave: None,
                 },
             },
         )
@@ -1036,13 +1069,14 @@ mod tests {
             let mixdown = Mixdown {
                 sample_rate: RATE,
                 frame_count: 48_000,
-                tracks: vec![stem(&song, 1.0)],
+                stems: [None, None, Some(stem(&song, 1.0))],
                 takes: Vec::new(),
+                take_gain: 1.0,
                 format,
                 change: MixdownChange {
                     tempo_percent: 125,
                     semitones: 1,
-                    lead_semitones: 1,
+                    voice_octave: None,
                 },
             };
             write_mixdown(&fixture, mixdown, &directory.join("mix"), &watch)
@@ -1083,6 +1117,13 @@ mod tests {
                 outcome
             })
         }
+
+        fn stream_pcm(&self, request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError> {
+            if request.from == Path::new("lead.flac") {
+                return Ok(chunks(Err("the lead stem cannot be read".into())));
+            }
+            Ok(chunks(Ok([0.25, -0.25].repeat(48_000))))
+        }
     }
 
     #[tokio::test]
@@ -1093,19 +1134,14 @@ mod tests {
         let mixdown = Mixdown {
             sample_rate: RATE,
             frame_count: 48_000,
-            tracks: vec![
-                stem(&song, 1.0),
-                MixdownTrack {
-                    group: MixdownGroup::Lead,
-                    ..stem(&lead, 1.0)
-                },
-            ],
+            stems: [Some(stem(&lead, 1.0)), None, Some(stem(&song, 1.0))],
             takes: Vec::new(),
+            take_gain: 1.0,
             format: MixdownFormat::Wav,
             change: MixdownChange {
                 tempo_percent: 80,
                 semitones: -2,
-                lead_semitones: 10,
+                voice_octave: Some(1),
             },
         };
         let written = write_mixdown(

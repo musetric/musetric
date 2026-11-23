@@ -4,6 +4,7 @@ use std::{
     future::Future,
     path::Path,
     pin::Pin,
+    sync::mpsc::Receiver,
 };
 
 use crate::BoxedError;
@@ -24,6 +25,8 @@ pub type ReadingPcm<'reading> =
 
 pub type PcmSink<'sink> = &'sink mut (dyn FnMut(&[f32]) + Send);
 
+pub type PcmChunks = Receiver<Result<Vec<f32>, BoxedError>>;
+
 pub type DecodedFrames<'decoded> = &'decoded mut (dyn FnMut(u64) + Send);
 
 pub trait PcmSource: Send + Sync {
@@ -32,6 +35,8 @@ pub trait PcmSource: Send + Sync {
         request: PcmRequest<'source>,
         sink: PcmSink<'source>,
     ) -> ReadingPcm<'source>;
+
+    fn stream_pcm(&self, request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError>;
 }
 
 #[derive(Debug)]

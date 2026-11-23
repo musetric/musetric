@@ -12,7 +12,6 @@
     "${configDir}/src/calibration/**/*",
     "${configDir}/src/common/**/*",
     "${configDir}/src/decoder/**/*",
-    "${configDir}/src/player/**/*",
     "${configDir}/src/recording/**/*",
     "${configDir}/src/timeline/**/*",
     "${configDir}/src/waveform/**/*",
