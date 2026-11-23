@@ -15,6 +15,9 @@ the open project, deletes it afterwards and writes the runs and `report.md` to
 
 Every command first runs the app's calibration check and stops if it fails; a
 call it cannot parse prints its options. Open a project before running one.
+A take is kept as it was recorded, never stretched: frame k of a piece sung at
+tempo t lies on the song at the piece's start plus k × t, so at every tempo the
+take's distance from the beats is in milliseconds as heard, like the playhead's.
 `measure:delay` and `measure:sound` play their file from this computer with
 `ffplay`, which must be on `PATH`: put the speaker next to the microphone.
 

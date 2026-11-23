@@ -8,7 +8,8 @@
   },
   "include": [
     "${configDir}/src/__test__/injected/**/*.ts",
-    "${configDir}/src/__test__/analysis/edges.ts"
+    "${configDir}/src/__test__/analysis/edges.ts",
+    "${configDir}/src/__test__/take.ts"
   ],
   "exclude": []
 }

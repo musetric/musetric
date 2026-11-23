@@ -1,6 +1,7 @@
 import { findClicks } from '../dsp/clicks.js';
 import { getMedian, getSpread, type Spread } from '../dsp/stats.js';
 import { type TimingRun } from '../runs.js';
+import { takeFrameOnSong } from '../take.js';
 
 const matchShare = 0.25;
 
@@ -88,17 +89,19 @@ export const analyzeTiming = (run: TimingRun): TimingResult => {
     const frame = getShownFrame(run.playhead, epochMs);
     return frame === undefined ? [] : [frame];
   });
-  const takeFrames = findClicks(run.take.samples, run.sampleRate).map(
-    (index) => run.take.firstFrame + index,
+  const take = { firstFrame: run.take.firstFrame, tempo: run.tempo };
+  const takeFrames = findClicks(run.take.samples, run.sampleRate).map((index) =>
+    takeFrameOnSong(take, index),
   );
+  const heardFramesPerMs = (run.sampleRate * run.tempo) / 1000;
   return {
     tempo: run.tempo,
     heardClickCount: heard.length,
     playhead: getClickErrors(
-      matchBeats(shown, run.beatFrames, (run.sampleRate * run.tempo) / 1000),
+      matchBeats(shown, run.beatFrames, heardFramesPerMs),
     ),
     take: getClickErrors(
-      matchBeats(takeFrames, run.beatFrames, run.sampleRate / 1000),
+      matchBeats(takeFrames, run.beatFrames, heardFramesPerMs),
     ),
   };
 };

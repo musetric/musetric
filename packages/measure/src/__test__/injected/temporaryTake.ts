@@ -8,6 +8,7 @@ import {
   type SpectrogramViewMode,
 } from '@musetric/engine';
 import axios from 'axios';
+import { createTakeWindow, layTakePiece, type TakeWindow } from '../take.js';
 import { epochNow, wait } from './samples.js';
 
 const activePollMs = 100;
@@ -17,26 +18,19 @@ const streamSettleMs = 2500;
 const sliceLeadSeconds = 0.5;
 const sliceTailSeconds = 1;
 
-const assembleTake = async (
+const layPieces = async (
   projectId: number,
   recordingId: number,
   sampleRate: number,
-  frameCount: number,
-): Promise<Float32Array<ArrayBuffer>> => {
+  take: TakeWindow,
+): Promise<void> => {
   const { pieces } = await requestWithAxios(
     axios,
     api.audio.recordingPieces.base,
     { params: { projectId, recordingId } },
   );
   const decoder = createAudioDecoder();
-  const samples = new Float32Array(frameCount);
   for (const piece of pieces) {
-    const start = Math.round(
-      (piece.songStartFrame * sampleRate) / piece.sampleRate,
-    );
-    if (start >= frameCount) {
-      continue;
-    }
     const content = await requestWithAxios(
       axios,
       api.audio.recordingPiece.base,
@@ -47,9 +41,12 @@ const assembleTake = async (
       sampleRate,
       keepChannels: true,
     });
-    samples.set(channels[0].subarray(0, frameCount - start), start);
+    layTakePiece(take, {
+      songStartFrame: (piece.songStartFrame * sampleRate) / piece.sampleRate,
+      tempo: piece.tempo,
+      samples: channels[0],
+    });
   }
-  return samples;
 };
 
 type SavedSettings = Pick<
@@ -178,13 +175,13 @@ export const recordTemporaryTake = async (
       Math.round(
         (settings.seconds * settings.tempo + sliceTailSeconds) * sampleRate,
       );
-    const song = await assembleTake(
-      projectId,
-      temporary.id,
-      sampleRate,
+    const take = createTakeWindow(
+      firstFrame,
       Math.min(frameCount, lastFrame),
+      settings.tempo,
     );
-    return { firstFrame, samples: song.slice(firstFrame, lastFrame) };
+    await layPieces(projectId, temporary.id, sampleRate, take);
+    return { firstFrame, samples: take.samples };
   } finally {
     applySettings(engine, saved);
     await requestWithAxios(axios, api.recording.activate.base, {
