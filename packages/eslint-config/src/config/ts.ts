@@ -37,7 +37,6 @@ export const tsConfig: Linter.Config = {
     ],
     '@typescript-eslint/init-declarations': ['error', 'always'],
     '@typescript-eslint/no-empty-function': ['error'],
-    '@typescript-eslint/no-deprecated': 'error',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/no-namespace': 'off',
     '@typescript-eslint/no-non-null-assertion': ['error'],

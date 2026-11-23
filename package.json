@@ -30,6 +30,7 @@
     "fix:notices": "pnpm fix:notices:crates && pnpm fix:notices:packages",
     "check:links": "node packages/checks/src/cli.ts links",
     "check:comments": "node packages/checks/src/cli.ts comments",
+    "check:deprecated": "node packages/checks/src/deprecated.ts",
     "check:unused": "knip",
     "check:format": "prettier --check .",
     "fix:format": "prettier . --write --list-different",

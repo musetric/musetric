@@ -23,7 +23,7 @@ export const createBrowserBundleConfig = (
       target: 'es2022',
       modulePreload: false,
       chunkSizeWarningLimit: 8192,
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: options.entry ?? entry },
         output: {
           format: 'es',

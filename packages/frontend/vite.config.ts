@@ -26,7 +26,7 @@ export default defineConfig({
     target: 'es2022',
     assetsDir: '',
     chunkSizeWarningLimit: 1024,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         index: 'index.html',
       },
