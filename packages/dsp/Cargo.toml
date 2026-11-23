@@ -1,6 +1,6 @@
 [package]
 name = "musetric-dsp"
-description = "Musetric dsp: decoding, resampling, encoding, loudness, peaks, stretch and the microphone's ring, natively and in WebAssembly"
+description = "Musetric dsp: decoding, resampling, encoding, loudness, peaks, stretch, the renderer of a song and the microphone's ring, natively and in WebAssembly"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.100.0"
