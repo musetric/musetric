@@ -1,4 +1,7 @@
-use super::time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64};
+use super::{
+    CHANNELS,
+    time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64},
+};
 
 const UNIT_RATIO_TOLERANCE: f64 = 1e-6;
 const CONTINUITY_FRAMES: f64 = 4.0;
@@ -120,7 +123,7 @@ struct LiveRun {
 }
 
 struct Live {
-    take: String,
+    take: u32,
     key: TakeKey,
     runs: Vec<LiveRun>,
 }
@@ -188,6 +191,12 @@ fn add_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
     }
 }
 
+fn write_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
+    for (sample, value) in channel.iter_mut().zip(take) {
+        *sample = value * volume;
+    }
+}
+
 fn raw_sample(samples: &[f32], frame: i64) -> f32 {
     usize::try_from(frame)
         .ok()
@@ -222,12 +231,12 @@ impl Takes {
         self.segments = lay_out(&self.layers());
     }
 
-    pub fn set_pieces(&mut self, pieces: Vec<Piece>, finished_take: Option<&str>, switched: bool) {
+    pub fn set_pieces(&mut self, pieces: Vec<Piece>, finished_take: Option<u32>, switched: bool) {
         let keep_live = !switched
             && self
                 .live
                 .as_ref()
-                .is_none_or(|live| Some(live.take.as_str()) != finished_take);
+                .is_none_or(|live| Some(live.take) != finished_take);
         self.pieces = pieces;
         if !keep_live {
             self.live = None;
@@ -235,12 +244,12 @@ impl Takes {
         self.update();
     }
 
-    pub fn begin_live(&mut self, take: &str, key: TakeKey) {
+    pub fn begin_live(&mut self, take: u32, key: TakeKey) {
         if self.live.as_ref().is_some_and(|live| live.take == take) {
             return;
         }
         self.live = Some(Live {
-            take: take.to_owned(),
+            take,
             key,
             runs: Vec::new(),
         });
@@ -374,17 +383,28 @@ impl Takes {
         !parts.is_empty()
     }
 
-    pub fn mix_into(&mut self, output: &mut [f32], frames: usize, mix: TakeMix) -> bool {
+    #[must_use]
+    pub fn sounding(&self) -> bool {
+        !self.segments.is_empty()
+    }
+
+    pub fn mix_into(&mut self, output: &mut [f32], mix: TakeMix) {
+        self.put_into(output, mix, add_gained_into);
+    }
+
+    pub fn write_into(&mut self, output: &mut [f32], mix: TakeMix) {
+        self.put_into(output, mix, write_gained_into);
+    }
+
+    fn put_into(&mut self, output: &mut [f32], mix: TakeMix, put: fn(&mut [f32], &[f32], f32)) {
+        let frames = output.len() / CHANNELS;
         let mut scratch = std::mem::take(&mut self.scratch);
         scratch.resize(frames, 0.0);
         let taken = &mut scratch[..frames];
-        let written = self.render(taken, mix.song_frame, mix.target);
-        if written {
-            for channel in output.chunks_exact_mut(frames) {
-                add_gained_into(channel, taken, mix.volume);
-            }
+        self.render(taken, mix.song_frame, mix.target);
+        for channel in output.chunks_exact_mut(frames) {
+            put(channel, taken, mix.volume);
         }
         self.scratch = scratch;
-        written
     }
 }

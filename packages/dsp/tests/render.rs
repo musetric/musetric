@@ -85,7 +85,7 @@ mod tests {
     fn live(chunks: &[(f64, f64)], tempo: f64) -> Vec<(f64, f64, usize)> {
         let mut takes = Takes::new(RATE);
         takes.begin_live(
-            "take",
+            1,
             TakeKey {
                 tempo,
                 transpose: 0,
@@ -192,7 +192,8 @@ mod tests {
                 }],
             };
             let played = render(&mut Stems::silent(96_000), &song, Parts::ALL);
-            assert_eq!(&played[..raw.len()], raw.as_slice(), "{tempo}");
+            let left: Vec<f32> = played.iter().step_by(CHANNELS).copied().collect();
+            assert_eq!(&left[..raw.len()], raw.as_slice(), "{tempo}");
         }
     }
 
@@ -233,13 +234,27 @@ mod tests {
             .collect()
     }
 
-    fn export(stems: &mut Stems, song: &Song) -> Vec<f32> {
-        let mut exported = render(stems, song, Parts::SONG_AND_TAKES);
-        if song.target.voice_shifted && song.target.voice_octave != 0 {
-            let lead = render(stems, song, Parts::LEAD);
-            for (sample, voice) in exported.iter_mut().zip(&lead) {
-                *sample += voice;
+    fn add(exported: &mut [f32], part: &[f32]) {
+        if part.len() == exported.len() {
+            for (sample, value) in exported.iter_mut().zip(part) {
+                *sample += value;
             }
+            return;
+        }
+        for (frame, value) in exported.as_chunks_mut::<CHANNELS>().0.iter_mut().zip(part) {
+            for sample in frame {
+                *sample += value;
+            }
+        }
+    }
+
+    fn export(stems: &mut Stems, song: &Song) -> Vec<f32> {
+        let mut exported = render(stems, song, Parts::SONG);
+        if !song.pieces.is_empty() {
+            add(&mut exported, &render(stems, song, Parts::TAKES));
+        }
+        if song.target.voice_shifted && song.target.voice_octave != 0 {
+            add(&mut exported, &render(stems, song, Parts::LEAD));
         }
         exported
     }
@@ -302,9 +317,9 @@ mod tests {
         assert_eq!(
             digests,
             [
-                "6edc33da219d4929d80d0f22723a14b48baeaf03f44da2c104222101f9bcea9c",
-                "d1e75d6ce1552571d5839acb0e89fb862d9ed5449306a92089fe55e4099fef82",
-                "0ba2ae0cc1900c60c1612d5dcd07812bf6a5501860b79de14781779fa5549c99"
+                "81dc3a27127791efa176431ec21a399097c07963876c88886de6bc689a746788",
+                "09b5da0f2b7f29366380247f59bf029a4fb3a96fb0b41e560355845b1bf0955f",
+                "c333742c4a2a82fe4563b16c97932a2439ce434a31aa274a52b972f803f6002a"
             ]
         );
     }

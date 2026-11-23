@@ -195,22 +195,18 @@ pub fn stage_renderer_piece(handle: usize, song_start: f64, key: &[f64], samples
 }
 
 #[wasm_bindgen(js_name = setRendererPieces)]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "wasm-bindgen hands an optional string over by value"
-)]
-pub fn set_renderer_pieces(handle: usize, finished_take: Option<String>, switched: bool) {
+pub fn set_renderer_pieces(handle: usize, finished_take: Option<u32>, switched: bool) {
     with_player(handle, |player| {
         let pieces = std::mem::take(&mut player.staged);
         player
             .renderer
             .takes()
-            .set_pieces(pieces, finished_take.as_deref(), switched);
+            .set_pieces(pieces, finished_take, switched);
     });
 }
 
 #[wasm_bindgen(js_name = beginRendererLiveTake)]
-pub fn begin_renderer_live_take(handle: usize, take: &str, key: &[f64]) {
+pub fn begin_renderer_live_take(handle: usize, take: u32, key: &[f64]) {
     let Some(found) = key_of(key) else {
         return;
     };

@@ -142,7 +142,8 @@ pub fn render_song(
     let mut renderer = prepare(song);
     let mut pager = Pager::open(stems, renderer.mixer(), song.sample_rate)?;
     let frames = song.frame_count;
-    let mut output = vec![0.0; CHANNELS * frames];
+    let channels = parts.channels();
+    let mut output = vec![0.0; channels * frames];
     let mut block = vec![0.0; CHANNELS * QUANTUM];
     let mut frame = 0_i64;
     let mut written = 0;
@@ -157,10 +158,13 @@ pub fn render_song(
         };
         let processed = renderer.render_parts(parts, quantum, &mut block);
         let count = QUANTUM.min(frames - written);
-        for channel in 0..CHANNELS {
-            let at = channel * frames + written;
-            output[at..at + count]
-                .copy_from_slice(&block[channel * QUANTUM..channel * QUANTUM + count]);
+        for (offset, frame_out) in output[written * channels..(written + count) * channels]
+            .chunks_exact_mut(channels)
+            .enumerate()
+        {
+            for (channel, sample) in frame_out.iter_mut().enumerate() {
+                *sample = block[channel * QUANTUM + offset];
+            }
         }
         written += count;
         frame += i64::try_from(processed)?;

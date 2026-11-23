@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { type InitOutput,initSync } from '@musetric/dsp/stretch';
+import { type InitOutput, initSync } from '@musetric/dsp/stretch';
 
 export const loadStretch = (): InitOutput =>
   initSync({

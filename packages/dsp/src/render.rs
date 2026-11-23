@@ -23,13 +23,23 @@ pub struct Parts {
 }
 
 impl Parts {
+    #[must_use]
+    pub const fn channels(self) -> usize {
+        if self.song || self.lead { CHANNELS } else { 1 }
+    }
+
     pub const ALL: Self = Self {
         song: true,
         takes: true,
         lead: true,
     };
-    pub const SONG_AND_TAKES: Self = Self {
+    pub const SONG: Self = Self {
         song: true,
+        takes: false,
+        lead: false,
+    };
+    pub const TAKES: Self = Self {
+        song: false,
         takes: true,
         lead: false,
     };
@@ -192,8 +202,7 @@ impl Renderer {
             lead_output,
         } = self;
         output.fill(0.0);
-        let mut processed = frames;
-        if parts.song {
+        let processed = if parts.song {
             let mask = if lead_apart { ACCOMPANIMENT } else { ALL_STEMS };
             let mut stems = StemFill {
                 mixer,
@@ -201,22 +210,28 @@ impl Renderer {
                 frame,
                 mask,
             };
-            processed = song.process(output, frame, &mut |mut block: Block<'_>| {
+            song.process(output, frame, &mut |mut block: Block<'_>| {
                 stems.fill(&mut block);
-            });
-        }
+            })
+        } else {
+            song.advance(frames)
+        };
+        let mut sung = false;
         if parts.takes
+            && takes.sounding()
             && let Some(song_frame) = take_frame
         {
-            takes.mix_into(
-                output,
-                frames,
-                TakeMix {
-                    song_frame,
-                    target: *target,
-                    volume: *recording_volume,
-                },
-            );
+            let mix = TakeMix {
+                song_frame,
+                target: *target,
+                volume: *recording_volume,
+            };
+            if parts.song {
+                takes.mix_into(output, mix);
+            } else {
+                takes.write_into(output, mix);
+            }
+            sung = true;
         }
         if parts.lead && lead_apart {
             lead_output.clear();
@@ -227,13 +242,12 @@ impl Renderer {
                 frame,
                 mask: LEAD,
             };
-            let taken = lead.process(lead_output, frame, &mut |mut block: Block<'_>| {
+            lead.process(lead_output, frame, &mut |mut block: Block<'_>| {
                 stems.fill(&mut block);
             });
-            if parts.song || parts.takes {
+            if parts.song || sung {
                 add_into(output, lead_output);
             } else {
-                processed = taken;
                 output.copy_from_slice(lead_output);
             }
         }

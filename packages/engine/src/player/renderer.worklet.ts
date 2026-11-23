@@ -85,6 +85,17 @@ export const createPlayerRenderer = (
   let outputViews: Float32Array[] = [];
   let mounted = false;
   let reportedFrameIndex: number | undefined = undefined;
+  const takeIds = new Map<string, number>();
+
+  const toTakeId = (take: string): number => {
+    const known = takeIds.get(take);
+    if (known !== undefined) {
+      return known;
+    }
+    const next = takeIds.size + 1;
+    takeIds.set(take, next);
+    return next;
+  };
 
   const viewOutput = (frameCount: number): Float32Array[] => {
     const pointer = rendererOutput(handle);
@@ -220,14 +231,16 @@ export const createPlayerRenderer = (
       }
       setRendererPieces(
         handle,
-        update.finishedTakeId,
+        update.finishedTakeId === undefined
+          ? undefined
+          : takeIds.get(update.finishedTakeId),
         update.switched ?? false,
       );
     },
     beginLiveTake: (take) => {
       beginRendererLiveTake(
         handle,
-        take.takeId,
+        toTakeId(take.takeId),
         Float64Array.of(take.tempo, take.transpose, take.octave),
       );
     },

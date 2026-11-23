@@ -202,6 +202,14 @@ impl TimePitch {
         })
     }
 
+    pub fn advance(&mut self, frames: usize) -> usize {
+        if self.bypassed() {
+            self.cursor = None;
+            return frames;
+        }
+        self.input_count(frames)
+    }
+
     pub fn process(&mut self, output: &mut [f32], input_frame: i64, fill: Fill<'_>) -> usize {
         let frames = output.len() / self.channels;
         if self.bypassed() {

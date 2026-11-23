@@ -381,30 +381,30 @@ async fn read_pieces(
     Ok(pieces)
 }
 
-fn interleave(planar: &[f32], frames: usize) -> Vec<f32> {
-    let (left, right) = planar.split_at(frames);
-    left.iter()
-        .zip(right)
-        .flat_map(|(first, second)| [*first, *second])
-        .collect()
-}
-
-fn add_voice(
-    main: Result<Vec<f32>, BoxedError>,
-    voice: Result<Vec<f32>, BoxedError>,
+fn add_part(
+    sum: Result<Vec<f32>, BoxedError>,
+    part: Result<Vec<f32>, BoxedError>,
 ) -> Result<Vec<f32>, BoxedError> {
-    match (main, voice) {
-        (Ok(mut planar), Ok(lead)) => {
-            for (sample, value) in planar.iter_mut().zip(lead) {
+    match (sum, part) {
+        (Ok(mut mixed), Ok(added)) if added.len() == mixed.len() => {
+            for (sample, value) in mixed.iter_mut().zip(added) {
                 *sample += value;
             }
-            Ok(planar)
+            Ok(mixed)
+        }
+        (Ok(mut mixed), Ok(added)) => {
+            for (frame, value) in mixed.as_chunks_mut::<CHANNELS>().0.iter_mut().zip(added) {
+                for sample in frame {
+                    *sample += value;
+                }
+            }
+            Ok(mixed)
         }
         (Err(failure), Ok(_)) | (Ok(_), Err(failure)) => Err(failure),
-        (Err(main_failure), Err(voice_failure)) => Err(if main_failure.to_string() == STOPPED {
-            voice_failure
+        (Err(sum_failure), Err(part_failure)) => Err(if sum_failure.to_string() == STOPPED {
+            part_failure
         } else {
-            main_failure
+            sum_failure
         }),
     }
 }
@@ -437,32 +437,32 @@ async fn mix(
         recording_volume: mixdown.take_gain,
         pieces,
     };
-    let lead = if lead_apart {
-        let rendering = Rendering {
-            streams: Streams::open(source, &mixdown, LEAD)?,
-            song: song.clone(),
-            parts: Parts::LEAD,
-            reported: None,
-        };
-        Some(spawn_render(rendering, watch))
-    } else {
-        None
-    };
-    let accompaniment = if lead_apart { !LEAD } else { u32::MAX };
+    let mut sides = Vec::new();
+    for (parts, stems, used) in [
+        (Parts::TAKES, 0, !song.pieces.is_empty()),
+        (Parts::LEAD, LEAD, lead_apart),
+    ] {
+        if used {
+            let rendering = Rendering {
+                streams: Streams::open(source, &mixdown, stems)?,
+                song: song.clone(),
+                parts,
+                reported: None,
+            };
+            sides.push(spawn_render(rendering, watch));
+        }
+    }
     let rendering = Rendering {
-        streams: Streams::open(source, &mixdown, accompaniment)?,
+        streams: Streams::open(source, &mixdown, if lead_apart { !LEAD } else { u32::MAX })?,
         song,
-        parts: Parts::SONG_AND_TAKES,
+        parts: Parts::SONG,
         reported: Some(stage),
     };
-    let main = spawn_render(rendering, watch);
-    let main_outcome = rendered(main, watch).await;
-    let planar = match lead {
-        Some(task) => add_voice(main_outcome, rendered(task, watch).await)?,
-        None => main_outcome?,
-    };
-    let mut mixed = interleave(&planar, frames);
-    drop(planar);
+    let mut summed = rendered(spawn_render(rendering, watch), watch).await;
+    for side in sides {
+        summed = add_part(summed, rendered(side, watch).await);
+    }
+    let mut mixed = summed?;
     limit_peak(&mut mixed);
     let target_path = to.to_owned();
     let encoding = Arc::clone(watch);
