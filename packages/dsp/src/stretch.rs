@@ -69,6 +69,11 @@ impl StretchStream {
         self.engine.seek_length()
     }
 
+    #[must_use]
+    pub const fn overlap_length(&self) -> usize {
+        self.engine.overlap_length()
+    }
+
     pub fn reset(&mut self) {
         self.engine.reset();
     }

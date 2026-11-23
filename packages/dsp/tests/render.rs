@@ -197,6 +197,52 @@ mod tests {
         }
     }
 
+    fn clicks(seconds: usize) -> Vec<f32> {
+        let rate = usize::try_from(RATE).unwrap();
+        let mut samples = vec![0.0; rate * seconds];
+        for second in 0..seconds {
+            for index in 0..64_u8 {
+                samples[second * rate + usize::from(index)] = 0.8 * (1.0 - f32::from(index) / 64.0);
+            }
+        }
+        samples
+    }
+
+    fn click_peak(left: &[f32], center: usize) -> f32 {
+        left[center - 2_400..center + 2_400]
+            .iter()
+            .fold(0.0, |peak: f32, value| peak.max(value.abs()))
+    }
+
+    #[test]
+    fn keeps_the_first_moments_of_a_stretched_take() {
+        let song = Song {
+            sample_rate: RATE,
+            frame_count: 300_000,
+            volumes: [0.0; 3],
+            target: Target {
+                tempo: 0.8,
+                transpose: -2,
+                ..Target::ORIGINAL
+            },
+            recording_volume: 0.5,
+            pieces: vec![Piece {
+                song_start: 48_000.0,
+                tempo: 1.0,
+                transpose: 0,
+                octave: 0,
+                samples: clicks(4),
+            }],
+        };
+        let played = render(&mut Stems::silent(240_000), &song, Parts::ALL);
+        let left: Vec<f32> = played.iter().step_by(CHANNELS).copied().collect();
+        let peaks: Vec<f32> = (0..4)
+            .map(|click| click_peak(&left, 60_000 + click * 60_000))
+            .collect();
+        let quietest = peaks[1..].iter().copied().fold(f32::MAX, f32::min);
+        assert!(peaks[0] > quietest / 2.0, "{peaks:?}");
+    }
+
     fn scene(target: Target) -> Song {
         let mut transposed = piece(30_000.0, 40_000, 0.8);
         transposed.samples = noise(40_000, 11);
@@ -317,9 +363,9 @@ mod tests {
         assert_eq!(
             digests,
             [
-                "81dc3a27127791efa176431ec21a399097c07963876c88886de6bc689a746788",
-                "09b5da0f2b7f29366380247f59bf029a4fb3a96fb0b41e560355845b1bf0955f",
-                "c333742c4a2a82fe4563b16c97932a2439ce434a31aa274a52b972f803f6002a"
+                "77165639cd99239a195914b3799a8e548099a9f0f58f0a78446e365a68627d7c",
+                "900f7d7bc7e3cc15a6e2743893c6eeea933774a0160d6256a76407d3a8098afe",
+                "ef536715b220159dfd80c180579816f9a453257c42dbfaab964239cb78c90d69"
             ]
         );
     }

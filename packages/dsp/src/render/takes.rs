@@ -208,11 +208,13 @@ fn raw_sample(samples: &[f32], frame: i64) -> f32 {
 impl Takes {
     #[must_use]
     pub const fn new(sample_rate: u32) -> Self {
+        let mut stretcher = TimePitch::new(1, sample_rate);
+        stretcher.set_warm_start(true);
         Self {
             pieces: Vec::new(),
             live: None,
             segments: Vec::new(),
-            stretcher: TimePitch::new(1, sample_rate),
+            stretcher,
             previous: None,
             current: None,
             scratch: Vec::new(),
