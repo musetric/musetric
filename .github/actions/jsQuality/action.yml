@@ -35,6 +35,7 @@ runs:
     - if: inputs.part == 'types'
       run: |
         pnpm check:ts
+        pnpm check:deprecated
         pnpm check:notices:packages
       shell: bash
     - if: inputs.part == 'lint'

@@ -92,6 +92,7 @@ If code was changed, run the relevant repository-root scripts before finishing.
 - `pnpm check:unused`: detect unused files, dependencies, and exports.
 - `pnpm check:ts`: TypeScript checks across the monorepo.
 - `pnpm fix:lint`: lint checks with automatic fixes; before a pull request, lint the changed files once without the cache.
+- `pnpm check:deprecated`: uses of deprecated APIs, from TypeScript's own diagnostics through its API, in place of a lint rule.
 - `pnpm fix:translations`: update translation extraction results.
 - `pnpm fix:format`: apply repository formatting.
 - `pnpm check:rust`: Rust formatting, Clippy, and tests, when `packages/server` was touched.
