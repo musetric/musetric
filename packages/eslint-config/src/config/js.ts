@@ -108,6 +108,18 @@ export const jsConfig: Linter.Config = {
           'Use export statements instead of module.exports in ES modules',
       },
     ],
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: '@mui/icons-material',
+            message:
+              "Import each icon from its own path, such as '@mui/icons-material/Close': the package entry makes the build load every icon of the package",
+          },
+        ],
+      },
+    ],
     'no-useless-rename': ['error'],
     'object-shorthand': ['error', 'always'],
     'prefer-destructuring': [
