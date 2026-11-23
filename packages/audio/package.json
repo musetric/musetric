@@ -24,12 +24,6 @@
       "import": "./dist/decoder/index.js",
       "default": "./dist/decoder/index.js"
     },
-    "./player": {
-      "monorepo": "./src/player/index.ts",
-      "types": "./dist/player/index.d.ts",
-      "import": "./dist/player/index.js",
-      "default": "./dist/player/index.js"
-    },
     "./recording": {
       "monorepo": "./src/recording/index.ts",
       "types": "./dist/recording/index.d.ts",

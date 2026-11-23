@@ -13,6 +13,7 @@ pub mod mp3;
 mod mp4box;
 pub mod page_mix;
 pub mod peaks;
+pub mod render;
 pub mod resample;
 pub mod stretch;
 pub mod wav;

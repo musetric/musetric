@@ -1,18 +1,12 @@
 import { type StemType } from '@musetric/audio/es';
-import { createTimePitchProcessor } from '@musetric/audio/player';
+import { type InitOutput } from '@musetric/dsp/stretch';
 import { createHeardPosition } from './heardPosition.worklet.js';
-import { createLeadVoice } from './leadVoice.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
 import {
   createRangeFrames,
   processRangeMetronome,
   type RangeFrames,
 } from './playerRange.worklet.js';
-import {
-  accompanimentMask,
-  allStemsMask,
-  createPlayerTracks,
-} from './playerTracks.worklet.js';
 import { createHeldPlayheadValue } from './playhead.cross.js';
 import {
   createPlayheadPublisher,
@@ -27,14 +21,14 @@ import {
   type LatencyFrameCounts,
   type RecordingRuntime,
 } from './recording.worklet.js';
-import { createRecordingTrack } from './recordingTrack.worklet.js';
+import { createPlayerRenderer } from './renderer.worklet.js';
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
   dataPort: ReturnType<typeof playerDataChannel.inbound<MessagePort>>;
   playheadPorts: MessagePort[];
   sampleRate: number;
-  stretch: Parameters<typeof createTimePitchProcessor>[0];
+  stretch: InitOutput;
   getCurrentTime: () => number;
   getCurrentFrame: () => number;
 };
@@ -62,36 +56,16 @@ export const createPlayerRuntime = (
   let inputLatencyFrameCount = 0;
   let outputLatencyFrameCount = 0;
   let tempoRatio = 1;
-  let transposeSemitones = 0;
-  let voiceOctave = 0;
-  let voiceShifted = false;
   const trackVolumes: Partial<Record<StemType, number>> = {};
-  let recordingVolume = 1;
   const metronome = createMetronome(sampleRate);
-  const timePitchProcessor = createTimePitchProcessor(stretch, sampleRate);
-  const leadVoice = createLeadVoice(stretch, sampleRate);
-  const recordingTrack = createRecordingTrack(stretch, sampleRate);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
-  const tracks = createPlayerTracks(stretch, dataPort, () => range);
-
-  const getVoiceShiftSemitones = () => (voiceShifted ? 12 * voiceOctave : 0);
-
-  const applyLeadTranspose = () => {
-    leadVoice.setTransposeSemitones(
-      transposeSemitones + getVoiceShiftSemitones(),
-    );
-  };
-
-  const resetTimePitch = () => {
-    timePitchProcessor.reset();
-    leadVoice.reset();
-  };
-
-  const refillTimePitch = () => {
-    timePitchProcessor.refill();
-    leadVoice.refill();
-  };
+  const renderer = createPlayerRenderer({
+    stretch,
+    sampleRate,
+    dataPort,
+    getRange: () => range,
+  });
 
   const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
     latencyFrameCount = Math.max(0, counts.latencyFrameCount);
@@ -137,71 +111,60 @@ export const createPlayerRuntime = (
     position.begin(nextFrameIndex);
     playing = false;
     recordingRuntime.resetInputOffset();
-    resetTimePitch();
+    renderer.reset();
     metronome.reset(nextFrameIndex);
     metronome.clear();
     publishHeld();
     setPlaying(true);
   };
 
-  const mixRecording = (
-    outputs: Float32Array[],
-    currentOutputFrameIndex: number,
-  ) => {
+  const getTakeFrame = (currentOutputFrameIndex: number) => {
     const songFrame = range
       ? range.songFrame(currentOutputFrameIndex)
       : currentOutputFrameIndex;
     if (recordingRuntime.isActive() || (range && songFrame >= range.endFrame)) {
-      return;
+      return undefined;
     }
-    recordingTrack.mixInto({
-      outputs,
-      songFrame,
-      tempoRatio,
-      transposeSemitones,
-      voiceOctave,
-      voiceShifted,
-      volume: recordingVolume,
-    });
+    return songFrame;
   };
 
   dataPort.bindHandlers({
     mount: (message) => {
       frameCount = message.frameCount;
-      tracks.mount(message.layouts, message.residentPageLimit);
-      refillTimePitch();
-      recordingTrack.clear();
-      recordingTrack.setPieces({ pieces: message.recording });
+      renderer.mount(message.layouts, message.residentPageLimit);
+      renderer.refill();
+      renderer.clearTakes();
+      renderer.setPieces({ pieces: message.recording });
       position.begin(0);
       playing = false;
       recordingRuntime.resetInputOffset();
       publishHeld();
       setPlaying();
-      tracks.requestWindow(0, true);
+      renderer.requestWindow(0, true);
     },
     putPage: (message) => {
-      tracks.put(message);
+      renderer.put(message);
     },
     dropPages: (message) => {
-      tracks.drop(message.pages);
+      renderer.drop(message.pages);
     },
     setRecordingPieces: (message) => {
-      recordingTrack.setPieces(message);
+      renderer.setPieces(message);
     },
     beginLiveTake: (message) => {
-      recordingTrack.beginLiveTake(message);
+      renderer.beginLiveTake(message);
     },
     appendLiveTake: (message) => {
-      recordingTrack.appendLiveTake(message);
+      renderer.appendLiveTake(message);
     },
     unmount: () => {
       frameCount = 0;
-      tracks.release();
-      recordingTrack.clear();
+      renderer.release();
+      renderer.clearTakes();
       position.begin(0);
       playing = false;
       recordingRuntime.resetInputOffset();
-      resetTimePitch();
+      renderer.reset();
       publishHeld();
       setPlaying();
     },
@@ -210,7 +173,7 @@ export const createPlayerRuntime = (
   port.bindHandlers({
     play: (message) => {
       revision = message.revision;
-      if (!tracks.mounted()) {
+      if (!renderer.mounted()) {
         setPlaying();
         return;
       }
@@ -228,11 +191,11 @@ export const createPlayerRuntime = (
       metronome.clear();
       publishHeld();
       setPlaying();
-      tracks.requestWindow(message.frameIndex, true);
+      renderer.requestWindow(message.frameIndex, true);
     },
     setFrozen: (message) => {
       frozen = message.frozen;
-      resetTimePitch();
+      renderer.reset();
     },
     seek: (message) => {
       revision = message.revision;
@@ -240,11 +203,11 @@ export const createPlayerRuntime = (
       if (recordingRuntime.isActive()) {
         recordingRuntime.handleSeek(message.frameIndex);
       }
-      resetTimePitch();
+      renderer.reset();
       metronome.reset(message.frameIndex);
       metronome.clear();
       publishHeld();
-      tracks.requestWindow(message.frameIndex, true);
+      renderer.requestWindow(message.frameIndex, true);
     },
     setLatency: (message) => {
       applyLatencyFrameCounts(message);
@@ -253,28 +216,23 @@ export const createPlayerRuntime = (
       clockOffset = message.clockOffset;
     },
     setTransposeSemitones: (message) => {
-      transposeSemitones = message.transposeSemitones;
-      timePitchProcessor.setTransposeSemitones(message.transposeSemitones);
-      applyLeadTranspose();
+      renderer.setTransposeSemitones(message.transposeSemitones);
     },
     setVoiceOctave: (message) => {
-      voiceOctave = message.voiceOctave;
-      voiceShifted = message.shifted;
-      applyLeadTranspose();
-      refillTimePitch();
+      renderer.setVoice(message.voiceOctave, message.shifted);
+      renderer.refill();
     },
     setTempoRatio: (message) => {
       tempoRatio = message.tempoRatio;
-      timePitchProcessor.setTempoRatio(message.tempoRatio);
-      leadVoice.setTempoRatio(message.tempoRatio);
+      renderer.setTempoRatio(message.tempoRatio);
     },
     setTrackVolume: (message) => {
       trackVolumes[message.stemType] = message.volume;
-      tracks.setVolumes(trackVolumes);
-      refillTimePitch();
+      renderer.setVolumes(trackVolumes);
+      renderer.refill();
     },
     setRecordingVolume: (message) => {
-      recordingVolume = message.volume;
+      renderer.setRecordingVolume(message.volume);
     },
     setMetronome: (message) => {
       metronome.setConfig(message, position.getFrameIndex());
@@ -283,9 +241,9 @@ export const createPlayerRuntime = (
       range = message.range
         ? createRangeFrames(message.range, message.repeat, message.stopFrame)
         : undefined;
-      tracks.setRange(range);
-      refillTimePitch();
-      tracks.requestWindow(position.getFrameIndex(), true);
+      renderer.setRange(range);
+      renderer.refill();
+      renderer.requestWindow(position.getFrameIndex(), true);
     },
     startRecording: (message) => {
       revision = message.revision;
@@ -303,7 +261,7 @@ export const createPlayerRuntime = (
         output.fill(0);
       }
 
-      if (!tracks.mounted() || !playing) {
+      if (!renderer.mounted() || !playing) {
         recordingRuntime.processDrain(inputs);
         return;
       }
@@ -321,10 +279,10 @@ export const createPlayerRuntime = (
       }
 
       const currentOutputFrameIndex = position.getRenderFrameIndex();
-      tracks.requestWindow(currentOutputFrameIndex);
+      renderer.requestWindow(currentOutputFrameIndex);
       if (
         !recordingRuntime.isActive() &&
-        !tracks.ready(currentOutputFrameIndex)
+        !renderer.ready(currentOutputFrameIndex)
       ) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
@@ -334,27 +292,11 @@ export const createPlayerRuntime = (
 
       recordingRuntime.processInput(inputs);
 
-      const leadApart = getVoiceShiftSemitones() !== 0;
-      const processedFrameCount = timePitchProcessor.process(
+      const processedFrameCount = renderer.render(
         outputs,
         currentOutputFrameIndex,
-        (inputBuffers, inputFrameOffset, inputFrameCount) => {
-          tracks.mixInto(
-            inputBuffers,
-            currentOutputFrameIndex + inputFrameOffset,
-            inputFrameCount,
-            leadApart ? accompanimentMask : allStemsMask,
-          );
-        },
+        getTakeFrame(currentOutputFrameIndex),
       );
-      if (leadApart) {
-        leadVoice.mixInto({
-          outputs,
-          outputFrameIndex: currentOutputFrameIndex,
-          tracks,
-        });
-      }
-      mixRecording(outputs, currentOutputFrameIndex);
 
       const nextOutputFrameIndex = position.advance(
         contextFrame,

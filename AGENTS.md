@@ -13,9 +13,9 @@
 - `packages/frontend`: the main React application.
 - `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView.
 - `packages/engine`: the audio engine the frontend drives: decoding, playback, recording sessions, calibration and the spectrogram, orchestrated in one state.
-- `packages/audio`: browser-side audio: decoding, playback, recording, calibration, timeline and waveform, with workers and worklets.
+- `packages/audio`: browser-side audio: decoding, recording, calibration, timeline and waveform, with workers and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
-- `packages/dsp`: audio decoding, resampling, encoding, loudness, peaks and stretch in Rust: a member of the host's Cargo workspace that the host links natively, built to WebAssembly as the npm package `@musetric/dsp`.
+- `packages/dsp`: audio decoding, resampling, encoding, loudness, peaks, stretch and the renderer that plays and exports a song in Rust: a member of the host's Cargo workspace that the host links natively, built to WebAssembly as the npm package `@musetric/dsp`.
 - `packages/fft`: the WebGPU FFT, its inverse and window functions.
 - `packages/spectrogram`: the frequency spectrogram and the pitch line on WebGPU.
 - `packages/cqt`: recursive WebGPU constant-Q transform driven by a caller-supplied plan.

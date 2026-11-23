@@ -1,12 +1,12 @@
 # @musetric/dsp
 
-Musetric's audio code in Rust: decoding, resampling, the FLAC, WAV, M4A and MP3 writers, loudness, wave peaks, stretch and the microphone's ring. The host links the crate `musetric-dsp` natively, and the same crate builds to WebAssembly as this npm package, so a page computes what the host computes.
+Musetric's audio code in Rust: decoding, resampling, the FLAC, WAV, M4A and MP3 writers, loudness, wave peaks, stretch, the renderer of a song and the microphone's ring. The host links the crate `musetric-dsp` natively, and the same crate builds to WebAssembly as this npm package, so a page computes what the host computes.
 
 | Module                  | Features                      | What it holds                                                                                                                           |
 | ----------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `@musetric/dsp/decode`  | `web-decode`                  | `Decoder`, `FlacFeed` and `FlacPages` for FLAC and WAV, `Resampler` and `WavePeaks`                                                     |
 | `@musetric/dsp/songs`   | `opus`, `songs`, `web-decode` | the bindings of `decode` for every format the host decodes, Opus included                                                               |
-| `@musetric/dsp/stretch` | `web-stretch`                 | the streaming stretch and the mixer of the player's worklet: `openStretcher`, `openMixer` and the functions that take their handles     |
+| `@musetric/dsp/stretch` | `web-stretch`                 | the renderer of the player's worklet: `openRenderer` and the functions that take its handle                                             |
 | `@musetric/dsp/capture` | `web-capture`                 | the ring of the microphone's worklets, read at any position through a sinc kernel: `openCapture` and the functions that take its handle |
 
 ## API
@@ -38,21 +38,14 @@ Each module is an ES module for the web. Its default export `init` fetches its W
 
 ### `stretch`
 
-The streaming stretch and pitch shift of Signalsmith Stretch, ported to Rust, on a handle that lives as long as the module. Its buffers are in `memory`, one channel after another.
+The renderer of a song, on a handle that lives as long as the module: the pages of the stems' masters, the pieces of a recording and the streaming stretch and pitch shift of Signalsmith Stretch, ported to Rust, rendered one quantum at a time. The host runs the same renderer natively in `render::render_song`, quantum by quantum from the first frame, so an export holds the samples the player plays.
 
-- `openStretcher(channels, sampleRate)` returns a handle.
-- `stretcherInputLatency(handle)` and `stretcherOutputLatency(handle)` are the latencies in frames, and `stretcherSeekLength(handle)` the frames of input a seek reads.
-- `setStretcherBuffers(handle, length)` makes `2 * channels` buffers of `length` floats, the input channels and then the output channels, and returns their pointer. `length` holds the largest input or output of a call and the seek length.
-- `seekStretcher(handle, inputFrames, rate)` primes the stream from `inputFrames` of the input buffers, for playback at `rate`.
-- `processStretcher(handle, inputFrames, outputFrames)` consumes `inputFrames` of the input buffers and writes `outputFrames` to the output buffers; their ratio is the tempo.
-- `setStretcherSemitones(handle, semitones)` shifts the pitch by whole semitones, `setStretcherFormants(handle, keep)` keeps the formants or not, and `resetStretcher(handle)` empties the stream.
-
-The module also holds the mixer of the player's stems, on a handle that lives as long as the module: pages of the stems' masters in slots of its memory, mixed into the stretcher's input with the gains and the fades of a loop, by the same sum as the host's export.
-
-- `openMixer(channels, stemCount)` returns a handle, and `setMixerStem(handle, stem, frameCount, pageStarts)` lays a stem out in pages, the frames where each begins.
-- `mixerPageInput(handle, stem, index, sampleCount)` returns the pointer where the samples of a page go, one channel after another, or 0 when the page does not fit its layout; `dropMixerPage(handle, stem, index)` frees its slot.
-- `setMixerVolumes(handle, volumes)` sets the gain of each stem, and `setMixerRange(handle, cycle, frames)` the range `[from, to, end]` of a loop or a stop, empty for none.
-- `mixStems(handle, first, count, mask)` mixes the stems of `mask`, a bit per stem, over `count` frames from `first` and returns the pointer of the mix, one channel after another; a page that is not there mixes as silence, and `mixerReady(handle, frame)` says whether every page around a frame is there.
+- `openRenderer(sampleRate)` returns a handle.
+- `setRendererStem(handle, stem, frameCount, pageStarts)` lays a stem out in pages, the frames where each begins; the stems are the lead, the backing and the instrumental. `rendererPageInput(handle, stem, index, sampleCount)` returns the pointer where the samples of a page go, one channel after another, or 0 when the page does not fit its layout; `dropRendererPage(handle, stem, index)` frees its slot, `reserveRendererPages(handle, count)` makes the slots ahead, and `rendererReady(handle, frame)` says whether every page around a frame is there. A page that is not there renders as silence.
+- `setRendererVolumes(handle, volumes)` sets the gain of each stem, and `setRendererRange(handle, cycle, frames)` the range `[from, to, end]` of a loop or a stop, empty for none.
+- `setRendererTempo(handle, tempo)` and `setRendererTranspose(handle, semitones)` set the song's tempo and key, `setRendererVoice(handle, octave, shifted)` the octave the voice moves by, which renders the lead apart with its formants kept and moves the takes, and `setRendererRecordingVolume(handle, volume)` the gain of the takes.
+- `stageRendererPiece(handle, songStart, key, samples)` stages a piece of the recording, sung from the song frame `songStart` with `key`, `[tempo, transpose, octave]`, and `setRendererPieces(handle, finishedTake, switched)` lays the staged pieces out, a later one over an earlier one. `beginRendererLiveTake(handle, take, key)` and `appendRendererLiveTake(handle, startFrame, offset, samples)` lay out a take while it is sung, and `clearRendererTakes(handle)` removes the takes; a take is a number.
+- `renderQuantum(handle, frame, takeFrame, frames)` renders `frames` frames from the song frame `frame`, with the takes at the song frame `takeFrame`, or without them for `NaN`, into the buffer at `rendererOutput(handle)`, one channel after another, and returns the frames of the song it went through. `resetRenderer(handle)` empties the stretch, and `refillRenderer(handle)` primes it again at the next frame.
 
 ### `capture`
 
