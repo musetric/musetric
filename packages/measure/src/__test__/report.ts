@@ -94,7 +94,7 @@ const formatValues = (
 };
 
 export const formatCursorTable = (result: CursorResult) => {
-  const { run, stop, seek, playSeek, drag, loop, store } = result;
+  const { run, stop, seek, playSeek, drag, loop, store, buffering } = result;
   const ms = (value: number) => `${Math.round(value)} ms`;
   return [
     '| Check | Result |',
@@ -110,6 +110,7 @@ export const formatCursorTable = (result: CursorResult) => {
     `| Behind the finger at the release | ${formatValues(drag.behindMs, 0, ' ms')} |`,
     `| Loop: turns, steps back, the furthest past its end | ${loop.turns}, ${loop.stepsBack}, ${ms(loop.overshootMs)} |`,
     `| Changes of the store a second while playing | ${formatValues(store.changesPerSecond, 1, '')} |`,
+    `| The cursor waiting for missing pages | ${formatValues(buffering.heldMs, 0, ' ms')} |`,
     '',
     `Screen frame ${result.screenFrameMs.toFixed(1)} ms.`,
   ].join('\n');

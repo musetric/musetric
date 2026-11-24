@@ -2,7 +2,9 @@ import { type StemType } from '@musetric/audio/es';
 import { type InitOutput } from '@musetric/dsp/stretch';
 import { createCuts } from './cutFade.worklet.js';
 import { createHeardPosition } from './heardPosition.worklet.js';
+import { createWorkletLatency } from './latency.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
+import { createMotion } from './motion.worklet.js';
 import {
   createRangeFrames,
   getTakeFrame,
@@ -21,7 +23,6 @@ import {
 } from './protocol.cross.js';
 import {
   createRecordingRuntime,
-  type LatencyFrameCounts,
   type RecordingRuntime,
 } from './recording.worklet.js';
 import { createPlayerRenderer } from './renderer.worklet.js';
@@ -60,9 +61,6 @@ export const createPlayerRuntime = (
   let appliedCommand = 0;
   let playing = false;
   let frozen = false;
-  let latencyFrameCount = 0;
-  let inputLatencyFrameCount = 0;
-  let outputLatencyFrameCount = 0;
   let tempoRatio = 1;
   const trackVolumes: Partial<Record<StemType, number>> = {};
   const metronome = createMetronome(sampleRate);
@@ -77,18 +75,7 @@ export const createPlayerRuntime = (
   });
   const cuts = createCuts(() => playing && !frozen && renderer.mounted());
 
-  const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
-    latencyFrameCount = Math.max(0, counts.latencyFrameCount);
-    inputLatencyFrameCount = Math.max(0, counts.inputLatencyFrameCount);
-    outputLatencyFrameCount = Math.max(
-      0,
-      latencyFrameCount - inputLatencyFrameCount,
-    );
-    position.setOutputLatency(outputLatencyFrameCount);
-    if (playing) {
-      position.refresh();
-    }
-  };
+  const latency = createWorkletLatency(position, () => playing);
 
   const publishHeld = () => {
     playhead.publishNow(
@@ -97,10 +84,17 @@ export const createPlayerRuntime = (
   };
   const glide = createStopGlide(playhead, publishHeld);
 
+  const motion = createMotion({
+    isPlaying: () => playing,
+    isHeld: () => frozen,
+    isMounted: () => renderer.mounted(),
+  });
+
   const setPlaying = (positionJump?: true) => {
     port.methods.setPlaying({
       command: appliedCommand,
       playing,
+      motion: motion.settle(),
       frameIndex: position.getFrameIndex(),
       revision,
       positionJump,
@@ -112,12 +106,14 @@ export const createPlayerRuntime = (
     port,
     getPlaying: () => playing,
     getFrameIndex: () => position.getFrameIndex(),
-    getInputLatencyFrameCount: () => inputLatencyFrameCount,
+    getInputLatencyFrameCount: latency.getInputFrameCount,
     getPendingOutputFrameCount: () =>
-      playing ? position.getPendingOutputFrameCount() : outputLatencyFrameCount,
+      playing
+        ? position.getPendingOutputFrameCount()
+        : latency.getOutputFrameCount(),
     getTempoRatio: () => tempoRatio,
     getLoop: () => (range?.repeat === 'cycle' ? range.range : undefined),
-    applyLatencyFrameCounts,
+    applyLatencyFrameCounts: latency.apply,
   });
 
   const finishPlayback = (nextFrameIndex: number) => {
@@ -221,7 +217,7 @@ export const createPlayerRuntime = (
           return;
         }
 
-        applyLatencyFrameCounts(message);
+        latency.apply(message);
         metronome.reset(position.getFrameIndex());
         playing = true;
         recordingRuntime.resetInputOffset();
@@ -243,7 +239,7 @@ export const createPlayerRuntime = (
       cuts.cut(applySeek(message));
     },
     setLatency: (message) => {
-      applyLatencyFrameCounts(message);
+      latency.apply(message);
     },
     setOutputClock: (message) => {
       clockOffset = message.clockOffset;
@@ -325,11 +321,13 @@ export const createPlayerRuntime = (
       const ready =
         recordingRuntime.isActive() || renderer.ready(currentOutputFrameIndex);
       if (!ready && cuts.fade.silent()) {
+        motion.moveTo('buffering', setPlaying);
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
         playhead.publish(getValue());
         return;
       }
+      motion.moveTo('rolling', setPlaying);
       cuts.follow(ready);
 
       recordingRuntime.processInput(inputs);

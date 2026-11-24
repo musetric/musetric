@@ -24,6 +24,7 @@ const createRun = (
     frames,
     events,
     storeChanges: [],
+    buffering: [],
     loop,
   };
 };
@@ -209,5 +210,23 @@ describe('analyzeCursor', () => {
     };
     const { store } = analyzeCursor(run);
     expect(store.changesPerSecond).toEqual([1.5]);
+  });
+
+  it('times each wait for missing pages', () => {
+    const run = {
+      ...createRun(1000, (time) => ({ frame: time, playing: true }), [
+        [0, 'play', 0],
+      ]),
+      buffering: [
+        [100, 1],
+        [131, 0],
+        [400, 1],
+        [400, 1],
+        [452, 0],
+        [600, 0],
+      ] satisfies CursorRun['buffering'],
+    };
+    const { buffering } = analyzeCursor(run);
+    expect(buffering.heldMs).toEqual([31, 52]);
   });
 });

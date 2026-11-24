@@ -6,6 +6,7 @@ import {
   type SpectrogramColors,
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
+import { type PlayerMotion } from './player/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -111,6 +112,7 @@ export type EngineState = {
   viewWindow?: EngineViewWindow;
   duration: number;
   session: EngineSession;
+  motion: PlayerMotion;
   frozen: boolean;
   take: EngineTake;
   recordings: api.recording.Item[];
@@ -307,6 +309,7 @@ export const initialEngineState: EngineState = {
   frequencyRanges: defaultFrequencyRanges,
   duration: 0,
   session: 'idle',
+  motion: 'stopped',
   frozen: false,
   take: 'none',
   recordings: [],
@@ -370,3 +373,6 @@ export const isTransportBusy = (
   state.session === 'stopping' ||
   state.take === 'arming' ||
   state.take === 'draining';
+
+export const isBuffering = (state: Pick<EngineState, 'motion'>): boolean =>
+  state.motion === 'buffering';

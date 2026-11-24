@@ -1,5 +1,6 @@
 import { type Store } from '../common/store.js';
 import { type EngineState } from '../state.js';
+import { type PlayerMotion } from './protocol.cross.js';
 
 export type EngineSessionMachine = {
   beginPlay: () => void;
@@ -13,7 +14,7 @@ export type EngineSessionMachine = {
   beginDrain: () => void;
   settleDrain: () => void;
   endTake: () => void;
-  applyMotion: (playing: boolean) => void;
+  applyMotion: (motion: PlayerMotion) => void;
 };
 
 export const createEngineSessionMachine = (
@@ -98,8 +99,10 @@ export const createEngineSessionMachine = (
         }
       });
     },
-    applyMotion: (playing) => {
+    applyMotion: (motion) => {
+      const playing = motion !== 'stopped';
       update((state) => {
+        state.motion = motion;
         if (
           playing &&
           (state.session === 'idle' || state.session === 'starting')
