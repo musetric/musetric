@@ -81,3 +81,6 @@ catalog:
   'ws': '8.23.0'
   'zod': '4.6.7'
   'zustand': '5.1.0'
+updateConfig:
+  ignoreDependencies:
+    - 'onnxruntime-web'
