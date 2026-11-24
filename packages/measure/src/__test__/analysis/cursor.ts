@@ -1,4 +1,5 @@
 import { type CursorRun } from '../runs.js';
+import { type ApartResult, checkApart } from './apart.js';
 
 const startupMs = 400;
 const declaredJumpMs = 300;
@@ -311,6 +312,7 @@ export type CursorResult = {
   playSeek: { count: number; standing: number; longestStandMs: number };
   drag: { count: number; stepsBack: number; behindMs: number[] };
   play: { leadMs: number[] };
+  apart: ApartResult;
   spectrogram: {
     count: number;
     stepsBack: number;
@@ -345,6 +347,7 @@ export const analyzeCursor = (run: CursorRun): CursorResult => {
     playSeek: checkPlaySeeks(trace),
     drag: { count: releases.length, stepsBack: steps.drag, behindMs: releases },
     play: { leadMs: checkPlayLeads(trace) },
+    apart: checkApart(run),
     spectrogram: {
       count: run.drawn.length,
       stepsBack: drawnSteps.run,
