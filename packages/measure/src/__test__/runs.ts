@@ -107,12 +107,11 @@ export type CursorRun = z.infer<typeof cursorRunSchema>;
 export const failureRunSchema = z.object({
   fault: z.enum(['caught', 'uncaught']),
   sampleRate: z.number(),
-  faultSeconds: z.number(),
   failedMs: z.number().optional(),
   stoppedMs: z.number().optional(),
   takeEndedMs: z.number().optional(),
   noticeMs: z.number().optional(),
-  latencyFrameCount: z.number(),
+  sentFrameCount: z.number(),
   hostFrameCount: z.number(),
   cursorDriftFrames: z.number(),
 });

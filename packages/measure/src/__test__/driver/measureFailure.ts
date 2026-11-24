@@ -63,9 +63,7 @@ const formatMs = (value: number | undefined) =>
 
 const formatRun = (run: FailureRun) => {
   const toMs = (frameCount: number) => (frameCount / run.sampleRate) * 1000;
-  const expectedMs = run.faultSeconds * 1000 - toMs(run.latencyFrameCount);
-  const hostMs = toMs(run.hostFrameCount);
-  return `| ${run.fault} | ${formatMs(run.failedMs)} | ${formatMs(run.stoppedMs)} | ${formatMs(run.takeEndedMs)} | ${formatMs(run.noticeMs)} | ${Math.round(toMs(run.cursorDriftFrames))} ms | ${(hostMs / 1000).toFixed(3)} s | ${Math.round(expectedMs - hostMs)} ms |`;
+  return `| ${run.fault} | ${formatMs(run.failedMs)} | ${formatMs(run.stoppedMs)} | ${formatMs(run.takeEndedMs)} | ${formatMs(run.noticeMs)} | ${Math.round(toMs(run.cursorDriftFrames))} ms | ${run.sentFrameCount} | ${run.hostFrameCount} |`;
 };
 
 export const runFailure = async (request: MeasureRequest) => {
@@ -80,7 +78,7 @@ export const runFailure = async (request: MeasureRequest) => {
     JSON.parse(output.read(recoveryName)),
   );
   const report = [
-    '| Fault | Reported | Stopped | Take ended | Notice | Cursor after | Take on host | Short of the fault |',
+    '| Fault | Reported | Stopped | Take ended | Notice | Cursor after | Frames the worklet sent | Frames on the host |',
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
     ...runs.map(formatRun),
     '',

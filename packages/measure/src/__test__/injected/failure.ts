@@ -1,9 +1,4 @@
-import {
-  type Engine,
-  getRecordingLatencyFrameCount,
-  isPlaying,
-  isRecording,
-} from '@musetric/engine';
+import { type Engine, isPlaying, isRecording } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { epochNow, wait } from './samples.js';
 import { recordTemporaryTake } from './temporaryTake.js';
@@ -37,12 +32,29 @@ const waitForPlayer = async (engine: Engine) => {
 
 export type PlayerFault = 'caught' | 'uncaught';
 
-const createFaultInjector = async (context: AudioContext) => {
+type FaultTap = {
+  inject: (fault: PlayerFault) => void;
+  countSentFrames: () => Promise<number>;
+};
+
+const createFaultTap = async (context: AudioContext): Promise<FaultTap> => {
   const name = `measure-fault-${Math.round(epochNow())}`;
-  const source = `registerProcessor(${JSON.stringify(name)}, class extends AudioWorkletProcessor {
+  const source = `let sentFrames = 0;
+const post = MessagePort.prototype.postMessage;
+MessagePort.prototype.postMessage = function (message, transfer) {
+  if (message && message.type === 'chunk') {
+    sentFrames += message.payload.samples.length;
+  }
+  return post.call(this, message, transfer);
+};
+registerProcessor(${JSON.stringify(name)}, class extends AudioWorkletProcessor {
   constructor() {
     super();
     this.port.onmessage = (event) => {
+      if (event.data === 'count') {
+        this.port.postMessage(sentFrames);
+        return;
+      }
       globalThis.musetricMeasureHooks.injectPlayerFault(event.data);
     };
   }
@@ -62,8 +74,17 @@ const createFaultInjector = async (context: AudioContext) => {
     numberOfInputs: 0,
     numberOfOutputs: 1,
   });
-  return (fault: PlayerFault) => {
-    node.port.postMessage(fault);
+  return {
+    inject: (fault) => {
+      node.port.postMessage(fault);
+    },
+    countSentFrames: async () =>
+      new Promise<number>((resolve) => {
+        node.port.onmessage = (event: MessageEvent<number>) => {
+          resolve(event.data);
+        };
+        node.port.postMessage('count');
+      }),
   };
 };
 
@@ -79,34 +100,47 @@ type FailureMoments = {
   noticeMs?: number;
 };
 
-const watchFailure = async (
-  engine: Engine,
-  faultAt: number,
-): Promise<FailureMoments> => {
+const watchFailure = (engine: Engine) => {
   const moments: FailureMoments = {};
-  const pending = () =>
-    moments.failedMs === undefined ||
-    moments.stoppedMs === undefined ||
-    moments.takeEndedMs === undefined ||
-    moments.noticeMs === undefined;
-  while (pending() && epochNow() - faultAt < watchTimeoutMs) {
-    const state = engine.store.get();
-    const elapsed = epochNow() - faultAt;
-    if (moments.failedMs === undefined && state.statuses.player === 'error') {
-      moments.failedMs = elapsed;
-    }
-    if (moments.stoppedMs === undefined && !isPlaying(state)) {
-      moments.stoppedMs = elapsed;
-    }
-    if (moments.takeEndedMs === undefined && !isRecording(state)) {
-      moments.takeEndedMs = elapsed;
-    }
-    if (moments.noticeMs === undefined && isNoticeShown()) {
-      moments.noticeMs = elapsed;
-    }
-    await wait(pollMs);
-  }
-  return moments;
+  let faultAt = 0;
+  const elapsed = () => epochNow() - faultAt;
+  const unsubscribes = [
+    engine.store.subscribe(
+      (state) => state.statuses.player,
+      (status) => {
+        if (faultAt > 0 && status === 'error') {
+          moments.failedMs ??= elapsed();
+        }
+      },
+    ),
+    engine.store.subscribe(isPlaying, (playing) => {
+      if (faultAt > 0 && !playing) {
+        moments.stoppedMs ??= elapsed();
+      }
+    }),
+    engine.store.subscribe(isRecording, (recording) => {
+      if (faultAt > 0 && !recording) {
+        moments.takeEndedMs ??= elapsed();
+      }
+    }),
+  ];
+  return {
+    start: () => {
+      faultAt = epochNow();
+    },
+    finish: async (): Promise<FailureMoments> => {
+      while (moments.noticeMs === undefined && elapsed() < watchTimeoutMs) {
+        if (isNoticeShown()) {
+          moments.noticeMs = elapsed();
+        }
+        await wait(pollMs);
+      }
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+      return moments;
+    },
+  };
 };
 
 export type FailureOptions = {
@@ -116,14 +150,10 @@ export type FailureOptions = {
   faultSeconds: number;
 };
 
-type WatchedFault = FailureMoments & {
-  faultSeconds: number;
-};
-
-export type FailureRun = WatchedFault & {
+export type FailureRun = FailureMoments & {
   fault: PlayerFault;
   sampleRate: number;
-  latencyFrameCount: number;
+  sentFrameCount: number;
   hostFrameCount: number;
   cursorDriftFrames: number;
 };
@@ -134,10 +164,10 @@ export const measureFailure = async (
 ): Promise<FailureRun> => {
   const { engine } = hooks;
   await waitForPlayer(engine);
-  const inject = await createFaultInjector(engine.context);
+  const tap = await createFaultTap(engine.context);
   const { sampleRate } = engine.context;
-  const latencyFrameCount = getRecordingLatencyFrameCount(engine.store.get());
-  const watched = Promise.withResolvers<WatchedFault>();
+  const watch = watchFailure(engine);
+  const fault = { injected: false };
   const taking = recordTemporaryTake(
     engine,
     {
@@ -149,16 +179,10 @@ export const measureFailure = async (
       metronome: false,
     },
     () => {
-      const started = epochNow();
       const timer = setTimeout(() => {
-        const faultAt = epochNow();
-        inject(options.fault);
-        void watchFailure(engine, faultAt).then((moments) => {
-          watched.resolve({
-            ...moments,
-            faultSeconds: (faultAt - started) / 1000,
-          });
-        }, watched.reject);
+        fault.injected = true;
+        watch.start();
+        tap.inject(options.fault);
       }, options.faultSeconds * 1000);
       return () => {
         clearTimeout(timer);
@@ -179,14 +203,17 @@ export const measureFailure = async (
   const take = await Promise.race([taking, hung.promise]).finally(() => {
     clearTimeout(hangTimer);
   });
-  const moments = await watched.promise;
+  if (!fault.injected) {
+    throw new Error('The take ended before the fault');
+  }
+  const moments = await watch.finish();
   const held = engine.position.read();
   await wait(driftSeconds * 1000);
   return {
     ...moments,
     fault: options.fault,
     sampleRate,
-    latencyFrameCount,
+    sentFrameCount: await tap.countSentFrames(),
     hostFrameCount: take.hostFrameCount,
     cursorDriftFrames: engine.position.read() - held,
   };
