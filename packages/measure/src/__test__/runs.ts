@@ -131,9 +131,7 @@ export const seekRunSchema = z.object({
   frameCount: z.number(),
   seeks: z.array(z.tuple([z.number(), z.number()])),
   decoys: z.array(z.tuple([z.number(), z.number()])).default([]),
-  motion: z.array(
-    z.tuple([z.number(), z.enum(['stopped', 'rolling', 'held', 'buffering'])]),
-  ),
+  buffering: z.array(z.tuple([z.number(), z.number()])),
   endedAt: z.number(),
   requests: z.array(
     z.object({

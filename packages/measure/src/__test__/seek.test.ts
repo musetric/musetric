@@ -3,7 +3,7 @@ import { analyzeSeek } from './analysis/seek.js';
 import { type SeekRun } from './runs.js';
 
 const createRun = (
-  motion: SeekRun['motion'],
+  buffering: SeekRun['buffering'],
   requests: SeekRun['requests'],
 ): SeekRun => ({
   sampleRate: 48000,
@@ -14,7 +14,7 @@ const createRun = (
     [6000, 8_000_000],
   ],
   decoys: [],
-  motion,
+  buffering,
   endedAt: 8500,
   requests,
 });
@@ -23,12 +23,12 @@ describe('analyzeSeek', () => {
   it('times each seek to the end of the hold that follows it', () => {
     const run = createRun(
       [
-        [0, 'rolling'],
-        [1004, 'buffering'],
-        [1040, 'rolling'],
-        [3503, 'buffering'],
-        [3590, 'rolling'],
-        [6002, 'rolling'],
+        [0, 0],
+        [1004, 1],
+        [1040, 0],
+        [3503, 1],
+        [3590, 0],
+        [6002, 0],
       ],
       [],
     );
@@ -44,9 +44,9 @@ describe('analyzeSeek', () => {
   it('holds a seek from its start when the sound is still waiting', () => {
     const run = createRun(
       [
-        [0, 'rolling'],
-        [900, 'buffering'],
-        [1060, 'rolling'],
+        [0, 0],
+        [900, 1],
+        [1060, 0],
       ],
       [],
     );
@@ -60,9 +60,9 @@ describe('analyzeSeek', () => {
   it('counts a seek still waiting at the next one as silent', () => {
     const run = createRun(
       [
-        [0, 'rolling'],
-        [1004, 'buffering'],
-        [3600, 'rolling'],
+        [0, 0],
+        [1004, 1],
+        [3600, 0],
       ],
       [],
     );
@@ -77,9 +77,9 @@ describe('analyzeSeek', () => {
   it('counts the range requests a seek waited for and those it aborted', () => {
     const run = createRun(
       [
-        [0, 'rolling'],
-        [1004, 'buffering'],
-        [1040, 'rolling'],
+        [0, 0],
+        [1004, 1],
+        [1040, 0],
       ],
       [
         { stem: 'lead', sentAt: 900, endedAt: 1010, failed: false },

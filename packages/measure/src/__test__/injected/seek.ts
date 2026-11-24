@@ -1,4 +1,4 @@
-import { type EngineState, isPlaying } from '@musetric/engine';
+import { isBuffering, isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { epochNow, wait } from './samples.js';
 
@@ -55,7 +55,7 @@ export type SeekRun = {
   frameCount: number;
   seeks: [epochMs: number, frameIndex: number][];
   decoys: [epochMs: number, frameIndex: number][];
-  motion: [epochMs: number, motion: EngineState['motion']][];
+  buffering: [epochMs: number, buffering: number][];
   endedAt: number;
 };
 
@@ -70,13 +70,12 @@ export const measureSeek = async (
   const targets = pickTargets(options, sampleRate, frameCount);
   const seeks: SeekRun['seeks'] = [];
   const decoys: SeekRun['decoys'] = [];
-  const motion: SeekRun['motion'] = [[epochNow(), store.get().motion]];
-  const unsubscribe = store.subscribe(
-    (state) => state.motion,
-    (value) => {
-      motion.push([epochNow(), value]);
-    },
-  );
+  const buffering: SeekRun['buffering'] = [
+    [epochNow(), isBuffering(store.get()) ? 1 : 0],
+  ];
+  const unsubscribe = store.subscribe(isBuffering, (value) => {
+    buffering.push([epochNow(), value ? 1 : 0]);
+  });
 
   try {
     if (isPlaying(store.get())) {
@@ -114,7 +113,7 @@ export const measureSeek = async (
     frameCount,
     seeks,
     decoys,
-    motion,
+    buffering,
     endedAt: epochNow(),
   };
 };

@@ -41,18 +41,18 @@ export const analyzeSeek = (run: SeekRun): SeekResult => {
           within(request.endedAt),
       ).length,
     );
-    const motion = run.motion.filter((event) => within(event[0]));
+    const buffering = run.buffering.filter((event) => within(event[0]));
     const waiting =
-      run.motion.findLast((event) => event[0] < seekAt)?.[1] === 'buffering';
+      run.buffering.findLast((event) => event[0] < seekAt)?.[1] === 1;
     const heldAt = waiting
       ? seekAt
-      : motion.find((event) => event[1] === 'buffering')?.[0];
+      : buffering.find((event) => event[1] === 1)?.[0];
     if (heldAt === undefined) {
       result.unheld += 1;
       continue;
     }
-    const sound = motion.find(
-      (event) => event[0] >= heldAt && event[1] !== 'buffering',
+    const sound = buffering.find(
+      (event) => event[0] >= heldAt && event[1] === 0,
     );
     if (!sound) {
       result.silent += 1;
