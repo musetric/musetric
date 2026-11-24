@@ -105,14 +105,14 @@ const waitForReady = async (
         resolve(true);
       },
     });
-    node.addEventListener('processorerror', (event) => {
+    node.onprocessorerror = (event) => {
       console.error(
         'The microphone failed on the audio thread:',
         event.message,
       );
       window.clearTimeout(timeout);
       resolve(false);
-    });
+    };
   });
 
 export type TimedMicrophoneSource = {

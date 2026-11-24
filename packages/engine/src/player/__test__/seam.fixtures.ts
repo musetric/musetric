@@ -148,13 +148,13 @@ export const createSeam = async (
   let onPostFromWorklet: Seam['onPostFromWorklet'] = noop;
   let animationCallbacks: FrameRequestCallback[] = [];
 
-  class FakeAudioWorkletNode extends EventTarget {
+  class FakeAudioWorkletNode {
     readonly port: MessagePort;
     readonly connect = noop;
     readonly disconnect = noop;
+    onprocessorerror: ((event: ErrorEvent) => void) | undefined = undefined;
 
     constructor() {
-      super();
       const channel = new MessageChannel();
       this.port = channel.port1;
       onPostToWorklet = watchPosts(channel.port1, toWorklet);
@@ -173,7 +173,7 @@ export const createSeam = async (
         },
         reportError: (error) => {
           setImmediate(() => {
-            this.dispatchEvent(
+            this.onprocessorerror?.(
               new ErrorEvent('processorerror', { message: String(error) }),
             );
           });

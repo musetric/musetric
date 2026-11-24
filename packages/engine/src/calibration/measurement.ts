@@ -95,7 +95,7 @@ const waitForResult = async (
         resolve({ peaks: message.peaks });
       },
     });
-    node.addEventListener('processorerror', (event) => {
+    node.onprocessorerror = (event) => {
       if (settled) {
         return;
       }
@@ -106,7 +106,7 @@ const waitForResult = async (
           `The calibration failed on the audio thread: ${event.message}`,
         ),
       );
-    });
+    };
   });
 
 export type CalibrationMeasurementOptions = CalibrationMeasurementListeners & {

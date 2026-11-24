@@ -171,9 +171,9 @@ export const createEnginePlayback = async (
     options.onFailed();
   };
 
-  node.addEventListener('processorerror', (event) => {
+  node.onprocessorerror = (event) => {
     fail(event.message);
-  });
+  };
 
   port.bindHandlers({
     booted: () => {

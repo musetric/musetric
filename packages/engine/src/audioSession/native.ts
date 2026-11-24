@@ -177,14 +177,14 @@ export const createNativeAudioSession = (
           resolve();
         },
       });
-      node.addEventListener('processorerror', (event) => {
+      node.onprocessorerror = (event) => {
         console.error(
           'The microphone failed on the audio thread:',
           event.message,
         );
         window.clearTimeout(timeout);
         resolve();
-      });
+      };
     });
     return { node, keepAlive, port, ready };
   };
