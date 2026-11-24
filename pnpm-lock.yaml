@@ -341,7 +341,7 @@ catalogs:
 
 overrides:
   browserslist: 4.28.8
-  onnxruntime-web: 1.31.1
+  onnxruntime-web: 1.30.0
 
 importers:
 
@@ -390,8 +390,8 @@ importers:
         specifier: 'catalog:'
         version: 10.15.0(jiti@2.7.0)(supports-color@10.2.2)
       onnxruntime-web:
-        specifier: 1.31.1
-        version: 1.31.1
+        specifier: 1.30.0
+        version: 1.30.0
       typescript:
         specifier: 'catalog:'
         version: '@typescript/typescript6@6.0.2'
@@ -465,8 +465,8 @@ importers:
         specifier: 'catalog:'
         version: 10.15.0(jiti@2.7.0)(supports-color@10.2.2)
       onnxruntime-web:
-        specifier: 1.31.1
-        version: 1.31.1
+        specifier: 1.30.0
+        version: 1.30.0
       typescript:
         specifier: 'catalog:'
         version: '@typescript/typescript6@6.0.2'
@@ -1070,8 +1070,8 @@ importers:
         specifier: 'catalog:'
         version: 10.15.0(jiti@2.7.0)(supports-color@10.2.2)
       onnxruntime-web:
-        specifier: 1.31.1
-        version: 1.31.1
+        specifier: 1.30.0
+        version: 1.30.0
       typescript:
         specifier: 'catalog:'
         version: '@typescript/typescript6@6.0.2'
@@ -4015,15 +4015,12 @@ packages:
   onnxruntime-common@1.30.0:
     resolution: {integrity: sha512-7fdVWjAID1dVhH/G8qK3APARunV4VkBFoCQAP7qp4Wkab0mrorvmc+sqiT+mKXOzDqdjN5j+/Z9nb4gzNPWcyA==}
 
-  onnxruntime-common@1.31.1:
-    resolution: {integrity: sha512-F+nnYNiQtmNJ95V6R/isBJqiVpdANCrsMEg1OaF+Bkbl3GAtzWLR7Ng17Ld0QtYtYJyotOHPJzOQn1Y6PLZjpg==}
-
   onnxruntime-node@1.30.0:
     resolution: {integrity: sha512-twhs1C2C/BFkz1yc5OY0KIU2GUq6DURO7hD4bx5Q2Qy3nAMJwRXW8xU3NVczE29VA9lolLOYepoD8fjTGOfIqw==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.31.1:
-    resolution: {integrity: sha512-5GeH+bWQ+HxM10z7erGlsWqryrwMbSvm/1tkIsKTT48g0fI19VXVVC435t4t7VsPdSQeS7NmuZPXrQ73k82URw==}
+  onnxruntime-web@1.30.0:
+    resolution: {integrity: sha512-q0y+JrrtukXSzsBWEMccVfqX25LRmosXHF+CaRJmg8pZClzcV7svNc4rKY3jL02Vb7QmRMDs1SigqR4CXAfKYQ==}
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -5060,7 +5057,7 @@ snapshots:
       '@huggingface/jinja': 0.5.10
       '@huggingface/tokenizers': 0.2.0
       onnxruntime-node: 1.30.0
-      onnxruntime-web: 1.31.1
+      onnxruntime-web: 1.30.0
       sharp: 0.35.5(@types/node@26.6.6)
     transitivePeerDependencies:
       - '@types/node'
@@ -7083,20 +7080,18 @@ snapshots:
 
   onnxruntime-common@1.30.0: {}
 
-  onnxruntime-common@1.31.1: {}
-
   onnxruntime-node@1.30.0:
     dependencies:
       adm-zip: 0.6.1
       global-agent: 4.1.3
       onnxruntime-common: 1.30.0
 
-  onnxruntime-web@1.31.1:
+  onnxruntime-web@1.30.0:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
       long: 5.3.2
-      onnxruntime-common: 1.31.1
+      onnxruntime-common: 1.30.0
       platform: 1.3.6
       protobufjs: 7.6.6
 
