@@ -153,9 +153,9 @@ export const createEnginePlayback = async (
             };
           }
         });
-        if (message.playing) {
+        if (message.playing || message.glide) {
           startFrameIndexPump();
-        } else if (!message.glide) {
+        } else {
           stopFrameIndexPump();
         }
       }

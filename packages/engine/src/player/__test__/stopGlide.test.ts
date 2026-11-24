@@ -59,6 +59,23 @@ describe('Stop', () => {
     expect(await shownAfter(seam, 60)).toBe(after);
   });
 
+  it('brings the cursor to where the sound ends after race 1', async () => {
+    const seam = await open();
+    seam.onPostToWorklet('play', () => {
+      seam.player.seek(2 * rate, 'player');
+    });
+    await seam.player.play();
+    await shownAfter(seam, 200);
+    let soundEnd = Number.NaN;
+    seam.onPostFromWorklet('setPlaying', (payload) => {
+      if (payload instanceof Object && 'frameIndex' in payload) {
+        soundEnd = Number(payload.frameIndex);
+      }
+    });
+    await seam.player.stop();
+    expect(await shownAfter(seam, 60)).toBe(soundEnd);
+  });
+
   it('jumps nowhere back when a seek lands during the glide', async () => {
     const seam = await open();
     await seam.player.play();
