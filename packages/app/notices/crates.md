@@ -4302,7 +4302,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- `cookie` 0.18.2
+- `cookie` 0.18.3
 
 ````text
 Copyright (c) 2017 Sergio Benitez
