@@ -12,6 +12,7 @@ export type MeasurePage = {
   callText: (procedure: string, options: object) => Promise<string>;
   logs: MeasureLog[];
   waitForLog: (channel: string, after: number) => Promise<MeasureLog>;
+  reload: () => Promise<void>;
   close: () => void;
 };
 
@@ -67,6 +68,9 @@ export const openMeasurePage = async (
         }
         await setTimeout(logPollMs);
       }
+    },
+    reload: async () => {
+      await page.evaluate('setTimeout(() => location.reload(), 0)');
     },
     close: () => {
       page.close();

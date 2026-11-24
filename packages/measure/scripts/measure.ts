@@ -7,7 +7,7 @@ import { startVitest } from 'vitest/node';
 
 type DeviceKind = 'android' | 'chrome' | 'desktop';
 
-type MeasureCommand = 'timing' | 'delay' | 'sound' | 'cursor';
+type MeasureCommand = 'timing' | 'delay' | 'sound' | 'cursor' | 'failure';
 
 type MeasureRequest = {
   command: MeasureCommand;
@@ -32,12 +32,13 @@ declare module 'vitest' {
   }
 }
 
-const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|sound|cursor> [options]
+const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|sound|cursor|failure> [options]
 
   measure:timing   the playhead against the heard metronome click, and the take against the beats
   measure:delay    how far the voice line, the spectrogram and the newest audio trail the playhead
   measure:sound    the take against the browser path on a played synthetic file, and gaps in a long take
   measure:cursor   the shown cursor through Play, Stop, seeks, a drag and a loop: steps back, stalls and jumps
+  measure:failure  a fault thrown in the player during a take: the notice, the stop and the take on the host
 
 options
   --device <android|chrome|desktop>  the page to drive (default: android)
@@ -46,9 +47,9 @@ options
   --out <dir>                        where runs and report.md go (default: tmp/measure/<command>)
   --reanalyze                        analyze the runs already in --out, without a device
   --keep-calibration                 measure with the stored calibration instead of calibrating first
-  --seconds <n>                      take length for timing and delay (default: 20)
+  --seconds <n>                      take length for timing and delay, the time to the fault for failure (default: 20)
   --tempos <a,b>                     timing tempos (default: 1)
-  --start <seconds>                  where delay and sound takes and the cursor events start in the song (default: 30)
+  --start <seconds>                  where delay, sound and failure takes and the cursor events start in the song (default: 30)
   --cycles <n>                       cursor: how many times the events repeat (default: 3)
   --take-seconds <n>                 the sound take with the song (default: 60)
   --take-only                        sound: only the take with the song, without the file comparison
@@ -60,6 +61,7 @@ const commands: readonly MeasureCommand[] = [
   'delay',
   'sound',
   'cursor',
+  'failure',
 ];
 const devices: readonly DeviceKind[] = ['android', 'chrome', 'desktop'];
 const defaultPorts: Record<DeviceKind, number> = {

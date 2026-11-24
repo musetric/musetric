@@ -25,13 +25,14 @@ const layPieces = async (
   recordingId: number,
   sampleRate: number,
   take: TakeWindow,
-): Promise<void> => {
+): Promise<number> => {
   const { pieces } = await requestWithAxios(
     axios,
     api.audio.recordingPieces.base,
     { params: { projectId, recordingId } },
   );
   const decoder = createAudioDecoder();
+  let hostFrameCount = 0;
   for (const piece of pieces) {
     const content = await requestWithAxios(
       axios,
@@ -48,7 +49,9 @@ const layPieces = async (
       tempo: piece.tempo,
       samples: channels[0],
     });
+    hostFrameCount += channels[0].length;
   }
+  return hostFrameCount;
 };
 
 type SavedSettings = Pick<
@@ -115,6 +118,7 @@ export type TemporaryTakeSettings = {
 export type TemporaryTake = {
   firstFrame: number;
   samples: Float32Array;
+  hostFrameCount: number;
 };
 
 export const recordTemporaryTake = async (
@@ -183,8 +187,13 @@ export const recordTemporaryTake = async (
       Math.min(frameCount, lastFrame),
       settings.tempo,
     );
-    await layPieces(projectId, temporary.id, sampleRate, take);
-    return { firstFrame, samples: take.samples };
+    const hostFrameCount = await layPieces(
+      projectId,
+      temporary.id,
+      sampleRate,
+      take,
+    );
+    return { firstFrame, samples: take.samples, hostFrameCount };
   } finally {
     applySettings(engine, saved);
     await requestWithAxios(axios, api.recording.activate.base, {

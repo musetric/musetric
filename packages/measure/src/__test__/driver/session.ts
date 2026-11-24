@@ -24,7 +24,8 @@ export const createOutput = (outDir: string): MeasureOutput => {
   };
 };
 
-export type MeasureCommand = 'timing' | 'delay' | 'sound' | 'cursor';
+export type MeasureCommand =
+  'timing' | 'delay' | 'sound' | 'cursor' | 'failure';
 
 export type MeasureRequest = {
   command: MeasureCommand;
