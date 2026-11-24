@@ -31,19 +31,22 @@ const createPlayer = async () => {
   const harness = await createHarness([], [playheadChannel.port1]);
   const playhead = createPlayhead(playheadChannel.port2, rate);
   const silence = new Float32Array(blockSize);
+  let processed = 0;
   const run = async (blocks: number): Promise<PlayheadValue> => {
     for (let block = 0; block < blocks; block += 1) {
       harness.process(silence);
     }
+    processed += blocks;
     await settle();
     return playhead.read();
   };
-  return { harness, run };
+  const heardNow = () => processed * blockSize - outputLatency;
+  return { harness, run, heardNow };
 };
 
 describe('player playhead', () => {
   it('reports the song frame heard at the speaker across a tempo change', async () => {
-    const { harness, run } = await createPlayer();
+    const { harness, run, heardNow } = await createPlayer();
     const startFrame = rate;
     harness.player.methods.seek({ frameIndex: startFrame, revision: 1 });
     harness.player.methods.play({
@@ -74,12 +77,14 @@ describe('player playhead', () => {
     ];
     for (const blocks of [5, 10, 20]) {
       const value = await run(blocks);
-      expect(value.contextFrame).toBeGreaterThan(
-        110 * blockSize - outputLatency,
-      );
       expect(value.frameIndex).toBe(
         renderedFrame(startFrame, segments, value.contextFrame),
       );
+      const predicted =
+        value.frameIndex + (heardNow() - value.contextFrame) * value.rate;
+      expect(
+        Math.abs(predicted - renderedFrame(startFrame, segments, heardNow())),
+      ).toBeLessThanOrEqual(blockSize);
     }
     const after = await run(40);
     expect(after.contextFrame).toBeGreaterThan(110 * blockSize);

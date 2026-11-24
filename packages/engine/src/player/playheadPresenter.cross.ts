@@ -2,7 +2,10 @@ import { type PlayheadLoop, type PlayheadValue } from './playhead.cross.js';
 
 const maxExtrapolationSeconds = 0.25;
 
-const wrapLoop = (frameIndex: number, loop: PlayheadLoop | undefined) => {
+export const wrapLoop = (
+  frameIndex: number,
+  loop: PlayheadLoop | undefined,
+) => {
   if (!loop || frameIndex < loop.toFrame) {
     return frameIndex;
   }
@@ -40,7 +43,7 @@ const jumpSeconds = 0.2;
 const loopLength = (loop: PlayheadLoop | undefined) =>
   loop ? loop.toFrame - loop.fromFrame : 0;
 
-const sameLoop = (
+export const sameLoop = (
   left: PlayheadLoop | undefined,
   right: PlayheadLoop | undefined,
 ) => left?.fromFrame === right?.fromFrame && left?.toFrame === right?.toFrame;
