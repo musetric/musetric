@@ -211,7 +211,7 @@ Apache License
    limitations under the License.
 ````
 
-## onnxruntime-common 1.31.1
+## onnxruntime-common 1.30.0
 
 - License: MIT
 - Source: https://github.com/Microsoft/onnxruntime.git
@@ -220,7 +220,7 @@ Apache License
 The package ships no license file.
 ````
 
-## onnxruntime-web 1.31.1
+## onnxruntime-web 1.30.0
 
 - License: MIT
 - Source: https://github.com/Microsoft/onnxruntime.git
