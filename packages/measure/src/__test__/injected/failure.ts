@@ -124,17 +124,22 @@ const watchFailure = (engine: Engine) => {
       }
     }),
   ];
+  const pollNotice = async () => {
+    while (moments.noticeMs === undefined && elapsed() < watchTimeoutMs) {
+      if (isNoticeShown()) {
+        moments.noticeMs = elapsed();
+      }
+      await wait(pollMs);
+    }
+  };
+  let noticePolled: Promise<void> | undefined = undefined;
   return {
     start: () => {
       faultAt = epochNow();
+      noticePolled = pollNotice();
     },
     finish: async (): Promise<FailureMoments> => {
-      while (moments.noticeMs === undefined && elapsed() < watchTimeoutMs) {
-        if (isNoticeShown()) {
-          moments.noticeMs = elapsed();
-        }
-        await wait(pollMs);
-      }
+      await noticePolled;
       for (const unsubscribe of unsubscribes) {
         unsubscribe();
       }
