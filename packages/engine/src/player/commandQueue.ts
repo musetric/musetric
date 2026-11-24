@@ -35,7 +35,7 @@ export const createEngineCommandQueue = (
     }
   });
 
-  const run = async (command: TransportCommand): Promise<void> => {
+  const enqueue = async (command: TransportCommand): Promise<void> => {
     if (waiting.length === 0 && free()) {
       return command();
     }
@@ -45,12 +45,16 @@ export const createEngineCommandQueue = (
   };
 
   return {
-    run,
+    run: async (command) => {
+      if (store.get().statuses.player !== 'error') {
+        await enqueue(command);
+      }
+    },
     runStop: async (command) => {
       for (const dropped of waiting.splice(0)) {
         dropped.settle(Promise.resolve());
       }
-      return run(command);
+      return enqueue(command);
     },
   };
 };

@@ -102,6 +102,7 @@ const createPlayer = async (paging: Paging, withheld: number[] = []) => {
     recordingFlushed: () => undefined,
     recordingPassStarted: () => undefined,
     recordingPassEnded: () => undefined,
+    failed: () => undefined,
   });
   const player = outbound.methods;
   return {

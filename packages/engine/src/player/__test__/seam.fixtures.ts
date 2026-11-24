@@ -1,7 +1,6 @@
 /* eslint-disable musetric/no-classes, musetric/no-this-expression */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { initSync } from '@musetric/dsp/stretch';
 import { vi } from 'vitest';
 import { type EngineAudioOutput } from '../../audioOutput/index.js';
 import { type EngineOutputClock } from '../../audioOutput/outputClock.js';
@@ -12,10 +11,15 @@ import {
 import { createStore, type Store } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
 import { type EngineState, initialEngineState } from '../../state.js';
+import {
+  createGuardedPlayer,
+  type GuardedPlayer,
+  type PlayerFault,
+} from '../guardedPlayer.worklet.js';
 import { createEnginePlayer, type EnginePlayer } from '../index.js';
 import { createEnginePosition, type EnginePosition } from '../position.js';
-import { playerChannel, playerDataChannel } from '../protocol.cross.js';
-import { createPlayerRuntime, type PlayerRuntime } from '../runtime.worklet.js';
+import { playerDataChannel } from '../protocol.cross.js';
+import { recordingStreamChannel } from '../recordingStream.cross.js';
 import { blockSize, mountTracks, rate } from './player.fixtures.js';
 
 const songSeconds = 8;
@@ -106,9 +110,19 @@ export type Seam = {
   microphone: Microphone;
   onPostToWorklet: (type: string, hook: PostHook) => void;
   onPostFromWorklet: (type: string, hook: PostHook) => void;
+  injectFault: (fault: PlayerFault) => void;
+  postToWorklet: (message: unknown) => void;
+  hostFrames: () => number;
   run: (quanta: number) => Promise<void>;
   frame: () => Promise<void>;
   close: () => void;
+};
+
+type FakeWorklet = {
+  player: GuardedPlayer;
+  processing: boolean;
+  post: (message: unknown) => void;
+  reportError: (error: unknown) => void;
 };
 
 export type CreateSeamOptions = {
@@ -128,7 +142,8 @@ export const createSeam = async (
   const toWorklet: string[] = [];
   const fromWorklet: string[] = [];
   let contextFrame = 0;
-  let runtime: PlayerRuntime | undefined = undefined;
+  let hostFrames = 0;
+  let worklet: FakeWorklet | undefined = undefined;
   let onPostToWorklet: Seam['onPostToWorklet'] = noop;
   let onPostFromWorklet: Seam['onPostFromWorklet'] = noop;
   let animationCallbacks: FrameRequestCallback[] = [];
@@ -137,25 +152,33 @@ export const createSeam = async (
     readonly port: MessagePort;
     readonly connect = noop;
     readonly disconnect = noop;
+    onprocessorerror: ((event: ErrorEvent) => void) | undefined = undefined;
 
     constructor() {
       const channel = new MessageChannel();
       this.port = channel.port1;
       onPostToWorklet = watchPosts(channel.port1, toWorklet);
       onPostFromWorklet = watchPosts(channel.port2, fromWorklet);
-      const port = playerChannel.inbound(channel.port2);
-      port.bindBoot((message) => {
-        runtime = createPlayerRuntime({
-          port,
-          dataPort: playerDataChannel.inbound(message.dataPort),
-          playheadPorts: message.playheadPorts,
+      worklet = {
+        player: createGuardedPlayer({
+          port: channel.port2,
           sampleRate: rate,
-          stretch: initSync({ module: message.stretchModule }),
           getCurrentTime: () => contextFrame / rate,
           getCurrentFrame: () => contextFrame,
-        });
-        port.methods.booted();
-      });
+          measure: true,
+        }),
+        processing: true,
+        post: (message) => {
+          channel.port1.postMessage(message);
+        },
+        reportError: (error) => {
+          setImmediate(() => {
+            this.onprocessorerror?.(
+              new ErrorEvent('processorerror', { message: String(error) }),
+            );
+          });
+        },
+      };
     }
   }
 
@@ -198,11 +221,19 @@ export const createSeam = async (
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
   };
-  const record = (method: string) => () => {
-    host.push(method);
+  const startRecordingStream: EngineDecoder['startRecordingStream'] = (
+    recording,
+  ) => {
+    host.push('recording.start');
+    recordingStreamChannel.outbound(recording.port).bindHandlers({
+      chunk: (message) => {
+        hostFrames += message.samples.length;
+      },
+      flush: noop,
+    });
   };
   const decoder = fake<EngineDecoder>({
-    startRecordingStream: record('recording.start'),
+    startRecordingStream,
     finishRecordingStream: async () => {
       host.push('recording.finish');
       return Promise.resolve();
@@ -234,16 +265,28 @@ export const createSeam = async (
   );
   await flush();
 
+  const readWorklet = () => {
+    if (!worklet) {
+      throw new Error('The player has no node');
+    }
+    return worklet;
+  };
+
   const run = async (quanta: number) => {
     for (let index = 0; index < quanta; index += 1) {
-      if (!runtime) {
-        throw new Error('The player has not booted');
-      }
+      const current = readWorklet();
       const outputs = [
         new Float32Array(blockSize),
         new Float32Array(blockSize),
       ];
-      runtime.process([[new Float32Array(blockSize)]], outputs);
+      if (current.processing) {
+        try {
+          current.player.process([[new Float32Array(blockSize)]], outputs);
+        } catch (error) {
+          current.processing = false;
+          current.reportError(error);
+        }
+      }
       contextFrame += blockSize;
       if ((index + 1) % screenFrameQuanta === 0) {
         await flush();
@@ -285,6 +328,17 @@ export const createSeam = async (
     onPostFromWorklet: (type, hook) => {
       onPostFromWorklet(type, hook);
     },
+    injectFault: (fault) => {
+      const { injectFault } = readWorklet().player;
+      if (!injectFault) {
+        throw new Error('The player takes no fault');
+      }
+      injectFault(fault);
+    },
+    postToWorklet: (message) => {
+      readWorklet().post(message);
+    },
+    hostFrames: () => hostFrames,
     run,
     frame: async () => {
       await flush();

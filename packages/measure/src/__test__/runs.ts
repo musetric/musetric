@@ -104,6 +104,26 @@ export const cursorRunSchema = z.object({
 
 export type CursorRun = z.infer<typeof cursorRunSchema>;
 
+export const failureRunSchema = z.object({
+  fault: z.enum(['caught', 'uncaught']),
+  sampleRate: z.number(),
+  failedMs: z.number().optional(),
+  stoppedMs: z.number().optional(),
+  takeEndedMs: z.number().optional(),
+  noticeMs: z.number().optional(),
+  sentFrameCount: z.number(),
+  hostFrameCount: z.number(),
+  cursorDriftFrames: z.number(),
+});
+
+export type FailureRun = z.infer<typeof failureRunSchema>;
+
+export const recoveryRunSchema = z.object({
+  player: z.string(),
+  sampleRate: z.number(),
+  playedFrames: z.number(),
+});
+
 export const browserCaptureSchema = z.object({
   sampleRate: z.number(),
   label: z.string(),

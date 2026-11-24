@@ -52,11 +52,12 @@ export type CalibrationMeasurementListeners = {
 };
 
 const waitForResult = async (
+  node: AudioWorkletNode,
   port: ReturnType<typeof microphoneCalibrationChannel.outbound<MessagePort>>,
   listeners: CalibrationMeasurementListeners,
   timeoutSeconds: number,
 ): Promise<WorkletResult | undefined> =>
-  new Promise<WorkletResult | undefined>((resolve) => {
+  new Promise<WorkletResult | undefined>((resolve, reject) => {
     let settled = false;
     const timeout = window.setTimeout(
       () => {
@@ -94,6 +95,18 @@ const waitForResult = async (
         resolve({ peaks: message.peaks });
       },
     });
+    node.onprocessorerror = (event) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeout);
+      reject(
+        new Error(
+          `The calibration failed on the audio thread: ${event.message}`,
+        ),
+      );
+    };
   });
 
 export type CalibrationMeasurementOptions = CalibrationMeasurementListeners & {
@@ -165,6 +178,7 @@ export const measureRecordingLatency = async (
 
     const port = microphoneCalibrationChannel.outbound(calibrationNode.port);
     const resultPromise = waitForResult(
+      calibrationNode,
       port,
       options,
       recordingLatencyCalibrationTimeoutSeconds + searchOffsetSeconds,

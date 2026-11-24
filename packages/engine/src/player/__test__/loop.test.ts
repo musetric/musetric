@@ -58,6 +58,7 @@ const listenToPasses = (
     recordingPassEnded: (message) => {
       events.push(message.complete ? 'complete' : 'cancelled');
     },
+    failed: () => undefined,
   });
   return events;
 };

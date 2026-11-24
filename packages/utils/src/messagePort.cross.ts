@@ -44,17 +44,46 @@ type PortMessage<Methods extends PortMethods> = {
   };
 }[keyof Methods];
 
-const listen = (instance: MessagePortLike, getHandlers: () => PortMethods) => {
+const readHandler = (
+  message: PortMessage<PortMethods>,
+  handlers: PortMethods,
+): PortMethods[string] | undefined => {
+  const handler = handlers[message.type];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!handler) {
+    console.error('Unhandled port method', message);
+  }
+  return handler;
+};
+
+export type PortDispatch = <Payload>(
+  handler: (payload: Payload) => unknown,
+  payload: Payload,
+) => void;
+
+const listen = (
+  instance: MessagePortLike,
+  getHandlers: () => PortMethods,
+  dispatch?: PortDispatch,
+) => {
+  if (dispatch) {
+    const onmessage = (event: MessageEvent<PortMessage<PortMethods>>) => {
+      const message = event.data;
+      const handler = readHandler(message, getHandlers());
+      if (handler) {
+        dispatch(handler, message.payload);
+      }
+    };
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    instance.onmessage = onmessage as MessagePortLike['onmessage'];
+    return;
+  }
   const onmessage = async (event: MessageEvent<PortMessage<PortMethods>>) => {
     const message = event.data;
-    const handler = getHandlers()[message.type];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!handler) {
-      console.error('Unhandled port method', message);
-      return;
+    const handler = readHandler(message, getHandlers());
+    if (handler) {
+      await handler(message.payload);
     }
-    const { payload } = message;
-    await handler(payload);
   };
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   instance.onmessage = createCallEvery(
@@ -81,6 +110,7 @@ export const createMessagePort = <
   instance: Port,
   methodKeys: readonly (keyof Methods)[],
   methodTransfers: PortTransfers<Methods> = {},
+  dispatch?: PortDispatch,
 ): TypedMessagePort<Port, Handlers, Methods> => {
   let handlers: PortMethods = {};
   let listening = false;
@@ -88,7 +118,7 @@ export const createMessagePort = <
     handlers = next;
     if (!listening) {
       listening = true;
-      listen(instance, () => handlers);
+      listen(instance, () => handlers, dispatch);
     }
   };
   return {

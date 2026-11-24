@@ -36,6 +36,7 @@ export type WaveformStatuses = Record<StemType, PortStatus> & {
 export type EngineStatuses = {
   decoder: PortStatus;
   realtime: PortStatus;
+  player: PortStatus;
   spectrogram: PortStatus;
   waveform: WaveformStatuses;
 };
@@ -295,6 +296,7 @@ export const initialEngineState: EngineState = {
   statuses: {
     decoder: 'pending',
     realtime: 'pending',
+    player: 'pending',
     spectrogram: 'pending',
     waveform: {
       lead: 'pending',

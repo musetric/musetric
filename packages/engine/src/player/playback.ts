@@ -78,6 +78,7 @@ export type CreateEnginePlaybackOptions = {
   applyMotion: (motion: PlayerMotion) => void;
   onRecordingPassStarted?: () => void;
   onRecordingPassEnded?: (complete: boolean) => void;
+  onFailed: () => void;
 };
 
 type PlayingAck = { frameIndex: number; playing: boolean };
@@ -144,9 +145,45 @@ export const createEnginePlayback = async (
     frameIndexPump.stop();
   };
 
+  let failed = false;
+
+  const fail = (reason: string) => {
+    if (failed) {
+      return;
+    }
+    failed = true;
+    console.error('The player failed on the audio thread:', reason);
+    node.port.close();
+    stopFrameIndexPump();
+    if (isCurrentRevision(playhead.read().revision)) {
+      position.write(playhead.readFrameIndex());
+    }
+    const frameIndex = position.read();
+    for (const waiter of playingWaiters.splice(0)) {
+      waiter.resolve({ frameIndex, playing: false });
+    }
+    recordingFlushPromise?.resolve(0);
+    recordingFlushPromise = undefined;
+    bootPromise.resolve();
+    store.update((state) => {
+      state.statuses.player = 'error';
+    });
+    options.onFailed();
+  };
+
+  node.onprocessorerror = (event) => {
+    fail(event.message);
+  };
+
   port.bindHandlers({
     booted: () => {
+      store.update((state) => {
+        state.statuses.player = 'success';
+      });
       bootPromise.resolve();
+    },
+    failed: (message) => {
+      fail(message.reason);
     },
     recordingFlushed: (message) => {
       recordingFlushPromise?.resolve(message.sequence);
@@ -265,6 +302,9 @@ export const createEnginePlayback = async (
     play: async () => {
       await outputClock.wake();
       await audioOutput.play();
+      if (failed) {
+        return false;
+      }
       const { revision } = store.get().seekEvent;
       const command = nextCommand();
       const playingPromise = createPlayingPromise(command);
@@ -272,6 +312,9 @@ export const createEnginePlayback = async (
       return (await playingPromise).playing;
     },
     stop: async () => {
+      if (failed) {
+        return position.read();
+      }
       const { revision } = store.get().seekEvent;
       const frameIndex = isCurrentRevision(playhead.read().revision)
         ? playhead.readFrameIndex()
@@ -306,6 +349,9 @@ export const createEnginePlayback = async (
     },
     ...settings,
     flushRecording: async () => {
+      if (failed) {
+        return 0;
+      }
       recordingFlushPromise = createControlledPromise<number>();
       const currentPromise = recordingFlushPromise;
       port.methods.flushRecording();

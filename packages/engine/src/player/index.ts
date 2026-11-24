@@ -101,6 +101,10 @@ export const createEnginePlayer = (
         onRecordingPassEnded: (complete) => {
           engineRecorder?.handlePassEnded(complete);
         },
+        onFailed: () => {
+          session.applyMotion('stopped');
+          void ref.stop();
+        },
       });
       engineRecorder = createEngineRecorder({
         context,

@@ -12,7 +12,8 @@
     "measure:timing": "node ./scripts/measure.ts timing",
     "measure:delay": "node ./scripts/measure.ts delay",
     "measure:sound": "node ./scripts/measure.ts sound",
-    "measure:cursor": "node ./scripts/measure.ts cursor"
+    "measure:cursor": "node ./scripts/measure.ts cursor",
+    "measure:failure": "node ./scripts/measure.ts failure"
   },
   "devDependencies": {
     "@musetric/api": "workspace:*",
