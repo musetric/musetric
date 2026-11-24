@@ -63,6 +63,7 @@ export type PlayerInboundMethods = {
     frameIndex: number;
     revision: number;
     positionJump?: true;
+    glide?: true;
   }) => void;
   recordingFlushed: (message: { sequence: number }) => void;
   recordingPassStarted: () => void;

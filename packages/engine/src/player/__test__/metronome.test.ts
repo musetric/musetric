@@ -81,12 +81,12 @@ describe('player metronome', () => {
     expect(await player.playClickAt(rate / blockSize)).toBe(beat - start);
   });
 
-  it('clicks again a beat that a stop cut off before it was heard', async () => {
+  it('does not click again a beat that the sound already played out after Stop', async () => {
     const player = await createPlayer();
     const blocks = Math.ceil((beat - start + latency / 2) / blockSize);
-    await player.playClickAt(blocks);
+    expect(await player.playClickAt(blocks)).toBe(beat - start);
     const heard = start + blocks * blockSize - latency;
     await player.stop(heard);
-    expect(await player.playClickAt(blocks)).toBe(beat - heard);
+    expect(await player.playClickAt(blocks)).toBe(-2);
   });
 });

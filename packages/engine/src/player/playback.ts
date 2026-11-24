@@ -100,15 +100,18 @@ export const createEnginePlayback = async (
   let lastPumpedFrameIndex = -1;
 
   const frameIndexPump = createAnimationFrameLoop(() => {
-    const { revision } = playhead.read();
+    const value = playhead.read();
     const frameIndex = playhead.readFrameIndex();
-    if (!isCurrentRevision(revision) || frameIndex === lastPumpedFrameIndex) {
-      return;
+    if (
+      isCurrentRevision(value.revision) &&
+      frameIndex !== lastPumpedFrameIndex
+    ) {
+      lastPumpedFrameIndex = frameIndex;
+      store.update((state) => {
+        state.frameIndex = frameIndex;
+      });
     }
-    lastPumpedFrameIndex = frameIndex;
-    store.update((state) => {
-      state.frameIndex = frameIndex;
-    });
+    return store.get().playing || value.rate !== 0;
   });
 
   const startFrameIndexPump = () => {
@@ -139,7 +142,9 @@ export const createEnginePlayback = async (
       if (currentRevision) {
         store.update((state) => {
           state.playing = message.playing;
-          state.frameIndex = message.frameIndex;
+          if (!message.glide) {
+            state.frameIndex = message.frameIndex;
+          }
           if (message.positionJump) {
             state.seekEvent = {
               revision: nextNumber(state.seekEvent.revision),
@@ -150,7 +155,7 @@ export const createEnginePlayback = async (
         });
         if (message.playing) {
           startFrameIndexPump();
-        } else {
+        } else if (!message.glide) {
           stopFrameIndexPump();
         }
       }
@@ -315,14 +320,10 @@ export const createEnginePlayback = async (
       await playingPromise;
     },
     stop: async () => {
-      stopFrameIndexPump();
       const { revision } = store.get().seekEvent;
       const frameIndex = isCurrentRevision(playhead.read().revision)
         ? playhead.readFrameIndex()
         : store.get().frameIndex;
-      store.update((state) => {
-        state.frameIndex = frameIndex;
-      });
       const playingPromise = createPlayingPromise(revision);
       port.methods.stop({ revision, frameIndex });
       return await playingPromise;

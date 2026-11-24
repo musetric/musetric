@@ -124,7 +124,8 @@ const checkStalls = (trace: Trace) => {
 
 const checkStops = (trace: Trace) => {
   const jumps: number[] = [];
-  const stops = { jumps, largestReversalMs: 0 };
+  const distancesMs: number[] = [];
+  const stops = { jumps, distancesMs, largestReversalMs: 0 };
   for (const [index, event] of trace.events.entries()) {
     if (event[1] !== 'stop') {
       continue;
@@ -132,13 +133,16 @@ const checkStops = (trace: Trace) => {
     const [, , frame] = event;
     const window = between(trace.windowOf(index), 0, event[0] + stopSettleMs);
     const settled = window.at(-1)?.frame ?? frame;
-    stops.jumps.push(trace.toMs(settled - frame) / trace.screenFrameMs);
+    stops.distancesMs.push(trace.toMs(settled - frame));
     let path = 0;
+    let largestStep = 0;
     let last = frame;
     for (const sample of window) {
       path += Math.abs(sample.frame - last);
+      largestStep = Math.max(largestStep, Math.abs(sample.frame - last));
       last = sample.frame;
     }
+    stops.jumps.push(trace.toMs(largestStep) / trace.screenFrameMs);
     stops.largestReversalMs = Math.max(
       stops.largestReversalMs,
       trace.toMs(path - Math.abs(settled - frame)),
@@ -227,7 +231,12 @@ export type CursorResult = {
     stalls: number;
     longestStallMs: number;
   };
-  stop: { count: number; jumps: number[]; largestReversalMs: number };
+  stop: {
+    count: number;
+    jumps: number[];
+    distancesMs: number[];
+    largestReversalMs: number;
+  };
   seek: { count: number; settleMs: number[]; unsettled: number };
   playSeek: { count: number; standing: number; longestStandMs: number };
   drag: { count: number; stepsBack: number; behindMs: number[] };
