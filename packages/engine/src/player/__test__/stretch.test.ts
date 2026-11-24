@@ -16,8 +16,9 @@ const playAcrossTempoChange = async (before: number, after: number) => {
   const harness = await createHarness([]);
   harness.player.methods.setTempoRatio({ tempoRatio: before });
   harness.player.methods.setTransposeSemitones({ transposeSemitones: 2 });
-  harness.player.methods.seek({ frameIndex: 0, revision: 1 });
+  harness.player.methods.seek({ command: 0, frameIndex: 0, revision: 1 });
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: 0,
     inputLatencyFrameCount: 0,

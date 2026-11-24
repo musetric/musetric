@@ -117,17 +117,18 @@ const playScenario = async (paging: Paging, tempoRatio: number) => {
   const run = await createPlayer(paging);
   run.player.setTempoRatio({ tempoRatio });
   run.player.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: 0,
     inputLatencyFrameCount: 0,
   });
   await settle();
   const rendered = run.render(300);
-  run.player.seek({ frameIndex: 131_000, revision: 2 });
+  run.player.seek({ command: 0, frameIndex: 131_000, revision: 2 });
   await settle();
   rendered.push(...run.render(120));
-  run.player.seek({ frameIndex: 50_000, revision: 3 });
-  run.player.setRange({ range: loop, repeat: 'cycle' });
+  run.player.seek({ command: 0, frameIndex: 50_000, revision: 3 });
+  run.player.setRange({ command: 0, range: loop, repeat: 'cycle' });
   await settle();
   rendered.push(...run.render(900));
   return rendered;
@@ -165,6 +166,7 @@ describe('player pages', () => {
     const missing = await createPlayer('pages', [2]);
     for (const run of [whole, missing]) {
       run.player.play({
+        command: 0,
         revision: 1,
         latencyFrameCount: 0,
         inputLatencyFrameCount: 0,

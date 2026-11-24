@@ -1,4 +1,3 @@
-import { type StemType, stemTypes } from '@musetric/audio/es';
 import stretchWasmUrl from '@musetric/dsp/stretch.wasm?url';
 import {
   type ControlledPromise,
@@ -15,15 +14,18 @@ import {
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
 } from '../state.js';
+import {
+  createPlaybackSettings,
+  type PlaybackSettings,
+} from './playbackSettings.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
 import { type EnginePositionWriter } from './position.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
-import { type EngineTrackKey } from './settings.js';
 
 const noop = (): void => undefined;
 
-export type EnginePlayback = {
+export type EnginePlayback = PlaybackSettings & {
   boot: () => Promise<void>;
   play: () => Promise<void>;
   stop: () => Promise<number>;
@@ -39,12 +41,6 @@ export type EnginePlayback = {
     pass?: boolean;
   }) => void;
   flushRecording: () => Promise<number>;
-  sendTempoRatio: () => void;
-  sendTranspose: () => void;
-  sendVoice: () => void;
-  sendMetronome: () => void;
-  sendTrackVolume: (track: EngineTrackKey) => void;
-  sendTrackVolumes: () => void;
 };
 
 export const createEngineStubPlayback = (): EnginePlayback => ({
@@ -64,8 +60,6 @@ export const createEngineStubPlayback = (): EnginePlayback => ({
   sendTrackVolumes: noop,
 });
 
-const dbToGain = (db: number) => 10 ** (db / 20);
-
 export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
@@ -81,7 +75,7 @@ export type CreateEnginePlaybackOptions = {
 };
 
 type PlayingWaiter = {
-  revision: number;
+  command: number;
   resolve: (frameIndex: number) => void;
 };
 
@@ -107,7 +101,12 @@ export const createEnginePlayback = async (
   node.connect(audioOutput.outputNode);
   const port = playerChannel.outbound(node.port);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
-  let playingWaiter: PlayingWaiter | undefined = undefined;
+  const playingWaiters: PlayingWaiter[] = [];
+  let sentCommand = 0;
+  const nextCommand = () => {
+    sentCommand += 1;
+    return sentCommand;
+  };
   let recordingFlushPromise: ControlledPromise<number> | undefined = undefined;
 
   const isCurrentRevision = (revision: number) =>
@@ -153,13 +152,13 @@ export const createEnginePlayback = async (
     },
     setPlaying: (message) => {
       const currentRevision = isCurrentRevision(message.revision);
-      if (currentRevision) {
-        if (!message.glide) {
+      if (message.command === sentCommand) {
+        if (currentRevision && !message.glide) {
           position.write(message.frameIndex);
         }
         store.update((state) => {
           state.playing = message.playing;
-          if (message.positionJump) {
+          if (currentRevision && message.positionJump) {
             state.seekEvent = {
               revision: nextNumber(state.seekEvent.revision),
               frameIndex: message.frameIndex,
@@ -176,54 +175,21 @@ export const createEnginePlayback = async (
       if (currentRevision && !message.playing && message.positionJump) {
         onPlaybackEnded?.();
       }
-      if (playingWaiter?.revision === message.revision) {
-        playingWaiter.resolve(message.frameIndex);
-        playingWaiter = undefined;
+      for (const waiter of playingWaiters.splice(0)) {
+        if (waiter.command <= message.command) {
+          waiter.resolve(message.frameIndex);
+        } else {
+          playingWaiters.push(waiter);
+        }
       }
     },
   });
 
-  const publishTrackVolume = (stemType: StemType) => {
-    const state = store.get();
-    port.methods.setTrackVolume({
-      stemType,
-      volume: state.trackVolumes[stemType] * dbToGain(state.sourceGainDb),
-    });
-  };
-
-  const sendRecordingVolume = () => {
-    port.methods.setRecordingVolume({
-      volume: store.get().trackVolumes.recording,
-    });
-  };
-  const sendTrackVolume = (track: EngineTrackKey) => {
-    if (track === 'recording') {
-      sendRecordingVolume();
-      return;
-    }
-    publishTrackVolume(track);
-  };
-  const sendTrackVolumes = () => {
-    for (const stemType of stemTypes) {
-      publishTrackVolume(stemType);
-    }
-    sendRecordingVolume();
-  };
-  const sendTranspose = () => {
-    port.methods.setTransposeSemitones({
-      transposeSemitones: store.get().transposeSemitones,
-    });
-  };
-  const sendVoice = () => {
-    const { voiceOctave, singerVoice } = store.get();
-    port.methods.setVoiceOctave({
-      voiceOctave,
-      shifted: singerVoice === 'shifted',
-    });
-  };
-  const sendTempoRatio = () => {
-    port.methods.setTempoRatio({ tempoRatio: store.get().tempoRatio });
-  };
+  const settings = createPlaybackSettings({
+    port,
+    store,
+    sampleRate: context.sampleRate,
+  });
 
   const getLatencyFrameCounts = () => {
     const state = store.get();
@@ -254,26 +220,10 @@ export const createEnginePlayback = async (
   outputClock.subscribe(publishOutputClock);
   store.subscribe(getOutputLatencyFrameCount, publishOutputClock);
 
-  const publishMetronome = () => {
-    const state = store.get();
-    const beatsInSamples = new Int32Array(state.metronomeBeats.length);
-    const downbeatMask = new Uint8Array(state.metronomeBeats.length);
-    const downbeatSet = new Set(state.metronomeDownbeats);
-    for (let i = 0; i < state.metronomeBeats.length; i += 1) {
-      const beat = state.metronomeBeats[i];
-      beatsInSamples[i] = Math.round(beat * context.sampleRate);
-      downbeatMask[i] = downbeatSet.has(beat) ? 1 : 0;
-    }
-    port.methods.setMetronome({
-      beatsInSamples,
-      downbeatMask,
-      enabled: state.metronomeEnabled,
-      volume: state.metronomeVolume,
-    });
-  };
   const publishRange = () => {
     const { range, rangeRepeat, rangeStopFrame } = store.get();
     port.methods.setRange({
+      command: nextCommand(),
       range: range && { fromFrame: range.fromFrame, toFrame: range.toFrame },
       repeat: rangeRepeat,
       stopFrame: rangeStopFrame,
@@ -283,12 +233,9 @@ export const createEnginePlayback = async (
   store.subscribe((state) => state.rangeRepeat, publishRange);
   store.subscribe((state) => state.rangeStopFrame, publishRange);
 
-  const createPlayingPromise = async (revision: number) => {
+  const createPlayingPromise = async (command: number) => {
     const playingPromise = createControlledPromise<number>();
-    playingWaiter = {
-      revision,
-      resolve: playingPromise.resolve,
-    };
+    playingWaiters.push({ command, resolve: playingPromise.resolve });
     return playingPromise.promise;
   };
 
@@ -300,19 +247,20 @@ export const createEnginePlayback = async (
         stretchModule,
       });
       await bootPromise.promise;
-      sendTempoRatio();
-      sendTranspose();
-      sendVoice();
-      sendTrackVolumes();
-      publishMetronome();
+      settings.sendTempoRatio();
+      settings.sendTranspose();
+      settings.sendVoice();
+      settings.sendTrackVolumes();
+      settings.sendMetronome();
       publishRange();
     },
     play: async () => {
       await outputClock.wake();
       await audioOutput.play();
       const { revision } = store.get().seekEvent;
-      const playingPromise = createPlayingPromise(revision);
-      port.methods.play({ revision, ...getLatencyFrameCounts() });
+      const command = nextCommand();
+      const playingPromise = createPlayingPromise(command);
+      port.methods.play({ command, revision, ...getLatencyFrameCounts() });
       await playingPromise;
     },
     stop: async () => {
@@ -320,19 +268,21 @@ export const createEnginePlayback = async (
       const frameIndex = isCurrentRevision(playhead.read().revision)
         ? playhead.readFrameIndex()
         : position.read();
-      const playingPromise = createPlayingPromise(revision);
-      port.methods.stop({ revision, frameIndex });
+      const command = nextCommand();
+      const playingPromise = createPlayingPromise(command);
+      port.methods.stop({ command, revision, frameIndex });
       return await playingPromise;
     },
     setFrozen: (frozen) => {
       store.update((state) => {
         state.frozen = frozen;
       });
-      port.methods.setFrozen({ frozen });
+      port.methods.setFrozen({ command: nextCommand(), frozen });
     },
     seek: (nextFrameIndex) => {
       const { revision } = store.get().seekEvent;
       port.methods.seek({
+        command: nextCommand(),
         frameIndex: nextFrameIndex,
         revision,
       });
@@ -346,12 +296,7 @@ export const createEnginePlayback = async (
     startRecording: (recording) => {
       port.methods.startRecording(recording);
     },
-    sendTempoRatio,
-    sendTranspose,
-    sendVoice,
-    sendMetronome: publishMetronome,
-    sendTrackVolume,
-    sendTrackVolumes,
+    ...settings,
     flushRecording: async () => {
       recordingFlushPromise = createControlledPromise<number>();
       const currentPromise = recordingFlushPromise;

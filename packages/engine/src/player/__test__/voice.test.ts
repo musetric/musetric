@@ -55,8 +55,13 @@ const playVoice = async (playback: VoicePlayback) => {
     shifted: voiceShifted,
   });
   harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
-  harness.player.methods.seek({ frameIndex: songStart, revision: 1 });
+  harness.player.methods.seek({
+    command: 0,
+    frameIndex: songStart,
+    revision: 1,
+  });
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: 0,
     inputLatencyFrameCount: 0,
@@ -239,8 +244,9 @@ describe('player voice', () => {
     };
     const harness = await createHarness([loud, silent]);
     harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
-    harness.player.methods.seek({ frameIndex: rate, revision: 1 });
+    harness.player.methods.seek({ command: 0, frameIndex: rate, revision: 1 });
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: 0,
       inputLatencyFrameCount: 0,
@@ -252,7 +258,11 @@ describe('player voice', () => {
         loudPeak = Math.max(loudPeak, Math.abs(value));
       }
     }
-    harness.player.methods.seek({ frameIndex: 3.1 * rate, revision: 2 });
+    harness.player.methods.seek({
+      command: 0,
+      frameIndex: 3.1 * rate,
+      revision: 2,
+    });
     await settle();
     for (let block = 0; block < fadeQuanta; block += 1) {
       harness.process(new Float32Array(blockSize));
@@ -287,12 +297,13 @@ describe('player voice', () => {
       samples: new Float32Array(rate / 4),
     });
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: 0,
       inputLatencyFrameCount: 0,
     });
     const peakFrom = async (frameIndex: number, revision: number) => {
-      harness.player.methods.seek({ frameIndex, revision });
+      harness.player.methods.seek({ command: 0, frameIndex, revision });
       await settle();
       let peak = 0;
       for (let block = 0; block < 50; block += 1) {

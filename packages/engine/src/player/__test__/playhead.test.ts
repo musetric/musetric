@@ -49,8 +49,13 @@ describe('player playhead', () => {
   it('reports the song frame heard at the speaker across a tempo change', async () => {
     const { harness, run, heardNow } = await createPlayer();
     const startFrame = rate;
-    harness.player.methods.seek({ frameIndex: startFrame, revision: 1 });
+    harness.player.methods.seek({
+      command: 0,
+      frameIndex: startFrame,
+      revision: 1,
+    });
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: outputLatency,
       inputLatencyFrameCount: 0,
@@ -99,18 +104,19 @@ describe('player playhead', () => {
     const { harness, run } = await createPlayer();
     const play = () => {
       harness.player.methods.play({
+        command: 0,
         revision: 1,
         latencyFrameCount: outputLatency,
         inputLatencyFrameCount: 0,
       });
     };
-    harness.player.methods.seek({ frameIndex: rate, revision: 1 });
+    harness.player.methods.seek({ command: 0, frameIndex: rate, revision: 1 });
     play();
     await settle();
     await run(100);
 
     const soundEnd = rate + 100 * blockSize + fadeFrameCount;
-    harness.player.methods.stop({ revision: 1, frameIndex: rate });
+    harness.player.methods.stop({ command: 0, revision: 1, frameIndex: rate });
     await settle();
     const gliding = await run(10);
     expect(gliding.rate).toBe(1);
@@ -138,9 +144,14 @@ describe('player playhead', () => {
   it('wraps the heard frame at the loop end an output latency after the render', async () => {
     const { harness, run } = await createPlayer();
     const range = { fromFrame: rate, toFrame: rate + 50 * blockSize };
-    harness.player.methods.setRange({ range, repeat: 'cycle' });
-    harness.player.methods.seek({ frameIndex: range.fromFrame, revision: 1 });
+    harness.player.methods.setRange({ command: 0, range, repeat: 'cycle' });
+    harness.player.methods.seek({
+      command: 0,
+      frameIndex: range.fromFrame,
+      revision: 1,
+    });
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: outputLatency,
       inputLatencyFrameCount: 0,

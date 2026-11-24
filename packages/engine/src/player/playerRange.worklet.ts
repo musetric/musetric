@@ -85,3 +85,15 @@ export const processRangeMetronome = (
         : undefined,
   });
 };
+
+export const getTakeFrame = (
+  range: RangeFrames | undefined,
+  frame: number,
+  recording: boolean,
+): number | undefined => {
+  const songFrame = range ? range.songFrame(frame) : frame;
+  if (recording || (range && songFrame >= range.endFrame)) {
+    return undefined;
+  }
+  return songFrame;
+};

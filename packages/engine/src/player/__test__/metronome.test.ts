@@ -47,10 +47,11 @@ const createPlayer = async () => {
     enabled: true,
     volume: 1,
   });
-  player.seek({ frameIndex: start, revision: 1 });
+  player.seek({ command: 0, frameIndex: start, revision: 1 });
 
   const playClickAt = async (blocks: number): Promise<number> => {
     player.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: latency,
       inputLatencyFrameCount: 0,
@@ -69,7 +70,7 @@ const createPlayer = async () => {
     return played.findIndex((value) => Math.abs(value) > 0.01) - 1;
   };
   const stop = async (frameIndex: number) => {
-    player.stop({ revision: 1, frameIndex });
+    player.stop({ command: 0, revision: 1, frameIndex });
     await settle();
   };
   return { playClickAt, stop };

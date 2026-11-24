@@ -83,9 +83,19 @@ const playLoop = async (
   const stops: number[] = [];
   listenToPasses(harness, stops);
   harness.player.methods.setTempoRatio({ tempoRatio: tempo });
-  harness.player.methods.setRange({ range: loop, repeat, stopFrame });
-  harness.player.methods.seek({ frameIndex: loop.fromFrame, revision: 1 });
+  harness.player.methods.setRange({
+    command: 0,
+    range: loop,
+    repeat,
+    stopFrame,
+  });
+  harness.player.methods.seek({
+    command: 0,
+    frameIndex: loop.fromFrame,
+    revision: 1,
+  });
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: 0,
     inputLatencyFrameCount: 0,
@@ -114,12 +124,17 @@ const recordPass = async (loopback: PassLoopback) => {
   const events = listenToPasses(harness);
   const take = createTakeStream();
   harness.player.methods.setTempoRatio({ tempoRatio: tempo });
-  harness.player.methods.setRange({ range: loop, repeat: 'cycle' });
-  harness.player.methods.seek({ frameIndex: loop.fromFrame, revision: 1 });
+  harness.player.methods.setRange({ command: 0, range: loop, repeat: 'cycle' });
+  harness.player.methods.seek({
+    command: 0,
+    frameIndex: loop.fromFrame,
+    revision: 1,
+  });
   if (armSeconds === undefined) {
     startRecording(harness, take.notification);
   }
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: roundTrip,
     inputLatencyFrameCount: inputLatency,
@@ -135,7 +150,11 @@ const recordPass = async (loopback: PassLoopback) => {
       await settle();
     }
     if (seekSeconds !== undefined && block === blockAt(seekSeconds)) {
-      harness.player.methods.seek({ frameIndex: loop.fromFrame, revision: 2 });
+      harness.player.methods.seek({
+        command: 0,
+        frameIndex: loop.fromFrame,
+        revision: 2,
+      });
       await settle();
     }
     const input = new Float32Array(blockSize);

@@ -58,6 +58,7 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
+  let stopRequested = false;
 
   const getEngineRecorder = () =>
     assertDefined(engineRecorder, 'Player is not booted');
@@ -105,6 +106,7 @@ export const createEnginePlayer = (
     },
     stop: async () => {
       if (store.get().playerCommandPending) {
+        stopRequested = true;
         return;
       }
 
@@ -217,6 +219,16 @@ export const createEnginePlayer = (
       },
     }),
   };
+
+  store.subscribe(
+    (state) => state.playerCommandPending,
+    (pending) => {
+      if (!pending && stopRequested) {
+        stopRequested = false;
+        void ref.stop();
+      }
+    },
+  );
 
   return ref;
 };
