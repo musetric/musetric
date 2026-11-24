@@ -8,6 +8,7 @@ const describe = (error: unknown): string =>
 const serveStemPages = (): void => {
   const port = stemPagesChannel.inbound(self);
   let opened: MasterPages | undefined = undefined;
+  const reads = new Map<number, AbortController>();
 
   port.bindHandlers({
     open: async (message) => {
@@ -15,8 +16,8 @@ const serveStemPages = (): void => {
       try {
         opened?.free();
         opened = undefined;
-        const pages = await openMasterPages(async (from, to) =>
-          getMasterAudioRange(projectId, stem, from, to),
+        const pages = await openMasterPages(async (from, to, signal) =>
+          getMasterAudioRange({ projectId, type: stem, from, to, signal }),
         );
         if (pages.sampleRate !== sampleRate) {
           pages.free();
@@ -41,8 +42,10 @@ const serveStemPages = (): void => {
         port.methods.failed({ id, reason: 'No master is open' });
         return;
       }
+      const controller = new AbortController();
+      reads.set(id, controller);
       try {
-        const page = await pages.read(index, mono);
+        const page = await pages.read(index, mono, controller.signal);
         port.methods.page({
           id,
           index,
@@ -51,8 +54,15 @@ const serveStemPages = (): void => {
           samples: page.samples,
         });
       } catch (error) {
-        port.methods.failed({ id, reason: describe(error) });
+        if (!controller.signal.aborted) {
+          port.methods.failed({ id, reason: describe(error) });
+        }
+      } finally {
+        reads.delete(id);
       }
+    },
+    cancel: (message) => {
+      reads.get(message.id)?.abort();
     },
   });
 };

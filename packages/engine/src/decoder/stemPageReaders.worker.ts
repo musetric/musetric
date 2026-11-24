@@ -8,7 +8,11 @@ import stemPagesWorkerUrl from './stemPages.worker.ts?worker&url';
 
 export type StemPageReader = {
   open: (projectId: number, sampleRate: number) => Promise<StemPagesInfo>;
-  read: (index: number, mono: boolean) => Promise<StemPageSamples>;
+  read: (
+    index: number,
+    mono: boolean,
+    signal: AbortSignal,
+  ) => Promise<StemPageSamples>;
 };
 
 type Pending<Value> = {
@@ -52,13 +56,25 @@ const createStemPageReader = (stem: StemType): StemPageReader => {
         opening = { resolve, reject };
         port.methods.open({ projectId, stem, sampleRate });
       }),
-    read: async (index, mono) =>
-      new Promise<StemPageSamples>((resolve, reject) => {
+    read: async (index, mono, signal) => {
+      signal.throwIfAborted();
+      return new Promise<StemPageSamples>((resolve, reject) => {
         const id = nextId;
         nextId += 1;
         reads.set(id, { resolve, reject });
         port.methods.read({ id, index, mono });
-      }),
+        signal.addEventListener(
+          'abort',
+          () => {
+            if (reads.delete(id)) {
+              port.methods.cancel({ id });
+              reject(signal.reason);
+            }
+          },
+          { once: true },
+        );
+      });
+    },
   };
 };
 

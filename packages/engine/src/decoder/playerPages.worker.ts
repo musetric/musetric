@@ -71,10 +71,34 @@ const aheadSpans = (
   ];
 };
 
+const playDistance = (
+  layout: PlayerStemLayout,
+  index: number,
+  window: PlayerWindow,
+): number => {
+  const { frameIndex, loop } = window;
+  const start = layout.pageStarts[index];
+  const end = pageEndFrame(layout, index);
+  const near = Math.max(0, start - frameIndex, frameIndex + 1 - end);
+  if (!loop || frameIndex >= loop.toFrame || end <= loop.fromFrame) {
+    return near;
+  }
+  return Math.min(
+    near,
+    loop.toFrame - frameIndex + Math.max(0, start - loop.fromFrame),
+  );
+};
+
+const byPlayDistance =
+  (layout: PlayerStemLayout, window: PlayerWindow) =>
+  (left: number, right: number) =>
+    playDistance(layout, left, window) - playDistance(layout, right, window) ||
+    left - right;
+
 type StemState = {
   layout: PlayerStemLayout;
   resident: Set<number>;
-  reading: Set<number>;
+  reading: Map<number, AbortController>;
 };
 
 export type PlayerPagesOptions = {
@@ -95,16 +119,16 @@ export type PlayerPages = {
 export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
   const { readers, layouts, sampleRate } = options;
   const stems: Record<StemType, StemState> = {
-    lead: { layout: layouts.lead, resident: new Set(), reading: new Set() },
+    lead: { layout: layouts.lead, resident: new Set(), reading: new Map() },
     backing: {
       layout: layouts.backing,
       resident: new Set(),
-      reading: new Set(),
+      reading: new Map(),
     },
     instrumental: {
       layout: layouts.instrumental,
       resident: new Set(),
-      reading: new Set(),
+      reading: new Map(),
     },
   };
   let wanted: Record<StemType, number[]> = {
@@ -112,8 +136,6 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
     backing: [],
     instrumental: [],
   };
-  let closed = false;
-
   const pump = (stem: StemType) => {
     const state = stems[stem];
     for (const index of wanted[stem]) {
@@ -123,14 +145,15 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
       if (state.resident.has(index) || state.reading.has(index)) {
         continue;
       }
-      state.reading.add(index);
+      const controller = new AbortController();
+      state.reading.set(index, controller);
       readers[stem]
-        .read(index, false)
+        .read(index, false, controller.signal)
         .then((page) => {
-          state.reading.delete(index);
-          if (closed) {
+          if (state.reading.get(index) !== controller) {
             return;
           }
+          state.reading.delete(index);
           state.resident.add(index);
           options.putPage({
             stem,
@@ -142,10 +165,11 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
           pump(stem);
         })
         .catch((error: unknown) => {
-          state.reading.delete(index);
-          if (!closed) {
-            options.failed(error);
+          if (state.reading.get(index) !== controller) {
+            return;
           }
+          state.reading.delete(index);
+          options.failed(error);
         });
     }
   };
@@ -195,10 +219,14 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
           }
         }
         nextWanted[stem] = pagesOf(state.layout, wantSpans).sort(
-          (left, right) =>
-            Math.abs(state.layout.pageStarts[left] - frameIndex) -
-            Math.abs(state.layout.pageStarts[right] - frameIndex),
+          byPlayDistance(state.layout, window),
         );
+        for (const [index, controller] of state.reading) {
+          if (!nextWanted[stem].includes(index)) {
+            controller.abort();
+            state.reading.delete(index);
+          }
+        }
       }
       wanted = nextWanted;
       if (dropped.length > 0) {
@@ -209,7 +237,12 @@ export const createPlayerPages = (options: PlayerPagesOptions): PlayerPages => {
       }
     },
     close: () => {
-      closed = true;
+      for (const stem of stemTypes) {
+        for (const controller of stems[stem].reading.values()) {
+          controller.abort();
+        }
+        stems[stem].reading.clear();
+      }
     },
   };
 };

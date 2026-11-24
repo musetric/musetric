@@ -132,7 +132,7 @@ export const createAudioDecode = (
       }
       for (const index of message.indices) {
         lead
-          .read(index, true)
+          .read(index, true, new AbortController().signal)
           .then((page) => {
             spectrogramPort.methods.putLeadPage({
               index,

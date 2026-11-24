@@ -10,6 +10,7 @@ const ownBuffer = (samples: Float32Array): Float32Array<ArrayBuffer> =>
 export type FetchRange = (
   from: number,
   to: number | undefined,
+  signal?: AbortSignal,
 ) => Promise<Uint8Array>;
 
 const readHeader = async (fetchRange: FetchRange): Promise<FlacPages> => {
@@ -45,7 +46,11 @@ export type MasterPages = {
   sampleRate: number;
   channelCount: number;
   pageStarts: number[];
-  read: (index: number, mean: boolean) => Promise<MasterPage>;
+  read: (
+    index: number,
+    mean: boolean,
+    signal: AbortSignal,
+  ) => Promise<MasterPage>;
   free: () => void;
 };
 
@@ -64,13 +69,14 @@ export const openMasterPages = async (
     sampleRate: pages.sampleRate,
     channelCount,
     pageStarts,
-    read: async (index, mean) => {
+    read: async (index, mean, signal) => {
       const from = pages.byteStart(index);
       const frameCount = pages.pageFrames(index);
       if (from === undefined || frameCount === undefined) {
         throw new Error(`The master has no page ${String(index)}`);
       }
-      const bytes = await fetchRange(from, pages.byteEnd(index));
+      const bytes = await fetchRange(from, pages.byteEnd(index), signal);
+      signal.throwIfAborted();
       return {
         index,
         startFrame: pageStarts[index],
