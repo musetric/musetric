@@ -65,16 +65,12 @@ export const TransposePickerContent: FC = () => {
           original
             ? undefined
             : () => {
-                engine.store.update((state) => {
-                  state.transposeSemitones = 0;
-                  state.voiceOctave = 0;
-                });
+                engine.player.setTransposeSemitones(0);
+                engine.player.setVoiceOctave(0);
               }
         }
         onChange={(semitones) => {
-          engine.store.update((state) => {
-            state.transposeSemitones = semitones;
-          });
+          engine.player.setTransposeSemitones(semitones);
         }}
       />
       <Divider />

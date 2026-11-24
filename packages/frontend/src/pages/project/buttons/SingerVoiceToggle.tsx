@@ -40,9 +40,7 @@ export const SingerVoiceToggle: FC = () => {
           if (option === undefined) {
             return;
           }
-          engine.store.update((state) => {
-            state.singerVoice = option.value;
-          });
+          engine.player.setSingerVoice(option.value);
         }}
       >
         {options.map((option) => (

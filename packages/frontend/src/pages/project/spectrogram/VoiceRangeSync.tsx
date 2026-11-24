@@ -31,9 +31,7 @@ export const VoiceRangeSync: FC<VoiceRangeSyncProps> = (props) => {
             fallback: defaultFrequencyRanges,
           })
         : defaultFrequencyRanges;
-    engine.store.update((state) => {
-      state.frequencyRanges = ranges;
-    });
+    engine.view.setFrequencyRanges(ranges);
   }, [voiceRangeQuery.status, voiceRangeQuery.data, leadSpectrogramGainDb]);
 
   return undefined;

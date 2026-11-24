@@ -18,9 +18,9 @@ export const MetronomeToggleButton: FC = () => {
         aria-label={label}
         sx={{ borderRadius: 2, px: 2, py: 1, minWidth: 48 }}
         onClick={() => {
-          engine.store.update((state) => {
-            state.metronomeEnabled = !state.metronomeEnabled;
-          });
+          engine.player.setMetronomeEnabled(
+            !engine.store.get().metronomeEnabled,
+          );
         }}
       >
         <Stack sx={{ alignItems: 'center', gap: 0.5 }}>

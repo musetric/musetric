@@ -30,27 +30,15 @@ export const getTrackKey = (target: TrackVolumeTarget) =>
   target.kind === 'recording' ? target.kind : target.stemType;
 
 export const setTrackVolume = (target: TrackVolumeTarget, value: number) => {
-  engine.store.update((state) => {
-    state.trackVolumes[getTrackKey(target)] = value;
-  });
+  engine.player.setTrackVolume(getTrackKey(target), value);
 };
 
 export const rememberTrackVolume = (target: TrackVolumeTarget) => {
-  const key = getTrackKey(target);
-  engine.store.update((state) => {
-    if (state.trackVolumes[key] > 0) {
-      state.audibleTrackVolumes[key] = state.trackVolumes[key];
-    }
-  });
+  engine.player.rememberTrackVolume(getTrackKey(target));
 };
 
 export const toggleTrackMute = (target: TrackVolumeTarget) => {
-  rememberTrackVolume(target);
-  const key = getTrackKey(target);
-  engine.store.update((state) => {
-    state.trackVolumes[key] =
-      state.trackVolumes[key] > 0 ? 0 : state.audibleTrackVolumes[key];
-  });
+  engine.player.toggleTrackMute(getTrackKey(target));
 };
 
 export const useTrackVolume = (target: TrackVolumeTarget) =>

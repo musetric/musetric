@@ -58,15 +58,11 @@ export const TempoPickerContent: FC = () => {
         tempoRatio === 1
           ? undefined
           : () => {
-              engine.store.update((state) => {
-                state.tempoRatio = 1;
-              });
+              engine.player.setTempoRatio(1);
             }
       }
       onChange={(steps) => {
-        engine.store.update((state) => {
-          state.tempoRatio = steps / tempoStepsPerRatio;
-        });
+        engine.player.setTempoRatio(steps / tempoStepsPerRatio);
       }}
     />
   );

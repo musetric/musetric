@@ -18,10 +18,15 @@ import {
 import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
+import {
+  createEnginePlayerSettings,
+  type EnginePlayerSettings,
+} from './settings.js';
 import { createStartPlayback } from './startPlayback.js';
 
 export type EnginePlayer = EnginePlayerLoop &
-  EnginePlayerRange & {
+  EnginePlayerRange &
+  EnginePlayerSettings & {
     boot: () => Promise<void>;
     play: () => Promise<void>;
     stop: () => Promise<void>;
@@ -188,6 +193,7 @@ export const createEnginePlayer = (
         });
       }
     },
+    ...createEnginePlayerSettings(store),
     ...createEnginePlayerRange({
       store,
       readPosition: () => position.read(),

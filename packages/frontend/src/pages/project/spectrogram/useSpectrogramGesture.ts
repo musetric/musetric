@@ -1,4 +1,4 @@
-import { getFrequencyRange, toStoredFrequencyRange } from '@musetric/engine';
+import { getFrequencyRange } from '@musetric/engine';
 import {
   type GesturePanStart,
   type ViewportCustomPan,
@@ -62,12 +62,7 @@ export const useSpectrogramGesture = (
         setLoopViewWindow(viewWindow);
       },
       setFrequencyRange: (minFrequency, maxFrequency) => {
-        engine.store.update((state) => {
-          state.frequencyRanges[state.spectrogramView] = toStoredFrequencyRange(
-            state,
-            { minFrequency, maxFrequency },
-          );
-        });
+        engine.view.setFrequencyRange({ minFrequency, maxFrequency });
       },
       seek: (frameIndex) => {
         const roundedFrameIndex = Math.round(frameIndex);

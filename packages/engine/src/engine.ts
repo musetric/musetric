@@ -30,6 +30,7 @@ import {
   getActiveRecording,
   initialEngineState,
 } from './state.js';
+import { createEngineView, type EngineView } from './view.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
 const androidOutputBufferSeconds = 0.02;
@@ -46,6 +47,7 @@ export type Engine = {
   waveform: EngineWaveform;
   player: EnginePlayer;
   position: EnginePosition;
+  view: EngineView;
   boot: () => Promise<void>;
 };
 
@@ -104,6 +106,7 @@ export const createEngine = (): Engine => {
     }),
     spectrogram,
     waveform: createEngineWaveform(store),
+    view: createEngineView(store),
     decoder: createEngineDecoder({
       store,
       sampleRate: context.sampleRate,
