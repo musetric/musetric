@@ -78,7 +78,12 @@ const createPlayer = async (withheld: number[] = []) => {
   };
 };
 
-const play = { revision: 1, latencyFrameCount: 0, inputLatencyFrameCount: 0 };
+const play = {
+  command: 0,
+  revision: 1,
+  latencyFrameCount: 0,
+  inputLatencyFrameCount: 0,
+};
 
 const largestStep = (samples: readonly number[]) =>
   samples.reduce(
@@ -104,7 +109,7 @@ describe('the fades of a cut', () => {
     await settle();
     run.render(100);
     const stoppedAt = run.output.length;
-    run.player.stop({ revision: 2, frameIndex: 0 });
+    run.player.stop({ command: 0, revision: 2, frameIndex: 0 });
     await settle();
     run.render(20);
     run.player.play({ ...play, revision: 3 });
@@ -128,7 +133,7 @@ describe('the fades of a cut', () => {
     run.player.play(play);
     await settle();
     run.render(100);
-    run.player.seek({ frameIndex: 2.5 * rate + 92, revision: 2 });
+    run.player.seek({ command: 0, frameIndex: 2.5 * rate + 92, revision: 2 });
     await settle();
     run.render(fadeQuanta + 100);
 

@@ -32,45 +32,39 @@ describe('the seam of the player', () => {
     expect(current.store.get().playing).toBe(false);
   });
 
-  it.fails(
-    'race 1: moves the cursor after a seek within the round trip of Play',
-    async () => {
-      const current = await open();
-      const target = 2 * rate;
-      current.onPostToWorklet('play', () => {
-        current.player.seek(target, 'player');
-      });
-      await current.player.play();
-      const first = await shownAfter(current, 0.5);
-      const second = await shownAfter(current, 0.5);
-      expect(current.store.get().playing).toBe(true);
-      expect(first).toBeGreaterThanOrEqual(target);
-      expect(second).toBeGreaterThan(first);
-    },
-  );
+  it('race 1: moves the cursor after a seek within the round trip of Play', async () => {
+    const current = await open();
+    const target = 2 * rate;
+    current.onPostToWorklet('play', () => {
+      current.player.seek(target, 'player');
+    });
+    await current.player.play();
+    const first = await shownAfter(current, 0.5);
+    const second = await shownAfter(current, 0.5);
+    expect(current.store.get().playing).toBe(true);
+    expect(first).toBeGreaterThanOrEqual(target);
+    expect(second).toBeGreaterThan(first);
+  });
 
-  it.fails(
-    'race 2: stops playing when a range played once ends across a seek',
-    async () => {
-      const current = await open();
-      current.player.setRange({ fromFrame: 0, toFrame: rate });
-      await current.player.playRange('once');
-      current.onPostFromWorklet('setPlaying', (payload) => {
-        if (
-          payload instanceof Object &&
-          'playing' in payload &&
-          payload.playing === false
-        ) {
-          current.player.seek(rate / 2, 'player');
-        }
-      });
-      await shownAfter(current, 1.5);
-      await flush();
-      expect(current.store.get().playing).toBe(false);
-    },
-  );
+  it('race 2: stops playing when a range played once ends across a seek', async () => {
+    const current = await open();
+    current.player.setRange({ fromFrame: 0, toFrame: rate });
+    await current.player.playRange('once');
+    current.onPostFromWorklet('setPlaying', (payload) => {
+      if (
+        payload instanceof Object &&
+        'playing' in payload &&
+        payload.playing === false
+      ) {
+        current.player.seek(rate / 2, 'player');
+      }
+    });
+    await shownAfter(current, 1.5);
+    await flush();
+    expect(current.store.get().playing).toBe(false);
+  });
 
-  it.fails('race 5: keeps a Stop pressed while a take prepares', async () => {
+  it('race 5: keeps a Stop pressed while a take prepares', async () => {
     const current = await open();
     const recording = current.player.record(1);
     await flush();

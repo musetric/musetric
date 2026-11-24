@@ -17,13 +17,22 @@ export type PlayerOutboundMethods = {
     stretchModule: WebAssembly.Module;
   }) => void;
   play: (message: {
+    command: number;
     revision: number;
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
   }) => void;
-  stop: (message: { revision: number; frameIndex: number }) => void;
-  setFrozen: (message: { frozen: boolean }) => void;
-  seek: (message: { frameIndex: number; revision: number }) => void;
+  stop: (message: {
+    command: number;
+    revision: number;
+    frameIndex: number;
+  }) => void;
+  setFrozen: (message: { command: number; frozen: boolean }) => void;
+  seek: (message: {
+    command: number;
+    frameIndex: number;
+    revision: number;
+  }) => void;
   setLatency: (message: {
     latencyFrameCount: number;
     inputLatencyFrameCount: number;
@@ -41,6 +50,7 @@ export type PlayerOutboundMethods = {
     volume: number;
   }) => void;
   setRange: (message: {
+    command: number;
     range?: PlayerRange;
     repeat: PlayerRangeRepeat;
     stopFrame?: number;
@@ -59,6 +69,7 @@ export type PlayerOutboundMethods = {
 export type PlayerInboundMethods = {
   booted: () => void;
   setPlaying: (message: {
+    command: number;
     playing: boolean;
     frameIndex: number;
     revision: number;

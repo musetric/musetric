@@ -34,7 +34,11 @@ const recordRunsThroughLoopback = async (loopback: Loopback) => {
   const harness = await createHarness([]);
   const startFrame = Math.round(startSeconds * rate);
   harness.player.methods.setTempoRatio({ tempoRatio: tempo });
-  harness.player.methods.seek({ frameIndex: startFrame, revision: 1 });
+  harness.player.methods.seek({
+    command: 0,
+    frameIndex: startFrame,
+    revision: 1,
+  });
   harness.player.methods.startRecording({
     frameIndex: startFrame,
     revision: 1,
@@ -43,6 +47,7 @@ const recordRunsThroughLoopback = async (loopback: Loopback) => {
     notificationPort: harness.notification,
   });
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: roundTrip,
     inputLatencyFrameCount: inputLatency,
@@ -59,6 +64,7 @@ const recordRunsThroughLoopback = async (loopback: Loopback) => {
   for (let block = 0; block < blocks; block += 1) {
     if (seek && block === seekBlock) {
       harness.player.methods.seek({
+        command: 0,
         frameIndex: Math.round(seek.toSeconds * rate),
         revision: 2,
       });
@@ -108,7 +114,7 @@ const recordTogglesThroughLoopback = async (toggles: Toggles) => {
   const roundTrip = toggleOutputLatency + inputLatency;
   const harness = await createHarness([]);
   harness.player.methods.setTempoRatio({ tempoRatio: tempo });
-  harness.player.methods.play({ revision: 1, ...playLatency });
+  harness.player.methods.play({ command: 0, revision: 1, ...playLatency });
   await settle();
   const streams = takes.map(() => createTakeStream());
   const blockAt = (seconds: number) =>
@@ -163,7 +169,11 @@ const recordUntilHeard = async (heardSeconds: number) => {
   const roundTrip = outputLatency + slowInput;
   const harness = await createHarness([]);
   const startFrame = Math.round(0.75 * rate);
-  harness.player.methods.seek({ frameIndex: startFrame, revision: 1 });
+  harness.player.methods.seek({
+    command: 0,
+    frameIndex: startFrame,
+    revision: 1,
+  });
   harness.player.methods.startRecording({
     frameIndex: startFrame,
     revision: 1,
@@ -172,6 +182,7 @@ const recordUntilHeard = async (heardSeconds: number) => {
     notificationPort: harness.notification,
   });
   harness.player.methods.play({
+    command: 0,
     revision: 1,
     latencyFrameCount: roundTrip,
     inputLatencyFrameCount: slowInput,
@@ -192,6 +203,7 @@ const recordUntilHeard = async (heardSeconds: number) => {
     played.push(...harness.process(loopBack(block)));
   }
   harness.player.methods.stop({
+    command: 0,
     revision: 2,
     frameIndex: Math.round(heardSeconds * rate),
   });

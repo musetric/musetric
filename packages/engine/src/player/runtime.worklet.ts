@@ -5,6 +5,7 @@ import { createHeardPosition } from './heardPosition.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
 import {
   createRangeFrames,
+  getTakeFrame,
   processRangeMetronome,
   type RangeFrames,
 } from './playerRange.worklet.js';
@@ -16,6 +17,7 @@ import {
 import {
   type playerChannel,
   type playerDataChannel,
+  type PlayerOutboundMethods,
 } from './protocol.cross.js';
 import {
   createRecordingRuntime,
@@ -24,6 +26,9 @@ import {
 } from './recording.worklet.js';
 import { createPlayerRenderer } from './renderer.worklet.js';
 import { createStopGlide } from './stopGlide.worklet.js';
+
+type StopMessage = Parameters<PlayerOutboundMethods['stop']>[0];
+type SeekMessage = Parameters<PlayerOutboundMethods['seek']>[0];
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
@@ -52,6 +57,7 @@ export const createPlayerRuntime = (
   let frameCount = 0;
   let clockOffset: number | undefined = undefined;
   let revision = 0;
+  let appliedCommand = 0;
   let playing = false;
   let frozen = false;
   let latencyFrameCount = 0;
@@ -93,6 +99,7 @@ export const createPlayerRuntime = (
 
   const setPlaying = (positionJump?: true) => {
     port.methods.setPlaying({
+      command: appliedCommand,
       playing,
       frameIndex: position.getFrameIndex(),
       revision,
@@ -125,8 +132,9 @@ export const createPlayerRuntime = (
     setPlaying(true);
   };
 
-  const applyStop = (stopRevision: number, frameIndex: number) => () => {
-    revision = stopRevision;
+  const applyStop = (message: StopMessage) => () => {
+    appliedCommand = message.command;
+    revision = message.revision;
     const soundEnd =
       playing && !frozen
         ? glide.start(
@@ -139,7 +147,7 @@ export const createPlayerRuntime = (
     if (soundEnd !== undefined) {
       position.begin(soundEnd);
     } else if (!glide.active()) {
-      position.begin(frameIndex);
+      position.begin(message.frameIndex);
       publishHeld();
     }
     metronome.clear();
@@ -147,8 +155,10 @@ export const createPlayerRuntime = (
     renderer.requestWindow(position.getFrameIndex(), true);
   };
 
-  const applySeek = (seekRevision: number, frameIndex: number) => () => {
-    revision = seekRevision;
+  const applySeek = (message: SeekMessage) => () => {
+    appliedCommand = message.command;
+    revision = message.revision;
+    const { frameIndex } = message;
     glide.clear();
     position.begin(frameIndex);
     if (recordingRuntime.isActive()) {
@@ -159,16 +169,7 @@ export const createPlayerRuntime = (
     metronome.clear();
     publishHeld();
     renderer.requestWindow(frameIndex, true);
-  };
-
-  const getTakeFrame = (currentOutputFrameIndex: number) => {
-    const songFrame = range
-      ? range.songFrame(currentOutputFrameIndex)
-      : currentOutputFrameIndex;
-    if (recordingRuntime.isActive() || (range && songFrame >= range.endFrame)) {
-      return undefined;
-    }
-    return songFrame;
+    setPlaying();
   };
 
   dataPort.bindHandlers({
@@ -187,21 +188,13 @@ export const createPlayerRuntime = (
       setPlaying();
       renderer.requestWindow(0, true);
     },
-    putPage: (message) => {
-      renderer.put(message);
-    },
+    putPage: renderer.put,
     dropPages: (message) => {
       renderer.drop(message.pages);
     },
-    setRecordingPieces: (message) => {
-      renderer.setPieces(message);
-    },
-    beginLiveTake: (message) => {
-      renderer.beginLiveTake(message);
-    },
-    appendLiveTake: (message) => {
-      renderer.appendLiveTake(message);
-    },
+    setRecordingPieces: renderer.setPieces,
+    beginLiveTake: renderer.beginLiveTake,
+    appendLiveTake: renderer.appendLiveTake,
     unmount: () => {
       cuts.flush();
       glide.clear();
@@ -220,6 +213,7 @@ export const createPlayerRuntime = (
   port.bindHandlers({
     play: (message) => {
       cuts.after(() => {
+        appliedCommand = message.command;
         revision = message.revision;
         glide.clear();
         if (!renderer.mounted()) {
@@ -235,16 +229,18 @@ export const createPlayerRuntime = (
       });
     },
     stop: (message) => {
-      cuts.cut(applyStop(message.revision, message.frameIndex));
+      cuts.cut(applyStop(message));
     },
     setFrozen: (message) => {
       (message.frozen ? cuts.cut : cuts.after)(() => {
+        appliedCommand = message.command;
         frozen = message.frozen;
         renderer.reset();
+        setPlaying();
       });
     },
     seek: (message) => {
-      cuts.cut(applySeek(message.revision, message.frameIndex));
+      cuts.cut(applySeek(message));
     },
     setLatency: (message) => {
       applyLatencyFrameCounts(message);
@@ -283,6 +279,8 @@ export const createPlayerRuntime = (
         renderer.setRange(range);
         renderer.refill();
         renderer.requestWindow(position.getFrameIndex(), true);
+        appliedCommand = message.command;
+        setPlaying();
       });
     },
     startRecording: (message) => {
@@ -339,7 +337,11 @@ export const createPlayerRuntime = (
       const processedFrameCount = renderer.render(
         outputs,
         currentOutputFrameIndex,
-        getTakeFrame(currentOutputFrameIndex),
+        getTakeFrame(
+          range,
+          currentOutputFrameIndex,
+          recordingRuntime.isActive(),
+        ),
       );
       cuts.fade.apply(outputs);
 

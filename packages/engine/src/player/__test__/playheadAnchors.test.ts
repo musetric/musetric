@@ -39,6 +39,7 @@ describe('the anchors of the playhead', () => {
   it('pulses about 15 times a second while the line holds', async () => {
     const { harness, run, count } = await createCountedPlayer();
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: 4800,
       inputLatencyFrameCount: 0,
@@ -52,6 +53,7 @@ describe('the anchors of the playhead', () => {
   it('publishes a new anchor at once on a change of tempo and where a seek lands', async () => {
     const { harness, run, count } = await createCountedPlayer();
     harness.player.methods.play({
+      command: 0,
       revision: 1,
       latencyFrameCount: 0,
       inputLatencyFrameCount: 0,
@@ -60,7 +62,11 @@ describe('the anchors of the playhead', () => {
     harness.player.methods.setTempoRatio({ tempoRatio: 0.5 });
     await settle();
     expect(await count(async () => run(2))).toBeGreaterThanOrEqual(1);
-    harness.player.methods.seek({ frameIndex: 3 * rate, revision: 2 });
+    harness.player.methods.seek({
+      command: 0,
+      frameIndex: 3 * rate,
+      revision: 2,
+    });
     await settle();
     await run(fadeQuanta);
     expect(await count(async () => run(1))).toBeGreaterThanOrEqual(1);
