@@ -1,5 +1,9 @@
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
+import {
+  createPlayheadPresenter,
+  extrapolatePlayhead,
+} from './playheadPresenter.cross.js';
 
 export type PlayheadLoop = {
   fromFrame: number;
@@ -45,40 +49,6 @@ export const createHeldPlayheadValue = (
   endFrame: Number.POSITIVE_INFINITY,
 });
 
-const maxExtrapolationSeconds = 0.25;
-
-const wrapLoop = (frameIndex: number, loop: PlayheadLoop | undefined) => {
-  if (!loop || frameIndex < loop.toFrame) {
-    return frameIndex;
-  }
-  const length = loop.toFrame - loop.fromFrame;
-  return loop.fromFrame + ((frameIndex - loop.fromFrame) % length);
-};
-
-export const extrapolatePlayhead = (
-  value: PlayheadValue,
-  epochMs: number,
-  sampleRate: number,
-): number => {
-  if (value.rate === 0 || value.clockOffset === undefined) {
-    return value.frameIndex;
-  }
-  const heardContextFrame = (epochMs / 1000 + value.clockOffset) * sampleRate;
-  const limit = maxExtrapolationSeconds * sampleRate;
-  const elapsed = Math.max(
-    -limit,
-    Math.min(
-      limit,
-      Math.max(heardContextFrame, value.startContextFrame) - value.contextFrame,
-    ),
-  );
-  const frameIndex = wrapLoop(
-    value.frameIndex + elapsed * value.rate,
-    value.loop,
-  );
-  return Math.round(Math.min(value.endFrame, Math.max(0, frameIndex)));
-};
-
 export const readEpochMs = (): number =>
   performance.timeOrigin + performance.now();
 
@@ -94,6 +64,7 @@ export const createPlayhead = (
   sampleRate: number,
 ): Playhead => {
   let value: PlayheadValue = createHeldPlayheadValue(0, 0);
+  const presenter = createPlayheadPresenter(sampleRate);
   playheadChannel.inbound(port).bindHandlers({
     publish: (message) => {
       value = message;
@@ -102,7 +73,7 @@ export const createPlayhead = (
 
   return {
     read: () => value,
-    readFrameIndex: () => extrapolatePlayhead(value, readEpochMs(), sampleRate),
+    readFrameIndex: () => presenter.present(value, readEpochMs()),
     readFrameIndexAt: (epochMs) =>
       extrapolatePlayhead(value, epochMs, sampleRate),
     writeFrameIndex: (frameIndex) => {
