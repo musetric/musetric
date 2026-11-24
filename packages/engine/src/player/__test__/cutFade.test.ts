@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { fadeFrameCount } from '../playerRange.worklet.js';
 import { playerChannel, playerDataChannel } from '../protocol.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
-import { blockSize, fadeQuanta, rate, settle, sine } from './player.fixtures.js';
+import {
+  blockSize,
+  fadeQuanta,
+  rate,
+  settle,
+  sine,
+} from './player.fixtures.js';
 import { loadStretch } from './stretchModule.js';
 
 const songFrames = 4 * rate;

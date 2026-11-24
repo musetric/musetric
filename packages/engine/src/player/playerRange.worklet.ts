@@ -4,9 +4,7 @@ import { type PlayerRange, type PlayerRangeRepeat } from './protocol.cross.js';
 export const fadeFrameCount = 256;
 
 const ramp = (distance: number) =>
-  distance < fadeFrameCount
-    ? Math.max(0, distance) / fadeFrameCount
-    : 1;
+  distance < fadeFrameCount ? Math.max(0, distance) / fadeFrameCount : 1;
 
 export type MixTrackFrames = {
   songFrame: (frame: number) => number;
