@@ -39,6 +39,7 @@ export type MasterPage = {
   startFrame: number;
   frameCount: number;
   samples: Float32Array<ArrayBuffer>;
+  mean?: Float32Array<ArrayBuffer>;
 };
 
 export type MasterPages = {
@@ -77,13 +78,13 @@ export const openMasterPages = async (
       }
       const bytes = await fetchRange(from, pages.byteEnd(index), signal);
       signal.throwIfAborted();
+      pages.decode(index, bytes);
       return {
         index,
         startFrame: pageStarts[index],
         frameCount,
-        samples: ownBuffer(
-          mean ? pages.decodeMean(index, bytes) : pages.decode(index, bytes),
-        ),
+        samples: ownBuffer(pages.samples()),
+        ...(mean ? { mean: ownBuffer(pages.mean()) } : {}),
       };
     },
     free: () => {

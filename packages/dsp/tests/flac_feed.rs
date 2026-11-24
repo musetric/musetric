@@ -211,10 +211,8 @@ mod tests {
         for index in order {
             let page = pages.pages()[index];
             let span = page_bytes(&bytes, &pages, index);
-            let planar = pages
-                .decode(index, &span)
-                .expect("the page should decode")
-                .to_vec();
+            pages.decode(index, &span).expect("the page should decode");
+            let planar = pages.samples().to_vec();
             let first = usize::try_from(page.first_frame).expect("the page fits") * 2;
             let frames = usize::try_from(page.frames).expect("the page fits");
 
@@ -227,21 +225,16 @@ mod tests {
     }
 
     #[test]
-    fn decodes_a_page_to_the_mean_of_its_channels() {
+    fn gives_the_mean_of_the_channels_of_the_page_it_decoded() {
         let bytes = master();
         let mut pages = FlacPages::read(&bytes)
             .expect("the header should be read")
             .expect("the header should be whole");
         let span = page_bytes(&bytes, &pages, 1);
 
-        let planar = pages
-            .decode(1, &span)
-            .expect("the page should decode")
-            .to_vec();
-        let mean = pages
-            .decode_mean(1, &span)
-            .expect("the page should decode")
-            .to_vec();
+        pages.decode(1, &span).expect("the page should decode");
+        let mean = pages.mean().expect("a stereo page has a mean").to_vec();
+        let planar = pages.samples().to_vec();
 
         let frames = planar.len() / 2;
         let expected: Vec<f32> = (0..frames)
@@ -259,10 +252,8 @@ mod tests {
 
         assert_eq!(pages.pages().len(), 1);
         let span = page_bytes(&stripped, &pages, 0);
-        let planar = pages
-            .decode(0, &span)
-            .expect("the page should decode")
-            .to_vec();
+        pages.decode(0, &span).expect("the page should decode");
+        let planar = pages.samples().to_vec();
         assert_eq!(
             bits(&interleave(&planar, 2)),
             bits(&decode_whole(&stripped, None))

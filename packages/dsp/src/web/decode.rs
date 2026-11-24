@@ -252,17 +252,19 @@ impl FlacPages {
             .map(to_index)
     }
 
-    pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+    pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<(), JsError> {
         self.pages
             .decode(index, bytes)
-            .map(<[f32]>::to_vec)
             .map_err(|failure| failed(&failure))
     }
 
-    #[wasm_bindgen(js_name = decodeMean)]
-    pub fn decode_mean(&mut self, index: usize, bytes: &[u8]) -> Result<Vec<f32>, JsError> {
+    pub fn samples(&mut self) -> Vec<f32> {
+        self.pages.samples().to_vec()
+    }
+
+    pub fn mean(&mut self) -> Result<Vec<f32>, JsError> {
         self.pages
-            .decode_mean(index, bytes)
+            .mean()
             .map(<[f32]>::to_vec)
             .map_err(|failure| failed(&failure))
     }

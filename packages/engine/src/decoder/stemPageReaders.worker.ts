@@ -10,7 +10,7 @@ export type StemPageReader = {
   open: (projectId: number, sampleRate: number) => Promise<StemPagesInfo>;
   read: (
     index: number,
-    mono: boolean,
+    mean: boolean,
     signal: AbortSignal,
   ) => Promise<StemPageSamples>;
 };
@@ -56,13 +56,13 @@ const createStemPageReader = (stem: StemType): StemPageReader => {
         opening = { resolve, reject };
         port.methods.open({ projectId, stem, sampleRate });
       }),
-    read: async (index, mono, signal) => {
+    read: async (index, mean, signal) => {
       signal.throwIfAborted();
       return new Promise<StemPageSamples>((resolve, reject) => {
         const id = nextId;
         nextId += 1;
         reads.set(id, { resolve, reject });
-        port.methods.read({ id, index, mono });
+        port.methods.read({ id, index, mean });
         signal.addEventListener(
           'abort',
           () => {

@@ -36,7 +36,7 @@ const serveStemPages = (): void => {
       }
     },
     read: async (message) => {
-      const { id, index, mono } = message;
+      const { id, index, mean } = message;
       const pages = opened;
       if (!pages) {
         port.methods.failed({ id, reason: 'No master is open' });
@@ -45,13 +45,14 @@ const serveStemPages = (): void => {
       const controller = new AbortController();
       reads.set(id, controller);
       try {
-        const page = await pages.read(index, mono, controller.signal);
+        const page = await pages.read(index, mean, controller.signal);
         port.methods.page({
           id,
           index,
           startFrame: page.startFrame,
           frameCount: page.frameCount,
           samples: page.samples,
+          ...(page.mean ? { mean: page.mean } : {}),
         });
       } catch (error) {
         if (!controller.signal.aborted) {

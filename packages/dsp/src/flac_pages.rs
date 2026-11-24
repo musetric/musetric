@@ -89,38 +89,7 @@ impl FlacPages {
         &self.pages
     }
 
-    pub fn decode_mean(&mut self, index: usize, bytes: &[u8]) -> Result<&[f32], BoxedError> {
-        if self.channels != 2 {
-            return Err(NOT_STEREO.into());
-        }
-        self.decode_interleaved(index, bytes)?;
-        self.planar.clear();
-        self.planar.extend(
-            self.decoded
-                .as_chunks::<2>()
-                .0
-                .iter()
-                .map(|[left, right]| Downmix::Mean.apply(*left, *right)),
-        );
-        Ok(&self.planar)
-    }
-
-    pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<&[f32], BoxedError> {
-        self.decode_interleaved(index, bytes)?;
-        self.planar.clear();
-        for channel in 0..self.channels {
-            self.planar.extend(
-                self.decoded
-                    .iter()
-                    .skip(channel)
-                    .step_by(self.channels)
-                    .copied(),
-            );
-        }
-        Ok(&self.planar)
-    }
-
-    fn decode_interleaved(&mut self, index: usize, bytes: &[u8]) -> Result<(), BoxedError> {
+    pub fn decode(&mut self, index: usize, bytes: &[u8]) -> Result<(), BoxedError> {
         let page = *self.pages.get(index).ok_or(NO_PAGE)?;
         let mut reader = open_span(&self.info_header, bytes)?;
         let codec = match self.codec.as_mut() {
@@ -143,5 +112,34 @@ impl FlacPages {
             return Err(WRONG_LENGTH.into());
         }
         Ok(())
+    }
+
+    pub fn samples(&mut self) -> &[f32] {
+        self.planar.clear();
+        for channel in 0..self.channels {
+            self.planar.extend(
+                self.decoded
+                    .iter()
+                    .skip(channel)
+                    .step_by(self.channels)
+                    .copied(),
+            );
+        }
+        &self.planar
+    }
+
+    pub fn mean(&mut self) -> Result<&[f32], BoxedError> {
+        if self.channels != 2 {
+            return Err(NOT_STEREO.into());
+        }
+        self.planar.clear();
+        self.planar.extend(
+            self.decoded
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|[left, right]| Downmix::Mean.apply(*left, *right)),
+        );
+        Ok(&self.planar)
     }
 }

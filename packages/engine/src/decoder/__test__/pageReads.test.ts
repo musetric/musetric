@@ -6,7 +6,7 @@ import {
   type PlayerStemLayout,
   type PlayerWindow,
 } from '../../player/protocol.cross.js';
-import { createPlayerPages } from '../playerPages.worker.js';
+import { createPageReads } from '../pageReads.worker.js';
 import {
   type StemPageReader,
   type StemPageReaders,
@@ -61,6 +61,7 @@ const settle = async () =>
 type Read = {
   stem: StemType;
   index: number;
+  mean: boolean;
   signal: AbortSignal;
   finished: boolean;
   finish: () => void;
@@ -76,11 +77,12 @@ const createPages = (gated: boolean) => {
         channelCount: 2,
         pageStarts: layout.pageStarts,
       }),
-    read: async (index, _mono, signal) =>
+    read: async (index, mean, signal) =>
       new Promise<StemPageSamples>((resolve) => {
         const read: Read = {
           stem,
           index,
+          mean,
           signal,
           finished: false,
           finish: () => {
@@ -91,6 +93,7 @@ const createPages = (gated: boolean) => {
               startFrame: layout.pageStarts[index],
               frameCount: 1,
               samples: new Float32Array(2),
+              ...(mean ? { mean: new Float32Array(1) } : {}),
             });
           },
         };
@@ -110,8 +113,9 @@ const createPages = (gated: boolean) => {
     backing: new Set(),
     instrumental: new Set(),
   };
+  const leadPages: number[] = [];
   let most = 0;
-  const pages = createPlayerPages({
+  const pages = createPageReads({
     readers,
     layouts: { lead: layout, backing: layout, instrumental: layout },
     sampleRate,
@@ -127,6 +131,9 @@ const createPages = (gated: boolean) => {
         resident[page.stem].delete(page.index);
       }
     },
+    putLeadPage: (page) => {
+      leadPages.push(page.index);
+    },
     failed: (error) => {
       throw error;
     },
@@ -134,6 +141,16 @@ const createPages = (gated: boolean) => {
   const play = async (windows: PlayerWindow[]) => {
     for (const window of windows) {
       pages.requestWindow(window);
+      await settle();
+    }
+  };
+  const drain = async () => {
+    for (;;) {
+      const next = reads.find((read) => !read.finished && !read.signal.aborted);
+      if (!next) {
+        return;
+      }
+      next.finish();
       await settle();
     }
   };
@@ -147,7 +164,9 @@ const createPages = (gated: boolean) => {
     layout,
     reads,
     resident,
+    leadPages,
     play,
+    drain,
     indicesOf,
     most: () => most,
   };
@@ -163,7 +182,7 @@ const span = (fromSeconds: number, toSeconds: number) =>
     (_, step) => fromSeconds * sampleRate + step * reportFrames,
   );
 
-describe('player pages', () => {
+describe('page reads', () => {
   it('never holds more pages than its resident limit', async () => {
     const { pages, layout, play, most } = createPages(false);
     await play(span(0, 40).map((frameIndex) => ({ frameIndex })));
@@ -260,5 +279,58 @@ describe('player pages', () => {
     for (const stem of stemTypes) {
       expect(resident[stem]).toEqual(ready);
     }
+  });
+
+  it('reads a page of the lead once for the player and the spectrogram', async () => {
+    const { pages, reads, resident, leadPages, drain, indicesOf } =
+      createPages(true);
+    pages.requestWindow({ frameIndex: 0 });
+    await settle();
+    const first = indicesOf('lead');
+
+    pages.requestLeadPages(first);
+    await drain();
+    pages.requestLeadPages(
+      [...resident.lead].filter((index) => !first.includes(index)),
+    );
+    await settle();
+
+    const read = indicesOf('lead');
+    expect(new Set(read)).toEqual(resident.lead);
+    expect(read).toHaveLength(resident.lead.size);
+    expect(new Set(leadPages)).toEqual(resident.lead);
+    expect(leadPages).toHaveLength(resident.lead.size);
+    expect(reads.every((found) => found.mean === (found.stem === 'lead'))).toBe(
+      true,
+    );
+  });
+
+  it('reads the pages the spectrogram asks for after those the player wants', async () => {
+    const { pages, resident, leadPages, drain, indicesOf } = createPages(true);
+    pages.requestWindow({ frameIndex: 0 });
+    pages.requestLeadPages([50]);
+    await drain();
+
+    const read = indicesOf('lead');
+    expect(read.at(-1)).toBe(50);
+    expect(new Set(read.slice(0, -1))).toEqual(resident.lead);
+    expect(resident.lead.has(50)).toBe(false);
+    expect(leadPages).toEqual([50]);
+  });
+
+  it('reads the lead again for the spectrogram once the player drops it', async () => {
+    const { pages, layout, reads, leadPages, drain, indicesOf } =
+      createPages(true);
+    pages.requestWindow({ frameIndex: 0 });
+    await drain();
+    pages.requestWindow({ frameIndex: layout.pageStarts[60] });
+    await drain();
+    const before = reads.length;
+
+    pages.requestLeadPages([0]);
+    await drain();
+
+    expect(indicesOf('lead', before)).toEqual([0]);
+    expect(leadPages).toEqual([0]);
   });
 });

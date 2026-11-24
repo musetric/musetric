@@ -6,7 +6,7 @@ import {
   type PlayerRecordingPiece,
 } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
-import { createPlayerPages, type PlayerPages } from './playerPages.worker.js';
+import { createPageReads, type PageReads } from './pageReads.worker.js';
 import {
   copyPieces,
   createRecordingAssembly,
@@ -55,7 +55,7 @@ export const createAudioDecode = (
   const { playerPort, spectrogramPort } = options;
   const decoder = createAudioDecoder();
   let readers: StemPageReaders | undefined = undefined;
-  let playerPages: PlayerPages | undefined = undefined;
+  let pageReads: PageReads | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
   let assembly: RecordingAssembly | undefined = undefined;
   let activeRecordingId: number | undefined = undefined;
@@ -120,30 +120,13 @@ export const createAudioDecode = (
 
   playerPort.bindHandlers({
     requestWindow: (message) => {
-      playerPages?.requestWindow(message);
+      pageReads?.requestWindow(message);
     },
   });
 
   spectrogramPort.bindHandlers({
     requestLeadPages: (message) => {
-      const lead = readers?.lead;
-      if (!lead || !mounted) {
-        return;
-      }
-      for (const index of message.indices) {
-        lead
-          .read(index, true, new AbortController().signal)
-          .then((page) => {
-            spectrogramPort.methods.putLeadPage({
-              index,
-              startFrame: page.startFrame,
-              samples: page.samples,
-            });
-          })
-          .catch((error: unknown) => {
-            console.error('Failed to read a page of the lead', error);
-          });
-      }
+      pageReads?.requestLeadPages(message.indices);
     },
   });
 
@@ -153,8 +136,8 @@ export const createAudioDecode = (
       const recordingId = activeRecordingId;
       readers ??= createStemPageReaders();
       const current = readers;
-      playerPages?.close();
-      playerPages = undefined;
+      pageReads?.close();
+      pageReads = undefined;
       const [[lead, backing, instrumental], pieces] = await Promise.all([
         Promise.all([
           current.lead.open(projectId, sampleRate),
@@ -180,7 +163,7 @@ export const createAudioDecode = (
         },
       };
       mounted = { projectId, sampleRate, frameCount, recordingId, pieces };
-      playerPages = createPlayerPages({
+      pageReads = createPageReads({
         readers: current,
         layouts,
         sampleRate,
@@ -189,6 +172,9 @@ export const createAudioDecode = (
         },
         dropPages: (pages) => {
           playerPort.methods.dropPages({ pages });
+        },
+        putLeadPage: (page) => {
+          spectrogramPort.methods.putLeadPage(page);
         },
         failed: (error) => {
           console.error('Failed to read a page of a stem', error);
@@ -201,7 +187,7 @@ export const createAudioDecode = (
       playerPort.methods.mount({
         frameCount,
         layouts,
-        residentPageLimit: playerPages.residentLimit,
+        residentPageLimit: pageReads.residentLimit,
         recording: copyPieces(pieces),
       });
       const pending = reloadOnMount;
@@ -256,8 +242,8 @@ export const createAudioDecode = (
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
     unmount: () => {
       mounted = undefined;
-      playerPages?.close();
-      playerPages = undefined;
+      pageReads?.close();
+      pageReads = undefined;
       reloadOnMount = undefined;
       activeRecordingId = undefined;
       playerPort.methods.unmount();
