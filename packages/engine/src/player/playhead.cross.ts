@@ -79,6 +79,9 @@ export const createPlayhead = (
     readFrameIndexAt: (epochMs) =>
       extrapolatePlayhead(value, epochMs, sampleRate),
     writeFrameIndex: (frameIndex, revision) => {
+      if (revision === value.revision && value.rate !== 0) {
+        return;
+      }
       value = createHeldPlayheadValue(frameIndex, revision);
     },
   };
