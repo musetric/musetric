@@ -29,7 +29,6 @@ const createPlayer = async () => {
     playheadPorts: [],
     sampleRate: rate,
     stretch: loadStretch(),
-    getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
   });
   const silence = () => [new Float32Array(2 * rate)];

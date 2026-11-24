@@ -52,7 +52,6 @@ const createPlayer = async (withheld: boolean) => {
     playheadPorts: [playhead.port1],
     sampleRate: rate,
     stretch: loadStretch(),
-    getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
   });
   const dataPort = playerDataChannel.outbound(data.port2);

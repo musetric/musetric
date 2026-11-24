@@ -36,7 +36,6 @@ export type CreatePlayerRuntimeOptions = {
   playheadPorts: MessagePort[];
   sampleRate: number;
   stretch: InitOutput;
-  getCurrentTime: () => number;
   getCurrentFrame: () => number;
 };
 
@@ -51,7 +50,8 @@ export const createPlayerRuntime = (
   const { port, dataPort, sampleRate, stretch } = options;
   const playhead: PlayheadPublisher = createPlayheadPublisher(
     options.playheadPorts,
-    options.getCurrentTime,
+    options.getCurrentFrame,
+    sampleRate,
   );
 
   let frameCount = 0;
