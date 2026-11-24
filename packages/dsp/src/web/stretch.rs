@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     page_mix::{LoopRange, PageShape},
-    render::{CHANNELS, Piece, Quantum, Renderer, TakeKey},
+    render::{CHANNELS, Piece, QUANTUM, Quantum, Renderer, TakeKey},
 };
 
 struct Player {
@@ -55,7 +55,7 @@ pub fn open_renderer(sample_rate: u32) -> usize {
         players.push(Player {
             renderer: Renderer::new(sample_rate),
             staged: Vec::new(),
-            output: Vec::new(),
+            output: Vec::with_capacity(CHANNELS * QUANTUM),
         });
         players.len() - 1
     })

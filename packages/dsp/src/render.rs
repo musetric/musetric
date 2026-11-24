@@ -102,17 +102,20 @@ fn add_into(output: &mut [f32], source: &[f32]) {
 impl Renderer {
     #[must_use]
     pub fn new(sample_rate: u32) -> Self {
+        let mut song = TimePitch::new(CHANNELS, sample_rate);
+        song.reserve(QUANTUM);
         let mut lead = TimePitch::new(CHANNELS, sample_rate);
         lead.set_formants(true);
+        lead.reserve(QUANTUM);
         Self {
             mixer: PageMixer::new(CHANNELS, STEM_COUNT),
             volumes: vec![1.0; STEM_COUNT],
-            song: TimePitch::new(CHANNELS, sample_rate),
+            song,
             lead,
             takes: Takes::new(sample_rate),
             target: Target::ORIGINAL,
             recording_volume: 1.0,
-            lead_output: Vec::new(),
+            lead_output: Vec::with_capacity(CHANNELS * QUANTUM),
         }
     }
 
