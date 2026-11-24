@@ -111,9 +111,16 @@ export type Seam = {
   close: () => void;
 };
 
-export const createSeam = async (): Promise<Seam> => {
+export type CreateSeamOptions = {
+  before?: (store: Store<EngineState>) => void;
+};
+
+export const createSeam = async (
+  options: CreateSeamOptions = {},
+): Promise<Seam> => {
   const frameCount = songSeconds * rate;
   const store = createStore(initialEngineState);
+  options.before?.(store);
   store.update((state) => {
     state.frameCount = frameCount;
   });

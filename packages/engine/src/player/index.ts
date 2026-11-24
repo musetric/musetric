@@ -193,7 +193,10 @@ export const createEnginePlayer = (
         });
       }
     },
-    ...createEnginePlayerSettings(store),
+    ...createEnginePlayerSettings({
+      store,
+      getEnginePlayback: () => enginePlayback,
+    }),
     ...createEnginePlayerRange({
       store,
       readPosition: () => position.read(),

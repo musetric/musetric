@@ -19,6 +19,7 @@ import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
 import { type EnginePositionWriter } from './position.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
+import { type EngineTrackKey } from './settings.js';
 
 const noop = (): void => undefined;
 
@@ -38,6 +39,12 @@ export type EnginePlayback = {
     pass?: boolean;
   }) => void;
   flushRecording: () => Promise<number>;
+  sendTempoRatio: () => void;
+  sendTranspose: () => void;
+  sendVoice: () => void;
+  sendMetronome: () => void;
+  sendTrackVolume: (track: EngineTrackKey) => void;
+  sendTrackVolumes: () => void;
 };
 
 export const createEngineStubPlayback = (): EnginePlayback => ({
@@ -49,6 +56,12 @@ export const createEngineStubPlayback = (): EnginePlayback => ({
   connectRecordingSource: () => noop,
   startRecording: noop,
   flushRecording: async () => Promise.resolve(0),
+  sendTempoRatio: noop,
+  sendTranspose: noop,
+  sendVoice: noop,
+  sendMetronome: noop,
+  sendTrackVolume: noop,
+  sendTrackVolumes: noop,
 });
 
 const dbToGain = (db: number) => 10 ** (db / 20);
@@ -178,57 +191,39 @@ export const createEnginePlayback = async (
     });
   };
 
-  const subscribeTrackVolume = (stemType: StemType) => {
-    store.subscribe(
-      (state) => state.trackVolumes[stemType],
-      () => publishTrackVolume(stemType),
-    );
+  const sendRecordingVolume = () => {
+    port.methods.setRecordingVolume({
+      volume: store.get().trackVolumes.recording,
+    });
   };
-  for (const stemType of stemTypes) {
-    subscribeTrackVolume(stemType);
-  }
-  store.subscribe(
-    (state) => state.sourceGainDb,
-    () => {
-      for (const stemType of stemTypes) {
-        publishTrackVolume(stemType);
-      }
-    },
-  );
-  store.subscribe(
-    (state) => state.trackVolumes.recording,
-    (volume) => {
-      port.methods.setRecordingVolume({
-        volume,
-      });
-    },
-  );
-
-  store.subscribe(
-    (state) => state.transposeSemitones,
-    (transposeSemitones) => {
-      port.methods.setTransposeSemitones({
-        transposeSemitones,
-      });
-    },
-  );
-  const sendVoiceOctave = () => {
+  const sendTrackVolume = (track: EngineTrackKey) => {
+    if (track === 'recording') {
+      sendRecordingVolume();
+      return;
+    }
+    publishTrackVolume(track);
+  };
+  const sendTrackVolumes = () => {
+    for (const stemType of stemTypes) {
+      publishTrackVolume(stemType);
+    }
+    sendRecordingVolume();
+  };
+  const sendTranspose = () => {
+    port.methods.setTransposeSemitones({
+      transposeSemitones: store.get().transposeSemitones,
+    });
+  };
+  const sendVoice = () => {
     const { voiceOctave, singerVoice } = store.get();
     port.methods.setVoiceOctave({
       voiceOctave,
       shifted: singerVoice === 'shifted',
     });
   };
-  store.subscribe((state) => state.voiceOctave, sendVoiceOctave);
-  store.subscribe((state) => state.singerVoice, sendVoiceOctave);
-  store.subscribe(
-    (state) => state.tempoRatio,
-    (tempoRatio) => {
-      port.methods.setTempoRatio({
-        tempoRatio,
-      });
-    },
-  );
+  const sendTempoRatio = () => {
+    port.methods.setTempoRatio({ tempoRatio: store.get().tempoRatio });
+  };
 
   const getLatencyFrameCounts = () => {
     const state = store.get();
@@ -288,11 +283,6 @@ export const createEnginePlayback = async (
   store.subscribe((state) => state.rangeRepeat, publishRange);
   store.subscribe((state) => state.rangeStopFrame, publishRange);
 
-  store.subscribe((state) => state.metronomeEnabled, publishMetronome);
-  store.subscribe((state) => state.metronomeVolume, publishMetronome);
-  store.subscribe((state) => state.metronomeBeats, publishMetronome);
-  store.subscribe((state) => state.metronomeDownbeats, publishMetronome);
-
   const createPlayingPromise = async (revision: number) => {
     const playingPromise = createControlledPromise<number>();
     playingWaiter = {
@@ -309,8 +299,13 @@ export const createEnginePlayback = async (
         playheadPorts,
         stretchModule,
       });
-
-      return bootPromise.promise;
+      await bootPromise.promise;
+      sendTempoRatio();
+      sendTranspose();
+      sendVoice();
+      sendTrackVolumes();
+      publishMetronome();
+      publishRange();
     },
     play: async () => {
       await outputClock.wake();
@@ -351,6 +346,12 @@ export const createEnginePlayback = async (
     startRecording: (recording) => {
       port.methods.startRecording(recording);
     },
+    sendTempoRatio,
+    sendTranspose,
+    sendVoice,
+    sendMetronome: publishMetronome,
+    sendTrackVolume,
+    sendTrackVolumes,
     flushRecording: async () => {
       recordingFlushPromise = createControlledPromise<number>();
       const currentPromise = recordingFlushPromise;
