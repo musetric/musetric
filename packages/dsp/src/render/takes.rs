@@ -1,12 +1,12 @@
 use super::{
-    CHANNELS,
+    CHANNELS, QUANTUM,
     time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64},
 };
 use crate::stretch::StretchStream;
 
 const UNIT_RATIO_TOLERANCE: f64 = 1e-6;
 const LANES: usize = 2;
-const QUANTUM: usize = 128;
+const RESERVED_PARTS: usize = 16;
 const CONTINUITY_FRAMES: f64 = 4.0;
 const SEMITONES_PER_OCTAVE: i32 = 12;
 
@@ -192,6 +192,8 @@ pub struct Takes {
     lead: usize,
     scratch: Vec<f32>,
     lead_scratch: Vec<f32>,
+    parts: Vec<Part>,
+    plan: Vec<Option<Routed>>,
 }
 
 fn piece_at<'pieces>(
@@ -288,8 +290,10 @@ impl Takes {
             raw_previous: None,
             raw_current: None,
             lead: StretchStream::new(1, sample_rate).output_latency(),
-            scratch: Vec::new(),
-            lead_scratch: Vec::new(),
+            scratch: Vec::with_capacity(QUANTUM),
+            lead_scratch: Vec::with_capacity(QUANTUM),
+            parts: Vec::with_capacity(RESERVED_PARTS),
+            plan: Vec::with_capacity(RESERVED_PARTS),
         }
     }
 
@@ -380,36 +384,42 @@ impl Takes {
             .is_some_and(|found| is_stretched(target, found))
     }
 
-    fn sounding_parts(&self, song_frame: f64, target: Target, frames: usize) -> Vec<Part> {
+    fn sounding_parts(
+        &self,
+        song_frame: f64,
+        target: Target,
+        frames: usize,
+    ) -> impl Iterator<Item = Part> {
         let tempo = target.tempo;
-        let mut parts = Vec::new();
         let mut offset = 0.0_f64;
         let length = frames_to_f64(frames);
-        for segment in &self.segments[first_ending_after(&self.segments, song_frame)..] {
-            if offset >= length {
-                break;
-            }
-            let start = offset.max(((segment.start - song_frame) / tempo).ceil());
-            let end = length.min(((segment.end - song_frame) / tempo).ceil());
-            if start >= length {
-                break;
-            }
-            if end > start {
-                parts.push(Part {
+        self.segments[first_ending_after(&self.segments, song_frame)..]
+            .iter()
+            .map_while(move |segment| {
+                let start = offset.max(((segment.start - song_frame) / tempo).ceil());
+                let end = length.min(((segment.end - song_frame) / tempo).ceil());
+                if start >= length {
+                    return None;
+                }
+                offset = offset.max(end);
+                Some((end > start).then(|| Part {
                     from: to_index(start),
                     to: to_index(end),
                     segment: *segment,
                     song_frame: song_frame + start * tempo,
                     stretched: self.stretched(segment.piece, target),
                     sounding: true,
-                });
-            }
-            offset = offset.max(end);
-        }
-        parts
+                }))
+            })
+            .flatten()
     }
 
-    fn lead_ins(&self, song_frame: f64, target: Target, frames: usize) -> Vec<Part> {
+    fn lead_ins(
+        &self,
+        song_frame: f64,
+        target: Target,
+        frames: usize,
+    ) -> impl Iterator<Item = Part> {
         let tempo = target.tempo;
         let length = frames_to_f64(frames);
         let span = frames_to_f64(self.lead) * tempo;
@@ -419,9 +429,9 @@ impl Takes {
             .partition_point(|segment| segment.start <= song_frame);
         self.segments[first..]
             .iter()
-            .take_while(|segment| segment.start < reach)
-            .filter(|segment| self.stretched(segment.piece, target))
-            .filter_map(|segment| {
+            .take_while(move |segment| segment.start < reach)
+            .filter(move |segment| self.stretched(segment.piece, target))
+            .filter_map(move |segment| {
                 let start = ((segment.start - span - song_frame) / tempo)
                     .ceil()
                     .max(0.0);
@@ -435,12 +445,10 @@ impl Takes {
                     sounding: false,
                 })
             })
-            .collect()
     }
 
-    fn route(&self, parts: &[Part], target: Target) -> Vec<Option<Routed>> {
+    fn route(&self, parts: &[Part], target: Target, planned: &mut Vec<Option<Routed>>) {
         let mut last = self.lanes.each_ref().map(|lane| lane.previous);
-        let mut planned = Vec::with_capacity(parts.len());
         for (index, part) in parts.iter().enumerate() {
             if !part.stretched {
                 planned.push(None);
@@ -461,7 +469,6 @@ impl Takes {
             last[routed.lane] = Some(part.played(0, target.tempo));
             planned.push(Some(routed));
         }
-        planned
     }
 
     fn render_stretched(&mut self, block: &mut [f32], routed: Routed, target: Target) {
@@ -514,14 +521,18 @@ impl Takes {
         self.raw_previous = self.raw_current.take();
         output.fill(0.0);
         let frames = output.len();
-        let mut parts = self.sounding_parts(song_frame, target, frames);
+        let mut parts = std::mem::take(&mut self.parts);
+        parts.clear();
+        parts.extend(self.sounding_parts(song_frame, target, frames));
         let written = !parts.is_empty();
         parts.extend(self.lead_ins(song_frame, target, frames));
         parts.sort_by_key(|part| part.from);
-        let plan = self.route(&parts, target);
+        let mut plan = std::mem::take(&mut self.plan);
+        plan.clear();
+        self.route(&parts, target, &mut plan);
         let mut lead = std::mem::take(&mut self.lead_scratch);
         lead.resize(frames, 0.0);
-        for (part, step) in parts.iter().zip(plan) {
+        for (part, step) in parts.iter().zip(plan.iter().copied()) {
             let block = if part.sounding {
                 &mut output[part.from..part.to]
             } else {
@@ -533,6 +544,8 @@ impl Takes {
             }
         }
         self.lead_scratch = lead;
+        self.parts = parts;
+        self.plan = plan;
         written
     }
 
