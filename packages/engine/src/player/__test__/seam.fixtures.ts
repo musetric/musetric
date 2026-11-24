@@ -68,6 +68,7 @@ export type Seam = {
   player: EnginePlayer;
   store: Store<EngineState>;
   position: EnginePosition;
+  spectrogramPlayheadPort: MessagePort;
   host: string[];
   toWorklet: string[];
   fromWorklet: string[];
@@ -224,6 +225,7 @@ export const createSeam = async (
   const microphone = createMicrophone();
   const data = new MessageChannel();
   const playhead = new MessageChannel();
+  const spectrogramPlayhead = new MessageChannel();
   const position = createEnginePosition();
   const player = createEnginePlayer({
     context,
@@ -234,7 +236,7 @@ export const createSeam = async (
     decoderPort: data.port1,
     getDecoder: () => decoder,
     playheadPort: playhead.port2,
-    playheadPorts: [playhead.port1],
+    playheadPorts: [playhead.port1, spectrogramPlayhead.port1],
     position,
   });
   await player.boot();
@@ -300,6 +302,7 @@ export const createSeam = async (
     },
     store,
     position,
+    spectrogramPlayheadPort: spectrogramPlayhead.port2,
     host,
     toWorklet,
     fromWorklet,
@@ -340,6 +343,7 @@ export const createSeam = async (
     close: () => {
       data.port2.close();
       playhead.port2.close();
+      spectrogramPlayhead.port2.close();
       vi.unstubAllGlobals();
       if (!faulted && store.get().statuses.player === 'error') {
         throw new Error('The player failed though the test injected no fault');

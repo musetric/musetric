@@ -235,6 +235,7 @@ export const createSpectrogramRuntime = async (
       if (frameCount > 0) {
         playhead.writeFrameIndex(
           Math.round(message.trackProgress * frameCount),
+          message.revision,
         );
       }
       if (!playing) {

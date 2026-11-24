@@ -56,7 +56,7 @@ export type Playhead = {
   read: () => PlayheadValue;
   readFrameIndex: () => number;
   readFrameIndexAt: (epochMs: number) => number;
-  writeFrameIndex: (frameIndex: number) => void;
+  writeFrameIndex: (frameIndex: number, revision: number) => void;
 };
 
 export const createPlayhead = (
@@ -67,7 +67,9 @@ export const createPlayhead = (
   const presenter = createPlayheadPresenter(sampleRate);
   playheadChannel.inbound(port).bindHandlers({
     publish: (message) => {
-      value = message;
+      if (message.revision >= value.revision) {
+        value = message;
+      }
     },
   });
 
@@ -76,8 +78,8 @@ export const createPlayhead = (
     readFrameIndex: () => presenter.present(value, readEpochMs()),
     readFrameIndexAt: (epochMs) =>
       extrapolatePlayhead(value, epochMs, sampleRate),
-    writeFrameIndex: (frameIndex) => {
-      value = createHeldPlayheadValue(frameIndex, value.revision);
+    writeFrameIndex: (frameIndex, revision) => {
+      value = createHeldPlayheadValue(frameIndex, revision);
     },
   };
 };

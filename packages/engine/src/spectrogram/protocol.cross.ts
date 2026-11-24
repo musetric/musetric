@@ -26,7 +26,10 @@ export type SpectrogramOutboundMethods = {
     trackProgress: number;
   }) => void;
   unmount: () => void;
-  setTrackProgress: (message: { trackProgress: number }) => void;
+  setTrackProgress: (message: {
+    trackProgress: number;
+    revision: number;
+  }) => void;
   setFrameCount: (message: { frameCount: number }) => void;
   setPlaying: (message: { playing: boolean }) => void;
   updateConfig: (message: { patch: Partial<SpectrogramConfig> }) => void;

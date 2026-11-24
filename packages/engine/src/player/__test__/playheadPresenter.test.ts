@@ -94,6 +94,32 @@ describe('the playhead presenter', () => {
     expect(Math.max(...shown)).toBeLessThan(loop.toFrame);
   });
 
+  it('stands at Play until the sound is heard, then follows the line', () => {
+    const startFrame = 30 * rate;
+    for (const waitMs of [120, 300]) {
+      const presenter = createPlayheadPresenter(rate);
+      const startContextFrame = ((1000 + waitMs) / 1000) * rate;
+      presenter.present(
+        { ...anchorAt(1000), frameIndex: startFrame, rate: 0 },
+        1000 - screenMs,
+      );
+      for (let frame = 0; frame < 60; frame += 1) {
+        const epochMs = 1000 + frame * screenMs;
+        const heard = Math.max(0, (epochMs / 1000) * rate - startContextFrame);
+        const shown = presenter.present(
+          {
+            ...anchorAt(epochMs),
+            frameIndex: startFrame + heard,
+            contextFrame: startContextFrame + heard,
+            startContextFrame,
+          },
+          epochMs,
+        );
+        expect(Math.abs(shown - (startFrame + heard))).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   it('holds a stopped line where it stands', () => {
     const presenter = createPlayheadPresenter(rate);
     const held: PlayheadValue = {

@@ -68,16 +68,21 @@ export const createEngineSpectrogram = (
   });
 
   const sendTrackProgress = () => {
-    const spectrogramWorkerPollsPlayheadWhilePlaying = isPlaying(store.get());
-    if (spectrogramWorkerPollsPlayheadWhilePlaying) {
-      return;
-    }
+    const state = store.get();
     port.methods.setTrackProgress({
-      trackProgress: getTrackProgress(position.read(), store.get().frameCount),
+      trackProgress: getTrackProgress(position.read(), state.frameCount),
+      revision: state.seekEvent.revision,
     });
   };
-  position.subscribe(sendTrackProgress);
-  store.subscribe((state) => state.frameCount, sendTrackProgress);
+  const sendStoppedTrackProgress = () => {
+    const spectrogramWorkerPollsPlayheadWhilePlaying = isPlaying(store.get());
+    if (!spectrogramWorkerPollsPlayheadWhilePlaying) {
+      sendTrackProgress();
+    }
+  };
+  position.subscribe(sendStoppedTrackProgress);
+  store.subscribe((state) => state.frameCount, sendStoppedTrackProgress);
+  store.subscribe((state) => state.seekEvent.revision, sendTrackProgress);
 
   store.subscribe(isPlaying, (playing) => {
     port.methods.setPlaying({ playing });
