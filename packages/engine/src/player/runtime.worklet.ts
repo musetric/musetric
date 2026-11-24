@@ -8,7 +8,6 @@ import { createMotion } from './motion.worklet.js';
 import {
   createRangeFrames,
   getTakeFrame,
-  processRangeMetronome,
   type RangeFrames,
 } from './playerRange.worklet.js';
 import { createHeldPlayheadValue } from './playhead.cross.js';
@@ -37,7 +36,6 @@ export type CreatePlayerRuntimeOptions = {
   playheadPorts: MessagePort[];
   sampleRate: number;
   stretch: InitOutput;
-  getCurrentTime: () => number;
   getCurrentFrame: () => number;
 };
 
@@ -52,7 +50,8 @@ export const createPlayerRuntime = (
   const { port, dataPort, sampleRate, stretch } = options;
   const playhead: PlayheadPublisher = createPlayheadPublisher(
     options.playheadPorts,
-    options.getCurrentTime,
+    options.getCurrentFrame,
+    sampleRate,
   );
 
   let frameCount = 0;
@@ -76,6 +75,12 @@ export const createPlayerRuntime = (
   const cuts = createCuts(() => playing && !frozen && renderer.mounted());
 
   const latency = createWorkletLatency(position, () => playing);
+
+  const heard = createHeldPlayheadValue(0, 0);
+  const readHeard = () => {
+    position.read(heard, revision, clockOffset, frameCount);
+    return heard;
+  };
 
   const publishHeld = () => {
     playhead.publishNow(
@@ -134,7 +139,7 @@ export const createPlayerRuntime = (
     const soundEnd =
       playing && !frozen
         ? glide.start(
-            position.getValue({ revision, clockOffset, frameCount }),
+            readHeard(),
             position.getRenderFrameIndex(),
             lastContextFrame,
           )
@@ -293,8 +298,8 @@ export const createPlayerRuntime = (
   return {
     port,
     process: (inputs, outputs) => {
-      for (const output of outputs) {
-        output.fill(0);
+      for (let channel = 0; channel < outputs.length; channel += 1) {
+        outputs[channel].fill(0);
       }
 
       cuts.settle();
@@ -306,13 +311,11 @@ export const createPlayerRuntime = (
       }
       lastContextFrame = contextFrame;
       const outputFrameCount = outputs[0].length;
-      const getValue = () =>
-        position.getValue({ revision, clockOffset, frameCount });
 
       if (frozen) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(getValue());
+        playhead.publish(readHeard());
         return;
       }
 
@@ -324,7 +327,7 @@ export const createPlayerRuntime = (
         motion.moveTo('buffering', setPlaying);
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(getValue());
+        playhead.publish(readHeard());
         return;
       }
       motion.moveTo('rolling', setPlaying);
@@ -348,13 +351,12 @@ export const createPlayerRuntime = (
         outputFrameCount,
         processedFrameCount,
       );
-      processRangeMetronome({
-        metronome,
-        range,
-        currentFrameIndex: currentOutputFrameIndex,
-        nextFrameIndex: nextOutputFrameIndex,
+      metronome.process(
+        currentOutputFrameIndex,
+        nextOutputFrameIndex,
         outputs,
-      });
+        range,
+      );
       const frameIndex = position.getFrameIndex();
       if (range?.repeat === 'once' && frameIndex >= range.endFrame) {
         finishPlayback(range.range.fromFrame);
@@ -366,7 +368,7 @@ export const createPlayerRuntime = (
         return;
       }
 
-      playhead.publish(getValue());
+      playhead.publish(readHeard());
     },
   };
 };

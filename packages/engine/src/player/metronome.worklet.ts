@@ -1,7 +1,10 @@
+import { type RangeFrames } from './playerRange.worklet.js';
+
 const regularFrequency = 880;
 const accentFrequency = 1320;
 const clickDurationSeconds = 0.05;
 const envelopeTauSeconds = 0.015;
+const tickLimit = 16;
 
 type MetronomeTick = {
   startOffset: number;
@@ -18,19 +21,6 @@ export type MetronomeConfigMessage = {
   volume: number;
 };
 
-export type MetronomeWrap = {
-  endFrame: number;
-  startFrame: number;
-};
-
-export type MetronomeProcessParams = {
-  oldFrameIndex: number;
-  newFrameIndex: number;
-  outputs: Float32Array[];
-  outputFrameCount: number;
-  wrap?: MetronomeWrap;
-};
-
 export type Metronome = {
   setConfig: (
     message: MetronomeConfigMessage,
@@ -38,7 +28,12 @@ export type Metronome = {
   ) => void;
   reset: (currentFrameIndex: number) => void;
   clear: () => void;
-  process: (params: MetronomeProcessParams) => void;
+  process: (
+    oldFrameIndex: number,
+    newFrameIndex: number,
+    outputs: Float32Array[],
+    range: RangeFrames | undefined,
+  ) => void;
 };
 
 export const createMetronome = (sampleRate: number): Metronome => {
@@ -47,7 +42,14 @@ export const createMetronome = (sampleRate: number): Metronome => {
   let beatsInSamples: Int32Array | undefined = undefined;
   let downbeatMask: Uint8Array | undefined = undefined;
   let nextBeatIndex = 0;
-  const activeTicks: MetronomeTick[] = [];
+  const ticks: MetronomeTick[] = Array.from({ length: tickLimit }, () => ({
+    startOffset: 0,
+    elapsedSamples: 0,
+    remainingSamples: 0,
+    frequency: 0,
+    baseGain: 0,
+  }));
+  let tickCount = 0;
   const clickDurationSamples = Math.round(sampleRate * clickDurationSeconds);
   const envelopeTauSamples = Math.max(1, sampleRate * envelopeTauSeconds);
 
@@ -70,7 +72,16 @@ export const createMetronome = (sampleRate: number): Metronome => {
   };
 
   const clearTicks = (): void => {
-    activeTicks.length = 0;
+    tickCount = 0;
+  };
+
+  const removeTick = (index: number): void => {
+    const removed = ticks[index];
+    for (let next = index + 1; next < tickCount; next += 1) {
+      ticks[next - 1] = ticks[next];
+    }
+    tickCount -= 1;
+    ticks[tickCount] = removed;
   };
 
   const triggerBeats = (
@@ -109,13 +120,16 @@ export const createMetronome = (sampleRate: number): Metronome => {
         downbeatMask !== undefined &&
         nextBeatIndex < downbeatMask.length &&
         downbeatMask[nextBeatIndex] !== 0;
-      activeTicks.push({
-        startOffset,
-        elapsedSamples: 0,
-        remainingSamples: clickDurationSamples,
-        frequency: accent ? accentFrequency : regularFrequency,
-        baseGain: volume,
-      });
+      if (tickCount === tickLimit) {
+        removeTick(0);
+      }
+      const tick = ticks[tickCount];
+      tick.startOffset = startOffset;
+      tick.elapsedSamples = 0;
+      tick.remainingSamples = clickDurationSamples;
+      tick.frequency = accent ? accentFrequency : regularFrequency;
+      tick.baseGain = volume;
+      tickCount += 1;
       nextBeatIndex += 1;
     }
   };
@@ -124,15 +138,8 @@ export const createMetronome = (sampleRate: number): Metronome => {
     outputs: Float32Array[],
     outputFrameCount: number,
   ): void => {
-    if (activeTicks.length === 0) {
-      return;
-    }
-    for (
-      let tickIndex = activeTicks.length - 1;
-      tickIndex >= 0;
-      tickIndex -= 1
-    ) {
-      const tick = activeTicks[tickIndex];
+    for (let tickIndex = tickCount - 1; tickIndex >= 0; tickIndex -= 1) {
+      const tick = ticks[tickIndex];
       let s = tick.startOffset;
       while (s < outputFrameCount && tick.remainingSamples > 0) {
         const phase =
@@ -152,7 +159,7 @@ export const createMetronome = (sampleRate: number): Metronome => {
       }
       tick.startOffset = 0;
       if (tick.remainingSamples <= 0) {
-        activeTicks.splice(tickIndex, 1);
+        removeTick(tickIndex);
       }
     }
   };
@@ -171,32 +178,37 @@ export const createMetronome = (sampleRate: number): Metronome => {
       seekBeatCursor(currentFrameIndex);
     },
     clear: clearTicks,
-    process: (params) => {
-      const { oldFrameIndex, newFrameIndex, outputs, outputFrameCount, wrap } =
-        params;
-      if (!wrap) {
+    process: (oldFrameIndex, newFrameIndex, outputs, range) => {
+      const outputFrameCount = outputs[0].length;
+      if (!range) {
         if (enabled) {
           triggerBeats(oldFrameIndex, newFrameIndex, 0, outputFrameCount);
         }
         renderTicks(outputs, outputFrameCount);
         return;
       }
-      const before = wrap.endFrame - oldFrameIndex;
-      const after = newFrameIndex - wrap.startFrame;
+      const { fromFrame, toFrame } = range.range;
+      const oldSongFrame = range.songFrame(oldFrameIndex);
+      const newSongFrame = range.songFrame(newFrameIndex);
+      const endFrame = Math.min(newSongFrame, toFrame);
+      if (newSongFrame >= oldSongFrame) {
+        if (enabled) {
+          triggerBeats(oldSongFrame, endFrame, 0, outputFrameCount);
+        }
+        renderTicks(outputs, outputFrameCount);
+        return;
+      }
+      const before = toFrame - oldSongFrame;
+      const after = endFrame - fromFrame;
       const split = Math.round(
         (outputFrameCount * before) / Math.max(1, before + after),
       );
       if (enabled) {
-        triggerBeats(oldFrameIndex, wrap.endFrame, 0, split);
+        triggerBeats(oldSongFrame, toFrame, 0, split);
       }
-      seekBeatCursor(wrap.startFrame);
+      seekBeatCursor(fromFrame);
       if (enabled) {
-        triggerBeats(
-          wrap.startFrame,
-          newFrameIndex,
-          split,
-          outputFrameCount - split,
-        );
+        triggerBeats(fromFrame, endFrame, split, outputFrameCount - split);
       }
       renderTicks(outputs, outputFrameCount);
     },

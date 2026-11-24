@@ -32,17 +32,20 @@ export type PlayheadPublisher = {
 
 export const createPlayheadPublisher = (
   ports: MessagePort[],
-  getCurrentTime: () => number,
+  getCurrentFrame: () => number,
+  sampleRate: number,
 ): PlayheadPublisher => {
   const subscribers = ports.map(playheadChannel.outbound);
+  const pulseFrameCount = sampleRate * pulseSeconds;
   let published: PlayheadValue | undefined = undefined;
-  let publishedTime = 0;
+  let publishedFrame = 0;
 
   const publishNow = (value: PlayheadValue) => {
-    published = value;
-    publishedTime = getCurrentTime();
-    for (const subscriber of subscribers) {
-      subscriber.methods.publish(value);
+    const copy = { ...value };
+    published = copy;
+    publishedFrame = getCurrentFrame();
+    for (let index = 0; index < subscribers.length; index += 1) {
+      subscribers[index].methods.publish(copy);
     }
   };
 
@@ -51,7 +54,8 @@ export const createPlayheadPublisher = (
       if (
         published &&
         onLine(published, value) &&
-        (value.rate === 0 || getCurrentTime() - publishedTime < pulseSeconds)
+        (value.rate === 0 ||
+          getCurrentFrame() - publishedFrame < pulseFrameCount)
       ) {
         return;
       }

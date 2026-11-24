@@ -207,7 +207,6 @@ export const createHarness = async (
     playheadPorts,
     sampleRate: rate,
     stretch: loadStretch(),
-    getCurrentTime: () => contextFrame / rate,
     getCurrentFrame: () => contextFrame,
   });
   const take = createTakeStream();

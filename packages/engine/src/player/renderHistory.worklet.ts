@@ -1,50 +1,54 @@
-export type RenderHistoryEntry = {
-  contextFrame: number;
-  frameIndex: number;
-  rate: number;
-};
-
 export type RenderHistory = {
-  push: (entry: RenderHistoryEntry) => void;
-  find: (contextFrame: number) => RenderHistoryEntry | undefined;
-  first: () => RenderHistoryEntry | undefined;
+  contextFrames: Float64Array;
+  frameIndices: Float64Array;
+  rates: Float64Array;
+  push: (contextFrame: number, frameIndex: number, rate: number) => void;
+  find: (contextFrame: number) => number;
+  first: () => number;
   clear: () => void;
 };
 
 export const createRenderHistory = (capacity: number): RenderHistory => {
-  const entries: RenderHistoryEntry[] = [];
+  const contextFrames = new Float64Array(capacity);
+  const frameIndices = new Float64Array(capacity);
+  const rates = new Float64Array(capacity);
   let start = 0;
   let size = 0;
 
-  const at = (index: number) => entries[(start + index) % capacity];
+  const slot = (index: number) => (start + index) % capacity;
 
   return {
-    push: (entry) => {
+    contextFrames,
+    frameIndices,
+    rates,
+    push: (contextFrame, frameIndex, rate) => {
+      const next = slot(size);
+      contextFrames[next] = contextFrame;
+      frameIndices[next] = frameIndex;
+      rates[next] = rate;
       if (size < capacity) {
-        entries[(start + size) % capacity] = entry;
         size += 1;
         return;
       }
-      entries[start] = entry;
       start = (start + 1) % capacity;
     },
     find: (contextFrame) => {
-      if (size === 0 || contextFrame < at(0).contextFrame) {
-        return undefined;
+      if (size === 0 || contextFrame < contextFrames[slot(0)]) {
+        return -1;
       }
       let low = 0;
       let high = size - 1;
       while (low < high) {
         const middle = Math.ceil((low + high) / 2);
-        if (at(middle).contextFrame <= contextFrame) {
+        if (contextFrames[slot(middle)] <= contextFrame) {
           low = middle;
         } else {
           high = middle - 1;
         }
       }
-      return at(low);
+      return slot(low);
     },
-    first: () => (size > 0 ? at(0) : undefined),
+    first: () => (size > 0 ? slot(0) : -1),
     clear: () => {
       start = 0;
       size = 0;

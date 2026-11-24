@@ -18,7 +18,6 @@ export class PlayerProcessor
     this.player = createGuardedPlayer({
       port: this.port,
       sampleRate,
-      getCurrentTime: () => currentTime,
       getCurrentFrame: () => currentFrame,
       measure,
     });

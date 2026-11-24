@@ -140,7 +140,6 @@ export const createSeam = async (
         player: createGuardedPlayer({
           port: channel.port2,
           sampleRate: rate,
-          getCurrentTime: () => contextFrame / rate,
           getCurrentFrame: () => contextFrame,
           measure: true,
         }),

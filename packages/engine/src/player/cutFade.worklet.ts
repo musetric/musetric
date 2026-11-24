@@ -19,8 +19,8 @@ const createCutFade = () => {
       const frameCount = outputs.at(0)?.length ?? 0;
       for (let frame = 0; frame < frameCount; frame += 1) {
         const gain = level / fadeFrameCount;
-        for (const output of outputs) {
-          output[frame] *= gain;
+        for (let channel = 0; channel < outputs.length; channel += 1) {
+          outputs[channel][frame] *= gain;
         }
         level = rising
           ? Math.min(fadeFrameCount, level + 1)
@@ -50,9 +50,10 @@ export const createCuts = (sounding: () => boolean): Cuts => {
   const queue: (() => void)[] = [];
   const flush = () => {
     fade.mute();
-    for (const apply of queue.splice(0)) {
-      apply();
+    for (let index = 0; index < queue.length; index += 1) {
+      queue[index]();
     }
+    queue.length = 0;
   };
   return {
     fade,

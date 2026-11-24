@@ -13,7 +13,6 @@ const describeError = (error: unknown): string =>
 export type CreateGuardedPlayerOptions = {
   port: MessagePort;
   sampleRate: number;
-  getCurrentTime: () => number;
   getCurrentFrame: () => number;
   measure: boolean;
 };
@@ -59,7 +58,6 @@ export const createGuardedPlayer = (
       playheadPorts: message.playheadPorts,
       sampleRate: options.sampleRate,
       stretch: initSync({ module: message.stretchModule }),
-      getCurrentTime: options.getCurrentTime,
       getCurrentFrame: options.getCurrentFrame,
     });
     port.methods.booted();
