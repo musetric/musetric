@@ -13,6 +13,7 @@ const bootTimeoutMs = 30_000;
 const watchTimeoutMs = 5000;
 const driftSeconds = 1;
 const tailSeconds = 1;
+const takeTimeoutSeconds = 20;
 const playSeconds = 1;
 const songVolume = 0;
 const noticeText = 'The sound stopped';
@@ -137,7 +138,7 @@ export const measureFailure = async (
   const { sampleRate } = engine.context;
   const latencyFrameCount = getRecordingLatencyFrameCount(engine.store.get());
   const watched = Promise.withResolvers<WatchedFault>();
-  const take = await recordTemporaryTake(
+  const taking = recordTemporaryTake(
     engine,
     {
       projectId: options.projectId,
@@ -164,6 +165,20 @@ export const measureFailure = async (
       };
     },
   );
+  const hung = Promise.withResolvers<never>();
+  const hangTimer = setTimeout(
+    () => {
+      hung.reject(
+        new Error(
+          'The take did not end after the fault; its temporary recording is left in the project',
+        ),
+      );
+    },
+    (options.faultSeconds + takeTimeoutSeconds) * 1000,
+  );
+  const take = await Promise.race([taking, hung.promise]).finally(() => {
+    clearTimeout(hangTimer);
+  });
   const moments = await watched.promise;
   const held = engine.position.read();
   await wait(driftSeconds * 1000);
