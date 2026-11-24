@@ -52,7 +52,7 @@ const settle = async (): Promise<void> => {
 };
 
 describe('stem pages', () => {
-  it('reads two pages at once and aborts the one it is told to drop', async () => {
+  it('reads one page at a time and drops a read it is told to cancel', async () => {
     const channel = new MessageChannel();
     vi.stubGlobal('self', channel.port1);
     await import('../stemPages.worker.js');
@@ -68,21 +68,33 @@ describe('stem pages', () => {
         failed.push(message.id);
       },
     });
+    const started = () => pending.map((read) => read.index);
 
     client.methods.open({ projectId: 1, stem: 'lead', sampleRate: 48000 });
     await settle();
     client.methods.read({ id: 1, index: 0, mean: false });
     client.methods.read({ id: 2, index: 1, mean: false });
     await settle();
-    expect(pending.map((read) => read.index)).toEqual([0, 1]);
+    expect(started()).toEqual([0]);
 
-    client.methods.cancel({ id: 1 });
+    client.methods.cancel({ id: 2 });
     await settle();
-    expect(pending[0].signal.aborted).toBe(true);
-    pending[1].finish();
+    pending[0].finish();
+    await settle();
+    expect(started()).toEqual([0]);
+
+    client.methods.read({ id: 3, index: 1, mean: false });
+    client.methods.read({ id: 4, index: 0, mean: false });
+    await settle();
+    expect(started()).toEqual([0, 1]);
+    client.methods.cancel({ id: 3 });
+    await settle();
+    expect(pending[1].signal.aborted).toBe(true);
+    expect(started()).toEqual([0, 1, 0]);
+    pending[2].finish();
     await settle();
 
-    expect(pages).toEqual([2]);
+    expect(pages).toEqual([1, 4]);
     expect(failed).toEqual([]);
     channel.port1.close();
     channel.port2.close();

@@ -9,6 +9,7 @@ const serveStemPages = (): void => {
   const port = stemPagesChannel.inbound(self);
   let opened: MasterPages | undefined = undefined;
   const reads = new Map<number, AbortController>();
+  let reading: Promise<void> = Promise.resolve();
 
   port.bindHandlers({
     open: async (message) => {
@@ -44,9 +45,12 @@ const serveStemPages = (): void => {
       }
       const controller = new AbortController();
       reads.set(id, controller);
-      pages
-        .read(index, mean, controller.signal)
-        .then((page) => {
+      reading = reading.then(async () => {
+        try {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const page = await pages.read(index, mean, controller.signal);
           port.methods.page({
             id,
             index,
@@ -55,15 +59,14 @@ const serveStemPages = (): void => {
             samples: page.samples,
             ...(page.mean ? { mean: page.mean } : {}),
           });
-        })
-        .catch((error: unknown) => {
+        } catch (error) {
           if (!controller.signal.aborted) {
             port.methods.failed({ id, reason: describe(error) });
           }
-        })
-        .finally(() => {
+        } finally {
           reads.delete(id);
-        });
+        }
+      });
     },
     cancel: (message) => {
       reads.get(message.id)?.abort();
