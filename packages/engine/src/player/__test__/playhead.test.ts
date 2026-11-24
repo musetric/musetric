@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createPlayhead,
-  extrapolatePlayhead,
-  type PlayheadValue,
-} from '../playhead.cross.js';
+import { createPlayhead, type PlayheadValue } from '../playhead.cross.js';
+import { extrapolatePlayhead } from '../playheadPresenter.cross.js';
 import { blockSize, createHarness, rate, settle } from './player.fixtures.js';
 
 const outputLatency = 4800;
