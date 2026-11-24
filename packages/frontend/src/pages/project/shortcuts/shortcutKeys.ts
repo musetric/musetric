@@ -56,9 +56,7 @@ const stepKey = (state: EngineState, semitones: number) => {
   ) {
     return;
   }
-  engine.store.update((draft) => {
-    draft.transposeSemitones = next;
-  });
+  engine.player.setTransposeSemitones(next);
 };
 
 const toggleLoop = (

@@ -31,9 +31,7 @@ export const RecordingGainControl: FC = () => {
             5,
             (tick) => tick === 100,
           );
-          engine.store.update((state) => {
-            state.recordingGain = value / 100;
-          });
+          engine.player.setRecordingGain(value / 100);
         }}
       />
     </Stack>

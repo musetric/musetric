@@ -1,6 +1,7 @@
 import { api } from '@musetric/api';
 import { requestWithAxios } from '@musetric/api/dom';
 import { createAudioDecoder } from '@musetric/audio/decoder';
+import { stemTypes } from '@musetric/audio/es';
 import {
   type Engine,
   type EngineState,
@@ -70,13 +71,14 @@ const saveSettings = (engine: Engine): SavedSettings => {
 };
 
 const applySettings = (engine: Engine, settings: SavedSettings) => {
-  engine.store.update((state) => {
-    state.trackVolumes = settings.trackVolumes;
-    state.metronomeEnabled = settings.metronomeEnabled;
-    state.metronomeVolume = settings.metronomeVolume;
-    state.tempoRatio = settings.tempoRatio;
-    state.spectrogramView = settings.spectrogramView;
-  });
+  for (const stem of stemTypes) {
+    engine.player.setTrackVolume(stem, settings.trackVolumes[stem]);
+  }
+  engine.player.setTrackVolume('recording', settings.trackVolumes.recording);
+  engine.player.setMetronomeEnabled(settings.metronomeEnabled);
+  engine.player.setMetronomeVolume(settings.metronomeVolume);
+  engine.player.setTempoRatio(settings.tempoRatio);
+  engine.view.setSpectrogramView(settings.spectrogramView);
 };
 
 const waitForActive = async (engine: Engine, recordingId: number) => {

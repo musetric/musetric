@@ -9,9 +9,7 @@ const minMarginRatio = 1 / 6;
 const animationMilliseconds = 220;
 
 const setViewWindow = (viewWindow: EngineViewWindow | undefined) => {
-  engine.store.update((state) => {
-    state.viewWindow = viewWindow;
-  });
+  engine.view.setViewWindow(viewWindow);
 };
 
 const getFollowWindow = (): EngineViewWindow => {

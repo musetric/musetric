@@ -13,7 +13,5 @@ export const stepTempo = (steps: number) => {
   ) {
     return;
   }
-  engine.store.update((draft) => {
-    draft.tempoRatio = next / tempoStepsPerRatio;
-  });
+  engine.player.setTempoRatio(next / tempoStepsPerRatio);
 };

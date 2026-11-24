@@ -19,8 +19,6 @@ export const useThemeSpectrogramColors = () => {
       recordingMiss: theme.palette.error.main,
       recordingTimingMiss: defaultSpectrogramConfig.colors.recordingTimingMiss,
     };
-    engine.store.update((state) => {
-      state.colors = colors;
-    });
+    engine.view.setColors(colors);
   }, [theme]);
 };

@@ -113,9 +113,7 @@ export const SpectrumLanes: FC = () => {
                   },
                 }}
                 onClick={() => {
-                  engine.store.update((state) => {
-                    state.expandedSpectrumLane = otherLane;
-                  });
+                  engine.view.setExpandedSpectrumLane(otherLane);
                 }}
               >
                 <SwapVertRoundedIcon sx={{ fontSize: 16 }} />
@@ -139,9 +137,7 @@ export const SpectrumLanes: FC = () => {
             selected={lane === expandedLane}
             onClick={() => {
               setAnchorEl(undefined);
-              engine.store.update((state) => {
-                state.expandedSpectrumLane = lane;
-              });
+              engine.view.setExpandedSpectrumLane(lane);
             }}
           >
             <ListItemIcon>

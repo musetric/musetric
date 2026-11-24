@@ -51,9 +51,7 @@ export const VoiceOctaveToggle: FC = () => {
               if (option.value !== voiceOctave) {
                 playHaptic('detent');
               }
-              engine.store.update((state) => {
-                state.voiceOctave = option.value;
-              });
+              engine.player.setVoiceOctave(option.value);
             }}
           >
             {option.label}

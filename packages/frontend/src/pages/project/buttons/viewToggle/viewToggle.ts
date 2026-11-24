@@ -38,7 +38,5 @@ export const toggleView = (target: ViewToggleTarget) => {
     return;
   }
   project.setSpectrogramOpen(!selected);
-  engine.store.update((state) => {
-    state.spectrogramView = target.view;
-  });
+  engine.view.setSpectrogramView(target.view);
 };

@@ -17,10 +17,7 @@ export const RhythmMetronomeSync: FC<RhythmMetronomeSyncProps> = (props) => {
     if (rhythmQuery.status !== 'success') return;
     appliedRef.current = true;
     const { beats, downbeats } = rhythmQuery.data;
-    engine.store.update((state) => {
-      state.metronomeBeats = beats;
-      state.metronomeDownbeats = downbeats;
-    });
+    engine.player.setMetronomeBeats(beats, downbeats);
   }, [rhythmQuery.status, rhythmQuery.data]);
 
   return undefined;
