@@ -4,10 +4,6 @@ import { createRequire } from 'node:module';
 import { vi } from 'vitest';
 import { type EngineAudioOutput } from '../../audioOutput/index.js';
 import { type EngineOutputClock } from '../../audioOutput/outputClock.js';
-import {
-  type EngineAudioSession,
-  type EngineMicrophone,
-} from '../../audioSession/engineAudioSession.js';
 import { createStore, type Store } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
 import { type EngineState, initialEngineState } from '../../state.js';
@@ -20,6 +16,7 @@ import { createEnginePlayer, type EnginePlayer } from '../index.js';
 import { createEnginePosition, type EnginePosition } from '../position.js';
 import { playerDataChannel } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
+import { createMicrophone, type Microphone } from './microphone.fixtures.js';
 import { blockSize, mountTracks, rate } from './player.fixtures.js';
 
 const songSeconds = 8;
@@ -67,39 +64,6 @@ const watchPosts = (port: MessagePort, posted: string[]) => {
   };
 };
 
-export type Microphone = {
-  open: () => void;
-};
-
-const createMicrophone = (): { session: EngineAudioSession } & Microphone => {
-  let opened: (() => void) | undefined = undefined;
-  const microphone: EngineMicrophone = {
-    getSettings: () => ({}),
-    getMeasuredInputLatency: () => 0,
-    whenInputLatencyMeasured: async () => Promise.resolve(),
-    createSource: () => fake<AudioNode>({ connect: noop, disconnect: noop }),
-  };
-  return {
-    session: {
-      openMicrophone: async () =>
-        new Promise<EngineMicrophone>((resolve) => {
-          opened = () => {
-            resolve(microphone);
-          };
-        }),
-      closeMicrophone: noop,
-      enumerateDevices: async () => Promise.resolve([]),
-      subscribeDevices: () => noop,
-      readMicrophoneDenial: () => undefined,
-      canOpenMicrophoneSettings: () => false,
-      openMicrophoneSettings: noop,
-    },
-    open: () => {
-      opened?.();
-    },
-  };
-};
-
 export type Seam = {
   player: EnginePlayer;
   store: Store<EngineState>;
@@ -112,6 +76,7 @@ export type Seam = {
   onPostFromWorklet: (type: string, hook: PostHook) => void;
   injectFault: (fault: PlayerFault) => void;
   postToWorklet: (message: unknown) => void;
+  deliverFromWorklet: (message: unknown) => Promise<void>;
   hostFrames: () => number;
   run: (quanta: number) => Promise<void>;
   frame: () => Promise<void>;
@@ -122,11 +87,13 @@ type FakeWorklet = {
   player: GuardedPlayer;
   processing: boolean;
   post: (message: unknown) => void;
+  deliver: (message: unknown) => void;
   reportError: (error: unknown) => void;
 };
 
 export type CreateSeamOptions = {
   before?: (store: Store<EngineState>) => void;
+  bootFault?: true;
 };
 
 export const createSeam = async (
@@ -143,6 +110,7 @@ export const createSeam = async (
   const fromWorklet: string[] = [];
   let contextFrame = 0;
   let hostFrames = 0;
+  let faulted = options.bootFault === true;
   let worklet: FakeWorklet | undefined = undefined;
   let onPostToWorklet: Seam['onPostToWorklet'] = noop;
   let onPostFromWorklet: Seam['onPostFromWorklet'] = noop;
@@ -157,6 +125,15 @@ export const createSeam = async (
     constructor() {
       const channel = new MessageChannel();
       this.port = channel.port1;
+      if (options.bootFault) {
+        const post = channel.port1.postMessage.bind(channel.port1);
+        Object.assign(channel.port1, {
+          postMessage: (message: unknown, transfer: Transferable[] = []) => {
+            const boot = isPortMessage(message) && message.type === 'boot';
+            post(boot ? { type: 'boot', payload: {} } : message, transfer);
+          },
+        });
+      }
       onPostToWorklet = watchPosts(channel.port1, toWorklet);
       onPostFromWorklet = watchPosts(channel.port2, fromWorklet);
       worklet = {
@@ -170,6 +147,12 @@ export const createSeam = async (
         processing: true,
         post: (message) => {
           channel.port1.postMessage(message);
+        },
+        deliver: (message) => {
+          channel.port1.onmessage?.call(
+            channel.port1,
+            new MessageEvent('message', { data: message }),
+          );
         },
         reportError: (error) => {
           setImmediate(() => {
@@ -329,6 +312,7 @@ export const createSeam = async (
       onPostFromWorklet(type, hook);
     },
     injectFault: (fault) => {
+      faulted = true;
       const { injectFault } = readWorklet().player;
       if (!injectFault) {
         throw new Error('The player takes no fault');
@@ -336,7 +320,12 @@ export const createSeam = async (
       injectFault(fault);
     },
     postToWorklet: (message) => {
+      faulted = true;
       readWorklet().post(message);
+    },
+    deliverFromWorklet: async (message) => {
+      readWorklet().deliver(message);
+      await flush();
     },
     hostFrames: () => hostFrames,
     run,
@@ -353,6 +342,9 @@ export const createSeam = async (
       data.port2.close();
       playhead.port2.close();
       vi.unstubAllGlobals();
+      if (!faulted && store.get().statuses.player === 'error') {
+        throw new Error('The player failed though the test injected no fault');
+      }
     },
   };
 };

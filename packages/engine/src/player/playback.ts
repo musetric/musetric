@@ -108,7 +108,12 @@ export const createEnginePlayback = async (
     outputChannelCount: [2],
   });
   node.connect(audioOutput.outputNode);
-  const port = playerChannel.outbound(node.port);
+  let failed = false;
+  const port = playerChannel.outboundSync(node.port, (handler, payload) => {
+    if (!failed) {
+      handler(payload);
+    }
+  });
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   const playingWaiters: PlayingWaiter[] = [];
   let sentCommand = 0;
@@ -144,8 +149,6 @@ export const createEnginePlayback = async (
   const stopFrameIndexPump = () => {
     frameIndexPump.stop();
   };
-
-  let failed = false;
 
   const fail = (reason: string) => {
     if (failed) {
