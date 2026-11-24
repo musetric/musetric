@@ -1,8 +1,11 @@
+import { setTimeout } from 'node:timers/promises';
+import { z } from 'zod';
 import { analyzeCursor } from '../analysis/cursor.js';
 import { formatCursorTable } from '../report.js';
 import { calibrationSchema, cursorRunSchema } from '../runs.js';
 import { type MeasureLog } from './cdp.js';
-import { openMeasurePage } from './page.js';
+import { measureInputSchema } from './input.js';
+import { type MeasurePage, openMeasurePage } from './page.js';
 import {
   createOutput,
   formatSetup,
@@ -18,6 +21,38 @@ const readDrawn = (logs: readonly MeasureLog[]) =>
     .filter((log) => log.channel === 'drawn')
     .map((log) => log.values.map(Number));
 
+const inputPollMs = 10;
+
+const serveInputs = (page: MeasurePage, firstLog: number) => {
+  const served = new Set<number>();
+  const stopped = new AbortController();
+  const serve = async () => {
+    while (!stopped.signal.aborted) {
+      for (const log of page.logs.slice(firstLog)) {
+        if (log.channel !== 'input') {
+          continue;
+        }
+        const [id, text] = log.values;
+        const inputId = z.number().parse(id);
+        if (served.has(inputId)) {
+          continue;
+        }
+        served.add(inputId);
+        await page.input(
+          measureInputSchema.parse(JSON.parse(z.string().parse(text))),
+        );
+        await page.finishInput(inputId);
+      }
+      await setTimeout(inputPollMs);
+    }
+  };
+  const done = serve();
+  return async () => {
+    stopped.abort();
+    await done;
+  };
+};
+
 const recordRun = async (request: MeasureRequest, output: MeasureOutput) => {
   const page = await openMeasurePage(request.device);
   try {
@@ -25,14 +60,14 @@ const recordRun = async (request: MeasureRequest, output: MeasureOutput) => {
       `Running the cursor's events ${request.cycles} times from ${request.startSeconds} s`,
     );
     const firstLog = page.logs.length;
-    const run = cursorRunSchema.parse(
-      JSON.parse(
-        await page.callText('cursor', {
-          cycles: request.cycles,
-          startSeconds: request.startSeconds,
-        }),
-      ),
-    );
+    const stopServing = serveInputs(page, firstLog);
+    const text = await page
+      .callText('cursor', {
+        cycles: request.cycles,
+        startSeconds: request.startSeconds,
+      })
+      .finally(stopServing);
+    const run = cursorRunSchema.parse(JSON.parse(text));
     const from = run.frames.at(0)?.[0] ?? 0;
     const to = run.frames.at(-1)?.[0] ?? 0;
     const drawn = cursorRunSchema.shape.drawn.parse(
