@@ -22,6 +22,7 @@ import {
   type RecordingRuntime,
 } from './recording.worklet.js';
 import { createPlayerRenderer } from './renderer.worklet.js';
+import { createStopGlide } from './stopGlide.worklet.js';
 
 export type CreatePlayerRuntimeOptions = {
   port: ReturnType<typeof playerChannel.inbound<MessagePort>>;
@@ -60,6 +61,7 @@ export const createPlayerRuntime = (
   const metronome = createMetronome(sampleRate);
   let range: RangeFrames | undefined = undefined;
   const position = createHeardPosition(() => range);
+  let lastContextFrame = 0;
   const renderer = createPlayerRenderer({
     stretch,
     sampleRate,
@@ -85,6 +87,7 @@ export const createPlayerRuntime = (
       createHeldPlayheadValue(position.getFrameIndex(), revision),
     );
   };
+  const glide = createStopGlide(playhead, publishHeld);
 
   const setPlaying = (positionJump?: true) => {
     port.methods.setPlaying({
@@ -92,6 +95,7 @@ export const createPlayerRuntime = (
       frameIndex: position.getFrameIndex(),
       revision,
       positionJump,
+      glide: glide.active() ? true : undefined,
     });
   };
 
@@ -130,6 +134,7 @@ export const createPlayerRuntime = (
 
   dataPort.bindHandlers({
     mount: (message) => {
+      glide.clear();
       frameCount = message.frameCount;
       renderer.mount(message.layouts, message.residentPageLimit);
       renderer.refill();
@@ -158,6 +163,7 @@ export const createPlayerRuntime = (
       renderer.appendLiveTake(message);
     },
     unmount: () => {
+      glide.clear();
       frameCount = 0;
       renderer.release();
       renderer.clearTakes();
@@ -173,6 +179,7 @@ export const createPlayerRuntime = (
   port.bindHandlers({
     play: (message) => {
       revision = message.revision;
+      glide.clear();
       if (!renderer.mounted()) {
         setPlaying();
         return;
@@ -186,12 +193,24 @@ export const createPlayerRuntime = (
     },
     stop: (message) => {
       revision = message.revision;
+      const soundEnd =
+        playing && !frozen
+          ? glide.start(
+              position.getValue({ revision, clockOffset, frameCount }),
+              position.getRenderFrameIndex(),
+              lastContextFrame,
+            )
+          : undefined;
       playing = false;
-      position.begin(message.frameIndex);
+      if (soundEnd !== undefined) {
+        position.begin(soundEnd);
+      } else if (!glide.active()) {
+        position.begin(message.frameIndex);
+        publishHeld();
+      }
       metronome.clear();
-      publishHeld();
       setPlaying();
-      renderer.requestWindow(message.frameIndex, true);
+      renderer.requestWindow(position.getFrameIndex(), true);
     },
     setFrozen: (message) => {
       frozen = message.frozen;
@@ -199,6 +218,7 @@ export const createPlayerRuntime = (
     },
     seek: (message) => {
       revision = message.revision;
+      glide.clear();
       position.begin(message.frameIndex);
       if (recordingRuntime.isActive()) {
         recordingRuntime.handleSeek(message.frameIndex);
@@ -238,6 +258,7 @@ export const createPlayerRuntime = (
       metronome.setConfig(message, position.getFrameIndex());
     },
     setRange: (message) => {
+      glide.clear();
       range = message.range
         ? createRangeFrames(message.range, message.repeat, message.stopFrame)
         : undefined;
@@ -261,12 +282,13 @@ export const createPlayerRuntime = (
         output.fill(0);
       }
 
+      const contextFrame = options.getCurrentFrame();
       if (!renderer.mounted() || !playing) {
         recordingRuntime.processDrain(inputs);
+        glide.advance(contextFrame);
         return;
       }
-
-      const contextFrame = options.getCurrentFrame();
+      lastContextFrame = contextFrame;
       const outputFrameCount = outputs[0].length;
       const getValue = () =>
         position.getValue({ revision, clockOffset, frameCount });

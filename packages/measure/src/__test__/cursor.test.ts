@@ -88,8 +88,29 @@ describe('analyzeCursor', () => {
       ],
     );
     const { stop } = analyzeCursor(run);
-    expect(stop.jumps[0]).toBeCloseTo(-20 / screenMs, 0);
+    expect(stop.distancesMs[0]).toBeCloseTo(-20, 0);
+    expect(stop.jumps[0]).toBeGreaterThan(5);
     expect(stop.largestReversalMs).toBeGreaterThan(150);
+  });
+
+  it('takes a glide after Stop for a distance, not a jump', () => {
+    const stopMs = 1000;
+    const end = rolling(0, 0)(stopMs + 100);
+    const run = createRun(
+      1800,
+      (time) =>
+        time <= stopMs
+          ? { frame: rolling(0, 0)(time), playing: true }
+          : { frame: Math.min(end, rolling(0, 0)(time)), playing: false },
+      [
+        [0, 'play', 0],
+        [stopMs, 'stop', Math.round(rolling(0, 0)(stopMs))],
+      ],
+    );
+    const { stop } = analyzeCursor(run);
+    expect(stop.jumps[0]).toBeLessThan(1.5);
+    expect(stop.distancesMs[0]).toBeCloseTo(100, -1);
+    expect(stop.largestReversalMs).toBe(0);
   });
 
   it('leaves a seek after Stop out of the jump on Stop', () => {

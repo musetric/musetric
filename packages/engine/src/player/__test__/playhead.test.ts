@@ -94,7 +94,7 @@ describe('player playhead', () => {
     );
   });
 
-  it('holds the frame it is stopped on and plays on from it', async () => {
+  it('goes on to the end of the sound on Stop, holds it and plays on from it', async () => {
     const { harness, run } = await createPlayer();
     const play = () => {
       harness.player.methods.play({
@@ -108,21 +108,26 @@ describe('player playhead', () => {
     await settle();
     await run(100);
 
-    const stopFrame = rate + 12345;
-    harness.player.methods.stop({ revision: 1, frameIndex: stopFrame });
+    const soundEnd = rate + 100 * blockSize;
+    harness.player.methods.stop({ revision: 1, frameIndex: rate });
     await settle();
-    const held = await run(10);
-    expect(held.frameIndex).toBe(stopFrame);
+    const gliding = await run(10);
+    expect(gliding.rate).toBe(1);
+    expect(gliding.endFrame).toBe(soundEnd);
+    expect(gliding.frameIndex).toBeGreaterThanOrEqual(soundEnd - outputLatency);
+    expect(gliding.frameIndex).toBeLessThan(soundEnd);
+    const held = await run(40);
+    expect(held.frameIndex).toBe(soundEnd);
     expect(held.rate).toBe(0);
 
     play();
     await settle();
     const started = await run(10);
-    expect(started.frameIndex).toBe(stopFrame);
+    expect(started.frameIndex).toBe(soundEnd);
     const moving = await run(100);
     expect(moving.frameIndex).toBe(
       renderedFrame(
-        stopFrame,
+        soundEnd,
         [{ blocks: 110, rate: 1 }],
         moving.contextFrame - moving.startContextFrame,
       ),
