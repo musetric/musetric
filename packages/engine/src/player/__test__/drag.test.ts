@@ -24,7 +24,7 @@ describe('a drag of the cursor', () => {
     const seam = await open();
     await seam.player.play();
     await shownAfter(seam, 40);
-    seam.player.setFrozen(true);
+    const release = seam.player.hold();
     const seeksBefore = seam.toWorklet.filter((type) => type === 'seek').length;
     const hostBefore = seam.host.length;
     const targets = Array.from({ length: 20 }, (_, step) => rate + step * 2400);
@@ -36,7 +36,7 @@ describe('a drag of the cursor', () => {
       seeksBefore,
     );
     expect(seam.host).toHaveLength(hostBefore);
-    seam.player.setFrozen(false);
+    release();
     await shownAfter(seam, 6);
     expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
       seeksBefore + 1,
@@ -47,5 +47,28 @@ describe('a drag of the cursor', () => {
     const second = await shownAfter(seam, 40);
     expect(first).toBeGreaterThanOrEqual(released);
     expect(second).toBeGreaterThan(first);
+  });
+
+  it('holds the cursor until the last of two holds is released', async () => {
+    const seam = await open();
+    await seam.player.play();
+    await shownAfter(seam, 40);
+    const releaseFirst = seam.player.hold();
+    const releaseSecond = seam.player.hold();
+    const seeksBefore = seam.toWorklet.filter((type) => type === 'seek').length;
+    seam.player.seek(2 * rate, 'playhead');
+    releaseFirst();
+    releaseFirst();
+    await shownAfter(seam, 6);
+    expect(seam.store.get().frozen).toBe(true);
+    expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
+      seeksBefore,
+    );
+    releaseSecond();
+    await shownAfter(seam, 6);
+    expect(seam.store.get().frozen).toBe(false);
+    expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
+      seeksBefore + 1,
+    );
   });
 });

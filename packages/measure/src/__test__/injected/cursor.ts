@@ -133,7 +133,7 @@ export const measureCursor = async (
       await wait(800);
       const dragFrom = readPosition();
       mark('dragStart', dragFrom);
-      player.setFrozen(true);
+      const release = player.hold();
       let dragTarget = dragFrom;
       for (let step = 1; step <= dragSteps; step += 1) {
         await wait(dragStepMs);
@@ -142,7 +142,7 @@ export const measureCursor = async (
       }
       await wait(dragStepMs * 3);
       mark('dragEnd', dragTarget);
-      player.setFrozen(false);
+      release();
       await wait(1500);
       await stop();
 

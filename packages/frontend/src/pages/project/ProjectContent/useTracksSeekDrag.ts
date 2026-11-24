@@ -3,6 +3,7 @@ import { createNumberLimit } from '@musetric/utils';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
+import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { playHaptic } from '../haptics.js';
 
 export const useTracksSeekDrag = (
@@ -12,16 +13,15 @@ export const useTracksSeekDrag = (
     const element = elementRef.current;
     if (!element) return;
 
+    const freeze = createInteractionFreeze();
     let startFrameIndex = 0;
-    let releaseFrozenOnEnd = true;
     let pinned = false;
 
     const drag = createSeekDrag({
       element,
       onStart: () => {
-        releaseFrozenOnEnd = true;
         pinned = false;
-        engine.player.setFrozen(true);
+        freeze.freeze();
         startFrameIndex = engine.position.read();
       },
       onUpdate: (event) => {
@@ -52,22 +52,18 @@ export const useTracksSeekDrag = (
         engine.player.seek(startFrameIndex, 'tracksVisualization');
       },
       onEnd: () => {
-        if (releaseFrozenOnEnd) {
-          engine.player.setFrozen(false);
-        }
-        releaseFrozenOnEnd = true;
+        freeze.release();
       },
     });
 
     const unsubscribeSeek = subscribeForeignSeek('tracksVisualization', () => {
-      releaseFrozenOnEnd = false;
       drag.stop();
     });
 
     return () => {
       unsubscribeSeek();
       drag.dispose();
-      engine.player.setFrozen(false);
+      freeze.release();
     };
   }, [elementRef]);
 };
