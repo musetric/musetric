@@ -28,7 +28,7 @@ const noop = (): void => undefined;
 
 export type EnginePlayback = PlaybackSettings & {
   boot: () => Promise<void>;
-  play: () => Promise<void>;
+  play: () => Promise<boolean>;
   stop: () => Promise<number>;
   setFrozen: (frozen: boolean) => void;
   seek: (frameIndex: number) => void;
@@ -46,7 +46,7 @@ export type EnginePlayback = PlaybackSettings & {
 
 export const createEngineStubPlayback = (): EnginePlayback => ({
   boot: async () => Promise.resolve(),
-  play: async () => Promise.resolve(),
+  play: async () => Promise.resolve(false),
   stop: async () => Promise.resolve(0),
   setFrozen: noop,
   seek: noop,
@@ -76,9 +76,11 @@ export type CreateEnginePlaybackOptions = {
   onRecordingPassEnded?: (complete: boolean) => void;
 };
 
+type PlayingAck = { frameIndex: number; playing: boolean };
+
 type PlayingWaiter = {
   command: number;
-  resolve: (frameIndex: number) => void;
+  resolve: (ack: PlayingAck) => void;
 };
 
 export const createEnginePlayback = async (
@@ -179,7 +181,7 @@ export const createEnginePlayback = async (
       }
       for (const waiter of playingWaiters.splice(0)) {
         if (waiter.command <= message.command) {
-          waiter.resolve(message.frameIndex);
+          waiter.resolve(message);
         } else {
           playingWaiters.push(waiter);
         }
@@ -236,7 +238,7 @@ export const createEnginePlayback = async (
   store.subscribe((state) => state.rangeStopFrame, publishRange);
 
   const createPlayingPromise = async (command: number) => {
-    const playingPromise = createControlledPromise<number>();
+    const playingPromise = createControlledPromise<PlayingAck>();
     playingWaiters.push({ command, resolve: playingPromise.resolve });
     return playingPromise.promise;
   };
@@ -263,7 +265,7 @@ export const createEnginePlayback = async (
       const command = nextCommand();
       const playingPromise = createPlayingPromise(command);
       port.methods.play({ command, revision, ...getLatencyFrameCounts() });
-      await playingPromise;
+      return (await playingPromise).playing;
     },
     stop: async () => {
       const { revision } = store.get().seekEvent;
@@ -273,7 +275,7 @@ export const createEnginePlayback = async (
       const command = nextCommand();
       const playingPromise = createPlayingPromise(command);
       port.methods.stop({ command, revision, frameIndex });
-      return await playingPromise;
+      return (await playingPromise).frameIndex;
     },
     setFrozen: (frozen) => {
       store.update((state) => {

@@ -19,8 +19,11 @@ export const createStartPlayback =
 
     session.beginPlay();
     try {
-      await getEnginePlayback().play();
-      session.settlePlay();
+      if (await getEnginePlayback().play()) {
+        session.settlePlay();
+      } else {
+        session.failPlay();
+      }
     } catch (error) {
       session.failPlay();
       throw error;

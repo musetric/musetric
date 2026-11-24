@@ -100,14 +100,19 @@ export const createEngineSessionMachine = (
     },
     applyMotion: (playing) => {
       update((state) => {
-        if (playing && state.session === 'starting') {
-          state.session = 'playing';
+        if (
+          playing &&
+          (state.session === 'idle' || state.session === 'starting')
+        ) {
+          state.session = state.take === 'none' ? 'playing' : 'taking';
         }
+        const preparing =
+          state.session === 'starting' ||
+          (state.session === 'taking' && state.take === 'arming');
         if (
           !playing &&
-          (state.session === 'starting' ||
-            state.session === 'playing' ||
-            state.session === 'taking')
+          !preparing &&
+          (state.session === 'playing' || state.session === 'taking')
         ) {
           state.session = 'idle';
         }

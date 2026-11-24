@@ -1,4 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
+import { isPlaying } from '../../state.js';
 import { rate } from './player.fixtures.js';
 import { createSeam, type CreateSeamOptions, flush } from './seam.fixtures.js';
 
@@ -30,6 +31,19 @@ describe('the commands of the player', () => {
     const moved = seam.position.read() - from;
     expect(moved).toBeGreaterThan(0.4 * rate);
     expect(moved).toBeLessThan(0.6 * rate);
+  });
+
+  it('keeps a take playing when the ack of an earlier seek comes after it began', async () => {
+    const seam = await open();
+    seam.player.seek(rate, 'player');
+    const recording = seam.player.record(1);
+    await flush();
+    seam.microphone.open();
+    await seam.run(quantaOfSeconds(0.5));
+    await recording;
+    await seam.run(quantaOfSeconds(0.5));
+    expect(seam.store.get().session).toBe('taking');
+    expect(isPlaying(seam.store.get())).toBe(true);
   });
 
   it('sends a message for each command at once, in the order of the commands', async () => {
