@@ -1,3 +1,4 @@
+import { type CursorResult } from './analysis/cursor.js';
 import { type DelayResult } from './analysis/delay.js';
 import {
   bandCenters,
@@ -76,6 +77,39 @@ export const formatDelayTable = (result: DelayResult) => {
     `| ${formatSpread(result.line)} | ${formatSpread(result.spectrum)} | ${formatSpread(result.audio)} | ${arrivals.p50.toFixed(1)} / ${arrivals.p99.toFixed(1)} / ${arrivals.max.toFixed(1)} ms | ${roundTrip} | ${Math.round(result.reportedOutputMs)} / ${Math.round(result.outputMs)} ms |`,
     '',
     `Frames with a line: ${result.line.count} of ${result.renderCount}; render ${formatSpread(result.renderMs)}; latency ${result.latencySource}.`,
+  ].join('\n');
+};
+
+const formatValues = (
+  values: readonly number[],
+  digits: number,
+  unit: string,
+) => {
+  if (values.length === 0) {
+    return 'none';
+  }
+  const sorted = values.toSorted((left, right) => left - right);
+  const middle = sorted[Math.floor(sorted.length / 2)];
+  return `${formatSigned(middle, digits)}${unit} (${formatSigned(sorted[0], digits)}…${formatSigned(sorted[sorted.length - 1], digits)}), ${values.length} times`;
+};
+
+export const formatCursorTable = (result: CursorResult) => {
+  const { run, stop, seek, playSeek, drag, loop } = result;
+  const ms = (value: number) => `${Math.round(value)} ms`;
+  return [
+    '| Check | Result |',
+    '| --- | --- |',
+    `| Steps back while playing | ${run.stepsBack}, the largest ${ms(run.largestStepBackMs)} |`,
+    `| The cursor standing while playing | ${run.stalls}, the longest ${ms(run.longestStallMs)} |`,
+    `| Jump on Stop, in screen frames | ${formatValues(stop.jumps, 1, '')} |`,
+    `| Motion reversed after Stop, the largest | ${ms(stop.largestReversalMs)} |`,
+    `| A seek to the shown target | ${formatValues(seek.settleMs, 0, ' ms')}; ${seek.unsettled} never shown |`,
+    `| The cursor standing after a seek within Play's round trip | ${playSeek.standing} of ${playSeek.count}, the longest ${ms(playSeek.longestStandMs)} |`,
+    `| Steps back in a drag | ${drag.stepsBack} in ${drag.count} drags |`,
+    `| Behind the finger at the release | ${formatValues(drag.behindMs, 0, ' ms')} |`,
+    `| Loop: turns, steps back, the furthest past its end | ${loop.turns}, ${loop.stepsBack}, ${ms(loop.overshootMs)} |`,
+    '',
+    `Screen frame ${result.screenFrameMs.toFixed(1)} ms.`,
   ].join('\n');
 };
 

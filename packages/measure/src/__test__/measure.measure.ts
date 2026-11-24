@@ -1,4 +1,5 @@
 import { inject, it } from 'vitest';
+import { runCursor } from './driver/measureCursor.js';
 import { runDelay } from './driver/measureDelay.js';
 import { runSound } from './driver/measureSound.js';
 import { runTiming } from './driver/measureTiming.js';
@@ -18,6 +19,7 @@ const commands: Record<
   timing: runTiming,
   delay: runDelay,
   sound: runSound,
+  cursor: runCursor,
 };
 
 it('runs the measure command', async () => {

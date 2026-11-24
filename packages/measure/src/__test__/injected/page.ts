@@ -1,3 +1,4 @@
+import { type CursorOptions, measureCursor } from './cursor.js';
 import { type DelayOptions, measureDelayTake } from './delay.js';
 import { type PageHooks } from './hooks.js';
 import { calibrate, readMeasureLatency } from './latency.js';
@@ -22,6 +23,7 @@ const installMeasure = (hooks: PageHooks) => {
       timing: async (options: TimingOptions) =>
         measureTimingTake(hooks, options),
       delay: async (options: DelayOptions) => measureDelayTake(hooks, options),
+      cursor: async (options: CursorOptions) => measureCursor(hooks, options),
       browserCapture: async (options: BrowserCaptureOptions) =>
         captureBrowserMicrophone(engine, options),
       take: async (options: SoundTakeOptions) =>
