@@ -30,12 +30,12 @@ export const useSpectrogramGesture = (
 
     const { sampleRate } = engine.context;
     const freeze = createInteractionFreeze();
-    let requestedFrameIndex = Math.round(engine.store.get().frameIndex);
+    let requestedFrameIndex = Math.round(engine.position.read());
 
     const context: SpectrogramGestureContext = {
       getSampleRate: () => sampleRate,
       getFrameCount: () => engine.store.get().frameCount ?? 0,
-      getFrameIndex: () => engine.store.get().frameIndex,
+      getFrameIndex: () => engine.position.read(),
       getVisibleTime: () => useSettingsStore.getState().visibleTime,
       getPlayheadRatio: () => useSettingsStore.getState().playheadRatio,
       getViewWindow: () => engine.store.get().viewWindow,
@@ -81,7 +81,7 @@ export const useSpectrogramGesture = (
           return;
         }
         if (freeze.freeze()) {
-          requestedFrameIndex = Math.round(engine.store.get().frameIndex);
+          requestedFrameIndex = Math.round(engine.position.read());
         }
       },
       onLimit: () => {

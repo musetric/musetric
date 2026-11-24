@@ -47,7 +47,8 @@ export const subscribePlayheadDrag = (
   let listening: AbortController | undefined = undefined;
 
   const begin = (pointerId: number): boolean => {
-    const { frameIndex, frameCount } = engine.store.get();
+    const { frameCount } = engine.store.get();
+    const frameIndex = engine.position.read();
     if (!frameCount) return false;
     const { visibleTime, playheadRatio } = getVisualizationView();
     const viewFrameCount = visibleTime * engine.context.sampleRate;

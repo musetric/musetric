@@ -223,6 +223,22 @@ const checkLoopEnd = (trace: Trace) => {
   return overshootMs;
 };
 
+const checkStoreChanges = (run: CursorRun) => {
+  const changesPerSecond: number[] = [];
+  for (const [index, event] of run.events.entries()) {
+    const next = run.events.at(index + 1);
+    const from = event[0] + startupMs;
+    if (event[1] !== 'play' || next?.[1] !== 'stop' || next[0] <= from) {
+      continue;
+    }
+    const changes = run.storeChanges.filter(
+      (time) => time > from && time < next[0],
+    ).length;
+    changesPerSecond.push((changes * 1000) / (next[0] - from));
+  }
+  return changesPerSecond;
+};
+
 export type CursorResult = {
   screenFrameMs: number;
   run: {
@@ -241,6 +257,7 @@ export type CursorResult = {
   playSeek: { count: number; standing: number; longestStandMs: number };
   drag: { count: number; stepsBack: number; behindMs: number[] };
   loop: { turns: number; stepsBack: number; overshootMs: number };
+  store: { changesPerSecond: number[] };
 };
 
 export const analyzeCursor = (run: CursorRun): CursorResult => {
@@ -267,5 +284,6 @@ export const analyzeCursor = (run: CursorRun): CursorResult => {
       stepsBack: steps.loop,
       overshootMs: checkLoopEnd(trace),
     },
+    store: { changesPerSecond: checkStoreChanges(run) },
   };
 };

@@ -6,7 +6,7 @@ const getFramesPerPixel = (width: number): number =>
   Math.max(1, width);
 
 export const getXAtFrame = (frame: number, width: number): number => {
-  const { frameIndex } = engine.store.get();
+  const frameIndex = engine.position.read();
   const { playheadRatio } = getVisualizationView();
   return (
     playheadRatio * width + (frame - frameIndex) / getFramesPerPixel(width)
@@ -19,7 +19,7 @@ export const getLoopPointerFrame = (
 ): number => {
   const rect = area.getBoundingClientRect();
   const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
-  const { frameIndex } = engine.store.get();
+  const frameIndex = engine.position.read();
   const { playheadRatio } = getVisualizationView();
   return (
     frameIndex +

@@ -97,6 +97,7 @@ export const cursorRunSchema = z.object({
       z.number(),
     ]),
   ),
+  storeChanges: z.array(z.number()),
   loop: z.object({ fromFrame: z.number(), toFrame: z.number() }),
 });
 

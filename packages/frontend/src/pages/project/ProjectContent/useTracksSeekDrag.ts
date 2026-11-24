@@ -22,7 +22,7 @@ export const useTracksSeekDrag = (
         releaseFrozenOnEnd = true;
         pinned = false;
         engine.player.setFrozen(true);
-        startFrameIndex = engine.store.get().frameIndex;
+        startFrameIndex = engine.position.read();
       },
       onUpdate: (event) => {
         const { frameCount } = engine.store.get();

@@ -7,6 +7,7 @@ import { createStore } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
 import { initialEngineState } from '../../state.js';
 import { createEngineStubPlayback, type EnginePlayback } from '../playback.js';
+import { createEnginePosition } from '../position.js';
 import { createEngineRecorder, type EngineRecorder } from '../recorder.js';
 
 const noop = (): void => undefined;
@@ -70,6 +71,7 @@ export const createRecorderHarness = (
     outputClock,
     audioSession,
     store: createStore(initialEngineState),
+    position: createEnginePosition(),
     getDecoder: () => decoder,
     getEnginePlayback: () => enginePlayback,
   });

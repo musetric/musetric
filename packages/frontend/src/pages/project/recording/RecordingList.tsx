@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { endpoints } from '../../../api/index.js';
 import { routes } from '../../../app/router/routes.js';
 import { formatDuration } from '../../../common/formatDuration.js';
+import { useEnginePosition } from '../../../engine/enginePosition.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { getRecordingColumns, getRecordingLayout } from './recordingLayout.js';
@@ -68,7 +69,9 @@ export const RecordingList: FC<RecordingListProps> = (props) => {
   const duration = useEngineStore((state) => state.duration);
   const rulerRef = useRef<HTMLDivElement>(null);
   const [rulerWidth, setRulerWidth] = useState(0);
-  const progress = useEngineStore(getTrackProgress);
+  const progress = useEnginePosition((frameIndex, state) =>
+    getTrackProgress(frameIndex, state.frameCount),
+  );
   const setRenamingRecordingId = useProjectStore(
     (state) => state.setRenamingRecordingId,
   );

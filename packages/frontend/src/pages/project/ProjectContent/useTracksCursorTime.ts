@@ -21,7 +21,8 @@ export const useTracksCursorTime = (
     let timeWidth = 0;
 
     const render = () => {
-      const { frameCount, frameIndex, duration } = engine.store.get();
+      const { frameCount, duration } = engine.store.get();
+      const frameIndex = engine.position.read();
       const ratio = frameCount ? frameIndex / frameCount : 0;
       const cursorX = alignPixel(ratio * lanesWidth, window.devicePixelRatio);
       lanes.style.setProperty(playedWidthVariable, `${cursorX}px`);
@@ -48,7 +49,7 @@ export const useTracksCursorTime = (
         render();
       },
       render,
-      engineKeys: ['duration', 'frameCount', 'frameIndex'],
+      engineKeys: ['duration', 'frameCount'],
       settingsKeys: [],
     });
   }, [lanesRef, timeRef]);

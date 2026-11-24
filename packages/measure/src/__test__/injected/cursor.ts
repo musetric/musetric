@@ -35,6 +35,7 @@ export type CursorRun = {
   frameCount: number;
   frames: [epochMs: number, frameIndex: number, playing: number][];
   events: [epochMs: number, kind: CursorEventKind, frameIndex: number][];
+  storeChanges: number[];
   loop: { fromFrame: number; toFrame: number };
 };
 
@@ -44,6 +45,7 @@ export const measureCursor = async (
 ): Promise<CursorRun> => {
   const { engine } = hooks;
   const { player, store } = engine;
+  const readPosition = () => engine.position.read();
   const { sampleRate } = engine.context;
   const frameCount = store.get().frameCount ?? 0;
   const startFrame = Math.round(options.startSeconds * sampleRate);
@@ -57,6 +59,7 @@ export const measureCursor = async (
   };
   const frames: CursorRun['frames'] = [];
   const events: CursorRun['events'] = [];
+  const storeChanges: CursorRun['storeChanges'] = [];
   const mark = (kind: CursorEventKind, frameIndex: number) => {
     events.push([epochNow(), kind, frameIndex]);
   };
@@ -66,22 +69,24 @@ export const measureCursor = async (
     if (!sampling) {
       return;
     }
-    const state = store.get();
-    frames.push([epochNow(), state.frameIndex, state.playing ? 1 : 0]);
+    frames.push([epochNow(), readPosition(), store.get().playing ? 1 : 0]);
     requestAnimationFrame(sample);
   };
   requestAnimationFrame(sample);
+  const unsubscribeStore = store.subscribeState(() => {
+    storeChanges.push(epochNow());
+  });
 
   const stop = async () => {
     if (store.get().playing) {
-      mark('stop', store.get().frameIndex);
+      mark('stop', readPosition());
       await player.stop();
       await wait(settleMs);
     }
   };
 
   const play = async () => {
-    mark('play', store.get().frameIndex);
+    mark('play', readPosition());
     await player.play();
   };
 
@@ -102,9 +107,9 @@ export const measureCursor = async (
 
       await play();
       await wait(1000);
-      seek(store.get().frameIndex + seconds(farSeekSeconds));
+      seek(readPosition() + seconds(farSeekSeconds));
       await wait(1500);
-      seek(store.get().frameIndex + seconds(nearSeekSeconds));
+      seek(readPosition() + seconds(nearSeekSeconds));
       await wait(1500);
       await stop();
 
@@ -125,7 +130,7 @@ export const measureCursor = async (
       await wait(400);
       await play();
       await wait(800);
-      const dragFrom = store.get().frameIndex;
+      const dragFrom = readPosition();
       mark('dragStart', dragFrom);
       player.setFrozen(true);
       let dragTarget = dragFrom;
@@ -144,7 +149,7 @@ export const measureCursor = async (
       mark('loopStart', loop.fromFrame);
       await player.playRange('cycle');
       await wait(loopTurns * loopSeconds * 1000);
-      mark('loopEnd', store.get().frameIndex);
+      mark('loopEnd', readPosition());
       await stop();
       player.setRange(undefined);
       await wait(400);
@@ -155,7 +160,8 @@ export const measureCursor = async (
     }
     player.setRange(undefined);
     sampling = false;
+    unsubscribeStore();
   }
 
-  return { sampleRate, frameCount, frames, events, loop };
+  return { sampleRate, frameCount, frames, events, storeChanges, loop };
 };

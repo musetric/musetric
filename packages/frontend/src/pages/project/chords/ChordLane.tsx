@@ -62,7 +62,9 @@ export const ChordLane: FC = () => {
         strip.style.width = `${stripWidth}px`;
       }
 
-      const time = state.duration * getTrackProgress(state);
+      const time =
+        state.duration *
+        getTrackProgress(engine.position.read(), state.frameCount);
       const start = time - visibleTime * playheadRatio;
       const stripX = alignPixel(
         -start * pixelsPerSecond,
@@ -94,7 +96,7 @@ export const ChordLane: FC = () => {
       resizeTarget: lane,
       onResize: resize,
       render,
-      engineKeys: ['duration', 'frameCount', 'frameIndex', 'viewWindow'],
+      engineKeys: ['duration', 'frameCount', 'viewWindow'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 

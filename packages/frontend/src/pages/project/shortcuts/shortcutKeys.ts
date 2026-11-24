@@ -44,7 +44,7 @@ const seekBy = (state: EngineState, seconds: number) => {
     return;
   }
   const frames = Math.round(seconds * engine.context.sampleRate);
-  engine.player.seek(state.frameIndex + frames, 'player');
+  engine.player.seek(engine.position.read() + frames, 'player');
 };
 
 const stepKey = (state: EngineState, semitones: number) => {

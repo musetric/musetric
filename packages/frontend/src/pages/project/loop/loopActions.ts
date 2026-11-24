@@ -25,7 +25,7 @@ export const enterLoop = (subtitle: readonly api.subtitle.Segment[]) => {
   const state = engine.store.get();
   const { sampleRate } = engine.context;
   openLoop(
-    getLoopAtTime(subtitle, state.frameIndex / sampleRate, {
+    getLoopAtTime(subtitle, engine.position.read() / sampleRate, {
       ...state,
       sampleRate,
     }),

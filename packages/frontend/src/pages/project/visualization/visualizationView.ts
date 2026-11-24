@@ -7,7 +7,8 @@ export type VisualizationView = {
 };
 
 export const getVisualizationView = (): VisualizationView => {
-  const { viewWindow, frameIndex } = engine.store.get();
+  const { viewWindow } = engine.store.get();
+  const frameIndex = engine.position.read();
   if (viewWindow) {
     return {
       visibleTime: viewWindow.frameCount / engine.context.sampleRate,

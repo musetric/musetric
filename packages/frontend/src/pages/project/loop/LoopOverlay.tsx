@@ -54,7 +54,7 @@ export const LoopOverlay: FC = () => {
         render();
       },
       render,
-      engineKeys: ['frameIndex', 'range', 'viewWindow'],
+      engineKeys: ['range', 'viewWindow'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 

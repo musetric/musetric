@@ -15,6 +15,7 @@ import {
   createEngineStubPlayback,
   type EnginePlayback,
 } from './playback.js';
+import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { createStartPlayback } from './startPlayback.js';
@@ -59,6 +60,7 @@ export type CreateEnginePlayerOptions = {
   getDecoder: () => EngineDecoder;
   playheadPort: MessagePort;
   playheadPorts: MessagePort[];
+  position: EnginePositionWriter;
 };
 
 export const createEnginePlayer = (
@@ -66,7 +68,7 @@ export const createEnginePlayer = (
 ): EnginePlayer => {
   const { context, audioOutput, outputClock, store, decoderPort, getDecoder } =
     options;
-  const { playheadPort, playheadPorts } = options;
+  const { playheadPort, playheadPorts, position } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
@@ -92,6 +94,7 @@ export const createEnginePlayer = (
         decoderPort,
         playheadPort,
         playheadPorts,
+        position,
         onPlaybackEnded: () => {
           const state = store.get();
           if (!state.isSlave) {
@@ -110,6 +113,7 @@ export const createEnginePlayer = (
         outputClock,
         audioSession: options.audioSession,
         store,
+        position,
         getDecoder,
         getEnginePlayback: () => enginePlayback,
       });
@@ -148,8 +152,8 @@ export const createEnginePlayer = (
     },
     seek: (requestedFrameIndex, origin) => {
       const frameIndex = clampToRange(requestedFrameIndex, store.get().range);
+      position.write(frameIndex);
       store.update((state) => {
-        state.frameIndex = frameIndex;
         state.playerFrameIndexPending = true;
         state.seekEvent = {
           revision: nextNumber(state.seekEvent.revision),
@@ -181,7 +185,7 @@ export const createEnginePlayer = (
       enginePlayback.setFrozen(frozen);
       const state = store.get();
       getDecoderValue().sendPlayerFrameIndex({
-        frameIndex: state.frameIndex,
+        frameIndex: position.read(),
         frozen,
         revision: state.backendRevision,
         source: 'user',
@@ -253,6 +257,7 @@ export const createEnginePlayer = (
     },
     ...createEnginePlayerRange({
       store,
+      readPosition: () => position.read(),
       seek: (frameIndex) => {
         ref.seek(frameIndex, 'player');
       },
@@ -294,10 +299,10 @@ export const createEnginePlayer = (
         return;
       }
 
+      position.write(frameIndex);
       store.update((state) => {
         state.backendRevision = revision;
         state.playerFrameIndexPending = false;
-        state.frameIndex = frameIndex;
         state.frozen = frozen;
         state.seekEvent = {
           revision: nextNumber(state.seekEvent.revision),
@@ -331,6 +336,7 @@ export const createEnginePlayer = (
         await enginePlayback.stop();
       }
 
+      position.write(state.frameIndex);
       store.update((s) => {
         s.backendRevision = state.revision;
         s.playerFrameIndexPending = false;
@@ -338,7 +344,6 @@ export const createEnginePlayer = (
         s.playing = state.playing;
         s.recording = state.recording;
         s.frozen = state.frozen;
-        s.frameIndex = state.frameIndex;
         s.seekEvent = {
           revision: nextNumber(s.seekEvent.revision),
           frameIndex: state.frameIndex,

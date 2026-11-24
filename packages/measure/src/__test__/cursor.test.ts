@@ -18,7 +18,14 @@ const createRun = (
     const { frame, playing } = shown(time);
     frames.push([time, Math.round(frame), playing ? 1 : 0]);
   }
-  return { sampleRate, frameCount: 10_000_000, frames, events, loop };
+  return {
+    sampleRate,
+    frameCount: 10_000_000,
+    frames,
+    events,
+    storeChanges: [],
+    loop,
+  };
 };
 
 const rolling = (from: number, startMs: number) => (time: number) =>
@@ -189,5 +196,18 @@ describe('analyzeCursor', () => {
     expect(seek.unsettled).toBe(0);
     expect(seek.settleMs[0]).toBeGreaterThan(40);
     expect(seek.settleMs[0]).toBeLessThan(70);
+  });
+
+  it('counts the changes of the store a second while the song plays', () => {
+    const stopMs = 2400;
+    const run = {
+      ...createRun(stopMs, (time) => ({ frame: time, playing: true }), [
+        [0, 'play', 0],
+        [stopMs, 'stop', stopMs],
+      ]),
+      storeChanges: [10, 300, 900, 1500, 2100, 2500],
+    };
+    const { store } = analyzeCursor(run);
+    expect(store.changesPerSecond).toEqual([1.5]);
   });
 });

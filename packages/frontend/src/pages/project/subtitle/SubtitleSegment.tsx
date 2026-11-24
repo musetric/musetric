@@ -3,6 +3,7 @@ import { useTheme } from '@mui/material/styles';
 import { type api } from '@musetric/api';
 import { type FC, type RefObject, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
+import { subscribeEnginePosition } from '../../../engine/enginePosition.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { type SubtitleCursor } from './subtitleCursor.js';
 import { SubtitleLoopBand } from './SubtitleLoopBand.js';
@@ -10,7 +11,7 @@ import {
   getSubtitleLoopWordsKey,
   parseSubtitleLoopWordsKey,
 } from './subtitleLoopBands.js';
-import { getSubtitlePlaybackTimeFromState } from './subtitlePlayback.js';
+import { getSubtitlePlaybackTime } from './subtitlePlayback.js';
 import { SubtitleSegmentText } from './SubtitleSegmentText.js';
 import { useSubtitleSegmentStatus } from './useSubtitleSegmentStatus.js';
 
@@ -103,7 +104,10 @@ const useActiveSubtitleWordColors = (
     const timedElements = getTimedSubtitleElements(element);
 
     const update = () => {
-      const playbackTime = getSubtitlePlaybackTimeFromState(engine.store.get());
+      const playbackTime = getSubtitlePlaybackTime(
+        engine.position.read(),
+        engine.store.get(),
+      );
 
       for (const timedElement of timedElements) {
         setElementColor(
@@ -120,8 +124,8 @@ const useActiveSubtitleWordColors = (
 
     update();
 
-    const unsubscribe = engine.store.subscribe(
-      getSubtitlePlaybackTimeFromState,
+    const unsubscribe = subscribeEnginePosition(
+      getSubtitlePlaybackTime,
       update,
     );
 

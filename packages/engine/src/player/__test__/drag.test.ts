@@ -16,7 +16,7 @@ const shownAfter = async (
 ) => {
   await seam.run(quanta);
   await seam.frame();
-  return seam.store.get().frameIndex;
+  return seam.position.read();
 };
 
 describe('a drag of the cursor', () => {

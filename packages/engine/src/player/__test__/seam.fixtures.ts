@@ -13,6 +13,7 @@ import { createStore, type Store } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
 import { type EngineState, initialEngineState } from '../../state.js';
 import { createEnginePlayer, type EnginePlayer } from '../index.js';
+import { createEnginePosition, type EnginePosition } from '../position.js';
 import { playerChannel, playerDataChannel } from '../protocol.cross.js';
 import { createPlayerRuntime, type PlayerRuntime } from '../runtime.worklet.js';
 import { blockSize, mountTracks, rate } from './player.fixtures.js';
@@ -97,6 +98,7 @@ const createMicrophone = (): { session: EngineAudioSession } & Microphone => {
 export type Seam = {
   player: EnginePlayer;
   store: Store<EngineState>;
+  position: EnginePosition;
   host: string[];
   toWorklet: string[];
   fromWorklet: string[];
@@ -206,6 +208,7 @@ export const createSeam = async (): Promise<Seam> => {
   const microphone = createMicrophone();
   const data = new MessageChannel();
   const playhead = new MessageChannel();
+  const position = createEnginePosition();
   const player = createEnginePlayer({
     context,
     audioOutput,
@@ -216,6 +219,7 @@ export const createSeam = async (): Promise<Seam> => {
     getDecoder: () => decoder,
     playheadPort: playhead.port2,
     playheadPorts: [playhead.port1],
+    position,
   });
   await player.boot();
   const silence = new Float32Array(frameCount);
@@ -248,6 +252,7 @@ export const createSeam = async (): Promise<Seam> => {
   return {
     player,
     store,
+    position,
     host,
     toWorklet,
     fromWorklet,

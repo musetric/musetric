@@ -33,7 +33,8 @@ export const VisualizationTimeline: FC = () => {
     let canvasWidth = canvas.getBoundingClientRect().width;
 
     const render = () => {
-      const { duration, frameIndex, frameCount } = engine.store.get();
+      const { duration, frameCount } = engine.store.get();
+      const frameIndex = engine.position.read();
       const { visibleTime, playheadRatio } = getVisualizationView();
 
       processor.updateConfig({
@@ -64,7 +65,7 @@ export const VisualizationTimeline: FC = () => {
       resizeTarget: canvas,
       onResize: resize,
       render,
-      engineKeys: ['duration', 'frameCount', 'frameIndex', 'viewWindow'],
+      engineKeys: ['duration', 'frameCount', 'viewWindow'],
       settingsKeys: ['visibleTime', 'playheadRatio'],
     });
 

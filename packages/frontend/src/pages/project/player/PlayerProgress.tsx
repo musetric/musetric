@@ -4,6 +4,7 @@ import { isPrimaryPointerButton } from '@musetric/interaction';
 import { type FC, useEffect, useRef } from 'react';
 import { formatDuration } from '../../../common/formatDuration.js';
 import { engine } from '../../../engine/engine.js';
+import { useEnginePosition } from '../../../engine/enginePosition.js';
 import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { playHaptic } from '../haptics.js';
@@ -19,11 +20,13 @@ export const PlayerProgress: FC = () => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const position = useEngineStore((state) =>
-    Math.round(getTrackProgress(state) * progressScale),
+  const position = useEnginePosition((frameIndex, state) =>
+    Math.round(getTrackProgress(frameIndex, state.frameCount) * progressScale),
   );
-  const currentTime = useEngineStore((state) =>
-    formatDuration(getTrackProgress(state) * state.duration),
+  const currentTime = useEnginePosition((frameIndex, state) =>
+    formatDuration(
+      getTrackProgress(frameIndex, state.frameCount) * state.duration,
+    ),
   );
 
   useEffect(() => {
