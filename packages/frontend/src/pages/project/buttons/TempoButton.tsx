@@ -6,6 +6,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { isRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { TempoIcon } from '../../../icons/TempoIcon.js';
@@ -14,7 +15,7 @@ import { useTempoCaption } from './useTempoCaption.js';
 
 export const TempoButton: FC = () => {
   const frameCount = useEngineStore((state) => state.frameCount);
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );

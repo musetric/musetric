@@ -1,3 +1,4 @@
+import { isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { epochNow, wait } from './samples.js';
 
@@ -69,7 +70,7 @@ export const measureCursor = async (
     if (!sampling) {
       return;
     }
-    frames.push([epochNow(), readPosition(), store.get().playing ? 1 : 0]);
+    frames.push([epochNow(), readPosition(), isPlaying(store.get()) ? 1 : 0]);
     requestAnimationFrame(sample);
   };
   requestAnimationFrame(sample);
@@ -78,7 +79,7 @@ export const measureCursor = async (
   });
 
   const stop = async () => {
-    if (store.get().playing) {
+    if (isPlaying(store.get())) {
       mark('stop', readPosition());
       await player.stop();
       await wait(settleMs);
@@ -155,7 +156,7 @@ export const measureCursor = async (
       await wait(400);
     }
   } finally {
-    if (store.get().playing) {
+    if (isPlaying(store.get())) {
       await player.stop();
     }
     player.setRange(undefined);

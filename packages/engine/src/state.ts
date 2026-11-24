@@ -76,6 +76,11 @@ export type EngineRangePlay = {
 
 export type EngineLoopStage = 'range' | 'sing';
 
+export type EngineSession =
+  'idle' | 'starting' | 'playing' | 'taking' | 'stopping';
+
+export type EngineTake = 'none' | 'arming' | 'recording' | 'draining';
+
 export type EngineViewWindow = {
   startFrame: number;
   frameCount: number;
@@ -105,11 +110,10 @@ export type EngineState = {
   frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
   viewWindow?: EngineViewWindow;
   duration: number;
-  playing: boolean;
+  session: EngineSession;
   frozen: boolean;
-  recording: boolean;
+  take: EngineTake;
   recordings: api.recording.Item[];
-  playerCommandPending: boolean;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   voiceOctave: VoiceOctave;
@@ -302,11 +306,10 @@ export const initialEngineState: EngineState = {
   expandedSpectrumLane: 'none',
   frequencyRanges: defaultFrequencyRanges,
   duration: 0,
-  playing: false,
+  session: 'idle',
   frozen: false,
-  recording: false,
+  take: 'none',
   recordings: [],
-  playerCommandPending: false,
   seekEvent: {
     revision: 0,
     frameIndex: 0,
@@ -351,3 +354,19 @@ export const initialEngineState: EngineState = {
   rangeRepeat: 'cycle',
   loopTries: [],
 };
+
+export const isPlaying = (state: Pick<EngineState, 'session'>): boolean =>
+  state.session === 'starting' ||
+  state.session === 'playing' ||
+  state.session === 'taking';
+
+export const isRecording = (state: Pick<EngineState, 'take'>): boolean =>
+  state.take !== 'none';
+
+export const isTransportBusy = (
+  state: Pick<EngineState, 'session' | 'take'>,
+): boolean =>
+  state.session === 'starting' ||
+  state.session === 'stopping' ||
+  state.take === 'arming' ||
+  state.take === 'draining';

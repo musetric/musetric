@@ -1,4 +1,5 @@
 import { type api } from '@musetric/api';
+import { isPlaying, isRecording } from '@musetric/engine';
 import { type QueryClient } from '@tanstack/react-query';
 import { endpoints } from '../api/index.js';
 import { engine } from '../engine/engine.js';
@@ -79,14 +80,17 @@ export const holdScreenWhileWorking = (queryClient: QueryClient): void => {
   }
 
   const update = () => {
-    const { playing, recording } = engine.store.get();
+    const state = engine.store.get();
     const projects = queryClient.getQueryData(
       endpoints.project.list().queryKey,
     );
-    hold(playing || recording || isWorking(projects));
+    hold(isPlaying(state) || isRecording(state) || isWorking(projects));
   };
 
   queryClient.getQueryCache().subscribe(update);
-  engine.store.subscribe((state) => state.playing || state.recording, update);
+  engine.store.subscribe(
+    (state) => isPlaying(state) || isRecording(state),
+    update,
+  );
   document.addEventListener('visibilitychange', update);
 };

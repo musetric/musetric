@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material';
-import { getActiveRecording } from '@musetric/engine';
+import { getActiveRecording, isRecording } from '@musetric/engine';
 import { stackedLaneGap } from '@musetric/spectrogram';
 import { type FC, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +37,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
   const spectrogramAreaRef = useRef<HTMLDivElement>(null);
   const emptyRecordingName = useEngineStore((state) => {
     const active = getActiveRecording(state);
-    return active?.empty && !state.recording ? active.name : undefined;
+    return active?.empty && !isRecording(state) ? active.name : undefined;
   });
   const chordsOpen = useProjectStore((state) => state.chordsOpen);
   const spectrum = useEngineStore(

@@ -1,6 +1,6 @@
 import { type api } from '@musetric/api';
 import { maxTransposeSemitones, minTransposeSemitones } from '@musetric/audio';
-import { type EngineState } from '@musetric/engine';
+import { type EngineState, isRecording } from '@musetric/engine';
 import { findTopOverlay } from '../../../app/systemBack.js';
 import { engine } from '../../../engine/engine.js';
 import { togglePlayback } from '../buttons/playback.js';
@@ -50,7 +50,7 @@ const seekBy = (state: EngineState, seconds: number) => {
 const stepKey = (state: EngineState, semitones: number) => {
   const next = state.transposeSemitones + semitones;
   if (
-    state.recording ||
+    isRecording(state) ||
     next < minTransposeSemitones ||
     next > maxTransposeSemitones
   ) {

@@ -1,4 +1,5 @@
 import { type api } from '@musetric/api';
+import { isRecording } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { isSubtitleWordStartInRange } from '../subtitle/subtitleLoopBands.js';
 import { moveLoop } from './loopActions.js';
@@ -17,7 +18,7 @@ export const moveLoopToWord = (
     state.range &&
     isSubtitleWordStartInRange(subtitle, wordStart, state.range, sampleRate)
   ) {
-    return state.recording;
+    return isRecording(state);
   }
   if (state.loopStage === 'range') {
     moveLoop(getLoopAtTime(subtitle, wordStart, { ...state, sampleRate }));

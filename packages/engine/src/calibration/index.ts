@@ -18,6 +18,7 @@ import {
   getInputLatencyFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
+  isPlaying,
 } from '../state.js';
 import { createCalibrationDevices } from './devices.js';
 import { applyInputLatencyEstimate } from './estimate.js';
@@ -82,7 +83,7 @@ const stopActivePlayback = async (
   store: Store<EngineState>,
   player: EnginePlayer,
 ) => {
-  if (store.get().playing) {
+  if (isPlaying(store.get())) {
     await player.stop();
   }
 };

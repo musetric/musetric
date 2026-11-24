@@ -1,3 +1,4 @@
+import { isRecording } from '@musetric/engine';
 import { engine } from '../../engine/engine.js';
 
 export type HapticKind = 'tick' | 'detent' | 'grab';
@@ -18,7 +19,7 @@ type HapticsWindow = Window & {
 };
 
 export const playHaptic = (kind: HapticKind): void => {
-  if (engine.store.get().recording) {
+  if (isRecording(engine.store.get())) {
     return;
   }
   const target: HapticsWindow = window;

@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import { isPlaying, isRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { PlaybackPlayButton } from './PlaybackPlayButton.js';
@@ -7,10 +8,10 @@ import { PlaybackStopButton } from './PlaybackStopButton.js';
 
 export const PlaybackControlsButton: FC = () => {
   const frameCount = useEngineStore((state) => state.frameCount);
-  const playing = useEngineStore((state) => state.playing);
-  const recording = useEngineStore((state) => state.recording);
+  const playing = useEngineStore(isPlaying);
+  const recording = useEngineStore(isRecording);
   const writing = useEngineStore(
-    (state) => state.recording && state.loopTryPhase !== 'armed',
+    (state) => isRecording(state) && state.loopTryPhase !== 'armed',
   );
   const active = playing || recording;
   const playingColor = active ? 'action.selected' : 'action.hover';

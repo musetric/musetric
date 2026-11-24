@@ -1,5 +1,5 @@
 import { Stack, ToggleButton, Typography } from '@mui/material';
-import { type VoiceOctave } from '@musetric/engine';
+import { isRecording, type VoiceOctave } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
@@ -8,7 +8,7 @@ import { playHaptic } from '../haptics.js';
 
 export const VoiceOctaveToggle: FC = () => {
   const { t } = useTranslation();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const voiceOctave = useEngineStore((state) => state.voiceOctave);
   const options: { value: VoiceOctave; label: string }[] = [
     { value: -1, label: t('pages.project.player.controls.voiceOctaveLower') },

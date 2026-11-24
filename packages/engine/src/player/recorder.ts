@@ -15,6 +15,7 @@ import {
   type EngineState,
   getInputShareFrameCount,
   getRecordingLatencyFrameCount,
+  isPlaying,
 } from '../state.js';
 import { settleLoopTry } from './loopTry.js';
 import {
@@ -62,6 +63,7 @@ export type CreateEngineRecorderOptions = {
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   position: EnginePosition;
+  endTake: () => void;
   getDecoder: () => EngineDecoder;
   getEnginePlayback: () => EnginePlayback;
 };
@@ -72,12 +74,6 @@ export const createEngineRecorder = (
   const { context, outputClock, audioSession, store, getDecoder } = options;
   const { getEnginePlayback } = options;
   let currentSession: RecordingSession | undefined = undefined;
-
-  const setRecording = (recording: boolean) => {
-    store.update((state) => {
-      state.recording = recording;
-    });
-  };
 
   const isStopRequested = (session: RecordingSession) => session.stopRequested;
 
@@ -130,7 +126,7 @@ export const createEngineRecorder = (
     if (currentSession === session) {
       currentSession = undefined;
     }
-    setRecording(false);
+    options.endTake();
   };
 
   const stopInitializedSession = async (
@@ -183,7 +179,7 @@ export const createEngineRecorder = (
         currentSession = undefined;
       }
       await settleTry(session);
-      setRecording(false);
+      options.endTake();
     }
   };
 
@@ -277,14 +273,11 @@ export const createEngineRecorder = (
       });
       session.playerStreamStarted = true;
 
-      session.unsubscribePlayback = store.subscribe(
-        (state) => state.playing,
-        (playing) => {
-          if (!playing && currentSession === session) {
-            void requestSessionStop(session, false);
-          }
-        },
-      );
+      session.unsubscribePlayback = store.subscribe(isPlaying, (playing) => {
+        if (!playing && currentSession === session) {
+          void requestSessionStop(session, false);
+        }
+      });
       session.unsubscribeRecordingGain = store.subscribe(
         (state) => state.recordingGain,
         (recordingGain) => {
@@ -343,7 +336,7 @@ export const createEngineRecorder = (
     stop: async () => {
       const session = currentSession;
       if (!session) {
-        setRecording(false);
+        options.endTake();
         return;
       }
 
@@ -352,7 +345,7 @@ export const createEngineRecorder = (
     finish: async () => {
       const session = currentSession;
       if (!session) {
-        setRecording(false);
+        options.endTake();
         return;
       }
 

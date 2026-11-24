@@ -2,6 +2,7 @@ import {
   type EngineState,
   getActiveRecording,
   getCalibrationNeeded,
+  isRecording,
 } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { canCommandPlayback } from '../buttons/playback.js';
@@ -45,7 +46,7 @@ export const pressRecord = (projectId: number) => {
     requestTake('recordTry', projectId);
     return;
   }
-  if (state.recording) {
+  if (isRecording(state)) {
     void engine.player.stopRecording();
     return;
   }

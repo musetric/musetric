@@ -1,4 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
+import { isPlaying, isRecording } from '../../state.js';
 import { rate } from './player.fixtures.js';
 import { createSeam, flush, type Seam } from './seam.fixtures.js';
 
@@ -29,7 +30,7 @@ describe('the seam of the player', () => {
     await current.player.stop();
     const stopped = current.position.read();
     expect(await shownAfter(current, 0.5)).toBe(stopped);
-    expect(current.store.get().playing).toBe(false);
+    expect(isPlaying(current.store.get())).toBe(false);
   });
 
   it('race 1: moves the cursor after a seek within the round trip of Play', async () => {
@@ -41,7 +42,7 @@ describe('the seam of the player', () => {
     await current.player.play();
     const first = await shownAfter(current, 0.5);
     const second = await shownAfter(current, 0.5);
-    expect(current.store.get().playing).toBe(true);
+    expect(isPlaying(current.store.get())).toBe(true);
     expect(first).toBeGreaterThanOrEqual(target);
     expect(second).toBeGreaterThan(first);
   });
@@ -61,20 +62,20 @@ describe('the seam of the player', () => {
     });
     await shownAfter(current, 1.5);
     await flush();
-    expect(current.store.get().playing).toBe(false);
+    expect(isPlaying(current.store.get())).toBe(false);
   });
 
   it('race 5: keeps a Stop pressed while a take prepares', async () => {
     const current = await open();
     const recording = current.player.record(1);
     await flush();
-    expect(current.store.get().recording).toBe(true);
+    expect(isRecording(current.store.get())).toBe(true);
     await current.player.stop();
     current.microphone.open();
     await shownAfter(current, 0.5);
     await recording;
     await shownAfter(current, 0.5);
-    expect(current.store.get().recording).toBe(false);
+    expect(isRecording(current.store.get())).toBe(false);
   });
 });
 
@@ -150,7 +151,11 @@ describe('a seeded fuzz of the commands of the player', () => {
         for (let frame = 0; frame < 4; frame += 1) {
           frames.push(await shownAfter(current, 0.025));
         }
-        steps.push({ command, playing: current.store.get().playing, frames });
+        steps.push({
+          command,
+          playing: isPlaying(current.store.get()),
+          frames,
+        });
       }
       expect(steps.filter((step) => step.playing).length).toBeGreaterThan(5);
       expect(findBrokenInvariant(steps)).toBeUndefined();

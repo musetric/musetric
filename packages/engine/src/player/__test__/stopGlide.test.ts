@@ -1,4 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
+import { isPlaying } from '../../state.js';
 import { rate } from './player.fixtures.js';
 import { createSeam } from './seam.fixtures.js';
 
@@ -37,7 +38,7 @@ describe('Stop', () => {
       }
     });
     await seam.player.stop();
-    expect(seam.store.get().playing).toBe(false);
+    expect(isPlaying(seam.store.get())).toBe(false);
     expect(soundEnd - atStop).toBeGreaterThanOrEqual(outputLatency - 2 * 128);
     expect(seam.position.read()).toBeLessThan(soundEnd);
     expect(await shownAfter(seam, 60)).toBe(soundEnd);

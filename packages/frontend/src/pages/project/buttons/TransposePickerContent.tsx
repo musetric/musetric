@@ -1,5 +1,6 @@
 import { Divider, Stack } from '@mui/material';
 import { maxTransposeSemitones, minTransposeSemitones } from '@musetric/audio';
+import { isRecording } from '@musetric/engine';
 import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,7 @@ import { VoiceOctaveToggle } from './VoiceOctaveToggle.js';
 export const TransposePickerContent: FC = () => {
   const { t } = useTranslation();
   const { projectId } = routes.project.useAssertMatch();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const transposeSemitones = useEngineStore(
     (state) => state.transposeSemitones,
   );
