@@ -93,7 +93,7 @@ export const measureCursor = async (
   try {
     for (let cycle = 0; cycle < options.cycles; cycle += 1) {
       await stop();
-      player.seek(startFrame, 'player');
+      seek(startFrame);
       await wait(400);
 
       await play();
@@ -109,7 +109,7 @@ export const measureCursor = async (
       await stop();
 
       for (const delayMs of playSeekDelaysMs) {
-        player.seek(startFrame, 'player');
+        seek(startFrame);
         await wait(400);
         const target = startFrame + seconds(playSeekSeconds);
         const starting = player.play();
@@ -121,7 +121,7 @@ export const measureCursor = async (
         await stop();
       }
 
-      player.seek(startFrame, 'player');
+      seek(startFrame);
       await wait(400);
       await play();
       await wait(800);
@@ -134,6 +134,7 @@ export const measureCursor = async (
         dragTarget = dragFrom + seconds(step * dragStepSeconds);
         player.seek(dragTarget, 'playhead');
       }
+      await wait(dragStepMs * 3);
       mark('dragEnd', dragTarget);
       player.setFrozen(false);
       await wait(1500);

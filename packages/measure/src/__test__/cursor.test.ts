@@ -92,6 +92,27 @@ describe('analyzeCursor', () => {
     expect(stop.largestReversalMs).toBeGreaterThan(150);
   });
 
+  it('leaves a seek after Stop out of the jump on Stop', () => {
+    const stopMs = 1000;
+    const atStop = rolling(0, 0)(stopMs);
+    const run = createRun(
+      2200,
+      (time) => {
+        if (time <= stopMs) {
+          return { frame: rolling(0, 0)(time), playing: true };
+        }
+        return { frame: time < 1800 ? atStop : 0, playing: false };
+      },
+      [
+        [0, 'play', 0],
+        [stopMs, 'stop', Math.round(atStop)],
+      ],
+    );
+    const { stop } = analyzeCursor(run);
+    expect(stop.jumps.map(Math.round)).toEqual([0]);
+    expect(stop.largestReversalMs).toBe(0);
+  });
+
   it('takes the turns of a loop for no steps back and finds the furthest point', () => {
     const length = loop.toFrame - loop.fromFrame;
     const run = createRun(

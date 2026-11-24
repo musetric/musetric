@@ -4,6 +4,7 @@ const startupMs = 400;
 const declaredJumpMs = 300;
 const standingMs = 500;
 const seekReachSeconds = 0.25;
+const stopSettleMs = 700;
 
 const median = (values: readonly number[]) => {
   if (values.length === 0) {
@@ -125,7 +126,7 @@ const checkStops = (trace: Trace) => {
       continue;
     }
     const [, , frame] = event;
-    const window = trace.windowOf(index);
+    const window = between(trace.windowOf(index), 0, event[0] + stopSettleMs);
     const settled = window.at(-1)?.frame ?? frame;
     stops.jumps.push(trace.toMs(settled - frame) / trace.screenFrameMs);
     let path = 0;
