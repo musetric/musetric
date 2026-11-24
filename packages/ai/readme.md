@@ -77,6 +77,12 @@ transcription runs on, stay peers at the versions of the catalog.
   it builds the core, then releases their bytes.
 - `separateTrack` takes `separationTrack`, a source of the mixture at its
   sample rate, and a commit that stores each unit's stems.
+- `warmUpOrt` runs a small graph through `onnxruntime-web`, then waits as
+  long as it is told. WebKit compiles onnxruntime's wasm on its first runs; on
+  an iPhone that compile beside the core's session creation takes the page
+  past its limit, so a page in WebKit warms up before `loadSeparationModel`,
+  as the iOS executor does
+  ([#1362](https://github.com/musetric/musetric/issues/1362)).
 - The caller points `onnxruntime-web` at its wasm, since the package does not
   bundle it.
 
