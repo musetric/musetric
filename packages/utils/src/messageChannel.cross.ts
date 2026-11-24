@@ -5,6 +5,7 @@ import {
   type PortMethods,
   type PortTransfers,
   type TypedMessagePort,
+  type TypedSyncMessagePort,
 } from './messagePort.cross.js';
 
 type MessageChannelSide<Methods extends PortMethods> = {
@@ -27,10 +28,6 @@ export type TypedMessageChannel<
   inbound: <Port extends MessagePortLike>(
     instance: Port,
   ) => TypedMessagePort<Port, OutboundMethods, InboundMethods>;
-  inboundSync: <Port extends MessagePortLike>(
-    instance: Port,
-    dispatch: PortDispatch,
-  ) => TypedMessagePort<Port, OutboundMethods, InboundMethods>;
   outbound: <Port extends MessagePortLike>(
     instance: Port,
   ) => TypedMessagePort<Port, InboundMethods, OutboundMethods>;
@@ -50,6 +47,41 @@ export const createMessageChannel = <
         inbound.keys,
         inbound.transfers,
       ),
+    outbound: <Port extends MessagePortLike>(port: Port) =>
+      createMessagePort<Port, InboundMethods, OutboundMethods>(
+        port,
+        outbound.keys,
+        outbound.transfers,
+      ),
+  };
+};
+
+export type TypedSyncMessageChannel<
+  InboundMethods extends PortMethods,
+  OutboundMethods extends PortMethods,
+> = Omit<TypedMessageChannel<InboundMethods, OutboundMethods>, 'inbound'> & {
+  inbound: <Port extends MessagePortLike>(
+    instance: Port,
+  ) => TypedSyncMessagePort<Port, OutboundMethods, InboundMethods>;
+  inboundSync: <Port extends MessagePortLike>(
+    instance: Port,
+    dispatch: PortDispatch,
+  ) => TypedSyncMessagePort<Port, OutboundMethods, InboundMethods>;
+  outboundSync: <Port extends MessagePortLike>(
+    instance: Port,
+    dispatch: PortDispatch,
+  ) => TypedSyncMessagePort<Port, InboundMethods, OutboundMethods>;
+};
+
+export const createSyncMessageChannel = <
+  InboundMethods extends PortMethods,
+  OutboundMethods extends PortMethods,
+>(
+  options: CreateMessageChannelOptions<InboundMethods, OutboundMethods>,
+): TypedSyncMessageChannel<InboundMethods, OutboundMethods> => {
+  const { inbound, outbound } = options;
+  return {
+    ...createMessageChannel(options),
     inboundSync: <Port extends MessagePortLike>(
       port: Port,
       dispatch: PortDispatch,
@@ -60,11 +92,15 @@ export const createMessageChannel = <
         inbound.transfers,
         dispatch,
       ),
-    outbound: <Port extends MessagePortLike>(port: Port) =>
+    outboundSync: <Port extends MessagePortLike>(
+      port: Port,
+      dispatch: PortDispatch,
+    ) =>
       createMessagePort<Port, InboundMethods, OutboundMethods>(
         port,
         outbound.keys,
         outbound.transfers,
+        dispatch,
       ),
   };
 };

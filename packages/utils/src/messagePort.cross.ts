@@ -57,7 +57,7 @@ const readHandler = (
 };
 
 export type PortDispatch = <Payload>(
-  handler: (payload: Payload) => unknown,
+  handler: (payload: Payload) => void,
   payload: Payload,
 ) => void;
 
@@ -100,6 +100,32 @@ export type TypedMessagePort<
   methods: Methods;
   bindBoot: (boot: Handlers['boot']) => void;
   bindHandlers: (handlers: Omit<Handlers, 'boot'>) => void;
+};
+
+type SyncHandler<Handler> = Handler extends (
+  ...args: never[]
+) => PromiseLike<unknown>
+  ? never
+  : Handler;
+
+type SyncHandlers<Handlers> = {
+  [Type in keyof Handlers]: SyncHandler<Handlers[Type]>;
+};
+
+export type TypedSyncMessagePort<
+  Port extends MessagePortLike,
+  Handlers extends PortMethods,
+  Methods extends PortMethods,
+> = Omit<
+  TypedMessagePort<Port, Handlers, Methods>,
+  'bindBoot' | 'bindHandlers'
+> & {
+  bindBoot: <Boot extends Handlers['boot']>(
+    boot: Boot & SyncHandler<Boot>,
+  ) => void;
+  bindHandlers: <Bound extends Omit<Handlers, 'boot'>>(
+    handlers: Bound & SyncHandlers<Bound>,
+  ) => void;
 };
 
 export const createMessagePort = <

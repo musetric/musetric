@@ -13,7 +13,8 @@ import { hideLoopView, showLoopView } from './loopView.js';
 export const isLoopAvailable = (state: EngineState): boolean =>
   Boolean(state.frameCount) &&
   !isRecording(state) &&
-  state.statuses.realtime !== 'error';
+  state.statuses.realtime !== 'error' &&
+  state.statuses.player !== 'error';
 
 export const openLoop = (range: EngineRange) => {
   engine.player.openLoop(range);

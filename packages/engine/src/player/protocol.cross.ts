@@ -1,5 +1,5 @@
 import { type StemType } from '@musetric/audio/es';
-import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
+import { createSyncMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export const playerProcessorName = 'player-processor';
 
@@ -85,7 +85,7 @@ export type PlayerInboundMethods = {
   failed: (message: { reason: string }) => void;
 };
 
-export const playerChannel = createMessageChannel<
+export const playerChannel = createSyncMessageChannel<
   PlayerInboundMethods,
   PlayerOutboundMethods
 >({
@@ -208,7 +208,7 @@ export type PlayerDataInboundMethods = {
   requestWindow: (message: PlayerWindow) => void;
 };
 
-export const playerDataChannel = createMessageChannel<
+export const playerDataChannel = createSyncMessageChannel<
   PlayerDataInboundMethods,
   PlayerDataMethods
 >({
