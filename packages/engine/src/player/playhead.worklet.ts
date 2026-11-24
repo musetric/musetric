@@ -1,6 +1,29 @@
 import { playheadChannel, type PlayheadValue } from './playhead.cross.js';
+import { sameLoop, wrapLoop } from './playheadPresenter.cross.js';
 
-const publishIntervalSeconds = 1 / 240;
+const pulseSeconds = 1 / 15;
+const lineToleranceFrames = 128;
+const rateTolerance = 0.02;
+
+const onLine = (published: PlayheadValue, value: PlayheadValue) => {
+  if (
+    value.revision !== published.revision ||
+    Math.abs(value.rate - published.rate) > rateTolerance ||
+    (value.rate === 0) !== (published.rate === 0) ||
+    value.clockOffset !== published.clockOffset ||
+    value.endFrame !== published.endFrame ||
+    value.startContextFrame !== published.startContextFrame ||
+    !sameLoop(value.loop, published.loop)
+  ) {
+    return false;
+  }
+  const predicted = wrapLoop(
+    published.frameIndex +
+      (value.contextFrame - published.contextFrame) * published.rate,
+    published.loop,
+  );
+  return Math.abs(predicted - value.frameIndex) <= lineToleranceFrames;
+};
 
 export type PlayheadPublisher = {
   publish: (value: PlayheadValue) => void;
@@ -13,7 +36,7 @@ export const createPlayheadPublisher = (
 ): PlayheadPublisher => {
   const subscribers = ports.map(playheadChannel.outbound);
   let published: PlayheadValue | undefined = undefined;
-  let publishedTime = -publishIntervalSeconds;
+  let publishedTime = 0;
 
   const publishNow = (value: PlayheadValue) => {
     published = value;
@@ -25,16 +48,11 @@ export const createPlayheadPublisher = (
 
   return {
     publish: (value) => {
-      const unchanged =
-        published !== undefined &&
-        value.frameIndex === published.frameIndex &&
-        value.revision === published.revision &&
-        value.rate === published.rate &&
-        value.clockOffset === published.clockOffset;
-      if (unchanged) {
-        return;
-      }
-      if (getCurrentTime() - publishedTime < publishIntervalSeconds) {
+      if (
+        published &&
+        onLine(published, value) &&
+        (value.rate === 0 || getCurrentTime() - publishedTime < pulseSeconds)
+      ) {
         return;
       }
       publishNow(value);
