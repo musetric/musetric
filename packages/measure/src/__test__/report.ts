@@ -95,7 +95,7 @@ const formatValues = (
 
 export const formatCursorTable = (result: CursorResult) => {
   const { run, stop, seek, playSeek, drag, loop, store, buffering } = result;
-  const { play, spectrogram } = result;
+  const { play, spectrogram, apart } = result;
   const ms = (value: number) => `${Math.round(value)} ms`;
   return [
     '| Check | Result |',
@@ -111,6 +111,7 @@ export const formatCursorTable = (result: CursorResult) => {
     `| Behind the finger at the release | ${formatValues(drag.behindMs, 0, ' ms')} |`,
     `| Ahead of the sound after Play, the largest | ${formatValues(play.leadMs, 0, ' ms')} |`,
     `| The spectrogram: frames drawn, steps back while playing | ${spectrogram.count}, ${spectrogram.stepsBack}, the largest ${ms(spectrogram.largestStepBackMs)} |`,
+    `| The spectrogram apart from the ruler while playing | median ${apart.medianMs.toFixed(1)} ms, the largest ${apart.largestMs.toFixed(1)} ms, of ${apart.count} frames |`,
     `| The spectrogram behind the finger at the release | ${formatValues(spectrogram.behindMs, 0, ' ms')} |`,
     `| The spectrogram ahead of the sound after Play, the largest | ${formatValues(spectrogram.leadMs, 0, ' ms')} |`,
     `| Loop: turns, steps back, the furthest past its end | ${loop.turns}, ${loop.stepsBack}, ${ms(loop.overshootMs)} |`,

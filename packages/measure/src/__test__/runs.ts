@@ -100,6 +100,7 @@ export const cursorRunSchema = z.object({
   storeChanges: z.array(z.number()),
   buffering: z.array(z.tuple([z.number(), z.number()])).default([]),
   drawn: z.array(z.tuple([z.number(), z.number(), z.number()])).default([]),
+  writes: z.array(z.tuple([z.number(), z.number()])).default([]),
   loop: z.object({ fromFrame: z.number(), toFrame: z.number() }),
 });
 

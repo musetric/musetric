@@ -26,6 +26,7 @@ const createRun = (
     storeChanges: [],
     buffering: [],
     drawn: [],
+    writes: [],
     loop,
   };
 };
@@ -283,5 +284,27 @@ describe('analyzeCursor', () => {
       (target / sampleRate) * 1000,
       3,
     );
+  });
+  it('tells how far the spectrogram is from the ruler while playing', () => {
+    const line = rolling(0, 0);
+    const base = createRun(
+      3000,
+      (time) => ({ frame: line(time), playing: true }),
+      [[0, 'play', 0]],
+    );
+    const writes: CursorRun['writes'] = base.frames.map((entry) => [
+      entry[0],
+      entry[1],
+    ]);
+    const drawnAt = (lagMs: number): CursorRun['drawn'] =>
+      Array.from({ length: 60 }, (_, index) => {
+        const time = 1000 + index * 25;
+        return [time, Math.round(line(time - lagMs)), 1];
+      });
+    const together = analyzeCursor({ ...base, writes, drawn: drawnAt(0) });
+    const behind = analyzeCursor({ ...base, writes, drawn: drawnAt(screenMs) });
+    expect(together.apart.count).toBe(60);
+    expect(together.apart.largestMs).toBeLessThan(0.1);
+    expect(behind.apart.medianMs).toBeCloseTo(screenMs, 1);
   });
 });

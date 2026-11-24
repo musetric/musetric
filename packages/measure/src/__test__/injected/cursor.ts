@@ -78,6 +78,7 @@ export type CursorRun = {
   events: [epochMs: number, kind: CursorEventKind, frameIndex: number][];
   storeChanges: number[];
   buffering: [epochMs: number, buffering: number][];
+  writes: [epochMs: number, frameIndex: number][];
   loop: { fromFrame: number; toFrame: number };
 };
 
@@ -104,6 +105,7 @@ export const measureCursor = async (
   const events: CursorRun['events'] = [];
   const storeChanges: CursorRun['storeChanges'] = [];
   const buffering: CursorRun['buffering'] = [];
+  const writes: CursorRun['writes'] = [];
   const mark = (kind: CursorEventKind, frameIndex: number) => {
     events.push([epochNow(), kind, frameIndex]);
   };
@@ -122,6 +124,9 @@ export const measureCursor = async (
   });
   const unsubscribeBuffering = store.subscribe(isBuffering, (value) => {
     buffering.push([epochNow(), value ? 1 : 0]);
+  });
+  const unsubscribeWrites = engine.position.subscribe((frameIndex) => {
+    writes.push([epochNow(), frameIndex]);
   });
 
   const stop = async () => {
@@ -243,6 +248,7 @@ export const measureCursor = async (
     sampling = false;
     unsubscribeStore();
     unsubscribeBuffering();
+    unsubscribeWrites();
   }
 
   return {
@@ -252,6 +258,7 @@ export const measureCursor = async (
     events,
     storeChanges,
     buffering,
+    writes,
     loop,
   };
 };

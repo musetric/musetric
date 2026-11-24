@@ -3,6 +3,7 @@ import {
   isPrimaryPointerButton,
   type PointerInputType,
 } from './pointerType.js';
+import { createTapTracker } from './tap.js';
 
 const touchLockDistance = 8;
 
@@ -30,6 +31,7 @@ export type SeekDragOptions = {
   element: HTMLElement;
   onStart?: () => void;
   onUpdate: (event: SeekDragUpdate) => void;
+  onTap?: (ratio: number) => void;
   onCancel?: () => void;
   onEnd?: () => void;
 };
@@ -47,7 +49,8 @@ type SeekDragInternalState = {
 };
 
 export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
-  const { element, onStart, onUpdate, onCancel, onEnd } = options;
+  const { element, onStart, onUpdate, onTap, onCancel, onEnd } = options;
+  const tap = createTapTracker();
   const initialTouchAction = element.style.touchAction;
   const initialUserSelect = element.style.userSelect;
   let state: SeekDragInternalState | undefined = undefined;
@@ -89,6 +92,11 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     };
     element.setPointerCapture(event.pointerId);
     event.preventDefault();
+    if (event.pointerType === 'touch') {
+      tap.press(event);
+    } else {
+      tap.cancel();
+    }
     onStart?.();
 
     if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
@@ -110,6 +118,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
       return;
     }
     event.preventDefault();
+    tap.move(event);
     if (!currentState.locked) {
       if (Math.abs(event.clientX - currentState.startX) < touchLockDistance) {
         return;
@@ -130,6 +139,9 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     if (!currentState || event.pointerId !== currentState.pointerId) return;
     releasePointerCapture(event.pointerId);
     state = undefined;
+    if (tap.release(event)) {
+      onTap?.(getRatio(element, event.clientX));
+    }
     finish();
     event.preventDefault();
   };
@@ -139,6 +151,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     if (!currentState || event.pointerId !== currentState.pointerId) return;
     releasePointerCapture(event.pointerId);
     state = undefined;
+    tap.cancel();
     onCancel?.();
     finish();
   };
