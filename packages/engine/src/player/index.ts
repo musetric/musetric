@@ -35,7 +35,7 @@ export type EnginePlayer = EnginePlayerLoop &
     play: () => Promise<void>;
     stop: () => Promise<void>;
     seek: (frameIndex: number, origin: EngineSeekOrigin) => void;
-    setFrozen: (frozen: boolean) => void;
+    hold: () => () => void;
     record: (projectId: number) => Promise<void>;
     stopRecording: () => Promise<void>;
   };
@@ -62,6 +62,7 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
+  let holds = 0;
   const session = createEngineSessionMachine(store);
   const queue = createEngineCommandQueue(store);
 
@@ -73,6 +74,14 @@ export const createEnginePlayer = (
     session,
     getEnginePlayback: () => enginePlayback,
   });
+
+  const setFrozen = (frozen: boolean) => {
+    if (!frozen && heldSeek !== undefined) {
+      enginePlayback.seek(heldSeek);
+      heldSeek = undefined;
+    }
+    enginePlayback.setFrozen(frozen);
+  };
 
   const ref: EnginePlayer = {
     boot: async () => {
@@ -147,12 +156,22 @@ export const createEnginePlayer = (
       }
       enginePlayback.seek(frameIndex);
     },
-    setFrozen: (frozen) => {
-      if (!frozen && heldSeek !== undefined) {
-        enginePlayback.seek(heldSeek);
-        heldSeek = undefined;
+    hold: () => {
+      holds += 1;
+      if (holds === 1) {
+        setFrozen(true);
       }
-      enginePlayback.setFrozen(frozen);
+      let held = true;
+      return () => {
+        if (!held) {
+          return;
+        }
+        held = false;
+        holds -= 1;
+        if (holds === 0) {
+          setFrozen(false);
+        }
+      };
     },
     record: async (projectId) =>
       queue.run(async () => {
