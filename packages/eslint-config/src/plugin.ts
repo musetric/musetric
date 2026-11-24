@@ -10,6 +10,7 @@ export const musetricRecommendedRules: Linter.RulesRecord = {
   'musetric/no-defensive-throw-guards': 'error',
   'musetric/no-dynamic-translation-keys': 'error',
   'musetric/no-engine-store-writes': 'error',
+  'musetric/no-engine-transport-reads': 'error',
   'musetric/no-fragmented-type-declarations': 'error',
   'musetric/no-function-declarations': 'error',
   'musetric/no-global-state': 'error',
