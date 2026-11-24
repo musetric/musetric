@@ -25,6 +25,7 @@ const createRun = (
     events,
     storeChanges: [],
     buffering: [],
+    drawn: [],
     loop,
   };
 };
@@ -228,5 +229,59 @@ describe('analyzeCursor', () => {
     };
     const { buffering } = analyzeCursor(run);
     expect(buffering.heldMs).toEqual([31, 52]);
+  });
+  it('tells how far the cursor runs ahead of the sound after Play', () => {
+    const stopMs = 2500;
+    const heardMs = 100;
+    const heard = (time: number) =>
+      rolling(0, heardMs)(Math.max(heardMs, time));
+    const waiting = createRun(
+      stopMs,
+      (time) => ({ frame: heard(time), playing: true }),
+      [
+        [0, 'play', 0],
+        [stopMs, 'stop', heard(stopMs)],
+      ],
+    );
+    const ahead = createRun(
+      stopMs,
+      (time) => ({
+        frame: heard(time) + Math.max(0, 0.09 * sampleRate * (1 - time / 1000)),
+        playing: true,
+      }),
+      [
+        [0, 'play', 0],
+        [stopMs, 'stop', heard(stopMs)],
+      ],
+    );
+    expect(analyzeCursor(waiting).play.leadMs[0]).toBeLessThan(1);
+    expect(analyzeCursor(ahead).play.leadMs[0]).toBeGreaterThan(80);
+  });
+
+  it('tells a spectrogram that stays behind the finger in a drag', () => {
+    const target = 100_000;
+    const run = {
+      ...createRun(
+        1000,
+        (time) => ({ frame: time < 200 ? 0 : target, playing: true }),
+        [
+          [0, 'play', 0],
+          [100, 'dragStart', 0],
+          [900, 'dragEnd', target],
+        ],
+      ),
+      drawn: [
+        [50, 0, 1],
+        [500, 0, 1],
+        [880, 0, 1],
+      ] satisfies CursorRun['drawn'],
+    };
+    const { drag, spectrogram } = analyzeCursor(run);
+    expect(drag.behindMs).toEqual([0]);
+    expect(spectrogram.count).toBe(3);
+    expect(spectrogram.behindMs[0]).toBeCloseTo(
+      (target / sampleRate) * 1000,
+      3,
+    );
   });
 });

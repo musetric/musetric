@@ -8,8 +8,9 @@ const energyFrequency = 1000;
 type RenderedFrame = {
   processor: SpectrogramProcessor;
   startedAt: number;
+  playing: boolean;
   playheadFrame: number;
-  writtenEnd: number;
+  writtenEnd: number | undefined;
 };
 
 type WorkerHooks = {
@@ -20,9 +21,11 @@ type WorkerHooks = {
 
 declare const musetricMeasureHooks: WorkerHooks | undefined;
 
+type LiveFrame = RenderedFrame & { writtenEnd: number };
+
 const createEdgeProbe = (sampleRate: number) => {
   let renderCount = 0;
-  return async (frame: RenderedFrame) => {
+  return async (frame: LiveFrame) => {
     renderCount += 1;
     if (renderCount % probeEvery !== 0) {
       return;
@@ -54,4 +57,17 @@ const createEdgeProbe = (sampleRate: number) => {
 if (typeof musetricMeasureHooks === 'undefined') {
   throw new Error('The spectrogram worker has no measure hooks');
 }
-musetricMeasureHooks.setRenderListener(createEdgeProbe(defaultSampleRate));
+const probeEdges = createEdgeProbe(defaultSampleRate);
+musetricMeasureHooks.setRenderListener(async (frame) => {
+  console.info(
+    '[measure]',
+    'drawn',
+    frame.startedAt,
+    frame.playheadFrame,
+    frame.playing ? 1 : 0,
+  );
+  const { writtenEnd } = frame;
+  if (frame.playing && writtenEnd !== undefined) {
+    await probeEdges({ ...frame, writtenEnd });
+  }
+});

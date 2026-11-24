@@ -1,8 +1,10 @@
 import { setTimeout } from 'node:timers/promises';
 import { z } from 'zod';
+import { type MeasureInput } from '../measureInput.js';
 import { bundleInjectedScript } from './bundle.js';
 import { connectPage, type MeasureLog } from './cdp.js';
 import { type MeasureDevice, openDevicePage } from './device.js';
+import { createPageInput } from './input.js';
 
 const readStep = 1_000_000;
 const logPollMs = 50;
@@ -12,6 +14,8 @@ export type MeasurePage = {
   callText: (procedure: string, options: object) => Promise<string>;
   logs: MeasureLog[];
   waitForLog: (channel: string, after: number) => Promise<MeasureLog>;
+  input: (input: MeasureInput) => Promise<void>;
+  finishInput: (id: number) => Promise<void>;
   reload: () => Promise<void>;
   close: () => void;
 };
@@ -68,6 +72,10 @@ export const openMeasurePage = async (
         }
         await setTimeout(logPollMs);
       }
+    },
+    input: createPageInput(page.send, device.kind),
+    finishInput: async (id) => {
+      await page.evaluate(`musetricMeasure.inputDone(${id})`);
     },
     reload: async () => {
       await page.evaluate('setTimeout(() => location.reload(), 0)');

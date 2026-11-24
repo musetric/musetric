@@ -6,6 +6,7 @@ import {
   measureRecovery,
 } from './failure.js';
 import { type PageHooks } from './hooks.js';
+import { createInputBridge } from './input.js';
 import { calibrate, readMeasureLatency } from './latency.js';
 import {
   type BrowserCaptureOptions,
@@ -19,6 +20,7 @@ declare const musetricMeasureHooks: PageHooks | undefined;
 
 const installMeasure = (hooks: PageHooks) => {
   const { engine } = hooks;
+  const input = createInputBridge();
   let kept = '';
   // eslint-disable-next-line musetric/no-global-state -- the driver calls the injected procedures through one entry point
   Object.assign(globalThis, {
@@ -28,7 +30,9 @@ const installMeasure = (hooks: PageHooks) => {
       timing: async (options: TimingOptions) =>
         measureTimingTake(hooks, options),
       delay: async (options: DelayOptions) => measureDelayTake(hooks, options),
-      cursor: async (options: CursorOptions) => measureCursor(hooks, options),
+      cursor: async (options: CursorOptions) =>
+        measureCursor(hooks, options, input.send),
+      inputDone: input.finish,
       failure: async (options: FailureOptions) =>
         measureFailure(hooks, options),
       recovery: async () => measureRecovery(hooks),

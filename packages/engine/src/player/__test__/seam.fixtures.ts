@@ -68,6 +68,7 @@ export type Seam = {
   player: EnginePlayer;
   store: Store<EngineState>;
   position: EnginePosition;
+  spectrogramPlayheadPort: MessagePort;
   host: string[];
   toWorklet: string[];
   fromWorklet: string[];
@@ -78,6 +79,7 @@ export type Seam = {
   postToWorklet: (message: unknown) => void;
   deliverFromWorklet: (message: unknown) => Promise<void>;
   hostFrames: () => number;
+  contextFrame: () => number;
   run: (quanta: number) => Promise<void>;
   frame: () => Promise<void>;
   close: () => void;
@@ -94,6 +96,7 @@ type FakeWorklet = {
 export type CreateSeamOptions = {
   before?: (store: Store<EngineState>) => void;
   bootFault?: true;
+  heardAfterFrames?: number;
 };
 
 export const createSeam = async (
@@ -176,6 +179,13 @@ export const createSeam = async (
     return animationCallbacks.length;
   });
   vi.stubGlobal('cancelAnimationFrame', noop);
+  const { heardAfterFrames } = options;
+  if (heardAfterFrames !== undefined) {
+    vi.stubGlobal('performance', {
+      timeOrigin: 0,
+      now: () => (contextFrame / rate) * 1000,
+    });
+  }
 
   const context = fake<AudioContext>({
     sampleRate: rate,
@@ -198,7 +208,10 @@ export const createSeam = async (
     play: async () => Promise.resolve(),
   });
   const outputClock: EngineOutputClock = {
-    read: () => undefined,
+    read: () =>
+      heardAfterFrames === undefined
+        ? undefined
+        : { renderAhead: 0, clockOffset: -heardAfterFrames / rate },
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
@@ -224,6 +237,7 @@ export const createSeam = async (
   const microphone = createMicrophone();
   const data = new MessageChannel();
   const playhead = new MessageChannel();
+  const spectrogramPlayhead = new MessageChannel();
   const position = createEnginePosition();
   const player = createEnginePlayer({
     context,
@@ -234,10 +248,15 @@ export const createSeam = async (
     decoderPort: data.port1,
     getDecoder: () => decoder,
     playheadPort: playhead.port2,
-    playheadPorts: [playhead.port1],
+    playheadPorts: [playhead.port1, spectrogramPlayhead.port1],
     position,
   });
   await player.boot();
+  if (heardAfterFrames !== undefined) {
+    store.update((state) => {
+      state.outputLatencyFrameCount = heardAfterFrames;
+    });
+  }
   const silence = new Float32Array(frameCount);
   mountTracks(
     playerDataChannel.outbound(data.port2),
@@ -300,6 +319,7 @@ export const createSeam = async (
     },
     store,
     position,
+    spectrogramPlayheadPort: spectrogramPlayhead.port2,
     host,
     toWorklet,
     fromWorklet,
@@ -327,6 +347,7 @@ export const createSeam = async (
       await flush();
     },
     hostFrames: () => hostFrames,
+    contextFrame: () => contextFrame,
     run,
     frame: async () => {
       await flush();
@@ -340,6 +361,7 @@ export const createSeam = async (
     close: () => {
       data.port2.close();
       playhead.port2.close();
+      spectrogramPlayhead.port2.close();
       vi.unstubAllGlobals();
       if (!faulted && store.get().statuses.player === 'error') {
         throw new Error('The player failed though the test injected no fault');

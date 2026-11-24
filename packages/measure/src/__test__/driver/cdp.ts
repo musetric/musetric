@@ -49,6 +49,7 @@ export type MeasureLog = {
 
 export type CdpPage = {
   evaluate: (expression: string) => Promise<unknown>;
+  send: (method: string, params: Record<string, unknown>) => Promise<unknown>;
   logs: MeasureLog[];
   close: () => void;
 };
@@ -159,6 +160,7 @@ export const connectPage = async (
 
   return {
     evaluate,
+    send,
     logs,
     close: () => {
       socket.close();

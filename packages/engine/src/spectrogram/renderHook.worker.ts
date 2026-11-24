@@ -3,8 +3,9 @@ import { type SpectrogramProcessor } from '@musetric/spectrogram/gpu';
 export type RenderedFrame = {
   processor: SpectrogramProcessor;
   startedAt: number;
+  playing: boolean;
   playheadFrame: number;
-  writtenEnd: number;
+  writtenEnd: number | undefined;
 };
 
 export type RenderListener = (frame: RenderedFrame) => Promise<void>;
