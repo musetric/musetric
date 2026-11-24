@@ -17,8 +17,8 @@ const serveStemPages = (): void => {
       try {
         opened?.free();
         opened = undefined;
-        const pages = await openMasterPages(async (from, to, signal) =>
-          getMasterAudioRange({ projectId, type: stem, from, to, signal }),
+        const pages = await openMasterPages(async (from, to) =>
+          getMasterAudioRange(projectId, stem, from, to),
         );
         if (pages.sampleRate !== sampleRate) {
           pages.free();

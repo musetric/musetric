@@ -23,13 +23,14 @@ vi.mock('@musetric/audio/decoder', () => ({
       pageStarts: [0, 4],
       read: async (index, _mean, signal) =>
         new Promise<MasterPage>((resolve, reject) => {
-          signal.addEventListener('abort', () => {
-            reject(signal.reason);
-          });
           pending.push({
             index,
             signal,
             finish: () => {
+              if (signal.aborted) {
+                reject(signal.reason);
+                return;
+              }
               resolve({
                 index,
                 startFrame: index * 4,
@@ -90,6 +91,9 @@ describe('stem pages', () => {
     client.methods.cancel({ id: 3 });
     await settle();
     expect(pending[1].signal.aborted).toBe(true);
+    expect(started()).toEqual([0, 1]);
+    pending[1].finish();
+    await settle();
     expect(started()).toEqual([0, 1, 0]);
     pending[2].finish();
     await settle();

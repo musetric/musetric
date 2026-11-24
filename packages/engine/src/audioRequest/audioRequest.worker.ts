@@ -3,22 +3,15 @@ import { requestWithAxios } from '@musetric/api/dom';
 import { type StemType } from '@musetric/audio/es';
 import axios from 'axios';
 
-type MasterAudioRange = {
-  projectId: number;
-  type: StemType;
-  from: number;
-  to: number | undefined;
-  signal?: AbortSignal;
-};
-
 export const getMasterAudioRange = async (
-  range: MasterAudioRange,
+  projectId: number,
+  type: StemType,
+  from: number,
+  to: number | undefined,
 ): Promise<Uint8Array> => {
-  const { projectId, type, from, to, signal } = range;
   const response = await fetch(
     api.audio.masterContent.base.endpoint({ projectId, type }),
     {
-      signal,
       headers: {
         range:
           to === undefined
