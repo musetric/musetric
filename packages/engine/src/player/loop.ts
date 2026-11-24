@@ -5,8 +5,8 @@ import {
   type EngineState,
   isPlaying,
   isRecording,
-  isTransportBusy,
 } from '../state.js';
+import { type EngineCommandQueue } from './commandQueue.js';
 import { type EngineRecorder } from './recorder.js';
 import { type EngineSessionMachine } from './session.js';
 
@@ -25,6 +25,7 @@ export type EnginePlayerLoop = {
 export type CreateEnginePlayerLoopOptions = {
   store: Store<EngineState>;
   session: EngineSessionMachine;
+  queue: EngineCommandQueue;
   getDecoder: () => EngineDecoder;
   getEngineRecorder: () => EngineRecorder;
   seek: (frameIndex: number) => void;
@@ -34,8 +35,8 @@ export type CreateEnginePlayerLoopOptions = {
 export const createEnginePlayerLoop = (
   options: CreateEnginePlayerLoopOptions,
 ): EnginePlayerLoop => {
-  const { store, session, getDecoder, getEngineRecorder, seek, setRange } =
-    options;
+  const { store, session, queue, getDecoder, getEngineRecorder } = options;
+  const { seek, setRange } = options;
 
   const discardTries = () => {
     store.update((draft) => {
@@ -46,11 +47,7 @@ export const createEnginePlayerLoop = (
   };
 
   const cancelTry = async () => {
-    const currentState = store.get();
-    if (
-      isTransportBusy(currentState) ||
-      currentState.loopTryPhase === undefined
-    ) {
+    if (store.get().loopTryPhase === undefined) {
       return;
     }
 
@@ -76,47 +73,53 @@ export const createEnginePlayerLoop = (
       });
     },
     closeLoop: () => {
-      void cancelTry();
+      void queue.run(cancelTry);
       discardTries();
       store.update((draft) => {
         draft.loopStage = undefined;
       });
       setRange(undefined);
     },
-    recordTry: async (projectId) => {
-      const currentState = store.get();
-      const { range } = currentState;
-      const playing = isPlaying(currentState);
-      if (
-        !range ||
-        currentState.loopStage !== 'sing' ||
-        isTransportBusy(currentState) ||
-        isRecording(currentState)
-      ) {
-        return;
-      }
+    recordTry: async (projectId) =>
+      queue.run(async () => {
+        const currentState = store.get();
+        const { range } = currentState;
+        const playing = isPlaying(currentState);
+        if (
+          !range ||
+          currentState.loopStage !== 'sing' ||
+          isRecording(currentState)
+        ) {
+          return;
+        }
 
-      if (!playing) {
-        seek(range.fromFrame);
-      }
-      store.update((draft) => {
-        draft.rangeRepeat = 'cycle';
-        draft.rangeStopFrame = undefined;
-        draft.loopTryPhase = 'armed';
-      });
-      session.beginTake();
-      try {
-        await getEngineRecorder().record(projectId, !playing, true);
-        session.settleTake();
-      } catch (error) {
+        if (!playing) {
+          seek(range.fromFrame);
+        }
         store.update((draft) => {
-          draft.loopTryPhase = undefined;
+          draft.rangeRepeat = 'cycle';
+          draft.rangeStopFrame = undefined;
+          draft.loopTryPhase = 'armed';
         });
-        session.failTake(playing);
-        throw error;
-      }
-    },
-    cancelTry,
+        session.beginTake();
+        const failTry = () => {
+          store.update((draft) => {
+            draft.loopTryPhase = undefined;
+          });
+          session.failTake(playing);
+        };
+        try {
+          if (await getEngineRecorder().record(projectId, !playing, true)) {
+            session.settleTake();
+          } else {
+            failTry();
+          }
+        } catch (error) {
+          failTry();
+          throw error;
+        }
+      }),
+    cancelTry: async () => queue.run(cancelTry),
     selectTry: (tryId) => {
       store.update((draft) => {
         draft.loopSelectedTryId = tryId;

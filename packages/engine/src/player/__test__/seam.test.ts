@@ -70,12 +70,14 @@ describe('the seam of the player', () => {
     const recording = current.player.record(1);
     await flush();
     expect(isRecording(current.store.get())).toBe(true);
-    await current.player.stop();
+    const stopping = current.player.stop();
     current.microphone.open();
-    await shownAfter(current, 0.5);
+    await stopping;
     await recording;
     await shownAfter(current, 0.5);
     expect(isRecording(current.store.get())).toBe(false);
+    expect(isPlaying(current.store.get())).toBe(false);
+    expect(current.host).not.toContain('recording.start');
   });
 });
 

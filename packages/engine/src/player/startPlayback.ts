@@ -1,5 +1,5 @@
 import { type Store } from '../common/store.js';
-import { type EngineState, isPlaying, isTransportBusy } from '../state.js';
+import { type EngineState, isPlaying } from '../state.js';
 import { type EnginePlayback } from './playback.js';
 import { type EngineSessionMachine } from './session.js';
 
@@ -12,8 +12,7 @@ export type CreateStartPlaybackOptions = {
 export const createStartPlayback =
   (options: CreateStartPlaybackOptions) => async (): Promise<void> => {
     const { store, session, getEnginePlayback } = options;
-    const currentState = store.get();
-    if (isTransportBusy(currentState) || isPlaying(currentState)) {
+    if (isPlaying(store.get())) {
       return;
     }
 

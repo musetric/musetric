@@ -10,8 +10,8 @@ import {
   type EngineState,
   isPlaying,
   isRecording,
-  isTransportBusy,
 } from '../state.js';
+import { createEngineCommandQueue } from './commandQueue.js';
 import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
 import {
   createEnginePlayback,
@@ -62,8 +62,8 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
-  let stopRequested = false;
   const session = createEngineSessionMachine(store);
+  const queue = createEngineCommandQueue(store);
 
   const getEngineRecorder = () =>
     assertDefined(engineRecorder, 'Player is not booted');
@@ -105,30 +105,31 @@ export const createEnginePlayer = (
       });
       await enginePlayback.boot();
     },
-    play: async () => {
-      store.update((draft) => {
-        draft.rangeRepeat = 'cycle';
-        draft.rangeStopFrame = undefined;
-      });
-      await startPlayback();
-    },
+    play: async () =>
+      queue.run(async () => {
+        store.update((draft) => {
+          draft.rangeRepeat = 'cycle';
+          draft.rangeStopFrame = undefined;
+        });
+        await startPlayback();
+      }),
     stop: async () => {
-      if (isTransportBusy(store.get())) {
-        stopRequested = true;
-        return;
+      if (store.get().take === 'arming') {
+        getEngineRecorder().cancel();
       }
-
-      const recording = isRecording(store.get());
-      session.beginStop();
-      try {
-        if (recording) {
-          await getEngineRecorder().stop();
-        } else {
-          await enginePlayback.stop();
+      return queue.runStop(async () => {
+        const recording = isRecording(store.get());
+        session.beginStop();
+        try {
+          if (recording) {
+            await getEngineRecorder().stop();
+          } else {
+            await enginePlayback.stop();
+          }
+        } finally {
+          session.settleStop();
         }
-      } finally {
-        session.settleStop();
-      }
+      });
     },
     seek: (requestedFrameIndex, origin) => {
       const frameIndex = clampToRange(requestedFrameIndex, store.get().range);
@@ -153,35 +154,39 @@ export const createEnginePlayer = (
       }
       enginePlayback.setFrozen(frozen);
     },
-    record: async (projectId) => {
-      const currentState = store.get();
-      if (isTransportBusy(currentState) || isRecording(currentState)) {
-        return;
-      }
+    record: async (projectId) =>
+      queue.run(async () => {
+        const currentState = store.get();
+        if (isRecording(currentState)) {
+          return;
+        }
 
-      const playing = isPlaying(currentState);
-      session.beginTake();
-      try {
-        await getEngineRecorder().record(projectId, !playing);
-        session.settleTake();
-      } catch (error) {
-        session.failTake(playing);
-        throw error;
-      }
-    },
-    stopRecording: async () => {
-      const currentState = store.get();
-      if (isTransportBusy(currentState) || !isRecording(currentState)) {
-        return;
-      }
+        const playing = isPlaying(currentState);
+        session.beginTake();
+        try {
+          if (await getEngineRecorder().record(projectId, !playing)) {
+            session.settleTake();
+          } else {
+            session.failTake(playing);
+          }
+        } catch (error) {
+          session.failTake(playing);
+          throw error;
+        }
+      }),
+    stopRecording: async () =>
+      queue.run(async () => {
+        if (!isRecording(store.get())) {
+          return;
+        }
 
-      session.beginDrain();
-      try {
-        await getEngineRecorder().finish();
-      } finally {
-        session.settleDrain();
-      }
-    },
+        session.beginDrain();
+        try {
+          await getEngineRecorder().finish();
+        } finally {
+          session.settleDrain();
+        }
+      }),
     ...createEnginePlayerSettings({
       store,
       getEnginePlayback: () => enginePlayback,
@@ -192,11 +197,13 @@ export const createEnginePlayer = (
       seek: (frameIndex) => {
         ref.seek(frameIndex, 'player');
       },
+      queue,
       startPlayback,
     }),
     ...createEnginePlayerLoop({
       store,
       session,
+      queue,
       getDecoder,
       getEngineRecorder,
       seek: (frameIndex) => {
@@ -207,13 +214,6 @@ export const createEnginePlayer = (
       },
     }),
   };
-
-  store.subscribe(isTransportBusy, (busy) => {
-    if (!busy && stopRequested) {
-      stopRequested = false;
-      void ref.stop();
-    }
-  });
 
   return ref;
 };

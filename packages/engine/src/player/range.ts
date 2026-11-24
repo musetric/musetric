@@ -7,11 +7,13 @@ import {
   type EngineState,
   isPlaying,
 } from '../state.js';
+import { type EngineCommandQueue } from './commandQueue.js';
 
 export type CreateEnginePlayerRangeOptions = {
   store: Store<EngineState>;
   readPosition: () => number;
   seek: (frameIndex: number) => void;
+  queue: EngineCommandQueue;
   startPlayback: () => Promise<void>;
 };
 
@@ -27,7 +29,7 @@ export type EnginePlayerRange = {
 export const createEnginePlayerRange = (
   options: CreateEnginePlayerRangeOptions,
 ): EnginePlayerRange => {
-  const { store, seek, startPlayback } = options;
+  const { store, seek, queue, startPlayback } = options;
 
   const playRange = async (
     repeat: EngineRangeRepeat,
@@ -62,11 +64,13 @@ export const createEnginePlayerRange = (
         seek(range.fromFrame);
       }
     },
-    playRange,
-    replayRange: async (play) => {
-      const { rangeRepeat } = store.get();
-      const playing = isPlaying(store.get());
-      await playRange(playing ? rangeRepeat : 'once', play);
-    },
+    playRange: async (repeat, play) =>
+      queue.run(async () => playRange(repeat, play)),
+    replayRange: async (play) =>
+      queue.run(async () => {
+        const { rangeRepeat } = store.get();
+        const playing = isPlaying(store.get());
+        await playRange(playing ? rangeRepeat : 'once', play);
+      }),
   };
 };
