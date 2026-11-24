@@ -69,6 +69,7 @@ export const createEnginePlayer = (
   const { playheadPort, playheadPorts } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
+  let heldSeek: number | undefined = undefined;
 
   const getEngineRecorder = () =>
     assertDefined(engineRecorder, 'Player is not booted');
@@ -156,6 +157,10 @@ export const createEnginePlayer = (
           origin,
         };
       });
+      if (store.get().frozen) {
+        heldSeek = frameIndex;
+        return;
+      }
       enginePlayback.seek(frameIndex);
       const state = store.get();
       getDecoderValue().sendPlayerFrameIndex({
@@ -169,6 +174,10 @@ export const createEnginePlayer = (
       store.update((state) => {
         state.playerFrameIndexPending = true;
       });
+      if (!frozen && heldSeek !== undefined) {
+        enginePlayback.seek(heldSeek);
+        heldSeek = undefined;
+      }
       enginePlayback.setFrozen(frozen);
       const state = store.get();
       getDecoderValue().sendPlayerFrameIndex({
