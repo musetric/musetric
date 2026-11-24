@@ -119,7 +119,10 @@ describe('analyzeCursor', () => {
       7000,
       (time) => {
         const played = (time / 1000) * sampleRate;
-        return { frame: loop.fromFrame + (played % (length + 960)), playing: true };
+        return {
+          frame: loop.fromFrame + (played % (length + 960)),
+          playing: true,
+        };
       },
       [
         [0, 'loopStart', loop.fromFrame],

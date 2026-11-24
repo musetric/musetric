@@ -80,7 +80,11 @@ export const formatDelayTable = (result: DelayResult) => {
   ].join('\n');
 };
 
-const formatValues = (values: readonly number[], digits: number, unit: string) => {
+const formatValues = (
+  values: readonly number[],
+  digits: number,
+  unit: string,
+) => {
   if (values.length === 0) {
     return 'none';
   }

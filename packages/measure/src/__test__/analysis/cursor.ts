@@ -108,7 +108,11 @@ const checkStalls = (trace: Trace) => {
     if (event[1] !== 'play' && event[1] !== 'seek') {
       continue;
     }
-    const after = between(trace.windowOf(index), event[0] + startupMs, Infinity);
+    const after = between(
+      trace.windowOf(index),
+      event[0] + startupMs,
+      Infinity,
+    );
     const stall = longestStand(after);
     if (stall >= 3 * trace.screenFrameMs) {
       stalls.count += 1;
@@ -201,7 +205,11 @@ const checkLoopEnd = (trace: Trace) => {
     const end = trace.events
       .slice(index)
       .find((candidate) => candidate[1] === 'loopEnd');
-    for (const sample of between(trace.samples, event[0], end?.[0] ?? Infinity)) {
+    for (const sample of between(
+      trace.samples,
+      event[0],
+      end?.[0] ?? Infinity,
+    )) {
       overshootMs = Math.max(
         overshootMs,
         trace.toMs(sample.frame - trace.loop.toFrame),
