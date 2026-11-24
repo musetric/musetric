@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fadeFrameCount } from '../playerRange.worklet.js';
 import { createPlayhead, type PlayheadValue } from '../playhead.cross.js';
 import { extrapolatePlayhead } from '../playheadPresenter.cross.js';
 import { blockSize, createHarness, rate, settle } from './player.fixtures.js';
@@ -108,7 +109,7 @@ describe('player playhead', () => {
     await settle();
     await run(100);
 
-    const soundEnd = rate + 100 * blockSize;
+    const soundEnd = rate + 100 * blockSize + fadeFrameCount;
     harness.player.methods.stop({ revision: 1, frameIndex: rate });
     await settle();
     const gliding = await run(10);

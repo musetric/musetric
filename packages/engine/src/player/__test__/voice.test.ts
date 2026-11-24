@@ -4,6 +4,8 @@ import {
   burstCenters,
   burstTrack,
   createHarness,
+  fadedIn,
+  fadeQuanta,
   noise,
   rate,
   settle,
@@ -83,7 +85,7 @@ describe('player voice', () => {
         playTranspose: 0,
       });
       expect(Array.from(played.subarray(0, raw.length))).toEqual(
-        Array.from(raw),
+        Array.from(fadedIn(raw)),
       );
     },
   );
@@ -125,7 +127,7 @@ describe('player voice', () => {
         playTranspose,
       });
       expect(Array.from(played.subarray(0, raw.length))).toEqual(
-        Array.from(raw),
+        Array.from(fadedIn(raw)),
       );
     },
   );
@@ -173,7 +175,7 @@ describe('player voice', () => {
         voiceShifted,
       });
       expect(Array.from(played.subarray(0, raw.length))).toEqual(
-        Array.from(raw),
+        Array.from(fadedIn(raw)),
       );
     },
   );
@@ -252,6 +254,9 @@ describe('player voice', () => {
     }
     harness.player.methods.seek({ frameIndex: 3.1 * rate, revision: 2 });
     await settle();
+    for (let block = 0; block < fadeQuanta; block += 1) {
+      harness.process(new Float32Array(blockSize));
+    }
     let stalePeak = 0;
     for (let block = 0; block < 100; block += 1) {
       for (const value of harness.process(new Float32Array(blockSize))) {

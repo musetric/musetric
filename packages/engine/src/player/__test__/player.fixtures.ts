@@ -1,5 +1,6 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { createRecordingStream } from '../../decoder/recordingStream.worker.js';
+import { fadeFrameCount } from '../playerRange.worklet.js';
 import {
   type LiveTakeChunk,
   playerChannel,
@@ -104,6 +105,15 @@ export const runSamples = (run: TakeRun): Float32Array => {
   }
   return samples;
 };
+
+export const fadeQuanta = fadeFrameCount / blockSize;
+
+export const fadedIn = (
+  samples: Float32Array<ArrayBuffer>,
+): Float32Array<ArrayBuffer> =>
+  samples.map((value, frame) =>
+    frame < fadeFrameCount ? value * (frame / fadeFrameCount) : value,
+  );
 
 export const noise = (length: number): Float32Array<ArrayBuffer> => {
   let seed = 1;
