@@ -64,16 +64,13 @@ export const measureTimingTake = async (
       metronome: true,
     },
     () => {
-      const unsubscribePlayhead = engine.store.subscribe(
-        (state) => state.frameIndex,
-        (frameIndex) => {
-          playhead.push([
-            epochNow(),
-            frameIndex,
-            engine.store.get().playing ? 1 : 0,
-          ]);
-        },
-      );
+      const unsubscribePlayhead = engine.position.subscribe((frameIndex) => {
+        playhead.push([
+          epochNow(),
+          frameIndex,
+          engine.store.get().playing ? 1 : 0,
+        ]);
+      });
       const unsubscribeCaptured = hooks.listenCaptured((chunk) => {
         capturedRate = chunk.sampleRate;
         chunks.push([capturedLength, performance.timeOrigin + chunk.startMs]);

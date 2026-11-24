@@ -18,9 +18,7 @@ const getFollowWindow = (): EngineViewWindow => {
   const { visibleTime, playheadRatio } = useSettingsStore.getState();
   const frameCount = visibleTime * engine.context.sampleRate;
   return {
-    startFrame: Math.round(
-      engine.store.get().frameIndex - playheadRatio * frameCount,
-    ),
+    startFrame: Math.round(engine.position.read() - playheadRatio * frameCount),
     frameCount: Math.round(frameCount),
   };
 };

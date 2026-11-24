@@ -17,6 +17,7 @@ import {
 } from '../state.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
+import { type EnginePositionWriter } from './position.js';
 import { playerChannel, playerProcessorName } from './protocol.cross.js';
 
 const noop = (): void => undefined;
@@ -60,6 +61,7 @@ export type CreateEnginePlaybackOptions = {
   decoderPort: MessagePort;
   playheadPort: MessagePort;
   playheadPorts: MessagePort[];
+  position: EnginePositionWriter;
   onPlaybackEnded?: () => void;
   onRecordingPassStarted?: () => void;
   onRecordingPassEnded?: (complete: boolean) => void;
@@ -73,7 +75,8 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, outputClock, store, decoderPort } = options;
+  const { context, audioOutput, outputClock, store, decoderPort, position } =
+    options;
   const { playheadPorts } = options;
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
@@ -107,9 +110,7 @@ export const createEnginePlayback = async (
       frameIndex !== lastPumpedFrameIndex
     ) {
       lastPumpedFrameIndex = frameIndex;
-      store.update((state) => {
-        state.frameIndex = frameIndex;
-      });
+      position.write(frameIndex);
     }
     return store.get().playing || value.rate !== 0;
   });
@@ -140,11 +141,11 @@ export const createEnginePlayback = async (
     setPlaying: (message) => {
       const currentRevision = isCurrentRevision(message.revision);
       if (currentRevision) {
+        if (!message.glide) {
+          position.write(message.frameIndex);
+        }
         store.update((state) => {
           state.playing = message.playing;
-          if (!message.glide) {
-            state.frameIndex = message.frameIndex;
-          }
           if (message.positionJump) {
             state.seekEvent = {
               revision: nextNumber(state.seekEvent.revision),
@@ -323,7 +324,7 @@ export const createEnginePlayback = async (
       const { revision } = store.get().seekEvent;
       const frameIndex = isCurrentRevision(playhead.read().revision)
         ? playhead.readFrameIndex()
-        : store.get().frameIndex;
+        : position.read();
       const playingPromise = createPlayingPromise(revision);
       port.methods.stop({ revision, frameIndex });
       return await playingPromise;

@@ -21,7 +21,7 @@ const shownAfter = async (
 ) => {
   await seam.run(quanta);
   await seam.frame();
-  return seam.store.get().frameIndex;
+  return seam.position.read();
 };
 
 describe('Stop', () => {
@@ -29,7 +29,7 @@ describe('Stop', () => {
     const seam = await open();
     await seam.player.play();
     await shownAfter(seam, 200);
-    const atStop = seam.store.get().frameIndex;
+    const atStop = seam.position.read();
     let soundEnd = Number.NaN;
     seam.onPostFromWorklet('setPlaying', (payload) => {
       if (payload instanceof Object && 'frameIndex' in payload) {
@@ -39,7 +39,7 @@ describe('Stop', () => {
     await seam.player.stop();
     expect(seam.store.get().playing).toBe(false);
     expect(soundEnd - atStop).toBeGreaterThanOrEqual(outputLatency - 2 * 128);
-    expect(seam.store.get().frameIndex).toBeLessThan(soundEnd);
+    expect(seam.position.read()).toBeLessThan(soundEnd);
     expect(await shownAfter(seam, 60)).toBe(soundEnd);
     expect(await shownAfter(seam, 60)).toBe(soundEnd);
     await seam.player.play();
@@ -50,7 +50,7 @@ describe('Stop', () => {
     const seam = await open();
     await seam.player.play();
     await shownAfter(seam, 200);
-    const atStop = seam.store.get().frameIndex;
+    const atStop = seam.position.read();
     await seam.player.stop();
     await seam.run(6);
     await seam.player.stop();

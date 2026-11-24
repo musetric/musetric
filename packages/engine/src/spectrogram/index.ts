@@ -10,6 +10,7 @@ import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { compileCapture } from '../audioSession/captureModule.js';
 import { type CapturedChunk } from '../audioSession/timedChunkPusher.cross.js';
 import { type Store } from '../common/store.js';
+import { type EnginePosition } from '../player/position.js';
 import {
   type EngineState,
   getFrequencyRange,
@@ -37,12 +38,13 @@ export type CreateEngineSpectrogramOptions = {
   sampleRate: number;
   decoderPort: MessagePort;
   playheadPort: MessagePort;
+  position: EnginePosition;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, playheadPort } = options;
+  const { store, sampleRate, decoderPort, playheadPort, position } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -63,15 +65,17 @@ export const createEngineSpectrogram = (
     },
   });
 
-  store.subscribe(getTrackProgress, (trackProgress) => {
+  const sendTrackProgress = () => {
     const spectrogramWorkerPollsPlayheadWhilePlaying = store.get().playing;
     if (spectrogramWorkerPollsPlayheadWhilePlaying) {
       return;
     }
     port.methods.setTrackProgress({
-      trackProgress,
+      trackProgress: getTrackProgress(position.read(), store.get().frameCount),
     });
-  });
+  };
+  position.subscribe(sendTrackProgress);
+  store.subscribe((state) => state.frameCount, sendTrackProgress);
 
   store.subscribe(
     (state) => state.playing,
@@ -159,7 +163,10 @@ export const createEngineSpectrogram = (
           sampleRate,
           ...buildStateView(engineState),
         },
-        trackProgress: getTrackProgress(engineState),
+        trackProgress: getTrackProgress(
+          position.read(),
+          engineState.frameCount,
+        ),
       });
       port.methods.setPlaying({ playing: engineState.playing });
 

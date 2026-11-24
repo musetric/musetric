@@ -34,7 +34,8 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
     let parentWidth = parentElement.getBoundingClientRect().width;
 
     const render = () => {
-      const { frameCount, frameIndex } = engine.store.get();
+      const { frameCount } = engine.store.get();
+      const frameIndex = engine.position.read();
       const { playheadRatio } = getVisualizationView();
       const waveformCursorRatio = frameCount ? frameIndex / frameCount : 0;
       const cursorRatio =
@@ -66,7 +67,7 @@ export const VisualizationCursor: FC<VisualizationCursorProps> = (props) => {
       resizeTarget: parentElement,
       onResize: resize,
       render,
-      engineKeys: ['frameCount', 'frameIndex', 'viewWindow'],
+      engineKeys: ['frameCount', 'viewWindow'],
       settingsKeys: ['playheadRatio'],
     });
 

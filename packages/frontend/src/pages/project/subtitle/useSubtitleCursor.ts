@@ -1,8 +1,9 @@
 import { type api } from '@musetric/api';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { engine } from '../../../engine/engine.js';
+import { subscribeEnginePosition } from '../../../engine/enginePosition.js';
 import { createSubtitleCursor, type SubtitleCursor } from './subtitleCursor.js';
-import { getSubtitlePlaybackTimeFromState } from './subtitlePlayback.js';
+import { getSubtitlePlaybackTime } from './subtitlePlayback.js';
 import { getSubtitleActiveSegmentIndex } from './subtitleTiming.js';
 
 const getCurrentSubtitleActiveSegmentIndex = (
@@ -10,7 +11,7 @@ const getCurrentSubtitleActiveSegmentIndex = (
 ) =>
   getSubtitleActiveSegmentIndex(
     subtitle,
-    getSubtitlePlaybackTimeFromState(engine.store.get()),
+    getSubtitlePlaybackTime(engine.position.read(), engine.store.get()),
   );
 
 export const useSubtitleCursor = (
@@ -28,11 +29,11 @@ export const useSubtitleCursor = (
 
   useEffect(
     () =>
-      engine.store.subscribe(
-        (state) =>
+      subscribeEnginePosition(
+        (frameIndex, state) =>
           getSubtitleActiveSegmentIndex(
             subtitle,
-            getSubtitlePlaybackTimeFromState(state),
+            getSubtitlePlaybackTime(frameIndex, state),
           ),
         (activeSegmentIndex) => {
           subtitleCursor.setActiveSegmentIndex(activeSegmentIndex);

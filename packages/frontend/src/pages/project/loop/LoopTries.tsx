@@ -5,6 +5,7 @@ import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
+import { useEnginePosition } from '../../../engine/enginePosition.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { applyLoopTry, closeLoop } from './loopActions.js';
@@ -48,9 +49,9 @@ export const LoopTries: FC = () => {
   const range = useEngineStore((state) => state.range);
   const tries = useEngineStore((state) => state.loopTries);
   const phase = useEngineStore((state) => state.loopTryPhase);
-  const beats = useEngineStore((state) =>
+  const beats = useEnginePosition((frameIndex, state) =>
     state.loopTryPhase === 'armed'
-      ? getBeatsToFrom(state, engine.context.sampleRate)
+      ? getBeatsToFrom(frameIndex, state, engine.context.sampleRate)
       : undefined,
   );
   const pending = useProjectStore((state) => state.insertingTry);

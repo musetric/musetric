@@ -15,7 +15,7 @@ const open = async () => {
 const shownAfter = async (current: Seam, seconds: number) => {
   await current.run(quantaOfSeconds(seconds));
   await current.frame();
-  return current.store.get().frameIndex;
+  return current.position.read();
 };
 
 describe('the seam of the player', () => {
@@ -27,7 +27,7 @@ describe('the seam of the player', () => {
     expect(first).toBeGreaterThan(0);
     expect(second - first).toBeGreaterThan(0.4 * rate);
     await current.player.stop();
-    const stopped = current.store.get().frameIndex;
+    const stopped = current.position.read();
     expect(await shownAfter(current, 0.5)).toBe(stopped);
     expect(current.store.get().playing).toBe(false);
   });

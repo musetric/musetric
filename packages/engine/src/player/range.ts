@@ -9,6 +9,7 @@ import {
 
 export type CreateEnginePlayerRangeOptions = {
   store: Store<EngineState>;
+  readPosition: () => number;
   seek: (frameIndex: number) => void;
   startPlayback: () => Promise<void>;
 };
@@ -54,7 +55,7 @@ export const createEnginePlayerRange = (
           draft.rangeStopFrame = undefined;
         }
       });
-      const { frameIndex } = store.get();
+      const frameIndex = options.readPosition();
       if (range && clampToRange(frameIndex, range) !== frameIndex) {
         seek(range.fromFrame);
       }

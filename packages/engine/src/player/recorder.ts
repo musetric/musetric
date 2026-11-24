@@ -22,6 +22,7 @@ import {
   resolvePreferredMicrophone,
 } from './microphone.js';
 import { type EnginePlayback } from './playback.js';
+import { type EnginePosition } from './position.js';
 
 const recordingFlushTimeoutMs = 2000;
 
@@ -60,6 +61,7 @@ export type CreateEngineRecorderOptions = {
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
+  position: EnginePosition;
   getDecoder: () => EngineDecoder;
   getEnginePlayback: () => EnginePlayback;
 };
@@ -239,7 +241,7 @@ export const createEngineRecorder = (
         return;
       }
 
-      const startFrameIndex = store.get().frameIndex;
+      const startFrameIndex = options.position.read();
       const frameCount = store.get().frameCount ?? 0;
       const source = microphone.createSource();
       const gain = context.createGain();

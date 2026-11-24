@@ -5,6 +5,7 @@ import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
 import { engine } from '../../../engine/engine.js';
+import { useEnginePosition } from '../../../engine/enginePosition.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { canPressRecord, pressRecord } from '../calibration/takeActions.js';
 import { getBeatsToFrom } from '../loop/loopCountdown.js';
@@ -19,9 +20,9 @@ export const PlaybackRecordButton: FC = () => {
   const stage = useEngineStore((state) => state.loopStage);
   const looping = stage !== undefined;
   const phase = useEngineStore((state) => state.loopTryPhase);
-  const beats = useEngineStore((state) =>
+  const beats = useEnginePosition((frameIndex, state) =>
     state.loopTryPhase === 'armed'
-      ? getBeatsToFrom(state, engine.context.sampleRate)
+      ? getBeatsToFrom(frameIndex, state, engine.context.sampleRate)
       : undefined,
   );
   const calibrationNeeded = useEngineStore(getCalibrationNeeded);

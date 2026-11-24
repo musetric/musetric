@@ -114,7 +114,6 @@ export type EngineState = {
   playerCommandPending: boolean;
   playerFrameIndexPending: boolean;
   backendRevision: number;
-  frameIndex: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   voiceOctave: VoiceOctave;
@@ -259,10 +258,11 @@ export const toStoredFrequencyRange = (
 };
 
 export const getTrackProgress = (
-  state: Pick<EngineState, 'frameCount' | 'frameIndex'>,
+  frameIndex: number,
+  frameCount: number | undefined,
 ): number => {
-  if (!state.frameCount) return 0;
-  return state.frameIndex / state.frameCount;
+  if (!frameCount) return 0;
+  return frameIndex / frameCount;
 };
 
 export const clampToRange = (
@@ -314,7 +314,6 @@ export const initialEngineState: EngineState = {
   playerCommandPending: false,
   playerFrameIndexPending: false,
   backendRevision: 0,
-  frameIndex: 0,
   seekEvent: {
     revision: 0,
     frameIndex: 0,

@@ -58,7 +58,7 @@ export const subscribeMediaSession = (
       return;
     }
     shown = true;
-    const positionMs = toMilliseconds(state.frameIndex);
+    const positionMs = toMilliseconds(engine.position.read());
     published = {
       positionMs,
       at: performance.now(),
@@ -88,7 +88,7 @@ export const subscribeMediaSession = (
     const expected =
       published.positionMs +
       (performance.now() - published.at) * published.speed;
-    const actual = toMilliseconds(engine.store.get().frameIndex);
+    const actual = toMilliseconds(engine.position.read());
     if (Math.abs(actual - expected) > driftMilliseconds) {
       publish();
     }
@@ -127,7 +127,7 @@ export const subscribeMediaSession = (
     engine.store.subscribe((state) => state.tempoRatio, publish),
     engine.store.subscribe((state) => state.seekEvent, publishPosition),
     engine.store.subscribe((state) => state.frozen, publishPosition),
-    engine.store.subscribe((state) => state.frameIndex, follow),
+    engine.position.subscribe(follow),
   ];
 
   return () => {

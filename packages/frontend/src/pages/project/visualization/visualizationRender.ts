@@ -23,6 +23,7 @@ export const subscribeVisualizationRender = (
 
   const unsubscribes = [
     subscribeResizeObserver(resizeTarget, onResize),
+    engine.position.subscribe(render),
     ...engineKeys.map((key) =>
       engine.store.subscribe((state) => state[key], render),
     ),
