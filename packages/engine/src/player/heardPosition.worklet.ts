@@ -4,12 +4,6 @@ import { createRenderHistory } from './renderHistory.worklet.js';
 
 const renderHistoryCapacity = 1024;
 
-export type HeardPositionValueOptions = {
-  revision: number;
-  clockOffset: number | undefined;
-  frameCount: number;
-};
-
 export type HeardPosition = {
   getFrameIndex: () => number;
   getRenderFrameIndex: () => number;
@@ -23,7 +17,12 @@ export type HeardPosition = {
     processedFrameCount: number,
   ) => number;
   refresh: () => void;
-  getValue: (options: HeardPositionValueOptions) => PlayheadValue;
+  read: (
+    value: PlayheadValue,
+    revision: number,
+    clockOffset: number | undefined,
+    frameCount: number,
+  ) => void;
 };
 
 export const createHeardPosition = (
@@ -35,25 +34,29 @@ export const createHeardPosition = (
   let runStartFrameIndex = 0;
   let runStartContextFrame: number | undefined = undefined;
   let nextContextFrame = 0;
-  let heardContextFrame = 0;
-  let heardRate = 1;
+  const heard = { contextFrame: 0, rate: 1 };
   let outputLatencyFrameCount = 0;
 
   const refresh = () => {
-    heardContextFrame = nextContextFrame - outputLatencyFrameCount;
-    const entry = history.find(heardContextFrame);
-    if (!entry || runStartContextFrame === undefined) {
+    heard.contextFrame = nextContextFrame - outputLatencyFrameCount;
+    const entry = history.find(heard.contextFrame);
+    if (entry < 0 || runStartContextFrame === undefined) {
       frameIndex = runStartFrameIndex;
-      heardContextFrame = runStartContextFrame ?? heardContextFrame;
-      heardRate = history.first()?.rate ?? heardRate;
+      heard.contextFrame = runStartContextFrame ?? heard.contextFrame;
+      const first = history.first();
+      if (first >= 0) {
+        heard.rate = history.rates[first];
+      }
       return;
     }
     const songFrame = Math.round(
-      entry.frameIndex + (heardContextFrame - entry.contextFrame) * entry.rate,
+      history.frameIndices[entry] +
+        (heard.contextFrame - history.contextFrames[entry]) *
+          history.rates[entry],
     );
     const range = getRange();
     frameIndex = range ? range.songFrame(songFrame) : songFrame;
-    heardRate = entry.rate;
+    heard.rate = history.rates[entry];
   };
 
   const startQuantum = (contextFrame: number, outputFrameCount: number) => {
@@ -84,16 +87,16 @@ export const createHeardPosition = (
     },
     hold: (contextFrame, outputFrameCount) => {
       startQuantum(contextFrame, outputFrameCount);
-      history.push({ contextFrame, frameIndex: renderFrameIndex, rate: 0 });
+      history.push(contextFrame, renderFrameIndex, 0);
       refresh();
     },
     advance: (contextFrame, outputFrameCount, processedFrameCount) => {
       startQuantum(contextFrame, outputFrameCount);
-      history.push({
+      history.push(
         contextFrame,
-        frameIndex: renderFrameIndex,
-        rate: processedFrameCount / outputFrameCount,
-      });
+        renderFrameIndex,
+        processedFrameCount / outputFrameCount,
+      );
       const nextFrameIndex = renderFrameIndex + processedFrameCount;
       const range = getRange();
       renderFrameIndex = range
@@ -103,19 +106,16 @@ export const createHeardPosition = (
       return nextFrameIndex;
     },
     refresh,
-    getValue: (options) => {
+    read: (value, revision, clockOffset, frameCount) => {
       const range = getRange();
-      return {
-        frameIndex,
-        revision: options.revision,
-        contextFrame: heardContextFrame,
-        startContextFrame: runStartContextFrame ?? heardContextFrame,
-        rate: heardRate,
-        clockOffset: options.clockOffset,
-        endFrame:
-          range?.repeat === 'once' ? range.endFrame : options.frameCount,
-        loop: range?.repeat === 'cycle' ? range.range : undefined,
-      };
+      value.frameIndex = frameIndex;
+      value.revision = revision;
+      value.contextFrame = heard.contextFrame;
+      value.startContextFrame = runStartContextFrame ?? heard.contextFrame;
+      value.rate = heard.rate;
+      value.clockOffset = clockOffset;
+      value.endFrame = range?.repeat === 'once' ? range.endFrame : frameCount;
+      value.loop = range?.repeat === 'cycle' ? range.range : undefined;
     },
   };
 };

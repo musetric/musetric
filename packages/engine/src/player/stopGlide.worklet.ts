@@ -14,8 +14,8 @@ export type StopGlide = {
 
 type Glide = {
   line: PlayheadValue;
+  moving: PlayheadValue;
   stopContextFrame: number;
-  endFrame: number;
 };
 
 export const createStopGlide = (
@@ -31,7 +31,11 @@ export const createStopGlide = (
         glide = undefined;
         return undefined;
       }
-      glide = { line: { ...line, endFrame }, stopContextFrame, endFrame };
+      glide = {
+        line: { ...line, endFrame },
+        moving: { ...line, endFrame },
+        stopContextFrame,
+      };
       playhead.publishNow(glide.line);
       return endFrame;
     },
@@ -39,21 +43,19 @@ export const createStopGlide = (
       if (!glide) {
         return;
       }
-      const { line, stopContextFrame, endFrame } = glide;
+      const { line, moving, stopContextFrame } = glide;
       const heardContextFrame =
         line.contextFrame + (contextFrame - stopContextFrame);
       const frameIndex =
         line.frameIndex + (heardContextFrame - line.contextFrame) * line.rate;
-      if (frameIndex >= endFrame) {
+      if (frameIndex >= line.endFrame) {
         glide = undefined;
         publishHeld();
         return;
       }
-      playhead.publish({
-        ...line,
-        frameIndex,
-        contextFrame: heardContextFrame,
-      });
+      moving.frameIndex = frameIndex;
+      moving.contextFrame = heardContextFrame;
+      playhead.publish(moving);
     },
     clear: () => {
       glide = undefined;

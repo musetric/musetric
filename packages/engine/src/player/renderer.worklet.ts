@@ -43,6 +43,21 @@ const stemIndices: Record<StemType, number> = {
   instrumental: 2,
 };
 
+const createOutputViews = (
+  buffer: ArrayBuffer,
+  pointer: number,
+  frameCount: number,
+): Float32Array[] =>
+  Array.from(
+    { length: outputChannelCount },
+    (_, channel) =>
+      new Float32Array(
+        buffer,
+        pointer + channel * frameCount * Float32Array.BYTES_PER_ELEMENT,
+        frameCount,
+      ),
+  );
+
 export type PlayerRenderer = {
   mounted: () => boolean;
   mount: (layouts: PlayerStemLayouts, residentPageLimit: number) => void;
@@ -106,14 +121,10 @@ export const createPlayerRenderer = (
       first.byteOffset !== pointer ||
       first.length !== frameCount
     ) {
-      outputViews = Array.from(
-        { length: outputChannelCount },
-        (_, channel) =>
-          new Float32Array(
-            stretch.memory.buffer,
-            pointer + channel * frameCount * Float32Array.BYTES_PER_ELEMENT,
-            frameCount,
-          ),
+      outputViews = createOutputViews(
+        stretch.memory.buffer,
+        pointer,
+        frameCount,
       );
     }
     return outputViews;
@@ -150,12 +161,14 @@ export const createPlayerRenderer = (
         page.index,
         page.samples.length,
       );
-      if (pointer === 0) {
-        return;
+      if (pointer !== 0) {
+        new Float32Array(
+          stretch.memory.buffer,
+          pointer,
+          page.samples.length,
+        ).set(page.samples);
       }
-      new Float32Array(stretch.memory.buffer, pointer, page.samples.length).set(
-        page.samples,
-      );
+      page.samples.buffer.transfer(0);
     },
     drop: (pages) => {
       for (const page of pages) {

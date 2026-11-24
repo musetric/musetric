@@ -39,10 +39,11 @@ export const createPlayheadPublisher = (
   let publishedTime = 0;
 
   const publishNow = (value: PlayheadValue) => {
-    published = value;
+    const copy = { ...value };
+    published = copy;
     publishedTime = getCurrentTime();
-    for (const subscriber of subscribers) {
-      subscriber.methods.publish(value);
+    for (let index = 0; index < subscribers.length; index += 1) {
+      subscribers[index].methods.publish(copy);
     }
   };
 
