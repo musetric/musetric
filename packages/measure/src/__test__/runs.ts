@@ -77,6 +77,31 @@ export const delayRunSchema = z.object({
 
 export type DelayRun = z.infer<typeof delayRunSchema>;
 
+export const cursorRunSchema = z.object({
+  sampleRate: z.number(),
+  frameCount: z.number(),
+  frames: z.array(z.tuple([z.number(), z.number(), z.number()])),
+  events: z.array(
+    z.tuple([
+      z.number(),
+      z.enum([
+        'play',
+        'stop',
+        'seek',
+        'playSeek',
+        'dragStart',
+        'dragEnd',
+        'loopStart',
+        'loopEnd',
+      ]),
+      z.number(),
+    ]),
+  ),
+  loop: z.object({ fromFrame: z.number(), toFrame: z.number() }),
+});
+
+export type CursorRun = z.infer<typeof cursorRunSchema>;
+
 export const browserCaptureSchema = z.object({
   sampleRate: z.number(),
   label: z.string(),

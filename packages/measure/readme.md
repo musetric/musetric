@@ -7,11 +7,12 @@ the open project, deletes it afterwards and writes the runs and `report.md` to
 
 ## Commands
 
-| Command                                          | What it measures                                                                                                                              |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter @musetric/measure measure:timing` | The playhead against the click the microphone hears, the take against the beats ([#1072](https://github.com/musetric/musetric/issues/1072))   |
-| `pnpm --filter @musetric/measure measure:delay`  | How far the voice line, the spectrogram and the newest audio trail the playhead ([#1072](https://github.com/musetric/musetric/issues/1072))   |
-| `pnpm --filter @musetric/measure measure:sound`  | A synthetic file through the browser path and through a take, gaps in a long take ([#1072](https://github.com/musetric/musetric/issues/1072)) |
+| Command                                          | What it measures                                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @musetric/measure measure:timing` | The playhead against the click the microphone hears, the take against the beats ([#1072](https://github.com/musetric/musetric/issues/1072))             |
+| `pnpm --filter @musetric/measure measure:delay`  | How far the voice line, the spectrogram and the newest audio trail the playhead ([#1072](https://github.com/musetric/musetric/issues/1072))             |
+| `pnpm --filter @musetric/measure measure:sound`  | A synthetic file through the browser path and through a take, gaps in a long take ([#1072](https://github.com/musetric/musetric/issues/1072))           |
+| `pnpm --filter @musetric/measure measure:cursor` | The shown cursor through Play, Stop, seeks, a drag and a loop: steps back, stalls and jumps ([#1368](https://github.com/musetric/musetric/issues/1368)) |
 
 Every command first runs the app's calibration check and stops if it fails; a
 call it cannot parse prints its options. Open a project before running one.
