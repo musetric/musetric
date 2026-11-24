@@ -1,6 +1,7 @@
 import {
   createMessagePort,
   type MessagePortLike,
+  type PortDispatch,
   type PortMethods,
   type PortTransfers,
   type TypedMessagePort,
@@ -26,6 +27,10 @@ export type TypedMessageChannel<
   inbound: <Port extends MessagePortLike>(
     instance: Port,
   ) => TypedMessagePort<Port, OutboundMethods, InboundMethods>;
+  inboundSync: <Port extends MessagePortLike>(
+    instance: Port,
+    dispatch: PortDispatch,
+  ) => TypedMessagePort<Port, OutboundMethods, InboundMethods>;
   outbound: <Port extends MessagePortLike>(
     instance: Port,
   ) => TypedMessagePort<Port, InboundMethods, OutboundMethods>;
@@ -44,6 +49,16 @@ export const createMessageChannel = <
         port,
         inbound.keys,
         inbound.transfers,
+      ),
+    inboundSync: <Port extends MessagePortLike>(
+      port: Port,
+      dispatch: PortDispatch,
+    ) =>
+      createMessagePort<Port, OutboundMethods, InboundMethods>(
+        port,
+        inbound.keys,
+        inbound.transfers,
+        dispatch,
       ),
     outbound: <Port extends MessagePortLike>(port: Port) =>
       createMessagePort<Port, InboundMethods, OutboundMethods>(

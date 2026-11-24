@@ -82,6 +82,7 @@ export type PlayerInboundMethods = {
   recordingFlushed: (message: { sequence: number }) => void;
   recordingPassStarted: () => void;
   recordingPassEnded: (message: { complete: boolean }) => void;
+  failed: (message: { reason: string }) => void;
 };
 
 export const playerChannel = createMessageChannel<
@@ -95,6 +96,7 @@ export const playerChannel = createMessageChannel<
       'recordingFlushed',
       'recordingPassStarted',
       'recordingPassEnded',
+      'failed',
     ],
   },
   outbound: {

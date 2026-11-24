@@ -91,7 +91,10 @@ export const readTrackChunks = (
   };
 };
 
-const waitForReady = async (port: TimedMicrophonePort) =>
+const waitForReady = async (
+  node: AudioWorkletNode,
+  port: TimedMicrophonePort,
+) =>
   new Promise<boolean>((resolve) => {
     const timeout = window.setTimeout(() => {
       resolve(false);
@@ -101,6 +104,14 @@ const waitForReady = async (port: TimedMicrophonePort) =>
         window.clearTimeout(timeout);
         resolve(true);
       },
+    });
+    node.addEventListener('processorerror', (event) => {
+      console.error(
+        'The microphone failed on the audio thread:',
+        event.message,
+      );
+      window.clearTimeout(timeout);
+      resolve(false);
     });
   });
 
@@ -150,7 +161,7 @@ export const createTimedMicrophones = (
       keepAlive.connect(context.destination);
       const port = timedMicrophoneChannel.outbound(node.port);
       port.methods.boot({ captureModule });
-      const ready = waitForReady(port);
+      const ready = waitForReady(node, port);
       let settled = false;
       void outputClock.whenSettled().then(() => {
         settled = true;

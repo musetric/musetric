@@ -1,4 +1,4 @@
-import { Alert, Stack } from '@mui/material';
+import { Alert, Button, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +34,9 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
+  const playerFailed = useEngineStore(
+    (state) => state.statuses.player === 'error',
+  );
 
   useEffect(() => subscribeSettingsStore(), []);
   useEffect(() => subscribeTakeInterruptions(), []);
@@ -53,6 +56,24 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
       <Stack sx={{ width: '100%', flexGrow: 1, minHeight: 0, gap: 2 }}>
         {realtimeFailed && (
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
+        )}
+        {playerFailed && (
+          <Alert
+            severity='error'
+            action={
+              <Button
+                color='inherit'
+                size='small'
+                onClick={() => {
+                  window.location.reload();
+                }}
+              >
+                {t('pages.project.player.reload')}
+              </Button>
+            }
+          >
+            {t('pages.project.player.failed')}
+          </Alert>
         )}
         <ProjectContent />
         <PlaybackPanel />
