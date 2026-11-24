@@ -3,6 +3,7 @@ import {
   type EngineRange,
   type EngineRangePlay,
   type EngineState,
+  isRecording,
 } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import { useProjectStore } from '../store.js';
@@ -11,7 +12,7 @@ import { hideLoopView, showLoopView } from './loopView.js';
 
 export const isLoopAvailable = (state: EngineState): boolean =>
   Boolean(state.frameCount) &&
-  !state.recording &&
+  !isRecording(state) &&
   state.statuses.realtime !== 'error';
 
 export const openLoop = (range: EngineRange) => {
@@ -57,8 +58,9 @@ export const closeLoop = () => {
 };
 
 export const leaveLoop = () => {
-  const { loopStage, loopTries, recording } = engine.store.get();
-  if (loopStage === undefined || recording || loopTries.length > 0) {
+  const state = engine.store.get();
+  const { loopStage, loopTries } = state;
+  if (loopStage === undefined || isRecording(state) || loopTries.length > 0) {
     return;
   }
   closeLoop();

@@ -16,6 +16,7 @@ import {
   getRealAudioInputDevices,
   resolveAudioInputDevice,
 } from '@musetric/audio/recording';
+import { isRecording } from '@musetric/engine';
 import { type FC, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
@@ -30,7 +31,7 @@ const inputIconByKind: Record<AudioInputSourceKind, ReactNode> = {
 
 export const AudioInputSelect: FC = () => {
   const { t } = useTranslation();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const calibrating = useEngineStore((state) => state.calibrating);
   const audioDevices = useEngineStore((state) => state.audioDevices);
   const microphoneDeviceId = useEngineStore(

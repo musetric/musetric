@@ -1,3 +1,4 @@
+import { isPlaying, isRecording } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 import {
   type MediaAction,
@@ -54,7 +55,7 @@ export const subscribeMediaSession = (
 
   const publish = () => {
     const state = engine.store.get();
-    if (!state.frameCount || (!shown && !state.playing)) {
+    if (!state.frameCount || (!shown && !isPlaying(state))) {
       return;
     }
     shown = true;
@@ -62,15 +63,15 @@ export const subscribeMediaSession = (
     published = {
       positionMs,
       at: performance.now(),
-      speed: state.playing ? state.tempoRatio : 0,
+      speed: isPlaying(state) ? state.tempoRatio : 0,
     };
     bridge.update({
       title,
       coverUrl,
       durationMs: toMilliseconds(state.frameCount),
       positionMs,
-      playing: state.playing,
-      recording: state.recording,
+      playing: isPlaying(state),
+      recording: isRecording(state),
       speed: state.tempoRatio,
     });
   };
@@ -122,8 +123,8 @@ export const subscribeMediaSession = (
   window.addEventListener(mediaEventName, handleAction);
   window.addEventListener('pagehide', clear);
   const unsubscribes = [
-    engine.store.subscribe((state) => state.playing, publish),
-    engine.store.subscribe((state) => state.recording, publish),
+    engine.store.subscribe(isPlaying, publish),
+    engine.store.subscribe(isRecording, publish),
     engine.store.subscribe((state) => state.tempoRatio, publish),
     engine.store.subscribe((state) => state.seekEvent, publishPosition),
     engine.store.subscribe((state) => state.frozen, publishPosition),

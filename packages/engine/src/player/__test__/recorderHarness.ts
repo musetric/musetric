@@ -72,6 +72,7 @@ export const createRecorderHarness = (
     audioSession,
     store: createStore(initialEngineState),
     position: createEnginePosition(),
+    endTake: noop,
     getDecoder: () => decoder,
     getEnginePlayback: () => enginePlayback,
   });

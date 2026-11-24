@@ -5,7 +5,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { type SingerVoice } from '@musetric/engine';
+import { isRecording, type SingerVoice } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { engine } from '../../../engine/engine.js';
@@ -13,7 +13,7 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 export const SingerVoiceToggle: FC = () => {
   const { t } = useTranslation();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const singerVoice = useEngineStore((state) => state.singerVoice);
   const options: { value: SingerVoice; label: string; caption: string }[] = [
     {

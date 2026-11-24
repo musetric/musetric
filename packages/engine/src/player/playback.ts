@@ -13,6 +13,7 @@ import {
   getInputShareFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
+  isPlaying,
 } from '../state.js';
 import {
   createPlaybackSettings,
@@ -70,6 +71,7 @@ export type CreateEnginePlaybackOptions = {
   playheadPorts: MessagePort[];
   position: EnginePositionWriter;
   onPlaybackEnded?: () => void;
+  applyMotion: (playing: boolean) => void;
   onRecordingPassStarted?: () => void;
   onRecordingPassEnded?: (complete: boolean) => void;
 };
@@ -124,7 +126,7 @@ export const createEnginePlayback = async (
       lastPumpedFrameIndex = frameIndex;
       position.write(frameIndex);
     }
-    return store.get().playing || value.rate !== 0;
+    return isPlaying(store.get()) || value.rate !== 0;
   });
 
   const startFrameIndexPump = () => {
@@ -156,8 +158,8 @@ export const createEnginePlayback = async (
         if (currentRevision && !message.glide) {
           position.write(message.frameIndex);
         }
+        options.applyMotion(message.playing);
         store.update((state) => {
-          state.playing = message.playing;
           if (currentRevision && message.positionJump) {
             state.seekEvent = {
               revision: nextNumber(state.seekEvent.revision),

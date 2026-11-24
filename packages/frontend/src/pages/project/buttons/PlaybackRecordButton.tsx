@@ -1,6 +1,10 @@
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import { Badge, Box, IconButton, Tooltip } from '@mui/material';
-import { getActiveRecording, getCalibrationNeeded } from '@musetric/engine';
+import {
+  getActiveRecording,
+  getCalibrationNeeded,
+  isRecording,
+} from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { routes } from '../../../app/router/routes.js';
@@ -16,7 +20,7 @@ import { useLongPress } from './useLongPress.js';
 export const PlaybackRecordButton: FC = () => {
   const { projectId } = routes.project.useAssertMatch();
   const { t } = useTranslation();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const stage = useEngineStore((state) => state.loopStage);
   const looping = stage !== undefined;
   const phase = useEngineStore((state) => state.loopTryPhase);

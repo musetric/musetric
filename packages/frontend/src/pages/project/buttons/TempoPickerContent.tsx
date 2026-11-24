@@ -1,4 +1,5 @@
 import { maxTempoRatio, minTempoRatio } from '@musetric/audio';
+import { isRecording } from '@musetric/engine';
 import { useQuery } from '@tanstack/react-query';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +15,7 @@ const labelledTempoRatios = [minTempoRatio, 0.5, 1.5, maxTempoRatio];
 export const TempoPickerContent: FC = () => {
   const { t } = useTranslation();
   const { projectId } = routes.project.useAssertMatch();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const tempoRatio = useEngineStore((state) => state.tempoRatio);
   const rhythmQuery = useQuery(endpoints.rhythm.get(projectId));
   const sourceTempoBpm =

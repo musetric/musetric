@@ -1,6 +1,7 @@
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { Box, ButtonBase, Stack, Typography } from '@mui/material';
+import { isRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -16,7 +17,7 @@ export const TimingRow: FC = () => {
     (state) => state.setCalibrationPrompt,
   );
   const { source, text: status } = useTimingStatus();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const calibrating = useEngineStore((state) => state.calibrating);
 
   return (

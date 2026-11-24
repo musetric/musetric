@@ -1,12 +1,12 @@
 import { Stack, Typography } from '@mui/material';
-import { getActiveRecording } from '@musetric/engine';
+import { getActiveRecording, isRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 
 export const RecordingEmptyHint: FC = () => {
   const { t } = useTranslation();
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const empty = useEngineStore(
     (state) => getActiveRecording(state)?.empty === true,
   );

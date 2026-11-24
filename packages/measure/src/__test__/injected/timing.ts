@@ -1,3 +1,4 @@
+import { isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { type MeasureLatency, readMeasureLatency } from './latency.js';
 import { encodeSamples, epochNow, joinSamples } from './samples.js';
@@ -68,7 +69,7 @@ export const measureTimingTake = async (
         playhead.push([
           epochNow(),
           frameIndex,
-          engine.store.get().playing ? 1 : 0,
+          isPlaying(engine.store.get()) ? 1 : 0,
         ]);
       });
       const unsubscribeCaptured = hooks.listenCaptured((chunk) => {

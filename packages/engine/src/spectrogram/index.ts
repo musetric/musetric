@@ -16,6 +16,8 @@ import {
   getFrequencyRange,
   getNoteShiftSemitones,
   getTrackProgress,
+  isPlaying,
+  isRecording,
 } from '../state.js';
 import { spectrogramChannel } from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
@@ -66,7 +68,7 @@ export const createEngineSpectrogram = (
   });
 
   const sendTrackProgress = () => {
-    const spectrogramWorkerPollsPlayheadWhilePlaying = store.get().playing;
+    const spectrogramWorkerPollsPlayheadWhilePlaying = isPlaying(store.get());
     if (spectrogramWorkerPollsPlayheadWhilePlaying) {
       return;
     }
@@ -77,12 +79,9 @@ export const createEngineSpectrogram = (
   position.subscribe(sendTrackProgress);
   store.subscribe((state) => state.frameCount, sendTrackProgress);
 
-  store.subscribe(
-    (state) => state.playing,
-    (playing) => {
-      port.methods.setPlaying({ playing });
-    },
-  );
+  store.subscribe(isPlaying, (playing) => {
+    port.methods.setPlaying({ playing });
+  });
 
   store.subscribe(
     (state) => state.viewWindow,
@@ -141,7 +140,7 @@ export const createEngineSpectrogram = (
             showSpectrogram: !notes,
             showFundamental: true,
             showNotes: notes,
-            truncateAfterPlayhead: state.recording,
+            truncateAfterPlayhead: isRecording(state),
             transposeSemitones: getNoteShiftSemitones(state),
           },
         };
@@ -168,7 +167,7 @@ export const createEngineSpectrogram = (
           engineState.frameCount,
         ),
       });
-      port.methods.setPlaying({ playing: engineState.playing });
+      port.methods.setPlaying({ playing: isPlaying(engineState) });
 
       const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
         port.methods.updateConfig({
@@ -179,7 +178,7 @@ export const createEngineSpectrogram = (
       const unsubscribeView = store.subscribe(
         (state) => {
           const range = getFrequencyRange(state);
-          return `${state.spectrogramView}:${state.expandedSpectrumLane}:${state.recording}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${state.voiceOctave}:${range.minFrequency}:${range.maxFrequency}`;
+          return `${state.spectrogramView}:${state.expandedSpectrumLane}:${isRecording(state)}:${state.leadSpectrogramGainDb}:${state.transposeSemitones}:${state.voiceOctave}:${range.minFrequency}:${range.maxFrequency}`;
         },
         () => {
           port.methods.updateConfig({
@@ -203,7 +202,7 @@ export const createEngineSpectrogram = (
       });
     },
     previewLiveTake: (chunk) => {
-      if (!store.get().recording) {
+      if (!isRecording(store.get())) {
         return;
       }
       port.methods.previewLiveTake({

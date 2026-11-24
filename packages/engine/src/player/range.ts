@@ -5,6 +5,7 @@ import {
   type EngineRangePlay,
   type EngineRangeRepeat,
   type EngineState,
+  isPlaying,
 } from '../state.js';
 
 export type CreateEnginePlayerRangeOptions = {
@@ -32,7 +33,8 @@ export const createEnginePlayerRange = (
     repeat: EngineRangeRepeat,
     play?: EngineRangePlay,
   ) => {
-    const { range, playing } = store.get();
+    const { range } = store.get();
+    const playing = isPlaying(store.get());
     if (!range) {
       return;
     }
@@ -62,7 +64,8 @@ export const createEnginePlayerRange = (
     },
     playRange,
     replayRange: async (play) => {
-      const { playing, rangeRepeat } = store.get();
+      const { rangeRepeat } = store.get();
+      const playing = isPlaying(store.get());
       await playRange(playing ? rangeRepeat : 'once', play);
     },
   };

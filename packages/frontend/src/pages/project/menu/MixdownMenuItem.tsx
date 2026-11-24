@@ -1,4 +1,5 @@
 import { ListItemText, MenuItem } from '@mui/material';
+import { isRecording } from '@musetric/engine';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
@@ -11,7 +12,7 @@ export type MixdownMenuItemProps = {
 export const MixdownMenuItem: FC<MixdownMenuItemProps> = (props) => {
   const { t } = useTranslation();
   const setMixdownOpen = useProjectStore((state) => state.setMixdownOpen);
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
 
   return (
     <MenuItem

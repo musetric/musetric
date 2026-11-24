@@ -6,6 +6,7 @@ import {
   type Engine,
   type EngineState,
   getActiveRecording,
+  isPlaying,
   type SpectrogramViewMode,
 } from '@musetric/engine';
 import axios from 'axios';
@@ -122,7 +123,7 @@ export const recordTemporaryTake = async (
   probe?: TakeProbe,
 ): Promise<TemporaryTake> => {
   const { projectId } = settings;
-  if (engine.store.get().playing) {
+  if (isPlaying(engine.store.get())) {
     await engine.player.stop();
   }
   const original = findActive(

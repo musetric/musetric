@@ -1,4 +1,5 @@
 import { Box, Drawer, Popover, useMediaQuery } from '@mui/material';
+import { isRecording } from '@musetric/engine';
 import { type FC, useEffect } from 'react';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
@@ -15,7 +16,7 @@ export const RecordingListPicker: FC = () => {
   const setRenamingRecordingId = useProjectStore(
     (state) => state.setRenamingRecordingId,
   );
-  const recording = useEngineStore((state) => state.recording);
+  const recording = useEngineStore(isRecording);
   const open = anchorEl !== undefined;
 
   useEffect(() => {

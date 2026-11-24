@@ -7,6 +7,7 @@ import {
   type Engine,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
+  isPlaying,
 } from '@musetric/engine';
 import { wait } from './samples.js';
 
@@ -57,7 +58,7 @@ export type MeasureCalibration = {
 export const calibrate = async (
   engine: Engine,
 ): Promise<MeasureCalibration> => {
-  if (engine.store.get().playing) {
+  if (isPlaying(engine.store.get())) {
     await engine.player.stop();
   }
   const closePreview = engine.calibration.openPreview();
