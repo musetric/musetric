@@ -2,7 +2,7 @@ import { setTimeout } from 'node:timers/promises';
 import { z } from 'zod';
 import { type MeasureInput } from '../measureInput.js';
 import { bundleInjectedScript } from './bundle.js';
-import { connectPage, type MeasureLog } from './cdp.js';
+import { connectPage, type MeasureLog, type RequestLog } from './cdp.js';
 import { type MeasureDevice, openDevicePage } from './device.js';
 import { createPageInput } from './input.js';
 
@@ -13,6 +13,7 @@ export type MeasurePage = {
   projectId: number;
   callText: (procedure: string, options: object) => Promise<string>;
   logs: MeasureLog[];
+  requests: () => RequestLog[];
   waitForLog: (channel: string, after: number) => Promise<MeasureLog>;
   input: (input: MeasureInput) => Promise<void>;
   finishInput: (id: number) => Promise<void>;
@@ -22,16 +23,18 @@ export type MeasurePage = {
 
 export const openMeasurePage = async (
   device: MeasureDevice,
+  watchRequests = false,
 ): Promise<MeasurePage> => {
   const [pageScript, workerScript] = await Promise.all([
     bundleInjectedScript('page'),
     bundleInjectedScript('spectrogramWorker'),
   ]);
   const target = await openDevicePage(device);
-  const page = await connectPage(target.webSocketUrl, {
-    urlPart: 'spectrogram.worker',
-    code: workerScript,
-  });
+  const page = await connectPage(
+    target.webSocketUrl,
+    { urlPart: 'spectrogram.worker', code: workerScript },
+    watchRequests,
+  );
   const ready = await page.evaluate("typeof musetricMeasureHooks === 'object'");
   if (ready !== true) {
     page.close();
@@ -62,6 +65,7 @@ export const openMeasurePage = async (
       return text;
     },
     logs: page.logs,
+    requests: page.requests,
     waitForLog: async (channel, after) => {
       for (;;) {
         const log = page.logs

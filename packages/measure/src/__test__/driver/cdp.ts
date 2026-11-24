@@ -33,6 +33,18 @@ const evaluationSchema = z.object({
     .optional(),
 });
 
+const requestSentSchema = z.object({
+  requestId: z.string(),
+  request: z.object({ url: z.string() }),
+  wallTime: z.number(),
+  timestamp: z.number(),
+});
+
+const requestEndSchema = z.object({
+  requestId: z.string(),
+  timestamp: z.number(),
+});
+
 const measureTag = '[measure]';
 
 export type CdpMessage = z.infer<typeof messageSchema>;
@@ -47,10 +59,18 @@ export type MeasureLog = {
   values: unknown[];
 };
 
+export type RequestLog = {
+  url: string;
+  sentAt: number;
+  endedAt?: number;
+  failed: boolean;
+};
+
 export type CdpPage = {
   evaluate: (expression: string) => Promise<unknown>;
   send: (method: string, params: Record<string, unknown>) => Promise<unknown>;
   logs: MeasureLog[];
+  requests: () => RequestLog[];
   close: () => void;
 };
 
@@ -62,6 +82,7 @@ export type WorkerScript = {
 export const connectPage = async (
   url: string,
   workerScript: WorkerScript,
+  watchRequests: boolean,
 ): Promise<CdpPage> => {
   const socket = new WebSocket(url);
   await new Promise<void>((resolve, reject) => {
@@ -75,6 +96,7 @@ export const connectPage = async (
   let nextId = 0;
   const pending = new Map<number, Pending>();
   const logs: MeasureLog[] = [];
+  const requests = new Map<string, RequestLog & { offsetMs: number }>();
 
   const send = async (
     method: string,
@@ -109,11 +131,15 @@ export const connectPage = async (
 
   const watchTarget = async (sessionId?: string) => {
     await send('Runtime.enable', {}, sessionId);
+    const watching = watchRequests
+      ? send('Network.enable', {}, sessionId).catch(() => undefined)
+      : undefined;
     await send(
       'Target.setAutoAttach',
       { autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
       sessionId,
     );
+    await watching;
   };
 
   const receive = (message: CdpMessage) => {
@@ -128,6 +154,30 @@ export const connectPage = async (
         .catch((error: unknown) => {
           console.error('Failed to prepare a worker for measuring', error);
         });
+      return;
+    }
+    if (message.method === 'Network.requestWillBeSent') {
+      const sent = requestSentSchema.parse(message.params);
+      if (!requests.has(sent.requestId)) {
+        requests.set(sent.requestId, {
+          url: sent.request.url,
+          sentAt: sent.wallTime * 1000,
+          offsetMs: (sent.wallTime - sent.timestamp) * 1000,
+          failed: false,
+        });
+      }
+      return;
+    }
+    if (
+      message.method === 'Network.loadingFinished' ||
+      message.method === 'Network.loadingFailed'
+    ) {
+      const ended = requestEndSchema.parse(message.params);
+      const request = requests.get(ended.requestId);
+      if (request && request.endedAt === undefined) {
+        request.endedAt = request.offsetMs + ended.timestamp * 1000;
+        request.failed = message.method === 'Network.loadingFailed';
+      }
       return;
     }
     if (message.method !== 'Runtime.consoleAPICalled') {
@@ -162,6 +212,13 @@ export const connectPage = async (
     evaluate,
     send,
     logs,
+    requests: () =>
+      [...requests.values()].map((request) => ({
+        url: request.url,
+        sentAt: request.sentAt,
+        endedAt: request.endedAt,
+        failed: request.failed,
+      })),
     close: () => {
       socket.close();
     },

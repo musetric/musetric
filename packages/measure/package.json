@@ -13,7 +13,8 @@
     "measure:delay": "node ./scripts/measure.ts delay",
     "measure:sound": "node ./scripts/measure.ts sound",
     "measure:cursor": "node ./scripts/measure.ts cursor",
-    "measure:failure": "node ./scripts/measure.ts failure"
+    "measure:failure": "node ./scripts/measure.ts failure",
+    "measure:seek": "node ./scripts/measure.ts seek"
   },
   "devDependencies": {
     "@musetric/api": "workspace:*",
