@@ -1,4 +1,4 @@
-import { isPlaying } from '@musetric/engine';
+import { isBuffering, isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { epochNow, wait } from './samples.js';
 
@@ -37,6 +37,7 @@ export type CursorRun = {
   frames: [epochMs: number, frameIndex: number, playing: number][];
   events: [epochMs: number, kind: CursorEventKind, frameIndex: number][];
   storeChanges: number[];
+  buffering: [epochMs: number, buffering: number][];
   loop: { fromFrame: number; toFrame: number };
 };
 
@@ -61,6 +62,7 @@ export const measureCursor = async (
   const frames: CursorRun['frames'] = [];
   const events: CursorRun['events'] = [];
   const storeChanges: CursorRun['storeChanges'] = [];
+  const buffering: CursorRun['buffering'] = [];
   const mark = (kind: CursorEventKind, frameIndex: number) => {
     events.push([epochNow(), kind, frameIndex]);
   };
@@ -76,6 +78,9 @@ export const measureCursor = async (
   requestAnimationFrame(sample);
   const unsubscribeStore = store.subscribeState(() => {
     storeChanges.push(epochNow());
+  });
+  const unsubscribeBuffering = store.subscribe(isBuffering, (value) => {
+    buffering.push([epochNow(), value ? 1 : 0]);
   });
 
   const stop = async () => {
@@ -162,7 +167,16 @@ export const measureCursor = async (
     player.setRange(undefined);
     sampling = false;
     unsubscribeStore();
+    unsubscribeBuffering();
   }
 
-  return { sampleRate, frameCount, frames, events, storeChanges, loop };
+  return {
+    sampleRate,
+    frameCount,
+    frames,
+    events,
+    storeChanges,
+    buffering,
+    loop,
+  };
 };

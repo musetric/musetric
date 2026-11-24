@@ -223,6 +223,20 @@ const checkLoopEnd = (trace: Trace) => {
   return overshootMs;
 };
 
+const checkBuffering = (run: CursorRun) => {
+  const heldMs: number[] = [];
+  let since: number | undefined = undefined;
+  for (const [time, value] of run.buffering) {
+    if (value === 1) {
+      since ??= time;
+    } else if (since !== undefined) {
+      heldMs.push(time - since);
+      since = undefined;
+    }
+  }
+  return heldMs;
+};
+
 const checkStoreChanges = (run: CursorRun) => {
   const changesPerSecond: number[] = [];
   for (const [index, event] of run.events.entries()) {
@@ -258,6 +272,7 @@ export type CursorResult = {
   drag: { count: number; stepsBack: number; behindMs: number[] };
   loop: { turns: number; stepsBack: number; overshootMs: number };
   store: { changesPerSecond: number[] };
+  buffering: { heldMs: number[] };
 };
 
 export const analyzeCursor = (run: CursorRun): CursorResult => {
@@ -285,5 +300,6 @@ export const analyzeCursor = (run: CursorRun): CursorResult => {
       overshootMs: checkLoopEnd(trace),
     },
     store: { changesPerSecond: checkStoreChanges(run) },
+    buffering: { heldMs: checkBuffering(run) },
   };
 };

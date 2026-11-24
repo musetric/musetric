@@ -90,9 +90,23 @@ const createPlayer = async (paging: Paging, withheld: number[] = []) => {
     );
   }
   await settle();
-  const player = playerChannel.outbound(control.port2).methods;
+  const outbound = playerChannel.outbound(control.port2);
+  const motions: string[] = [];
+  outbound.bindHandlers({
+    booted: () => undefined,
+    setPlaying: (message) => {
+      if (motions.at(-1) !== message.motion) {
+        motions.push(message.motion);
+      }
+    },
+    recordingFlushed: () => undefined,
+    recordingPassStarted: () => undefined,
+    recordingPassEnded: () => undefined,
+  });
+  const player = outbound.methods;
   return {
     player,
+    motions,
     putLate: async (indices: number[]) => {
       putPages(dataPort, tracks, indices);
       await settle();
@@ -194,5 +208,13 @@ describe('player pages', () => {
       fadeAround(expected[index * 2 + 1], index * blockSize, cut),
     ]);
     expect(played).toEqual(faded);
+    await settle();
+    expect(missing.motions).toEqual([
+      'stopped',
+      'rolling',
+      'buffering',
+      'rolling',
+    ]);
+    expect(whole.motions).toEqual(['stopped', 'rolling']);
   });
 });

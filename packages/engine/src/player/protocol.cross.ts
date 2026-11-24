@@ -66,11 +66,14 @@ export type PlayerOutboundMethods = {
   flushRecording: () => void;
 };
 
+export type PlayerMotion = 'stopped' | 'rolling' | 'held' | 'buffering';
+
 export type PlayerInboundMethods = {
   booted: () => void;
   setPlaying: (message: {
     command: number;
     playing: boolean;
+    motion: PlayerMotion;
     frameIndex: number;
     revision: number;
     positionJump?: true;

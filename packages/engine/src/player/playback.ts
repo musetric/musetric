@@ -22,7 +22,11 @@ import {
 import playerWorkletUrl from './player.worklet.ts?worker&url';
 import { createPlayhead } from './playhead.cross.js';
 import { type EnginePositionWriter } from './position.js';
-import { playerChannel, playerProcessorName } from './protocol.cross.js';
+import {
+  playerChannel,
+  type PlayerMotion,
+  playerProcessorName,
+} from './protocol.cross.js';
 
 const noop = (): void => undefined;
 
@@ -71,7 +75,7 @@ export type CreateEnginePlaybackOptions = {
   playheadPorts: MessagePort[];
   position: EnginePositionWriter;
   onPlaybackEnded?: () => void;
-  applyMotion: (playing: boolean) => void;
+  applyMotion: (motion: PlayerMotion) => void;
   onRecordingPassStarted?: () => void;
   onRecordingPassEnded?: (complete: boolean) => void;
 };
@@ -160,7 +164,7 @@ export const createEnginePlayback = async (
         if (currentRevision && !message.glide) {
           position.write(message.frameIndex);
         }
-        options.applyMotion(message.playing);
+        options.applyMotion(message.motion);
         store.update((state) => {
           if (currentRevision && message.positionJump) {
             state.seekEvent = {

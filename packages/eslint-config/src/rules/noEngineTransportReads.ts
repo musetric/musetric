@@ -3,7 +3,7 @@ import { type Expression, type ObjectPattern, type Super } from 'estree';
 import { type Node, type Program, type Type } from 'typescript';
 
 const stateTypeName = 'EngineState';
-const transportFields = new Set(['session', 'take']);
+const transportFields = new Set(['session', 'take', 'motion']);
 const packagePattern = /[\\/]packages[\\/]([^\\/]+)[\\/]/;
 
 const getPackageName = (fileName: string): string | undefined =>
@@ -27,7 +27,7 @@ export const noEngineTransportReadsRule: Rule.RuleModule = {
     },
     messages: {
       transportRead:
-        "Do not read '{{name}}' of the engine's state outside the engine. The session machine owns the transport's states and may change them; read the transport through isPlaying, isRecording and isTransportBusy of @musetric/engine, and add a reading there where none fits.",
+        "Do not read '{{name}}' of the engine's state outside the engine. The session machine owns the transport's states and may change them; read the transport through isPlaying, isRecording, isTransportBusy and isBuffering of @musetric/engine, and add a reading there where none fits.",
     },
     schema: [],
   },

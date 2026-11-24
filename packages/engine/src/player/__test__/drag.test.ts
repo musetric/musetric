@@ -61,12 +61,16 @@ describe('a drag of the cursor', () => {
     releaseFirst();
     await shownAfter(seam, 6);
     expect(seam.store.get().frozen).toBe(true);
+    await shownAfter(seam, 6);
+    expect(seam.store.get().motion).toBe('held');
     expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
       seeksBefore,
     );
     releaseSecond();
     await shownAfter(seam, 6);
     expect(seam.store.get().frozen).toBe(false);
+    await shownAfter(seam, 6);
+    expect(seam.store.get().motion).toBe('rolling');
     expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
       seeksBefore + 1,
     );
