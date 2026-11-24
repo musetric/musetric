@@ -38,6 +38,7 @@ export type MasterPage = {
   startFrame: number;
   frameCount: number;
   samples: Float32Array<ArrayBuffer>;
+  mean?: Float32Array<ArrayBuffer>;
 };
 
 export type MasterPages = {
@@ -45,7 +46,11 @@ export type MasterPages = {
   sampleRate: number;
   channelCount: number;
   pageStarts: number[];
-  read: (index: number, mean: boolean) => Promise<MasterPage>;
+  read: (
+    index: number,
+    mean: boolean,
+    signal: AbortSignal,
+  ) => Promise<MasterPage>;
   free: () => void;
 };
 
@@ -64,20 +69,21 @@ export const openMasterPages = async (
     sampleRate: pages.sampleRate,
     channelCount,
     pageStarts,
-    read: async (index, mean) => {
+    read: async (index, mean, signal) => {
       const from = pages.byteStart(index);
       const frameCount = pages.pageFrames(index);
       if (from === undefined || frameCount === undefined) {
         throw new Error(`The master has no page ${String(index)}`);
       }
       const bytes = await fetchRange(from, pages.byteEnd(index));
+      signal.throwIfAborted();
+      pages.decode(index, bytes);
       return {
         index,
         startFrame: pageStarts[index],
         frameCount,
-        samples: ownBuffer(
-          mean ? pages.decodeMean(index, bytes) : pages.decode(index, bytes),
-        ),
+        samples: ownBuffer(pages.samples()),
+        ...(mean ? { mean: ownBuffer(pages.mean()) } : {}),
       };
     },
     free: () => {

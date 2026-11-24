@@ -1,12 +1,14 @@
+import { stemTypes } from '@musetric/audio/es';
 import { type CursorResult } from './analysis/cursor.js';
 import { type DelayResult } from './analysis/delay.js';
+import { type SeekResult } from './analysis/seek.js';
 import {
   bandCenters,
   type HoleResult,
   type SoundResult,
 } from './analysis/sound.js';
 import { type TimingResult } from './analysis/timing.js';
-import { type Spread } from './dsp/stats.js';
+import { getMedian, getPercentile, type Spread } from './dsp/stats.js';
 import { type PageLatency } from './runs.js';
 
 const minus = '−';
@@ -121,6 +123,24 @@ export const formatCursorTable = (result: CursorResult) => {
     `Screen frame ${result.screenFrameMs.toFixed(1)} ms.`,
   ].join('\n');
 };
+
+const formatAmounts = (values: readonly number[], unit: string) =>
+  values.length === 0
+    ? 'none'
+    : `${formatNumber(getMedian(values), 0)}${unit}, p90 ${formatNumber(getPercentile(values, 90), 0)}${unit}, max ${formatNumber(Math.max(...values), 0)}${unit}`;
+
+export const formatSeekTable = (result: SeekResult) =>
+  [
+    '| Check | Result |',
+    '| --- | --- |',
+    `| Seeks, without a hold, still silent at the next seek | ${result.count}, ${result.unheld}, ${result.silent} |`,
+    `| From the seek to the first sound | ${formatAmounts(result.toSoundMs, ' ms')} |`,
+    `| The hold after a seek | ${formatAmounts(result.heldMs, ' ms')} |`,
+    `| Range requests finished while a seek waited | ${formatAmounts(result.waitedRequests, '')} |`,
+    `| Range requests aborted after a seek | ${formatAmounts(result.abortedRequests, '')} |`,
+    `| Range requests of the lead after a seek | ${formatAmounts(result.leadRequests, '')} |`,
+    `| Range requests a second: lead, backing, instrumental | ${stemTypes.map((stem) => result.requestsPerSecond[stem].toFixed(1)).join(', ')} |`,
+  ].join('\n');
 
 const formatBand = (center: number) =>
   center >= 1000 ? `${center / 1000} kHz` : `${center} Hz`;

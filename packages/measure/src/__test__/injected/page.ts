@@ -8,6 +8,7 @@ import {
 import { type PageHooks } from './hooks.js';
 import { createInputBridge } from './input.js';
 import { calibrate, readMeasureLatency } from './latency.js';
+import { measureSeek, type SeekOptions } from './seek.js';
 import {
   type BrowserCaptureOptions,
   captureBrowserMicrophone,
@@ -36,6 +37,7 @@ const installMeasure = (hooks: PageHooks) => {
       failure: async (options: FailureOptions) =>
         measureFailure(hooks, options),
       recovery: async () => measureRecovery(hooks),
+      seek: async (options: SeekOptions) => measureSeek(hooks, options),
       browserCapture: async (options: BrowserCaptureOptions) =>
         captureBrowserMicrophone(engine, options),
       take: async (options: SoundTakeOptions) =>

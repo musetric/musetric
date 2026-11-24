@@ -8,6 +8,8 @@ const describe = (error: unknown): string =>
 const serveStemPages = (): void => {
   const port = stemPagesChannel.inbound(self);
   let opened: MasterPages | undefined = undefined;
+  const reads = new Map<number, AbortController>();
+  let reading: Promise<void> = Promise.resolve();
 
   port.bindHandlers({
     open: async (message) => {
@@ -34,25 +36,40 @@ const serveStemPages = (): void => {
         port.methods.failed({ reason: describe(error) });
       }
     },
-    read: async (message) => {
-      const { id, index, mono } = message;
+    read: (message) => {
+      const { id, index, mean } = message;
       const pages = opened;
       if (!pages) {
         port.methods.failed({ id, reason: 'No master is open' });
         return;
       }
-      try {
-        const page = await pages.read(index, mono);
-        port.methods.page({
-          id,
-          index,
-          startFrame: page.startFrame,
-          frameCount: page.frameCount,
-          samples: page.samples,
-        });
-      } catch (error) {
-        port.methods.failed({ id, reason: describe(error) });
-      }
+      const controller = new AbortController();
+      reads.set(id, controller);
+      reading = reading.then(async () => {
+        try {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const page = await pages.read(index, mean, controller.signal);
+          port.methods.page({
+            id,
+            index,
+            startFrame: page.startFrame,
+            frameCount: page.frameCount,
+            samples: page.samples,
+            ...(page.mean ? { mean: page.mean } : {}),
+          });
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            port.methods.failed({ id, reason: describe(error) });
+          }
+        } finally {
+          reads.delete(id);
+        }
+      });
+    },
+    cancel: (message) => {
+      reads.get(message.id)?.abort();
     },
   });
 };

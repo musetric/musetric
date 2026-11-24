@@ -16,7 +16,7 @@ export type StemPagesInfo = {
 export type StemPageRequest = {
   id: number;
   index: number;
-  mono: boolean;
+  mean: boolean;
 };
 
 export type StemPageSamples = {
@@ -25,11 +25,13 @@ export type StemPageSamples = {
   startFrame: number;
   frameCount: number;
   samples: Float32Array<ArrayBuffer>;
+  mean?: Float32Array<ArrayBuffer>;
 };
 
 export type StemPagesOutboundMethods = {
   open: (message: StemPagesOpen) => void;
   read: (message: StemPageRequest) => void;
+  cancel: (message: { id: number }) => void;
 };
 
 export type StemPagesInboundMethods = {
@@ -45,10 +47,13 @@ export const stemPagesChannel = createMessageChannel<
   inbound: {
     keys: ['opened', 'page', 'failed'],
     transfers: {
-      page: (message) => [message.samples.buffer],
+      page: (message) =>
+        message.mean
+          ? [message.samples.buffer, message.mean.buffer]
+          : [message.samples.buffer],
     },
   },
   outbound: {
-    keys: ['open', 'read'],
+    keys: ['open', 'read', 'cancel'],
   },
 });

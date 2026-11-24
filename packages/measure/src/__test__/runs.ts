@@ -126,6 +126,25 @@ export const recoveryRunSchema = z.object({
   playedFrames: z.number(),
 });
 
+export const seekRunSchema = z.object({
+  sampleRate: z.number(),
+  frameCount: z.number(),
+  seeks: z.array(z.tuple([z.number(), z.number()])),
+  decoys: z.array(z.tuple([z.number(), z.number()])).default([]),
+  buffering: z.array(z.tuple([z.number(), z.number()])),
+  endedAt: z.number(),
+  requests: z.array(
+    z.object({
+      stem: z.enum(['lead', 'backing', 'instrumental']),
+      sentAt: z.number(),
+      endedAt: z.number().optional(),
+      failed: z.boolean(),
+    }),
+  ),
+});
+
+export type SeekRun = z.infer<typeof seekRunSchema>;
+
 export const browserCaptureSchema = z.object({
   sampleRate: z.number(),
   label: z.string(),

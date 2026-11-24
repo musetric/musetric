@@ -60,13 +60,14 @@ vi.mock('../stemPageReaders.worker.js', () => {
   const reader: StemPageReader = {
     open: async () =>
       Promise.resolve({ frameCount: 8, channelCount: 2, pageStarts }),
-    read: async (index, mono) =>
+    read: async (index, mean) =>
       Promise.resolve({
         id: index,
         index,
         startFrame: pageStarts[index],
         frameCount: 4,
-        samples: new Float32Array(mono ? 4 : 8).fill(index + 1),
+        samples: new Float32Array(8).fill(index + 1),
+        ...(mean ? { mean: new Float32Array(4).fill(index + 1) } : {}),
       }),
   };
   return {
