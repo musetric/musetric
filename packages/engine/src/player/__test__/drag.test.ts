@@ -41,7 +41,7 @@ describe('a drag of the cursor', () => {
     expect(seam.toWorklet.filter((type) => type === 'seek')).toHaveLength(
       seeksBefore + 1,
     );
-    expect(seam.host.slice(hostBefore)).toEqual(['player.frameIndex']);
+    expect(seam.host).toHaveLength(hostBefore);
     const released = targets.at(-1) ?? 0;
     const first = await shownAfter(seam, 40);
     const second = await shownAfter(seam, 40);

@@ -11,7 +11,6 @@ import { hideLoopView, showLoopView } from './loopView.js';
 
 export const isLoopAvailable = (state: EngineState): boolean =>
   Boolean(state.frameCount) &&
-  !state.isSlave &&
   !state.recording &&
   state.statuses.realtime !== 'error';
 

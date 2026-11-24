@@ -6,7 +6,7 @@ import { engine } from '../../../engine/engine.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { useProjectStore } from '../store.js';
 import { HoldRing } from './HoldRing.js';
-import { canPlay } from './playback.js';
+import { canCommandPlayback } from './playback.js';
 import { useLongPress } from './useLongPress.js';
 
 export const PlaybackPlayButton: FC = () => {
@@ -17,7 +17,7 @@ export const PlaybackPlayButton: FC = () => {
   const longPress = useLongPress(() => {
     setAudioSettingsOpen(true);
   });
-  const disabled = !useEngineStore(canPlay);
+  const disabled = !useEngineStore(canCommandPlayback);
 
   return (
     <IconButton

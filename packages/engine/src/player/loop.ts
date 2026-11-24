@@ -85,8 +85,7 @@ export const createEnginePlayerLoop = (
         !range ||
         currentState.loopStage !== 'sing' ||
         currentState.playerCommandPending ||
-        currentState.recording ||
-        currentState.isSlave
+        currentState.recording
       ) {
         return;
       }
@@ -103,15 +102,8 @@ export const createEnginePlayerLoop = (
         draft.loopTryPhase = 'armed';
       });
       try {
-        getDecoder().sendPlayerRecord();
         await getEngineRecorder().record(projectId, !playing, true);
       } catch (error) {
-        const state = store.get();
-        if (!state.isSlave && !playing) {
-          getDecoder().sendPlayerStop();
-        } else if (!state.isSlave && state.playing) {
-          getDecoder().sendPlayerPlay();
-        }
         store.update((draft) => {
           draft.recording = false;
           draft.loopTryPhase = undefined;

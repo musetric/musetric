@@ -1,8 +1,7 @@
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes};
 use serde_json::{Value, json};
 
-use super::rooms::RoomTake;
-use crate::recording::RecordingSummary;
+use crate::recording::{RecordingSummary, TakeFormat};
 
 pub(crate) fn text(event: &Value) -> Message {
     Message::Text(Utf8Bytes::from(event.to_string()))
@@ -15,14 +14,14 @@ pub(crate) fn close(code: u16, reason: &str) -> Message {
     }))
 }
 
-pub(crate) fn recording_started(take: &RoomTake) -> Value {
+pub(crate) fn recording_started(session_id: &str, recording_id: i64, format: &TakeFormat) -> Value {
     json!({
         "type": "recording.started",
-        "sessionId": take.session_id,
-        "recordingId": take.recording_id,
-        "tempo": take.tempo,
-        "transpose": take.transpose,
-        "octave": take.octave,
+        "sessionId": session_id,
+        "recordingId": recording_id,
+        "tempo": format.tempo,
+        "transpose": format.transpose,
+        "octave": format.octave,
     })
 }
 
@@ -62,56 +61,4 @@ pub(crate) fn peaks_changed(recording_id: i64, start_peak_index: usize, peaks: &
 
 pub(crate) fn failed(error: &str) -> Value {
     json!({ "type": "error", "error": error })
-}
-
-pub(crate) fn player_started(recording: bool) -> Value {
-    let name = if recording {
-        "player.record"
-    } else {
-        "player.play"
-    };
-    json!({ "type": name })
-}
-
-pub(crate) fn player_stopped() -> Value {
-    json!({ "type": "player.stop" })
-}
-
-pub(crate) fn player_revision(revision: i64) -> Value {
-    json!({ "type": "player.revision", "revision": revision })
-}
-
-pub(crate) fn player_frame_index(
-    frame_index: f64,
-    frozen: bool,
-    revision: i64,
-    from_user: bool,
-) -> Value {
-    let source = if from_user { "user" } else { "playback" };
-    json!({
-        "type": "player.frameIndex",
-        "frameIndex": frame_index,
-        "frozen": frozen,
-        "revision": revision,
-        "source": source,
-    })
-}
-
-pub(crate) struct PlayerSyncState {
-    pub(crate) active: bool,
-    pub(crate) recording: bool,
-    pub(crate) frozen: bool,
-    pub(crate) frame_index: f64,
-    pub(crate) revision: i64,
-}
-
-pub(crate) fn player_sync_state(state: &PlayerSyncState) -> Value {
-    json!({
-        "type": "player.sync.state",
-        "active": state.active,
-        "recording": state.recording,
-        "frozen": state.frozen,
-        "frameIndex": state.frame_index,
-        "revision": state.revision,
-    })
 }

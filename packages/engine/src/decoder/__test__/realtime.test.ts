@@ -14,7 +14,6 @@ describe('project realtime', () => {
       isRecordingReady: () => recordingReady,
       onOpen: () => undefined,
       onEvent: () => undefined,
-      onPacket: () => undefined,
       onClose: () => undefined,
     });
     realtime.open(1);

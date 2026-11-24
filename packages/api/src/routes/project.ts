@@ -190,26 +190,7 @@ export namespace realtime {
     | { type: 'recording.finished'; sessionId: string }
     | { type: 'recording.changed'; recordingId: number }
     | { type: 'recording.list'; recordings: recording.Item[] }
-    | { type: 'error'; error: string }
-    | { type: 'player.play' }
-    | { type: 'player.record' }
-    | { type: 'player.stop' }
-    | {
-        type: 'player.frameIndex';
-        frameIndex: number;
-        frozen: boolean;
-        revision: number;
-        source: 'playback' | 'user';
-      }
-    | { type: 'player.revision'; revision: number }
-    | {
-        type: 'player.sync.state';
-        active: boolean;
-        recording: boolean;
-        frozen: boolean;
-        frameIndex: number;
-        revision: number;
-      };
+    | { type: 'error'; error: string };
 }
 
 export namespace create {

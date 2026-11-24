@@ -37,7 +37,6 @@ export type ProjectRealtimeOptions = {
   isRecordingReady: () => boolean;
   onOpen: () => void;
   onEvent: (event: api.project.realtime.Event) => void;
-  onPacket: (data: ArrayBuffer) => void;
   onClose: (error: Error) => void;
 };
 
@@ -54,7 +53,7 @@ export type ProjectRealtime = {
 export const createProjectRealtime = (
   options: ProjectRealtimeOptions,
 ): ProjectRealtime => {
-  const { isRecordingReady, onOpen, onEvent, onPacket, onClose } = options;
+  const { isRecordingReady, onOpen, onEvent, onClose } = options;
   let realtime: InternalRealtime | undefined = undefined;
 
   const flush = () => {
@@ -103,11 +102,6 @@ export const createProjectRealtime = (
         'message',
         (event: MessageEvent<string | ArrayBuffer>) => {
           if (typeof event.data !== 'string') {
-            try {
-              onPacket(event.data);
-            } catch (error) {
-              console.error('Failed to process project realtime packet', error);
-            }
             return;
           }
           try {
