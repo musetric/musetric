@@ -50,7 +50,8 @@ export type EngineRecorder = {
     projectId: number,
     startPlayback: boolean,
     pass?: boolean,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  cancel: () => void;
   stop: () => Promise<void>;
   finish: () => Promise<void>;
   handlePassStarted: () => void;
@@ -317,9 +318,10 @@ export const createEngineRecorder = (
   const ref: EngineRecorder = {
     record: async (projectId, startPlayback, pass) => {
       if (currentSession) {
-        return currentSession.initializePromise;
+        const running = currentSession;
+        await running.initializePromise;
+        return running.playerStreamStarted;
       }
-
       const session = createSession(projectId, startPlayback, pass === true);
       currentSession = session;
       session.initializePromise = initializeSession(session);
@@ -331,6 +333,16 @@ export const createEngineRecorder = (
           failSession(session);
         }
         throw error;
+      }
+      if (!session.playerStreamStarted) {
+        cleanupSession(session);
+        currentSession = undefined;
+      }
+      return session.playerStreamStarted;
+    },
+    cancel: () => {
+      if (currentSession && !currentSession.playerStreamStarted) {
+        currentSession.stopRequested = true;
       }
     },
     stop: async () => {

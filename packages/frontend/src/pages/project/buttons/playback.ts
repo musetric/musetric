@@ -1,15 +1,8 @@
-import {
-  type EngineState,
-  isPlaying,
-  isRecording,
-  isTransportBusy,
-} from '@musetric/engine';
+import { type EngineState, isPlaying, isRecording } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 
 export const canCommandPlayback = (state: EngineState): boolean =>
-  Boolean(state.frameCount) &&
-  state.statuses.realtime !== 'error' &&
-  !isTransportBusy(state);
+  Boolean(state.frameCount) && state.statuses.realtime !== 'error';
 
 export const togglePlayback = () => {
   const state = engine.store.get();
