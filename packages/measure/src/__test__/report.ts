@@ -95,6 +95,7 @@ const formatValues = (
 
 export const formatCursorTable = (result: CursorResult) => {
   const { run, stop, seek, playSeek, drag, loop, store, buffering } = result;
+  const { play, spectrogram } = result;
   const ms = (value: number) => `${Math.round(value)} ms`;
   return [
     '| Check | Result |',
@@ -108,6 +109,10 @@ export const formatCursorTable = (result: CursorResult) => {
     `| The cursor standing after a seek within Play's round trip | ${playSeek.standing} of ${playSeek.count}, the longest ${ms(playSeek.longestStandMs)} |`,
     `| Steps back in a drag | ${drag.stepsBack} in ${drag.count} drags |`,
     `| Behind the finger at the release | ${formatValues(drag.behindMs, 0, ' ms')} |`,
+    `| Ahead of the sound after Play, the largest | ${formatValues(play.leadMs, 0, ' ms')} |`,
+    `| The spectrogram: frames drawn, steps back while playing | ${spectrogram.count}, ${spectrogram.stepsBack}, the largest ${ms(spectrogram.largestStepBackMs)} |`,
+    `| The spectrogram behind the finger at the release | ${formatValues(spectrogram.behindMs, 0, ' ms')} |`,
+    `| The spectrogram ahead of the sound after Play, the largest | ${formatValues(spectrogram.leadMs, 0, ' ms')} |`,
     `| Loop: turns, steps back, the furthest past its end | ${loop.turns}, ${loop.stepsBack}, ${ms(loop.overshootMs)} |`,
     `| Changes of the store a second while playing | ${formatValues(store.changesPerSecond, 1, '')} |`,
     `| The cursor waiting for missing pages | ${formatValues(buffering.heldMs, 0, ' ms')} |`,

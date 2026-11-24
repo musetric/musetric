@@ -5,6 +5,7 @@ const declaredJumpMs = 300;
 const standingMs = 500;
 const seekReachSeconds = 0.25;
 const stopSettleMs = 700;
+const playSteadyFromMs = 1500;
 
 const median = (values: readonly number[]) => {
   if (values.length === 0) {
@@ -15,6 +16,12 @@ const median = (values: readonly number[]) => {
 };
 
 type Sample = { time: number; frame: number; playing: boolean };
+
+const toSamples = (entries: CursorRun['frames']): Sample[] =>
+  entries.map((entry) => {
+    const [time, frame, playing] = entry;
+    return { time, frame, playing: playing === 1 };
+  });
 
 const longestStand = (samples: readonly Sample[]) => {
   let longest = 0;
@@ -47,12 +54,11 @@ type Trace = {
   windowOf: (index: number) => Sample[];
 };
 
-const toTrace = (run: CursorRun): Trace => {
+const toTrace = (
+  run: CursorRun,
+  samples: Sample[] = toSamples(run.frames),
+): Trace => {
   const { sampleRate, loop, events } = run;
-  const samples = run.frames.map((entry) => {
-    const [time, frame, playing] = entry;
-    return { time, frame, playing: playing === 1 };
-  });
   const end = samples.at(-1)?.time ?? 0;
   return {
     samples,
@@ -200,6 +206,40 @@ const checkReleases = (trace: Trace) =>
       return before ? [trace.toMs(frame - before.frame)] : [];
     });
 
+const lineThrough = (first: Sample, last: Sample) => (time: number) =>
+  first.frame +
+  ((last.frame - first.frame) * (time - first.time)) / (last.time - first.time);
+
+const checkPlayLeads = (trace: Trace) => {
+  const leadsMs: number[] = [];
+  for (const [index, event] of trace.events.entries()) {
+    const next = trace.events.at(index + 1);
+    const [time, , startFrame] = event;
+    if (event[1] !== 'play' || next?.[1] !== 'stop') {
+      continue;
+    }
+    const steady = between(trace.samples, time + playSteadyFromMs, next[0]);
+    const [first, last] = [steady.at(0), steady.at(-1)];
+    if (!first || !last || last.time <= first.time) {
+      continue;
+    }
+    const line = lineThrough(first, last);
+    let lead = 0;
+    for (const sample of between(
+      trace.samples,
+      time,
+      time + playSteadyFromMs,
+    )) {
+      lead = Math.max(
+        lead,
+        sample.frame - Math.max(startFrame, line(sample.time)),
+      );
+    }
+    leadsMs.push(trace.toMs(lead));
+  }
+  return leadsMs;
+};
+
 const checkLoopEnd = (trace: Trace) => {
   let overshootMs = 0;
   for (const [index, event] of trace.events.entries()) {
@@ -270,6 +310,14 @@ export type CursorResult = {
   seek: { count: number; settleMs: number[]; unsettled: number };
   playSeek: { count: number; standing: number; longestStandMs: number };
   drag: { count: number; stepsBack: number; behindMs: number[] };
+  play: { leadMs: number[] };
+  spectrogram: {
+    count: number;
+    stepsBack: number;
+    largestStepBackMs: number;
+    behindMs: number[];
+    leadMs: number[];
+  };
   loop: { turns: number; stepsBack: number; overshootMs: number };
   store: { changesPerSecond: number[] };
   buffering: { heldMs: number[] };
@@ -282,6 +330,8 @@ export const analyzeCursor = (run: CursorRun): CursorResult => {
   const stops = checkStops(trace);
   const seeks = checkSeeks(trace);
   const releases = checkReleases(trace);
+  const drawn = toTrace(run, toSamples(run.drawn));
+  const drawnSteps = countStepsBack(drawn);
   return {
     screenFrameMs: trace.screenFrameMs,
     run: {
@@ -294,6 +344,14 @@ export const analyzeCursor = (run: CursorRun): CursorResult => {
     seek: { count: seeks.settleMs.length + seeks.unsettled, ...seeks },
     playSeek: checkPlaySeeks(trace),
     drag: { count: releases.length, stepsBack: steps.drag, behindMs: releases },
+    play: { leadMs: checkPlayLeads(trace) },
+    spectrogram: {
+      count: run.drawn.length,
+      stepsBack: drawnSteps.run,
+      largestStepBackMs: drawnSteps.largestRun,
+      behindMs: checkReleases(drawn),
+      leadMs: checkPlayLeads(drawn),
+    },
     loop: {
       turns: steps.turns,
       stepsBack: steps.loop,

@@ -121,10 +121,11 @@ export const createSpectrogramRuntime = async (
       const startedAt = performance.timeOrigin + performance.now();
       const writtenEnd = recording.liveEnd();
       await render();
-      if (onRendered && playing && writtenEnd !== undefined) {
+      if (onRendered) {
         await onRendered({
           processor,
           startedAt,
+          playing,
           playheadFrame: trackProgress * frameCount,
           writtenEnd,
         });
