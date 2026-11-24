@@ -35,7 +35,7 @@ const serveStemPages = (): void => {
         port.methods.failed({ reason: describe(error) });
       }
     },
-    read: async (message) => {
+    read: (message) => {
       const { id, index, mean } = message;
       const pages = opened;
       if (!pages) {
@@ -44,23 +44,26 @@ const serveStemPages = (): void => {
       }
       const controller = new AbortController();
       reads.set(id, controller);
-      try {
-        const page = await pages.read(index, mean, controller.signal);
-        port.methods.page({
-          id,
-          index,
-          startFrame: page.startFrame,
-          frameCount: page.frameCount,
-          samples: page.samples,
-          ...(page.mean ? { mean: page.mean } : {}),
+      pages
+        .read(index, mean, controller.signal)
+        .then((page) => {
+          port.methods.page({
+            id,
+            index,
+            startFrame: page.startFrame,
+            frameCount: page.frameCount,
+            samples: page.samples,
+            ...(page.mean ? { mean: page.mean } : {}),
+          });
+        })
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) {
+            port.methods.failed({ id, reason: describe(error) });
+          }
+        })
+        .finally(() => {
+          reads.delete(id);
         });
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          port.methods.failed({ id, reason: describe(error) });
-        }
-      } finally {
-        reads.delete(id);
-      }
     },
     cancel: (message) => {
       reads.get(message.id)?.abort();
