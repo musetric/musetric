@@ -70,6 +70,11 @@ export const useSpectrogramGesture = (
         requestedFrameIndex = roundedFrameIndex;
         engine.player.seek(roundedFrameIndex, 'spectrogramVisualization');
       },
+      seekTap: (frameIndex) => {
+        if (engine.store.get().loopStage === 'range') return;
+        requestedFrameIndex = Math.round(frameIndex);
+        engine.player.seek(requestedFrameIndex, 'spectrogramVisualization');
+      },
       setFreeze: (shouldFreeze) => {
         if (!shouldFreeze) {
           freeze.release();

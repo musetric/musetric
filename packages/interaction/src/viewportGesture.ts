@@ -10,7 +10,7 @@ import {
   type GesturePinchStart,
   type GesturePinchUpdate,
 } from './multiPointerGesture.js';
-import { isPointerInputType, isPrimaryPointerButton } from './pointerType.js';
+import { subscribePointerPress } from './pointerPress.js';
 import {
   getViewportCoordinateAnchorRatio,
   getViewportDragZoomScale,
@@ -46,6 +46,8 @@ export const createViewportGesture = (
     applyState,
     setFreeze,
     customPan,
+    onTap,
+    readWheelAnchorRatio,
     zoomSensitivity = 0.002,
   } = options;
   const physics = createInertialDragPhysics();
@@ -186,7 +188,25 @@ export const createViewportGesture = (
     mode = 'drag-zoom';
   };
 
+  const press = subscribePointerPress(element, {
+    press: () => {
+      const caught = inertiaRunner !== undefined;
+      stopInertia();
+      freeze();
+      return !caught;
+    },
+    release: (event, tapped) => {
+      if (mode === 'idle' && !inertiaRunner) {
+        if (tapped) {
+          onTap?.(event.clientX, event.clientY);
+        }
+        releaseFrozen();
+      }
+    },
+  });
+
   const handlePanStart = (event: GesturePanStart) => {
+    press.cancelTap();
     stopInertia();
     const zoomDrag = isZoomDragModifier(event.modifiers);
     activeCustomPan = zoomDrag ? undefined : customPan?.(event);
@@ -265,6 +285,7 @@ export const createViewportGesture = (
   };
 
   const handlePinchStart = (event: GesturePinchStart) => {
+    press.cancelTap();
     stopInertia();
     const state = readState(event.axis);
     if (!state) {
@@ -313,18 +334,18 @@ export const createViewportGesture = (
   };
 
   const handleWheel = (event: WheelUpdate) => {
-    stopInertia();
+    if (inertiaRunner) {
+      stopInertia();
+      releaseFrozen();
+    }
     const state = readState(event.axis);
     if (!state) return;
-    const anchorRatio = getPointAnchorRatio(
-      state,
-      event.axis,
-      event.clientX,
-      event.clientY,
-    );
+    const anchorRatio =
+      state.kind === 'position' && readWheelAnchorRatio
+        ? readWheelAnchorRatio(state)
+        : getPointAnchorRatio(state, event.axis, event.clientX, event.clientY);
     if (anchorRatio === undefined) return;
 
-    freeze();
     applyZoom(
       {
         axis: event.axis,
@@ -333,26 +354,7 @@ export const createViewportGesture = (
       },
       Math.exp(-event.delta * zoomSensitivity),
     );
-    releaseFrozen();
   };
-
-  const handlePointerDown = (event: PointerEvent) => {
-    if (!isPrimaryPointerButton(event)) return;
-    if (!event.isPrimary) return;
-    if (!isPointerInputType(event.pointerType)) return;
-    stopInertia();
-    freeze();
-  };
-
-  const handlePointerEnd = () => {
-    if (mode === 'idle' && !inertiaRunner) {
-      releaseFrozen();
-    }
-  };
-
-  element.addEventListener('pointerdown', handlePointerDown, true);
-  document.addEventListener('pointerup', handlePointerEnd, true);
-  document.addEventListener('pointercancel', handlePointerEnd, true);
 
   const multiPointer = createMultiPointerGesture({
     element,
@@ -382,9 +384,7 @@ export const createViewportGesture = (
       axisSizes.dispose();
       multiPointer.dispose();
       wheel.dispose();
-      element.removeEventListener('pointerdown', handlePointerDown, true);
-      document.removeEventListener('pointerup', handlePointerEnd, true);
-      document.removeEventListener('pointercancel', handlePointerEnd, true);
+      press.dispose();
     },
   };
 };

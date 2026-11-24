@@ -48,6 +48,15 @@ export const useTracksSeekDrag = (
         pinned = atEdge;
         engine.player.seek(clamped, 'tracksVisualization');
       },
+      onTap: (ratio) => {
+        const { frameCount } = engine.store.get();
+        if (frameCount) {
+          engine.player.seek(
+            Math.round(ratio * frameCount),
+            'tracksVisualization',
+          );
+        }
+      },
       onCancel: () => {
         engine.player.seek(startFrameIndex, 'tracksVisualization');
       },

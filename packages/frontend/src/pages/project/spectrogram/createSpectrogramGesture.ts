@@ -18,6 +18,9 @@ const logMinFrequency = Math.log(minimumSpectrogramFrequency);
 const logMaxFrequency = Math.log(maximumSpectrogramFrequency);
 const logMinRange = Math.log(minimumSpectrogramFrequencyRatio);
 const logMaxRange = logMaxFrequency - logMinFrequency;
+const clamp = (value: number, minimum: number, maximum: number) =>
+  Math.min(maximum, Math.max(minimum, value));
+
 const minVisibleTime = 0.1;
 const maxVisibleTime = 60;
 const zoomLimitTolerance = 1e-9;
@@ -118,6 +121,7 @@ export type SpectrogramGestureControls = {
   setViewWindow: (viewWindow: SpectrogramViewWindow) => void;
   setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   seek: (frameIndex: number) => void;
+  seekTap: (frameIndex: number) => void;
   setFreeze: (freeze: boolean) => void;
   onLimit: () => void;
 };
@@ -137,7 +141,9 @@ const applyState = (
   if (state.kind === 'position') {
     const sampleRate = context.getSampleRate();
     controls.setVisibleTime(state.size / sampleRate);
-    controls.seek(state.position);
+    if (Math.round(state.position) !== Math.round(context.getFrameIndex())) {
+      controls.seek(state.position);
+    }
     return;
   }
 
@@ -199,6 +205,26 @@ export const createSpectrogramGesture = (
       controls.setFreeze(shouldFreeze);
     },
     customPan,
+    onTap: (clientX) => {
+      const state = readPositionState(context);
+      const rect = element.getBoundingClientRect();
+      if (!state || rect.width <= 0) return;
+      const ratio = (clientX - rect.left) / rect.width;
+      controls.seekTap(
+        clamp(
+          state.position + (ratio - state.originRatio) * state.size,
+          state.minimumPosition,
+          state.maximumPosition,
+        ),
+      );
+    },
+    readWheelAnchorRatio: (state) =>
+      clamp(
+        (context.getFrameIndex() - state.position) / state.size +
+          state.originRatio,
+        0,
+        1,
+      ),
     zoomSensitivity,
   });
 };

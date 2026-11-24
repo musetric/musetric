@@ -2,7 +2,10 @@ import {
   type GestureAxis,
   type GesturePanStart,
 } from './multiPointerGesture.js';
-import { type ViewportState } from './viewportState.js';
+import {
+  type ViewportPositionState,
+  type ViewportState,
+} from './viewportState.js';
 
 export type ViewportCustomPan = {
   update: (delta: number) => void;
@@ -15,6 +18,8 @@ export type ViewportGestureOptions = {
   applyState: (state: ViewportState) => void;
   setFreeze: (freeze: boolean) => void;
   customPan?: (event: GesturePanStart) => ViewportCustomPan | undefined;
+  onTap?: (clientX: number, clientY: number) => void;
+  readWheelAnchorRatio?: (state: ViewportPositionState) => number;
   zoomSensitivity?: number;
 };
 
