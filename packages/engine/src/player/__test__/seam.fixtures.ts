@@ -18,6 +18,7 @@ import { playerDataChannel } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
 import { createMicrophone, type Microphone } from './microphone.fixtures.js';
 import { blockSize, mountTracks, rate } from './player.fixtures.js';
+import { isPortMessage, type PostHook, watchPosts } from './posts.fixtures.js';
 
 const songSeconds = 8;
 const screenFrameQuanta = 6;
@@ -36,36 +37,9 @@ export const flush = async (): Promise<void> => {
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
 const fake = <Type>(value: object): Type => value as Type;
 
-type PortMessage = { type: string; payload: unknown };
-
-const isPortMessage = (value: unknown): value is PortMessage =>
-  value instanceof Object && 'type' in value;
-
-type PostHook = (payload: unknown) => void;
-
-const watchPosts = (port: MessagePort, posted: string[]) => {
-  const hooks = new Map<string, PostHook>();
-  const post = port.postMessage.bind(port);
-  const postWatched = (message: unknown, transfer: Transferable[] = []) => {
-    post(message, transfer);
-    if (!isPortMessage(message)) {
-      return;
-    }
-    posted.push(message.type);
-    const hook = hooks.get(message.type);
-    if (hook) {
-      hooks.delete(message.type);
-      hook(message.payload);
-    }
-  };
-  Object.assign(port, { postMessage: postWatched });
-  return (type: string, hook: PostHook) => {
-    hooks.set(type, hook);
-  };
-};
-
 export type Seam = {
   player: EnginePlayer;
+  unclocked: EnginePlayer;
   store: Store<EngineState>;
   position: EnginePosition;
   spectrogramPlayheadPort: MessagePort;
@@ -317,6 +291,7 @@ export const createSeam = async (
       play: async () => clocked(player.play()),
       stop: async () => clocked(player.stop()),
     },
+    unclocked: player,
     store,
     position,
     spectrogramPlayheadPort: spectrogramPlayhead.port2,

@@ -8,6 +8,7 @@ export type StopGlide = {
     stopContextFrame: number,
   ) => number | undefined;
   advance: (contextFrame: number) => void;
+  seek: (frameIndex: number, revision: number) => void;
   clear: () => void;
   active: () => boolean;
 };
@@ -56,6 +57,14 @@ export const createStopGlide = (
       moving.frameIndex = frameIndex;
       moving.contextFrame = heardContextFrame;
       playhead.publish(moving);
+    },
+    seek: (frameIndex, revision) => {
+      if (
+        glide?.line.endFrame !== frameIndex ||
+        glide.line.revision !== revision
+      ) {
+        glide = undefined;
+      }
     },
     clear: () => {
       glide = undefined;

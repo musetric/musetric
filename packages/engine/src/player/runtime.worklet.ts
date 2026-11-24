@@ -160,7 +160,7 @@ export const createPlayerRuntime = (
     appliedCommand = message.command;
     revision = message.revision;
     const { frameIndex } = message;
-    glide.clear();
+    glide.seek(frameIndex, revision);
     position.begin(frameIndex);
     if (recordingRuntime.isActive()) {
       recordingRuntime.handleSeek(frameIndex);
@@ -168,7 +168,9 @@ export const createPlayerRuntime = (
     renderer.reset();
     metronome.reset(frameIndex);
     metronome.clear();
-    publishHeld();
+    if (!glide.active()) {
+      publishHeld();
+    }
     renderer.requestWindow(frameIndex, true);
     setPlaying();
   };
