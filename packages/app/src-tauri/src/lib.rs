@@ -17,6 +17,8 @@ use tauri_plugin_window_state::StateFlags;
 use crate::assets::TauriAssets;
 
 mod assets;
+#[cfg(any(target_os = "windows", test))]
+mod capture;
 #[cfg(desktop)]
 mod download;
 #[cfg(mobile)]
@@ -77,7 +79,9 @@ pub fn run() {
 }
 
 fn run_app() -> tauri::Result<()> {
-    #[cfg(desktop)]
+    #[cfg(target_os = "windows")]
+    let builder = tauri::Builder::default().plugin(capture::init());
+    #[cfg(all(desktop, not(target_os = "windows")))]
     let builder = tauri::Builder::default();
     #[cfg(target_os = "android")]
     let builder = tauri::Builder::default().plugin(executor_view::init());

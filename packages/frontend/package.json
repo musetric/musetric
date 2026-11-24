@@ -30,6 +30,7 @@
     "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@tanstack/react-query": "catalog:",
+    "@tauri-apps/api": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

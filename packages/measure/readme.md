@@ -42,4 +42,6 @@ spectrogram worker and in its audio worklet. The variable goes before the
   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9335`, then
   `--device desktop`. `measure:delay` does not run there: WebView2 answers
   `Target.setAutoAttach`, through which the command reaches the spectrogram's
-  worker, with `wasn't found`.
+  worker, with `wasn't found`. With `frontendNativeMicrophone=true` as well,
+  the take comes from the app's native capture on Windows instead of
+  `getUserMedia`.

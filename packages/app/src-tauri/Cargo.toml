@@ -22,7 +22,9 @@ tauri = { version = "=2.12.7", features = [] }
 tokio = { version = "=1.54.1", features = ["sync", "time"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
 tauri = { version = "=2.12.7", features = ["tray-icon"] }
+wasapi = "=0.27.0"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 log = "=0.4.35"

@@ -2,6 +2,7 @@
 interface ImportMetaEnv {
   readonly frontendSpectrogramProfiling: string;
   readonly frontendMeasure: string;
+  readonly frontendNativeMicrophone: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions

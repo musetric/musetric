@@ -1,5 +1,6 @@
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { createAndroidAudioSession, readAndroidMicrophone } from './android.js';
+import { createDesktopAudioSession, hasDesktopMicrophone } from './desktop.js';
 import { type EngineAudioSession } from './engineAudioSession.js';
 import {
   createNativeAudioSession,
@@ -23,7 +24,10 @@ export const createEngineAudioSession = (
     );
   }
   const handler = readNativeMicrophoneHandler();
-  return handler
-    ? createNativeAudioSession(getContext, handler)
+  if (handler) {
+    return createNativeAudioSession(getContext, handler);
+  }
+  return hasDesktopMicrophone()
+    ? createDesktopAudioSession(getContext, outputClock, onCaptured)
     : createWebAudioSession(getContext, outputClock, onCaptured);
 };

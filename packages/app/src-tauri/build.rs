@@ -1,6 +1,8 @@
 use std::{env, error::Error};
 
 const PUBLISH_VARIABLE: &str = "MUSETRIC_PUBLISH";
+const MICROPHONE_PLUGIN: &str = "microphone";
+const MICROPHONE_COMMANDS: &[&str] = &["clock", "devices", "start", "stop", "watch"];
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(development)");
@@ -11,7 +13,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
         ios::link_ios_plugins()?;
     }
-    tauri_build::try_build(tauri_build::Attributes::new())?;
+    tauri_build::try_build(
+        tauri_build::Attributes::new().plugin(
+            MICROPHONE_PLUGIN,
+            tauri_build::InlinedPlugin::new()
+                .commands(MICROPHONE_COMMANDS)
+                .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands),
+        ),
+    )?;
     Ok(())
 }
 
