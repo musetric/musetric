@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { blockSize, createHarness, rate, settle } from './player.fixtures.js';
+import {
+  blockSize,
+  createHarness,
+  fadeQuanta,
+  rate,
+  settle,
+} from './player.fixtures.js';
 
 const quantaOfSeconds = (seconds: number) =>
   Math.round((seconds * rate) / blockSize);
@@ -43,7 +49,7 @@ describe('the anchors of the playhead', () => {
     expect(second).toBeLessThanOrEqual(17);
   });
 
-  it('publishes a new anchor at once on a change of tempo and a seek', async () => {
+  it('publishes a new anchor at once on a change of tempo and where a seek lands', async () => {
     const { harness, run, count } = await createCountedPlayer();
     harness.player.methods.play({
       revision: 1,
@@ -56,7 +62,8 @@ describe('the anchors of the playhead', () => {
     expect(await count(async () => run(2))).toBeGreaterThanOrEqual(1);
     harness.player.methods.seek({ frameIndex: 3 * rate, revision: 2 });
     await settle();
-    expect(await count(async () => run(1))).toBe(1);
+    await run(fadeQuanta);
+    expect(await count(async () => run(1))).toBeGreaterThanOrEqual(1);
   });
 
   it('publishes nothing while the song stands still', async () => {

@@ -1,5 +1,6 @@
 import { type StemType } from '@musetric/audio/es';
 import { type InitOutput } from '@musetric/dsp/stretch';
+import { createCuts } from './cutFade.worklet.js';
 import { createHeardPosition } from './heardPosition.worklet.js';
 import { createMetronome } from './metronome.worklet.js';
 import {
@@ -68,6 +69,7 @@ export const createPlayerRuntime = (
     dataPort,
     getRange: () => range,
   });
+  const cuts = createCuts(() => playing && !frozen && renderer.mounted());
 
   const applyLatencyFrameCounts = (counts: LatencyFrameCounts) => {
     latencyFrameCount = Math.max(0, counts.latencyFrameCount);
@@ -114,12 +116,49 @@ export const createPlayerRuntime = (
   const finishPlayback = (nextFrameIndex: number) => {
     position.begin(nextFrameIndex);
     playing = false;
+    cuts.fade.mute();
     recordingRuntime.resetInputOffset();
     renderer.reset();
     metronome.reset(nextFrameIndex);
     metronome.clear();
     publishHeld();
     setPlaying(true);
+  };
+
+  const applyStop = (stopRevision: number, frameIndex: number) => () => {
+    revision = stopRevision;
+    const soundEnd =
+      playing && !frozen
+        ? glide.start(
+            position.getValue({ revision, clockOffset, frameCount }),
+            position.getRenderFrameIndex(),
+            lastContextFrame,
+          )
+        : undefined;
+    playing = false;
+    if (soundEnd !== undefined) {
+      position.begin(soundEnd);
+    } else if (!glide.active()) {
+      position.begin(frameIndex);
+      publishHeld();
+    }
+    metronome.clear();
+    setPlaying();
+    renderer.requestWindow(position.getFrameIndex(), true);
+  };
+
+  const applySeek = (seekRevision: number, frameIndex: number) => () => {
+    revision = seekRevision;
+    glide.clear();
+    position.begin(frameIndex);
+    if (recordingRuntime.isActive()) {
+      recordingRuntime.handleSeek(frameIndex);
+    }
+    renderer.reset();
+    metronome.reset(frameIndex);
+    metronome.clear();
+    publishHeld();
+    renderer.requestWindow(frameIndex, true);
   };
 
   const getTakeFrame = (currentOutputFrameIndex: number) => {
@@ -134,6 +173,7 @@ export const createPlayerRuntime = (
 
   dataPort.bindHandlers({
     mount: (message) => {
+      cuts.flush();
       glide.clear();
       frameCount = message.frameCount;
       renderer.mount(message.layouts, message.residentPageLimit);
@@ -163,6 +203,7 @@ export const createPlayerRuntime = (
       renderer.appendLiveTake(message);
     },
     unmount: () => {
+      cuts.flush();
       glide.clear();
       frameCount = 0;
       renderer.release();
@@ -178,56 +219,32 @@ export const createPlayerRuntime = (
 
   port.bindHandlers({
     play: (message) => {
-      revision = message.revision;
-      glide.clear();
-      if (!renderer.mounted()) {
-        setPlaying();
-        return;
-      }
+      cuts.after(() => {
+        revision = message.revision;
+        glide.clear();
+        if (!renderer.mounted()) {
+          setPlaying();
+          return;
+        }
 
-      applyLatencyFrameCounts(message);
-      metronome.reset(position.getFrameIndex());
-      playing = true;
-      recordingRuntime.resetInputOffset();
-      setPlaying();
+        applyLatencyFrameCounts(message);
+        metronome.reset(position.getFrameIndex());
+        playing = true;
+        recordingRuntime.resetInputOffset();
+        setPlaying();
+      });
     },
     stop: (message) => {
-      revision = message.revision;
-      const soundEnd =
-        playing && !frozen
-          ? glide.start(
-              position.getValue({ revision, clockOffset, frameCount }),
-              position.getRenderFrameIndex(),
-              lastContextFrame,
-            )
-          : undefined;
-      playing = false;
-      if (soundEnd !== undefined) {
-        position.begin(soundEnd);
-      } else if (!glide.active()) {
-        position.begin(message.frameIndex);
-        publishHeld();
-      }
-      metronome.clear();
-      setPlaying();
-      renderer.requestWindow(position.getFrameIndex(), true);
+      cuts.cut(applyStop(message.revision, message.frameIndex));
     },
     setFrozen: (message) => {
-      frozen = message.frozen;
-      renderer.reset();
+      (message.frozen ? cuts.cut : cuts.after)(() => {
+        frozen = message.frozen;
+        renderer.reset();
+      });
     },
     seek: (message) => {
-      revision = message.revision;
-      glide.clear();
-      position.begin(message.frameIndex);
-      if (recordingRuntime.isActive()) {
-        recordingRuntime.handleSeek(message.frameIndex);
-      }
-      renderer.reset();
-      metronome.reset(message.frameIndex);
-      metronome.clear();
-      publishHeld();
-      renderer.requestWindow(message.frameIndex, true);
+      cuts.cut(applySeek(message.revision, message.frameIndex));
     },
     setLatency: (message) => {
       applyLatencyFrameCounts(message);
@@ -258,17 +275,21 @@ export const createPlayerRuntime = (
       metronome.setConfig(message, position.getFrameIndex());
     },
     setRange: (message) => {
-      glide.clear();
-      range = message.range
-        ? createRangeFrames(message.range, message.repeat, message.stopFrame)
-        : undefined;
-      renderer.setRange(range);
-      renderer.refill();
-      renderer.requestWindow(position.getFrameIndex(), true);
+      cuts.after(() => {
+        glide.clear();
+        range = message.range
+          ? createRangeFrames(message.range, message.repeat, message.stopFrame)
+          : undefined;
+        renderer.setRange(range);
+        renderer.refill();
+        renderer.requestWindow(position.getFrameIndex(), true);
+      });
     },
     startRecording: (message) => {
-      revision = message.revision;
-      recordingRuntime.start(message);
+      cuts.after(() => {
+        revision = message.revision;
+        recordingRuntime.start(message);
+      });
     },
     flushRecording: () => {
       recordingRuntime.drain();
@@ -282,6 +303,7 @@ export const createPlayerRuntime = (
         output.fill(0);
       }
 
+      cuts.settle();
       const contextFrame = options.getCurrentFrame();
       if (!renderer.mounted() || !playing) {
         recordingRuntime.processDrain(inputs);
@@ -302,15 +324,15 @@ export const createPlayerRuntime = (
 
       const currentOutputFrameIndex = position.getRenderFrameIndex();
       renderer.requestWindow(currentOutputFrameIndex);
-      if (
-        !recordingRuntime.isActive() &&
-        !renderer.ready(currentOutputFrameIndex)
-      ) {
+      const ready =
+        recordingRuntime.isActive() || renderer.ready(currentOutputFrameIndex);
+      if (!ready && cuts.fade.silent()) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
         playhead.publish(getValue());
         return;
       }
+      cuts.follow(ready);
 
       recordingRuntime.processInput(inputs);
 
@@ -319,6 +341,7 @@ export const createPlayerRuntime = (
         currentOutputFrameIndex,
         getTakeFrame(currentOutputFrameIndex),
       );
+      cuts.fade.apply(outputs);
 
       const nextOutputFrameIndex = position.advance(
         contextFrame,

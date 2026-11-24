@@ -1,5 +1,6 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { describe, expect, it } from 'vitest';
+import { fadeFrameCount } from '../playerRange.worklet.js';
 import {
   playerChannel,
   playerDataChannel,
@@ -132,6 +133,19 @@ const playScenario = async (paging: Paging, tempoRatio: number) => {
   return rendered;
 };
 
+const cutGain = (frame: number, cut: number) => {
+  if (frame >= cut - fadeFrameCount && frame < cut) {
+    return (cut - frame) / fadeFrameCount;
+  }
+  if (frame >= cut && frame < cut + fadeFrameCount) {
+    return (frame - cut) / fadeFrameCount;
+  }
+  return 1;
+};
+
+const fadeAround = (block: Float32Array, start: number, cut: number) =>
+  block.map((value, frame) => value * cutGain(start + frame, cut));
+
 const isSilent = (blocks: Float32Array[]) =>
   blocks.every((block) => block.every((value) => value === 0));
 
@@ -171,7 +185,12 @@ describe('player pages', () => {
     const heldPairs = pairs.filter(isSilent).length;
     expect(heldPairs).toBeGreaterThan(0);
     expect(pairs.slice(-50).some((pair) => !isSilent(pair))).toBe(true);
-    const played = pairs.filter((pair) => !isSilent(pair)).flat();
-    expect(played).toEqual(expected.slice(0, played.length));
+    const played = pairs.filter((pair) => !isSilent(pair));
+    const cut = pairs.findIndex(isSilent) * blockSize;
+    const faded = played.map((_, index) => [
+      fadeAround(expected[index * 2], index * blockSize, cut),
+      fadeAround(expected[index * 2 + 1], index * blockSize, cut),
+    ]);
+    expect(played).toEqual(faded);
   });
 });

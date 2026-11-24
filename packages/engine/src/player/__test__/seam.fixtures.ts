@@ -20,6 +20,7 @@ import { blockSize, mountTracks, rate } from './player.fixtures.js';
 
 const songSeconds = 8;
 const screenFrameQuanta = 6;
+const settleQuantumLimit = 2000;
 
 const noop = (): void => undefined;
 
@@ -244,8 +245,27 @@ export const createSeam = async (): Promise<Seam> => {
     await flush();
   };
 
+  const clocked = async (command: Promise<void>): Promise<void> => {
+    const state = { settled: false };
+    const tracked = command.finally(() => {
+      state.settled = true;
+    });
+    for (
+      let quantum = 0;
+      !state.settled && quantum < settleQuantumLimit;
+      quantum += 1
+    ) {
+      await run(1);
+    }
+    return tracked;
+  };
+
   return {
-    player,
+    player: {
+      ...player,
+      play: async () => clocked(player.play()),
+      stop: async () => clocked(player.stop()),
+    },
     store,
     position,
     host,
