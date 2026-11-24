@@ -1,23 +1,19 @@
 import { type EngineState } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
 
-export const canStop = (state: EngineState): boolean =>
+export const canCommandPlayback = (state: EngineState): boolean =>
   Boolean(state.frameCount) &&
   state.statuses.realtime !== 'error' &&
   !state.playerCommandPending;
 
-export const canPlay = (state: EngineState): boolean =>
-  canStop(state) && !state.isSlave;
-
 export const togglePlayback = () => {
   const state = engine.store.get();
-  if (state.playing || state.recording) {
-    if (canStop(state)) {
-      void engine.player.stop();
-    }
+  if (!canCommandPlayback(state)) {
     return;
   }
-  if (canPlay(state)) {
-    void engine.player.play();
+  if (state.playing || state.recording) {
+    void engine.player.stop();
+    return;
   }
+  void engine.player.play();
 };

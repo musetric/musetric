@@ -2,13 +2,11 @@ import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
-import { type Playhead } from '../player/playhead.cross.js';
 import { type playerDataChannel } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { createAudioDecode } from './audioDecode.worker.js';
 import { createLoopTries } from './loopTries.worker.js';
-import { createPlayerFrameIndexStream } from './playerFrameIndexStream.worker.js';
 import { type engineDecoderChannel } from './protocol.cross.js';
 import {
   createProjectRealtime,
@@ -25,7 +23,6 @@ import {
 } from './recordingList.worker.js';
 import {
   createRecordingStream,
-  readRecordingPacket,
   type RecordingStream,
 } from './recordingStream.worker.js';
 
@@ -40,13 +37,12 @@ export type CreateDecoderWorkerRuntimeOptions = {
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
   >;
-  playhead: Playhead;
 };
 
 export const createDecoderWorkerRuntime = (
   options: CreateDecoderWorkerRuntimeOptions,
 ): void => {
-  const { port, playerPort, spectrogramPort, playhead } = options;
+  const { port, playerPort, spectrogramPort } = options;
 
   const audioDecode = createAudioDecode({ playerPort, spectrogramPort });
 
@@ -58,7 +54,6 @@ export const createDecoderWorkerRuntime = (
   let draftStream = false;
   let recordingSessionId: string | undefined = undefined;
   let recordingReady = false;
-  let backendRevision = 0;
   let finishedTakeId: string | undefined = undefined;
 
   let recordingController: RecordingController | undefined = undefined;
@@ -77,15 +72,6 @@ export const createDecoderWorkerRuntime = (
       return;
     }
     if (!own) {
-      if (event.recordingId !== recordingList.getActiveId()) {
-        return;
-      }
-      audioDecode.beginLiveTake({
-        takeId: event.sessionId,
-        tempo: event.tempo,
-        transpose: event.transpose,
-        octave: event.octave,
-      });
       return;
     }
     recordingReady = true;
@@ -110,54 +96,12 @@ export const createDecoderWorkerRuntime = (
         applyTakeEvent(event, realtime);
         return;
       }
-      if (event.type === 'player.play') {
-        port.methods.playerPlayRequested();
-        return;
-      }
-      if (event.type === 'player.record') {
-        port.methods.playerRecordRequested();
-        return;
-      }
-      if (event.type === 'player.stop') {
-        port.methods.playerStopRequested();
-        return;
-      }
-      if (event.type === 'player.frameIndex') {
-        backendRevision = event.revision;
-        port.methods.playerFrameIndexChanged({
-          frameIndex: event.frameIndex,
-          frozen: event.frozen,
-          revision: event.revision,
-          source: event.source,
-        });
-        return;
-      }
-      if (event.type === 'player.revision') {
-        backendRevision = event.revision;
-        port.methods.playerRevisionChanged({ revision: event.revision });
-        return;
-      }
-      if (event.type === 'player.sync.state') {
-        backendRevision = event.revision;
-        port.methods.playerSyncState({
-          isSlave: event.active,
-          playing: event.active,
-          recording: event.recording,
-          frozen: event.frozen,
-          frameIndex: event.frameIndex,
-          revision: event.revision,
-        });
-        return;
-      }
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (event.type === 'error') {
         recordingController?.failRecordingStream(event.error);
         return;
       }
       assertNever(event, 'Unhandled project realtime event');
-    },
-    onPacket: (data) => {
-      audioDecode.patchLiveTake(readRecordingPacket(data));
     },
     onClose: (error) => {
       port.methods.setRealtimeState({ status: 'error' });
@@ -181,19 +125,6 @@ export const createDecoderWorkerRuntime = (
     port,
   });
 
-  const frameIndexStream = createPlayerFrameIndexStream({
-    playhead,
-    onFrameIndex: (message) => {
-      realtime.sendJson({
-        type: 'player.frameIndex',
-        frameIndex: message.frameIndex,
-        frozen: false,
-        revision: backendRevision,
-        source: 'playback',
-      });
-    },
-  });
-
   port.bindHandlers({
     mount: async (message) => {
       try {
@@ -202,7 +133,6 @@ export const createDecoderWorkerRuntime = (
         recordingList.apply(recordings);
         const mounted = await audioDecode.mount(message);
         port.methods.mounted({ frameCount: mounted.frameCount });
-        realtime.sendJson({ type: 'player.sync.request' });
       } catch (error) {
         console.error('Failed to load and decode project audio track', error);
         port.methods.setState({ status: 'error' });
@@ -211,7 +141,6 @@ export const createDecoderWorkerRuntime = (
     unmount: () => {
       loopTries.clear();
       recordingList.clear();
-      frameIndexStream.stop();
       recordingController.clearRecordingStream();
       realtime.close();
       audioDecode.unmount();
@@ -321,30 +250,6 @@ export const createDecoderWorkerRuntime = (
       if (recordingId !== undefined) {
         realtime.sendJson({ type: 'recording.redo', recordingId });
       }
-    },
-    sendPlayerPlay: () => {
-      realtime.sendJson({ type: 'player.play' });
-      frameIndexStream.start();
-    },
-    sendPlayerRecord: () => {
-      realtime.sendJson({ type: 'player.record' });
-      frameIndexStream.start();
-    },
-    sendPlayerStop: () => {
-      frameIndexStream.stop();
-      realtime.sendJson({ type: 'player.stop' });
-    },
-    sendPlayerFrameIndex: (message) => {
-      realtime.sendJson({
-        type: 'player.frameIndex',
-        frameIndex: message.frameIndex,
-        frozen: message.frozen,
-        revision: message.revision,
-        source: message.source,
-      });
-    },
-    sendPlayerSyncRequest: () => {
-      realtime.sendJson({ type: 'player.sync.request' });
     },
   });
 };

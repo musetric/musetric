@@ -70,37 +70,6 @@ describe('the seam of the player', () => {
     },
   );
 
-  it.fails(
-    "race 3: keeps a quick Play when the host echoes the client's own Stop",
-    async () => {
-      const current = await open();
-      await current.player.play();
-      await shownAfter(current, 0.3);
-      await current.player.stop();
-      expect(current.host).toContain('player.stop');
-      await current.player.play();
-      await current.player.applyRemoteStop();
-      await shownAfter(current, 0.3);
-      expect(current.store.get().playing).toBe(true);
-    },
-  );
-
-  it.fails(
-    'race 4: settles both a Play and a remote Stop that overlap',
-    async () => {
-      const current = await open();
-      const settled = { play: false, stop: false };
-      void current.player.play().finally(() => {
-        settled.play = true;
-      });
-      void current.player.applyRemoteStop().finally(() => {
-        settled.stop = true;
-      });
-      await shownAfter(current, 0.3);
-      expect(settled).toEqual({ play: true, stop: true });
-    },
-  );
-
   it.fails('race 5: keeps a Stop pressed while a take prepares', async () => {
     const current = await open();
     const recording = current.player.record(1);

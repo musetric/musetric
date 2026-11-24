@@ -44,7 +44,6 @@ export type EngineSeekOrigin =
   | 'player'
   | 'playerProgress'
   | 'playhead'
-  | 'remote'
   | 'spectrogramVisualization'
   | 'subtitle'
   | 'tracksVisualization';
@@ -110,10 +109,7 @@ export type EngineState = {
   frozen: boolean;
   recording: boolean;
   recordings: api.recording.Item[];
-  isSlave: boolean;
   playerCommandPending: boolean;
-  playerFrameIndexPending: boolean;
-  backendRevision: number;
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   voiceOctave: VoiceOctave;
@@ -310,10 +306,7 @@ export const initialEngineState: EngineState = {
   frozen: false,
   recording: false,
   recordings: [],
-  isSlave: false,
   playerCommandPending: false,
-  playerFrameIndexPending: false,
-  backendRevision: 0,
   seekEvent: {
     revision: 0,
     frameIndex: 0,

@@ -81,7 +81,7 @@ export const createEngineRecorder = (
 
   const isStopRequested = (session: RecordingSession) => session.stopRequested;
 
-  const settleTry = async (session: RecordingSession, keepPlaying: boolean) => {
+  const settleTry = async (session: RecordingSession) => {
     if (!session.pass) {
       return;
     }
@@ -91,7 +91,6 @@ export const createEngineRecorder = (
       settled: session.decoderStreamStarted,
       keep: session.passComplete,
       tempoRatio: session.tempoRatio,
-      keepPlaying,
     });
   };
 
@@ -126,9 +125,7 @@ export const createEngineRecorder = (
   };
 
   const failSession = (session: RecordingSession) => {
-    void closeDecoderStream(session).then(async () =>
-      settleTry(session, false),
-    );
+    void closeDecoderStream(session).then(async () => settleTry(session));
     cleanupSession(session);
     if (currentSession === session) {
       currentSession = undefined;
@@ -185,7 +182,7 @@ export const createEngineRecorder = (
       if (currentSession === session) {
         currentSession = undefined;
       }
-      await settleTry(session, keepPlaying);
+      await settleTry(session);
       setRecording(false);
     }
   };

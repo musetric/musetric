@@ -37,6 +37,7 @@ pub(crate) fn parse(packet: &[u8]) -> Result<StreamPacket, BoxedError> {
     })
 }
 
+#[cfg(test)]
 pub(crate) fn create_chunk(
     start_frame: u32,
     offset: u32,

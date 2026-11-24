@@ -11,8 +11,6 @@ export type EngineDecoderOutboundMethods = {
   boot: (message: {
     playerPort: MessagePort;
     spectrogramPort: MessagePort;
-    playheadPort: MessagePort;
-    sampleRate: number;
   }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;
@@ -40,16 +38,6 @@ export type EngineDecoderOutboundMethods = {
   }) => void;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
-  sendPlayerPlay: () => void;
-  sendPlayerRecord: () => void;
-  sendPlayerStop: () => void;
-  sendPlayerFrameIndex: (message: {
-    frameIndex: number;
-    frozen: boolean;
-    revision: number;
-    source: 'playback' | 'user';
-  }) => void;
-  sendPlayerSyncRequest: () => void;
 };
 
 export type EngineDecoderInboundMethods = {
@@ -69,24 +57,6 @@ export type EngineDecoderInboundMethods = {
   recordingContentChanged: (message: { recordingId: number }) => void;
   loopTrySettled: (message: { loopTry?: SettledLoopTry }) => void;
   loopTryInserted: (message: { inserted: boolean }) => void;
-  playerPlayRequested: () => void;
-  playerRecordRequested: () => void;
-  playerStopRequested: () => void;
-  playerFrameIndexChanged: (message: {
-    frameIndex: number;
-    frozen: boolean;
-    revision: number;
-    source: 'playback' | 'user';
-  }) => void;
-  playerRevisionChanged: (message: { revision: number }) => void;
-  playerSyncState: (message: {
-    isSlave: boolean;
-    playing: boolean;
-    recording: boolean;
-    frozen: boolean;
-    frameIndex: number;
-    revision: number;
-  }) => void;
 };
 
 export const engineDecoderChannel = createMessageChannel<
@@ -107,12 +77,6 @@ export const engineDecoderChannel = createMessageChannel<
       'recordingContentChanged',
       'loopTrySettled',
       'loopTryInserted',
-      'playerPlayRequested',
-      'playerRecordRequested',
-      'playerStopRequested',
-      'playerFrameIndexChanged',
-      'playerRevisionChanged',
-      'playerSyncState',
     ],
   },
   outbound: {
@@ -129,18 +93,9 @@ export const engineDecoderChannel = createMessageChannel<
       'insertLoopTry',
       'sendRecordingUndo',
       'sendRecordingRedo',
-      'sendPlayerPlay',
-      'sendPlayerRecord',
-      'sendPlayerStop',
-      'sendPlayerFrameIndex',
-      'sendPlayerSyncRequest',
     ],
     transfers: {
-      boot: (message) => [
-        message.playerPort,
-        message.spectrogramPort,
-        message.playheadPort,
-      ],
+      boot: (message) => [message.playerPort, message.spectrogramPort],
       startRecordingStream: (message) => [message.port],
     },
   },

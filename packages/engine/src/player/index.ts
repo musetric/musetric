@@ -29,25 +29,6 @@ export type EnginePlayer = EnginePlayerLoop &
     setFrozen: (frozen: boolean) => void;
     record: (projectId: number) => Promise<void>;
     stopRecording: () => Promise<void>;
-    applyRemoteStop: () => Promise<void>;
-    applyRemoteFrameIndex: (
-      frameIndex: number,
-      frozen: boolean,
-      revision: number,
-      source: 'playback' | 'user',
-    ) => void;
-    applyRemotePlayState: (state: {
-      playing: boolean;
-      recording: boolean;
-    }) => Promise<void>;
-    applyRemoteSyncState: (state: {
-      isSlave: boolean;
-      playing: boolean;
-      recording: boolean;
-      frozen: boolean;
-      frameIndex: number;
-      revision: number;
-    }) => Promise<void>;
   };
 
 export type CreateEnginePlayerOptions = {
@@ -76,11 +57,8 @@ export const createEnginePlayer = (
   const getEngineRecorder = () =>
     assertDefined(engineRecorder, 'Player is not booted');
 
-  const getDecoderValue = () => getDecoder();
-
   const startPlayback = createStartPlayback({
     store,
-    getDecoder,
     getEnginePlayback: () => enginePlayback,
   });
 
@@ -95,12 +73,6 @@ export const createEnginePlayer = (
         playheadPort,
         playheadPorts,
         position,
-        onPlaybackEnded: () => {
-          const state = store.get();
-          if (!state.isSlave) {
-            getDecoderValue().sendPlayerStop();
-          }
-        },
         onRecordingPassStarted: () => {
           engineRecorder?.handlePassStarted();
         },
@@ -134,7 +106,6 @@ export const createEnginePlayer = (
       const { recording } = store.get();
       store.update((state) => {
         state.playing = false;
-        state.isSlave = false;
         state.playerCommandPending = true;
       });
       try {
@@ -143,7 +114,6 @@ export const createEnginePlayer = (
         } else {
           await enginePlayback.stop();
         }
-        getDecoderValue().sendPlayerStop();
       } finally {
         store.update((state) => {
           state.playerCommandPending = false;
@@ -154,7 +124,6 @@ export const createEnginePlayer = (
       const frameIndex = clampToRange(requestedFrameIndex, store.get().range);
       position.write(frameIndex);
       store.update((state) => {
-        state.playerFrameIndexPending = true;
         state.seekEvent = {
           revision: nextNumber(state.seekEvent.revision),
           frameIndex,
@@ -166,38 +135,17 @@ export const createEnginePlayer = (
         return;
       }
       enginePlayback.seek(frameIndex);
-      const state = store.get();
-      getDecoderValue().sendPlayerFrameIndex({
-        frameIndex,
-        frozen: state.frozen,
-        revision: state.backendRevision,
-        source: 'user',
-      });
     },
     setFrozen: (frozen) => {
-      store.update((state) => {
-        state.playerFrameIndexPending = true;
-      });
       if (!frozen && heldSeek !== undefined) {
         enginePlayback.seek(heldSeek);
         heldSeek = undefined;
       }
       enginePlayback.setFrozen(frozen);
-      const state = store.get();
-      getDecoderValue().sendPlayerFrameIndex({
-        frameIndex: position.read(),
-        frozen,
-        revision: state.backendRevision,
-        source: 'user',
-      });
     },
     record: async (projectId) => {
       const currentState = store.get();
-      if (
-        currentState.playerCommandPending ||
-        currentState.recording ||
-        currentState.isSlave
-      ) {
+      if (currentState.playerCommandPending || currentState.recording) {
         return;
       }
 
@@ -208,15 +156,8 @@ export const createEnginePlayer = (
         draft.playerCommandPending = true;
       });
       try {
-        getDecoderValue().sendPlayerRecord();
         await getEngineRecorder().record(projectId, !playing);
       } catch (error) {
-        const state = store.get();
-        if (!state.isSlave && !playing) {
-          getDecoderValue().sendPlayerStop();
-        } else if (!state.isSlave && state.playing) {
-          getDecoderValue().sendPlayerPlay();
-        }
         store.update((draft) => {
           draft.recording = false;
           if (!playing) {
@@ -232,11 +173,7 @@ export const createEnginePlayer = (
     },
     stopRecording: async () => {
       const currentState = store.get();
-      if (
-        currentState.playerCommandPending ||
-        !currentState.recording ||
-        currentState.isSlave
-      ) {
+      if (currentState.playerCommandPending || !currentState.recording) {
         return;
       }
 
@@ -245,10 +182,6 @@ export const createEnginePlayer = (
       });
       try {
         await getEngineRecorder().finish();
-        const state = store.get();
-        if (!state.isSlave && state.playing) {
-          getDecoderValue().sendPlayerPlay();
-        }
       } finally {
         store.update((draft) => {
           draft.playerCommandPending = false;
@@ -274,86 +207,6 @@ export const createEnginePlayer = (
         ref.setRange(range);
       },
     }),
-    applyRemoteStop: async () => {
-      const { recording: wasRecording } = store.get();
-      store.update((state) => {
-        state.isSlave = false;
-        state.playing = false;
-        state.recording = false;
-        state.playerCommandPending = false;
-        state.playerFrameIndexPending = false;
-      });
-      if (wasRecording) {
-        await getEngineRecorder().stop();
-      } else {
-        await enginePlayback.stop();
-      }
-    },
-    applyRemoteFrameIndex: (frameIndex, frozen, revision, source) => {
-      const currentState = store.get();
-      if (
-        source === 'playback' &&
-        (currentState.playerFrameIndexPending ||
-          currentState.backendRevision !== revision)
-      ) {
-        return;
-      }
-
-      position.write(frameIndex);
-      store.update((state) => {
-        state.backendRevision = revision;
-        state.playerFrameIndexPending = false;
-        state.frozen = frozen;
-        state.seekEvent = {
-          revision: nextNumber(state.seekEvent.revision),
-          frameIndex,
-          origin: 'remote',
-        };
-      });
-      enginePlayback.seek(frameIndex);
-      enginePlayback.setFrozen(frozen);
-    },
-    applyRemotePlayState: async (state) => {
-      const currentState = store.get();
-      if (currentState.recording) {
-        await getEngineRecorder().stop();
-      } else if (currentState.playing) {
-        await enginePlayback.stop();
-      }
-      store.update((s) => {
-        s.isSlave = true;
-        s.playing = state.playing;
-        s.recording = state.recording;
-        s.playerCommandPending = false;
-        s.playerFrameIndexPending = false;
-      });
-    },
-    applyRemoteSyncState: async (state) => {
-      const currentState = store.get();
-      if (state.isSlave && currentState.recording) {
-        await getEngineRecorder().stop();
-      } else if (state.isSlave && currentState.playing) {
-        await enginePlayback.stop();
-      }
-
-      position.write(state.frameIndex);
-      store.update((s) => {
-        s.backendRevision = state.revision;
-        s.playerFrameIndexPending = false;
-        s.isSlave = state.isSlave;
-        s.playing = state.playing;
-        s.recording = state.recording;
-        s.frozen = state.frozen;
-        s.seekEvent = {
-          revision: nextNumber(s.seekEvent.revision),
-          frameIndex: state.frameIndex,
-          origin: 'remote',
-        };
-        s.playerCommandPending = false;
-      });
-      enginePlayback.seek(state.frameIndex);
-      enginePlayback.setFrozen(state.frozen);
-    },
   };
 
   return ref;

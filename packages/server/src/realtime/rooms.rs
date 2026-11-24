@@ -18,8 +18,6 @@ use crate::realtime::{
     events,
 };
 
-const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
-
 pub(crate) type MemberId = u64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -29,70 +27,18 @@ pub(crate) enum Begin {
     Busy,
 }
 
-pub(crate) struct FrameIndexUpdate {
-    pub(crate) frame_index: f64,
-    pub(crate) frozen: bool,
-    pub(crate) revision: f64,
-    pub(crate) from_user: bool,
-}
-
-struct Player {
-    master: Option<MemberId>,
-    active: bool,
-    recording: bool,
-    frozen: bool,
-    frame_index: f64,
-    revision: i64,
-}
-
-impl Player {
-    fn create() -> Self {
-        Self {
-            master: None,
-            active: false,
-            recording: false,
-            frozen: false,
-            frame_index: 0.0,
-            revision: 0,
-        }
-    }
-
-    fn sync_state(&self) -> Value {
-        events::player_sync_state(&events::PlayerSyncState {
-            active: self.active,
-            recording: self.recording,
-            frozen: self.frozen,
-            frame_index: self.frame_index,
-            revision: self.revision,
-        })
-    }
-}
-
-pub(crate) struct RoomTake {
-    pub(crate) owner: MemberId,
-    pub(crate) session_id: String,
-    pub(crate) recording_id: i64,
-    pub(crate) tempo: f64,
-    pub(crate) transpose: i64,
-    pub(crate) octave: i64,
-}
-
 struct Room {
     members: HashMap<MemberId, UnboundedSender<Message>>,
-    player: Option<Player>,
     session_owner: Option<MemberId>,
     saving: bool,
-    take: Option<RoomTake>,
 }
 
 impl Room {
     fn create() -> Self {
         Self {
             members: HashMap::new(),
-            player: None,
             session_owner: None,
             saving: false,
-            take: None,
         }
     }
 
@@ -187,13 +133,6 @@ impl Rooms {
             return;
         };
         room.members.remove(&member);
-        let was_master = room
-            .player
-            .as_ref()
-            .is_some_and(|player| player.master == Some(member));
-        if was_master {
-            stop_player(room);
-        }
         forget_idle_room(&mut projects, project_id);
     }
 
@@ -208,105 +147,6 @@ impl Rooms {
         exclude: Option<MemberId>,
     ) {
         self.in_room(project_id, |room| room.broadcast_event(event, exclude));
-    }
-
-    pub(crate) fn broadcast_packet(&self, project_id: i64, packet: Vec<u8>, exclude: MemberId) {
-        let message = Message::Binary(packet.into());
-        self.in_room(project_id, |room| {
-            room.broadcast(&message, Some(exclude));
-        });
-    }
-
-    pub(crate) fn claim_master(&self, project_id: i64, member: MemberId, recording: bool) -> bool {
-        let claimed = self.with_room(project_id, |room| {
-            let player = room.player.get_or_insert_with(Player::create);
-            if !player.active {
-                player.master = Some(member);
-                player.active = true;
-                player.recording = recording;
-                room.broadcast_event(&events::player_started(recording), Some(member));
-                return true;
-            }
-            if player.master != Some(member) {
-                let state = player.sync_state();
-                room.send_to(member, &state);
-                return false;
-            }
-            if player.recording != recording {
-                player.recording = recording;
-                room.broadcast_event(&events::player_started(recording), Some(member));
-            }
-            true
-        });
-        claimed.unwrap_or(false)
-    }
-
-    pub(crate) fn stop_player(&self, project_id: i64) {
-        self.in_room(project_id, stop_player);
-    }
-
-    pub(crate) fn request_sync(&self, project_id: i64, member: MemberId) {
-        self.in_room(project_id, |room| {
-            if let Some(player) = room.player.as_ref() {
-                room.send_to(member, &player.sync_state());
-            }
-            if let Some(take) = room.take.as_ref().filter(|take| take.owner != member) {
-                let started = events::recording_started(take);
-                room.send_to(member, &started);
-            }
-        });
-    }
-
-    pub(crate) fn begin_take(&self, project_id: i64, take: RoomTake) {
-        self.in_room(project_id, |room| room.take = Some(take));
-    }
-
-    pub(crate) fn end_take(&self, project_id: i64, member: MemberId) {
-        self.in_room(project_id, |room| {
-            if room.take.as_ref().is_some_and(|take| take.owner == member) {
-                room.take = None;
-            }
-        });
-    }
-
-    pub(crate) fn set_frame_index(
-        &self,
-        project_id: i64,
-        member: MemberId,
-        update: &FrameIndexUpdate,
-    ) {
-        self.in_room(project_id, |room| {
-            let Some(player) = room.player.as_mut() else {
-                return;
-            };
-            if update.from_user {
-                player.revision = (player.revision + 1) % MAX_SAFE_INTEGER;
-                player.frame_index = update.frame_index;
-                player.frozen = update.frozen;
-                let revision = events::player_revision(player.revision);
-                let moved = frame_index_event(player, true);
-                room.send_to(member, &revision);
-                room.broadcast_event(&moved, Some(member));
-                return;
-            }
-            if !player.active || player.master != Some(member) {
-                let state = player.sync_state();
-                room.send_to(member, &state);
-                return;
-            }
-            #[expect(
-                clippy::cast_precision_loss,
-                clippy::float_cmp,
-                reason = "the client echoes the revision it was given, so only an exact match counts"
-            )]
-            if update.revision != player.revision as f64 {
-                return;
-            }
-            player.frame_index = update.frame_index;
-            player.frozen = update.frozen;
-            let moved = frame_index_event(player, false);
-            room.broadcast_event(&moved, Some(member));
-        });
     }
 
     pub(crate) fn begin_session(&self, project_id: i64, member: MemberId) -> Begin {
@@ -353,6 +193,14 @@ impl Rooms {
         forget_idle_room(&mut projects, project_id);
     }
 
+    #[cfg(test)]
+    pub(crate) fn holds_unsaved_session(&self, project_id: i64) -> bool {
+        self.with_room(project_id, |room| {
+            room.session_owner.is_some() && !room.saving
+        })
+        .unwrap_or(false)
+    }
+
     fn with_room<Value>(
         &self,
         project_id: i64,
@@ -388,24 +236,6 @@ fn forget_idle_room(projects: &mut HashMap<i64, Room>, project_id: i64) {
     }
 }
 
-fn stop_player(room: &mut Room) {
-    if let Some(player) = room.player.as_mut() {
-        player.master = None;
-        player.active = false;
-        player.recording = false;
-    }
-    room.broadcast_event(&events::player_stopped(), None);
-}
-
-fn frame_index_event(player: &Player, from_user: bool) -> Value {
-    events::player_frame_index(
-        player.frame_index,
-        player.frozen,
-        player.revision,
-        from_user,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Begin, Rooms, events};
@@ -414,15 +244,11 @@ mod tests {
     fn forgets_a_room_once_the_last_member_leaves() {
         let rooms = Rooms::create();
         let (member, _outgoing) = rooms.join(1);
-        rooms.claim_master(1, member, false);
         rooms.leave(1, member);
 
         rooms.broadcast_event(1, &events::recording_finished("take"), None);
         rooms.send_to(1, member, &events::recording_finished("take"));
-        rooms.stop_player(1);
-        rooms.request_sync(1, member);
         rooms.end_session(1, member);
-        assert!(!rooms.claim_master(1, member, false));
         assert_eq!(rooms.begin_session(1, member), Begin::Busy);
 
         assert_eq!(rooms.room_count(), 0);

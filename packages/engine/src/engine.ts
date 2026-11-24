@@ -88,7 +88,6 @@ export const createEngine = (): Engine => {
   });
   const playerChannel = new MessageChannel();
   const playerPlayheadChannel = new MessageChannel();
-  const decoderPlayheadChannel = new MessageChannel();
 
   const ref: Engine = {
     context,
@@ -110,7 +109,6 @@ export const createEngine = (): Engine => {
       sampleRate: context.sampleRate,
       playerPort: playerChannel.port1,
       spectrogramPort: spectrogramChannel.port1,
-      playheadPort: decoderPlayheadChannel.port2,
       onRecordingPeaksChanged: (message) => {
         ref.waveform.applyRecordingPeakPatch(message);
       },
@@ -127,42 +125,6 @@ export const createEngine = (): Engine => {
       onRecordingStreamFailed: () => {
         void ref.player.stop();
       },
-      onPlayerPlayRequested: () => {
-        void ref.player.applyRemotePlayState({
-          playing: true,
-          recording: false,
-        });
-      },
-      onPlayerRecordRequested: () => {
-        void ref.player.applyRemotePlayState({
-          playing: true,
-          recording: true,
-        });
-      },
-      onPlayerStopRequested: () => {
-        void ref.player.applyRemoteStop();
-      },
-      onPlayerFrameIndexChanged: (frameIndex, frozen, revision, source) => {
-        ref.player.applyRemoteFrameIndex(frameIndex, frozen, revision, source);
-      },
-      onPlayerRevisionChanged: (revision) => {
-        const currentState = store.get();
-
-        if (
-          currentState.backendRevision === revision &&
-          !currentState.playerFrameIndexPending
-        ) {
-          return;
-        }
-
-        store.update((state) => {
-          state.backendRevision = revision;
-          state.playerFrameIndexPending = false;
-        });
-      },
-      onPlayerSyncState: (syncState) => {
-        void ref.player.applyRemoteSyncState(syncState);
-      },
     }),
     player: createEnginePlayer({
       context,
@@ -175,7 +137,6 @@ export const createEngine = (): Engine => {
       playheadPort: playerPlayheadChannel.port2,
       playheadPorts: [
         playerPlayheadChannel.port1,
-        decoderPlayheadChannel.port1,
         spectrogramPlayheadChannel.port1,
       ],
       position,

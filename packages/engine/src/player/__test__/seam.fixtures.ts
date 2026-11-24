@@ -194,11 +194,6 @@ export const createSeam = async (): Promise<Seam> => {
     host.push(method);
   };
   const decoder = fake<EngineDecoder>({
-    sendPlayerPlay: record('player.play'),
-    sendPlayerRecord: record('player.record'),
-    sendPlayerStop: record('player.stop'),
-    sendPlayerFrameIndex: record('player.frameIndex'),
-    sendPlayerSyncRequest: record('player.sync'),
     startRecordingStream: record('recording.start'),
     finishRecordingStream: async () => {
       host.push('recording.finish');

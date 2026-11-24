@@ -37,16 +37,6 @@ export type EngineDecoder = {
   insertLoopTry: (projectId: number, tryId: string) => Promise<boolean>;
   sendRecordingUndo: () => void;
   sendRecordingRedo: () => void;
-  sendPlayerPlay: () => void;
-  sendPlayerRecord: () => void;
-  sendPlayerStop: () => void;
-  sendPlayerFrameIndex: (message: {
-    frameIndex: number;
-    frozen: boolean;
-    revision: number;
-    source: 'playback' | 'user';
-  }) => void;
-  sendPlayerSyncRequest: () => void;
 };
 
 export type CreateEngineDecoderOptions = {
@@ -54,7 +44,6 @@ export type CreateEngineDecoderOptions = {
   sampleRate: number;
   playerPort: MessagePort;
   spectrogramPort: MessagePort;
-  playheadPort: MessagePort;
   onRecordingPeaksChanged: (message: {
     recordingId: number;
     startPeakIndex: number;
@@ -63,24 +52,6 @@ export type CreateEngineDecoderOptions = {
   onRecordingsChanged: (recordings: api.recording.Item[]) => void;
   onRecordingContentChanged: (recordingId: number) => void;
   onRecordingStreamFailed: () => void;
-  onPlayerPlayRequested: () => void;
-  onPlayerRecordRequested: () => void;
-  onPlayerStopRequested: () => void;
-  onPlayerFrameIndexChanged: (
-    frameIndex: number,
-    frozen: boolean,
-    revision: number,
-    source: 'playback' | 'user',
-  ) => void;
-  onPlayerRevisionChanged: (revision: number) => void;
-  onPlayerSyncState: (state: {
-    isSlave: boolean;
-    playing: boolean;
-    recording: boolean;
-    frozen: boolean;
-    frameIndex: number;
-    revision: number;
-  }) => void;
 };
 
 export const createEngineDecoder = (
@@ -90,17 +61,10 @@ export const createEngineDecoder = (
     store,
     playerPort,
     spectrogramPort,
-    playheadPort,
     onRecordingPeaksChanged,
     onRecordingsChanged,
     onRecordingContentChanged,
     onRecordingStreamFailed,
-    onPlayerPlayRequested,
-    onPlayerRecordRequested,
-    onPlayerStopRequested,
-    onPlayerFrameIndexChanged,
-    onPlayerRevisionChanged,
-    onPlayerSyncState,
   } = options;
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
@@ -191,32 +155,12 @@ export const createEngineDecoder = (
       loopTryInsertPromise?.resolve(message.inserted);
       loopTryInsertPromise = undefined;
     },
-    playerPlayRequested: onPlayerPlayRequested,
-    playerRecordRequested: onPlayerRecordRequested,
-    playerStopRequested: onPlayerStopRequested,
-    playerFrameIndexChanged: (message) => {
-      onPlayerFrameIndexChanged(
-        message.frameIndex,
-        message.frozen,
-        message.revision,
-        message.source,
-      );
-    },
-    playerRevisionChanged: (message) => {
-      onPlayerRevisionChanged(message.revision);
-    },
-    playerSyncState: onPlayerSyncState,
   });
 
   return {
     port,
     boot: async () => {
-      port.methods.boot({
-        playerPort,
-        spectrogramPort,
-        playheadPort,
-        sampleRate: runtimeSampleRate,
-      });
+      port.methods.boot({ playerPort, spectrogramPort });
 
       return bootPromise.promise;
     },
@@ -275,21 +219,6 @@ export const createEngineDecoder = (
     },
     sendRecordingRedo: () => {
       port.methods.sendRecordingRedo();
-    },
-    sendPlayerPlay: () => {
-      port.methods.sendPlayerPlay();
-    },
-    sendPlayerRecord: () => {
-      port.methods.sendPlayerRecord();
-    },
-    sendPlayerStop: () => {
-      port.methods.sendPlayerStop();
-    },
-    sendPlayerFrameIndex: (message) => {
-      port.methods.sendPlayerFrameIndex(message);
-    },
-    sendPlayerSyncRequest: () => {
-      port.methods.sendPlayerSyncRequest();
     },
   };
 };

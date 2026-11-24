@@ -4,7 +4,7 @@ import {
   getCalibrationNeeded,
 } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
-import { canPlay } from '../buttons/playback.js';
+import { canCommandPlayback } from '../buttons/playback.js';
 import { lockLoop } from '../loop/loopActions.js';
 import { type CalibrationPrompt, useProjectStore } from '../store.js';
 
@@ -30,7 +30,7 @@ export const requestTake = (kind: TakeKind, projectId: number) => {
 };
 
 export const canPressRecord = (state: EngineState): boolean =>
-  canPlay(state) && getActiveRecording(state) !== undefined;
+  canCommandPlayback(state) && getActiveRecording(state) !== undefined;
 
 export const pressRecord = (projectId: number) => {
   const state = engine.store.get();
