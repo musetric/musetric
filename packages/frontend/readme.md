@@ -34,7 +34,7 @@ shell.
 
 ## Build
 
-`build:project`, also run from the root, builds into `dist` and copies the
+`build:project` builds into `dist` and copies the
 build over `../server/storage/public`, clearing it first, for the server of
 `pnpm dev`; a second server gets its own build from
 `vite build --configLoader native --outDir <dir>`.

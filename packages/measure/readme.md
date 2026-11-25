@@ -28,16 +28,14 @@ take's distance from the beats is in milliseconds as heard, like the playhead's.
 
 A frontend built with `frontendMeasure=true` carries the engine's measure
 points; what uses them lives in `src/__test__` and runs in the page, in its
-spectrogram worker and in its audio worklet. A build of the app packs
-`@musetric/dsp` as its last build left it, so that is built first, as the
-[app's rules](../app/readme.md#rules) say.
+spectrogram worker and in its audio worklet. The variable goes before the
+[app's commands](../app/readme.md#commands).
 
-- Android: `frontendMeasure=true pnpm build:android`. Like every development
-  build, the APK is Musetric Dev, whose WebView can be inspected; the command
-  forwards its socket with `adb`.
+- Android: `frontendMeasure=true pnpm build:android`, then
+  `pnpm start:android <serial> --install`. The APK is Musetric Dev, whose
+  WebView can be inspected; the command forwards its socket with `adb`.
 - Chrome: the frontend run with `frontendMeasure=true` and Chrome with
   `--remote-debugging-port=9334`, then `--device chrome`.
 - Desktop app: `frontendMeasure=true pnpm build:app`, started with
-  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` set to the app's own WebView2
-  arguments from `src-tauri/src/lib.rs` plus `--remote-debugging-port=9335`,
-  then `--device desktop`.
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9335`, then
+  `--device desktop`.

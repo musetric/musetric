@@ -46,6 +46,7 @@ android {
         getByName("release") {
             if (!published) {
                 applicationIdSuffix = ".dev"
+                signingConfig = signingConfigs.getByName("debug")
             }
             resValue("string", "app_name", if (published) "Musetric" else "Musetric Dev")
             buildConfigField("boolean", "PUBLISHED", published.toString())

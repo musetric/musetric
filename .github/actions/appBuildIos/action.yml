@@ -37,9 +37,7 @@ runs:
       working-directory: packages/app
       run: pnpm init:ios
       shell: bash
-    - uses: ./.github/actions/buildDsp
-      with:
-        script: build:app
+    - uses: ./.github/actions/setupWasmBindgen
     - name: Build iOS app (unsigned)
       working-directory: packages/app
       run: |
