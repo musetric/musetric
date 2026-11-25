@@ -51,6 +51,7 @@ export const createCuts = (sounding: () => boolean): Cuts => {
   const flush = () => {
     fade.mute();
     for (let index = 0; index < queue.length; index += 1) {
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- the queue holds the commands of messages, each run once
       queue[index]();
     }
     queue.length = 0;

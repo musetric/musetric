@@ -44,6 +44,9 @@ const config: KnipConfig = {
     'packages/checks': {
       ignoreDependencies: ['@ast-grep/cli'],
     },
+    'packages/eslint-config': {
+      ignore: ['src/rules/__test__/fixtures/**'],
+    },
     'packages/cqt': {
       entry: ['src/**/*.bench.ts'],
     },

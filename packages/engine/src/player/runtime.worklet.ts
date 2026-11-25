@@ -361,11 +361,13 @@ export const createPlayerRuntime = (
       );
       const frameIndex = position.getFrameIndex();
       if (range?.repeat === 'once' && frameIndex >= range.endFrame) {
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when a range played once ends
         finishPlayback(range.range.fromFrame);
         return;
       }
 
       if (frameIndex >= frameCount) {
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the song ends
         finishPlayback(0);
         return;
       }

@@ -27,6 +27,7 @@ export const createMotion = (options: CreateMotionOptions): Motion => {
     moveTo: (next, report) => {
       if (motion !== next) {
         motion = next;
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
         report();
       }
     },

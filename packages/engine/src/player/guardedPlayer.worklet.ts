@@ -35,6 +35,7 @@ export const createGuardedPlayer = (
   const fail = (error: unknown) => {
     failed = true;
     runtime = undefined;
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the player fails and goes silent
     sendFailed?.({ reason: describeError(error) });
   };
 
@@ -67,12 +68,14 @@ export const createGuardedPlayer = (
     process: (inputs, output) => {
       if (fault === 'uncaught') {
         fault = undefined;
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- a fault the measure build injects, once
         throw new Error('A fault injected out of the player');
       }
       if (runtime) {
         try {
           if (fault === 'caught') {
             fault = undefined;
+            // eslint-disable-next-line musetric/no-audio-thread-allocations -- a fault the measure build injects, once
             throw new Error('A fault injected into the player');
           }
           runtime.process(inputs, output);
@@ -81,8 +84,8 @@ export const createGuardedPlayer = (
           fail(error);
         }
       }
-      for (const channel of output) {
-        channel.fill(0);
+      for (let channel = 0; channel < output.length; channel += 1) {
+        output[channel].fill(0);
       }
     },
     injectFault: options.measure

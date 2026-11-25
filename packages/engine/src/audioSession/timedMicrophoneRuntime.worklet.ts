@@ -68,9 +68,11 @@ export const createTimedMicrophoneRuntime = (
         return;
       }
       const ratio = steer((currentFrame - start) * step);
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- the ring makes its output view again only when the capture's memory grows or a quantum changes its length
       position = ring.render(output, position ?? 0, ratio);
       if (!ready && firstFrame !== undefined && position >= firstFrame) {
         ready = true;
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when playback reaches the first captured frame
         onReady();
       }
     },

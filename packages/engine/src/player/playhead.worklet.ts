@@ -59,6 +59,7 @@ export const createPlayheadPublisher = (
       ) {
         return;
       }
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- the playhead's 15 Hz pulse, or a change of its line
       publishNow(value);
     },
     publishNow,

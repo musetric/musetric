@@ -1,3 +1,10 @@
-import { config } from './src/index.js';
+import { type Config, config } from './src/index.js';
 
-export default config();
+const configs: Config = [
+  ...config(),
+  {
+    ignores: ['src/**/__test__/fixtures/**/*'],
+  },
+];
+
+export default configs;

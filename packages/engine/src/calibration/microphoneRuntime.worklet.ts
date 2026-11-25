@@ -165,7 +165,9 @@ export const createMicrophoneCalibrationRuntime = (
 
   const finish = () => {
     collecting = false;
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the calibration ends
     closeUpTo(windows.length);
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the calibration ends
     port.methods.done({ peaks: windows.map(toPeak) });
   };
 
@@ -175,6 +177,7 @@ export const createMicrophoneCalibrationRuntime = (
         return;
       }
       clickIndex += 1;
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once per click, when its window closes
       closeUpTo(clickIndex);
     }
   };
@@ -186,6 +189,7 @@ export const createMicrophoneCalibrationRuntime = (
       return;
     }
     const started = windows.length > 0 && frame >= windows[0].clickFrame;
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- the level meter, every 10 ms while calibrating
     port.methods.level({
       clickIndex: started ? clickIndex : -1,
       level: levelPeak,
@@ -208,6 +212,7 @@ export const createMicrophoneCalibrationRuntime = (
       return;
     }
     click.judgedPeakOffset = click.peakOffset;
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- once per new peak of a click, after it fades
     const peak = toHeardPeak(click, filledFrameCount);
     if (
       !peak ||
@@ -216,6 +221,7 @@ export const createMicrophoneCalibrationRuntime = (
       return;
     }
     click.heard = true;
+    // eslint-disable-next-line musetric/no-audio-thread-allocations -- once per click, when it is heard
     port.methods.heard({ clickIndex, peak });
   };
 
@@ -291,16 +297,15 @@ export const createMicrophoneCalibrationRuntime = (
       collecting = true;
     },
     process: (inputs, outputs, currentFrame) => {
-      for (const output of outputs[0]) {
-        output.fill(0);
+      for (let channel = 0; channel < outputs[0].length; channel += 1) {
+        outputs[0][channel].fill(0);
       }
 
       if (!collecting) {
         return;
       }
 
-      const [input] = inputs;
-      const firstChannel = input?.[0];
+      const firstChannel = inputs[0]?.[0];
       if (!firstChannel) {
         if (currentFrame >= endFrame) {
           finish();
