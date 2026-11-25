@@ -3,7 +3,9 @@
 Measures recording on a real device. Each command drives a page of a measure
 build over the Chrome DevTools protocol, records into a temporary recording of
 the open project, deletes it afterwards and writes the runs and `report.md` to
-`packages/measure/tmp/measure/<command>`. It is run by hand, never in CI.
+`packages/measure/tmp/measure/<command>`. It is run by hand, never in CI, and
+needs nothing built beforehand: each command first builds the WebAssembly of
+`@musetric/dsp` that it puts into the page.
 
 ## Commands
 
@@ -38,4 +40,6 @@ spectrogram worker and in its audio worklet. The variable goes before the
   `--remote-debugging-port=9334`, then `--device chrome`.
 - Desktop app: `frontendMeasure=true pnpm build:app`, started with
   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9335`, then
-  `--device desktop`.
+  `--device desktop`. `measure:delay` does not run there: WebView2 answers
+  `Target.setAutoAttach`, through which the command reaches the spectrogram's
+  worker, with `wasn't found`.

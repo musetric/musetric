@@ -175,8 +175,12 @@ const runMeasure = async (provide: Partial<ProvidedContext>) => {
   );
   const failures = vitest.state
     .getTestModules()
-    .flatMap((module) => [...module.children.allTests()])
-    .flatMap((test) => test.result().errors ?? []);
+    .flatMap((module) => [
+      ...module.errors(),
+      ...[...module.children.allTests()].flatMap(
+        (test) => test.result().errors ?? [],
+      ),
+    ]);
   await vitest.close();
   if (failures.length > 0) {
     throw new Error(failures.map((failure) => failure.message).join('; '));
