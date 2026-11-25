@@ -1,7 +1,6 @@
-import { Alert, Stack } from '@mui/material';
+import { Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { engine } from '../../engine/engine.js';
 import { useEngineStore } from '../../engine/useEngineStore.js';
 import { AudioSettings } from './audioSettings/AudioSettings.js';
@@ -17,6 +16,7 @@ import { PlaybackPanel } from './player/PlaybackPanel.js';
 import { PlayerFailedNotice } from './player/PlayerFailedNotice.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
+import { RealtimeNotice } from './RealtimeNotice.js';
 import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
 import { RecordingListPicker } from './recording/RecordingListPicker.js';
 import { subscribeTakeInterruptions } from './recording/subscribeTakeInterruptions.js';
@@ -32,10 +32,6 @@ export type ProjectAppProps = {
 };
 export const ProjectApp: FC<ProjectAppProps> = (props) => {
   const { project } = props;
-  const { t } = useTranslation();
-  const realtimeFailed = useEngineStore(
-    (state) => state.statuses.realtime === 'error',
-  );
   const playerFailed = useEngineStore(
     (state) => state.statuses.player === 'error',
   );
@@ -59,9 +55,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   return (
     <ProjectLayout framed>
       <Stack sx={{ width: '100%', flexGrow: 1, minHeight: 0, gap: 2 }}>
-        {realtimeFailed && (
-          <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
-        )}
+        <RealtimeNotice />
         <ProjectContent />
         <PlaybackPanel />
       </Stack>

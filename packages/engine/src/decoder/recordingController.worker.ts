@@ -1,6 +1,5 @@
 import { type api } from '@musetric/api';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
-import { waitWithTimeout } from '@musetric/utils/cross/waitWithTimeout';
 import { type LiveTakeChunk } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import {
@@ -13,8 +12,6 @@ import {
   type RecordingStream,
 } from './recordingStream.worker.js';
 import { createTakePages, type TakePages } from './takePages.worker.js';
-
-const hostAnswerTimeoutMs = 5000;
 
 export type TakeStart = {
   takeId: string;
@@ -50,7 +47,6 @@ type Take = {
   accepted: boolean;
   finishing: boolean;
   asked: boolean;
-  released: PromiseWithResolvers<void>;
 };
 
 export type RecordingController = {
@@ -120,7 +116,6 @@ export const createRecordingController = (
   const drop = (take: Take) => {
     takes = takes.filter((item) => item !== take);
     take.stream.close();
-    take.released.resolve();
     link();
   };
 
@@ -167,7 +162,6 @@ export const createRecordingController = (
         accepted: false,
         finishing: false,
         asked: false,
-        released: Promise.withResolvers<void>(),
       });
       link();
     },
@@ -181,18 +175,11 @@ export const createRecordingController = (
       take.stream.close();
       take.finishing = true;
       pump();
-      if (!realtime.isOpen()) {
-        take.released.resolve();
-      }
-      await waitWithTimeout(take.released.promise, hostAnswerTimeoutMs);
     },
     connect: link,
     disconnect: () => {
       for (const take of takes) {
         take.link = 'offline';
-        if (take.finishing) {
-          take.released.resolve();
-        }
       }
     },
     apply: (event) => {
@@ -225,7 +212,6 @@ export const createRecordingController = (
     clear: () => {
       for (const take of takes) {
         take.stream.close();
-        take.released.resolve();
       }
       takes = [];
     },

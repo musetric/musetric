@@ -22,7 +22,7 @@ use crate::realtime::{
 
 pub(crate) type MemberId = u64;
 
-const PARKING_WINDOW: Duration = Duration::from_mins(1);
+const PARKING_WINDOW: Duration = Duration::from_secs(10);
 
 struct Parked {
     take: Take,
