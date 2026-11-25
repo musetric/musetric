@@ -147,13 +147,12 @@ describe('play after a failure of the player', () => {
     const kept = seam.hostFrames();
     expectFailed(seam);
     const recording = seam.player.record(1);
-    while (seam.store.get().statuses.player !== 'success') {
+    seam.microphone.open();
+    while (seam.store.get().take !== 'recording') {
       await seam.run(1);
     }
-    await flush();
-    seam.microphone.open();
-    await seam.run(quantaOfSeconds(0.5));
     await recording;
+    await seam.run(quantaOfSeconds(0.5));
     expect(seam.store.get().take).toBe('recording');
     expect(isPlaying(seam.store.get())).toBe(true);
     expect(seam.host).toEqual([

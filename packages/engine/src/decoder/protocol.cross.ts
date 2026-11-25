@@ -42,7 +42,7 @@ export type EngineDecoderOutboundMethods = {
 
 export type EngineDecoderInboundMethods = {
   booted: () => void;
-  playerConnected: () => void;
+  playerConnected: (message: { mounted: boolean }) => void;
   setState: (message: { status: 'error' }) => void;
   setRealtimeState: (message: { status: 'success' | 'error' }) => void;
   mounted: (message: { frameCount: number }) => void;

@@ -126,8 +126,11 @@ export const createDecoderWorkerRuntime = (
 
   port.bindHandlers({
     connectPlayer: (message) => {
-      audioDecode.connectPlayer(playerDataChannel.outbound(message.playerPort));
-      port.methods.playerConnected();
+      port.methods.playerConnected({
+        mounted: audioDecode.connectPlayer(
+          playerDataChannel.outbound(message.playerPort),
+        ),
+      });
     },
     mount: async (message) => {
       try {

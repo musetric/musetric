@@ -40,6 +40,7 @@ export type EnginePlayer = EnginePlayerLoop &
 export type EnginePlayerPorts = {
   dataPort: MessagePort;
   playheadPort: MessagePort;
+  mounted: boolean;
 };
 
 export type CreateEnginePlayerOptions = {

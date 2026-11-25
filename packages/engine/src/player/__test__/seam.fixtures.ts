@@ -227,6 +227,7 @@ export const createSeam = async (
       return Promise.resolve({
         dataPort: data.port1,
         playheadPort: playhead.port1,
+        mounted: true,
       });
     },
     rebuildOutput: async () => {

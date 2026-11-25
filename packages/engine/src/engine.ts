@@ -142,8 +142,11 @@ export const createEngine = (): Engine => {
         const data = new MessageChannel();
         const playhead = new MessageChannel();
         spectrogram.connectPlayhead(playhead.port2);
-        await ref.decoder.connectPlayer(data.port1);
-        return { dataPort: data.port2, playheadPort: playhead.port1 };
+        return {
+          dataPort: data.port2,
+          playheadPort: playhead.port1,
+          mounted: await ref.decoder.connectPlayer(data.port1),
+        };
       },
       rebuildOutput: async () => {
         const previous = context;

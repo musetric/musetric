@@ -53,6 +53,7 @@ export type CreateEnginePlaybackOptions = {
   store: Store<EngineState>;
   dataPort: MessagePort;
   playheadPort: MessagePort;
+  mounted: boolean;
   position: EnginePositionWriter;
   onPlaybackEnded?: () => void;
   applyMotion: (motion: PlayerMotion) => void;
@@ -96,6 +97,7 @@ export const createEnginePlayback = async (
     }
   });
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
+  const mountPromise = createControlledPromise<void>();
   const playingWaiters: PlayingWaiter[] = [];
   let sentCommand = 0;
   const nextCommand = () => {
@@ -154,6 +156,7 @@ export const createEnginePlayback = async (
     recordingFlushPromise?.resolve(0);
     recordingFlushPromise = undefined;
     bootPromise.resolve();
+    mountPromise.resolve();
     store.update((state) => {
       state.statuses.player = 'error';
       state.seekEvent = {
@@ -178,6 +181,9 @@ export const createEnginePlayback = async (
         state.statuses.player = 'success';
       });
       bootPromise.resolve();
+    },
+    mounted: () => {
+      mountPromise.resolve();
     },
     failed: (message) => {
       fail(message.reason);
@@ -291,6 +297,9 @@ export const createEnginePlayback = async (
         stretchModule,
       });
       await bootPromise.promise;
+      if (options.mounted) {
+        await mountPromise.promise;
+      }
       publishOutputClock();
       settings.sendTempoRatio();
       settings.sendTranspose();

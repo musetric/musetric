@@ -190,6 +190,7 @@ export const createPlayerRuntime = (
       publishHeld();
       setPlaying();
       renderer.requestWindow(0, true);
+      port.methods.mounted();
     },
     putPage: renderer.put,
     dropPages: (message) => {

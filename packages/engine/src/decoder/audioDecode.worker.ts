@@ -28,7 +28,7 @@ export type CreateAudioDecodeOptions = {
 };
 
 export type AudioDecode = {
-  connectPlayer: (port: PlayerPort) => void;
+  connectPlayer: (port: PlayerPort) => boolean;
   mount: (message: { projectId: number; sampleRate: number }) => Promise<{
     frameCount: number;
   }>;
@@ -148,10 +148,12 @@ export const createAudioDecode = (
           pageReads?.requestWindow(message);
         },
       });
-      if (mounted && pageReads) {
-        pageReads.forgetPlayer();
-        mountPlayer(mounted, pageReads);
+      if (!mounted || !pageReads) {
+        return false;
       }
+      pageReads.forgetPlayer();
+      mountPlayer(mounted, pageReads);
+      return true;
     },
     mount: async (message) => {
       const { projectId, sampleRate } = message;

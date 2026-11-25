@@ -18,7 +18,7 @@ type Unmount = () => void;
 export type EngineDecoder = {
   port: ReturnType<typeof engineDecoderChannel.outbound<Worker>>;
   boot: () => Promise<void>;
-  connectPlayer: (playerPort: MessagePort) => Promise<void>;
+  connectPlayer: (playerPort: MessagePort) => Promise<boolean>;
   mount: (projectId: number) => Unmount;
   requestTarget: (window: PlayerWindow) => void;
   startRecordingStream: (options: {
@@ -70,7 +70,7 @@ export const createEngineDecoder = (
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
-  let playerPromise: ControlledPromise<void> | undefined = undefined;
+  let playerPromise: ControlledPromise<boolean> | undefined = undefined;
   let mountPromise: ControlledPromise<void> | undefined = undefined;
   let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
   let loopTrySettlePromise:
@@ -88,8 +88,8 @@ export const createEngineDecoder = (
     booted: () => {
       bootPromise.resolve();
     },
-    playerConnected: () => {
-      playerPromise?.resolve();
+    playerConnected: (message) => {
+      playerPromise?.resolve(message.mounted);
       playerPromise = undefined;
     },
     setState: (message) => {
@@ -172,10 +172,10 @@ export const createEngineDecoder = (
     },
     connectPlayer: async (playerPort) => {
       await bootPromise.promise;
-      playerPromise = createControlledPromise<void>();
+      playerPromise = createControlledPromise<boolean>();
       const { promise } = playerPromise;
       port.methods.connectPlayer({ playerPort });
-      await promise;
+      return await promise;
     },
     mount: createLazyMount((projectId: number) => {
       mountPromise = createControlledPromise<void>();

@@ -16,6 +16,7 @@ export const createMicrophone = (): {
   session: EngineAudioSession;
 } & Microphone => {
   let opened: (() => void) | undefined = undefined;
+  let openedEarly = false;
   const microphone: EngineMicrophone = {
     getSettings: () => ({}),
     getMeasuredInputLatency: () => 0,
@@ -29,6 +30,10 @@ export const createMicrophone = (): {
           opened = () => {
             resolve(microphone);
           };
+          if (openedEarly) {
+            openedEarly = false;
+            opened();
+          }
         }),
       closeMicrophone: noop,
       enumerateDevices: async () => Promise.resolve([]),
@@ -38,7 +43,12 @@ export const createMicrophone = (): {
       openMicrophoneSettings: noop,
     },
     open: () => {
-      opened?.();
+      if (opened) {
+        opened();
+        opened = undefined;
+      } else {
+        openedEarly = true;
+      }
     },
   };
 };
