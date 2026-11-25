@@ -43,7 +43,7 @@ type Unsubscribe = () => void;
 export type SubtitleFollowControllerOptions = {
   element: HTMLDivElement;
   cursor: SubtitleCursor;
-  subscribeSeek: (callback: () => void) => Unsubscribe;
+  subscribeSeek: (callback: (activeIndex: number) => void) => Unsubscribe;
   isMoving: () => boolean;
   seekWord: (wordStart: number) => void;
 };

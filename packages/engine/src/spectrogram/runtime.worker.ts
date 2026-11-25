@@ -66,9 +66,11 @@ export const createSpectrogramRuntime = async (
     });
 
   let processor = createProcessor();
+  let canvas = new OffscreenCanvas(1, 1);
   let lead: LeadPages | undefined = undefined;
   const recording = createRecordingSource();
   let trackProgress = 0;
+  let frameIndex = 0;
   let frameCount = 0;
   let playing = false;
   let rendering = false;
@@ -86,7 +88,7 @@ export const createSpectrogramRuntime = async (
       processor.updateConfig(view);
     }
     const liveEnd = recording.liveEnd();
-    const ok = await processor.render(
+    const drawn = await processor.render(
       samples,
       trackProgress,
       liveEnd === undefined ? {} : { recording: liveEnd },
@@ -98,72 +100,59 @@ export const createSpectrogramRuntime = async (
         dataPort.methods.requestLeadPages({ indices });
       }
     }
-    if (!ok || !lead) {
-      return;
+    if (drawn && lead) {
+      setStatus('success');
     }
-    setStatus('success');
+    return drawn;
   };
 
-  const playheadTrackProgress = () => {
-    if (frameCount <= 0) {
-      return trackProgress;
-    }
-    return Math.min(1, Math.max(0, playhead.readFrameIndex() / frameCount));
-  };
-
-  const renderFromPlayhead = async () => {
-    if (rendering) {
-      return;
-    }
-    rendering = true;
-    try {
-      trackProgress = playheadTrackProgress();
-      const startedAt = performance.timeOrigin + performance.now();
-      const writtenEnd = recording.liveEnd();
-      await render();
-      if (onRendered) {
-        await onRendered({
-          processor,
-          startedAt,
-          playing,
-          playheadFrame: trackProgress * frameCount,
-          writtenEnd,
-        });
-      }
-    } finally {
-      rendering = false;
+  const present = async () => {
+    const shownFrameIndex = frameIndex;
+    const playheadFrame = trackProgress * frameCount;
+    const startedAt = performance.timeOrigin + performance.now();
+    const writtenEnd = recording.liveEnd();
+    const drawn = await render();
+    port.methods.presented({
+      frameIndex: shownFrameIndex,
+      bitmap: drawn ? canvas.transferToImageBitmap() : undefined,
+    });
+    if (onRendered) {
+      await onRendered({
+        processor,
+        startedAt,
+        playing,
+        playheadFrame,
+        writtenEnd,
+      });
     }
   };
 
-  const renderLoop = createAnimationFrameLoop(renderFromPlayhead);
   let renderRequest = 0;
-  const fillLoop = createAnimationFrameLoop(async () => {
-    if (playing) {
-      return false;
-    }
+  const presentLoop = createAnimationFrameLoop(async () => {
     if (rendering) {
       return true;
     }
+    rendering = true;
     const request = renderRequest;
-    await renderFromPlayhead();
-    return (
-      request !== renderRequest ||
-      processor.hasPendingWork() ||
-      playhead.read().rate !== 0
-    );
+    try {
+      await present();
+    } finally {
+      rendering = false;
+    }
+    return request !== renderRequest || processor.hasPendingWork();
   });
 
-  const renderPaused = () => {
+  const requestRender = () => {
     renderRequest += 1;
-    fillLoop.start();
+    presentLoop.start();
   };
 
   dataPort.bindHandlers({
-    mount: async (message) => {
+    mount: (message) => {
       lead = createLeadPages(message.lead);
       recording.clear();
       recording.setPieces({ pieces: message.recording });
-      await render();
+      requestRender();
     },
     putLeadPage: (message) => {
       const range = lead?.put(message.index, message.samples);
@@ -171,21 +160,17 @@ export const createSpectrogramRuntime = async (
         return;
       }
       processor.invalidateSamples([{ trackKey: 'lead', ...range }]);
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
-    unmount: async () => {
+    unmount: () => {
       lead = undefined;
       recording.clear();
       setStatus('pending');
-      await render();
+      requestRender();
     },
     setRecordingPieces: (message) => {
       recording.setPieces(message);
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
     beginLiveTake: (message) => {
       recording.beginLiveTake(message);
@@ -196,9 +181,7 @@ export const createSpectrogramRuntime = async (
         return;
       }
       processor.invalidateSamples([{ trackKey: 'recording', ...range }]);
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
   });
 
@@ -206,27 +189,23 @@ export const createSpectrogramRuntime = async (
     connectPlayhead: (message) => {
       playhead.connect(message.playheadPort);
     },
-    mount: async (message) => {
+    mount: (message) => {
       try {
         trackProgress = message.trackProgress;
+        frameIndex = message.frameIndex;
         viewWindow.remember(message.config);
         processor.dispose();
         processor = createProcessor();
-        processor.updateConfig(message.config);
-        await render();
-        if (playing) {
-          renderLoop.start();
-        } else if (processor.hasPendingWork()) {
-          fillLoop.start();
-        }
+        canvas = new OffscreenCanvas(1, 1);
+        processor.updateConfig({ ...message.config, canvas });
+        requestRender();
       } catch (error) {
         console.error('Failed to render spectrogram', error);
         setStatus('error');
       }
     },
     unmount: () => {
-      renderLoop.stop();
-      fillLoop.stop();
+      presentLoop.stop();
       processor.dispose();
       processor = createProcessor();
       trackProgress = 0;
@@ -235,43 +214,32 @@ export const createSpectrogramRuntime = async (
     },
     setTrackProgress: (message) => {
       trackProgress = message.trackProgress;
+      frameIndex = message.frameIndex;
       if (frameCount > 0) {
         playhead.writeFrameIndex(
           Math.round(message.trackProgress * frameCount),
           message.revision,
         );
       }
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
     setFrameCount: (message) => {
       frameCount = message.frameCount;
     },
     setPlaying: (message) => {
       playing = message.playing;
-      if (playing) {
-        renderLoop.start();
-        return;
-      }
-      renderLoop.stop();
-      renderPaused();
     },
     updateConfig: (message) => {
       viewWindow.remember(message.patch);
       processor.updateConfig(viewWindow.filter(message.patch));
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
     setViewWindow: (message) => {
       const restore = viewWindow.set(message.window);
       if (restore) {
         processor.updateConfig(restore);
       }
-      if (!playing) {
-        renderPaused();
-      }
+      requestRender();
     },
     previewLiveTake: (message) => {
       const preview = convertPreview(message);

@@ -3,6 +3,7 @@ import {
   type SpectrogramConfig,
 } from '@musetric/spectrogram';
 import {
+  assertDefined,
   type ControlledPromise,
   createControlledPromise,
 } from '@musetric/utils';
@@ -10,7 +11,7 @@ import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { compileCapture } from '../audioSession/captureModule.js';
 import { type CapturedChunk } from '../audioSession/timedChunkPusher.cross.js';
 import { type Store } from '../common/store.js';
-import { type EnginePosition } from '../player/position.js';
+import { type EnginePositionWriter } from '../player/position.js';
 import {
   type EngineState,
   getFrequencyRange,
@@ -40,7 +41,7 @@ export type CreateEngineSpectrogramOptions = {
   store: Store<EngineState>;
   sampleRate: number;
   decoderPort: MessagePort;
-  position: EnginePosition;
+  position: EnginePositionWriter;
 };
 
 export const createEngineSpectrogram = (
@@ -50,38 +51,62 @@ export const createEngineSpectrogram = (
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
-  port.instance.onerror = () => {
+  let bitmaps: ImageBitmapRenderingContext | undefined = undefined;
+  let requested = position.read();
+
+  const presenter = () =>
+    store.get().statuses.spectrogram === 'error' ? undefined : bitmaps;
+  const fail = () => {
     store.update((state) => {
       state.statuses.spectrogram = 'error';
     });
+    position.show(requested);
   };
+  port.instance.onerror = fail;
 
   port.bindHandlers({
     booted: () => {
       bootPromise.resolve();
     },
     setState: (message) => {
+      if (message.status === 'error') {
+        fail();
+        return;
+      }
       store.update((state) => {
         state.statuses.spectrogram = message.status;
       });
+    },
+    presented: (message) => {
+      const context = presenter();
+      if (!context) {
+        message.bitmap?.close();
+        return;
+      }
+      if (message.bitmap) {
+        context.transferFromImageBitmap(message.bitmap);
+      }
+      position.show(message.frameIndex);
     },
   });
 
   const sendTrackProgress = () => {
     const state = store.get();
     port.methods.setTrackProgress({
-      trackProgress: getTrackProgress(position.read(), state.frameCount),
+      trackProgress: getTrackProgress(requested, state.frameCount),
+      frameIndex: requested,
       revision: state.seekEvent.revision,
     });
   };
-  const sendStoppedTrackProgress = () => {
-    const spectrogramWorkerPollsPlayheadWhilePlaying = isPlaying(store.get());
-    if (!spectrogramWorkerPollsPlayheadWhilePlaying) {
+  position.setStage((frameIndex) => {
+    requested = frameIndex;
+    if (presenter()) {
       sendTrackProgress();
+      return;
     }
-  };
-  position.subscribe(sendStoppedTrackProgress);
-  store.subscribe((state) => state.frameCount, sendStoppedTrackProgress);
+    position.show(frameIndex);
+  });
+  store.subscribe((state) => state.frameCount, sendTrackProgress);
   store.subscribe((state) => state.seekEvent.revision, sendTrackProgress);
 
   store.subscribe(isPlaying, (playing) => {
@@ -130,7 +155,6 @@ export const createEngineSpectrogram = (
     },
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);
-      const offscreenCanvas = canvas.transferControlToOffscreen();
       const engineState = store.get();
 
       const buildLanes = (state: EngineState) => {
@@ -165,17 +189,18 @@ export const createEngineSpectrogram = (
         config: {
           ...defaultSpectrogramConfig,
           ...config,
-          canvas: offscreenCanvas,
           viewSize,
           colors: engineState.colors,
           sampleRate,
           ...buildStateView(engineState),
         },
-        trackProgress: getTrackProgress(
-          position.read(),
-          engineState.frameCount,
-        ),
+        trackProgress: getTrackProgress(requested, engineState.frameCount),
+        frameIndex: requested,
       });
+      bitmaps = assertDefined(
+        canvas.getContext('bitmaprenderer'),
+        'The spectrogram canvas has no bitmap renderer',
+      );
       port.methods.setPlaying({ playing: isPlaying(engineState) });
 
       const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
@@ -197,6 +222,8 @@ export const createEngineSpectrogram = (
       );
 
       return () => {
+        bitmaps = undefined;
+        position.show(requested);
         unsubscribeView();
         unsubscribeResizeObserver();
         port.methods.unmount();

@@ -207,7 +207,7 @@ export const createSpectrogramProcessor = (
       const samples = toTrackSources(inputs);
       const runtime = configurator.configure();
       if (!runtime) {
-        return { ok: false };
+        return { drawn: false };
       }
       timer.configure();
       const configChanged = runtime.config !== lastConfig;
@@ -239,7 +239,7 @@ export const createSpectrogramProcessor = (
         isRenderNoop(plans, lastBaseSlots) &&
         !hasPendingPitch(runtime, work)
       ) {
-        return { ok: true };
+        return { drawn: false };
       }
       writeBuffers({
         runtime,
@@ -257,7 +257,7 @@ export const createSpectrogramProcessor = (
       lastRuntime = runtime;
       lastPlans = plans;
       lastWork = work;
-      return { ok: true };
+      return { drawn: true };
     },
   );
 
@@ -268,7 +268,7 @@ export const createSpectrogramProcessor = (
       recordedEnds?: SpectrogramRecordedEnds,
     ) => {
       const result = await runRender(samples, trackProgress, recordedEnds);
-      if (!result.ok) {
+      if (!result.drawn) {
         return false;
       }
       await timer.finish();

@@ -6,7 +6,7 @@ export type FollowScrollControllerOptions = {
   element: HTMLElement;
   getActiveIndex: () => number;
   subscribeActiveIndex: (callback: () => void) => Unsubscribe;
-  subscribeSeek: (callback: () => void) => Unsubscribe;
+  subscribeSeek: (callback: (activeIndex: number) => void) => Unsubscribe;
   locateElement: (index: number) => HTMLElement | null;
   isMoving: () => boolean;
 };
@@ -31,6 +31,7 @@ export const createFollowScrollController = (
   const listening = new AbortController();
   const { signal } = listening;
   let userScroll = false;
+  let seekIndex: number | undefined = undefined;
   let free: ReturnType<typeof setTimeout> | undefined = undefined;
 
   const place = (behavior: ScrollBehavior) => {
@@ -46,11 +47,15 @@ export const createFollowScrollController = (
   };
 
   const unsubscribeActiveIndex = subscribeActiveIndex(() => {
-    if (isMoving() && free === undefined) {
+    if (getActiveIndex() === seekIndex) {
+      seekIndex = undefined;
+      place('instant');
+    } else if (isMoving() && free === undefined) {
       place('smooth');
     }
   });
-  const unsubscribeSeek = subscribeSeek(() => {
+  const unsubscribeSeek = subscribeSeek((activeIndex) => {
+    seekIndex = activeIndex === getActiveIndex() ? undefined : activeIndex;
     place('instant');
   });
   for (const type of ['pointerdown', 'touchmove', 'wheel', 'keydown']) {
@@ -68,6 +73,7 @@ export const createFollowScrollController = (
     'scroll',
     () => {
       if (!userScroll) return;
+      seekIndex = undefined;
       clearTimeout(free);
       free = setTimeout(() => {
         free = undefined;

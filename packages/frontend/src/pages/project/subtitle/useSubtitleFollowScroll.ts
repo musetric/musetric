@@ -8,7 +8,9 @@ import {
   createSubtitleFollowController,
   type SubtitleFollowController,
 } from './subtitleFollowController.js';
+import { getSubtitlePlaybackTime } from './subtitlePlayback.js';
 import { getSubtitleSeekFrameIndex } from './subtitleSeek.js';
+import { getSubtitleActiveSegmentIndex } from './subtitleTiming.js';
 import { createSubtitleWordDrag } from './subtitleWordDrag.js';
 
 export const useSubtitleFollowScroll = (
@@ -31,7 +33,15 @@ export const useSubtitleFollowScroll = (
           (state) => state.seekEvent,
           (seekEvent) => {
             if (seekEvent.origin !== 'playbackEnd' && !wordDrag.isActive()) {
-              callback();
+              callback(
+                getSubtitleActiveSegmentIndex(
+                  subtitle,
+                  getSubtitlePlaybackTime(
+                    seekEvent.frameIndex,
+                    engine.store.get(),
+                  ),
+                ),
+              );
             }
           },
         ),

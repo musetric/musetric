@@ -146,10 +146,11 @@ export const createEnginePlayback = async (
       unsubscribe();
     }
     stopFrameIndexPump();
-    if (booted && isCurrentRevision(playhead.read().revision)) {
-      position.write(playhead.readFrameIndex());
+    const heard = booted && isCurrentRevision(playhead.read().revision);
+    const frameIndex = heard ? playhead.readFrameIndex() : position.read();
+    if (heard) {
+      position.write(frameIndex);
     }
-    const frameIndex = position.read();
     for (const waiter of playingWaiters.splice(0)) {
       waiter.resolve({ frameIndex, playing: false });
     }

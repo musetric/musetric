@@ -24,10 +24,12 @@ export type SpectrogramOutboundMethods = {
   mount: (message: {
     config: Partial<SpectrogramConfig>;
     trackProgress: number;
+    frameIndex: number;
   }) => void;
   unmount: () => void;
   setTrackProgress: (message: {
     trackProgress: number;
+    frameIndex: number;
     revision: number;
   }) => void;
   setFrameCount: (message: { frameCount: number }) => void;
@@ -40,6 +42,7 @@ export type SpectrogramOutboundMethods = {
 export type SpectrogramInboundMethods = {
   booted: () => void;
   setState: (message: { status: 'pending' | 'error' | 'success' }) => void;
+  presented: (message: { frameIndex: number; bitmap?: ImageBitmap }) => void;
 };
 
 export const spectrogramChannel = createMessageChannel<
@@ -47,7 +50,10 @@ export const spectrogramChannel = createMessageChannel<
   SpectrogramOutboundMethods
 >({
   inbound: {
-    keys: ['booted', 'setState'],
+    keys: ['booted', 'setState', 'presented'],
+    transfers: {
+      presented: (message) => (message.bitmap ? [message.bitmap] : []),
+    },
   },
   outbound: {
     keys: [
@@ -66,8 +72,6 @@ export const spectrogramChannel = createMessageChannel<
       boot: (message) => [message.dataPort],
       connectPlayhead: (message) => [message.playheadPort],
       previewLiveTake: (message) => [message.samples.buffer],
-      mount: (message) =>
-        message.config.canvas ? [message.config.canvas] : [],
     },
   },
 });

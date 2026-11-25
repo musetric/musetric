@@ -24,7 +24,7 @@ import { type SpectrogramLaneWork } from '../lane/index.js';
 
 const emptyInvalidations: readonly SpectrogramSampleInvalidation[] = [];
 
-export type RenderResult = { ok: boolean };
+export type RenderResult = { drawn: boolean };
 
 const computeInvalidatingConfigKeys: readonly (keyof SpectrogramConfig)[] = [
   'fourierMode',
