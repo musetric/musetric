@@ -8,7 +8,7 @@ runs:
       shell: bash
       working-directory: packages/server
     - id: wasm-bindgen
-      run: echo "version=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p}' Cargo.lock)" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)" >> "$GITHUB_OUTPUT"
       shell: bash
       working-directory: packages/server
     - uses: taiki-e/install-action@v2
