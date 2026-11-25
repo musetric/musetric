@@ -158,7 +158,8 @@ impl TimePitch {
         clippy::float_cmp,
         reason = "the player passes a tempo of exactly 1 to bypass the stretch, as before"
     )]
-    const fn bypassed(&self) -> bool {
+    #[must_use]
+    pub const fn bypassed(&self) -> bool {
         self.semitones == 0 && self.tempo == 1.0
     }
 

@@ -340,8 +340,12 @@ impl PageMixer {
     }
 
     #[must_use]
-    pub fn ready(&self, frame: i64) -> bool {
-        let mut at = frame - READY_MARGIN_FRAMES;
+    pub fn ready(&self, frame: i64, behind: bool) -> bool {
+        let mut at = if behind {
+            frame - READY_MARGIN_FRAMES
+        } else {
+            frame
+        };
         while at <= frame + READY_MARGIN_FRAMES {
             let song_frame = self.range.map_or(at, |range| range.song_frame(at));
             let resident = self.stems.iter().all(|stem| {

@@ -1,5 +1,6 @@
 import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
+import { type PlayerWindow } from '../player/protocol.cross.js';
 
 export type SettledLoopTry = {
   id: string;
@@ -14,6 +15,7 @@ export type EngineDecoderOutboundMethods = {
   }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;
+  requestTarget: (message: PlayerWindow) => void;
   startRecordingStream: (message: {
     projectId: number;
     sampleRate: number;
@@ -84,6 +86,7 @@ export const engineDecoderChannel = createMessageChannel<
       'boot',
       'mount',
       'unmount',
+      'requestTarget',
       'startRecordingStream',
       'finishRecordingStream',
       'settleLoopTry',

@@ -123,6 +123,12 @@ impl Renderer {
         &mut self.mixer
     }
 
+    #[must_use]
+    pub fn ready(&self, frame: i64) -> bool {
+        self.mixer
+            .ready(frame, !(self.song.bypassed() && self.lead.bypassed()))
+    }
+
     pub const fn takes(&mut self) -> &mut Takes {
         &mut self.takes
     }

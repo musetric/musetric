@@ -13,6 +13,7 @@ export type StemPageReader = {
     mean: boolean,
     signal: AbortSignal,
   ) => Promise<StemPageSamples>;
+  setWanted: (indices: number[]) => void;
 };
 
 type Pending<Value> = {
@@ -74,6 +75,9 @@ const createStemPageReader = (stem: StemType): StemPageReader => {
           { once: true },
         );
       });
+    },
+    setWanted: (indices) => {
+      port.methods.setWanted({ indices });
     },
   };
 };
