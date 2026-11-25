@@ -28,7 +28,9 @@ take's distance from the beats is in milliseconds as heard, like the playhead's.
 
 A frontend built with `frontendMeasure=true` carries the engine's measure
 points; what uses them lives in `src/__test__` and runs in the page, in its
-spectrogram worker and in its audio worklet.
+spectrogram worker and in its audio worklet. A build of the app packs
+`@musetric/dsp` as its last build left it, so that is built first, as the
+[app's rules](../app/readme.md#rules) say.
 
 - Android: `frontendMeasure=true pnpm build:android`. Like every development
   build, the APK is Musetric Dev, whose WebView can be inspected; the command

@@ -21,6 +21,12 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 - On desktop the window of `pnpm dev:app` shows the page of `dist`, as the
   last `pnpm build:ui` left it: a change of the frontend is built again before
   it is checked there.
+- Every build of the app packs the WebAssembly of `@musetric/dsp` from
+  `packages/dsp/dist`, as its last build left it, since `pnpm build:ui` does not
+  build it. After a pull or a change of `packages/dsp`,
+  `pnpm --filter @musetric/dsp build:app` runs first, as the jobs of
+  `appBuild.yml` do: a page newer than its module can leave the player waiting
+  at the cursor for audio that never comes.
 - A script drives that window over the Chrome DevTools Protocol, such as
   Playwright's `chromium.connectOverCDP`, when `pnpm dev:app` starts with
   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`.
