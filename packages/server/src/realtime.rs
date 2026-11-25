@@ -669,7 +669,7 @@ mod tests {
     const THIRD_TAKE: &str = "third-take";
     const SILENCE: Duration = Duration::from_millis(300);
     const SHORT_WINDOW: Duration = Duration::from_secs(1);
-    const LONG_WINDOW: Duration = Duration::from_mins(1);
+    const LONG_WINDOW: Duration = Duration::from_secs(10);
 
     type ClientSocket = tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,

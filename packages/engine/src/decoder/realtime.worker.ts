@@ -1,7 +1,7 @@
 import { api } from '@musetric/api';
 
 const reconnectDelayMs = (attempt: number) =>
-  Math.min(500 * 2 ** attempt, 10_000);
+  Math.min(500 * 2 ** attempt, 2000);
 
 const createWebSocketUrl = (projectId: number) => {
   const url = new URL(

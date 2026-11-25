@@ -14,7 +14,7 @@ import {
   type TakeRefusal,
 } from './protocol.cross.js';
 
-const realtimeNoticeDelayMs = 10_000;
+const realtimeStopDelayMs = 10_000;
 
 type Unmount = () => void;
 
@@ -58,6 +58,7 @@ export type CreateEngineDecoderOptions = {
   onRecordingsChanged: (recordings: api.recording.Item[]) => void;
   onRecordingContentChanged: (recordingId: number) => void;
   onTakeRefused: (reason: TakeRefusal, streaming: boolean) => void;
+  onRealtimeLost: () => void;
 };
 
 export const createEngineDecoder = (
@@ -70,6 +71,7 @@ export const createEngineDecoder = (
     onRecordingsChanged,
     onRecordingContentChanged,
     onTakeRefused,
+    onRealtimeLost,
   } = options;
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
@@ -83,26 +85,21 @@ export const createEngineDecoder = (
   let loopTryInsertPromise: ControlledPromise<boolean> | undefined = undefined;
   const runtimeSampleRate = options.sampleRate;
   let realtimeDropped = false;
-  let realtimeNotice: number | undefined = undefined;
+  let realtimeStop: number | undefined = undefined;
 
-  const cancelRealtimeNotice = () => {
-    window.clearTimeout(realtimeNotice);
-    realtimeNotice = undefined;
+  const cancelRealtimeStop = () => {
+    window.clearTimeout(realtimeStop);
+    realtimeStop = undefined;
   };
 
-  const armRealtimeNotice = () => {
-    if (
-      realtimeNotice !== undefined ||
-      document.visibilityState !== 'visible'
-    ) {
+  const showRealtimeLoss = () => {
+    if (realtimeStop !== undefined || document.visibilityState !== 'visible') {
       return;
     }
-    realtimeNotice = window.setTimeout(() => {
-      realtimeNotice = undefined;
-      store.update((state) => {
-        state.statuses.realtime = 'error';
-      });
-    }, realtimeNoticeDelayMs);
+    store.update((state) => {
+      state.statuses.realtime = 'error';
+    });
+    realtimeStop = window.setTimeout(onRealtimeLost, realtimeStopDelayMs);
   };
 
   document.addEventListener('visibilitychange', () => {
@@ -110,11 +107,10 @@ export const createEngineDecoder = (
       return;
     }
     if (document.visibilityState !== 'visible') {
-      cancelRealtimeNotice();
+      cancelRealtimeStop();
       return;
     }
     port.methods.reconnectRealtime();
-    armRealtimeNotice();
   });
 
   port.instance.onerror = () => {
@@ -140,11 +136,11 @@ export const createEngineDecoder = (
     },
     setRealtimeState: (message) => {
       realtimeDropped = message.status === 'error';
-      if (message.status === 'error') {
-        armRealtimeNotice();
+      if (realtimeDropped) {
+        showRealtimeLoss();
         return;
       }
-      cancelRealtimeNotice();
+      cancelRealtimeStop();
       store.update((state) => {
         state.statuses.realtime = message.status;
       });
@@ -160,7 +156,7 @@ export const createEngineDecoder = (
     },
     unmounted: () => {
       realtimeDropped = false;
-      cancelRealtimeNotice();
+      cancelRealtimeStop();
       store.update((state) => {
         state.statuses.decoder = 'pending';
         state.statuses.realtime = 'pending';

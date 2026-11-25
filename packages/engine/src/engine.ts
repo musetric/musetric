@@ -134,6 +134,9 @@ export const createEngine = (): Engine => {
           void ref.player.stopRecording();
         }
       },
+      onRealtimeLost: () => {
+        void ref.player.stop();
+      },
     }),
     player: createEnginePlayer({
       getContext,

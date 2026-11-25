@@ -1,5 +1,6 @@
 import { isPlaying, isRecording } from '@musetric/engine';
 import { engine } from '../../../engine/engine.js';
+import { canStartPlayback } from '../buttons/playback.js';
 import {
   type MediaAction,
   type MediaBridge,
@@ -101,7 +102,9 @@ export const subscribeMediaSession = (
     }
     const { action, positionMs } = event.detail;
     if (action === 'play') {
-      void engine.player.play();
+      if (canStartPlayback(engine.store.get())) {
+        void engine.player.play();
+      }
       return;
     }
     if (action === 'pause') {
