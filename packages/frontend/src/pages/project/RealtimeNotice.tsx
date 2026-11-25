@@ -1,7 +1,9 @@
-import { Alert, Snackbar } from '@mui/material';
-import { type FC, useState } from 'react';
+import { Alert } from '@mui/material';
+import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../engine/useEngineStore.js';
+
+const restoredNoticeMs = 3000;
 
 export const RealtimeNotice: FC = () => {
   const { t } = useTranslation();
@@ -13,21 +15,25 @@ export const RealtimeNotice: FC = () => {
     setRestored(shown === 'error' && status === 'success');
   }
 
-  return (
-    <>
-      {status === 'error' && (
-        <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
-      )}
-      <Snackbar
-        open={restored}
-        autoHideDuration={3000}
-        onClose={() => {
-          setRestored(false);
-        }}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert severity='success'>{t('pages.project.realtime.restored')}</Alert>
-      </Snackbar>
-    </>
-  );
+  useEffect(() => {
+    if (!restored) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setRestored(false);
+    }, restoredNoticeMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [restored]);
+
+  if (status === 'error') {
+    return <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>;
+  }
+  if (restored) {
+    return (
+      <Alert severity='success'>{t('pages.project.realtime.restored')}</Alert>
+    );
+  }
+  return undefined;
 };

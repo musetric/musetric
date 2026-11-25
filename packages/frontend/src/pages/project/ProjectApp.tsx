@@ -56,11 +56,11 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
     <ProjectLayout framed>
       <Stack sx={{ width: '100%', flexGrow: 1, minHeight: 0, gap: 2 }}>
         <RealtimeNotice />
+        {takeRefused && <TakeRefusedNotice />}
         <ProjectContent />
         <PlaybackPanel />
       </Stack>
       {playerFailed && <PlayerFailedNotice />}
-      {takeRefused && <TakeRefusedNotice />}
       <RhythmMetronomeSync projectId={project.id} />
       <MediaSessionSync title={project.name} coverUrl={project.previewUrl} />
       <ProjectShortcuts projectId={project.id} />
