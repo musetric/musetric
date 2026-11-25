@@ -1,5 +1,4 @@
-import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
-import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
+import { createSyncMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type LiveTakeChunk } from './protocol.cross.js';
 
 export type RecordingStreamChunkMessage = LiveTakeChunk & {
@@ -15,9 +14,13 @@ export type RecordingStreamInboundMethods = {
   flush: (message: RecordingStreamFlushMessage) => void;
 };
 
-export const recordingStreamChannel = createMessageChannel<
+export type RecordingStreamOutboundMethods = {
+  returnChunk: (message: { samples: Float32Array<ArrayBuffer> }) => void;
+};
+
+export const recordingStreamChannel = createSyncMessageChannel<
   RecordingStreamInboundMethods,
-  EmptyPortMethods
+  RecordingStreamOutboundMethods
 >({
   inbound: {
     keys: ['chunk', 'flush'],
@@ -26,6 +29,9 @@ export const recordingStreamChannel = createMessageChannel<
     },
   },
   outbound: {
-    keys: [],
+    keys: ['returnChunk'],
+    transfers: {
+      returnChunk: (message) => [message.samples.buffer],
+    },
   },
 });

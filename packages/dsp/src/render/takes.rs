@@ -2,7 +2,7 @@ use super::{
     CHANNELS, QUANTUM,
     time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64},
 };
-use crate::stretch::StretchStream;
+use crate::{page_mix::PageMixer, stretch::StretchStream};
 
 const UNIT_RATIO_TOLERANCE: f64 = 1e-6;
 const LANES: usize = 2;
@@ -10,26 +10,27 @@ const RESERVED_PARTS: usize = 16;
 const CONTINUITY_FRAMES: f64 = 4.0;
 const SEMITONES_PER_OCTAVE: i32 = 12;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece {
     pub song_start: f64,
     pub tempo: f64,
     pub transpose: i32,
     pub octave: i32,
-    pub samples: Vec<f32>,
+    pub track: usize,
+    pub frame_count: usize,
 }
 
 impl Piece {
     fn song_end(&self) -> f64 {
-        self.song_start + frames_to_f64(self.samples.len()) * self.tempo
+        self.song_start + frames_to_f64(self.frame_count) * self.tempo
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TakeKey {
-    pub tempo: f64,
-    pub transpose: i32,
-    pub octave: i32,
+#[derive(Clone, Debug, PartialEq)]
+pub struct TakeTrack {
+    pub piece: Piece,
+    pub page_starts: Vec<i64>,
+    pub sounding: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -119,18 +120,6 @@ fn first_ending_after(segments: &[Segment], song_frame: f64) -> usize {
     segments.partition_point(|segment| segment.end <= song_frame)
 }
 
-struct LiveRun {
-    start_frame: f64,
-    first_offset: f64,
-    piece: Piece,
-}
-
-struct Live {
-    take: u32,
-    key: TakeKey,
-    runs: Vec<LiveRun>,
-}
-
 #[derive(Clone, Copy, PartialEq)]
 struct Played {
     piece: usize,
@@ -184,7 +173,6 @@ struct Lane {
 
 pub struct Takes {
     pieces: Vec<Piece>,
-    live: Option<Live>,
     segments: Vec<Segment>,
     lanes: [Lane; LANES],
     raw_previous: Option<Played>,
@@ -194,17 +182,6 @@ pub struct Takes {
     lead_scratch: Vec<f32>,
     parts: Vec<Part>,
     plan: Vec<Option<Routed>>,
-}
-
-fn piece_at<'pieces>(
-    pieces: &'pieces [Piece],
-    live: Option<&'pieces Live>,
-    index: usize,
-) -> Option<&'pieces Piece> {
-    if index < pieces.len() {
-        return pieces.get(index);
-    }
-    live?.runs.get(index - pieces.len()).map(|run| &run.piece)
 }
 
 #[must_use]
@@ -250,6 +227,8 @@ fn free_lane(last: &[Option<Played>; LANES], later: &[Part]) -> usize {
         .unwrap_or(0)
 }
 
+type Put = fn(&mut [f32], &[f32], f32);
+
 fn add_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
     for (sample, value) in channel.iter_mut().zip(take) {
         *sample += value * volume;
@@ -262,12 +241,20 @@ fn write_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
     }
 }
 
-fn raw_sample(samples: &[f32], frame: i64) -> f32 {
-    usize::try_from(frame)
-        .ok()
-        .and_then(|index| samples.get(index))
-        .copied()
-        .unwrap_or(0.0)
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a frame of a take is a whole number far below i64::MAX"
+)]
+fn floor_frame(frame: f64) -> i64 {
+    frame.floor() as i64
+}
+
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a frame of a song is far below the f64 mantissa"
+)]
+const fn song_frame_of(frame: i64) -> f64 {
+    frame as f64
 }
 
 impl Takes {
@@ -284,7 +271,6 @@ impl Takes {
         };
         Self {
             pieces: Vec::new(),
-            live: None,
             segments: Vec::new(),
             lanes: [lane(), lane()],
             raw_previous: None,
@@ -297,81 +283,14 @@ impl Takes {
         }
     }
 
-    fn layers(&self) -> Vec<&Piece> {
-        let live = self.live.iter().flat_map(|live| &live.runs);
-        self.pieces
-            .iter()
-            .chain(live.map(|run| &run.piece))
-            .collect()
-    }
-
-    fn update(&mut self) {
-        self.segments = lay_out(&self.layers());
-    }
-
-    pub fn set_pieces(&mut self, pieces: Vec<Piece>, finished_take: Option<u32>, switched: bool) {
-        let keep_live = !switched
-            && self
-                .live
-                .as_ref()
-                .is_none_or(|live| Some(live.take) != finished_take);
+    pub fn set_pieces(&mut self, pieces: Vec<Piece>) {
+        self.segments = lay_out(&pieces.iter().collect::<Vec<_>>());
         self.pieces = pieces;
-        if !keep_live {
-            self.live = None;
-        }
-        self.update();
     }
 
-    pub fn begin_live(&mut self, take: u32, key: TakeKey) {
-        if self.live.as_ref().is_some_and(|live| live.take == take) {
-            return;
-        }
-        self.live = Some(Live {
-            take,
-            key,
-            runs: Vec::new(),
-        });
-        self.update();
-    }
-
-    #[expect(
-        clippy::float_cmp,
-        reason = "a chunk goes on a run only when it starts at the very frame of the run, as before"
-    )]
-    pub fn append_live(&mut self, start_frame: f64, offset: f64, samples: &[f32]) {
-        let Some(live) = self.live.as_mut() else {
-            return;
-        };
-        let goes_on = live
-            .runs
-            .last()
-            .is_some_and(|run| offset > 0.0 && run.start_frame == start_frame);
-        if !goes_on {
-            live.runs.push(LiveRun {
-                start_frame,
-                first_offset: offset,
-                piece: Piece {
-                    song_start: start_frame + offset * live.key.tempo,
-                    tempo: live.key.tempo,
-                    transpose: live.key.transpose,
-                    octave: live.key.octave,
-                    samples: Vec::new(),
-                },
-            });
-        }
-        if let Some(run) = live.runs.last_mut() {
-            let at = usize::try_from(whole_to_i64(offset - run.first_offset)).unwrap_or(0);
-            let end = at + samples.len();
-            if run.piece.samples.len() < end {
-                run.piece.samples.resize(end, 0.0);
-            }
-            run.piece.samples[at..end].copy_from_slice(samples);
-        }
-        self.update();
-    }
-
-    pub fn clear(&mut self) {
-        self.set_pieces(Vec::new(), None, true);
+    #[must_use]
+    pub fn pieces(&self) -> &[Piece] {
+        &self.pieces
     }
 
     #[must_use]
@@ -380,8 +299,26 @@ impl Takes {
     }
 
     fn stretched(&self, piece: usize, target: Target) -> bool {
-        piece_at(&self.pieces, self.live.as_ref(), piece)
+        self.pieces
+            .get(piece)
             .is_some_and(|found| is_stretched(target, found))
+    }
+
+    #[must_use]
+    pub fn resident_near(&self, mixer: &PageMixer, song_frame: i64, until: i64) -> bool {
+        let from = song_frame_of(song_frame);
+        let reach = song_frame_of(until);
+        self.segments[first_ending_after(&self.segments, from)..]
+            .iter()
+            .take_while(|segment| segment.start < reach)
+            .all(|segment| {
+                let piece = &self.pieces[segment.piece];
+                let at = segment.start.max(from);
+                mixer.track_resident(
+                    piece.track,
+                    floor_frame((at - piece.song_start) / piece.tempo),
+                )
+            })
     }
 
     fn sounding_parts(
@@ -471,13 +408,18 @@ impl Takes {
         }
     }
 
-    fn render_stretched(&mut self, block: &mut [f32], routed: Routed, target: Target) {
+    fn render_stretched(
+        &mut self,
+        mixer: &PageMixer,
+        block: &mut [f32],
+        (routed, target): (Routed, Target),
+    ) {
         let Routed {
             part,
             lane: chosen,
             continued,
         } = routed;
-        let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
+        let Some(piece) = self.pieces.get(part.segment.piece) else {
             return;
         };
         let (ratio, semitones) = target.shift(piece);
@@ -489,18 +431,19 @@ impl Takes {
         }
         lane.stretcher.set_tempo(ratio);
         lane.stretcher.set_semitones(semitones);
-        let samples = piece.samples.as_slice();
+        let track = piece.track;
         lane.stretcher
             .process(block, position, &mut |fill: Block<'_>| {
-                for index in 0..fill.count {
-                    let frame = position + fill.offset + i64::try_from(index).unwrap_or(0);
-                    fill.samples[index] = raw_sample(samples, frame);
-                }
+                mixer.read_track(
+                    track,
+                    position + fill.offset,
+                    &mut fill.samples[..fill.count],
+                );
             });
     }
 
-    fn render_raw(&mut self, block: &mut [f32], part: Part, target: Target) {
-        let Some(piece) = piece_at(&self.pieces, self.live.as_ref(), part.segment.piece) else {
+    fn render_raw(&mut self, mixer: &PageMixer, block: &mut [f32], (part, target): (Part, Target)) {
+        let Some(piece) = self.pieces.get(part.segment.piece) else {
             return;
         };
         let mapped = whole_to_i64(js_round((part.song_frame - piece.song_start) / piece.tempo));
@@ -509,12 +452,13 @@ impl Takes {
             _ => mapped,
         };
         self.raw_current = Some(part.played(position, target.tempo));
-        for (index, sample) in block.iter_mut().enumerate() {
-            *sample = raw_sample(&piece.samples, position + i64::try_from(index).unwrap_or(0));
-        }
+        mixer.read_track(piece.track, position, block);
     }
 
-    pub fn render(&mut self, output: &mut [f32], song_frame: f64, target: Target) -> bool {
+    fn render(&mut self, mixer: &PageMixer, output: &mut [f32], mix: TakeMix) -> bool {
+        let TakeMix {
+            song_frame, target, ..
+        } = mix;
         for lane in &mut self.lanes {
             lane.previous = lane.current.take();
         }
@@ -539,8 +483,8 @@ impl Takes {
                 &mut lead[part.from..part.to]
             };
             match step {
-                Some(routed) => self.render_stretched(block, routed, target),
-                None => self.render_raw(block, *part, target),
+                Some(routed) => self.render_stretched(mixer, block, (routed, target)),
+                None => self.render_raw(mixer, block, (*part, target)),
             }
         }
         self.lead_scratch = lead;
@@ -554,20 +498,20 @@ impl Takes {
         !self.segments.is_empty()
     }
 
-    pub fn mix_into(&mut self, output: &mut [f32], mix: TakeMix) {
-        self.put_into(output, mix, add_gained_into);
+    pub fn mix_into(&mut self, mixer: &PageMixer, output: &mut [f32], mix: TakeMix) {
+        self.put_into(mixer, output, (mix, add_gained_into));
     }
 
-    pub fn write_into(&mut self, output: &mut [f32], mix: TakeMix) {
-        self.put_into(output, mix, write_gained_into);
+    pub fn write_into(&mut self, mixer: &PageMixer, output: &mut [f32], mix: TakeMix) {
+        self.put_into(mixer, output, (mix, write_gained_into));
     }
 
-    fn put_into(&mut self, output: &mut [f32], mix: TakeMix, put: fn(&mut [f32], &[f32], f32)) {
+    fn put_into(&mut self, mixer: &PageMixer, output: &mut [f32], (mix, put): (TakeMix, Put)) {
         let frames = output.len() / CHANNELS;
         let mut scratch = std::mem::take(&mut self.scratch);
         scratch.resize(frames, 0.0);
         let taken = &mut scratch[..frames];
-        self.render(taken, mix.song_frame, mix.target);
+        self.render(mixer, taken, mix);
         for channel in output.chunks_exact_mut(frames) {
             put(channel, taken, mix.volume);
         }

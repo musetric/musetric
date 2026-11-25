@@ -144,15 +144,33 @@ export const recordingDataKeys = [
   'appendLiveTake',
 ] as const;
 
+export const stemTracks: Record<StemType, number> = {
+  lead: 0,
+  backing: 1,
+  instrumental: 2,
+};
+
 export type PlayerStemLayout = {
   frameCount: number;
   pageStarts: number[];
 };
 
-export type PlayerStemLayouts = Record<StemType, PlayerStemLayout>;
+export type PlayerTakeTrack = PlayerStemLayout & {
+  track: number;
+  songStartFrame: number;
+  tempo: number;
+  transpose: number;
+  octave: number;
+  sounding: boolean;
+};
+
+export type PlayerTakes = {
+  takes: PlayerTakeTrack[];
+  residentPageLimit: number;
+};
 
 export type PlayerPage = {
-  stem: StemType;
+  track: number;
   index: number;
   frameCount: number;
   channelCount: number;
@@ -160,7 +178,7 @@ export type PlayerPage = {
 };
 
 export type PlayerPageKey = {
-  stem: StemType;
+  track: number;
   index: number;
 };
 
@@ -194,13 +212,16 @@ export type RecordingDataMethods = {
   appendLiveTake: (message: LiveTakeChunk) => void;
 };
 
-export type PlayerDataMethods = RecordingDataMethods & {
-  mount: (message: {
-    frameCount: number;
-    layouts: PlayerStemLayouts;
-    residentPageLimit: number;
-    recording: PlayerRecordingPiece[];
-  }) => void;
+export type PlayerStemLayouts = Record<StemType, PlayerStemLayout>;
+
+export type PlayerDataMethods = {
+  mount: (
+    message: PlayerTakes & {
+      frameCount: number;
+      layouts: PlayerStemLayouts;
+    },
+  ) => void;
+  setTakes: (message: PlayerTakes) => void;
   putPage: (message: PlayerPage) => void;
   dropPages: (message: { pages: PlayerPageKey[] }) => void;
   unmount: () => void;
@@ -218,12 +239,9 @@ export const playerDataChannel = createSyncMessageChannel<
     keys: ['requestWindow'],
   },
   outbound: {
-    keys: ['mount', 'putPage', 'dropPages', 'unmount', ...recordingDataKeys],
+    keys: ['mount', 'setTakes', 'putPage', 'dropPages', 'unmount'],
     transfers: {
-      mount: (message) => pieceBuffers(message.recording),
       putPage: (message) => [message.samples.buffer],
-      setRecordingPieces: (message) => pieceBuffers(message.pieces),
-      appendLiveTake: (message) => [message.samples.buffer],
     },
   },
 });

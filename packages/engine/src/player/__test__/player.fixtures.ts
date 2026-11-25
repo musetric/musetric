@@ -6,6 +6,7 @@ import {
   playerChannel,
   playerDataChannel,
   type PlayerRecordingPiece,
+  stemTracks,
 } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
 import { createPlayerRuntime } from '../runtime.worklet.js';
@@ -153,7 +154,7 @@ export const createTakeStream = (): TakeStream => {
   createRecordingStream({
     port: recordingStreamChannel.outbound(stream.port2),
     onChunk: (chunk) => {
-      chunks.push(chunk);
+      chunks.push({ ...chunk, samples: chunk.samples.slice() });
     },
   });
   return { chunks, notification: stream.port1 };
@@ -166,11 +167,21 @@ export const mountTracks = (
   recording: PlayerRecordingPiece[],
 ): void => {
   const layout = { frameCount, pageStarts: [0] };
+  const takes = recording.map((piece, index) => ({
+    track: stemTypes.length + index,
+    songStartFrame: piece.songStartFrame,
+    tempo: piece.tempo,
+    transpose: piece.transpose,
+    octave: piece.octave,
+    frameCount: piece.samples.length,
+    pageStarts: [0],
+    sounding: true,
+  }));
   data.methods.mount({
     frameCount,
     layouts: { lead: layout, backing: layout, instrumental: layout },
-    residentPageLimit: stemTypes.length,
-    recording,
+    takes,
+    residentPageLimit: stemTypes.length + takes.length,
   });
   for (const stem of stemTypes) {
     const channels = tracks[stem];
@@ -179,11 +190,20 @@ export const mountTracks = (
       samples.set(channel, index * frameCount);
     }
     data.methods.putPage({
-      stem,
+      track: stemTracks[stem],
       index: 0,
       frameCount,
       channelCount: channels.length,
       samples,
+    });
+  }
+  for (const [index, piece] of recording.entries()) {
+    data.methods.putPage({
+      track: takes[index].track,
+      index: 0,
+      frameCount: piece.samples.length,
+      channelCount: 1,
+      samples: piece.samples.slice(),
     });
   }
 };

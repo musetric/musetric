@@ -2,9 +2,10 @@
 mod tests {
     use musetric_dsp::{
         BoxedError,
+        page_mix::{LoopRange, PageShape},
         render::{
-            CHANNELS, Parts, Piece, Song, StemLayout, StemPages, TakeKey, Takes, Target, lay_out,
-            render_song,
+            CHANNELS, Parts, Piece, QUANTUM, Quantum, Renderer, STEM_COUNT, Song, StemLayout,
+            TakeTrack, Target, TrackPages, lay_out, render_song,
         },
     };
     #[cfg(target_arch = "wasm32")]
@@ -12,6 +13,7 @@ mod tests {
 
     const RATE: u32 = 48_000;
     const PAGE: usize = 4_096;
+    const TAKE_PAGE: usize = 9_600;
 
     fn noise(frames: usize, seed: u32) -> Vec<f32> {
         let mut state = seed;
@@ -29,7 +31,8 @@ mod tests {
             tempo,
             transpose: 0,
             octave: 0,
-            samples: vec![0.0; frames],
+            track: STEM_COUNT,
+            frame_count: frames,
         }
     }
 
@@ -56,81 +59,79 @@ mod tests {
         );
     }
 
-    fn live(chunks: &[(f64, f64)], tempo: f64) -> Vec<(f64, f64, usize)> {
-        let mut takes = Takes::new(RATE);
-        takes.begin_live(
-            1,
-            TakeKey {
-                tempo,
-                transpose: 0,
-                octave: 0,
-            },
-        );
-        for (start, offset) in chunks {
-            takes.append_live(*start, *offset, &[0.5; 4]);
-        }
-        takes
-            .segments()
-            .iter()
-            .map(|segment| (segment.start, segment.end, segment.piece))
-            .collect()
-    }
-
-    #[test]
-    fn continues_a_live_run_only_with_a_later_chunk_from_the_same_start() {
-        assert_eq!(live(&[(10.0, 0.0), (10.0, 4.0)], 1.0), [(10.0, 18.0, 0)]);
-        assert_eq!(
-            live(&[(10.0, 0.0), (12.0, 4.0)], 1.0),
-            [(10.0, 14.0, 0), (16.0, 20.0, 1)]
-        );
-        assert_eq!(live(&[(10.0, 0.0), (10.0, 0.0)], 1.0), [(10.0, 14.0, 1)]);
-    }
-
-    #[test]
-    fn places_a_run_joined_late_where_its_first_chunk_was_sung() {
-        assert_eq!(live(&[(10.0, 8.0)], 0.5), [(14.0, 16.0, 0)]);
-    }
-
     fn stem_channels(stem: usize, frames: usize) -> Vec<Vec<f32>> {
         (0..CHANNELS)
             .map(|channel| noise(frames, u32::try_from(stem * 2 + channel + 1).unwrap()))
             .collect()
     }
 
-    struct Stems {
-        channels: Vec<Vec<Vec<f32>>>,
+    fn pages_of(frames: usize, page: usize) -> Vec<i64> {
+        (0..frames)
+            .step_by(page)
+            .map(|start| i64::try_from(start).unwrap())
+            .collect()
     }
 
-    impl Stems {
-        fn new(frames: usize) -> Self {
+    struct Tracks {
+        stems: Vec<Vec<Vec<f32>>>,
+        takes: Vec<Vec<f32>>,
+        stem_page: usize,
+        take_page: usize,
+    }
+
+    impl Tracks {
+        fn new(frames: usize, takes: Vec<Vec<f32>>) -> Self {
             Self {
-                channels: (0..3).map(|stem| stem_channels(stem, frames)).collect(),
+                stems: (0..STEM_COUNT)
+                    .map(|stem| stem_channels(stem, frames))
+                    .collect(),
+                takes,
+                stem_page: PAGE,
+                take_page: TAKE_PAGE,
             }
         }
 
-        fn silent(frames: usize) -> Self {
+        fn silent(frames: usize, takes: Vec<Vec<f32>>) -> Self {
             Self {
-                channels: vec![vec![vec![0.0; frames]; CHANNELS]; 3],
+                stems: vec![vec![vec![0.0; frames]; CHANNELS]; STEM_COUNT],
+                takes,
+                stem_page: PAGE,
+                take_page: TAKE_PAGE,
             }
+        }
+
+        fn take_page(&self, track: usize) -> usize {
+            self.take_page
+                .min(self.takes[track - STEM_COUNT].len().max(1))
         }
     }
 
-    impl StemPages for Stems {
-        fn layout(&self, stem: usize) -> StemLayout {
-            let frames = self.channels[stem][0].len();
+    impl TrackPages for Tracks {
+        fn layout(&self, track: usize) -> StemLayout {
+            if track >= STEM_COUNT {
+                let frames = self.takes[track - STEM_COUNT].len();
+                return StemLayout {
+                    frame_count: i64::try_from(frames).unwrap(),
+                    page_starts: pages_of(frames, self.take_page(track)),
+                };
+            }
+            let frames = self.stems[track][0].len();
             StemLayout {
                 frame_count: i64::try_from(frames).unwrap(),
-                page_starts: (0..frames)
-                    .step_by(PAGE)
-                    .map(|start| i64::try_from(start).unwrap())
-                    .collect(),
+                page_starts: pages_of(frames, self.stem_page),
             }
         }
 
-        fn read(&mut self, stem: usize, index: usize) -> Result<Vec<f32>, BoxedError> {
-            let channels = &self.channels[stem];
-            let start = index * PAGE;
-            let end = (start + PAGE).min(channels[0].len());
+        fn read(&mut self, track: usize, index: usize) -> Result<Vec<f32>, BoxedError> {
+            if track >= STEM_COUNT {
+                let samples = &self.takes[track - STEM_COUNT];
+                let page = self.take_page(track);
+                let start = index * page;
+                return Ok(samples[start..(start + page).min(samples.len())].to_vec());
+            }
+            let channels = &self.stems[track];
+            let start = index * self.stem_page;
+            let end = (start + self.stem_page).min(channels[0].len());
             Ok(channels
                 .iter()
                 .flat_map(|channel| channel[start..end].iter().copied())
@@ -138,10 +139,21 @@ mod tests {
         }
     }
 
-    fn render(stems: &mut Stems, song: &Song, parts: Parts) -> Vec<f32> {
-        render_song(stems, song, parts, &mut |_| true)
+    fn render(tracks: &mut Tracks, song: &Song, parts: Parts) -> Vec<f32> {
+        render_song(tracks, song, parts, &mut |_| true)
             .unwrap()
             .unwrap()
+    }
+
+    fn sung(song_start: f64, samples: &[f32], tempo: f64, track: usize) -> Piece {
+        Piece {
+            song_start,
+            tempo,
+            transpose: 0,
+            octave: 0,
+            track: STEM_COUNT + track,
+            frame_count: samples.len(),
+        }
     }
 
     #[test]
@@ -157,15 +169,10 @@ mod tests {
                     ..Target::ORIGINAL
                 },
                 recording_volume: 1.0,
-                pieces: vec![Piece {
-                    song_start: 0.0,
-                    tempo,
-                    transpose: 0,
-                    octave: 0,
-                    samples: raw.clone(),
-                }],
+                pieces: vec![sung(0.0, &raw, tempo, 0)],
             };
-            let played = render(&mut Stems::silent(96_000), &song, Parts::ALL);
+            let mut tracks = Tracks::silent(96_000, vec![raw.clone()]);
+            let played = render(&mut tracks, &song, Parts::ALL);
             let left: Vec<f32> = played.iter().step_by(CHANNELS).copied().collect();
             assert_eq!(&left[..raw.len()], raw.as_slice(), "{tempo}");
         }
@@ -190,6 +197,7 @@ mod tests {
 
     #[test]
     fn keeps_the_first_moments_of_a_stretched_take() {
+        let (long, short) = (clicks(4), clicks(2));
         let song = Song {
             sample_rate: RATE,
             frame_count: 300_000,
@@ -201,23 +209,12 @@ mod tests {
             },
             recording_volume: 0.5,
             pieces: vec![
-                Piece {
-                    song_start: 48_000.0,
-                    tempo: 1.0,
-                    transpose: 0,
-                    octave: 0,
-                    samples: clicks(4),
-                },
-                Piece {
-                    song_start: 168_000.0,
-                    tempo: 1.0,
-                    transpose: 0,
-                    octave: 0,
-                    samples: clicks(2),
-                },
+                sung(48_000.0, &long, 1.0, 0),
+                sung(168_000.0, &short, 1.0, 1),
             ],
         };
-        let played = render(&mut Stems::silent(240_000), &song, Parts::ALL);
+        let mut tracks = Tracks::silent(240_000, vec![long, short]);
+        let played = render(&mut tracks, &song, Parts::ALL);
         let left: Vec<f32> = played.iter().step_by(CHANNELS).copied().collect();
         let peaks: Vec<f32> = [60_000, 120_000, 180_000, 210_000, 270_000]
             .into_iter()
@@ -230,20 +227,22 @@ mod tests {
         assert!(peaks[3] > quietest / 2.0, "{peaks:?}");
     }
 
+    fn scene_takes() -> Vec<Vec<f32>> {
+        vec![noise(40_000, 11), noise(20_000, 12)]
+    }
+
     fn scene(target: Target) -> Song {
-        let mut transposed = piece(30_000.0, 40_000, 0.8);
-        transposed.samples = noise(40_000, 11);
+        let takes = scene_takes();
+        let mut transposed = sung(30_000.0, &takes[0], 0.8, 0);
         transposed.transpose = 2;
         transposed.octave = -1;
-        let mut covering = piece(50_000.0, 20_000, 1.0);
-        covering.samples = noise(20_000, 12);
         Song {
             sample_rate: RATE,
             frame_count: 150_000,
             volumes: [0.8, 0.5, 1.25],
             target,
             recording_volume: 0.7,
-            pieces: vec![transposed, covering],
+            pieces: vec![transposed, sung(50_000.0, &takes[1], 1.0, 1)],
         }
     }
 
@@ -281,24 +280,24 @@ mod tests {
         }
     }
 
-    fn export(stems: &mut Stems, song: &Song) -> Vec<f32> {
-        let mut exported = render(stems, song, Parts::SONG);
+    fn export(tracks: &mut Tracks, song: &Song) -> Vec<f32> {
+        let mut exported = render(tracks, song, Parts::SONG);
         if !song.pieces.is_empty() {
-            add(&mut exported, &render(stems, song, Parts::TAKES));
+            add(&mut exported, &render(tracks, song, Parts::TAKES));
         }
         if song.target.voice_shifted && song.target.voice_octave != 0 {
-            add(&mut exported, &render(stems, song, Parts::LEAD));
+            add(&mut exported, &render(tracks, song, Parts::LEAD));
         }
         exported
     }
 
     #[test]
     fn exports_by_its_parts_what_the_player_renders_quantum_by_quantum() {
-        let mut stems = Stems::new(120_000);
+        let mut tracks = Tracks::new(120_000, scene_takes());
         for target in targets() {
             let song = scene(target);
-            let played = render(&mut stems, &song, Parts::ALL);
-            let exported = export(&mut stems, &song);
+            let played = render(&mut tracks, &song, Parts::ALL);
+            let exported = export(&mut tracks, &song);
             let equal = played
                 .iter()
                 .zip(&exported)
@@ -306,5 +305,223 @@ mod tests {
             assert!(equal, "{target:?}");
             assert!(played.iter().any(|sample| *sample != 0.0), "{target:?}");
         }
+    }
+
+    const SONG_FRAMES: usize = 240_000;
+    const STEM_PAGE: usize = 30_000;
+    const WINDOW_FRAMES: f64 = 96_000.0;
+
+    struct Player {
+        renderer: Renderer,
+        tracks: Tracks,
+        takes: Vec<TakeTrack>,
+        resident: Vec<Vec<bool>>,
+        range: Option<LoopRange>,
+        window: f64,
+    }
+
+    fn load(renderer: &mut Renderer, tracks: &mut Tracks, track: usize, index: usize) {
+        let samples = tracks.read(track, index).unwrap();
+        let layout = tracks.layout(track);
+        let end = layout
+            .page_starts
+            .get(index + 1)
+            .copied()
+            .unwrap_or(layout.frame_count);
+        let frames = usize::try_from(end - layout.page_starts[index]).unwrap();
+        renderer
+            .mixer()
+            .page_input(PageShape {
+                track,
+                index,
+                frames,
+                channels: samples.len() / frames,
+            })
+            .unwrap()
+            .copy_from_slice(&samples);
+    }
+
+    fn sung_takes() -> (Vec<Vec<f32>>, Vec<Piece>) {
+        let samples = vec![noise(60_000, 21), noise(30_000, 22), noise(50_000, 23)];
+        let pieces = vec![
+            sung(20_000.0, &samples[0], 1.0, 0),
+            sung(50_000.0, &samples[1], 1.0, 1),
+            sung(110_000.0, &samples[2], 0.8, 2),
+        ];
+        (samples, pieces)
+    }
+
+    fn load_stem(renderer: &mut Renderer, tracks: &mut Tracks, stem: usize) {
+        let layout = tracks.layout(stem);
+        renderer
+            .mixer()
+            .set_track(stem, layout.frame_count, &layout.page_starts)
+            .unwrap();
+        for index in 0..layout.page_starts.len() {
+            load(renderer, tracks, stem, index);
+        }
+    }
+
+    fn wanted_pages(layout: &StemLayout, piece: Piece, song_frame: f64, window: f64) -> Vec<bool> {
+        let into = |at: f64| (at - piece.song_start) / piece.tempo;
+        let (from, to) = (into(song_frame - window), into(song_frame + window));
+        let ends = layout
+            .page_starts
+            .iter()
+            .skip(1)
+            .copied()
+            .chain([layout.frame_count]);
+        layout
+            .page_starts
+            .iter()
+            .zip(ends)
+            .map(|(start, end)| song_frame_of(*start) < to && song_frame_of(end) > from)
+            .collect()
+    }
+
+    fn keep_pages(player: &mut Player, take: usize, wanted: &[bool]) {
+        let track = player.takes[take].piece.track;
+        for (index, want) in wanted.iter().copied().enumerate() {
+            let held = player.resident[take][index];
+            if want && !held {
+                load(&mut player.renderer, &mut player.tracks, track, index);
+            } else if held && !want {
+                player.renderer.mixer().drop_page(track, index).unwrap();
+            }
+            player.resident[take][index] = want;
+        }
+    }
+
+    impl Player {
+        fn open(take_page: usize) -> Self {
+            let (samples, pieces) = sung_takes();
+            let mut tracks = Tracks::new(SONG_FRAMES, samples);
+            tracks.stem_page = STEM_PAGE;
+            tracks.take_page = take_page;
+            let mut renderer = Renderer::new(RATE);
+            renderer.set_volumes(&[0.8, 0.5, 1.25]);
+            renderer.set_recording_volume(0.7);
+            for stem in 0..STEM_COUNT {
+                load_stem(&mut renderer, &mut tracks, stem);
+            }
+            let takes: Vec<TakeTrack> = pieces
+                .into_iter()
+                .map(|piece| TakeTrack {
+                    piece,
+                    page_starts: tracks.layout(piece.track).page_starts,
+                    sounding: true,
+                })
+                .collect();
+            renderer.set_takes(&takes).unwrap();
+            Self {
+                renderer,
+                tracks,
+                resident: takes
+                    .iter()
+                    .map(|take| vec![false; take.page_starts.len()])
+                    .collect(),
+                takes,
+                range: None,
+                window: if take_page < SONG_FRAMES {
+                    WINDOW_FRAMES
+                } else {
+                    f64::INFINITY
+                },
+            }
+        }
+
+        fn song_frame(&self, frame: i64) -> i64 {
+            self.range.map_or(frame, |range| range.song_frame(frame))
+        }
+
+        fn feed(&mut self, frame: i64) {
+            let song_frame = song_frame_of(self.song_frame(frame));
+            for take in 0..self.takes.len() {
+                let piece = self.takes[take].piece;
+                let layout = self.tracks.layout(piece.track);
+                let wanted = wanted_pages(&layout, piece, song_frame, self.window);
+                keep_pages(self, take, &wanted);
+            }
+        }
+
+        fn play(&mut self, from: i64, quanta: usize) -> Vec<u32> {
+            self.renderer.reset();
+            let mut frame = from;
+            let mut output = vec![0.0; CHANNELS * QUANTUM];
+            let mut bits = Vec::with_capacity(quanta * CHANNELS * QUANTUM);
+            for _ in 0..quanta {
+                self.feed(frame);
+                assert!(self.renderer.ready(frame), "{frame}");
+                let quantum = Quantum {
+                    frame,
+                    take_frame: Some(song_frame_of(self.song_frame(frame))),
+                };
+                let processed = self.renderer.render(quantum, &mut output);
+                bits.extend(output.iter().map(|sample| sample.to_bits()));
+                frame += i64::try_from(processed).unwrap();
+            }
+            bits
+        }
+
+        fn set_loop(&mut self, from: i64, to: i64) {
+            let range = LoopRange {
+                from,
+                to,
+                end: to,
+                cycle: true,
+            };
+            self.range = Some(range);
+            self.renderer.set_range(Some(range));
+            self.renderer.refill();
+        }
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a frame of a song is far below the f64 mantissa"
+    )]
+    const fn song_frame_of(frame: i64) -> f64 {
+        frame as f64
+    }
+
+    fn run(player: &mut Player) -> Vec<u32> {
+        let mut bits = player.play(10_000, 400);
+        bits.extend(player.play(108_000, 200));
+        bits.extend(player.play(52_000, 120));
+        player.set_loop(40_000, 125_000);
+        bits.extend(player.play(100_000, 900));
+        bits
+    }
+
+    #[test]
+    fn plays_paged_takes_to_the_bits_of_one_page_per_piece_through_seeks_and_a_loop() {
+        let whole = run(&mut Player::open(SONG_FRAMES));
+        let paged = run(&mut Player::open(TAKE_PAGE));
+        assert_eq!(whole.len(), paged.len());
+        let parted = whole
+            .iter()
+            .zip(&paged)
+            .position(|(left, right)| left != right);
+        assert_eq!(parted, None);
+        assert!(whole.iter().any(|sample| f32::from_bits(*sample) != 0.0));
+    }
+
+    #[test]
+    fn holds_for_a_missing_take_page() {
+        let mut player = Player::open(TAKE_PAGE);
+        player.feed(60_000);
+        assert!(player.renderer.ready(60_000));
+        let track = player.takes[1].piece.track;
+        player.renderer.mixer().drop_page(track, 1).unwrap();
+        assert!(!player.renderer.ready(60_000));
+        assert!(player.renderer.ready(200_000));
+        let mut silent = vec![1.0; QUANTUM];
+        player
+            .renderer
+            .mixer()
+            .read_track(track, 10_000, &mut silent);
+        assert!(silent.iter().all(|sample| *sample == 0.0));
+        load(&mut player.renderer, &mut player.tracks, track, 1);
+        assert!(player.renderer.ready(60_000));
     }
 }

@@ -1,8 +1,5 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import {
-  appendRendererLiveTake,
-  beginRendererLiveTake,
-  clearRendererTakes,
   dropRendererPage,
   type InitOutput,
   openRenderer,
@@ -13,35 +10,28 @@ import {
   renderQuantum,
   reserveRendererPages,
   resetRenderer,
-  setRendererPieces,
   setRendererRange,
   setRendererRecordingVolume,
   setRendererStem,
+  setRendererTakes,
   setRendererTempo,
   setRendererTranspose,
   setRendererVoice,
   setRendererVolumes,
-  stageRendererPiece,
 } from '@musetric/dsp/stretch';
 import { type RangeFrames } from './playerRange.worklet.js';
 import {
-  type LiveTakeChunk,
-  type LiveTakeStart,
   type playerDataChannel,
   type PlayerPage,
   type PlayerPageKey,
   type PlayerStemLayouts,
-  type RecordingPiecesUpdate,
+  type PlayerTakes,
+  type PlayerTakeTrack,
+  stemTracks,
 } from './protocol.cross.js';
 
 const windowReportFrameCount = 12000;
 const outputChannelCount = 2;
-
-const stemIndices: Record<StemType, number> = {
-  lead: 0,
-  backing: 1,
-  instrumental: 2,
-};
 
 const createOutputViews = (
   buffer: ArrayBuffer,
@@ -58,9 +48,24 @@ const createOutputViews = (
       ),
   );
 
+const takeFields = (takes: readonly PlayerTakeTrack[]): Float64Array =>
+  Float64Array.from(
+    takes.flatMap((take) => [
+      take.track,
+      take.songStartFrame,
+      take.tempo,
+      take.transpose,
+      take.octave,
+      take.frameCount,
+      take.pageStarts.length,
+      take.sounding ? 1 : 0,
+    ]),
+  );
+
 export type PlayerRenderer = {
   mounted: () => boolean;
-  mount: (layouts: PlayerStemLayouts, residentPageLimit: number) => void;
+  mount: (layouts: PlayerStemLayouts, takes: PlayerTakes) => void;
+  setTakes: (takes: PlayerTakes) => void;
   put: (page: PlayerPage) => void;
   drop: (pages: PlayerPageKey[]) => void;
   release: () => void;
@@ -74,10 +79,6 @@ export type PlayerRenderer = {
   setRecordingVolume: (volume: number) => void;
   reset: () => void;
   refill: () => void;
-  setPieces: (update: RecordingPiecesUpdate) => void;
-  beginLiveTake: (take: LiveTakeStart) => void;
-  appendLiveTake: (chunk: LiveTakeChunk) => void;
-  clearTakes: () => void;
   render: (
     outputs: Float32Array[],
     frameIndex: number,
@@ -100,17 +101,6 @@ export const createPlayerRenderer = (
   let outputViews: Float32Array[] = [];
   let mounted = false;
   let reportedFrameIndex: number | undefined = undefined;
-  const takeIds = new Map<string, number>();
-
-  const toTakeId = (take: string): number => {
-    const known = takeIds.get(take);
-    if (known !== undefined) {
-      return known;
-    }
-    const next = takeIds.size + 1;
-    takeIds.set(take, next);
-    return next;
-  };
 
   const viewOutput = (frameCount: number): Float32Array[] => {
     const pointer = rendererOutput(handle);
@@ -131,34 +121,53 @@ export const createPlayerRenderer = (
     return outputViews;
   };
 
+  const setTakes = (message: PlayerTakes) => {
+    const laid = setRendererTakes(
+      handle,
+      takeFields(message.takes),
+      Uint32Array.from(message.takes.flatMap((take) => take.pageStarts)),
+    );
+    if (!laid) {
+      throw new Error('The takes of the recording do not fit the renderer');
+    }
+    reserveRendererPages(handle, message.residentPageLimit);
+  };
+
+  const releaseTakes = () => {
+    setRendererTakes(handle, new Float64Array(0), new Uint32Array(0));
+  };
+
   const release = () => {
     for (const stem of stemTypes) {
-      setRendererStem(handle, stemIndices[stem], 0, new Uint32Array(0));
+      setRendererStem(handle, stemTracks[stem], 0, new Uint32Array(0));
     }
+    releaseTakes();
     mounted = false;
     reportedFrameIndex = undefined;
   };
 
   return {
     mounted: () => mounted,
-    mount: (layouts, residentPageLimit) => {
+    mount: (layouts, takes) => {
+      releaseTakes();
       for (const stem of stemTypes) {
         const layout = layouts[stem];
         setRendererStem(
           handle,
-          stemIndices[stem],
+          stemTracks[stem],
           layout.frameCount,
           Uint32Array.from(layout.pageStarts),
         );
       }
-      reserveRendererPages(handle, residentPageLimit);
+      setTakes(takes);
       mounted = true;
       reportedFrameIndex = undefined;
     },
+    setTakes,
     put: (page) => {
       const pointer = rendererPageInput(
         handle,
-        stemIndices[page.stem],
+        page.track,
         page.index,
         page.samples.length,
       );
@@ -173,7 +182,7 @@ export const createPlayerRenderer = (
     },
     drop: (pages) => {
       for (const page of pages) {
-        dropRendererPage(handle, stemIndices[page.stem], page.index);
+        dropRendererPage(handle, page.track, page.index);
       }
     },
     release,
@@ -233,42 +242,6 @@ export const createPlayerRenderer = (
     },
     refill: () => {
       refillRenderer(handle);
-    },
-    setPieces: (update) => {
-      for (const piece of update.pieces) {
-        stageRendererPiece(
-          handle,
-          piece.songStartFrame,
-          Float64Array.of(piece.tempo, piece.transpose, piece.octave),
-          piece.samples,
-        );
-        piece.samples.buffer.transfer(0);
-      }
-      setRendererPieces(
-        handle,
-        update.finishedTakeId === undefined
-          ? undefined
-          : takeIds.get(update.finishedTakeId),
-        update.switched ?? false,
-      );
-    },
-    beginLiveTake: (take) => {
-      beginRendererLiveTake(
-        handle,
-        toTakeId(take.takeId),
-        Float64Array.of(take.tempo, take.transpose, take.octave),
-      );
-    },
-    appendLiveTake: (chunk) => {
-      appendRendererLiveTake(
-        handle,
-        chunk.startFrame,
-        chunk.offset,
-        chunk.samples,
-      );
-    },
-    clearTakes: () => {
-      clearRendererTakes(handle);
     },
     render: (outputs, frameIndex, takeFrame) => {
       const frameCount = outputs[0].length;

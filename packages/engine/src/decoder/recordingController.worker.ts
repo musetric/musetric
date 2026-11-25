@@ -11,7 +11,11 @@ import {
   createRecordingStream,
   type RecordingStream,
 } from './recordingStream.worker.js';
-import { createTakePages, type TakePages } from './takePages.worker.js';
+import {
+  createTakePages,
+  type HeldTake,
+  type TakePages,
+} from './takePages.worker.js';
 
 export type TakeStart = {
   takeId: string;
@@ -52,7 +56,7 @@ type Take = {
 export type RecordingController = {
   begin: (start: TakeStart, onChunk: (chunk: LiveTakeChunk) => void) => void;
   holds: (takeId: string) => boolean;
-  finish: (takeId: string, sequence: number) => Promise<void>;
+  finish: (takeId: string, sequence: number) => Promise<HeldTake | undefined>;
   connect: () => void;
   disconnect: () => void;
   apply: (event: TakeEvent) => void;
@@ -169,12 +173,21 @@ export const createRecordingController = (
     finish: async (takeId, sequence) => {
       const take = takes.find((item) => item.start.takeId === takeId);
       if (!take) {
-        return;
+        return undefined;
       }
       await take.stream.waitForFlush(sequence);
       take.stream.close();
       take.finishing = true;
       pump();
+      const { pages, start } = take;
+      return {
+        takeId,
+        tempo: start.tempo,
+        transpose: start.transpose,
+        octave: start.octave,
+        runs: pages.runs(),
+        read: pages.read,
+      };
     },
     connect: link,
     disconnect: () => {

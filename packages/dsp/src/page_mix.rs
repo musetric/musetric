@@ -8,8 +8,8 @@ pub const READY_MARGIN_FRAMES: i64 = 16_384;
 pub const READY_STEP_FRAMES: i64 = 4_096;
 pub const OUTPUT_RESERVE_FRAMES: usize = 65_536;
 
-const NO_STEM: &str = "The mixer has no such stem";
-const NO_PAGE: &str = "The stem has no such page";
+const NO_TRACK: &str = "The mixer has no such track";
+const NO_PAGE: &str = "The track has no such page";
 const TOO_LONG: &str = "The page is longer than a slot of the mixer";
 const TOO_WIDE: &str = "The page has more channels than the mixer";
 
@@ -76,7 +76,7 @@ impl LoopRange {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageShape {
-    pub stem: usize,
+    pub track: usize,
     pub index: usize,
     pub frames: usize,
     pub channels: usize,
@@ -97,13 +97,13 @@ struct Resident {
 }
 
 #[derive(Default)]
-struct Stem {
+struct Track {
     frame_count: i64,
     page_starts: Vec<i64>,
     pages: Vec<Option<Resident>>,
 }
 
-impl Stem {
+impl Track {
     fn page_of(&self, frame: i64) -> Option<usize> {
         if frame < 0 || frame >= self.frame_count || self.page_starts.is_empty() {
             return None;
@@ -137,6 +137,11 @@ impl Stem {
             .max()
             .unwrap_or(0)
     }
+
+    fn resident(&self, frame: i64) -> bool {
+        self.page_of(frame)
+            .is_none_or(|index| self.pages[index].is_some())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -153,10 +158,19 @@ struct Slots {
 }
 
 impl Slots {
-    fn reset(&mut self, samples: usize) {
+    fn widen(&mut self, samples: usize) {
+        let mut block = vec![0.0; self.places.len() * samples];
+        for (slot, target) in block.chunks_exact_mut(samples).enumerate() {
+            target[..self.samples].copy_from_slice(self.slot(slot));
+        }
+        self.places = (0..self.places.len())
+            .map(|slot| SlotPlace {
+                block: 0,
+                start: slot * samples,
+            })
+            .collect();
+        self.blocks = vec![block];
         self.samples = samples;
-        self.blocks.clear();
-        self.places.clear();
     }
 
     fn count(&self) -> usize {
@@ -198,7 +212,7 @@ fn page_sample(slots: &Slots, place: Option<(Resident, usize)>, channel: usize) 
 
 #[derive(Clone, Copy)]
 struct StemMix<'mixed> {
-    stem: &'mixed Stem,
+    stem: &'mixed Track,
     volume: f32,
 }
 
@@ -276,7 +290,8 @@ pub struct PageMixer {
     slot_frames: usize,
     slots: Slots,
     free: Vec<usize>,
-    stems: Vec<Stem>,
+    stem_count: usize,
+    tracks: Vec<Track>,
     range: Option<LoopRange>,
     output: Vec<f32>,
 }
@@ -289,32 +304,50 @@ impl PageMixer {
             slot_frames: 0,
             slots: Slots::default(),
             free: Vec::new(),
-            stems: (0..stem_count).map(|_| Stem::default()).collect(),
+            stem_count,
+            tracks: (0..stem_count).map(|_| Track::default()).collect(),
             range: None,
             output: Vec::with_capacity(channels * OUTPUT_RESERVE_FRAMES),
         }
     }
 
-    pub fn set_stem(
+    pub fn set_track(
         &mut self,
-        stem: usize,
+        track: usize,
         frame_count: i64,
         page_starts: &[i64],
     ) -> Result<(), BoxedError> {
-        self.release_stem(stem)?;
-        let target = self.stems.get_mut(stem).ok_or(NO_STEM)?;
+        self.release_track(track)?;
+        let target = self.tracks.get_mut(track).ok_or(NO_TRACK)?;
         target.frame_count = frame_count;
         target.page_starts = page_starts.to_vec();
         target.pages = vec![None; page_starts.len()];
         let longest = usize::try_from(target.longest_page())?;
         if longest > self.slot_frames {
             self.slot_frames = longest;
-            self.slots.reset(longest * self.channels);
-            self.free.clear();
-            for other in &mut self.stems {
-                other.pages.iter_mut().for_each(|page| *page = None);
-            }
+            self.slots.widen(longest * self.channels);
         }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn lays_out(&self, track: usize, frame_count: i64, page_starts: &[i64]) -> bool {
+        self.tracks.get(track).is_some_and(|target| {
+            target.frame_count == frame_count && target.page_starts == page_starts
+        })
+    }
+
+    #[must_use]
+    pub const fn track_count(&self) -> usize {
+        self.tracks.len()
+    }
+
+    pub fn set_track_count(&mut self, count: usize) -> Result<(), BoxedError> {
+        let kept = count.max(self.stem_count);
+        for track in kept..self.tracks.len() {
+            self.release_track(track)?;
+        }
+        self.tracks.resize_with(kept, Track::default);
         Ok(())
     }
 
@@ -323,8 +356,8 @@ impl PageMixer {
         self.free.extend(self.slots.add(missing));
     }
 
-    fn release_stem(&mut self, stem: usize) -> Result<(), BoxedError> {
-        let target = self.stems.get_mut(stem).ok_or(NO_STEM)?;
+    fn release_track(&mut self, track: usize) -> Result<(), BoxedError> {
+        let target = self.tracks.get_mut(track).ok_or(NO_TRACK)?;
         for page in target.pages.iter_mut().filter_map(Option::take) {
             self.free.push(page.slot);
         }
@@ -338,13 +371,13 @@ impl PageMixer {
         if shape.channels == 0 || shape.channels > self.channels {
             return Err(TOO_WIDE.into());
         }
-        self.drop_page(shape.stem, shape.index)?;
+        self.drop_page(shape.track, shape.index)?;
         let slot = if let Some(slot) = self.free.pop() {
             slot
         } else {
             self.slots.add(1).start
         };
-        let target = self.stems.get_mut(shape.stem).ok_or(NO_STEM)?;
+        let target = self.tracks.get_mut(shape.track).ok_or(NO_TRACK)?;
         *target.pages.get_mut(shape.index).ok_or(NO_PAGE)? = Some(Resident {
             slot,
             frames: shape.frames,
@@ -354,14 +387,14 @@ impl PageMixer {
     }
 
     #[must_use]
-    pub fn page_frames(&self, stem: usize, index: usize) -> Option<usize> {
-        let target = self.stems.get(stem)?;
+    pub fn page_frames(&self, track: usize, index: usize) -> Option<usize> {
+        let target = self.tracks.get(track)?;
         let start = *target.page_starts.get(index)?;
         usize::try_from(target.page_end(index) - start).ok()
     }
 
-    pub fn drop_page(&mut self, stem: usize, index: usize) -> Result<(), BoxedError> {
-        let target = self.stems.get_mut(stem).ok_or(NO_STEM)?;
+    pub fn drop_page(&mut self, track: usize, index: usize) -> Result<(), BoxedError> {
+        let target = self.tracks.get_mut(track).ok_or(NO_TRACK)?;
         if let Some(page) = target.pages.get_mut(index).and_then(Option::take) {
             self.free.push(page.slot);
         }
@@ -372,32 +405,73 @@ impl PageMixer {
         self.range = range;
     }
 
+    #[must_use]
+    pub fn track_resident(&self, track: usize, frame: i64) -> bool {
+        self.tracks
+            .get(track)
+            .is_none_or(|target| target.resident(frame))
+    }
+
+    pub fn read_track(&self, track: usize, first: i64, samples: &mut [f32]) {
+        samples.fill(0.0);
+        let Some(target) = self.tracks.get(track) else {
+            return;
+        };
+        let end = first + i64::try_from(samples.len()).unwrap_or(i64::MAX);
+        let mut frame = first.max(0);
+        while frame < end {
+            let Some(index) = target.page_of(frame) else {
+                return;
+            };
+            let start = target.page_starts[index];
+            let stop = target.page_end(index).min(end);
+            if let Some(page) = target.pages[index] {
+                let from = usize::try_from(frame - start).unwrap_or(0);
+                let to = usize::try_from(stop - start).unwrap_or(0);
+                let at = usize::try_from(frame - first).unwrap_or(0);
+                samples[at..at + to - from]
+                    .copy_from_slice(&page_channel(&self.slots, page, 0)[from..to]);
+            }
+            frame = stop;
+        }
+    }
+
     fn resident(&self, song_frame: i64) -> bool {
-        self.stems.iter().all(|stem| {
-            stem.page_of(song_frame)
-                .is_none_or(|index| stem.pages[index].is_some())
-        })
+        self.tracks[..self.stem_count]
+            .iter()
+            .all(|stem| stem.resident(song_frame))
+    }
+
+    pub fn probes(&self, frame: i64, behind: bool) -> impl Iterator<Item = (i64, i64)> {
+        let first = if behind {
+            frame - READY_MARGIN_FRAMES
+        } else {
+            frame
+        };
+        let looped = self.range;
+        (first..=frame + READY_MARGIN_FRAMES)
+            .step_by(usize::try_from(READY_STEP_FRAMES).unwrap_or(1))
+            .map(move |at| {
+                let song_frame = looped.map_or(at, |range| range.song_frame(at));
+                let until = song_frame + READY_STEP_FRAMES;
+                let limit = looped
+                    .filter(|range| range.cycle && song_frame < range.to)
+                    .map_or(until, |range| until.min(range.to));
+                (song_frame, limit)
+            })
     }
 
     #[must_use]
     pub fn ready(&self, frame: i64, behind: bool) -> bool {
         let last = frame + READY_MARGIN_FRAMES;
-        let mut at = if behind {
-            frame - READY_MARGIN_FRAMES
-        } else {
-            frame
-        };
-        while at <= last {
-            if !self.resident(self.range.map_or(at, |range| range.song_frame(at))) {
-                return false;
-            }
-            at += READY_STEP_FRAMES;
-        }
-        self.range
-            .filter(|range| range.cycle && last >= range.to - CROSSFADE_FRAMES)
-            .is_none_or(|range| {
-                self.resident(range.from - CROSSFADE_FRAMES) && self.resident(range.from - 1)
-            })
+        self.probes(frame, behind)
+            .all(|(song_frame, _)| self.resident(song_frame))
+            && self
+                .range
+                .filter(|range| range.cycle && last >= range.to - CROSSFADE_FRAMES)
+                .is_none_or(|range| {
+                    self.resident(range.from - CROSSFADE_FRAMES) && self.resident(range.from - 1)
+                })
     }
 
     pub fn mix(&mut self, request: MixRequest, volumes: &[f32]) -> &[f32] {
@@ -408,7 +482,7 @@ impl PageMixer {
             channels: self.channels,
             slots: &self.slots,
         };
-        for (index, stem) in self.stems.iter().enumerate() {
+        for (index, stem) in self.tracks[..self.stem_count].iter().enumerate() {
             if request.mask & (1 << index) == 0 {
                 continue;
             }

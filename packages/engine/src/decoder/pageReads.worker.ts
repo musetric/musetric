@@ -5,11 +5,27 @@ import {
   type PlayerPageKey,
   type PlayerRange,
   type PlayerStemLayout,
+  type PlayerTakes,
   type PlayerWindow,
+  stemTracks,
 } from '../player/protocol.cross.js';
 import { type SpectrogramLeadPage } from '../spectrogram/protocol.cross.js';
 import { type StemPageReaders } from './stemPageReaders.worker.js';
 import { type StemPageSamples } from './stemPages.cross.js';
+import {
+  createTakeTracks,
+  type TakeSource,
+  type TakeTracks,
+} from './takeTracks.worker.js';
+import {
+  abortReads,
+  abortUnwanted,
+  byPlayDistance,
+  type FrameSpan,
+  placeWindow,
+  type TrackReads,
+  type TrackWindow,
+} from './trackReads.worker.js';
 
 const behindSeconds = 4;
 const aheadSeconds = 8;
@@ -17,25 +33,6 @@ const keepSeconds = 4;
 const loopPinSeconds = 4;
 const crossfadeFrameCount = 1488;
 const readsPerStem = 2;
-
-type FrameSpan = {
-  from: number;
-  to: number;
-};
-
-const pagesOf = (layout: PlayerStemLayout, spans: FrameSpan[]): number[] => {
-  const found = new Set<number>();
-  for (const span of spans) {
-    const from = Math.max(0, span.from);
-    const to = Math.min(layout.frameCount, span.to);
-    for (let index = 0; index < layout.pageStarts.length; index += 1) {
-      if (layout.pageStarts[index] < to && pageEndFrame(layout, index) > from) {
-        found.add(index);
-      }
-    }
-  }
-  return [...found];
-};
 
 const spanPageCount = (layout: PlayerStemLayout, frameCount: number) => {
   let shortest = Infinity;
@@ -74,52 +71,76 @@ const aheadSpans = (
   ];
 };
 
-const playDistance = (
-  layout: PlayerStemLayout,
-  index: number,
+const placeSpans = (
   window: PlayerWindow,
-): number => {
+  played: PlayerWindow,
+  sampleRate: number,
+): TrackWindow => {
   const { frameIndex, loop } = window;
-  const start = layout.pageStarts[index];
-  const end = pageEndFrame(layout, index);
-  const near = Math.max(0, start - frameIndex, frameIndex + 1 - end);
-  if (!loop || frameIndex >= loop.toFrame || end <= loop.fromFrame) {
-    return near;
-  }
-  return Math.min(
-    near,
-    loop.toFrame - frameIndex + Math.max(0, start - loop.fromFrame),
-  );
+  const wantSpans = [
+    { from: frameIndex - behindSeconds * sampleRate, to: frameIndex },
+    ...aheadSpans(frameIndex, aheadSeconds * sampleRate, loop),
+    ...(loop
+      ? [
+          {
+            from: loop.fromFrame - crossfadeFrameCount,
+            to: Math.min(
+              loop.toFrame,
+              loop.fromFrame + loopPinSeconds * sampleRate,
+            ),
+          },
+        ]
+      : []),
+  ];
+  const keepSpans = [
+    ...wantSpans,
+    {
+      from: frameIndex - (behindSeconds + keepSeconds) * sampleRate,
+      to: frameIndex + (aheadSeconds + keepSeconds) * sampleRate,
+    },
+    ...aheadSpans(played.frameIndex, aheadSeconds * sampleRate, played.loop),
+  ];
+  return { window, wantSpans, keepSpans };
 };
 
-const byPlayDistance =
-  (layout: PlayerStemLayout, window: PlayerWindow) =>
-  (left: number, right: number) =>
-    playDistance(layout, left, window) - playDistance(layout, right, window) ||
-    left - right;
-
-type StemReads = {
-  layout: PlayerStemLayout;
+type StemReads = TrackReads & {
   mean: boolean;
-  wanted: number[];
-  resident: Set<number>;
-  reading: Map<number, AbortController>;
   asked: Set<number>;
   means: Map<number, Float32Array<ArrayBuffer>>;
 };
 
+const createStemReads = (
+  stem: StemType,
+  layout: PlayerStemLayout,
+): StemReads => ({
+  track: stemTracks[stem],
+  layout,
+  songStartFrame: 0,
+  tempo: 1,
+  heard: [{ from: -Infinity, to: Infinity }],
+  mean: stem === 'lead',
+  wanted: [],
+  resident: new Set(),
+  reading: new Map(),
+  asked: new Set(),
+  means: new Map(),
+});
+
 export type PageReadsOptions = {
   readers: StemPageReaders;
   layouts: Record<StemType, PlayerStemLayout>;
+  takes: TakeSource[];
   sampleRate: number;
   putPage: (page: PlayerPage) => void;
   dropPages: (pages: PlayerPageKey[]) => void;
+  setTakes: (takes: PlayerTakes) => void;
   putLeadPage: (page: SpectrogramLeadPage) => void;
   failed: (error: unknown) => void;
 };
 
 export type PageReads = {
-  residentLimit: number;
+  takes: () => PlayerTakes;
+  setTakes: (sources: readonly TakeSource[]) => void;
   requestWindow: (window: PlayerWindow) => void;
   requestTarget: (window: PlayerWindow) => void;
   requestLeadPages: (indices: number[]) => void;
@@ -130,34 +151,14 @@ export type PageReads = {
 export const createPageReads = (options: PageReadsOptions): PageReads => {
   const { readers, layouts, sampleRate } = options;
   const stems: Record<StemType, StemReads> = {
-    lead: {
-      layout: layouts.lead,
-      mean: true,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
-    backing: {
-      layout: layouts.backing,
-      mean: false,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
-    instrumental: {
-      layout: layouts.instrumental,
-      mean: false,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
+    lead: createStemReads('lead', layouts.lead),
+    backing: createStemReads('backing', layouts.backing),
+    instrumental: createStemReads('instrumental', layouts.instrumental),
   };
+  const stemLimit = stemTypes.reduce(
+    (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
+    0,
+  );
   let window: PlayerWindow = { frameIndex: 0 };
   let played = window;
 
@@ -167,7 +168,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     if (state.wanted.includes(index) && !state.resident.has(index)) {
       state.resident.add(index);
       options.putPage({
-        stem,
+        track: state.track,
         index,
         frameCount: page.frameCount,
         channelCount: page.samples.length / page.frameCount,
@@ -193,7 +194,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     const missing = state.wanted.filter((index) => !state.resident.has(index));
     const queue = [
       ...missing,
-      ...[...state.asked].sort(byPlayDistance(state.layout, window)),
+      ...[...state.asked].sort(byPlayDistance(state, window)),
     ];
     for (const index of queue) {
       if (
@@ -224,76 +225,76 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     }
   };
 
-  const reads: PageReads = {
-    residentLimit: stemTypes.reduce(
-      (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
-      0,
-    ),
+  const placeStem = (
+    stem: StemType,
+    placed: TrackWindow,
+    dropped: PlayerPageKey[],
+  ) => {
+    const state = stems[stem];
+    placeWindow(state, placed, dropped);
+    for (const index of state.means.keys()) {
+      if (!state.resident.has(index)) {
+        state.means.delete(index);
+      }
+    }
+    abortUnwanted(state, state.asked);
+    readers[stem].setWanted(
+      state.wanted.filter((index) => !state.resident.has(index)),
+    );
+  };
+
+  let takeTracks: TakeTracks | undefined = undefined;
+
+  const target = (next: PlayerWindow) => {
+    window = next;
+    const placed = placeSpans(next, played, sampleRate);
+    const dropped: PlayerPageKey[] = [];
+    for (const stem of stemTypes) {
+      placeStem(stem, placed, dropped);
+    }
+    for (const state of takeTracks?.held() ?? []) {
+      placeWindow(state, placed, dropped);
+    }
+    if (dropped.length > 0) {
+      options.dropPages(dropped);
+    }
+    for (const stem of stemTypes) {
+      pump(stem);
+    }
+    takeTracks?.pump();
+  };
+
+  const tracks = createTakeTracks({
+    sources: options.takes,
+    sampleRate,
+    windowFrameCount:
+      (behindSeconds + 2 * aheadSeconds + 2 * keepSeconds + loopPinSeconds) *
+      sampleRate,
+    putPage: options.putPage,
+    setTakes: (message) => {
+      options.setTakes({
+        ...message,
+        residentPageLimit: stemLimit + tracks.pageLimit(),
+      });
+    },
+    retarget: () => {
+      target(window);
+    },
+    failed: options.failed,
+  });
+  takeTracks = tracks;
+
+  return {
+    takes: () => ({
+      takes: tracks.takes(),
+      residentPageLimit: stemLimit + tracks.pageLimit(),
+    }),
+    setTakes: tracks.set,
     requestWindow: (next) => {
       played = next;
-      reads.requestTarget(next);
+      target(next);
     },
-    requestTarget: (next) => {
-      window = next;
-      const { frameIndex, loop } = next;
-      const wantSpans = [
-        { from: frameIndex - behindSeconds * sampleRate, to: frameIndex },
-        ...aheadSpans(frameIndex, aheadSeconds * sampleRate, loop),
-        ...(loop
-          ? [
-              {
-                from: loop.fromFrame - crossfadeFrameCount,
-                to: Math.min(
-                  loop.toFrame,
-                  loop.fromFrame + loopPinSeconds * sampleRate,
-                ),
-              },
-            ]
-          : []),
-      ];
-      const keepSpans = [
-        ...wantSpans,
-        {
-          from: frameIndex - (behindSeconds + keepSeconds) * sampleRate,
-          to: frameIndex + (aheadSeconds + keepSeconds) * sampleRate,
-        },
-        ...aheadSpans(
-          played.frameIndex,
-          aheadSeconds * sampleRate,
-          played.loop,
-        ),
-      ];
-      const dropped: PlayerPageKey[] = [];
-      for (const stem of stemTypes) {
-        const state = stems[stem];
-        const keep = new Set(pagesOf(state.layout, keepSpans));
-        for (const index of state.resident) {
-          if (!keep.has(index)) {
-            state.resident.delete(index);
-            state.means.delete(index);
-            dropped.push({ stem, index });
-          }
-        }
-        state.wanted = pagesOf(state.layout, wantSpans).sort(
-          byPlayDistance(state.layout, next),
-        );
-        for (const [index, controller] of state.reading) {
-          if (!state.wanted.includes(index) && !state.asked.has(index)) {
-            controller.abort();
-            state.reading.delete(index);
-          }
-        }
-        readers[stem].setWanted(
-          state.wanted.filter((index) => !state.resident.has(index)),
-        );
-      }
-      if (dropped.length > 0) {
-        options.dropPages(dropped);
-      }
-      for (const stem of stemTypes) {
-        pump(stem);
-      }
-    },
+    requestTarget: target,
     requestLeadPages: (indices) => {
       const { lead } = stems;
       for (const index of indices) {
@@ -316,15 +317,13 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
         stems[stem].resident.clear();
         stems[stem].means.clear();
       }
+      tracks.forget();
     },
     close: () => {
       for (const stem of stemTypes) {
-        for (const controller of stems[stem].reading.values()) {
-          controller.abort();
-        }
-        stems[stem].reading.clear();
+        abortReads(stems[stem]);
       }
+      tracks.close();
     },
   };
-  return reads;
 };

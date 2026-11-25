@@ -171,7 +171,10 @@ export const createDecoderWorkerRuntime = (
     finishRecordingStream: async (message) => {
       const { takeId, sequence } = message;
       if (takes.holds(takeId)) {
-        await takes.finish(takeId, sequence);
+        const held = await takes.finish(takeId, sequence);
+        if (held) {
+          audioDecode.holdTake(held);
+        }
       } else {
         await draft?.waitForFlush(sequence);
         closeDraft();

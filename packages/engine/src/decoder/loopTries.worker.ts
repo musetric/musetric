@@ -12,12 +12,22 @@ import {
   createRecordingStream,
   type RecordingStream,
 } from './recordingStream.worker.js';
+import { type HeldTake } from './takePages.worker.js';
 
 type LoopTryDraft = LiveTakeStart & {
   startFrame: number;
   samples: Float32Array<ArrayBuffer>;
   frameCount: number;
 };
+
+const heldTry = (draft: LoopTryDraft): HeldTake => ({
+  takeId: draft.takeId,
+  tempo: draft.tempo,
+  transpose: draft.transpose,
+  octave: draft.octave,
+  runs: [{ startFrame: draft.startFrame, frameCount: draft.frameCount }],
+  read: (_run, from, to) => draft.samples.slice(from, to),
+});
 
 export type LoopTryDraftStart = Omit<LiveTakeStart, 'takeId'> & {
   port: MessagePort;
@@ -53,23 +63,16 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
 
   const hide = () => {
     if (liveTryId !== undefined) {
-      audioDecode.clearLiveTake(liveTryId);
+      audioDecode.hideTake(liveTryId);
       liveTryId = undefined;
     }
   };
 
   const show = (draft: LoopTryDraft) => {
-    audioDecode.beginLiveTake({
-      takeId: draft.takeId,
-      tempo: draft.tempo,
-      transpose: draft.transpose,
-      octave: draft.octave,
-    });
-    audioDecode.patchLiveTake({
-      startFrame: draft.startFrame,
-      offset: 0,
-      samples: draft.samples.slice(0, draft.frameCount),
-    });
+    audioDecode.showTry(
+      heldTry(draft),
+      draft.samples.slice(0, draft.frameCount),
+    );
     liveTryId = draft.takeId;
   };
 
@@ -121,6 +124,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
         return undefined;
       }
       kept.set(draft.takeId, draft);
+      audioDecode.holdTake(heldTry(draft));
       return {
         id: draft.takeId,
         startFrame: draft.startFrame,
