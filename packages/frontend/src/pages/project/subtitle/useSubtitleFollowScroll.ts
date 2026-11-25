@@ -1,4 +1,5 @@
 import { type api } from '@musetric/api';
+import { isPlaying, isRecording } from '@musetric/engine';
 import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { moveLoopToWord } from '../loop/moveLoopToWord.js';
@@ -21,30 +22,33 @@ export const useSubtitleFollowScroll = (
     const element = subtitleListRef.current;
     if (!element) return;
 
-    const wordDrag = createSubtitleWordDrag(element, subtitle, () => {
-      controllerRef.current?.revealActive();
-    });
+    const wordDrag = createSubtitleWordDrag(element, subtitle);
     const controller = createSubtitleFollowController({
       element,
       cursor: subtitleCursor,
-      subtitleLength: subtitle.length,
-      getSeekEvent: () => engine.store.get().seekEvent,
-      subscribeSeekRevision: (callback) =>
-        engine.store.subscribe((state) => state.seekEvent.revision, callback),
-      getSeekFrameIndex: (playbackTime) =>
-        getSubtitleSeekFrameIndex(playbackTime, engine.store.get()),
-      seek: (frameIndex, wordStart) => {
-        if (moveLoopToWord(subtitle, wordStart)) {
+      subscribeSeek: (callback) =>
+        engine.store.subscribe(
+          (state) => state.seekEvent,
+          (seekEvent) => {
+            if (seekEvent.origin !== 'playbackEnd' && !wordDrag.isActive()) {
+              callback();
+            }
+          },
+        ),
+      isMoving: () => {
+        const state = engine.store.get();
+        return !wordDrag.isActive() && (isPlaying(state) || isRecording(state));
+      },
+      seekWord: (wordStart) => {
+        const frameIndex = getSubtitleSeekFrameIndex(
+          wordStart,
+          engine.store.get(),
+        );
+        if (frameIndex === undefined || moveLoopToWord(subtitle, wordStart)) {
           return;
         }
         engine.player.seek(frameIndex, 'subtitle');
       },
-      isIgnoredSeekOrigin: (origin) =>
-        wordDrag.isActive() ||
-        origin === 'playhead' ||
-        origin === 'spectrogramVisualization' ||
-        origin === 'tracksVisualization',
-      isVisibleLineKept: () => engine.store.get().loopStage !== undefined,
     });
     controller.reset();
     controllerRef.current = controller;
@@ -57,6 +61,6 @@ export const useSubtitleFollowScroll = (
   }, [subtitle, subtitleCursor, subtitleListRef]);
 
   return useCallback(() => {
-    controllerRef.current?.centerActive();
+    controllerRef.current?.showActive();
   }, []);
 };
