@@ -91,8 +91,8 @@ pub fn set_renderer_track(
 
 #[wasm_bindgen(js_name = setRendererTakes)]
 #[must_use]
-pub fn set_renderer_takes(handle: usize, pieces: &[f64]) -> bool {
-    let (rows, rest) = pieces.as_chunks::<6>();
+pub fn set_renderer_takes(handle: usize, fields: &[f64]) -> bool {
+    let (rows, rest) = fields.as_chunks::<6>();
     let pieces = rows.iter().map(piece_of).collect();
     rest.is_empty() && with_player(handle, |player| player.renderer.set_takes(pieces).is_ok())
 }
