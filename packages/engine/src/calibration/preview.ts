@@ -26,7 +26,7 @@ const computeRmsLevel = (analyser: AnalyserNode) => {
 };
 
 export type CalibrationPreviewOptions = {
-  context: AudioContext;
+  getContext: () => AudioContext;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
@@ -41,7 +41,8 @@ export type CalibrationPreview = {
 export const createCalibrationPreview = (
   options: CalibrationPreviewOptions,
 ): CalibrationPreview => {
-  const { context, outputClock, audioSession, store, refreshDevices } = options;
+  const { getContext, outputClock, audioSession, store, refreshDevices } =
+    options;
   let activeMicrophone: EngineMicrophone | undefined = undefined;
 
   const open = () => {
@@ -159,6 +160,7 @@ export const createCalibrationPreview = (
           activeMicrophone = previewMicrophone;
         }
 
+        const context = getContext();
         applyInputLatencyEstimate(store, {
           context,
           microphone: previewMicrophone,

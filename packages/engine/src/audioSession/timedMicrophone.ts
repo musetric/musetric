@@ -128,13 +128,18 @@ export type TimedMicrophones = {
 export type CapturedChunkListener = (chunk: CapturedChunk) => void;
 
 export const createTimedMicrophones = (
-  context: AudioContext,
+  getContext: () => AudioContext,
   outputClock: EngineOutputClock,
   onCaptured: CapturedChunkListener,
 ): TimedMicrophones => {
   let modulePromise: Promise<WebAssembly.Module> | undefined = undefined;
+  let moduleContext: AudioContext | undefined = undefined;
 
-  const loadModule = async () => {
+  const loadModule = async (context: AudioContext) => {
+    if (moduleContext !== context) {
+      moduleContext = context;
+      modulePromise = undefined;
+    }
     modulePromise ??= Promise.all([
       compileCapture(),
       context.audioWorklet.addModule(timedMicrophoneWorkletUrl),
@@ -149,7 +154,8 @@ export const createTimedMicrophones = (
 
   return {
     open: async (source) => {
-      const captureModule = await loadModule();
+      const context = getContext();
+      const captureModule = await loadModule(context);
       const node = new AudioWorkletNode(context, timedMicrophoneProcessorName, {
         numberOfInputs: 0,
         numberOfOutputs: 1,

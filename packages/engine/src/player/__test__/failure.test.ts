@@ -91,17 +91,121 @@ describe('a failure of the player on the audio thread', () => {
     expect(seam.fromWorklet).toContain('failed');
     expectFailed(seam);
   });
+});
 
-  it('answers Play and Record at once after a failure', async () => {
+const expectPlaysOnFrom = async (seam: Seam, held: number) => {
+  const state = seam.store.get();
+  expect(state.statuses.player).toBe('success');
+  expect(isPlaying(state)).toBe(true);
+  await seam.run(quantaOfSeconds(0.5));
+  await seam.frame();
+  expect(seam.position.read()).toBeGreaterThan(held + 0.3 * rate);
+};
+
+describe('play after a failure of the player', () => {
+  it.each(faults)(
+    'waits for Play and plays on from where it stood after a %s fault',
+    async (fault) => {
+      const seam = await open();
+      await seam.player.play();
+      await seam.run(quantaOfSeconds(0.5));
+      seam.injectFault(fault);
+      await seam.run(1);
+      await seam.frame();
+      const held = seam.position.read();
+      await seam.run(quantaOfSeconds(0.5));
+      await seam.frame();
+      expectFailed(seam);
+      expect(seam.position.read()).toBe(held);
+      await seam.player.play();
+      await expectPlaysOnFrom(seam, held);
+      expect(seam.rebuilds()).toBe(0);
+    },
+  );
+
+  it('plays again after a second failure', async () => {
+    const seam = await open();
+    for (const fault of faults) {
+      await seam.player.play();
+      await seam.run(quantaOfSeconds(0.2));
+      seam.injectFault(fault);
+      await seam.run(1);
+      await seam.frame();
+      expectFailed(seam);
+    }
+    const held = seam.position.read();
+    await seam.player.play();
+    await expectPlaysOnFrom(seam, held);
+  });
+
+  it('keeps the take of the failure and records the next one on Record', async () => {
+    const seam = await open();
+    await startTake(seam);
+    seam.injectFault('caught');
+    await seam.run(1);
+    expect(seam.host).toEqual(['recording.start', 'recording.finish']);
+    const kept = seam.hostFrames();
+    expectFailed(seam);
+    const recording = seam.player.record(1);
+    seam.microphone.open();
+    while (seam.store.get().take !== 'recording') {
+      await seam.run(1);
+    }
+    await recording;
+    await seam.run(quantaOfSeconds(0.5));
+    expect(seam.store.get().take).toBe('recording');
+    expect(isPlaying(seam.store.get())).toBe(true);
+    expect(seam.host).toEqual([
+      'recording.start',
+      'recording.finish',
+      'recording.start',
+    ]);
+    expect(seam.hostFrames()).toBeGreaterThan(kept + 0.4 * rate);
+  });
+
+  it('cancels a take whose Stop comes while Record starts the player again', async () => {
     const seam = await open();
     seam.injectFault('caught');
     await seam.run(1);
-    await seam.player.play();
-    expectFailed(seam);
-    await seam.player.record(1);
-    expectFailed(seam);
+    const recording = seam.player.record(1);
+    expect(seam.store.get().take).toBe('arming');
+    await Promise.all([recording, seam.player.stop()]);
+    const state = seam.store.get();
+    expect(state.statuses.player).toBe('success');
+    expect(state.take).toBe('none');
+    expect(isPlaying(state)).toBe(false);
+    expect(isTransportBusy(state)).toBe(false);
     expect(seam.host).toEqual([]);
-    expect(seam.toWorklet).not.toContain('play');
+  });
+
+  it('builds the output again when the worklet does not boot again', async () => {
+    const seam = await open();
+    await seam.player.play();
+    await seam.run(quantaOfSeconds(0.2));
+    seam.injectFault('caught');
+    await seam.run(1);
+    await seam.frame();
+    const held = seam.position.read();
+    seam.breakBoots(1);
+    await seam.player.play();
+    expect(seam.rebuilds()).toBe(1);
+    await expectPlaysOnFrom(seam, held);
+  });
+
+  it('runs a Stop pressed while the player starts again after its Play', async () => {
+    const seam = await open();
+    seam.injectFault('caught');
+    await seam.run(1);
+    const playing = seam.player.play();
+    const stopping = seam.player.stop();
+    await Promise.all([playing, stopping]);
+    const state = seam.store.get();
+    expect(state.statuses.player).toBe('success');
+    expect(isPlaying(state)).toBe(false);
+    expect(isTransportBusy(state)).toBe(false);
+    expect(seam.toWorklet.lastIndexOf('stop')).toBeGreaterThan(
+      seam.toWorklet.lastIndexOf('play'),
+    );
   });
 });
 

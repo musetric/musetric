@@ -27,6 +27,7 @@ type Unmount = () => void;
 export type EngineSpectrogram = {
   port: ReturnType<typeof spectrogramChannel.outbound<Worker>>;
   boot: () => Promise<void>;
+  connectPlayhead: (playheadPort: MessagePort) => void;
   mount: (
     canvas: HTMLCanvasElement,
     config: Partial<SpectrogramConfig>,
@@ -39,14 +40,13 @@ export type CreateEngineSpectrogramOptions = {
   store: Store<EngineState>;
   sampleRate: number;
   decoderPort: MessagePort;
-  playheadPort: MessagePort;
   position: EnginePosition;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, playheadPort, position } = options;
+  const { store, sampleRate, decoderPort, position } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -116,13 +116,17 @@ export const createEngineSpectrogram = (
     boot: async () => {
       port.methods.boot({
         dataPort: decoderPort,
-        playheadPort,
         sampleRate,
         captureModule: await compileCapture(),
       });
 
       await bootPromise.promise;
       port.methods.setFrameCount({ frameCount: store.get().frameCount ?? 0 });
+    },
+    connectPlayhead: (playheadPort) => {
+      void bootPromise.promise.then(() => {
+        port.methods.connectPlayhead({ playheadPort });
+      });
     },
     mount: (canvas, config) => {
       const viewSize = getCanvasSize(canvas);

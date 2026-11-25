@@ -103,7 +103,7 @@ export type EngineCalibration = {
 };
 
 export type CreateEngineCalibrationOptions = {
-  context: AudioContext;
+  getContext: () => AudioContext;
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
@@ -114,9 +114,9 @@ export type CreateEngineCalibrationOptions = {
 export const createEngineCalibration = (
   options: CreateEngineCalibrationOptions,
 ): EngineCalibration => {
-  const { context, audioOutput, outputClock, audioSession, store } = options;
+  const { getContext, audioOutput, outputClock, audioSession, store } = options;
   const { getPlayer } = options;
-  const { sampleRate } = context;
+  const { sampleRate } = getContext();
   const latencyStore = createCalibrationLatencyStore(
     Math.round(routeToleranceSeconds * sampleRate),
   );
@@ -217,7 +217,7 @@ export const createEngineCalibration = (
   let preview: CalibrationPreview | undefined = undefined;
   const getPreview = (): CalibrationPreview => {
     preview ??= createCalibrationPreview({
-      context,
+      getContext,
       outputClock,
       audioSession,
       store,
@@ -259,9 +259,9 @@ export const createEngineCalibration = (
         explicitDeviceId: store.get().microphoneDeviceId,
       });
       const result = await measureRecordingLatency({
-        context,
+        context: getContext(),
         audioSession,
-        outputNode: audioOutput.outputNode,
+        outputNode: audioOutput.getOutputNode(),
         playOutput: audioOutput.play,
         workletUrl: microphoneCalibrationWorkletUrl,
         processorName: microphoneCalibrationProcessorName,
@@ -282,7 +282,7 @@ export const createEngineCalibration = (
         return false;
       }
 
-      applyInputLatencyEstimate(store, { context, microphone });
+      applyInputLatencyEstimate(store, { context: getContext(), microphone });
       saveCorrection(
         result.latencyFrameCount,
         'calibrated',

@@ -2,7 +2,7 @@ import { type api } from '@musetric/api';
 import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
-import { type playerDataChannel } from '../player/protocol.cross.js';
+import { playerDataChannel } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { createAudioDecode } from './audioDecode.worker.js';
@@ -33,7 +33,6 @@ type TakeEvent = Extract<
 
 export type CreateDecoderWorkerRuntimeOptions = {
   port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
-  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
   >;
@@ -42,9 +41,9 @@ export type CreateDecoderWorkerRuntimeOptions = {
 export const createDecoderWorkerRuntime = (
   options: CreateDecoderWorkerRuntimeOptions,
 ): void => {
-  const { port, playerPort, spectrogramPort } = options;
+  const { port, spectrogramPort } = options;
 
-  const audioDecode = createAudioDecode({ playerPort, spectrogramPort });
+  const audioDecode = createAudioDecode({ spectrogramPort });
 
   const recordingList = createRecordingList({ port, audioDecode });
 
@@ -126,6 +125,13 @@ export const createDecoderWorkerRuntime = (
   });
 
   port.bindHandlers({
+    connectPlayer: (message) => {
+      port.methods.playerConnected({
+        mounted: audioDecode.connectPlayer(
+          playerDataChannel.outbound(message.playerPort),
+        ),
+      });
+    },
     mount: async (message) => {
       try {
         realtime.open(message.projectId);

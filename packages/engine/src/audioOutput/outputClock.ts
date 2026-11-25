@@ -58,11 +58,13 @@ export type EngineOutputClock = {
   subscribe: (listener: (reading: OutputClockReading) => void) => () => void;
   whenSettled: () => Promise<void>;
   wake: () => Promise<void>;
+  attach: (context: AudioContext) => void;
 };
 
 export const createEngineOutputClock = (
-  context: AudioContext,
+  initialContext: AudioContext,
 ): EngineOutputClock => {
+  let context = initialContext;
   const renderAheads: number[] = [];
   const clockOffsets: number[] = [];
   const contextOffsets: number[] = [];
@@ -153,8 +155,7 @@ export const createEngineOutputClock = (
     }
   };
 
-  setInterval(sample, sampleIntervalMs);
-  context.addEventListener('statechange', () => {
+  const applyState = () => {
     const running = context.state === 'running';
     if (!running && !pausedReading && published && contextOffsets.length > 0) {
       pausedReading = {
@@ -173,8 +174,23 @@ export const createEngineOutputClock = (
     for (const delay of startupSampleDelaysMs) {
       setTimeout(sample, delay);
     }
-  });
-  context.addEventListener('sinkchange', releaseHeld);
+  };
+
+  const listen = (target: AudioContext) => {
+    target.addEventListener('statechange', () => {
+      if (target === context) {
+        applyState();
+      }
+    });
+    target.addEventListener('sinkchange', () => {
+      if (target === context) {
+        releaseHeld();
+      }
+    });
+  };
+
+  setInterval(sample, sampleIntervalMs);
+  listen(context);
 
   return {
     read: () => published,
@@ -204,6 +220,14 @@ export const createEngineOutputClock = (
       return () => {
         listeners.delete(listener);
       };
+    },
+    attach: (next) => {
+      context = next;
+      published = undefined;
+      pausedReading = undefined;
+      releaseHeld();
+      listen(next);
+      applyState();
     },
   };
 };

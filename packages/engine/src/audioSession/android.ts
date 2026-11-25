@@ -137,7 +137,7 @@ type PendingRequest = {
 };
 
 export const createAndroidAudioSession = (
-  context: AudioContext,
+  getContext: () => AudioContext,
   outputClock: EngineOutputClock,
   android: AndroidMicrophone,
   onCaptured: CapturedChunkListener,
@@ -148,7 +148,7 @@ export const createAndroidAudioSession = (
   const consumers = new Set<(chunk: CapturedChunk) => void>();
   const sources = new Map<EngineMicrophone, TimedMicrophoneSource>();
   const timedMicrophones = createTimedMicrophones(
-    context,
+    getContext,
     outputClock,
     onCaptured,
   );
@@ -232,6 +232,7 @@ export const createAndroidAudioSession = (
   return {
     openMicrophone: async (microphoneRequest) => {
       opening += 1;
+      const context = getContext();
       try {
         clockOffsetMs = measureClockOffset(clock);
         const reply = startSchema.parse(

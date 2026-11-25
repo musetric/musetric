@@ -53,27 +53,30 @@ export const readEpochMs = (): number =>
   performance.timeOrigin + performance.now();
 
 export type Playhead = {
+  connect: (port: MessagePort) => void;
   read: () => PlayheadValue;
   readFrameIndex: () => number;
   readFrameIndexAt: (epochMs: number) => number;
   writeFrameIndex: (frameIndex: number, revision: number) => void;
 };
 
-export const createPlayhead = (
-  port: MessagePort,
-  sampleRate: number,
-): Playhead => {
+export const createPlayhead = (sampleRate: number): Playhead => {
   let value: PlayheadValue = createHeldPlayheadValue(0, 0);
+  let connected: MessagePort | undefined = undefined;
   const presenter = createPlayheadPresenter(sampleRate);
-  playheadChannel.inbound(port).bindHandlers({
-    publish: (message) => {
-      if (message.revision >= value.revision) {
-        value = message;
-      }
-    },
-  });
 
   return {
+    connect: (port) => {
+      connected?.close();
+      connected = port;
+      playheadChannel.inbound(port).bindHandlers({
+        publish: (message) => {
+          if (message.revision >= value.revision) {
+            value = message;
+          }
+        },
+      });
+    },
     read: () => value,
     readFrameIndex: () => presenter.present(value, readEpochMs()),
     readFrameIndexAt: (epochMs) =>

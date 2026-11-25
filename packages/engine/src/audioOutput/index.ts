@@ -17,37 +17,40 @@ const getAudioContextSetSinkId = (
 };
 
 export type EngineAudioOutput = {
-  outputNode: AudioNode;
+  getOutputNode: () => AudioNode;
   supportsDeviceSelection: boolean;
   getDeviceId: () => string | undefined;
   setDeviceId: (deviceId: string | undefined) => Promise<void>;
   play: () => Promise<void>;
+  attach: (context: AudioContext) => Promise<void>;
 };
 
 export const createEngineAudioOutput = (
-  context: AudioContext,
+  initialContext: AudioContext,
 ): EngineAudioOutput => {
-  const setSinkId = getAudioContextSetSinkId(context);
+  let context = initialContext;
   let deviceId: string | undefined = undefined;
 
-  if (!setSinkId) {
-    return {
-      outputNode: context.destination,
-      supportsDeviceSelection: false,
-      getDeviceId: () => deviceId,
-      setDeviceId: async () => Promise.resolve(),
-      play: async () => Promise.resolve(),
-    };
-  }
+  const applyDeviceId = async (nextDeviceId: string | undefined) => {
+    const setSinkId = getAudioContextSetSinkId(context);
+    if (!setSinkId) {
+      return;
+    }
+    await setSinkId(nextDeviceId ?? '');
+    deviceId = nextDeviceId;
+  };
 
   return {
-    outputNode: context.destination,
-    supportsDeviceSelection: true,
+    getOutputNode: () => context.destination,
+    supportsDeviceSelection: getAudioContextSetSinkId(context) !== undefined,
     getDeviceId: () => deviceId,
-    setDeviceId: async (nextDeviceId) => {
-      await setSinkId(nextDeviceId ?? '');
-      deviceId = nextDeviceId;
-    },
+    setDeviceId: applyDeviceId,
     play: async () => Promise.resolve(),
+    attach: async (next) => {
+      context = next;
+      if (deviceId !== undefined) {
+        await applyDeviceId(deviceId);
+      }
+    },
   };
 };

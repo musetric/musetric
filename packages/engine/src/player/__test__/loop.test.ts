@@ -52,6 +52,7 @@ const listenToPasses = (
       }
     },
     recordingFlushed: () => undefined,
+    mounted: () => undefined,
     recordingPassStarted: () => {
       events.push('started');
     },

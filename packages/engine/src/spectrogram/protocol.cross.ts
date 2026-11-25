@@ -17,10 +17,10 @@ export type SpectrogramViewWindow = {
 export type SpectrogramOutboundMethods = {
   boot: (message: {
     dataPort: MessagePort;
-    playheadPort: MessagePort;
     sampleRate: number;
     captureModule: WebAssembly.Module;
   }) => void;
+  connectPlayhead: (message: { playheadPort: MessagePort }) => void;
   mount: (message: {
     config: Partial<SpectrogramConfig>;
     trackProgress: number;
@@ -52,6 +52,7 @@ export const spectrogramChannel = createMessageChannel<
   outbound: {
     keys: [
       'boot',
+      'connectPlayhead',
       'mount',
       'unmount',
       'setTrackProgress',
@@ -62,7 +63,8 @@ export const spectrogramChannel = createMessageChannel<
       'previewLiveTake',
     ],
     transfers: {
-      boot: (message) => [message.dataPort, message.playheadPort],
+      boot: (message) => [message.dataPort],
+      connectPlayhead: (message) => [message.playheadPort],
       previewLiveTake: (message) => [message.samples.buffer],
       mount: (message) =>
         message.config.canvas ? [message.config.canvas] : [],

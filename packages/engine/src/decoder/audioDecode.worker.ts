@@ -4,6 +4,7 @@ import {
   type LiveTakeStart,
   type playerDataChannel,
   type PlayerRecordingPiece,
+  type PlayerStemLayouts,
   type PlayerWindow,
 } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
@@ -18,14 +19,16 @@ import {
   type StemPageReaders,
 } from './stemPageReaders.worker.js';
 
+type PlayerPort = ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
+
 export type CreateAudioDecodeOptions = {
-  playerPort: ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
   >;
 };
 
 export type AudioDecode = {
+  connectPlayer: (port: PlayerPort) => boolean;
   mount: (message: { projectId: number; sampleRate: number }) => Promise<{
     frameCount: number;
   }>;
@@ -42,6 +45,7 @@ type MountedAudio = {
   projectId: number;
   sampleRate: number;
   frameCount: number;
+  layouts: PlayerStemLayouts;
   recordingId: number | undefined;
   pieces: PlayerRecordingPiece[];
 };
@@ -54,8 +58,9 @@ type Reload = {
 export const createAudioDecode = (
   options: CreateAudioDecodeOptions,
 ): AudioDecode => {
-  const { playerPort, spectrogramPort } = options;
+  const { spectrogramPort } = options;
   const decoder = createAudioDecoder();
+  let playerPort: PlayerPort | undefined = undefined;
   let readers: StemPageReaders | undefined = undefined;
   let pageReads: PageReads | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
@@ -100,7 +105,7 @@ export const createAudioDecode = (
       Boolean(reload.switched) || current.recordingId !== recordingId;
     current.recordingId = recordingId;
     current.pieces = pieces;
-    playerPort.methods.setRecordingPieces({
+    playerPort?.methods.setRecordingPieces({
       pieces: copyPieces(pieces),
       finishedTakeId: reload.finishedTakeId,
       switched,
@@ -112,6 +117,15 @@ export const createAudioDecode = (
     });
   };
 
+  const mountPlayer = (audio: MountedAudio, reads: PageReads) => {
+    playerPort?.methods.mount({
+      frameCount: audio.frameCount,
+      layouts: audio.layouts,
+      residentPageLimit: reads.residentLimit,
+      recording: copyPieces(audio.pieces),
+    });
+  };
+
   const queueReload = async (reload: Reload): Promise<void> => {
     const next = reloading
       .catch(() => undefined)
@@ -120,12 +134,6 @@ export const createAudioDecode = (
     await next;
   };
 
-  playerPort.bindHandlers({
-    requestWindow: (message) => {
-      pageReads?.requestWindow(message);
-    },
-  });
-
   spectrogramPort.bindHandlers({
     requestLeadPages: (message) => {
       pageReads?.requestLeadPages(message.indices);
@@ -133,6 +141,20 @@ export const createAudioDecode = (
   });
 
   return {
+    connectPlayer: (port) => {
+      playerPort = port;
+      port.bindHandlers({
+        requestWindow: (message) => {
+          pageReads?.requestWindow(message);
+        },
+      });
+      if (!mounted || !pageReads) {
+        return false;
+      }
+      pageReads.forgetPlayer();
+      mountPlayer(mounted, pageReads);
+      return true;
+    },
     mount: async (message) => {
       const { projectId, sampleRate } = message;
       const recordingId = activeRecordingId;
@@ -164,16 +186,23 @@ export const createAudioDecode = (
           pageStarts: instrumental.pageStarts,
         },
       };
-      mounted = { projectId, sampleRate, frameCount, recordingId, pieces };
+      mounted = {
+        projectId,
+        sampleRate,
+        frameCount,
+        layouts,
+        recordingId,
+        pieces,
+      };
       pageReads = createPageReads({
         readers: current,
         layouts,
         sampleRate,
         putPage: (page) => {
-          playerPort.methods.putPage(page);
+          playerPort?.methods.putPage(page);
         },
         dropPages: (pages) => {
-          playerPort.methods.dropPages({ pages });
+          playerPort?.methods.dropPages({ pages });
         },
         putLeadPage: (page) => {
           spectrogramPort.methods.putLeadPage(page);
@@ -186,12 +215,7 @@ export const createAudioDecode = (
         lead: layouts.lead,
         recording: copyPieces(pieces),
       });
-      playerPort.methods.mount({
-        frameCount,
-        layouts,
-        residentPageLimit: pageReads.residentLimit,
-        recording: copyPieces(pieces),
-      });
+      mountPlayer(mounted, pageReads);
       const pending = reloadOnMount;
       reloadOnMount = undefined;
       if (pending || activeRecordingId !== recordingId) {
@@ -214,11 +238,11 @@ export const createAudioDecode = (
       });
     },
     beginLiveTake: (take) => {
-      playerPort.methods.beginLiveTake(take);
+      playerPort?.methods.beginLiveTake(take);
       spectrogramPort.methods.beginLiveTake(take);
     },
     patchLiveTake: (chunk) => {
-      playerPort.methods.appendLiveTake({
+      playerPort?.methods.appendLiveTake({
         ...chunk,
         samples: chunk.samples.slice(),
       });
@@ -232,7 +256,7 @@ export const createAudioDecode = (
       if (!current) {
         return;
       }
-      playerPort.methods.setRecordingPieces({
+      playerPort?.methods.setRecordingPieces({
         pieces: copyPieces(current.pieces),
         finishedTakeId: takeId,
       });
@@ -251,7 +275,7 @@ export const createAudioDecode = (
       pageReads = undefined;
       reloadOnMount = undefined;
       activeRecordingId = undefined;
-      playerPort.methods.unmount();
+      playerPort?.methods.unmount();
       spectrogramPort.methods.unmount();
     },
   };

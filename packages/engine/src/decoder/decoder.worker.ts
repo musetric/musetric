@@ -1,4 +1,3 @@
-import { playerDataChannel } from '../player/protocol.cross.js';
 import { spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { engineDecoderChannel } from './protocol.cross.js';
 import { createDecoderWorkerRuntime } from './runtime.worker.js';
@@ -15,7 +14,6 @@ self.addEventListener('messageerror', reportError);
 port.bindBoot((message) => {
   createDecoderWorkerRuntime({
     port,
-    playerPort: playerDataChannel.outbound(message.playerPort),
     spectrogramPort: spectrogramDataChannel.outbound(message.spectrogramPort),
   });
   port.methods.booted();

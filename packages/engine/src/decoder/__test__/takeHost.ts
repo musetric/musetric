@@ -1,4 +1,3 @@
-import { playerDataChannel } from '../../player/protocol.cross.js';
 import { recordingStreamChannel } from '../../player/recordingStream.cross.js';
 import { spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
 import { engineDecoderChannel } from '../protocol.cross.js';
@@ -65,7 +64,6 @@ export const createTakeHost = async (): Promise<TakeHost> => {
   const spectrogram = new MessageChannel();
   createDecoderWorkerRuntime({
     port: engineDecoderChannel.inbound(control.port1),
-    playerPort: playerDataChannel.outbound(player.port1),
     spectrogramPort: spectrogramDataChannel.outbound(spectrogram.port1),
   });
   const received: string[] = [];
@@ -73,6 +71,7 @@ export const createTakeHost = async (): Promise<TakeHost> => {
     received.push(event.data.type);
   };
   const engine = engineDecoderChannel.outbound(control.port2);
+  engine.methods.connectPlayer({ playerPort: player.port1 });
   engine.methods.mount({ projectId: 1, sampleRate: takeRate });
   await flushPorts();
   sockets[0].open();

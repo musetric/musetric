@@ -1,4 +1,4 @@
-import { Alert, Button, Stack } from '@mui/material';
+import { Alert, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { MediaSessionSync } from './mediaSession/MediaSessionSync.js';
 import { MixPopover } from './mix/MixPopover.js';
 import { MixdownDialog } from './mixdown/MixdownDialog.js';
 import { PlaybackPanel } from './player/PlaybackPanel.js';
+import { PlayerFailedNotice } from './player/PlayerFailedNotice.js';
 import { ProjectContent } from './ProjectContent/index.js';
 import { ProjectLayout } from './ProjectPageLayout.js';
 import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
@@ -57,27 +58,10 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         {realtimeFailed && (
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
         )}
-        {playerFailed && (
-          <Alert
-            severity='error'
-            action={
-              <Button
-                color='inherit'
-                size='small'
-                onClick={() => {
-                  window.location.reload();
-                }}
-              >
-                {t('pages.project.player.reload')}
-              </Button>
-            }
-          >
-            {t('pages.project.player.failed')}
-          </Alert>
-        )}
         <ProjectContent />
         <PlaybackPanel />
       </Stack>
+      {playerFailed && <PlayerFailedNotice />}
       <RhythmMetronomeSync projectId={project.id} />
       <MediaSessionSync title={project.name} coverUrl={project.previewUrl} />
       <ProjectShortcuts projectId={project.id} />

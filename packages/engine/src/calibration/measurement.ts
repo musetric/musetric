@@ -21,22 +21,25 @@ import {
 
 const searchLeadSeconds = 0.05;
 
-const workletPromises = new Map<string, Promise<void>>();
+const workletPromises = new WeakMap<AudioContext, Map<string, Promise<void>>>();
 
 const loadWorklet = async (
   context: AudioContext,
   workletUrl: string | URL,
 ): Promise<void> => {
   const key = workletUrl.toString();
-  let promise = workletPromises.get(key);
+  const promises =
+    workletPromises.get(context) ?? new Map<string, Promise<void>>();
+  workletPromises.set(context, promises);
+  let promise = promises.get(key);
   if (!promise) {
     promise = context.audioWorklet
       .addModule(workletUrl)
       .catch((error: unknown) => {
-        workletPromises.delete(key);
+        promises.delete(key);
         throw error;
       });
-    workletPromises.set(key, promise);
+    promises.set(key, promise);
   }
   return promise;
 };

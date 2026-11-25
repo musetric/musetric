@@ -82,6 +82,7 @@ export type PlayerInboundMethods = {
   recordingFlushed: (message: { sequence: number }) => void;
   recordingPassStarted: () => void;
   recordingPassEnded: (message: { complete: boolean }) => void;
+  mounted: () => void;
   failed: (message: { reason: string }) => void;
 };
 
@@ -96,6 +97,7 @@ export const playerChannel = createSyncMessageChannel<
       'recordingFlushed',
       'recordingPassStarted',
       'recordingPassEnded',
+      'mounted',
       'failed',
     ],
   },

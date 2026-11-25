@@ -6,19 +6,20 @@ import { type EngineSessionMachine } from './session.js';
 export type CreateStartPlaybackOptions = {
   store: Store<EngineState>;
   session: EngineSessionMachine;
+  revive: () => Promise<boolean>;
   getEnginePlayback: () => EnginePlayback;
 };
 
 export const createStartPlayback =
   (options: CreateStartPlaybackOptions) => async (): Promise<void> => {
-    const { store, session, getEnginePlayback } = options;
+    const { store, session, revive, getEnginePlayback } = options;
     if (isPlaying(store.get())) {
       return;
     }
 
     session.beginPlay();
     try {
-      if (await getEnginePlayback().play()) {
+      if ((await revive()) && (await getEnginePlayback().play())) {
         session.settlePlay();
       } else {
         session.failPlay();

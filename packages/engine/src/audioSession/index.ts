@@ -9,16 +9,21 @@ import { type CapturedChunkListener } from './timedMicrophone.js';
 import { createWebAudioSession } from './web.js';
 
 export const createEngineAudioSession = (
-  context: AudioContext,
+  getContext: () => AudioContext,
   outputClock: EngineOutputClock,
   onCaptured: CapturedChunkListener,
 ): EngineAudioSession => {
   const android = readAndroidMicrophone();
   if (android) {
-    return createAndroidAudioSession(context, outputClock, android, onCaptured);
+    return createAndroidAudioSession(
+      getContext,
+      outputClock,
+      android,
+      onCaptured,
+    );
   }
   const handler = readNativeMicrophoneHandler();
   return handler
-    ? createNativeAudioSession(context, handler)
-    : createWebAudioSession(context, outputClock, onCaptured);
+    ? createNativeAudioSession(getContext, handler)
+    : createWebAudioSession(getContext, outputClock, onCaptured);
 };

@@ -48,9 +48,11 @@ export type Seam = {
   onPostToWorklet: (type: string, hook: PostHook) => void;
   onPostFromWorklet: (type: string, hook: PostHook) => void;
   injectFault: (fault: PlayerFault) => void;
+  breakBoots: (count: number) => void;
   postToWorklet: (message: unknown) => void;
   deliverFromWorklet: (message: unknown) => Promise<void>;
   hostFrames: () => number;
+  rebuilds: () => number;
   run: (quanta: number) => Promise<void>;
   frame: () => Promise<void>;
   close: () => void;
@@ -84,6 +86,7 @@ export const createSeam = async (
   let contextFrame = 0;
   let hostFrames = 0;
   let faulted = options.bootFault === true;
+  let brokenBoots = options.bootFault ? Infinity : 0;
   let worklet: FakeWorklet | undefined = undefined;
   let onPostToWorklet: Seam['onPostToWorklet'] = noop;
   let onPostFromWorklet: Seam['onPostFromWorklet'] = noop;
@@ -98,7 +101,8 @@ export const createSeam = async (
     constructor() {
       const channel = new MessageChannel();
       this.port = channel.port1;
-      if (options.bootFault) {
+      if (brokenBoots > 0) {
+        brokenBoots -= 1;
         const post = channel.port1.postMessage.bind(channel.port1);
         Object.assign(channel.port1, {
           postMessage: (message: unknown, transfer: Transferable[] = []) => {
@@ -164,17 +168,19 @@ export const createSeam = async (
     }),
   });
   const audioOutput = fake<EngineAudioOutput>({
-    outputNode: {},
+    getOutputNode: () => ({}),
     supportsDeviceSelection: false,
     getDeviceId: () => undefined,
     setDeviceId: async () => Promise.resolve(),
     play: async () => Promise.resolve(),
+    attach: async () => Promise.resolve(),
   });
   const outputClock: EngineOutputClock = {
     read: () => undefined,
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
+    attach: noop,
   };
   const startRecordingStream: EngineDecoder['startRecordingStream'] = (
     recording,
@@ -196,30 +202,40 @@ export const createSeam = async (
     },
   });
   const microphone = createMicrophone();
-  const data = new MessageChannel();
-  const playhead = new MessageChannel();
-  const spectrogramPlayhead = new MessageChannel();
+  const decoderPorts: MessagePort[] = [];
+  const silence = new Float32Array(frameCount);
+  let rebuilds = 0;
   const position = createEnginePosition();
   const player = createEnginePlayer({
-    context,
+    getContext: () => context,
     audioOutput,
     outputClock,
     audioSession: microphone.session,
     store,
-    decoderPort: data.port1,
     getDecoder: () => decoder,
-    playheadPort: playhead.port2,
-    playheadPorts: [playhead.port1, spectrogramPlayhead.port1],
     position,
+    connect: async () => {
+      const data = new MessageChannel();
+      const playhead = new MessageChannel();
+      decoderPorts.push(data.port2, playhead.port2);
+      mountTracks(
+        playerDataChannel.outbound(data.port2),
+        frameCount,
+        { lead: [silence], backing: [silence], instrumental: [silence] },
+        [],
+      );
+      return Promise.resolve({
+        dataPort: data.port1,
+        playheadPort: playhead.port1,
+        mounted: true,
+      });
+    },
+    rebuildOutput: async () => {
+      rebuilds += 1;
+      return Promise.resolve();
+    },
   });
   await player.boot();
-  const silence = new Float32Array(frameCount);
-  mountTracks(
-    playerDataChannel.outbound(data.port2),
-    frameCount,
-    { lead: [silence], backing: [silence], instrumental: [silence] },
-    [],
-  );
   await flush();
 
   const readWorklet = () => {
@@ -293,6 +309,10 @@ export const createSeam = async (
       }
       injectFault(fault);
     },
+    breakBoots: (count) => {
+      faulted = true;
+      brokenBoots = count;
+    },
     postToWorklet: (message) => {
       faulted = true;
       readWorklet().post(message);
@@ -302,6 +322,7 @@ export const createSeam = async (
       await flush();
     },
     hostFrames: () => hostFrames,
+    rebuilds: () => rebuilds,
     run,
     frame: async () => {
       await flush();
@@ -313,9 +334,9 @@ export const createSeam = async (
       await flush();
     },
     close: () => {
-      data.port2.close();
-      playhead.port2.close();
-      spectrogramPlayhead.port2.close();
+      for (const port of decoderPorts) {
+        port.close();
+      }
       vi.unstubAllGlobals();
       if (!faulted && store.get().statuses.player === 'error') {
         throw new Error('The player failed though the test injected no fault');
