@@ -1,25 +1,22 @@
 import { Box, Slider, Stack, Typography } from '@mui/material';
 import { getTrackProgress } from '@musetric/engine';
-import { isPrimaryPointerButton } from '@musetric/interaction';
-import { type FC, useEffect, useRef } from 'react';
+import { type FC, useRef } from 'react';
 import { formatDuration } from '../../../common/formatDuration.js';
-import { engine } from '../../../engine/engine.js';
 import { useEnginePosition } from '../../../engine/enginePosition.js';
-import { createInteractionFreeze } from '../../../engine/interactionFreeze.js';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { playHaptic } from '../haptics.js';
 import { LoopProgressRange } from '../loop/LoopProgressRange.js';
+import { useSeekDrag } from './useSeekDrag.js';
 
 const progressScale = 1000;
 
 export const PlayerProgress: FC = () => {
-  const ref = useRef<HTMLSpanElement>(null);
-  const atEdgeRef = useRef(false);
+  const ref = useRef<HTMLDivElement>(null);
   const frameCount = useEngineStore((state) => state.frameCount);
   const duration = useEngineStore((state) => state.duration);
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
+  const disabled = !frameCount || realtimeFailed;
   const position = useEnginePosition((frameIndex, state) =>
     Math.round(getTrackProgress(frameIndex, state.frameCount) * progressScale),
   );
@@ -28,36 +25,7 @@ export const PlayerProgress: FC = () => {
       getTrackProgress(frameIndex, state.frameCount) * state.duration,
     ),
   );
-
-  useEffect(() => {
-    const element = ref.current;
-
-    if (!element) {
-      return;
-    }
-
-    const freeze = createInteractionFreeze();
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!isPrimaryPointerButton(event)) return;
-      if (!event.isPrimary) return;
-      atEdgeRef.current = false;
-      freeze.freeze();
-    };
-
-    const handlePointerUp = freeze.release;
-
-    element.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerUp);
-
-    return () => {
-      element.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('pointercancel', handlePointerUp);
-      freeze.release();
-    };
-  }, []);
+  useSeekDrag(ref, 'playerProgress', disabled);
 
   return (
     <Stack direction='row' sx={{ alignItems: 'center', gap: 2 }}>
@@ -71,15 +39,19 @@ export const PlayerProgress: FC = () => {
       >
         {currentTime}
       </Typography>
-      <Box sx={{ flexGrow: 1, mx: 1.5, position: 'relative', display: 'flex' }}>
+      <Box
+        ref={ref}
+        sx={{ flexGrow: 1, mx: 1.5, position: 'relative', display: 'flex' }}
+      >
         <Slider
-          ref={ref}
           min={0}
           max={progressScale}
           value={position}
-          disabled={!frameCount || realtimeFailed}
+          disabled={disabled}
+          tabIndex={-1}
           size='small'
           sx={{
+            pointerEvents: 'none',
             '& .MuiSlider-thumb': {
               color: 'primary.main',
               transitionProperty: 'box-shadow',
@@ -88,19 +60,6 @@ export const PlayerProgress: FC = () => {
               color: 'primary.main',
               transitionProperty: 'none',
             },
-          }}
-          onChange={(_, value) => {
-            if (!frameCount) {
-              return;
-            }
-
-            const atEdge = value <= 0 || value >= progressScale;
-            if (atEdge && !atEdgeRef.current) {
-              playHaptic('detent');
-            }
-            atEdgeRef.current = atEdge;
-            const frameIndex = Math.round((value / progressScale) * frameCount);
-            engine.player.seek(frameIndex, 'playerProgress');
           }}
         />
         <LoopProgressRange />

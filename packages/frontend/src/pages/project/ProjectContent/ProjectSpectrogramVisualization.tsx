@@ -10,7 +10,6 @@ import {
   chordLaneHeight,
 } from '../chords/ChordLane.js';
 import { ChordsToggleButton } from '../chords/ChordsToggleButton.js';
-import { createLoopRangeGesture } from '../loop/createLoopRangeGesture.js';
 import { LoopOverlay } from '../loop/LoopOverlay.js';
 import { LoopPictureControls } from '../loop/LoopPictureControls.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
@@ -45,7 +44,7 @@ export const ProjectSpectrogramVisualization: FC = () => {
   );
   const expandedLane = useEngineStore((state) => state.expandedSpectrumLane);
   const recordingBandShown = !spectrum || expandedLane !== 'lead';
-  useSpectrogramGesture(spectrogramAreaRef, createLoopRangeGesture);
+  useSpectrogramGesture(spectrogramAreaRef);
   useEffect(() => {
     const surface = spectrogramAreaRef.current;
     return surface ? keepSystemGesturesOut(surface) : undefined;

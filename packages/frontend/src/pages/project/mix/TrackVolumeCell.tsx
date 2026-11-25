@@ -1,33 +1,22 @@
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
 import { alpha, Box, Stack, Typography } from '@mui/material';
-import { createScaledDrag } from '@musetric/interaction';
 import { type FC, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
-import { playHaptic } from '../haptics.js';
 import { RecordingPicker } from '../recording/RecordingPicker.js';
 import { useTrackName } from '../waveform/trackName.js';
 import {
   playVolumeTick,
-  rememberTrackVolume,
   setTrackVolume,
-  toggleTrackMute,
   type TrackVolumeTarget,
   useTrackVolume,
+  useTrackVolumeDrag,
   volumeFullPercent,
   volumeTickEvery,
 } from './trackVolume.js';
 
-const dragLockDistance = 8;
 const iconSize = 16;
-
-type VolumeDrag = {
-  pointerId: number;
-  startX: number;
-  startPercent: number;
-  getPercent: ((position: number) => number) | undefined;
-};
 
 export type TrackVolumeCellProps = {
   target: TrackVolumeTarget;
@@ -41,7 +30,8 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
-  const dragRef = useRef<VolumeDrag>(undefined);
+  const ref = useRef<HTMLDivElement>(null);
+  useTrackVolumeDrag(ref, target, realtimeFailed);
   const percent = Math.round(volume * volumeFullPercent);
   const muted = volume === 0;
 
@@ -51,14 +41,10 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
     setTrackVolume(target, limited / volumeFullPercent);
   };
 
-  const toggleMute = () => {
-    playHaptic('detent');
-    toggleTrackMute(target);
-  };
-
   return (
     <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0 }}>
       <Box
+        ref={ref}
         role='slider'
         tabIndex={realtimeFailed ? -1 : 0}
         aria-label={t('pages.project.mix.trackVolume', { name })}
@@ -66,59 +52,12 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
         aria-valuemax={volumeFullPercent}
         aria-valuenow={percent}
         aria-disabled={realtimeFailed}
-        onPointerDown={(event) => {
-          if (realtimeFailed || !event.isPrimary || event.button !== 0) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          dragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startPercent: percent,
-            getPercent: undefined,
-          };
-        }}
-        onPointerMove={(event) => {
-          const drag = dragRef.current;
-          if (drag?.pointerId !== event.pointerId) return;
-          if (!drag.getPercent) {
-            if (Math.abs(event.clientX - drag.startX) < dragLockDistance) {
-              return;
-            }
-            rememberTrackVolume(target);
-            const rect = event.currentTarget.getBoundingClientRect();
-            drag.getPercent = createScaledDrag({
-              startPosition: event.clientX,
-              startValue: drag.startPercent,
-              maxValue: volumeFullPercent,
-              min: rect.left,
-              max: rect.right,
-            });
-          }
-          changePercent(Math.round(drag.getPercent(event.clientX)));
-        }}
-        onPointerUp={(event) => {
-          const drag = dragRef.current;
-          if (drag?.pointerId !== event.pointerId) return;
-          dragRef.current = undefined;
-          if (!drag.getPercent) {
-            toggleMute();
-          }
-        }}
-        onPointerCancel={(event) => {
-          const drag = dragRef.current;
-          if (drag?.pointerId !== event.pointerId) return;
-          dragRef.current = undefined;
-          if (drag.getPercent) {
-            setTrackVolume(target, drag.startPercent / volumeFullPercent);
-          }
-        }}
         onKeyDown={(event) => {
           if (realtimeFailed) return;
           if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
             changePercent(percent + volumeTickEvery);
           } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
             changePercent(percent - volumeTickEvery);
-          } else if (event.key === 'Enter' || event.key === ' ') {
-            toggleMute();
           } else {
             return;
           }
@@ -131,8 +70,6 @@ export const TrackVolumeCell: FC<TrackVolumeCellProps> = (props) => {
           borderRadius: 1.5,
           bgcolor: 'action.hover',
           cursor: 'ew-resize',
-          touchAction: 'none',
-          userSelect: 'none',
           '&:focus-visible': {
             outline: 2,
             outlineColor: 'primary.main',

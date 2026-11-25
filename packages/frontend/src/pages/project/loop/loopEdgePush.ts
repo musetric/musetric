@@ -7,25 +7,13 @@ const zoneRatio = 0.06;
 const maxStrength = 2;
 const baseGrowthPerSecond = 1.2;
 const strengthGrowthPerSecond = 0.8;
-const scrollViewsPerSecond = 0.6;
 const maxStepSeconds = 0.05;
-
-export type LoopEdgePushMode = 'widen' | 'scroll';
 
 const pushWindow = (
   viewWindow: EngineViewWindow,
-  mode: LoopEdgePushMode,
   strength: number,
   seconds: number,
 ): EngineViewWindow => {
-  if (mode === 'scroll') {
-    const shift =
-      viewWindow.frameCount * scrollViewsPerSecond * strength * seconds;
-    return {
-      startFrame: Math.round(viewWindow.startFrame + shift),
-      frameCount: viewWindow.frameCount,
-    };
-  }
   const { frameCount = 0 } = engine.store.get();
   const grown = Math.min(
     Math.max(frameCount, viewWindow.frameCount),
@@ -50,7 +38,6 @@ export type LoopEdgePush = {
 
 export const createLoopEdgePush = (
   area: HTMLElement,
-  mode: LoopEdgePushMode,
   onPush: (clientX: number) => void,
 ): LoopEdgePush => {
   let clientX = 0;
@@ -79,7 +66,7 @@ export const createLoopEdgePush = (
     }
     const seconds = Math.min(maxStepSeconds, (now - last) / 1000);
     last = now;
-    setLoopViewWindow(pushWindow(viewWindow, mode, strength, seconds));
+    setLoopViewWindow(pushWindow(viewWindow, strength, seconds));
     onPush(clientX);
     frame = requestAnimationFrame(tick);
   };
