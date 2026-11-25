@@ -30,6 +30,14 @@ pub(crate) const fn frames_to_f64(frames: usize) -> f64 {
 }
 
 #[expect(
+    clippy::cast_precision_loss,
+    reason = "a frame of a song is far below the f64 mantissa"
+)]
+pub(crate) const fn frame_to_f64(frame: i64) -> f64 {
+    frame as f64
+}
+
+#[expect(
     clippy::cast_possible_truncation,
     reason = "a rounded frame of a song is far below i64::MAX"
 )]

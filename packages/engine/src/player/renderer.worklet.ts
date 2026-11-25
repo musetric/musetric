@@ -12,9 +12,9 @@ import {
   resetRenderer,
   setRendererRange,
   setRendererRecordingVolume,
-  setRendererStem,
   setRendererTakes,
   setRendererTempo,
+  setRendererTrack,
   setRendererTranspose,
   setRendererVoice,
   setRendererVolumes,
@@ -24,9 +24,9 @@ import {
   type playerDataChannel,
   type PlayerPage,
   type PlayerPageKey,
+  type PlayerStemLayout,
   type PlayerStemLayouts,
   type PlayerTakes,
-  type PlayerTakeTrack,
   stemTracks,
 } from './protocol.cross.js';
 
@@ -48,19 +48,7 @@ const createOutputViews = (
       ),
   );
 
-const takeFields = (takes: readonly PlayerTakeTrack[]): Float64Array =>
-  Float64Array.from(
-    takes.flatMap((take) => [
-      take.track,
-      take.songStartFrame,
-      take.tempo,
-      take.transpose,
-      take.octave,
-      take.frameCount,
-      take.pageStarts.length,
-      take.sounding ? 1 : 0,
-    ]),
-  );
+const emptyLayout: PlayerStemLayout = { frameCount: 0, pageStarts: [] };
 
 export type PlayerRenderer = {
   mounted: () => boolean;
@@ -101,6 +89,7 @@ export const createPlayerRenderer = (
   let outputViews: Float32Array[] = [];
   let mounted = false;
   let reportedFrameIndex: number | undefined = undefined;
+  let takeTracks: number[] = [];
 
   const viewOutput = (frameCount: number): Float32Array[] => {
     const pointer = rendererOutput(handle);
@@ -121,27 +110,45 @@ export const createPlayerRenderer = (
     return outputViews;
   };
 
-  const setTakes = (message: PlayerTakes) => {
-    const laid = setRendererTakes(
+  const setTrack = (track: number, layout: PlayerStemLayout) => {
+    setRendererTrack(
       handle,
-      takeFields(message.takes),
-      Uint32Array.from(message.takes.flatMap((take) => take.pageStarts)),
+      track,
+      layout.frameCount,
+      Uint32Array.from(layout.pageStarts),
     );
-    if (!laid) {
+  };
+
+  const setTakes = (message: PlayerTakes) => {
+    const tracks = message.takes.map((take) => take.track);
+    for (const track of takeTracks.filter((held) => !tracks.includes(held))) {
+      setTrack(track, emptyLayout);
+    }
+    takeTracks = tracks;
+    for (const take of message.takes) {
+      setTrack(take.track, take);
+    }
+    const pieces = message.takes
+      .filter((take) => take.sounding)
+      .flatMap((take) => [
+        take.track,
+        take.songStartFrame,
+        take.tempo,
+        take.transpose,
+        take.octave,
+        take.frameCount,
+      ]);
+    if (!setRendererTakes(handle, Float64Array.from(pieces))) {
       throw new Error('The takes of the recording do not fit the renderer');
     }
     reserveRendererPages(handle, message.residentPageLimit);
   };
 
-  const releaseTakes = () => {
-    setRendererTakes(handle, new Float64Array(0), new Uint32Array(0));
-  };
-
   const release = () => {
     for (const stem of stemTypes) {
-      setRendererStem(handle, stemTracks[stem], 0, new Uint32Array(0));
+      setTrack(stemTracks[stem], emptyLayout);
     }
-    releaseTakes();
+    setTakes({ takes: [], residentPageLimit: 0 });
     mounted = false;
     reportedFrameIndex = undefined;
   };
@@ -149,15 +156,9 @@ export const createPlayerRenderer = (
   return {
     mounted: () => mounted,
     mount: (layouts, takes) => {
-      releaseTakes();
+      release();
       for (const stem of stemTypes) {
-        const layout = layouts[stem];
-        setRendererStem(
-          handle,
-          stemTracks[stem],
-          layout.frameCount,
-          Uint32Array.from(layout.pageStarts),
-        );
+        setTrack(stemTracks[stem], layouts[stem]);
       }
       setTakes(takes);
       mounted = true;

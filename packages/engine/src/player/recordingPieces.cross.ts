@@ -1,35 +1,32 @@
-export type RecordingSpan = {
+export type RecordingPiece = {
   songStartFrame: number;
   tempo: number;
-  frameCount: number;
-};
-
-export const pieceSongEnd = (piece: RecordingSpan): number =>
-  piece.songStartFrame + piece.frameCount * piece.tempo;
-
-export type RecordingPiece = RecordingSpan & {
   transpose: number;
   octave: number;
+  frameCount: number;
   samples: Float32Array<ArrayBuffer>;
 };
 
-export type RecordingSegment<Piece extends RecordingSpan = RecordingPiece> = {
+export const pieceSongEnd = (piece: RecordingPiece): number =>
+  piece.songStartFrame + piece.frameCount * piece.tempo;
+
+export type RecordingSegment = {
   songStartFrame: number;
   songEndFrame: number;
-  piece: Piece;
+  piece: RecordingPiece;
 };
 
-export const toRecordingSegments = <Piece extends RecordingSpan>(
-  pieces: readonly Piece[],
-): RecordingSegment<Piece>[] => {
-  let segments: RecordingSegment<Piece>[] = [];
+export const toRecordingSegments = (
+  pieces: readonly RecordingPiece[],
+): RecordingSegment[] => {
+  let segments: RecordingSegment[] = [];
   for (const piece of pieces) {
     const start = piece.songStartFrame;
     const end = pieceSongEnd(piece);
     if (end <= start) {
       continue;
     }
-    const kept: RecordingSegment<Piece>[] = [];
+    const kept: RecordingSegment[] = [];
     for (const segment of segments) {
       if (segment.songEndFrame <= start || segment.songStartFrame >= end) {
         kept.push(segment);

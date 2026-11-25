@@ -142,6 +142,24 @@ impl Track {
         self.page_of(frame)
             .is_none_or(|index| self.pages[index].is_some())
     }
+
+    fn runs(&self, first: i64, count: usize) -> impl Iterator<Item = (Resident, Span)> {
+        let end = first + i64::try_from(count).unwrap_or(i64::MAX);
+        let mut frame = first.max(0);
+        std::iter::from_fn(move || {
+            let index = self.page_of(frame).filter(|_| frame < end)?;
+            let start = self.page_starts[index];
+            let stop = self.page_end(index).min(end);
+            let span = Span {
+                from: usize::try_from(frame - start).unwrap_or(0),
+                to: usize::try_from(stop - start).unwrap_or(0),
+                offset: usize::try_from(frame - first).unwrap_or(0),
+            };
+            frame = stop;
+            Some((self.pages[index], span))
+        })
+        .filter_map(|(resident, span)| Some((resident?, span)))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -244,24 +262,8 @@ impl Output<'_> {
     }
 
     fn add_run(&mut self, mix: StemMix<'_>, request: MixRequest) {
-        let StemMix { stem, volume } = mix;
-        let end = request.first + i64::try_from(request.count).unwrap_or(i64::MAX);
-        let mut frame = request.first.max(0);
-        while frame < end {
-            let Some(index) = stem.page_of(frame) else {
-                return;
-            };
-            let start = stem.page_starts[index];
-            let stop = stem.page_end(index).min(end);
-            if let Some(page) = stem.pages[index] {
-                let span = Span {
-                    from: usize::try_from(frame - start).unwrap_or(0),
-                    to: usize::try_from(stop - start).unwrap_or(0),
-                    offset: usize::try_from(frame - request.first).unwrap_or(0),
-                };
-                self.add_page(page, span, volume);
-            }
-            frame = stop;
+        for (page, span) in mix.stem.runs(request.first, request.count) {
+            self.add_page(page, span, mix.volume);
         }
     }
 
@@ -317,8 +319,15 @@ impl PageMixer {
         frame_count: i64,
         page_starts: &[i64],
     ) -> Result<(), BoxedError> {
+        if track >= self.tracks.len() {
+            self.tracks.resize_with(track + 1, Track::default);
+        }
+        let current = &self.tracks[track];
+        if current.frame_count == frame_count && current.page_starts == page_starts {
+            return Ok(());
+        }
         self.release_track(track)?;
-        let target = self.tracks.get_mut(track).ok_or(NO_TRACK)?;
+        let target = &mut self.tracks[track];
         target.frame_count = frame_count;
         target.page_starts = page_starts.to_vec();
         target.pages = vec![None; page_starts.len()];
@@ -327,27 +336,6 @@ impl PageMixer {
             self.slot_frames = longest;
             self.slots.widen(longest * self.channels);
         }
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn lays_out(&self, track: usize, frame_count: i64, page_starts: &[i64]) -> bool {
-        self.tracks.get(track).is_some_and(|target| {
-            target.frame_count == frame_count && target.page_starts == page_starts
-        })
-    }
-
-    #[must_use]
-    pub const fn track_count(&self) -> usize {
-        self.tracks.len()
-    }
-
-    pub fn set_track_count(&mut self, count: usize) -> Result<(), BoxedError> {
-        let kept = count.max(self.stem_count);
-        for track in kept..self.tracks.len() {
-            self.release_track(track)?;
-        }
-        self.tracks.resize_with(kept, Track::default);
         Ok(())
     }
 
@@ -417,22 +405,9 @@ impl PageMixer {
         let Some(target) = self.tracks.get(track) else {
             return;
         };
-        let end = first + i64::try_from(samples.len()).unwrap_or(i64::MAX);
-        let mut frame = first.max(0);
-        while frame < end {
-            let Some(index) = target.page_of(frame) else {
-                return;
-            };
-            let start = target.page_starts[index];
-            let stop = target.page_end(index).min(end);
-            if let Some(page) = target.pages[index] {
-                let from = usize::try_from(frame - start).unwrap_or(0);
-                let to = usize::try_from(stop - start).unwrap_or(0);
-                let at = usize::try_from(frame - first).unwrap_or(0);
-                samples[at..at + to - from]
-                    .copy_from_slice(&page_channel(&self.slots, page, 0)[from..to]);
-            }
-            frame = stop;
+        for (page, span) in target.runs(first, samples.len()) {
+            samples[span.offset..span.offset + span.to - span.from]
+                .copy_from_slice(&page_channel(&self.slots, page, 0)[span.from..span.to]);
         }
     }
 

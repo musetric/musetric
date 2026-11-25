@@ -10,17 +10,6 @@ const packetSeconds = 0.05;
 export const takePageFrameCount = (sampleRate: number): number =>
   Math.round(sampleRate * pageSeconds);
 
-export const takePageStarts = (
-  frameCount: number,
-  sampleRate: number,
-): number[] => {
-  const step = takePageFrameCount(sampleRate);
-  return Array.from(
-    { length: Math.ceil(frameCount / step) },
-    (_, index) => index * step,
-  );
-};
-
 export type HeldRun = {
   startFrame: number;
   frameCount: number;

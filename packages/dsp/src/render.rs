@@ -2,7 +2,7 @@ mod takes;
 mod time_pitch;
 mod whole;
 
-pub use takes::{Piece, Segment, TakeMix, TakeTrack, Takes, Target, lay_out, stretches};
+pub use takes::{Piece, Segment, TakeMix, Takes, Target, lay_out, stretches};
 pub use time_pitch::{Block, Fill, TimePitch, js_round};
 pub use whole::{QUANTUM, Song, StemLayout, TrackPages, render_song};
 
@@ -139,38 +139,11 @@ impl Renderer {
                 .all(|(song_frame, until)| self.takes.resident_near(&self.mixer, song_frame, until))
     }
 
-    pub fn set_takes(&mut self, tracks: &[TakeTrack]) -> Result<(), BoxedError> {
-        if tracks.iter().any(|take| take.piece.track < STEM_COUNT) {
+    pub fn set_takes(&mut self, pieces: Vec<Piece>) -> Result<(), BoxedError> {
+        if pieces.iter().any(|piece| piece.track < STEM_COUNT) {
             return Err(STEM_TRACK.into());
         }
-        for track in STEM_COUNT..self.mixer.track_count() {
-            if tracks.iter().all(|take| take.piece.track != track) {
-                self.mixer.set_track(track, 0, &[])?;
-            }
-        }
-        let count = tracks
-            .iter()
-            .map(|take| take.piece.track + 1)
-            .max()
-            .unwrap_or(STEM_COUNT);
-        self.mixer.set_track_count(count)?;
-        for take in tracks {
-            let frame_count = i64::try_from(take.piece.frame_count)?;
-            if !self
-                .mixer
-                .lays_out(take.piece.track, frame_count, &take.page_starts)
-            {
-                self.mixer
-                    .set_track(take.piece.track, frame_count, &take.page_starts)?;
-            }
-        }
-        self.takes.set_pieces(
-            tracks
-                .iter()
-                .filter(|take| take.sounding)
-                .map(|take| take.piece)
-                .collect(),
-        );
+        self.takes.set_pieces(pieces);
         Ok(())
     }
 

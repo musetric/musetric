@@ -4,10 +4,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     page_mix::{LoopRange, PageShape},
-    render::{CHANNELS, Piece, QUANTUM, Quantum, Renderer, TakeTrack},
+    render::{CHANNELS, Piece, QUANTUM, Quantum, Renderer},
 };
-
-const TAKE_FIELDS: usize = 8;
 
 struct Player {
     renderer: Renderer,
@@ -41,48 +39,21 @@ const fn to_semitones(value: f64) -> i32 {
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "a track, a frame count or a page count from JavaScript is a whole number that is not negative"
+    reason = "a track or a frame count from JavaScript is a whole number that is not negative"
 )]
 const fn to_count(value: f64) -> usize {
     value as usize
 }
 
-fn takes_of(fields: &[f64], page_starts: &[u32]) -> Option<Vec<TakeTrack>> {
-    let (rows, rest) = fields.as_chunks::<TAKE_FIELDS>();
-    let pages: usize = rows.iter().map(|row| to_count(row[6])).sum();
-    if !rest.is_empty() || pages != page_starts.len() {
-        return None;
+fn piece_of([track, song_start, tempo, transpose, octave, frame_count]: &[f64; 6]) -> Piece {
+    Piece {
+        song_start: *song_start,
+        tempo: *tempo,
+        transpose: to_semitones(*transpose),
+        octave: to_semitones(*octave),
+        track: to_count(*track),
+        frame_count: to_count(*frame_count),
     }
-    let mut starts = page_starts.iter().copied().map(i64::from);
-    Some(
-        rows.iter()
-            .map(
-                |[
-                    track,
-                    song_start,
-                    tempo,
-                    transpose,
-                    octave,
-                    frame_count,
-                    page_count,
-                    sounding,
-                ]| {
-                    TakeTrack {
-                        piece: Piece {
-                            song_start: *song_start,
-                            tempo: *tempo,
-                            transpose: to_semitones(*transpose),
-                            octave: to_semitones(*octave),
-                            track: to_count(*track),
-                            frame_count: to_count(*frame_count),
-                        },
-                        page_starts: starts.by_ref().take(to_count(*page_count)).collect(),
-                        sounding: *sounding > 0.0,
-                    }
-                },
-            )
-            .collect(),
-    )
 }
 
 #[wasm_bindgen(js_name = openRenderer)]
@@ -97,11 +68,11 @@ pub fn open_renderer(sample_rate: u32) -> usize {
     })
 }
 
-#[wasm_bindgen(js_name = setRendererStem)]
+#[wasm_bindgen(js_name = setRendererTrack)]
 #[must_use]
-pub fn set_renderer_stem(
+pub fn set_renderer_track(
     handle: usize,
-    stem: usize,
+    track: usize,
     frame_count: usize,
     page_starts: &[u32],
 ) -> bool {
@@ -113,18 +84,17 @@ pub fn set_renderer_stem(
         player
             .renderer
             .mixer()
-            .set_track(stem, frames, &starts)
+            .set_track(track, frames, &starts)
             .is_ok()
     })
 }
 
 #[wasm_bindgen(js_name = setRendererTakes)]
 #[must_use]
-pub fn set_renderer_takes(handle: usize, takes: &[f64], page_starts: &[u32]) -> bool {
-    let Some(tracks) = takes_of(takes, page_starts) else {
-        return false;
-    };
-    with_player(handle, |player| player.renderer.set_takes(&tracks).is_ok())
+pub fn set_renderer_takes(handle: usize, pieces: &[f64]) -> bool {
+    let (rows, rest) = pieces.as_chunks::<6>();
+    let pieces = rows.iter().map(piece_of).collect();
+    rest.is_empty() && with_player(handle, |player| player.renderer.set_takes(pieces).is_ok())
 }
 
 #[wasm_bindgen(js_name = rendererPageInput)]

@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use super::{
-    CHANNELS, Parts, Piece, Quantum, Renderer, STEM_COUNT, TakeTrack, Target,
-    time_pitch::whole_to_i64,
+    CHANNELS, Parts, Piece, Quantum, Renderer, STEM_COUNT, Target,
+    time_pitch::{frame_to_f64, whole_to_i64},
 };
 use crate::{
     BoxedError,
@@ -82,39 +82,30 @@ impl Pager {
         song: &Song,
         parts: Parts,
     ) -> Result<Self, BoxedError> {
-        let mut tracks = Vec::with_capacity(STEM_COUNT + song.pieces.len());
-        for stem in 0..STEM_COUNT {
-            let layout = source.layout(stem);
+        let pieces = if parts.takes {
+            song.pieces.as_slice()
+        } else {
+            &[]
+        };
+        let stems = (0..STEM_COUNT).map(|stem| (stem, 0.0, 1.0));
+        let takes = pieces
+            .iter()
+            .map(|piece| (piece.track, piece.song_start, piece.tempo));
+        let mut tracks = Vec::with_capacity(STEM_COUNT + pieces.len());
+        for (track, song_start, tempo) in stems.chain(takes) {
+            let layout = source.layout(track);
             renderer
                 .mixer()
-                .set_track(stem, layout.frame_count, &layout.page_starts)?;
+                .set_track(track, layout.frame_count, &layout.page_starts)?;
             tracks.push(Paged {
-                track: stem,
+                track,
                 layout,
-                song_start: 0.0,
-                tempo: 1.0,
+                song_start,
+                tempo,
                 resident: 0..0,
             });
         }
-        if parts.takes {
-            let mut takes = Vec::with_capacity(song.pieces.len());
-            for piece in &song.pieces {
-                let layout = source.layout(piece.track);
-                takes.push(TakeTrack {
-                    piece: *piece,
-                    page_starts: layout.page_starts.clone(),
-                    sounding: true,
-                });
-                tracks.push(Paged {
-                    track: piece.track,
-                    layout,
-                    song_start: piece.song_start,
-                    tempo: piece.tempo,
-                    resident: 0..0,
-                });
-            }
-            renderer.set_takes(&takes)?;
-        }
+        renderer.set_takes(pieces.to_vec())?;
         Ok(Self {
             tracks,
             kept: i64::from(song.sample_rate) * KEPT_SECONDS,
@@ -161,14 +152,6 @@ fn load_page(
     };
     mixer.page_input(shape)?.copy_from_slice(&samples);
     Ok(())
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "a frame of a song is far below the f64 mantissa"
-)]
-const fn frame_to_f64(frame: i64) -> f64 {
-    frame as f64
 }
 
 fn prepare(song: &Song) -> Renderer {

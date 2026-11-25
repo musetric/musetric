@@ -1,6 +1,6 @@
 use super::{
     CHANNELS, QUANTUM,
-    time_pitch::{Block, TimePitch, frames_to_f64, js_round, whole_to_i64},
+    time_pitch::{Block, TimePitch, frame_to_f64, frames_to_f64, js_round, whole_to_i64},
 };
 use crate::{page_mix::PageMixer, stretch::StretchStream};
 
@@ -24,13 +24,6 @@ impl Piece {
     fn song_end(&self) -> f64 {
         self.song_start + frames_to_f64(self.frame_count) * self.tempo
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TakeTrack {
-    pub piece: Piece,
-    pub page_starts: Vec<i64>,
-    pub sounding: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -241,22 +234,6 @@ fn write_gained_into(channel: &mut [f32], take: &[f32], volume: f32) {
     }
 }
 
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "a frame of a take is a whole number far below i64::MAX"
-)]
-fn floor_frame(frame: f64) -> i64 {
-    frame.floor() as i64
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "a frame of a song is far below the f64 mantissa"
-)]
-const fn song_frame_of(frame: i64) -> f64 {
-    frame as f64
-}
-
 impl Takes {
     #[must_use]
     pub fn new(sample_rate: u32) -> Self {
@@ -306,8 +283,8 @@ impl Takes {
 
     #[must_use]
     pub fn resident_near(&self, mixer: &PageMixer, song_frame: i64, until: i64) -> bool {
-        let from = song_frame_of(song_frame);
-        let reach = song_frame_of(until);
+        let from = frame_to_f64(song_frame);
+        let reach = frame_to_f64(until);
         self.segments[first_ending_after(&self.segments, from)..]
             .iter()
             .take_while(|segment| segment.start < reach)
@@ -316,7 +293,7 @@ impl Takes {
                 let at = segment.start.max(from);
                 mixer.track_resident(
                     piece.track,
-                    floor_frame((at - piece.song_start) / piece.tempo),
+                    whole_to_i64(((at - piece.song_start) / piece.tempo).floor()),
                 )
             })
     }

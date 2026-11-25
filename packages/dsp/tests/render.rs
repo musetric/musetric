@@ -5,7 +5,7 @@ mod tests {
         page_mix::{LoopRange, PageShape},
         render::{
             CHANNELS, Parts, Piece, QUANTUM, Quantum, Renderer, STEM_COUNT, Song, StemLayout,
-            TakeTrack, Target, TrackPages, lay_out, render_song,
+            Target, TrackPages, lay_out, render_song,
         },
     };
     #[cfg(target_arch = "wasm32")]
@@ -314,7 +314,7 @@ mod tests {
     struct Player {
         renderer: Renderer,
         tracks: Tracks,
-        takes: Vec<TakeTrack>,
+        pieces: Vec<Piece>,
         resident: Vec<Vec<bool>>,
         range: Option<LoopRange>,
         window: f64,
@@ -351,13 +351,17 @@ mod tests {
         (samples, pieces)
     }
 
-    fn load_stem(renderer: &mut Renderer, tracks: &mut Tracks, stem: usize) {
-        let layout = tracks.layout(stem);
+    fn lay_out_track(renderer: &mut Renderer, tracks: &Tracks, track: usize) -> usize {
+        let layout = tracks.layout(track);
         renderer
             .mixer()
-            .set_track(stem, layout.frame_count, &layout.page_starts)
+            .set_track(track, layout.frame_count, &layout.page_starts)
             .unwrap();
-        for index in 0..layout.page_starts.len() {
+        layout.page_starts.len()
+    }
+
+    fn load_stem(renderer: &mut Renderer, tracks: &mut Tracks, stem: usize) {
+        for index in 0..lay_out_track(renderer, tracks, stem) {
             load(renderer, tracks, stem, index);
         }
     }
@@ -380,7 +384,7 @@ mod tests {
     }
 
     fn keep_pages(player: &mut Player, take: usize, wanted: &[bool]) {
-        let track = player.takes[take].piece.track;
+        let track = player.pieces[take].track;
         for (index, want) in wanted.iter().copied().enumerate() {
             let held = player.resident[take][index];
             if want && !held {
@@ -404,23 +408,16 @@ mod tests {
             for stem in 0..STEM_COUNT {
                 load_stem(&mut renderer, &mut tracks, stem);
             }
-            let takes: Vec<TakeTrack> = pieces
-                .into_iter()
-                .map(|piece| TakeTrack {
-                    piece,
-                    page_starts: tracks.layout(piece.track).page_starts,
-                    sounding: true,
-                })
+            let resident = pieces
+                .iter()
+                .map(|piece| vec![false; lay_out_track(&mut renderer, &tracks, piece.track)])
                 .collect();
-            renderer.set_takes(&takes).unwrap();
+            renderer.set_takes(pieces.clone()).unwrap();
             Self {
                 renderer,
                 tracks,
-                resident: takes
-                    .iter()
-                    .map(|take| vec![false; take.page_starts.len()])
-                    .collect(),
-                takes,
+                resident,
+                pieces,
                 range: None,
                 window: if take_page < SONG_FRAMES {
                     WINDOW_FRAMES
@@ -436,8 +433,8 @@ mod tests {
 
         fn feed(&mut self, frame: i64) {
             let song_frame = song_frame_of(self.song_frame(frame));
-            for take in 0..self.takes.len() {
-                let piece = self.takes[take].piece;
+            for take in 0..self.pieces.len() {
+                let piece = self.pieces[take];
                 let layout = self.tracks.layout(piece.track);
                 let wanted = wanted_pages(&layout, piece, song_frame, self.window);
                 keep_pages(self, take, &wanted);
@@ -511,7 +508,7 @@ mod tests {
         let mut player = Player::open(TAKE_PAGE);
         player.feed(60_000);
         assert!(player.renderer.ready(60_000));
-        let track = player.takes[1].piece.track;
+        let track = player.pieces[1].track;
         player.renderer.mixer().drop_page(track, 1).unwrap();
         assert!(!player.renderer.ready(60_000));
         assert!(player.renderer.ready(200_000));
