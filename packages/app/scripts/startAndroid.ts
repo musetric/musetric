@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
@@ -35,16 +36,11 @@ const port = Number(values.port);
 const adb = (...args: string[]) =>
   execFileSync('adb', ['-s', serial, ...args], { encoding: 'utf8' }).trim();
 
-const sleep = async (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
 const readPid = () => adb('shell', `pidof ${packageName} || true`);
 
 const waitForSocket = async () => {
   for (let tries = 0; tries < 30; tries++) {
-    await sleep(500);
+    await setTimeout(500);
     const pid = readPid();
     if (
       pid !== '' &&
@@ -69,7 +65,7 @@ const start = async () => {
       `${packageName}/com.musetric.client.MainActivity`,
     );
     const pid = await waitForSocket();
-    await sleep(2000);
+    await setTimeout(2000);
     if (pid !== undefined && readPid() === pid) {
       return pid;
     }

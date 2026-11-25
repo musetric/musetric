@@ -1,5 +1,5 @@
 name: App Build Android
-description: Builds the unsigned APK and App Bundle for arm64-v8a and x86_64 and keeps them as artifacts
+description: Builds the APK and App Bundle for arm64-v8a and x86_64, unsigned when published and signed with the debug keystore otherwise, and keeps them as artifacts
 
 inputs:
   version:
@@ -59,7 +59,7 @@ runs:
         key: gradle-${{ runner.os }}-${{ hashFiles('packages/app/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties', 'packages/app/src-tauri/gen/android/**/*.gradle.kts', '!packages/app/src-tauri/gen/android/app/tauri.build.gradle.kts', 'packages/app/src-tauri/gen/android/gradle.properties') }}
         restore-keys: gradle-${{ runner.os }}-
     - uses: ./.github/actions/setupWasmBindgen
-    - name: Build the release APK and App Bundle (unsigned)
+    - name: Build the release APK and App Bundle
       working-directory: packages/app
       run: |
         version_code=$((1000 + GITHUB_RUN_NUMBER))
