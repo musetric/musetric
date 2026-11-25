@@ -9,10 +9,8 @@ export type SettledLoopTry = {
 };
 
 export type EngineDecoderOutboundMethods = {
-  boot: (message: {
-    playerPort: MessagePort;
-    spectrogramPort: MessagePort;
-  }) => void;
+  boot: (message: { spectrogramPort: MessagePort }) => void;
+  connectPlayer: (message: { playerPort: MessagePort }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;
   requestTarget: (message: PlayerWindow) => void;
@@ -44,6 +42,7 @@ export type EngineDecoderOutboundMethods = {
 
 export type EngineDecoderInboundMethods = {
   booted: () => void;
+  playerConnected: () => void;
   setState: (message: { status: 'error' }) => void;
   setRealtimeState: (message: { status: 'success' | 'error' }) => void;
   mounted: (message: { frameCount: number }) => void;
@@ -68,6 +67,7 @@ export const engineDecoderChannel = createMessageChannel<
   inbound: {
     keys: [
       'booted',
+      'playerConnected',
       'setState',
       'setRealtimeState',
       'mounted',
@@ -84,6 +84,7 @@ export const engineDecoderChannel = createMessageChannel<
   outbound: {
     keys: [
       'boot',
+      'connectPlayer',
       'mount',
       'unmount',
       'requestTarget',
@@ -98,7 +99,8 @@ export const engineDecoderChannel = createMessageChannel<
       'sendRecordingRedo',
     ],
     transfers: {
-      boot: (message) => [message.playerPort, message.spectrogramPort],
+      boot: (message) => [message.spectrogramPort],
+      connectPlayer: (message) => [message.playerPort],
       startRecordingStream: (message) => [message.port],
     },
   },

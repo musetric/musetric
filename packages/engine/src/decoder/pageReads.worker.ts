@@ -122,6 +122,7 @@ export type PageReads = {
   requestWindow: (window: PlayerWindow) => void;
   requestTarget: (window: PlayerWindow) => void;
   requestLeadPages: (indices: number[]) => void;
+  forgetPlayer: () => void;
   close: () => void;
 };
 
@@ -308,6 +309,12 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
         }
       }
       pump('lead');
+    },
+    forgetPlayer: () => {
+      for (const stem of stemTypes) {
+        stems[stem].resident.clear();
+        stems[stem].means.clear();
+      }
     },
     close: () => {
       for (const stem of stemTypes) {

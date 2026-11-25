@@ -63,14 +63,14 @@ const readMediaDevices = (): MediaDevices | undefined =>
   'mediaDevices' in navigator ? navigator.mediaDevices : undefined;
 
 export const createWebAudioSession = (
-  context: AudioContext,
+  getContext: () => AudioContext,
   outputClock: EngineOutputClock,
   onCaptured: CapturedChunkListener,
 ): EngineAudioSession => {
   const streams = new Map<EngineMicrophone, MediaStream>();
   const timedSources = new Map<EngineMicrophone, TimedMicrophoneSource>();
   const timedMicrophones = createTimedMicrophones(
-    context,
+    getContext,
     outputClock,
     onCaptured,
   );
@@ -89,6 +89,7 @@ export const createWebAudioSession = (
       const { deviceId } = request;
       openingStreams += 1;
       apply();
+      const context = getContext();
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: createMicrophoneAudioConstraints({

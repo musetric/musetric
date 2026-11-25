@@ -1,4 +1,4 @@
-import { initSync } from '@musetric/dsp/stretch';
+import { initSync, resetRenderer } from '@musetric/dsp/stretch';
 import { type PortDispatch } from '@musetric/utils/cross/messagePort';
 import {
   playerChannel,
@@ -6,6 +6,7 @@ import {
   type PlayerInboundMethods,
 } from './protocol.cross.js';
 import { createPlayerRuntime, type PlayerRuntime } from './runtime.worklet.js';
+import { createUnderrunCount } from './underrunCount.worklet.js';
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -17,11 +18,12 @@ export type CreateGuardedPlayerOptions = {
   measure: boolean;
 };
 
-export type PlayerFault = 'caught' | 'uncaught';
+export type PlayerFault = 'caught' | 'uncaught' | 'trap';
 
 export type GuardedPlayer = {
   process: (inputs: Float32Array[][], output: Float32Array[]) => void;
   injectFault?: (fault: PlayerFault) => void;
+  readUnderruns?: () => number;
 };
 
 export const createGuardedPlayer = (
@@ -31,6 +33,9 @@ export const createGuardedPlayer = (
   let failed = false;
   let fault: PlayerFault | undefined = undefined;
   let sendFailed: PlayerInboundMethods['failed'] | undefined = undefined;
+  const underruns = options.measure
+    ? createUnderrunCount(options.sampleRate)
+    : undefined;
 
   const fail = (error: unknown) => {
     failed = true;
@@ -66,6 +71,7 @@ export const createGuardedPlayer = (
 
   return {
     process: (inputs, output) => {
+      underruns?.observe(output[0].length);
       if (fault === 'uncaught') {
         fault = undefined;
         // eslint-disable-next-line musetric/no-audio-thread-allocations -- a fault the measure build injects, once
@@ -77,6 +83,10 @@ export const createGuardedPlayer = (
             fault = undefined;
             // eslint-disable-next-line musetric/no-audio-thread-allocations -- a fault the measure build injects, once
             throw new Error('A fault injected into the player');
+          }
+          if (fault === 'trap') {
+            fault = undefined;
+            resetRenderer(-1);
           }
           runtime.process(inputs, output);
           return;
@@ -93,5 +103,6 @@ export const createGuardedPlayer = (
           fault = next;
         }
       : undefined,
+    readUnderruns: underruns?.read,
   };
 };

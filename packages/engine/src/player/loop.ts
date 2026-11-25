@@ -88,7 +88,8 @@ export const createEnginePlayerLoop = (
         if (
           !range ||
           currentState.loopStage !== 'sing' ||
-          isRecording(currentState)
+          isRecording(currentState) ||
+          currentState.statuses.player === 'error'
         ) {
           return;
         }

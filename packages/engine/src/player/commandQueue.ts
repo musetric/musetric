@@ -45,11 +45,7 @@ export const createEngineCommandQueue = (
   };
 
   return {
-    run: async (command) => {
-      if (store.get().statuses.player !== 'error') {
-        await enqueue(command);
-      }
-    },
+    run: enqueue,
     runStop: async (command) => {
       for (const dropped of waiting.splice(0)) {
         dropped.settle(Promise.resolve());

@@ -105,13 +105,14 @@ type NativeCapture = {
 };
 
 export const createNativeAudioSession = (
-  context: AudioContext,
+  getContext: () => AudioContext,
   handler: NativeMicrophoneHandler,
 ): EngineAudioSession => {
   const listeners = new Set<() => void>();
   const sources = new Map<EngineMicrophone, AudioNode[]>();
   let capture: NativeCapture | undefined = undefined;
   let modulePromise: Promise<WebAssembly.Module> | undefined = undefined;
+  let moduleContext: AudioContext | undefined = undefined;
   let opening = 0;
   let currentSession = -1;
   let minimumSession = 0;
@@ -144,7 +145,11 @@ export const createNativeAudioSession = (
     },
   };
 
-  const loadModule = async () => {
+  const loadModule = async (context: AudioContext) => {
+    if (moduleContext !== context) {
+      moduleContext = context;
+      modulePromise = undefined;
+    }
     modulePromise ??= Promise.all([
       compileCapture(),
       context.audioWorklet.addModule(nativeMicrophoneWorkletUrl),
@@ -157,7 +162,10 @@ export const createNativeAudioSession = (
     return modulePromise;
   };
 
-  const createCapture = (captureModule: WebAssembly.Module): NativeCapture => {
+  const createCapture = (
+    context: AudioContext,
+    captureModule: WebAssembly.Module,
+  ): NativeCapture => {
     const node = new AudioWorkletNode(context, nativeMicrophoneProcessorName, {
       numberOfInputs: 0,
       numberOfOutputs: 1,
@@ -209,12 +217,13 @@ export const createNativeAudioSession = (
     openMicrophone: async (request) => {
       const { deviceId } = request;
       opening += 1;
+      const context = getContext();
       try {
-        const captureModule = await loadModule();
+        const captureModule = await loadModule(context);
         const reply = captureSchema.parse(
           await handler.postMessage({ type: 'start', deviceId }),
         );
-        capture ??= createCapture(captureModule);
+        capture ??= createCapture(context, captureModule);
         const { node, ready } = capture;
         await ready;
         const settings = {

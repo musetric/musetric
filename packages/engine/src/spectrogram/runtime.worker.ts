@@ -203,6 +203,9 @@ export const createSpectrogramRuntime = async (
   });
 
   port.bindHandlers({
+    connectPlayhead: (message) => {
+      playhead.connect(message.playheadPort);
+    },
     mount: async (message) => {
       try {
         trackProgress = message.trackProgress;

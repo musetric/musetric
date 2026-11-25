@@ -31,7 +31,9 @@ export const requestTake = (kind: TakeKind, projectId: number) => {
 };
 
 export const canPressRecord = (state: EngineState): boolean =>
-  canCommandPlayback(state) && getActiveRecording(state) !== undefined;
+  canCommandPlayback(state) &&
+  state.statuses.player !== 'error' &&
+  getActiveRecording(state) !== undefined;
 
 export const pressRecord = (projectId: number) => {
   const state = engine.store.get();

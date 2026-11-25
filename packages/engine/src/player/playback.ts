@@ -28,10 +28,8 @@ import {
   playerProcessorName,
 } from './protocol.cross.js';
 
-const noop = (): void => undefined;
-
 export type EnginePlayback = PlaybackSettings & {
-  boot: () => Promise<void>;
+  boot: () => Promise<boolean>;
   play: () => Promise<boolean>;
   stop: () => Promise<number>;
   setFrozen: (frozen: boolean) => void;
@@ -48,31 +46,13 @@ export type EnginePlayback = PlaybackSettings & {
   flushRecording: () => Promise<number>;
 };
 
-export const createEngineStubPlayback = (): EnginePlayback => ({
-  boot: async () => Promise.resolve(),
-  play: async () => Promise.resolve(false),
-  stop: async () => Promise.resolve(0),
-  setFrozen: noop,
-  seek: noop,
-  connectRecordingSource: () => noop,
-  startRecording: noop,
-  flushRecording: async () => Promise.resolve(0),
-  sendTempoRatio: noop,
-  sendTranspose: noop,
-  sendVoice: noop,
-  sendMetronome: noop,
-  sendTrackVolume: noop,
-  sendTrackVolumes: noop,
-});
-
 export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   store: Store<EngineState>;
-  decoderPort: MessagePort;
+  dataPort: MessagePort;
   playheadPort: MessagePort;
-  playheadPorts: MessagePort[];
   position: EnginePositionWriter;
   onPlaybackEnded?: () => void;
   applyMotion: (motion: PlayerMotion) => void;
@@ -91,12 +71,12 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, outputClock, store, decoderPort, position } =
-    options;
-  const { playheadPorts } = options;
+  const { context, audioOutput, outputClock, store, position } = options;
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
-  const playhead = createPlayhead(options.playheadPort, context.sampleRate);
+  const playheadChannel = new MessageChannel();
+  const playhead = createPlayhead(context.sampleRate);
+  playhead.connect(playheadChannel.port2);
   const compiling = fetch(stretchWasmUrl)
     .then(async (response) => response.arrayBuffer())
     .then(WebAssembly.compile);
@@ -107,7 +87,8 @@ export const createEnginePlayback = async (
     numberOfOutputs: 1,
     outputChannelCount: [2],
   });
-  node.connect(audioOutput.outputNode);
+  node.connect(audioOutput.getOutputNode());
+  let booted = false;
   let failed = false;
   const port = playerChannel.outboundSync(node.port, (handler, payload) => {
     if (!failed) {
@@ -122,6 +103,7 @@ export const createEnginePlayback = async (
     return sentCommand;
   };
   let recordingFlushPromise: ControlledPromise<number> | undefined = undefined;
+  const unsubscribes: (() => void)[] = [];
 
   const isCurrentRevision = (revision: number) =>
     store.get().seekEvent.revision === revision;
@@ -157,8 +139,12 @@ export const createEnginePlayback = async (
     failed = true;
     console.error('The player failed on the audio thread:', reason);
     node.port.close();
+    node.disconnect();
+    for (const unsubscribe of unsubscribes.splice(0)) {
+      unsubscribe();
+    }
     stopFrameIndexPump();
-    if (isCurrentRevision(playhead.read().revision)) {
+    if (booted && isCurrentRevision(playhead.read().revision)) {
       position.write(playhead.readFrameIndex());
     }
     const frameIndex = position.read();
@@ -170,8 +156,15 @@ export const createEnginePlayback = async (
     bootPromise.resolve();
     store.update((state) => {
       state.statuses.player = 'error';
+      state.seekEvent = {
+        revision: nextNumber(state.seekEvent.revision),
+        frameIndex,
+        origin: 'playbackEnd',
+      };
     });
-    options.onFailed();
+    if (booted) {
+      options.onFailed();
+    }
   };
 
   node.onprocessorerror = (event) => {
@@ -180,6 +173,7 @@ export const createEnginePlayback = async (
 
   port.bindHandlers({
     booted: () => {
+      booted = true;
       store.update((state) => {
         state.statuses.player = 'success';
       });
@@ -246,12 +240,6 @@ export const createEnginePlayback = async (
       inputLatencyFrameCount: getInputShareFrameCount(state),
     };
   };
-  store.subscribe(getRecordingLatencyFrameCount, () => {
-    port.methods.setLatency(getLatencyFrameCounts());
-  });
-  store.subscribe(getInputShareFrameCount, () => {
-    port.methods.setLatency(getLatencyFrameCounts());
-  });
 
   const publishOutputClock = () => {
     const reading = outputClock.read();
@@ -265,8 +253,6 @@ export const createEnginePlayback = async (
       clockOffset: reading.clockOffset - addedFrameCount / context.sampleRate,
     });
   };
-  outputClock.subscribe(publishOutputClock);
-  store.subscribe(getOutputLatencyFrameCount, publishOutputClock);
 
   const publishRange = () => {
     const { range, rangeRepeat, rangeStopFrame } = store.get();
@@ -277,9 +263,19 @@ export const createEnginePlayback = async (
       stopFrame: rangeStopFrame,
     });
   };
-  store.subscribe((state) => state.range, publishRange);
-  store.subscribe((state) => state.rangeRepeat, publishRange);
-  store.subscribe((state) => state.rangeStopFrame, publishRange);
+  unsubscribes.push(
+    store.subscribe(getRecordingLatencyFrameCount, () => {
+      port.methods.setLatency(getLatencyFrameCounts());
+    }),
+    store.subscribe(getInputShareFrameCount, () => {
+      port.methods.setLatency(getLatencyFrameCounts());
+    }),
+    outputClock.subscribe(publishOutputClock),
+    store.subscribe(getOutputLatencyFrameCount, publishOutputClock),
+    store.subscribe((state) => state.range, publishRange),
+    store.subscribe((state) => state.rangeRepeat, publishRange),
+    store.subscribe((state) => state.rangeStopFrame, publishRange),
+  );
 
   const createPlayingPromise = async (command: number) => {
     const playingPromise = createControlledPromise<PlayingAck>();
@@ -290,17 +286,19 @@ export const createEnginePlayback = async (
   const ref: EnginePlayback = {
     boot: async () => {
       port.methods.boot({
-        dataPort: decoderPort,
-        playheadPorts,
+        dataPort: options.dataPort,
+        playheadPorts: [playheadChannel.port1, options.playheadPort],
         stretchModule,
       });
       await bootPromise.promise;
+      publishOutputClock();
       settings.sendTempoRatio();
       settings.sendTranspose();
       settings.sendVoice();
       settings.sendTrackVolumes();
       settings.sendMetronome();
       publishRange();
+      return !failed;
     },
     play: async () => {
       await outputClock.wake();

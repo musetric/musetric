@@ -32,7 +32,7 @@ port.bindBoot(async (message) => {
   await createSpectrogramRuntime({
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
-    playhead: createPlayhead(message.playheadPort, message.sampleRate),
+    playhead: createPlayhead(message.sampleRate),
     convertPreview: createLivePreview(
       loadCapture(message.captureModule),
       message.sampleRate,

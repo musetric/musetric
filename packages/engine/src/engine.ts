@@ -36,6 +36,14 @@ import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 const androidOutputBufferSeconds = 0.02;
 const measure = import.meta.env.frontendMeasure === 'true';
 
+const createAudioContext = () =>
+  new AudioContext({
+    sampleRate: defaultSampleRate,
+    latencyHint: navigator.userAgent.includes('Android')
+      ? androidOutputBufferSeconds
+      : 'interactive',
+  });
+
 export type Engine = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
@@ -52,28 +60,22 @@ export type Engine = {
 };
 
 export const createEngine = (): Engine => {
-  const context = new AudioContext({
-    sampleRate: defaultSampleRate,
-    latencyHint: navigator.userAgent.includes('Android')
-      ? androidOutputBufferSeconds
-      : 'interactive',
-  });
+  let context = createAudioContext();
+  const getContext = () => context;
   const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
   const store = createStore(initialEngineState);
   const position = createEnginePosition();
   const spectrogramChannel = new MessageChannel();
-  const spectrogramPlayheadChannel = new MessageChannel();
   const spectrogram = createEngineSpectrogram({
     store,
     sampleRate: context.sampleRate,
     decoderPort: spectrogramChannel.port2,
-    playheadPort: spectrogramPlayheadChannel.port2,
     position,
   });
   const capturedTap = measure ? createCapturedTap() : undefined;
   const audioSession = createEngineAudioSession(
-    context,
+    getContext,
     outputClock,
     (chunk) => {
       spectrogram.previewLiveTake(chunk);
@@ -88,16 +90,16 @@ export const createEngine = (): Engine => {
       });
     }
   });
-  const playerChannel = new MessageChannel();
-  const playerPlayheadChannel = new MessageChannel();
 
   const ref: Engine = {
-    context,
+    get context() {
+      return context;
+    },
     audioOutput,
     store,
     microphoneAccess: createEngineMicrophoneAccess({ store, audioSession }),
     calibration: createEngineCalibration({
-      context,
+      getContext,
       audioOutput,
       outputClock,
       audioSession,
@@ -110,7 +112,6 @@ export const createEngine = (): Engine => {
     decoder: createEngineDecoder({
       store,
       sampleRate: context.sampleRate,
-      playerPort: playerChannel.port1,
       spectrogramPort: spectrogramChannel.port1,
       onRecordingPeaksChanged: (message) => {
         ref.waveform.applyRecordingPeakPatch(message);
@@ -130,19 +131,27 @@ export const createEngine = (): Engine => {
       },
     }),
     player: createEnginePlayer({
-      context,
+      getContext,
       audioOutput,
       outputClock,
       audioSession,
       store,
-      decoderPort: playerChannel.port2,
       getDecoder: () => ref.decoder,
-      playheadPort: playerPlayheadChannel.port2,
-      playheadPorts: [
-        playerPlayheadChannel.port1,
-        spectrogramPlayheadChannel.port1,
-      ],
       position,
+      connect: async () => {
+        const data = new MessageChannel();
+        const playhead = new MessageChannel();
+        spectrogram.connectPlayhead(playhead.port2);
+        await ref.decoder.connectPlayer(data.port1);
+        return { dataPort: data.port2, playheadPort: playhead.port1 };
+      },
+      rebuildOutput: async () => {
+        const previous = context;
+        context = createAudioContext();
+        outputClock.attach(context);
+        await audioOutput.attach(context);
+        await previous.close();
+      },
     }),
     position,
     boot: async () => {

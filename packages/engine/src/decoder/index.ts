@@ -18,6 +18,7 @@ type Unmount = () => void;
 export type EngineDecoder = {
   port: ReturnType<typeof engineDecoderChannel.outbound<Worker>>;
   boot: () => Promise<void>;
+  connectPlayer: (playerPort: MessagePort) => Promise<void>;
   mount: (projectId: number) => Unmount;
   requestTarget: (window: PlayerWindow) => void;
   startRecordingStream: (options: {
@@ -44,7 +45,6 @@ export type EngineDecoder = {
 export type CreateEngineDecoderOptions = {
   store: Store<EngineState>;
   sampleRate: number;
-  playerPort: MessagePort;
   spectrogramPort: MessagePort;
   onRecordingPeaksChanged: (message: {
     recordingId: number;
@@ -61,7 +61,6 @@ export const createEngineDecoder = (
 ): EngineDecoder => {
   const {
     store,
-    playerPort,
     spectrogramPort,
     onRecordingPeaksChanged,
     onRecordingsChanged,
@@ -71,6 +70,7 @@ export const createEngineDecoder = (
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
+  let playerPromise: ControlledPromise<void> | undefined = undefined;
   let mountPromise: ControlledPromise<void> | undefined = undefined;
   let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
   let loopTrySettlePromise:
@@ -87,6 +87,10 @@ export const createEngineDecoder = (
   port.bindHandlers({
     booted: () => {
       bootPromise.resolve();
+    },
+    playerConnected: () => {
+      playerPromise?.resolve();
+      playerPromise = undefined;
     },
     setState: (message) => {
       store.update((state) => {
@@ -162,9 +166,16 @@ export const createEngineDecoder = (
   return {
     port,
     boot: async () => {
-      port.methods.boot({ playerPort, spectrogramPort });
+      port.methods.boot({ spectrogramPort });
 
       return bootPromise.promise;
+    },
+    connectPlayer: async (playerPort) => {
+      await bootPromise.promise;
+      playerPromise = createControlledPromise<void>();
+      const { promise } = playerPromise;
+      port.methods.connectPlayer({ playerPort });
+      await promise;
     },
     mount: createLazyMount((projectId: number) => {
       mountPromise = createControlledPromise<void>();

@@ -1,4 +1,4 @@
-import { Alert, Button, Stack } from '@mui/material';
+import { Alert, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
 import { type FC, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,22 +58,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
           <Alert severity='error'>{t('pages.project.realtime.error')}</Alert>
         )}
         {playerFailed && (
-          <Alert
-            severity='error'
-            action={
-              <Button
-                color='inherit'
-                size='small'
-                onClick={() => {
-                  window.location.reload();
-                }}
-              >
-                {t('pages.project.player.reload')}
-              </Button>
-            }
-          >
-            {t('pages.project.player.failed')}
-          </Alert>
+          <Alert severity='error'>{t('pages.project.player.failed')}</Alert>
         )}
         <ProjectContent />
         <PlaybackPanel />

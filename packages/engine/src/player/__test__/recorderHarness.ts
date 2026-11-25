@@ -6,9 +6,10 @@ import {
 import { createStore } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
 import { initialEngineState } from '../../state.js';
-import { createEngineStubPlayback, type EnginePlayback } from '../playback.js';
+import { type EnginePlayback } from '../playback.js';
 import { createEnginePosition } from '../position.js';
 import { createEngineRecorder, type EngineRecorder } from '../recorder.js';
+import { createEngineStubPlayback } from '../stubPlayback.js';
 
 const noop = (): void => undefined;
 
@@ -46,6 +47,7 @@ export const createRecorderHarness = (
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
+    attach: noop,
   };
   const finished: number[] = [];
   let started = 0;

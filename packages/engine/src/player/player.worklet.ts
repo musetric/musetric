@@ -24,7 +24,10 @@ export class PlayerProcessor
     if (this.player.injectFault) {
       // eslint-disable-next-line musetric/no-global-state -- the measure build gives the external driver one entry point
       Object.assign(globalThis, {
-        musetricMeasureHooks: { injectPlayerFault: this.player.injectFault },
+        musetricMeasureHooks: {
+          injectPlayerFault: this.player.injectFault,
+          readUnderruns: this.player.readUnderruns,
+        },
       });
     }
   }
