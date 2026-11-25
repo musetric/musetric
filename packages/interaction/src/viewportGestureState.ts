@@ -18,7 +18,6 @@ export type ViewportGestureOptions = {
   applyState: (state: ViewportState) => void;
   setFreeze: (freeze: boolean) => void;
   customPan?: (event: GesturePanStart) => ViewportCustomPan | undefined;
-  onTap?: (clientX: number, clientY: number) => void;
   readWheelAnchorRatio?: (state: ViewportPositionState) => number;
   zoomSensitivity?: number;
 };

@@ -121,7 +121,6 @@ export type SpectrogramGestureControls = {
   setViewWindow: (viewWindow: SpectrogramViewWindow) => void;
   setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   seek: (frameIndex: number) => void;
-  seekTap: (frameIndex: number) => void;
   setFreeze: (freeze: boolean) => void;
   onLimit: () => void;
 };
@@ -205,19 +204,6 @@ export const createSpectrogramGesture = (
       controls.setFreeze(shouldFreeze);
     },
     customPan,
-    onTap: (clientX) => {
-      const state = readPositionState(context);
-      const rect = element.getBoundingClientRect();
-      if (!state || rect.width <= 0) return;
-      const ratio = (clientX - rect.left) / rect.width;
-      controls.seekTap(
-        clamp(
-          state.position + (ratio - state.originRatio) * state.size,
-          state.minimumPosition,
-          state.maximumPosition,
-        ),
-      );
-    },
     readWheelAnchorRatio: (state) =>
       clamp(
         (context.getFrameIndex() - state.position) / state.size +

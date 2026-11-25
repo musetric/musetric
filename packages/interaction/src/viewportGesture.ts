@@ -46,7 +46,6 @@ export const createViewportGesture = (
     applyState,
     setFreeze,
     customPan,
-    onTap,
     readWheelAnchorRatio,
     zoomSensitivity = 0.002,
   } = options;
@@ -188,25 +187,7 @@ export const createViewportGesture = (
     mode = 'drag-zoom';
   };
 
-  const press = subscribePointerPress(element, {
-    press: () => {
-      const caught = inertiaRunner !== undefined;
-      stopInertia();
-      freeze();
-      return !caught;
-    },
-    release: (event, tapped) => {
-      if (mode === 'idle' && !inertiaRunner) {
-        if (tapped) {
-          onTap?.(event.clientX, event.clientY);
-        }
-        releaseFrozen();
-      }
-    },
-  });
-
   const handlePanStart = (event: GesturePanStart) => {
-    press.cancelTap();
     stopInertia();
     const zoomDrag = isZoomDragModifier(event.modifiers);
     activeCustomPan = zoomDrag ? undefined : customPan?.(event);
@@ -285,7 +266,6 @@ export const createViewportGesture = (
   };
 
   const handlePinchStart = (event: GesturePinchStart) => {
-    press.cancelTap();
     stopInertia();
     const state = readState(event.axis);
     if (!state) {
@@ -356,6 +336,18 @@ export const createViewportGesture = (
     );
   };
 
+  const disposePress = subscribePointerPress(element, {
+    press: () => {
+      stopInertia();
+      freeze();
+    },
+    release: () => {
+      if (mode === 'idle' && !inertiaRunner) {
+        releaseFrozen();
+      }
+    },
+  });
+
   const multiPointer = createMultiPointerGesture({
     element,
     createVelocityTracker: physics.createVelocityTracker,
@@ -384,7 +376,7 @@ export const createViewportGesture = (
       axisSizes.dispose();
       multiPointer.dispose();
       wheel.dispose();
-      press.dispose();
+      disposePress();
     },
   };
 };

@@ -1,4 +1,5 @@
 import {
+  isControlPress,
   isPointerInputType,
   isPrimaryPointerButton,
   type PointerInputType,
@@ -81,6 +82,7 @@ export const createSeekDrag = (options: SeekDragOptions): SeekDrag => {
     if (!isPointerInputType(event.pointerType)) return;
     if (!isPrimaryPointerButton(event)) return;
     if (!event.isPrimary) return;
+    if (isControlPress(element, event)) return;
 
     stop();
     ended = false;
