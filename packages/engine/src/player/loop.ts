@@ -28,6 +28,11 @@ export type CreateEnginePlayerLoopOptions = {
   queue: EngineCommandQueue;
   getDecoder: () => EngineDecoder;
   getEngineRecorder: () => EngineRecorder;
+  recordTake: (
+    projectId: number,
+    startPlayback: boolean,
+    pass: boolean,
+  ) => Promise<boolean>;
   seek: (frameIndex: number) => void;
   setRange: (range: EngineRange | undefined) => void;
 };
@@ -36,6 +41,7 @@ export const createEnginePlayerLoop = (
   options: CreateEnginePlayerLoopOptions,
 ): EnginePlayerLoop => {
   const { store, session, queue, getDecoder, getEngineRecorder } = options;
+  const { recordTake } = options;
   const { seek, setRange } = options;
 
   const discardTries = () => {
@@ -88,8 +94,7 @@ export const createEnginePlayerLoop = (
         if (
           !range ||
           currentState.loopStage !== 'sing' ||
-          isRecording(currentState) ||
-          currentState.statuses.player === 'error'
+          isRecording(currentState)
         ) {
           return;
         }
@@ -110,7 +115,7 @@ export const createEnginePlayerLoop = (
           session.failTake(playing);
         };
         try {
-          if (await getEngineRecorder().record(projectId, !playing, true)) {
+          if (await recordTake(projectId, !playing, true)) {
             session.settleTake();
           } else {
             failTry();

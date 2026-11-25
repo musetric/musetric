@@ -138,25 +138,45 @@ describe('play after a failure of the player', () => {
     await expectPlaysOnFrom(seam, held);
   });
 
-  it('keeps the take of the failure and records again after Play', async () => {
+  it('keeps the take of the failure and records the next one on Record', async () => {
     const seam = await open();
     await startTake(seam);
     seam.injectFault('caught');
     await seam.run(1);
     expect(seam.host).toEqual(['recording.start', 'recording.finish']);
     const kept = seam.hostFrames();
-    await seam.player.record(1);
     expectFailed(seam);
-    expect(seam.host).toEqual(['recording.start', 'recording.finish']);
-    await seam.player.play();
-    await startTake(seam);
+    const recording = seam.player.record(1);
+    while (seam.store.get().statuses.player !== 'success') {
+      await seam.run(1);
+    }
+    await flush();
+    seam.microphone.open();
+    await seam.run(quantaOfSeconds(0.5));
+    await recording;
     expect(seam.store.get().take).toBe('recording');
+    expect(isPlaying(seam.store.get())).toBe(true);
     expect(seam.host).toEqual([
       'recording.start',
       'recording.finish',
       'recording.start',
     ]);
     expect(seam.hostFrames()).toBeGreaterThan(kept + 0.4 * rate);
+  });
+
+  it('cancels a take whose Stop comes while Record starts the player again', async () => {
+    const seam = await open();
+    seam.injectFault('caught');
+    await seam.run(1);
+    const recording = seam.player.record(1);
+    expect(seam.store.get().take).toBe('arming');
+    await Promise.all([recording, seam.player.stop()]);
+    const state = seam.store.get();
+    expect(state.statuses.player).toBe('success');
+    expect(state.take).toBe('none');
+    expect(isPlaying(state)).toBe(false);
+    expect(isTransportBusy(state)).toBe(false);
+    expect(seam.host).toEqual([]);
   });
 
   it('builds the output again when the worklet does not boot again', async () => {

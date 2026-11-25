@@ -62,6 +62,7 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
+  let armingStops = 0;
   let holds = 0;
   const session = createEngineSessionMachine(store);
   const queue = createEngineCommandQueue(store);
@@ -71,6 +72,7 @@ export const createEnginePlayer = (
 
   const stop = async () => {
     if (store.get().take === 'arming') {
+      armingStops += 1;
       getEngineRecorder().cancel();
     }
     return queue.runStop(async () => {
@@ -145,6 +147,19 @@ export const createEnginePlayer = (
     return true;
   };
 
+  const recordTake = async (
+    projectId: number,
+    startPlayback: boolean,
+    pass: boolean,
+  ) => {
+    const stops = armingStops;
+    return (
+      (await revive()) &&
+      stops === armingStops &&
+      (await getEngineRecorder().record(projectId, startPlayback, pass))
+    );
+  };
+
   const startPlayback = createStartPlayback({
     store,
     session,
@@ -214,17 +229,14 @@ export const createEnginePlayer = (
     record: async (projectId) =>
       queue.run(async () => {
         const currentState = store.get();
-        if (
-          isRecording(currentState) ||
-          currentState.statuses.player === 'error'
-        ) {
+        if (isRecording(currentState)) {
           return;
         }
 
         const playing = isPlaying(currentState);
         session.beginTake();
         try {
-          if (await getEngineRecorder().record(projectId, !playing)) {
+          if (await recordTake(projectId, !playing, false)) {
             session.settleTake();
           } else {
             session.failTake(playing);
@@ -266,6 +278,7 @@ export const createEnginePlayer = (
       queue,
       getDecoder,
       getEngineRecorder,
+      recordTake,
       seek: (frameIndex) => {
         ref.seek(frameIndex, 'player');
       },
