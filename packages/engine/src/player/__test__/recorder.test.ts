@@ -11,7 +11,11 @@ describe('engine recorder', () => {
     const harness = createRecorderHarness({
       flushRecording: async () => new Promise(() => undefined),
     });
-    await harness.recorder.record(1, false);
+    await harness.recorder.record({
+      projectId: 1,
+      takeId: 'first',
+      startPlayback: false,
+    });
     let stopped = false;
     void harness.recorder.stop().then(() => {
       stopped = true;
@@ -20,7 +24,11 @@ describe('engine recorder', () => {
 
     expect(stopped).toBe(true);
     expect(harness.finished).toEqual([0]);
-    await harness.recorder.record(1, false);
+    await harness.recorder.record({
+      projectId: 1,
+      takeId: 'second',
+      startPlayback: false,
+    });
     expect(harness.started()).toBe(2);
   });
 });

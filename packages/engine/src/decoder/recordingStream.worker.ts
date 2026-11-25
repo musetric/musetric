@@ -3,19 +3,6 @@ import { type recordingStreamChannel } from '../player/recordingStream.cross.js'
 
 const recordingPacketHeaderByteLength = 12;
 
-type ControlledPromise = {
-  promise: Promise<void>;
-  resolve: () => void;
-};
-
-const createControlledPromise = (): ControlledPromise => {
-  const { promise, resolve: resolveFn } = Promise.withResolvers<void>();
-  return {
-    promise,
-    resolve: () => resolveFn(),
-  };
-};
-
 export const createRecordingPacket = (chunk: LiveTakeChunk): ArrayBuffer => {
   const { samples } = chunk;
   const packet = new ArrayBuffer(
@@ -79,14 +66,9 @@ const resolveFlushWaiters = (
 export type RecordingStreamOptions = {
   port: ReturnType<typeof recordingStreamChannel.outbound<MessagePort>>;
   onChunk: (chunk: LiveTakeChunk) => void;
-  onFlush?: () => void;
 };
 
 export type RecordingStream = {
-  start: Promise<void>;
-  finish: Promise<void>;
-  notifyStarted: () => void;
-  notifyFinished: () => void;
   waitForFlush: (sequence: number) => Promise<void>;
   close: () => void;
 };
@@ -94,9 +76,7 @@ export type RecordingStream = {
 export const createRecordingStream = (
   options: RecordingStreamOptions,
 ): RecordingStream => {
-  const { port, onChunk, onFlush } = options;
-  const start = createControlledPromise();
-  const finish = createControlledPromise();
+  const { port, onChunk } = options;
   let processedFlushSequence = 0;
   let flushWaiters: FlushWaiter[] = [];
   let closed = false;
@@ -107,8 +87,6 @@ export const createRecordingStream = (
     }
     closed = true;
     port.instance.close();
-    start.resolve();
-    finish.resolve();
     for (const waiter of flushWaiters) {
       waiter.resolve();
     }
@@ -135,24 +113,13 @@ export const createRecordingStream = (
   port.instance.start();
 
   return {
-    start: start.promise,
-    finish: finish.promise,
-    notifyStarted: () => {
-      start.resolve();
-    },
-    notifyFinished: () => {
-      start.resolve();
-      finish.resolve();
-    },
     waitForFlush: async (sequence) => {
-      if (processedFlushSequence < sequence) {
-        await new Promise<void>((resolve) => {
-          flushWaiters.push({ sequence, resolve });
-        });
+      if (closed || processedFlushSequence >= sequence) {
+        return;
       }
-      if (!closed) {
-        onFlush?.();
-      }
+      await new Promise<void>((resolve) => {
+        flushWaiters.push({ sequence, resolve });
+      });
     },
     close,
   };

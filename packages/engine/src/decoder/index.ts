@@ -8,10 +8,11 @@ import { type Store } from '../common/store.js';
 import { type PlayerWindow } from '../player/protocol.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
-import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
-
-const sanitizeLogMessage = (message: string) =>
-  message.replace(/[\r\n\u2028\u2029]/g, ' ');
+import {
+  engineDecoderChannel,
+  type SettledLoopTry,
+  type TakeRefusal,
+} from './protocol.cross.js';
 
 const realtimeNoticeDelayMs = 10_000;
 
@@ -24,6 +25,7 @@ export type EngineDecoder = {
   mount: (projectId: number) => Unmount;
   requestTarget: (window: PlayerWindow) => void;
   startRecordingStream: (options: {
+    takeId: string;
     projectId: number;
     sampleRate: number;
     frameCount: number;
@@ -34,7 +36,7 @@ export type EngineDecoder = {
     draft: boolean;
     port: MessagePort;
   }) => void;
-  finishRecordingStream: (sequence: number) => Promise<void>;
+  finishRecordingStream: (takeId: string, sequence: number) => Promise<void>;
   settleLoopTry: (keep: boolean) => Promise<SettledLoopTry | undefined>;
   selectLoopTry: (tryId: string | undefined) => void;
   deleteLoopTry: (tryId: string) => void;
@@ -55,7 +57,7 @@ export type CreateEngineDecoderOptions = {
   }) => void;
   onRecordingsChanged: (recordings: api.recording.Item[]) => void;
   onRecordingContentChanged: (recordingId: number) => void;
-  onRecordingStreamFailed: (dropped: boolean) => void;
+  onTakeRefused: (reason: TakeRefusal, streaming: boolean) => void;
 };
 
 export const createEngineDecoder = (
@@ -67,14 +69,15 @@ export const createEngineDecoder = (
     onRecordingPeaksChanged,
     onRecordingsChanged,
     onRecordingContentChanged,
-    onRecordingStreamFailed,
+    onTakeRefused,
   } = options;
   const worker = new Worker(decoderWorkerUrl, { type: 'module' });
   const port = engineDecoderChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let playerPromise: ControlledPromise<boolean> | undefined = undefined;
   let mountPromise: ControlledPromise<void> | undefined = undefined;
-  let recordingStreamPromise: ControlledPromise<void> | undefined = undefined;
+  const takeFinishes = new Map<string, ControlledPromise<void>>();
+  let streamingTakeId: string | undefined = undefined;
   let loopTrySettlePromise:
     ControlledPromise<SettledLoopTry | undefined> | undefined = undefined;
   let loopTryInsertPromise: ControlledPromise<boolean> | undefined = undefined;
@@ -161,6 +164,7 @@ export const createEngineDecoder = (
       store.update((state) => {
         state.statuses.decoder = 'pending';
         state.statuses.realtime = 'pending';
+        state.takeRefusal = undefined;
         state.frameCount = undefined;
         state.duration = 0;
         state.recordings = [];
@@ -174,18 +178,13 @@ export const createEngineDecoder = (
         state.loopTryPhase = undefined;
       });
     },
-    recordingStreamFinished: () => {
-      recordingStreamPromise?.resolve();
-      recordingStreamPromise = undefined;
+    recordingStreamFinished: (message) => {
+      takeFinishes.get(message.takeId)?.resolve();
+      takeFinishes.delete(message.takeId);
     },
-    recordingStreamFailed: (message) => {
-      console.error(
-        'Recording stream failed',
-        sanitizeLogMessage(message.error),
-      );
-      recordingStreamPromise?.resolve();
-      recordingStreamPromise = undefined;
-      onRecordingStreamFailed(realtimeDropped);
+    takeRefused: (message) => {
+      console.error('The host refused the take', message.reason);
+      onTakeRefused(message.reason, message.takeId === streamingTakeId);
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
     recordingsChanged: (message) => {
@@ -233,15 +232,17 @@ export const createEngineDecoder = (
       port.methods.requestTarget(window);
     },
     startRecordingStream: (recording) => {
-      recordingStreamPromise = createControlledPromise<void>();
+      streamingTakeId = recording.draft ? undefined : recording.takeId;
       port.methods.startRecordingStream(recording);
     },
-    finishRecordingStream: async (sequence) => {
-      if (!recordingStreamPromise) {
-        return;
+    finishRecordingStream: async (takeId, sequence) => {
+      if (streamingTakeId === takeId) {
+        streamingTakeId = undefined;
       }
-      port.methods.finishRecordingStream({ sequence });
-      await recordingStreamPromise.promise;
+      const finish = createControlledPromise<void>();
+      takeFinishes.set(takeId, finish);
+      port.methods.finishRecordingStream({ takeId, sequence });
+      await finish.promise;
     },
     settleLoopTry: async (keep) => {
       loopTrySettlePromise = createControlledPromise<

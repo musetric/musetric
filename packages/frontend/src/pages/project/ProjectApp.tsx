@@ -20,6 +20,7 @@ import { ProjectLayout } from './ProjectPageLayout.js';
 import { RecordingDeleteDialog } from './recording/RecordingDeleteDialog.js';
 import { RecordingListPicker } from './recording/RecordingListPicker.js';
 import { subscribeTakeInterruptions } from './recording/subscribeTakeInterruptions.js';
+import { TakeRefusedNotice } from './recording/TakeRefusedNotice.js';
 import { RhythmMetronomeSync } from './rhythm/RhythmMetronomeSync.js';
 import { ProjectSettings } from './settings/field/ProjectSettings.js';
 import { subscribeSettingsStore } from './settings/store.js';
@@ -37,6 +38,9 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
   );
   const playerFailed = useEngineStore(
     (state) => state.statuses.player === 'error',
+  );
+  const takeRefused = useEngineStore(
+    (state) => state.takeRefusal !== undefined,
   );
 
   useEffect(() => subscribeSettingsStore(), []);
@@ -62,6 +66,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
         <PlaybackPanel />
       </Stack>
       {playerFailed && <PlayerFailedNotice />}
+      {takeRefused && <TakeRefusedNotice />}
       <RhythmMetronomeSync projectId={project.id} />
       <MediaSessionSync title={project.name} coverUrl={project.previewUrl} />
       <ProjectShortcuts projectId={project.id} />

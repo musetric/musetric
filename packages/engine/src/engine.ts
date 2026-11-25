@@ -126,8 +126,13 @@ export const createEngine = (): Engine => {
           ref.waveform.refreshRecording();
         }
       },
-      onRecordingStreamFailed: (dropped) => {
-        void (dropped ? ref.player.stopRecording() : ref.player.stop());
+      onTakeRefused: (reason, streaming) => {
+        store.update((state) => {
+          state.takeRefusal = reason;
+        });
+        if (streaming) {
+          void ref.player.stopRecording();
+        }
       },
     }),
     player: createEnginePlayer({

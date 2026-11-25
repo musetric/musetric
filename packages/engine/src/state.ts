@@ -6,6 +6,7 @@ import {
   type SpectrogramColors,
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
+import { type TakeRefusal } from './decoder/protocol.cross.js';
 import { type PlayerMotion } from './player/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
@@ -116,6 +117,7 @@ export type EngineState = {
   motion: PlayerMotion;
   frozen: boolean;
   take: EngineTake;
+  takeRefusal?: TakeRefusal;
   recordings: api.recording.Item[];
   seekEvent: EngineSeekEvent;
   transposeSemitones: number;

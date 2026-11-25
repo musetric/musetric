@@ -187,6 +187,12 @@ export namespace realtime {
         startPeakIndex: number;
         peaks: number[];
       }
+    | {
+        type: 'recording.resumed';
+        sessionId: string;
+        recordingId: number;
+        runs: { startFrame: number; frameCount: number }[];
+      }
     | { type: 'recording.finished'; sessionId: string }
     | { type: 'recording.changed'; recordingId: number }
     | { type: 'recording.list'; recordings: recording.Item[] }

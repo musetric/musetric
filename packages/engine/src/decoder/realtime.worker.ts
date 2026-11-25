@@ -15,7 +15,7 @@ const createWebSocketUrl = (projectId: number) => {
 type InternalRealtime = {
   projectId: number;
   socket: WebSocket;
-  pendingMessages: (string | ArrayBuffer)[];
+  pendingMessages: string[];
   openPromise: Promise<void>;
   closed: boolean;
 };
@@ -37,7 +37,6 @@ const closeSocket = (realtime: InternalRealtime) => {
 };
 
 export type ProjectRealtimeOptions = {
-  isRecordingReady: () => boolean;
   onOpen: (projectId: number, reopened: boolean) => void;
   onEvent: (event: api.project.realtime.Event) => void;
   onClose: (error: Error) => void;
@@ -48,17 +47,15 @@ export type ProjectRealtime = {
   reconnect: () => void;
   drop: () => void;
   close: () => void;
-  ready: () => Promise<void>;
+  isOpen: () => boolean;
   sendJson: (message: object) => void;
   sendBinary: (packet: ArrayBuffer) => void;
-  dropPackets: () => void;
-  flush: () => void;
 };
 
 export const createProjectRealtime = (
   options: ProjectRealtimeOptions,
 ): ProjectRealtime => {
-  const { isRecordingReady, onOpen, onEvent, onClose } = options;
+  const { onOpen, onEvent, onClose } = options;
   let realtime: InternalRealtime | undefined = undefined;
   let wantedProjectId: number | undefined = undefined;
   let attempt = 0;
@@ -68,16 +65,16 @@ export const createProjectRealtime = (
     if (!realtime || realtime.socket.readyState !== WebSocket.OPEN) {
       return;
     }
-    const deferred: (string | ArrayBuffer)[] = [];
     for (const message of realtime.pendingMessages) {
-      if (typeof message !== 'string' && !isRecordingReady()) {
-        deferred.push(message);
-        continue;
-      }
       realtime.socket.send(message);
     }
-    realtime.pendingMessages = deferred;
+    realtime.pendingMessages = [];
   };
+
+  const isOpen = () =>
+    realtime !== undefined &&
+    !realtime.closed &&
+    realtime.socket.readyState === WebSocket.OPEN;
 
   const cancelRetry = () => {
     clearTimeout(retry);
@@ -174,7 +171,7 @@ export const createProjectRealtime = (
       current.closed = true;
       closeSocket(current);
     },
-    ready: async () => (realtime ? realtime.openPromise : Promise.resolve()),
+    isOpen,
     sendJson: (message) => {
       if (!realtime || realtime.closed) {
         return;
@@ -188,24 +185,11 @@ export const createProjectRealtime = (
       realtime.pendingMessages.push(json);
     },
     sendBinary: (packet) => {
-      if (!realtime || realtime.closed) {
+      if (!realtime || !isOpen()) {
         throw new Error('Project realtime socket is not open');
       }
-      if (realtime.socket.readyState === WebSocket.OPEN && isRecordingReady()) {
-        flush();
-        realtime.socket.send(packet);
-        return;
-      }
-      realtime.pendingMessages.push(packet);
+      flush();
+      realtime.socket.send(packet);
     },
-    dropPackets: () => {
-      if (!realtime) {
-        return;
-      }
-      realtime.pendingMessages = realtime.pendingMessages.filter(
-        (message) => typeof message === 'string',
-      );
-    },
-    flush,
   };
 };
