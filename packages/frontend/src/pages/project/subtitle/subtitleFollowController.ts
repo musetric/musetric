@@ -38,64 +38,34 @@ const getSubtitleWordStart = (wordElement: HTMLElement) => {
   return wordStart === undefined ? undefined : Number(wordStart);
 };
 
-const getSubtitleSegmentElementFromWord = (wordElement: HTMLElement) =>
-  wordElement.closest<HTMLElement>(`[${subtitleSegmentIndexAttribute}]`);
-
-const getSubtitleSegmentElementIndex = (segmentElement: HTMLElement) => {
-  const segmentIndex = segmentElement.dataset.subtitleSegmentIndex;
-  return segmentIndex === undefined ? undefined : Number(segmentIndex);
-};
-
 type Unsubscribe = () => void;
-
-export type SubtitleSeekEvent = {
-  revision: number;
-  origin: string;
-};
 
 export type SubtitleFollowControllerOptions = {
   element: HTMLDivElement;
   cursor: SubtitleCursor;
-  subtitleLength: number;
-  getSeekEvent: () => SubtitleSeekEvent;
-  subscribeSeekRevision: (callback: () => void) => Unsubscribe;
-  getSeekFrameIndex: (playbackTime: number) => number | undefined;
-  seek: (frameIndex: number, wordStart: number) => void;
-  isIgnoredSeekOrigin: (origin: string) => boolean;
-  isVisibleLineKept: () => boolean;
+  subscribeSeek: (callback: () => void) => Unsubscribe;
+  isMoving: () => boolean;
+  seekWord: (wordStart: number) => void;
 };
 
 export type SubtitleFollowController = {
   reset: () => void;
-  centerActive: () => void;
-  revealActive: () => void;
+  showActive: () => void;
   dispose: () => void;
 };
 
 export const createSubtitleFollowController = (
   options: SubtitleFollowControllerOptions,
 ): SubtitleFollowController => {
-  const {
-    element,
-    cursor,
-    subtitleLength,
-    getSeekEvent,
-    subscribeSeekRevision,
-    getSeekFrameIndex,
-    seek,
-    isIgnoredSeekOrigin,
-    isVisibleLineKept,
-  } = options;
+  const { element, cursor, subscribeSeek, isMoving, seekWord } = options;
 
   const controller = createFollowScrollController({
     element,
     getActiveIndex: () => cursor.getActiveSegmentIndex(),
     subscribeActiveIndex: cursor.subscribeActiveSegmentIndex,
+    subscribeSeek,
     locateElement: (index) => getSubtitleSegmentElement(element, index),
-    getRevision: () => getSeekEvent().revision,
-    subscribeRevision: subscribeSeekRevision,
-    isRevisionIgnored: () => isIgnoredSeekOrigin(getSeekEvent().origin),
-    isVisibleElementKept: isVisibleLineKept,
+    isMoving,
   });
 
   const handleClick = (event: MouseEvent) => {
@@ -105,33 +75,14 @@ export const createSubtitleFollowController = (
     const clickedWordStart = getSubtitleWordStart(clickedWordElement);
     if (clickedWordStart === undefined) return;
 
-    const clickedSegmentElement =
-      getSubtitleSegmentElementFromWord(clickedWordElement);
-    if (!clickedSegmentElement) return;
-
-    const clickedSegmentIndex = getSubtitleSegmentElementIndex(
-      clickedSegmentElement,
-    );
-    if (
-      clickedSegmentIndex === undefined ||
-      clickedSegmentIndex >= subtitleLength
-    ) {
-      return;
-    }
-
-    const frameIndex = getSeekFrameIndex(clickedWordStart);
-    if (frameIndex === undefined) return;
-
-    seek(frameIndex, clickedWordStart);
-    controller.activate(clickedSegmentIndex, event.clientY);
+    seekWord(clickedWordStart);
   };
 
   element.addEventListener('click', handleClick);
 
   return {
     reset: controller.reset,
-    centerActive: controller.centerActive,
-    revealActive: controller.revealActive,
+    showActive: controller.showActive,
     dispose: () => {
       element.removeEventListener('click', handleClick);
       controller.dispose();
