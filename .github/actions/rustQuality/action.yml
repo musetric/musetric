@@ -40,9 +40,7 @@ runs:
         cache-targets: false
         save-if: ${{ github.ref == 'refs/heads/main' }}
     - if: inputs.part == 'native'
-      uses: ./.github/actions/buildDsp
-      with:
-        script: build:app
+      uses: ./.github/actions/setupWasmBindgen
     - if: inputs.part == 'native'
       id: image
       run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"

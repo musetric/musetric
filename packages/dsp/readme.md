@@ -67,7 +67,7 @@ The package carries `license.md`, the project's `thirdPartyNotices.md`, with the
 pnpm build:project
 ```
 
-`build:project` builds the crate for `wasm32-unknown-unknown` once per module, each with only the features its pages call, and writes every module to `dist/` with wasm-bindgen for the web target; `build:app` builds only the modules the app imports. It needs `wasm-bindgen-cli` at the version of `wasm-bindgen` in `packages/server/Cargo.lock`:
+`build:project` builds the crate for `wasm32-unknown-unknown` once per module, each with only the features its pages call, and writes every module to `dist/` with wasm-bindgen for the web target; `build:app` builds only the modules the app imports, and every build of the app runs it first ([the app's commands](../app/readme.md#commands)). It needs `wasm-bindgen-cli` at the version of `wasm-bindgen` in `packages/server/Cargo.lock`:
 
 ```sh
 cargo install wasm-bindgen-cli --version <version> --locked

@@ -4,7 +4,7 @@
   "version": "../package.json",
   "identifier": "com.musetric.client",
   "build": {
-    "beforeDevCommand": "pnpm build:icons && pnpm dev:ui",
+    "beforeDevCommand": "pnpm build:ui && pnpm dev:ui",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build:ui",
     "frontendDist": "../dist"

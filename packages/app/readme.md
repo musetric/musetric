@@ -5,31 +5,27 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
 
 ## Commands
 
-| Command              | What it does                                                      |
-| -------------------- | ----------------------------------------------------------------- |
-| `pnpm dev:app`       | Runs the Tauri shell                                              |
-| `pnpm build:app`     | Compiles the shell without packaging it                           |
-| `pnpm init:android`  | Materializes `src-tauri/gen/android`                              |
-| `pnpm dev:android`   | Runs a connected device against the development server            |
-| `pnpm build:android` | Builds the APK; `--debug` builds one `adb shell run-as` can enter |
-| `pnpm init:ios`      | Materializes `src-tauri/gen/apple`                                |
-| `pnpm dev:ios`       | Runs a connected device against the development server            |
-| `pnpm build:ios`     | Builds the app                                                    |
+Every command runs from the root of the repository and builds all that the app
+packs: `pnpm build:ui`, which every build of the app and `pnpm dev:app` run,
+builds the WebAssembly of `@musetric/dsp` first. None of them needs
+`build:project`, which builds the packages for npm. A change of the page alone
+is checked quickest in a browser, with [`pnpm dev`](../../readme.md#development).
+
+| Command                                 | What it gives                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev:app`                          | Musetric Dev on this computer, a debug build whose window reads the page from `dist` at every load: after a change of the frontend, `pnpm --filter @musetric/app build:ui` and a reload of the window show it without a build of Rust                                  |
+| `pnpm build:app`                        | `packages/server/target/release/musetric-app.exe`, the release build without an installer, on the data of the installed app                                                                                                                                            |
+| `pnpm pack:installer`                   | The installers of this computer's platform, as `appBuild.yml` builds them                                                                                                                                                                                              |
+| `pnpm build:android`                    | Musetric Dev for an arm64 phone, a release build signed with the debug keystore, in `src-tauri/gen/android/app/build/outputs/apk/universal/release`; `--debug` builds a debuggable APK, which `adb shell run-as` can enter                                             |
+| `pnpm start:android <serial> --install` | Installs that APK with `adb install -r`, which keeps the app's data, starts Musetric Dev again until it stays up, since an install can stop its first start, and forwards the DevTools of its WebView to port 9333; `--eval <expression>` prints the value in the page |
+| `pnpm dev:ios`                          | Runs a connected device against the development server                                                                                                                                                                                                                 |
+| `pnpm build:ios`                        | Builds the app                                                                                                                                                                                                                                                         |
 
 ## Rules
 
-- On desktop the window of `pnpm dev:app` shows the page of `dist`, as the
-  last `pnpm build:ui` left it: a change of the frontend is built again before
-  it is checked there.
-- Every build of the app packs the WebAssembly of `@musetric/dsp` from
-  `packages/dsp/dist`, as its last build left it, since `pnpm build:ui` does not
-  build it. After a pull or a change of `packages/dsp`,
-  `pnpm --filter @musetric/dsp build:app` runs first, as the jobs of
-  `appBuild.yml` do: a page newer than its module can leave the player waiting
-  at the cursor for audio that never comes.
-- A script drives that window over the Chrome DevTools Protocol, such as
-  Playwright's `chromium.connectOverCDP`, when `pnpm dev:app` starts with
-  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`.
+- A script drives the window of the desktop app over the Chrome DevTools
+  Protocol, such as Playwright's `chromium.connectOverCDP`, when the app starts
+  with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`.
   WebView2 adds it to the app's own arguments of `src-tauri/src/lib.rs`, so the
   WebView keeps `--force_high_performance_gpu`.
 - A download of the page goes through `src-tauri/src/download.rs`: the file is
@@ -59,11 +55,16 @@ links the shared Rust server and runs the Musetric frontend in a WebView.
   the version and `MUSETRIC_PUBLISH`, builds every platform and publishes the
   GitHub release. The steps of each job live in a composite action of
   `.github/actions`: `appBuildDesktop`, `appBuildAndroid`, `appBuildIos`,
-  `uploadTestflight`, `uploadTestflightMacos` and `uploadGooglePlay`. Only the
-  dev mode marks its version as a development one; the testing and release
-  modes carry the version of `package.json`, which the stores take. It numbers
-  every iOS, macOS and Android build 1000 plus its run number, since App Store
-  Connect and Google Play refuse a number they already have.
+  `uploadTestflight`, `uploadTestflightMacos` and `uploadGooglePlay`. A job
+  runs the scripts of this package, so its build is the same command here:
+  `pnpm pack:installer --target <triple>` for a desktop,
+  `pnpm --filter @musetric/app build:android --aab --target aarch64 x86_64`
+  and `pnpm build:ios --no-sign`, with `MUSETRIC_PUBLISH=true` for Musetric
+  rather than Musetric Dev. Only the dev mode marks its version as a
+  development one; the testing and release modes carry the version of
+  `package.json`, which the stores take. It numbers every iOS, macOS and
+  Android build 1000 plus its run number, since App Store Connect and Google
+  Play refuse a number they already have.
   The macOS app is built once, by the desktop job: its DMG goes to the GitHub
   release, and the same app, unsigned, to the Mac App Store.
   In the testing mode jobs of their own sign the iOS build, the macOS app and

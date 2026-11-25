@@ -13,6 +13,8 @@ pnpm dev
 
 It needs Chrome, Edge or Chromium installed (`--browser` points the server at a specific one).
 
+The app on a desktop, an Android phone or an iPhone is built and started by [the app's commands](packages/app/readme.md#commands).
+
 ## License
 
 Musetric's source code is [MIT licensed](https://github.com/musetric/musetric/blob/main/license.md).

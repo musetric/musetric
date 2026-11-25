@@ -11,7 +11,7 @@
 
 - Musetric is split into a web app, a Rust host, audio-processing modules, and shared infrastructure packages.
 - `packages/frontend`: the main React application.
-- `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView.
+- `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView. [Its commands](packages/app/readme.md#commands) build and start it on each platform.
 - `packages/engine`: the audio engine the frontend drives: decoding, playback, recording sessions, calibration and the spectrogram, orchestrated in one state.
 - `packages/audio`: browser-side audio: decoding, recording, calibration, timeline and waveform, with workers and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.

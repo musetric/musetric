@@ -1,16 +1,9 @@
 name: Build DSP
-description: The Rust toolchain of packages/server with its WebAssembly target, wasm-bindgen at the version Cargo.lock locks, and @musetric/dsp built into packages/dsp/dist
-
-inputs:
-  script:
-    description: The script of @musetric/dsp that builds it, build:app for the modules the app imports
-    default: build:project
+description: The Rust toolchain of packages/server with its WebAssembly target, wasm-bindgen at the version Cargo.lock locks, and every module of @musetric/dsp built into packages/dsp/dist
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setupWasmBindgen
-    - run: pnpm --filter @musetric/dsp "$SCRIPT"
+    - run: pnpm --filter @musetric/dsp build:project
       shell: bash
-      env:
-        SCRIPT: ${{ inputs.script }}
