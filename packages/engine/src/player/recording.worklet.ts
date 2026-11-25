@@ -157,11 +157,13 @@ export const createRecordingRuntime = (
       return;
     }
     if (runWriteOffset >= runEndOffset) {
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when a pass ends
       endPass(true);
       return;
     }
     if (pass && passState === 'waiting') {
       passState = 'writing';
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when a pass starts
       port.methods.recordingPassStarted();
     }
     chunkSamples[recordingOffset] = Math.max(-1, Math.min(1, sample));
@@ -169,14 +171,14 @@ export const createRecordingRuntime = (
     runWriteOffset += 1;
 
     if (recordingOffset === chunkFrameCount) {
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a capture chunk every 256 frames, until stage 6 of #1201 moves recording
       flushRecordingBuffer();
     }
   };
 
   const writeInput = (inputs: (Float32Array[] | undefined)[]): void => {
-    const [input] = inputs;
-    const firstChannel = input?.[0];
-    const secondChannel = input?.[1];
+    const firstChannel = inputs[0]?.[0];
+    const secondChannel = inputs[0]?.[1];
     if (!firstChannel) {
       return;
     }
@@ -223,6 +225,7 @@ export const createRecordingRuntime = (
     }
     drainFrameCount -= inputs[0]?.[0]?.length ?? renderQuantumFrameCount;
     if (drainFrameCount <= 0) {
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the drain after a take ends
       flush();
     }
   };

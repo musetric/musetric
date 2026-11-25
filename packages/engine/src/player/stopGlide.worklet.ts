@@ -51,6 +51,7 @@ export const createStopGlide = (
         line.frameIndex + (heardContextFrame - line.contextFrame) * line.rate;
       if (frameIndex >= line.endFrame) {
         glide = undefined;
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the glide after Stop ends
         publishHeld();
         return;
       }

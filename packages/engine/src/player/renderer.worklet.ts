@@ -121,6 +121,7 @@ export const createPlayerRenderer = (
       first.byteOffset !== pointer ||
       first.length !== frameCount
     ) {
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the module's memory grows or a quantum changes its length
       outputViews = createOutputViews(
         stretch.memory.buffer,
         pointer,
@@ -209,6 +210,7 @@ export const createPlayerRenderer = (
       }
       reportedFrameIndex = frameIndex;
       const range = getRange();
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a window request, on a jump or after 12000 frames of the song
       dataPort.methods.requestWindow({
         frameIndex,
         loop: range?.repeat === 'cycle' ? range.range : undefined,

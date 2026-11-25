@@ -1,6 +1,7 @@
 import { noAliasConstantsRule } from './noAliasConstants.js';
 import { noAliasedReexportsRule } from './noAliasedReexports.js';
 import { noAliasTypesRule } from './noAliasTypes.js';
+import { noAudioThreadAllocationsRule } from './noAudioThreadAllocations.js';
 import { noClassesRule } from './noClasses.js';
 import { noComponentSpacingPropRule } from './noComponentSpacingProp.js';
 import { noDefensiveThrowGuardsRule } from './noDefensiveThrowGuards.js';
@@ -35,6 +36,7 @@ export const musetricRules = {
   'no-alias-constants': noAliasConstantsRule,
   'no-alias-types': noAliasTypesRule,
   'no-aliased-reexports': noAliasedReexportsRule,
+  'no-audio-thread-allocations': noAudioThreadAllocationsRule,
   'no-classes': noClassesRule,
   'no-component-spacing-prop': noComponentSpacingPropRule,
   'no-defensive-throw-guards': noDefensiveThrowGuardsRule,

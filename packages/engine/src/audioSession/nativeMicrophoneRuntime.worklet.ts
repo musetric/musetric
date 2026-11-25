@@ -98,9 +98,11 @@ export const createNativeMicrophoneRuntime = (
         output.fill(0);
         return;
       }
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- the ring makes its output view again only when the capture's memory grows or a quantum changes its length
       position = ring.render(output, position, step * correction);
       if (!ready && clock - startClock >= warmupFrames) {
         ready = true;
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the capture has filled its warmup
         onReady();
       }
     },
