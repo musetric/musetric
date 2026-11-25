@@ -54,6 +54,27 @@ const waitForSocket = async () => {
   return undefined;
 };
 
+const targetsSchema = z.array(
+  z.object({
+    type: z.string(),
+    title: z.string(),
+    url: z.string(),
+    webSocketDebuggerUrl: z.string(),
+  }),
+);
+
+const readPages = async (pid: string) => {
+  adb('forward', `tcp:${port}`, `localabstract:webview_devtools_remote_${pid}`);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/json`);
+    return targetsSchema
+      .parse(await response.json())
+      .filter((target) => target.type === 'page');
+  } catch {
+    return [];
+  }
+};
+
 const start = async () => {
   for (let attempt = 1; attempt <= 3; attempt++) {
     adb(
@@ -65,23 +86,20 @@ const start = async () => {
       `${packageName}/com.musetric.client.MainActivity`,
     );
     const pid = await waitForSocket();
-    await setTimeout(2000);
-    if (pid !== undefined && readPid() === pid) {
-      return pid;
+    if (pid !== undefined) {
+      await setTimeout(2000);
+      const pages = await readPages(pid);
+      if (
+        readPid() === pid &&
+        pages.some((page) => page.title === 'Musetric')
+      ) {
+        return pages;
+      }
     }
     console.log(`Musetric Dev did not stay up, start ${attempt} of 3`);
   }
   throw new Error(`Musetric Dev does not start on ${serial}`);
 };
-
-const targetsSchema = z.array(
-  z.object({
-    type: z.string(),
-    title: z.string(),
-    url: z.string(),
-    webSocketDebuggerUrl: z.string(),
-  }),
-);
 
 const evaluateSchema = z.object({
   id: z.number(),
@@ -120,12 +138,7 @@ if (values.install) {
   adb('install', '-r', apk);
   console.log(`Installed ${apk} in ${(Date.now() - started) / 1000} s`);
 }
-const pid = await start();
-adb('forward', `tcp:${port}`, `localabstract:webview_devtools_remote_${pid}`);
-const response = await fetch(`http://127.0.0.1:${port}/json`);
-const pages = targetsSchema
-  .parse(await response.json())
-  .filter((target) => target.type === 'page');
+const pages = await start();
 for (const page of pages) {
   console.log(`${page.title} ${page.url} ${page.webSocketDebuggerUrl}`);
 }
