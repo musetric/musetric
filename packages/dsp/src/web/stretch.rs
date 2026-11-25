@@ -122,9 +122,7 @@ pub fn drop_renderer_page(handle: usize, stem: usize, index: usize) {
 #[wasm_bindgen(js_name = rendererReady)]
 #[must_use]
 pub fn renderer_ready(handle: usize, frame: f64) -> bool {
-    with_player(handle, |player| {
-        player.renderer.mixer().ready(to_frame(frame))
-    })
+    with_player(handle, |player| player.renderer.ready(to_frame(frame)))
 }
 
 #[wasm_bindgen(js_name = setRendererVolumes)]

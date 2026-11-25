@@ -4,6 +4,7 @@ import {
   type LiveTakeStart,
   type playerDataChannel,
   type PlayerRecordingPiece,
+  type PlayerWindow,
 } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { createPageReads, type PageReads } from './pageReads.worker.js';
@@ -33,6 +34,7 @@ export type AudioDecode = {
   patchLiveTake: (chunk: LiveTakeChunk) => void;
   clearLiveTake: (takeId: string) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
+  requestTarget: (window: PlayerWindow) => void;
   unmount: () => void;
 };
 
@@ -240,6 +242,9 @@ export const createAudioDecode = (
       });
     },
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
+    requestTarget: (window) => {
+      pageReads?.requestTarget(window);
+    },
     unmount: () => {
       mounted = undefined;
       pageReads?.close();

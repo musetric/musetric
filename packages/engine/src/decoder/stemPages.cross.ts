@@ -31,6 +31,7 @@ export type StemPageSamples = {
 export type StemPagesOutboundMethods = {
   open: (message: StemPagesOpen) => void;
   read: (message: StemPageRequest) => void;
+  setWanted: (message: { indices: number[] }) => void;
   cancel: (message: { id: number }) => void;
 };
 
@@ -54,6 +55,6 @@ export const stemPagesChannel = createMessageChannel<
     },
   },
   outbound: {
-    keys: ['open', 'read', 'cancel'],
+    keys: ['open', 'read', 'setWanted', 'cancel'],
   },
 });

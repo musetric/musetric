@@ -5,6 +5,7 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
+import { type PlayerWindow } from '../player/protocol.cross.js';
 import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
@@ -18,6 +19,7 @@ export type EngineDecoder = {
   port: ReturnType<typeof engineDecoderChannel.outbound<Worker>>;
   boot: () => Promise<void>;
   mount: (projectId: number) => Unmount;
+  requestTarget: (window: PlayerWindow) => void;
   startRecordingStream: (options: {
     projectId: number;
     sampleRate: number;
@@ -175,6 +177,9 @@ export const createEngineDecoder = (
         port.methods.unmount();
       };
     }),
+    requestTarget: (window) => {
+      port.methods.requestTarget(window);
+    },
     startRecordingStream: (recording) => {
       recordingStreamPromise = createControlledPromise<void>();
       port.methods.startRecordingStream(recording);

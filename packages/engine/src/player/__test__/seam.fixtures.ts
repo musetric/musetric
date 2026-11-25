@@ -188,6 +188,7 @@ export const createSeam = async (
     });
   };
   const decoder = fake<EngineDecoder>({
+    requestTarget: noop,
     startRecordingStream,
     finishRecordingStream: async () => {
       host.push('recording.finish');

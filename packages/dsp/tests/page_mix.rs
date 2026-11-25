@@ -164,8 +164,8 @@ mod tests {
         let mut mixer = PageMixer::new(2, 3);
         load(&mut mixer, &stems, &STARTS, &[2]);
 
-        assert!(mixer.ready(40_000));
-        assert!(!mixer.ready(70_000));
+        assert!(mixer.ready(40_000, true));
+        assert!(!mixer.ready(70_000, true));
         let request = MixRequest {
             first: 72_000,
             count: 100,
@@ -179,7 +179,7 @@ mod tests {
         );
 
         load(&mut mixer, &stems, &STARTS, &[]);
-        assert!(mixer.ready(70_000));
+        assert!(mixer.ready(70_000, true));
     }
 
     #[test]

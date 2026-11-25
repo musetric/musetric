@@ -120,6 +120,7 @@ export type PageReadsOptions = {
 export type PageReads = {
   residentLimit: number;
   requestWindow: (window: PlayerWindow) => void;
+  requestTarget: (window: PlayerWindow) => void;
   requestLeadPages: (indices: number[]) => void;
   close: () => void;
 };
@@ -156,6 +157,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     },
   };
   let window: PlayerWindow = { frameIndex: 0 };
+  let played = window;
 
   const deliver = (stem: StemType, page: StemPageSamples) => {
     const state = stems[stem];
@@ -186,15 +188,16 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
 
   const pump = (stem: StemType) => {
     const state = stems[stem];
+    const missing = state.wanted.filter((index) => !state.resident.has(index));
     const queue = [
-      ...state.wanted.filter((index) => !state.resident.has(index)),
+      ...missing,
       ...[...state.asked].sort(byPlayDistance(state.layout, window)),
     ];
     for (const index of queue) {
-      if (state.reading.size >= readsPerStem) {
-        return;
-      }
-      if (state.reading.has(index)) {
+      if (
+        state.reading.has(index) ||
+        (!missing.includes(index) && state.reading.size >= readsPerStem)
+      ) {
         continue;
       }
       const controller = new AbortController();
@@ -219,12 +222,16 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     }
   };
 
-  return {
+  const reads: PageReads = {
     residentLimit: stemTypes.reduce(
       (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
       0,
     ),
     requestWindow: (next) => {
+      played = next;
+      reads.requestTarget(next);
+    },
+    requestTarget: (next) => {
       window = next;
       const { frameIndex, loop } = next;
       const wantSpans = [
@@ -248,6 +255,11 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
           from: frameIndex - (behindSeconds + keepSeconds) * sampleRate,
           to: frameIndex + (aheadSeconds + keepSeconds) * sampleRate,
         },
+        ...aheadSpans(
+          played.frameIndex,
+          aheadSeconds * sampleRate,
+          played.loop,
+        ),
       ];
       const dropped: PlayerPageKey[] = [];
       for (const stem of stemTypes) {
@@ -269,6 +281,9 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
             state.reading.delete(index);
           }
         }
+        readers[stem].setWanted(
+          state.wanted.filter((index) => !state.resident.has(index)),
+        );
       }
       if (dropped.length > 0) {
         options.dropPages(dropped);
@@ -303,4 +318,5 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       }
     },
   };
+  return reads;
 };

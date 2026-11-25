@@ -145,7 +145,8 @@ export const createEnginePlayer = (
       });
     },
     seek: (requestedFrameIndex, origin) => {
-      const frameIndex = clampToRange(requestedFrameIndex, store.get().range);
+      const { range, rangeRepeat } = store.get();
+      const frameIndex = clampToRange(requestedFrameIndex, range);
       position.write(frameIndex);
       store.update((state) => {
         state.seekEvent = {
@@ -153,6 +154,10 @@ export const createEnginePlayer = (
           frameIndex,
           origin,
         };
+      });
+      getDecoder().requestTarget({
+        frameIndex,
+        loop: rangeRepeat === 'cycle' ? range : undefined,
       });
       if (store.get().frozen) {
         heldSeek = frameIndex;

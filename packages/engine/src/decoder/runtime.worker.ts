@@ -146,6 +146,9 @@ export const createDecoderWorkerRuntime = (
       audioDecode.unmount();
       port.methods.unmounted();
     },
+    requestTarget: (message) => {
+      audioDecode.requestTarget(message);
+    },
     startRecordingStream: (message) => {
       draftStream = message.draft;
       if (message.draft) {
