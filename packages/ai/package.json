@@ -51,7 +51,6 @@
     "@musetric/spectrogram": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@types/node": "catalog:",
-    "@types/ws": "catalog:",
     "@typescript/native": "catalog:",
     "@webgpu/types": "catalog:",
     "eslint": "catalog:",
@@ -59,7 +58,6 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "ws": "catalog:",
     "zod": "catalog:"
   }
 }

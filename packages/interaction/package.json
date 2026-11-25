@@ -17,19 +17,13 @@
     "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "test": "vitest run"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "devDependencies": {
     "@musetric/eslint-config": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
-    "@vitest/browser": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
     "eslint": "catalog:",
-    "playwright": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

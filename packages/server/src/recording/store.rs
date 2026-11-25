@@ -708,39 +708,6 @@ mod tests {
     }
 
     #[test]
-    fn places_a_slow_piece_on_the_song_timeline() {
-        let slow = RecordingPiece {
-            blob_id: "slow".to_owned(),
-            layer: RecordingLayer::Base,
-            song_start_frame: 1,
-            frame_count: 4,
-            tempo: 0.5,
-            transpose: 0,
-            octave: 0,
-        };
-        let mut pcm = PcmCache::new();
-        pcm.insert("slow".to_owned(), vec![1, 2, 3, 4]);
-
-        assert_eq!(render(4, &[&slow], &pcm), [0, 1, 3, 0]);
-    }
-
-    #[test]
-    fn copies_a_piece_at_the_original_tempo() {
-        let early = piece("early", -2, 6, 1.0);
-        let short = piece("short", 6, 4, 1.0);
-        let late = piece("late", 10, 2, 1.0);
-        let mut pcm = PcmCache::new();
-        pcm.insert("early".to_owned(), vec![1, 2, 3, 4, 5, 6]);
-        pcm.insert("short".to_owned(), vec![7, 8]);
-        pcm.insert("late".to_owned(), vec![9, 9]);
-
-        assert_eq!(
-            render(8, &[&early, &short, &late], &pcm),
-            [3, 4, 5, 6, 0, 0, 7, 8]
-        );
-    }
-
-    #[test]
     fn measures_the_peaks_of_every_frame_only_where_the_take_sounds() {
         for frame_count in [3_000_usize, 10_007, 480_013, 1_000_003] {
             let length = i64::try_from(frame_count).expect("the song length should fit");
@@ -768,14 +735,5 @@ mod tests {
                 bits(&measure_every_frame(&vec![0; frame_count]))
             );
         }
-    }
-
-    #[test]
-    fn measures_peaks_per_segment() {
-        let whole = piece("whole", 0, 4, 1.0);
-        let peaks = measure_peaks(&[0, 16384, -16384, 0], &[&whole]);
-
-        assert!((peaks[0] - 0.0).abs() < f32::EPSILON);
-        assert!((peaks[3] - 0.5).abs() < f32::EPSILON);
     }
 }

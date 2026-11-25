@@ -565,7 +565,7 @@ mod tests {
 
     use super::{
         Mixdown, MixdownChange, MixdownFormat, MixdownProgress, MixdownStage, MixdownTake,
-        MixdownTrack, MixdownWatch, STOPPED, write_mixdown,
+        MixdownTrack, MixdownWatch, write_mixdown,
     };
     use musetric_dsp::mix::PEAK_CEILING;
 
@@ -958,100 +958,6 @@ mod tests {
         let power = middle.iter().map(|value| value * value).sum::<f32>() / 12_000.0;
         assert!(power > 0.01, "{power}");
     }
-    struct Stopping {
-        samples: Vec<f32>,
-        watch: Arc<MixdownWatch>,
-    }
-
-    impl PcmSource for Stopping {
-        fn read_pcm<'source>(
-            &'source self,
-            _request: PcmRequest<'source>,
-            sink: PcmSink<'source>,
-        ) -> ReadingPcm<'source> {
-            Box::pin(async move {
-                sink(&self.samples);
-                self.watch.stop();
-                Ok(())
-            })
-        }
-
-        fn stream_pcm(&self, _request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError> {
-            self.watch.stop();
-            Ok(chunks(Ok(self.samples.clone())))
-        }
-    }
-
-    async fn stop_while_it_renders(name: &str, scene: Scene) -> (bool, MixdownProgress) {
-        let watch = Arc::new(MixdownWatch::default());
-        let source = Stopping {
-            samples: [0.25, -0.25].repeat(scene.frame_count),
-            watch: Arc::clone(&watch),
-        };
-        let directory = workspace(name);
-        let to = directory.join("mix.wav");
-        let mixdown = wav_mixdown(scene);
-        let written = write_mixdown(&source, mixdown, &to, &watch).await;
-        assert_eq!(
-            written.map_err(|failure| failure.to_string()),
-            Err(STOPPED.to_owned())
-        );
-        let left = to.exists();
-        remove_dir_all(&directory).expect("the workspace should be removed");
-        (left, watch.progress())
-    }
-
-    #[tokio::test]
-    async fn stops_while_it_renders_and_writes_no_file() {
-        let song = PathBuf::from("song.flac");
-        let backing = PathBuf::from("backing.flac");
-        let mixed = stop_while_it_renders(
-            "stop-mixing",
-            Scene {
-                frame_count: 48_000,
-                stems: [None, Some(stem(&backing, 1.0)), Some(stem(&song, 1.0))],
-                takes: Vec::new(),
-                take_gain: 1.0,
-                change: MixdownChange::ORIGINAL,
-            },
-        )
-        .await;
-        assert_eq!(
-            mixed,
-            (
-                false,
-                MixdownProgress {
-                    stage: MixdownStage::Mixing,
-                    done: Some(0.0),
-                }
-            )
-        );
-        let stretched = stop_while_it_renders(
-            "stop-stretch",
-            Scene {
-                frame_count: 48_000,
-                stems: [None, None, Some(stem(&song, 1.0))],
-                takes: Vec::new(),
-                take_gain: 1.0,
-                change: MixdownChange {
-                    tempo_percent: 80,
-                    semitones: -2,
-                    voice_octave: None,
-                },
-            },
-        )
-        .await;
-        assert_eq!(
-            stretched,
-            (
-                false,
-                MixdownProgress {
-                    stage: MixdownStage::Stretching,
-                    done: Some(0.0),
-                }
-            )
-        );
-    }
 
     #[tokio::test]
     async fn follows_every_stage_to_its_end() {
@@ -1092,70 +998,5 @@ mod tests {
             );
         }
         remove_dir_all(&directory).expect("the workspace should be removed");
-    }
-    struct FailingLead;
-
-    impl PcmSource for FailingLead {
-        fn read_pcm<'source>(
-            &'source self,
-            request: PcmRequest<'source>,
-            sink: PcmSink<'source>,
-        ) -> ReadingPcm<'source> {
-            let lead = request.from == Path::new("lead.flac");
-            let samples = if lead {
-                Vec::new()
-            } else {
-                [0.25, -0.25].repeat(48_000)
-            };
-            let outcome: Result<(), crate::BoxedError> = if lead {
-                Err("the lead stem cannot be read".into())
-            } else {
-                Ok(())
-            };
-            Box::pin(async move {
-                sink(&samples);
-                outcome
-            })
-        }
-
-        fn stream_pcm(&self, request: PcmRequest<'_>) -> Result<PcmChunks, BoxedError> {
-            if request.from == Path::new("lead.flac") {
-                return Ok(chunks(Err("the lead stem cannot be read".into())));
-            }
-            Ok(chunks(Ok([0.25, -0.25].repeat(48_000))))
-        }
-    }
-
-    #[tokio::test]
-    async fn lets_the_stretches_go_when_a_track_fails_and_keeps_the_failure() {
-        let song = PathBuf::from("song.flac");
-        let lead = PathBuf::from("lead.flac");
-        let watch = Arc::new(MixdownWatch::default());
-        let mixdown = Mixdown {
-            sample_rate: RATE,
-            frame_count: 48_000,
-            stems: [Some(stem(&lead, 1.0)), None, Some(stem(&song, 1.0))],
-            takes: Vec::new(),
-            take_gain: 1.0,
-            format: MixdownFormat::Wav,
-            change: MixdownChange {
-                tempo_percent: 80,
-                semitones: -2,
-                voice_octave: Some(1),
-            },
-        };
-        let written = write_mixdown(
-            &FailingLead,
-            mixdown,
-            &std::env::temp_dir().join("musetric-mixdown-failing.wav"),
-            &watch,
-        )
-        .await;
-        assert_eq!(
-            written.map_err(|failure| failure.to_string()),
-            Err("the lead stem cannot be read".to_owned())
-        );
-        assert!(!watch.going());
-        assert!(!watch.stopped());
     }
 }

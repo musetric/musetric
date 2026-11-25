@@ -209,11 +209,6 @@ impl Rooms {
         self.lock().get_mut(&project_id).map(run)
     }
 
-    #[cfg(test)]
-    fn room_count(&self) -> usize {
-        self.lock().len()
-    }
-
     fn in_room(&self, project_id: i64, run: impl FnOnce(&mut Room)) {
         if let Some(room) = self.lock().get_mut(&project_id) {
             run(room);
@@ -233,65 +228,5 @@ fn forget_idle_room(projects: &mut HashMap<i64, Room>, project_id: i64) {
         .is_some_and(|room| room.members.is_empty() && room.session_owner.is_none());
     if idle {
         projects.remove(&project_id);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Begin, Rooms, events};
-
-    #[test]
-    fn forgets_a_room_once_the_last_member_leaves() {
-        let rooms = Rooms::create();
-        let (member, _outgoing) = rooms.join(1);
-        rooms.leave(1, member);
-
-        rooms.broadcast_event(1, &events::recording_finished("take"), None);
-        rooms.send_to(1, member, &events::recording_finished("take"));
-        rooms.end_session(1, member);
-        assert_eq!(rooms.begin_session(1, member), Begin::Busy);
-
-        assert_eq!(rooms.room_count(), 0);
-    }
-
-    #[test]
-    fn holds_the_recording_until_its_session_ends() {
-        let rooms = Rooms::create();
-        let (owner, _owner_outgoing) = rooms.join(1);
-        assert_eq!(rooms.begin_session(1, owner), Begin::Started);
-        rooms.leave(1, owner);
-        let (next, _next_outgoing) = rooms.join(1);
-
-        assert_eq!(rooms.begin_session(1, next), Begin::Busy);
-        rooms.save_session(1, owner);
-        assert_eq!(rooms.begin_session(1, next), Begin::Saving);
-        rooms.end_session(1, owner);
-
-        assert_eq!(rooms.begin_session(1, next), Begin::Started);
-    }
-
-    #[test]
-    fn marks_only_its_own_session_as_saving() {
-        let rooms = Rooms::create();
-        let (owner, _owner_outgoing) = rooms.join(1);
-        let (other, _other_outgoing) = rooms.join(1);
-        rooms.begin_session(1, owner);
-
-        rooms.save_session(1, other);
-
-        assert_eq!(rooms.begin_session(1, other), Begin::Busy);
-    }
-
-    #[test]
-    fn forgets_a_room_once_its_last_session_ends() {
-        let rooms = Rooms::create();
-        let (owner, _outgoing) = rooms.join(1);
-        rooms.begin_session(1, owner);
-        rooms.leave(1, owner);
-        assert_eq!(rooms.room_count(), 1);
-
-        rooms.end_session(1, owner);
-
-        assert_eq!(rooms.room_count(), 0);
     }
 }

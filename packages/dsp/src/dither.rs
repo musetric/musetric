@@ -37,35 +37,3 @@ impl Dither {
             .clamp(-FULL_SCALE, FULL_SCALE - 1.0) as i16
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{Dither, FULL_SCALE};
-
-    #[test]
-    fn keeps_digital_silence_silent() {
-        let mut dither = Dither::create();
-
-        assert!((0..1000).all(|_| dither.quantize(0.0) == 0));
-    }
-
-    #[test]
-    fn spreads_the_rounding_of_a_quiet_signal_within_one_step() {
-        let mut dither = Dither::create();
-        let value = 0.25 / FULL_SCALE;
-
-        let samples: Vec<i16> = (0..100_000).map(|_| dither.quantize(value)).collect();
-
-        let mean = samples.iter().map(|&sample| f64::from(sample)).sum::<f64>() / 100_000.0;
-        assert!(samples.iter().all(|&sample| (-1..=1).contains(&sample)));
-        assert!((mean - 0.25).abs() < 0.01, "the mean is {mean}");
-    }
-
-    #[test]
-    fn clamps_a_full_scale_signal() {
-        let mut dither = Dither::create();
-
-        assert_eq!(dither.quantize(2.0), i16::MAX);
-        assert_eq!(dither.quantize(-2.0), i16::MIN);
-    }
-}

@@ -39,10 +39,8 @@ const fake = <Type>(value: object): Type => value as Type;
 
 export type Seam = {
   player: EnginePlayer;
-  unclocked: EnginePlayer;
   store: Store<EngineState>;
   position: EnginePosition;
-  spectrogramPlayheadPort: MessagePort;
   host: string[];
   toWorklet: string[];
   fromWorklet: string[];
@@ -53,7 +51,6 @@ export type Seam = {
   postToWorklet: (message: unknown) => void;
   deliverFromWorklet: (message: unknown) => Promise<void>;
   hostFrames: () => number;
-  contextFrame: () => number;
   run: (quanta: number) => Promise<void>;
   frame: () => Promise<void>;
   close: () => void;
@@ -70,7 +67,6 @@ type FakeWorklet = {
 export type CreateSeamOptions = {
   before?: (store: Store<EngineState>) => void;
   bootFault?: true;
-  heardAfterFrames?: number;
 };
 
 export const createSeam = async (
@@ -153,13 +149,6 @@ export const createSeam = async (
     return animationCallbacks.length;
   });
   vi.stubGlobal('cancelAnimationFrame', noop);
-  const { heardAfterFrames } = options;
-  if (heardAfterFrames !== undefined) {
-    vi.stubGlobal('performance', {
-      timeOrigin: 0,
-      now: () => (contextFrame / rate) * 1000,
-    });
-  }
 
   const context = fake<AudioContext>({
     sampleRate: rate,
@@ -182,10 +171,7 @@ export const createSeam = async (
     play: async () => Promise.resolve(),
   });
   const outputClock: EngineOutputClock = {
-    read: () =>
-      heardAfterFrames === undefined
-        ? undefined
-        : { renderAhead: 0, clockOffset: -heardAfterFrames / rate },
+    read: () => undefined,
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
@@ -226,11 +212,6 @@ export const createSeam = async (
     position,
   });
   await player.boot();
-  if (heardAfterFrames !== undefined) {
-    store.update((state) => {
-      state.outputLatencyFrameCount = heardAfterFrames;
-    });
-  }
   const silence = new Float32Array(frameCount);
   mountTracks(
     playerDataChannel.outbound(data.port2),
@@ -291,10 +272,8 @@ export const createSeam = async (
       play: async () => clocked(player.play()),
       stop: async () => clocked(player.stop()),
     },
-    unclocked: player,
     store,
     position,
-    spectrogramPlayheadPort: spectrogramPlayhead.port2,
     host,
     toWorklet,
     fromWorklet,
@@ -322,7 +301,6 @@ export const createSeam = async (
       await flush();
     },
     hostFrames: () => hostFrames,
-    contextFrame: () => contextFrame,
     run,
     frame: async () => {
       await flush();

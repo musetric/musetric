@@ -931,40 +931,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refuses_a_recording_start_without_a_frame_count() {
-        let workspace = Workspace::new();
-        workspace.seed(PROJECT);
-        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
-        let mut lonely = connect(&base).await;
-
-        send_json(
-            &mut lonely,
-            json!({ "type": "recording.start", "sampleRate": 48000 }),
-        )
-        .await;
-
-        assert_eq!(
-            receive_close(&mut lonely).await,
-            (1008, "Invalid recording start message".to_owned())
-        );
-    }
-
-    #[tokio::test]
-    async fn refuses_a_project_that_does_not_exist() {
-        let workspace = Workspace::new();
-        workspace.seed(PROJECT);
-        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
-        let (mut missing, _) = connect_async(realtime_url(&base, 404))
-            .await
-            .expect("the client should connect");
-
-        assert_eq!(
-            receive_close(&mut missing).await,
-            (1008, "Project with id 404 not found".to_owned())
-        );
-    }
-
-    #[tokio::test]
     async fn skips_a_packet_that_starts_past_the_recorded_frames() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);

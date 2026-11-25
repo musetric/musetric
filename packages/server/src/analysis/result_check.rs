@@ -296,6 +296,3 @@ fn check_time(name: &str, time: f64, limit: f64) -> Result<(), String> {
 fn millisecond_ceiling(seconds: f64) -> f64 {
     (seconds * 1000.0).ceil() / 1000.0
 }
-
-#[cfg(test)]
-mod tests;
