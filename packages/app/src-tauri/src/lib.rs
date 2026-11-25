@@ -17,6 +17,8 @@ use tauri_plugin_window_state::StateFlags;
 use crate::assets::TauriAssets;
 
 mod assets;
+#[cfg(any(target_os = "windows", test))]
+mod capture;
 #[cfg(desktop)]
 mod download;
 #[cfg(mobile)]
@@ -77,7 +79,9 @@ pub fn run() {
 }
 
 fn run_app() -> tauri::Result<()> {
-    #[cfg(desktop)]
+    #[cfg(target_os = "windows")]
+    let builder = tauri::Builder::default().plugin(capture::init());
+    #[cfg(all(desktop, not(target_os = "windows")))]
     let builder = tauri::Builder::default();
     #[cfg(target_os = "android")]
     let builder = tauri::Builder::default().plugin(executor_view::init());
@@ -182,15 +186,17 @@ fn create_main_window<R: tauri::Runtime>(
 fn finish_main_window<R: tauri::Runtime, M: Manager<R>>(
     builder: WebviewWindowBuilder<'_, R, M>,
 ) -> tauri::Result<()> {
-    builder
+    let window = builder
         .on_download(|webview, event| download::handle(&webview, event))
         .on_permission_request(|webview, kind| permission::handle(&webview, kind))
         .on_navigation(settings::allow_navigation)
         .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .background_color(tauri::webview::Color(18, 18, 18, 255))
         .visible(false)
-        .build()?
-        .show()?;
+        .build()?;
+    #[cfg(target_os = "windows")]
+    permission::grant_microphone(&window);
+    window.show()?;
     Ok(())
 }
 

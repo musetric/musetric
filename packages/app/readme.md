@@ -92,7 +92,21 @@ is checked quickest in a browser, with [`pnpm dev`](../../readme.md#development)
 - Delete the platform directory under `src-tauri/gen` after an interrupted
   generator run, a Tauri CLI update or a branch with extra overlay files.
 - Both windows load from the embedded host over the loopback address
-  (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page has no Tauri IPC.
+  (`WebviewUrl::External` in `src-tauri/src/lib.rs`): the page reaches Tauri
+  IPC only for what a capability with `remote` grants it, now the commands of
+  the `microphone` plugin on Windows (`src-tauri/capabilities/microphone.json`).
+- On Windows the app captures the microphone natively, through WASAPI in its
+  raw mode where the device offers it (`src-tauri/src/capture`), when the
+  frontend is built with `frontendNativeMicrophone=true`; otherwise the page
+  captures through `getUserMedia`. A system joins by implementing
+  `CaptureSystem` of `src-tauri/src/capture/system.rs`, whose timestamps share
+  the clock of the `clock` command.
+- On Windows the app grants the microphone to the embedded host's origin in
+  the WebView2 profile when the main window opens
+  (`src-tauri/src/permission.rs`), so the page names its devices even though
+  the native capture never calls `getUserMedia`. Its module `grant` is the only
+  unsafe code of the workspace, which denies it everywhere else: WebView2 sets
+  a permission ahead of a request only through its COM interface.
 - Each identity has its own port of the embedded host, so that its page keeps
   one origin and with it its local storage: Musetric listens on 47206, Musetric
   Dev, a desktop debug build included, on 47205. `src-tauri/build.rs` sets the

@@ -104,7 +104,7 @@ resolver = "3"
 symphonia-opus = { git = "https://github.com/musetric/symphonia-opus", rev = "e7272663ddd5a77741c252b8c44ae026374e1092" }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 unreachable_pub = "deny"
 unused = { level = "deny", priority = -1 }
 
