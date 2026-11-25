@@ -1,8 +1,4 @@
 import { getFrequencyRange } from '@musetric/engine';
-import {
-  type GesturePanStart,
-  type ViewportCustomPan,
-} from '@musetric/interaction';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
@@ -16,13 +12,8 @@ import {
   type SpectrogramGestureControls,
 } from './createSpectrogramGesture.js';
 
-export type CreateSpectrogramCustomPan = (
-  element: HTMLElement,
-) => (event: GesturePanStart) => ViewportCustomPan | undefined;
-
 export const useSpectrogramGesture = (
   elementRef: RefObject<HTMLDivElement | null>,
-  createCustomPan?: CreateSpectrogramCustomPan,
 ) => {
   useEffect(() => {
     const element = elementRef.current;
@@ -70,11 +61,6 @@ export const useSpectrogramGesture = (
         requestedFrameIndex = roundedFrameIndex;
         engine.player.seek(roundedFrameIndex, 'spectrogramVisualization');
       },
-      seekTap: (frameIndex) => {
-        if (engine.store.get().loopStage === 'range') return;
-        requestedFrameIndex = Math.round(frameIndex);
-        engine.player.seek(requestedFrameIndex, 'spectrogramVisualization');
-      },
       setFreeze: (shouldFreeze) => {
         if (!shouldFreeze) {
           freeze.release();
@@ -89,12 +75,7 @@ export const useSpectrogramGesture = (
       },
     };
 
-    const gesture = createSpectrogramGesture({
-      element,
-      context,
-      controls,
-      customPan: createCustomPan?.(element),
-    });
+    const gesture = createSpectrogramGesture({ element, context, controls });
 
     const unsubscribeSeek = subscribeForeignSeek(
       'spectrogramVisualization',
@@ -111,5 +92,5 @@ export const useSpectrogramGesture = (
       gesture.dispose();
       freeze.release();
     };
-  }, [elementRef, createCustomPan]);
+  }, [elementRef]);
 };

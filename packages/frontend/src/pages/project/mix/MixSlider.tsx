@@ -1,18 +1,18 @@
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
-import { IconButton, Slider, Stack, Typography } from '@mui/material';
-import { type FC } from 'react';
+import { Box, IconButton, Slider, Stack, Typography } from '@mui/material';
+import { type FC, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { playHaptic } from '../haptics.js';
 import { TrackLabel } from '../waveform/TrackLabel.js';
 import {
   playVolumeTick,
-  rememberTrackVolume,
   setTrackVolume,
   toggleTrackMute,
   type TrackVolumeTarget,
   useTrackVolume,
+  useTrackVolumeDrag,
   volumeFullPercent,
   volumeMajorNotchIndex,
   volumeTickEvery,
@@ -34,6 +34,8 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
   const realtimeFailed = useEngineStore(
     (state) => state.statuses.realtime === 'error',
   );
+  const ref = useRef<HTMLDivElement>(null);
+  useTrackVolumeDrag(ref, target, realtimeFailed);
   const volumePercent = Math.round(trackVolume * volumeFullPercent);
   const muted = trackVolume === 0;
 
@@ -70,40 +72,40 @@ export const MixSlider: FC<MixSliderProps> = (props) => {
           </IconButton>
         </Stack>
       </Stack>
-      <Slider
-        color='primary'
-        disabled={realtimeFailed}
-        min={0}
-        max={volumeFullPercent}
-        marks={notches}
-        value={volumePercent}
-        onPointerDownCapture={() => {
-          rememberTrackVolume(target);
-        }}
-        onChange={(_, value) => {
-          playVolumeTick(volumePercent, value);
-          setTrackVolume(target, value / volumeFullPercent);
-        }}
-        sx={{
-          height: 4,
-          py: '10px',
-          '& .MuiSlider-rail': { bgcolor: 'action.selected', opacity: 1 },
-          '& .MuiSlider-track': { border: 'none' },
-          '& .MuiSlider-mark': {
-            width: 2,
+      <Box ref={ref} sx={{ display: 'flex' }}>
+        <Slider
+          color='primary'
+          disabled={realtimeFailed}
+          min={0}
+          max={volumeFullPercent}
+          marks={notches}
+          value={volumePercent}
+          onChange={(_, value) => {
+            playVolumeTick(volumePercent, value);
+            setTrackVolume(target, value / volumeFullPercent);
+          }}
+          sx={{
+            pointerEvents: 'none',
             height: 4,
-            borderRadius: 0,
-            opacity: 1,
-            bgcolor: 'background.paper',
-            backgroundImage: 'var(--Paper-overlay)',
-          },
-          [`& .MuiSlider-mark[data-index="${volumeMajorNotchIndex}"]`]: {
-            width: 3,
-          },
-          '& .MuiSlider-thumb': { width: 18, height: 18 },
-          '@media (any-pointer: coarse)': { py: '16px' },
-        }}
-      />
+            py: '10px',
+            '& .MuiSlider-rail': { bgcolor: 'action.selected', opacity: 1 },
+            '& .MuiSlider-track': { border: 'none' },
+            '& .MuiSlider-mark': {
+              width: 2,
+              height: 4,
+              borderRadius: 0,
+              opacity: 1,
+              bgcolor: 'background.paper',
+              backgroundImage: 'var(--Paper-overlay)',
+            },
+            [`& .MuiSlider-mark[data-index="${volumeMajorNotchIndex}"]`]: {
+              width: 3,
+            },
+            '& .MuiSlider-thumb': { width: 18, height: 18 },
+            '@media (any-pointer: coarse)': { py: '16px' },
+          }}
+        />
+      </Box>
     </Stack>
   );
 };

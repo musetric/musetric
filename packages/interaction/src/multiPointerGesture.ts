@@ -9,6 +9,7 @@ import {
   type PinchTrackerUpdate,
 } from './pinchTracker.js';
 import {
+  isControlPress,
   isPointerInputType,
   isPrimaryPointerButton,
   type PointerInputType,
@@ -185,6 +186,7 @@ export const createMultiPointerGesture = (
     if (!isPointerInputType(event.pointerType)) return;
     if (!pointerTypes.includes(event.pointerType)) return;
     if (!isPrimaryPointerButton(event)) return;
+    if (isControlPress(element, event)) return;
 
     const pointer: Pointer = {
       id: event.pointerId,

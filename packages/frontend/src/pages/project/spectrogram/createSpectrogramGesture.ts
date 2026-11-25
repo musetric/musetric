@@ -1,8 +1,6 @@
 import {
   createViewportGesture,
   type GestureAxis,
-  type GesturePanStart,
-  type ViewportCustomPan,
   type ViewportGesture,
   type ViewportPositionState,
   type ViewportRangeState,
@@ -36,28 +34,6 @@ export type SpectrogramGestureRange = {
   toFrame: number;
 };
 
-const readWindowState = (
-  viewWindow: SpectrogramViewWindow,
-  range: SpectrogramGestureRange | undefined,
-  frameCount: number,
-  sampleRate: number,
-): ViewportPositionState => {
-  const anchorFrame = range
-    ? (range.fromFrame + range.toFrame) / 2
-    : viewWindow.startFrame + viewWindow.frameCount / 2;
-  return {
-    kind: 'position',
-    position: anchorFrame,
-    size: viewWindow.frameCount,
-    originRatio: (anchorFrame - viewWindow.startFrame) / viewWindow.frameCount,
-    minimumPosition: 0,
-    maximumPosition: frameCount,
-    minimumSize: minVisibleTime * sampleRate,
-    maximumSize: Math.max(maxVisibleTime * sampleRate, frameCount),
-    panDirection: -1,
-  };
-};
-
 export type SpectrogramGestureContext = {
   getSampleRate: () => number;
   getFrameCount: () => number;
@@ -79,18 +55,20 @@ const readPositionState = (
   const sampleRate = context.getSampleRate();
   const range = context.getRange();
   const viewWindow = context.getViewWindow();
-  if (viewWindow) {
-    return readWindowState(viewWindow, range, frameCount, sampleRate);
-  }
+  const position = context.getFrameIndex();
   return {
     kind: 'position',
-    position: context.getFrameIndex(),
-    size: context.getVisibleTime() * sampleRate,
-    originRatio: context.getPlayheadRatio(),
+    position,
+    size: viewWindow?.frameCount ?? context.getVisibleTime() * sampleRate,
+    originRatio: viewWindow
+      ? (position - viewWindow.startFrame) / viewWindow.frameCount
+      : context.getPlayheadRatio(),
     minimumPosition: range?.fromFrame ?? 0,
     maximumPosition: range ? range.toFrame - 1 : frameCount,
     minimumSize: minVisibleTime * sampleRate,
-    maximumSize: maxVisibleTime * sampleRate,
+    maximumSize: viewWindow
+      ? Math.max(maxVisibleTime * sampleRate, frameCount)
+      : maxVisibleTime * sampleRate,
     panDirection: -1,
   };
 };
@@ -121,7 +99,6 @@ export type SpectrogramGestureControls = {
   setViewWindow: (viewWindow: SpectrogramViewWindow) => void;
   setFrequencyRange: (minFrequency: number, maxFrequency: number) => void;
   seek: (frameIndex: number) => void;
-  seekTap: (frameIndex: number) => void;
   setFreeze: (freeze: boolean) => void;
   onLimit: () => void;
 };
@@ -131,16 +108,15 @@ const applyState = (
   controls: SpectrogramGestureControls,
   state: ViewportState,
 ) => {
-  if (state.kind === 'position' && context.getViewWindow()) {
-    controls.setViewWindow({
-      startFrame: Math.round(state.position - state.originRatio * state.size),
-      frameCount: Math.round(state.size),
-    });
-    return;
-  }
   if (state.kind === 'position') {
-    const sampleRate = context.getSampleRate();
-    controls.setVisibleTime(state.size / sampleRate);
+    if (context.getViewWindow()) {
+      controls.setViewWindow({
+        startFrame: Math.round(state.position - state.originRatio * state.size),
+        frameCount: Math.round(state.size),
+      });
+    } else {
+      controls.setVisibleTime(state.size / context.getSampleRate());
+    }
     if (Math.round(state.position) !== Math.round(context.getFrameIndex())) {
       controls.seek(state.position);
     }
@@ -178,14 +154,13 @@ export type SpectrogramGestureOptions = {
   element: HTMLElement;
   context: SpectrogramGestureContext;
   controls: SpectrogramGestureControls;
-  customPan?: (event: GesturePanStart) => ViewportCustomPan | undefined;
   zoomSensitivity?: number;
 };
 
 export const createSpectrogramGesture = (
   options: SpectrogramGestureOptions,
 ): ViewportGesture => {
-  const { element, context, controls, customPan, zoomSensitivity } = options;
+  const { element, context, controls, zoomSensitivity } = options;
   let previous: ViewportState | undefined = undefined;
   return createViewportGesture({
     element,
@@ -203,20 +178,6 @@ export const createSpectrogramGesture = (
         previous = undefined;
       }
       controls.setFreeze(shouldFreeze);
-    },
-    customPan,
-    onTap: (clientX) => {
-      const state = readPositionState(context);
-      const rect = element.getBoundingClientRect();
-      if (!state || rect.width <= 0) return;
-      const ratio = (clientX - rect.left) / rect.width;
-      controls.seekTap(
-        clamp(
-          state.position + (ratio - state.originRatio) * state.size,
-          state.minimumPosition,
-          state.maximumPosition,
-        ),
-      );
     },
     readWheelAnchorRatio: (state) =>
       clamp(

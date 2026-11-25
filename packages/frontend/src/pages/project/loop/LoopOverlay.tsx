@@ -5,8 +5,6 @@ import { useEngineStore } from '../../../engine/useEngineStore.js';
 import { subscribeVisualizationRender } from '../visualization/visualizationRender.js';
 import { getXAtFrame } from './loopPointer.js';
 import { subscribeLoopEdgeDrag } from './subscribeLoopEdgeDrag.js';
-import { subscribeLoopGrabCursor } from './subscribeLoopGrabCursor.js';
-import { subscribeLoopTapSeek } from './subscribeLoopTapSeek.js';
 
 export const LoopOverlay: FC = () => {
   const stage = useEngineStore((state) => state.loopStage);
@@ -45,8 +43,6 @@ export const LoopOverlay: FC = () => {
     render();
     const unsubscribeFrom = subscribeLoopEdgeDrag(fromEdge, 'from', root);
     const unsubscribeTo = subscribeLoopEdgeDrag(toEdge, 'to', root);
-    const unsubscribeCursor = subscribeLoopGrabCursor(root);
-    const unsubscribeTapSeek = subscribeLoopTapSeek(root);
     const unsubscribeRender = subscribeVisualizationRender({
       resizeTarget: root,
       onResize: () => {
@@ -61,8 +57,6 @@ export const LoopOverlay: FC = () => {
     return () => {
       unsubscribeFrom();
       unsubscribeTo();
-      unsubscribeCursor();
-      unsubscribeTapSeek();
       unsubscribeRender();
     };
   }, [looping]);
@@ -78,7 +72,6 @@ export const LoopOverlay: FC = () => {
     left: -8,
     width: 16,
     cursor: 'ew-resize',
-    touchAction: 'none',
     pointerEvents: editable ? 'auto' : 'none',
     willChange: 'transform',
     zIndex: 1,

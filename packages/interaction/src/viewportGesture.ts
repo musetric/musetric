@@ -10,7 +10,7 @@ import {
   type GesturePinchStart,
   type GesturePinchUpdate,
 } from './multiPointerGesture.js';
-import { subscribePointerPress } from './pointerPress.js';
+import { createPointerDrag } from './pointerDrag.js';
 import {
   getViewportCoordinateAnchorRatio,
   getViewportDragZoomScale,
@@ -22,7 +22,6 @@ import {
   type ActivePan,
   type ActivePinchZoom,
   type ActiveZoom,
-  type ViewportCustomPan,
   type ViewportGesture,
   type ViewportGestureMode,
   type ViewportGestureOptions,
@@ -45,8 +44,6 @@ export const createViewportGesture = (
     readState,
     applyState,
     setFreeze,
-    customPan,
-    onTap,
     readWheelAnchorRatio,
     zoomSensitivity = 0.002,
   } = options;
@@ -56,7 +53,6 @@ export const createViewportGesture = (
   let activePan: ActivePan | undefined = undefined;
   let activePinchZoom: ActivePinchZoom | undefined = undefined;
   let activeDragZoom: ActiveDragZoom | undefined = undefined;
-  let activeCustomPan: ViewportCustomPan | undefined = undefined;
   let inertiaRunner: InertiaRunner<GestureAxis> | undefined = undefined;
   const axisSizes = observeViewportAxisSizes(element);
 
@@ -109,9 +105,6 @@ export const createViewportGesture = (
     activePan = undefined;
     activePinchZoom = undefined;
     activeDragZoom = undefined;
-    const customPanToEnd = activeCustomPan;
-    activeCustomPan = undefined;
-    customPanToEnd?.end();
   };
 
   const stopInertia = () => {
@@ -188,31 +181,9 @@ export const createViewportGesture = (
     mode = 'drag-zoom';
   };
 
-  const press = subscribePointerPress(element, {
-    press: () => {
-      const caught = inertiaRunner !== undefined;
-      stopInertia();
-      freeze();
-      return !caught;
-    },
-    release: (event, tapped) => {
-      if (mode === 'idle' && !inertiaRunner) {
-        if (tapped) {
-          onTap?.(event.clientX, event.clientY);
-        }
-        releaseFrozen();
-      }
-    },
-  });
-
   const handlePanStart = (event: GesturePanStart) => {
-    press.cancelTap();
     stopInertia();
-    const zoomDrag = isZoomDragModifier(event.modifiers);
-    activeCustomPan = zoomDrag ? undefined : customPan?.(event);
-    if (activeCustomPan) {
-      mode = 'custom-pan';
-    } else if (zoomDrag) {
+    if (isZoomDragModifier(event.modifiers)) {
       startDragZoom(event);
     } else {
       startPan(event);
@@ -221,11 +192,6 @@ export const createViewportGesture = (
   };
 
   const handlePanUpdate = (event: GesturePanUpdate) => {
-    if (mode === 'custom-pan' && activeCustomPan) {
-      activeCustomPan.update(event.delta);
-      return;
-    }
-
     if (mode === 'pan' && activePan && activePan.axis === event.axis) {
       applyPan(activePan, event.delta);
       return;
@@ -252,15 +218,6 @@ export const createViewportGesture = (
   };
 
   const handlePanEnd = (event: GesturePanEnd) => {
-    if (mode === 'custom-pan') {
-      const customPanToEnd = activeCustomPan;
-      activeCustomPan = undefined;
-      mode = 'idle';
-      customPanToEnd?.end();
-      releaseFrozen();
-      return;
-    }
-
     if (mode === 'pan' && activePan && activePan.axis === event.axis) {
       if (Math.abs(event.velocity) >= physics.inertiaMinimumVelocity) {
         startPanInertia(event.axis, event.velocity);
@@ -285,7 +242,6 @@ export const createViewportGesture = (
   };
 
   const handlePinchStart = (event: GesturePinchStart) => {
-    press.cancelTap();
     stopInertia();
     const state = readState(event.axis);
     if (!state) {
@@ -355,6 +311,17 @@ export const createViewportGesture = (
       Math.exp(-event.delta * zoomSensitivity),
     );
   };
+
+  const press = createPointerDrag(element, () => {
+    stopInertia();
+    freeze();
+    const release = () => {
+      if (mode === 'idle' && !inertiaRunner) {
+        releaseFrozen();
+      }
+    };
+    return { end: release, cancel: release };
+  });
 
   const multiPointer = createMultiPointerGesture({
     element,

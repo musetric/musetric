@@ -3,6 +3,7 @@ import { stemTypes } from '@musetric/audio';
 import { type FC, useEffect, useRef } from 'react';
 import { getTrackKey, type TrackVolumeTarget } from '../mix/trackVolume.js';
 import { TrackVolumeCell } from '../mix/TrackVolumeCell.js';
+import { useSeekDrag } from '../player/useSeekDrag.js';
 import { keepSystemGesturesOut } from '../systemGestures.js';
 import { VisualizationCursor } from '../visualization/VisualizationCursor.js';
 import { WaveformCanvas } from '../waveform/WaveformCanvas.js';
@@ -10,7 +11,6 @@ import {
   playedWidthVariable,
   useTracksCursorTime,
 } from './useTracksCursorTime.js';
-import { useTracksSeekDrag } from './useTracksSeekDrag.js';
 
 const nameColumnWidth = 116;
 
@@ -31,7 +31,7 @@ export const ProjectTracksVisualization: FC = () => {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const lanesRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLSpanElement>(null);
-  useTracksSeekDrag(lanesRef);
+  useSeekDrag(lanesRef, 'tracksVisualization', false);
   useTracksCursorTime(lanesRef, timeRef);
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -43,17 +43,12 @@ export const ProjectTracksVisualization: FC = () => {
       ref={surfaceRef}
       sx={{
         display: 'grid',
-        gridTemplateColumns: `${nameColumnWidth}px minmax(0, 1fr)`,
+        gridTemplateColumns: `minmax(0, 1fr) ${nameColumnWidth}px`,
         columnGap: 1,
         height: '100%',
         overflow: 'hidden',
       }}
     >
-      <Box sx={rowsSx}>
-        {tracks.map((track) => (
-          <TrackVolumeCell key={getTrackKey(track)} target={track} />
-        ))}
-      </Box>
       <Box ref={lanesRef} sx={{ ...rowsSx, position: 'relative' }}>
         {tracks.map((track) => (
           <Box
@@ -98,6 +93,11 @@ export const ProjectTracksVisualization: FC = () => {
             willChange: 'transform',
           }}
         />
+      </Box>
+      <Box sx={rowsSx}>
+        {tracks.map((track) => (
+          <TrackVolumeCell key={getTrackKey(track)} target={track} />
+        ))}
       </Box>
     </Box>
   );
