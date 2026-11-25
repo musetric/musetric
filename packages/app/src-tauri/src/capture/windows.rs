@@ -243,8 +243,21 @@ impl Capture {
         ))
     }
 
+    fn drain(&self, buffers: &mut Buffers) -> Result<(), Failure> {
+        while let Some(frames) = self
+            .reader
+            .get_next_packet_size()?
+            .filter(|frames| *frames > 0)
+        {
+            buffers.bytes.resize(frames as usize * BYTES_PER_SAMPLE, 0);
+            self.reader.read_from_device(&mut buffers.bytes)?;
+        }
+        Ok(())
+    }
+
     fn pump(&self, sink: &mut PacketSink, running: &AtomicBool) -> Result<(), Failure> {
         let mut buffers = Buffers::default();
+        self.drain(&mut buffers)?;
         while running.load(Ordering::Acquire) {
             if self.event.wait_for_event(WAIT_MS).is_err() {
                 continue;
