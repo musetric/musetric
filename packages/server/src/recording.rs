@@ -1,6 +1,8 @@
+mod manifest;
 mod plan;
 mod store;
 
+pub(crate) use manifest::{ManifestRun, TakeManifest, recover_takes, write_manifest};
 pub(crate) use store::{
     FinishedTake, History, RecordingSummary, Sounding, TakeFormat, TakeRun, commit_take,
     ensure_recording, frames_per_peak, holds_piece, is_active_recording, peak_index,

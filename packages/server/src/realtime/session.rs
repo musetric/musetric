@@ -15,8 +15,8 @@ use tokio::{
 use crate::{
     blobs::{StagedBlob, close_area, open_area, recording_area, stage_blob},
     recording::{
-        FinishedTake, History, TakeFormat, TakeRun, commit_take, ensure_recording, frames_per_peak,
-        peak_index, sample_value,
+        FinishedTake, History, ManifestRun, TakeFormat, TakeManifest, TakeRun, commit_take,
+        ensure_recording, frames_per_peak, peak_index, sample_value, write_manifest,
     },
     storage::{Storage, read_database},
     wav::{BYTES_PER_SAMPLE, HEADER_BYTE_LENGTH, create_header},
@@ -58,7 +58,13 @@ impl LivePeak {
     }
 }
 
+pub(crate) struct HeldRun {
+    pub(crate) start_frame: i64,
+    pub(crate) frame_count: i64,
+}
+
 pub(crate) struct Session {
+    take_id: Option<String>,
     recording_id: i64,
     song_frame_count: i64,
     sample_rate: i64,
@@ -75,9 +81,9 @@ pub(crate) struct Session {
 impl Session {
     pub(crate) async fn create(
         storage: &Arc<Storage>,
-        project_id: i64,
-        recording_id: i64,
+        (project_id, recording_id): (i64, i64),
         format: TakeFormat,
+        take_id: Option<String>,
     ) -> Result<Self, BoxedError> {
         let found =
             read_database(storage, move |database| database.project_name(project_id)).await?;
@@ -90,6 +96,7 @@ impl Session {
         let wave =
             open_for_update(&blob_path(&storage.blobs_path, &recording.wave_blob_id)).await?;
         Ok(Self {
+            take_id,
             recording_id,
             song_frame_count: recording.frame_count,
             sample_rate: recording.sample_rate,
@@ -161,10 +168,45 @@ impl Session {
             .seek(SeekFrom::Start(frame_offset(run_offset)?))
             .await?;
         run.audio.write_all(&chunk).await?;
+        run.audio.flush().await?;
         run.frame_count = run
             .frame_count
             .max(run_offset + i64::try_from(frame_length)?);
+        if let Some(manifest) = self.manifest() {
+            write_manifest(&self.area, &manifest).await?;
+        }
         Ok(frame_length)
+    }
+
+    pub(crate) fn held_runs(&self) -> Vec<HeldRun> {
+        self.runs
+            .iter()
+            .map(|run| HeldRun {
+                start_frame: run.start_frame,
+                frame_count: run.frame_count,
+            })
+            .collect()
+    }
+
+    fn manifest(&self) -> Option<TakeManifest> {
+        Some(TakeManifest {
+            take_id: self.take_id.clone()?,
+            recording_id: self.recording_id,
+            sample_rate: self.sample_rate,
+            tempo: self.tempo,
+            transpose: self.transpose,
+            octave: self.octave,
+            runs: self
+                .runs
+                .iter()
+                .map(|run| ManifestRun {
+                    blob_id: run.blob.blob_id().to_owned(),
+                    start_frame: run.start_frame,
+                    frame_count: run.frame_count,
+                })
+                .collect(),
+            published: Vec::new(),
+        })
     }
 
     #[expect(
@@ -239,6 +281,7 @@ impl Session {
         mut self,
         storage: &Arc<Storage>,
     ) -> Result<Option<History>, BoxedError> {
+        let manifest = self.manifest();
         let mut runs = Vec::with_capacity(self.runs.len());
         for mut run in self.runs {
             let header = create_header(
@@ -270,6 +313,7 @@ impl Session {
             let take = FinishedTake {
                 area: &self.area,
                 runs,
+                manifest,
             };
             commit_take(storage, self.recording_id, take)
                 .await

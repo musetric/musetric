@@ -1,7 +1,10 @@
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes};
 use serde_json::{Value, json};
 
-use crate::recording::{RecordingSummary, TakeFormat};
+use crate::{
+    realtime::session::HeldRun,
+    recording::{RecordingSummary, TakeFormat},
+};
 
 pub(crate) fn text(event: &Value) -> Message {
     Message::Text(Utf8Bytes::from(event.to_string()))
@@ -22,6 +25,19 @@ pub(crate) fn recording_started(session_id: &str, recording_id: i64, format: &Ta
         "tempo": format.tempo,
         "transpose": format.transpose,
         "octave": format.octave,
+    })
+}
+
+pub(crate) fn recording_resumed(session_id: &str, recording_id: i64, runs: &[HeldRun]) -> Value {
+    let held: Vec<Value> = runs
+        .iter()
+        .map(|run| json!({ "startFrame": run.start_frame, "frameCount": run.frame_count }))
+        .collect();
+    json!({
+        "type": "recording.resumed",
+        "sessionId": session_id,
+        "recordingId": recording_id,
+        "runs": held,
     })
 }
 

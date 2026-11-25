@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use musetric_db::{BoxedError, ProcessingStep, blob_path};
-use tokio::fs::{File, create_dir_all, remove_dir_all, remove_file, rename};
+use tokio::fs::{File, create_dir_all, remove_dir_all, remove_file, rename, try_exists};
 use uuid::Uuid;
 
 const UPLOAD_AREA: &str = "upload";
@@ -56,7 +56,10 @@ pub(crate) struct StagedBlob {
 }
 
 pub(crate) fn stage_blob(area: &Path, blobs_path: &Path) -> StagedBlob {
-    let blob_id = Uuid::new_v4().to_string();
+    staged_blob(area, blobs_path, Uuid::new_v4().to_string())
+}
+
+pub(crate) fn staged_blob(area: &Path, blobs_path: &Path, blob_id: String) -> StagedBlob {
     StagedBlob {
         staged: area.join(&blob_id),
         committed: blob_path(blobs_path, &blob_id),
@@ -90,6 +93,17 @@ impl StagedBlob {
 
     pub(crate) async fn discard(&self) {
         let _ = remove_file(&self.staged).await;
+    }
+
+    pub(crate) async fn reclaim(&self) -> Result<bool, BoxedError> {
+        if try_exists(&self.staged).await? {
+            return Ok(true);
+        }
+        if !try_exists(&self.committed).await? {
+            return Ok(false);
+        }
+        rename(&self.committed, &self.staged).await?;
+        Ok(true)
     }
 }
 
