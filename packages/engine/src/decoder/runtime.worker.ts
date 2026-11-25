@@ -26,6 +26,8 @@ import {
   type RecordingStream,
 } from './recordingStream.worker.js';
 
+const measure = import.meta.env.frontendMeasure === 'true';
+
 type TakeEvent = Extract<
   api.project.realtime.Event,
   { type: 'recording.started' | 'recording.finished' }
@@ -57,6 +59,15 @@ export const createDecoderWorkerRuntime = (
 
   let recordingController: RecordingController | undefined = undefined;
 
+  let mountedProjectId: number | undefined = undefined;
+
+  const readRecordingList = async (projectId: number) => {
+    const { recordings } = await getRecordingList(projectId);
+    if (mountedProjectId === projectId) {
+      recordingList.apply(recordings);
+    }
+  };
+
   const applyTakeEvent = (event: TakeEvent, connection: ProjectRealtime) => {
     const own = event.sessionId === recordingSessionId;
     if (event.type === 'recording.finished') {
@@ -80,8 +91,13 @@ export const createDecoderWorkerRuntime = (
 
   const realtime = createProjectRealtime({
     isRecordingReady: () => recordingReady,
-    onOpen: () => {
+    onOpen: (projectId, reopened) => {
       port.methods.setRealtimeState({ status: 'success' });
+      if (reopened) {
+        readRecordingList(projectId).catch((error: unknown) => {
+          console.error('Failed to read the recordings again', error);
+        });
+      }
     },
     onEvent: (event) => {
       if (isRecordingListEvent(event)) {
@@ -105,11 +121,18 @@ export const createDecoderWorkerRuntime = (
     onClose: (error) => {
       port.methods.setRealtimeState({ status: 'error' });
       console.error('Project realtime socket failed', error);
-      if (recordingStream) {
+      if (recordingStream && !draftStream) {
         recordingController?.failRecordingStream(error);
       }
     },
   });
+
+  if (measure) {
+    // eslint-disable-next-line musetric/no-global-state -- the measure build gives the external driver one entry point
+    Object.assign(globalThis, {
+      musetricMeasureHooks: { dropRealtime: realtime.drop },
+    });
+  }
 
   recordingController = createRecordingController({
     getRecordingStream: () => recordingStream,
@@ -134,9 +157,9 @@ export const createDecoderWorkerRuntime = (
     },
     mount: async (message) => {
       try {
+        mountedProjectId = message.projectId;
         realtime.open(message.projectId);
-        const { recordings } = await getRecordingList(message.projectId);
-        recordingList.apply(recordings);
+        await readRecordingList(message.projectId);
         const mounted = await audioDecode.mount(message);
         port.methods.mounted({ frameCount: mounted.frameCount });
       } catch (error) {
@@ -148,9 +171,13 @@ export const createDecoderWorkerRuntime = (
       loopTries.clear();
       recordingList.clear();
       recordingController.clearRecordingStream();
+      mountedProjectId = undefined;
       realtime.close();
       audioDecode.unmount();
       port.methods.unmounted();
+    },
+    reconnectRealtime: () => {
+      realtime.reconnect();
     },
     requestTarget: (message) => {
       audioDecode.requestTarget(message);

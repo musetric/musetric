@@ -126,8 +126,8 @@ export const createEngine = (): Engine => {
           ref.waveform.refreshRecording();
         }
       },
-      onRecordingStreamFailed: () => {
-        void ref.player.stop();
+      onRecordingStreamFailed: (dropped) => {
+        void (dropped ? ref.player.stopRecording() : ref.player.stop());
       },
     }),
     player: createEnginePlayer({

@@ -1,5 +1,8 @@
 import { api } from '@musetric/api';
 
+const reconnectDelayMs = (attempt: number) =>
+  Math.min(500 * 2 ** attempt, 10_000);
+
 const createWebSocketUrl = (projectId: number) => {
   const url = new URL(
     api.project.realtime.base.endpoint({ projectId }),
@@ -35,13 +38,15 @@ const closeSocket = (realtime: InternalRealtime) => {
 
 export type ProjectRealtimeOptions = {
   isRecordingReady: () => boolean;
-  onOpen: () => void;
+  onOpen: (projectId: number, reopened: boolean) => void;
   onEvent: (event: api.project.realtime.Event) => void;
   onClose: (error: Error) => void;
 };
 
 export type ProjectRealtime = {
   open: (projectId: number) => void;
+  reconnect: () => void;
+  drop: () => void;
   close: () => void;
   ready: () => Promise<void>;
   sendJson: (message: object) => void;
@@ -55,6 +60,9 @@ export const createProjectRealtime = (
 ): ProjectRealtime => {
   const { isRecordingReady, onOpen, onEvent, onClose } = options;
   let realtime: InternalRealtime | undefined = undefined;
+  let wantedProjectId: number | undefined = undefined;
+  let attempt = 0;
+  let retry: ReturnType<typeof setTimeout> | undefined = undefined;
 
   const flush = () => {
     if (!realtime || realtime.socket.readyState !== WebSocket.OPEN) {
@@ -71,60 +79,93 @@ export const createProjectRealtime = (
     realtime.pendingMessages = deferred;
   };
 
+  const cancelRetry = () => {
+    clearTimeout(retry);
+    retry = undefined;
+  };
+
+  const connect = (projectId: number) => {
+    cancelRetry();
+    const socket = new WebSocket(createWebSocketUrl(projectId));
+    socket.binaryType = 'arraybuffer';
+    const created: InternalRealtime = {
+      projectId,
+      socket,
+      pendingMessages: [],
+      openPromise: new Promise<void>((resolve, reject) => {
+        socket.addEventListener('open', () => {
+          if (!created.closed) {
+            const reopened = attempt > 0;
+            attempt = 0;
+            onOpen(projectId, reopened);
+            flush();
+          }
+          resolve();
+        });
+        socket.addEventListener('error', () => {
+          reject(new Error('Project realtime WebSocket failed'));
+        });
+      }),
+      closed: false,
+    };
+    socket.addEventListener(
+      'message',
+      (event: MessageEvent<string | ArrayBuffer>) => {
+        if (typeof event.data !== 'string') {
+          return;
+        }
+        try {
+          onEvent(JSON.parse(event.data));
+        } catch (error) {
+          console.error('Failed to process project realtime event', error);
+        }
+      },
+    );
+    socket.addEventListener('close', () => {
+      if (realtime === created) {
+        realtime = undefined;
+      }
+      if (created.closed) {
+        return;
+      }
+      retry = setTimeout(() => {
+        connect(projectId);
+      }, reconnectDelayMs(attempt));
+      attempt += 1;
+      onClose(new Error('Project realtime WebSocket closed'));
+    });
+    created.openPromise.catch(() => undefined);
+    realtime = created;
+  };
+
   return {
     open: (projectId) => {
       if (realtime && realtime.projectId === projectId && !realtime.closed) {
         return;
       }
+      if (wantedProjectId !== projectId) {
+        attempt = 0;
+      }
+      wantedProjectId = projectId;
       if (realtime) {
         realtime.closed = true;
         closeSocket(realtime);
       }
-      const socket = new WebSocket(createWebSocketUrl(projectId));
-      socket.binaryType = 'arraybuffer';
-      const created: InternalRealtime = {
-        projectId,
-        socket,
-        pendingMessages: [],
-        openPromise: new Promise<void>((resolve, reject) => {
-          socket.addEventListener('open', () => {
-            onOpen();
-            flush();
-            resolve();
-          });
-          socket.addEventListener('error', () => {
-            reject(new Error('Project realtime WebSocket failed'));
-          });
-        }),
-        closed: false,
-      };
-      socket.addEventListener(
-        'message',
-        (event: MessageEvent<string | ArrayBuffer>) => {
-          if (typeof event.data !== 'string') {
-            return;
-          }
-          try {
-            onEvent(JSON.parse(event.data));
-          } catch (error) {
-            console.error('Failed to process project realtime event', error);
-          }
-        },
-      );
-      socket.addEventListener('close', () => {
-        if (realtime === created) {
-          realtime = undefined;
-        }
-        if (!created.closed) {
-          onClose(new Error('Project realtime WebSocket closed'));
-        }
-      });
-      created.openPromise.catch((error: Error) => {
-        onClose(error);
-      });
-      realtime = created;
+      connect(projectId);
+    },
+    reconnect: () => {
+      if (realtime || wantedProjectId === undefined) {
+        return;
+      }
+      connect(wantedProjectId);
+    },
+    drop: () => {
+      realtime?.socket.close();
     },
     close: () => {
+      wantedProjectId = undefined;
+      attempt = 0;
+      cancelRetry();
       if (!realtime) {
         return;
       }

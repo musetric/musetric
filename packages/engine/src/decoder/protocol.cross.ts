@@ -13,6 +13,7 @@ export type EngineDecoderOutboundMethods = {
   connectPlayer: (message: { playerPort: MessagePort }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
   unmount: () => void;
+  reconnectRealtime: () => void;
   requestTarget: (message: PlayerWindow) => void;
   startRecordingStream: (message: {
     projectId: number;
@@ -87,6 +88,7 @@ export const engineDecoderChannel = createMessageChannel<
       'connectPlayer',
       'mount',
       'unmount',
+      'reconnectRealtime',
       'requestTarget',
       'startRecordingStream',
       'finishRecordingStream',

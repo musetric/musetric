@@ -13,6 +13,8 @@ import { engineDecoderChannel, type SettledLoopTry } from './protocol.cross.js';
 const sanitizeLogMessage = (message: string) =>
   message.replace(/[\r\n\u2028\u2029]/g, ' ');
 
+const realtimeNoticeDelayMs = 10_000;
+
 type Unmount = () => void;
 
 export type EngineDecoder = {
@@ -53,7 +55,7 @@ export type CreateEngineDecoderOptions = {
   }) => void;
   onRecordingsChanged: (recordings: api.recording.Item[]) => void;
   onRecordingContentChanged: (recordingId: number) => void;
-  onRecordingStreamFailed: () => void;
+  onRecordingStreamFailed: (dropped: boolean) => void;
 };
 
 export const createEngineDecoder = (
@@ -77,6 +79,40 @@ export const createEngineDecoder = (
     ControlledPromise<SettledLoopTry | undefined> | undefined = undefined;
   let loopTryInsertPromise: ControlledPromise<boolean> | undefined = undefined;
   const runtimeSampleRate = options.sampleRate;
+  let realtimeDropped = false;
+  let realtimeNotice: number | undefined = undefined;
+
+  const cancelRealtimeNotice = () => {
+    window.clearTimeout(realtimeNotice);
+    realtimeNotice = undefined;
+  };
+
+  const armRealtimeNotice = () => {
+    if (
+      realtimeNotice !== undefined ||
+      document.visibilityState !== 'visible'
+    ) {
+      return;
+    }
+    realtimeNotice = window.setTimeout(() => {
+      realtimeNotice = undefined;
+      store.update((state) => {
+        state.statuses.realtime = 'error';
+      });
+    }, realtimeNoticeDelayMs);
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (!realtimeDropped) {
+      return;
+    }
+    if (document.visibilityState !== 'visible') {
+      cancelRealtimeNotice();
+      return;
+    }
+    port.methods.reconnectRealtime();
+    armRealtimeNotice();
+  });
 
   port.instance.onerror = () => {
     store.update((state) => {
@@ -100,12 +136,15 @@ export const createEngineDecoder = (
       mountPromise = undefined;
     },
     setRealtimeState: (message) => {
+      realtimeDropped = message.status === 'error';
+      if (message.status === 'error') {
+        armRealtimeNotice();
+        return;
+      }
+      cancelRealtimeNotice();
       store.update((state) => {
         state.statuses.realtime = message.status;
       });
-      if (message.status === 'error') {
-        onRecordingStreamFailed();
-      }
     },
     mounted: (message) => {
       store.update((state) => {
@@ -117,6 +156,8 @@ export const createEngineDecoder = (
       mountPromise = undefined;
     },
     unmounted: () => {
+      realtimeDropped = false;
+      cancelRealtimeNotice();
       store.update((state) => {
         state.statuses.decoder = 'pending';
         state.statuses.realtime = 'pending';
@@ -144,7 +185,7 @@ export const createEngineDecoder = (
       );
       recordingStreamPromise?.resolve();
       recordingStreamPromise = undefined;
-      onRecordingStreamFailed();
+      onRecordingStreamFailed(realtimeDropped);
     },
     recordingPeaksChanged: onRecordingPeaksChanged,
     recordingsChanged: (message) => {
