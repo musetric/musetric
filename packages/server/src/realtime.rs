@@ -18,18 +18,20 @@ use axum::{
 };
 use musetric_db::BoxedError;
 use serde_json::Value;
+use uuid::Uuid;
 
 use crate::{
     realtime::channel::{CLOSE_GOING_AWAY, CLOSE_POLICY, CLOSE_UNSUPPORTED, Channel},
     recording::{
-        TakeFormat, is_active_recording, read_recordings, refresh_peaks, set_fresh_applied,
-        write_peaks,
+        History, TakeFormat, is_active_recording, read_recordings, refresh_peaks,
+        set_fresh_applied, write_peaks,
     },
     routes::RouteState,
     storage::{Storage, read},
 };
 
 pub(crate) use events::recording_item;
+use rooms::MemberId;
 pub(crate) use rooms::Rooms;
 
 const SAVE_WAIT: Duration = Duration::from_secs(30);
@@ -69,14 +71,55 @@ async fn serve(
     let (member, outgoing) = state.rooms.join(project_id);
     let mut channel = Channel::create(socket, outgoing, state.rooms.heartbeat());
     let mut connection = Connection::new(project_id, member, Arc::clone(&state.storage));
-    if open_project(&mut channel, &state.storage, project_id).await {
-        run_connection(&mut channel, &state.rooms, &mut connection).await;
-    }
+    let dropped = open_project(&mut channel, &state.storage, project_id).await
+        && run_connection(&mut channel, &state.rooms, &mut connection).await;
     state.rooms.leave(project_id, member);
+    if dropped && !state.rooms.is_closing() {
+        drop(channel);
+        park_take(&state.rooms, connection).await;
+        return;
+    }
     let _ = finish_session(&mut channel, &state.rooms, &mut connection).await;
     if state.rooms.is_closing() {
         channel.close(CLOSE_GOING_AWAY, "The host is closing").await;
     }
+}
+
+async fn park_take(rooms: &Rooms, connection: Connection) {
+    let Some(take) = connection.take else {
+        return;
+    };
+    let owner = (connection.project_id, connection.member);
+    let released = rooms.park(owner.0, owner.1, take);
+    let mut closing = rooms.closing();
+    tokio::select! {
+        () = tokio::time::sleep(rooms.parking_window()) => {}
+        _ = closing.wait_for(|closed| *closed) => {}
+        _ = released => {}
+    }
+    if let Some(parked) = rooms.unpark(owner.0, owner.1) {
+        commit_parked(rooms, &connection.storage, owner, parked).await;
+    }
+}
+
+async fn claim_room(rooms: &Rooms, storage: &Arc<Storage>, project_id: i64) {
+    if let Some((member, parked)) = rooms.claim_parked(project_id) {
+        commit_parked(rooms, storage, (project_id, member), parked).await;
+    }
+}
+
+async fn commit_parked(rooms: &Rooms, storage: &Arc<Storage>, owner: (i64, MemberId), take: Take) {
+    let saved = save_take(rooms, storage, owner, take).await;
+    let _ = settle_take(rooms, storage, owner, saved).await;
+}
+
+pub(crate) async fn begin_edit(
+    rooms: &Rooms,
+    storage: &Arc<Storage>,
+    project_id: i64,
+) -> Option<MemberId> {
+    claim_room(rooms, storage, project_id).await;
+    rooms.begin_edit(project_id)
 }
 
 async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id: i64) -> bool {
@@ -99,18 +142,22 @@ async fn open_project(channel: &mut Channel, storage: &Arc<Storage>, project_id:
     false
 }
 
-async fn run_connection(channel: &mut Channel, rooms: &Rooms, connection: &mut Connection) {
+async fn run_connection(channel: &mut Channel, rooms: &Rooms, connection: &mut Connection) -> bool {
     let mut closing = rooms.closing();
     while let Some(incoming) = channel.receive(&mut closing).await {
+        if matches!(incoming, Message::Close(_)) {
+            return true;
+        }
         if !receive_message(channel, rooms, connection, incoming).await {
-            break;
+            return false;
         }
     }
+    true
 }
 
 struct Connection {
     project_id: i64,
-    member: rooms::MemberId,
+    member: MemberId,
     storage: Arc<Storage>,
     take: Option<Take>,
     refused: Option<String>,
@@ -123,7 +170,7 @@ struct Take {
 }
 
 impl Connection {
-    fn new(project_id: i64, member: rooms::MemberId, storage: Arc<Storage>) -> Self {
+    fn new(project_id: i64, member: MemberId, storage: Arc<Storage>) -> Self {
         Self {
             project_id,
             member,
@@ -176,6 +223,15 @@ async fn handle_text(
             };
             start_recording(channel, rooms, connection, start).await
         }
+        "recording.resume" => {
+            let Some(session_id) = event.get("sessionId").and_then(Value::as_str) else {
+                channel
+                    .close(CLOSE_POLICY, "Invalid recording resume message")
+                    .await;
+                return false;
+            };
+            resume_recording(channel, rooms, connection, session_id).await
+        }
         "recording.finish" => finish_recording(channel, rooms, connection).await,
         "recording.undo" | "recording.redo" => {
             if let Some(recording_id) = event.get("recordingId").and_then(read_integer) {
@@ -197,6 +253,7 @@ async fn start_recording(
         channel.fail("Failed to start recording session").await;
         return false;
     }
+    claim_room(rooms, &connection.storage, connection.project_id).await;
     if !begin_after_save(rooms, connection).await {
         refuse_recording(rooms, connection, start.session_id);
         return true;
@@ -214,28 +271,54 @@ async fn start_recording(
     }
     let created = session::Session::create(
         &connection.storage,
-        connection.project_id,
-        start.recording_id,
+        (connection.project_id, start.recording_id),
         start.format,
+        Some(start.session_id.clone()),
     )
     .await;
     let session = match created {
         Ok(session) => session,
         Err(error) => {
             rooms.end_session(connection.project_id, connection.member);
-            channel
-                .fail(&format!("Failed to start recording session: {error}"))
-                .await;
-            return false;
+            let failed = events::failed(&format!("Failed to start recording session: {error}"));
+            rooms.send_to(connection.project_id, connection.member, &failed);
+            connection.refused = Some(start.session_id);
+            return true;
         }
     };
     let started = events::recording_started(&start.session_id, start.recording_id, &start.format);
     rooms.send_to(connection.project_id, connection.member, &started);
+    connection.refused = None;
     connection.take = Some(Take {
         session,
         id: start.session_id,
         recording_id: start.recording_id,
     });
+    true
+}
+
+async fn resume_recording(
+    channel: &mut Channel,
+    rooms: &Rooms,
+    connection: &mut Connection,
+    session_id: &str,
+) -> bool {
+    if finish_session(channel, rooms, connection).await.is_err() {
+        channel.fail("Failed to resume recording session").await;
+        return false;
+    }
+    let Some(take) = rooms.resume(connection.project_id, session_id, connection.member) else {
+        rooms.send_to(
+            connection.project_id,
+            connection.member,
+            &events::recording_finished(session_id),
+        );
+        return true;
+    };
+    let resumed = events::recording_resumed(&take.id, take.recording_id, &take.session.held_runs());
+    rooms.send_to(connection.project_id, connection.member, &resumed);
+    connection.refused = None;
+    connection.take = Some(take);
     true
 }
 
@@ -340,46 +423,69 @@ async fn finish_session(
     rooms: &Rooms,
     connection: &mut Connection,
 ) -> Result<(), BoxedError> {
-    let Some(Take {
-        session,
-        id,
-        recording_id,
-        ..
-    }) = connection.take.take()
-    else {
+    let Some(take) = connection.take.take() else {
         return Ok(());
     };
-    rooms.save_session(connection.project_id, connection.member);
-    let finished = session.finish(&connection.storage).await;
-    rooms.broadcast_event(
-        connection.project_id,
-        &events::recording_finished(&id),
-        finished.is_err().then_some(connection.member),
-    );
+    let owner = (connection.project_id, connection.member);
+    let saved = save_take(rooms, &connection.storage, owner, take).await;
     channel.flush().await;
+    settle_take(rooms, &connection.storage, owner, saved).await
+}
+
+struct SavedTake {
+    recording_id: i64,
+    finished: Result<Option<History>, BoxedError>,
+}
+
+async fn save_take(
+    rooms: &Rooms,
+    storage: &Arc<Storage>,
+    (project_id, member): (i64, MemberId),
+    take: Take,
+) -> SavedTake {
+    rooms.save_session(project_id, member);
+    let finished = take.session.finish(storage).await;
+    rooms.broadcast_event(
+        project_id,
+        &events::recording_finished(&take.id),
+        finished.is_err().then_some(member),
+    );
+    SavedTake {
+        recording_id: take.recording_id,
+        finished,
+    }
+}
+
+async fn settle_take(
+    rooms: &Rooms,
+    storage: &Arc<Storage>,
+    (project_id, member): (i64, MemberId),
+    saved: SavedTake,
+) -> Result<(), BoxedError> {
+    let SavedTake {
+        recording_id,
+        finished,
+    } = saved;
     let changed = match &finished {
         Ok(None) => false,
         Ok(Some(_)) => {
-            refresh_peaks(&connection.storage, recording_id).await;
+            refresh_peaks(storage, recording_id).await;
             true
         }
-        Err(_) => write_peaks(&connection.storage, recording_id).await.is_ok(),
+        Err(_) => write_peaks(storage, recording_id).await.is_ok(),
     };
     if changed {
-        rooms.broadcast_event(
-            connection.project_id,
-            &events::recording_changed(recording_id),
-            None,
-        );
+        rooms.broadcast_event(project_id, &events::recording_changed(recording_id), None);
     }
-    rooms.end_session(connection.project_id, connection.member);
+    rooms.end_session(project_id, member);
     if matches!(finished, Ok(Some(_))) {
-        announce_recordings(rooms, &connection.storage, connection.project_id).await;
+        announce_recordings(rooms, storage, project_id).await;
     }
     finished.map(|_| ())
 }
 
 async fn change_history(rooms: &Rooms, connection: &Connection, recording_id: i64, applied: bool) {
+    claim_room(rooms, &connection.storage, connection.project_id).await;
     if !begin_after_save(rooms, connection).await {
         return;
     }
@@ -421,7 +527,7 @@ pub(crate) async fn insert_take(
     (project_id, recording_id): (i64, i64),
     take: InsertedTake,
 ) -> Result<TakeInsert, BoxedError> {
-    let Some(editor) = rooms.begin_edit(project_id) else {
+    let Some(editor) = begin_edit(rooms, storage, project_id).await else {
         return Ok(TakeInsert::Busy);
     };
     let written = write_inserted_take(storage, (project_id, recording_id), take).await;
@@ -443,7 +549,7 @@ async fn write_inserted_take(
         return Ok(TakeInsert::Inactive);
     }
     let mut session =
-        session::Session::create(storage, project_id, recording_id, take.format).await?;
+        session::Session::create(storage, (project_id, recording_id), take.format, None).await?;
     session
         .write_chunk(take.start_frame, 0, &take.samples)
         .await?;
@@ -470,7 +576,10 @@ fn read_recording_start(event: &serde_json::Map<String, Value>) -> Option<Record
     let sample_rate = read_integer(event.get("sampleRate")?)?;
     let frame_count = read_integer(event.get("frameCount")?)?;
     let latency_frame_count = read_integer(event.get("latencyFrameCount")?)?;
-    let session_id = event.get("sessionId")?.as_str()?.to_owned();
+    let session_id = match event.get("sessionId") {
+        Some(id) => id.as_str()?.to_owned(),
+        None => Uuid::new_v4().to_string(),
+    };
     let tempo = event.get("tempo").map_or(Some(1.0), Value::as_f64)?;
     let transpose = event.get("transpose").map_or(Some(0), read_integer)?;
     let octave = event.get("octave").map_or(Some(0), read_integer)?;
@@ -527,9 +636,15 @@ mod tests {
 
     use musetric_db::{RecordingLayer, RecordingPiece};
 
-    use super::{Rooms, channel::Heartbeat, packet};
+    use super::{
+        Rooms,
+        channel::{HEARTBEAT, Heartbeat},
+        packet,
+        session::Session,
+    };
     use crate::{
-        recording::read_sounding,
+        blobs::recording_area,
+        recording::{TakeFormat, read_sounding, recover_takes},
         routes::{self, RouteState},
         storage::Storage,
         test_workspace::{Workspace, create_route_state},
@@ -548,12 +663,13 @@ mod tests {
     const QUARTER: i16 = 8191;
     const HALF: i16 = 16383;
     const THREE_QUARTERS: i16 = 24575;
-    const LONG_TAKE: usize = 48_000 * 300;
     const OWNER_TAKE: &str = "owner-take";
     const LISTENER_TAKE: &str = "listener-take";
     const SECOND_TAKE: &str = "second-take";
     const THIRD_TAKE: &str = "third-take";
     const SILENCE: Duration = Duration::from_millis(300);
+    const SHORT_WINDOW: Duration = Duration::from_secs(1);
+    const LONG_WINDOW: Duration = Duration::from_mins(1);
 
     type ClientSocket = tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
@@ -836,19 +952,190 @@ mod tests {
         );
     }
 
+    async fn serve_parking(
+        workspace: &Workspace,
+        storage: Arc<Storage>,
+        window: Duration,
+    ) -> (String, TestServer, Arc<Rooms>) {
+        let mut state = create_route_state(workspace, storage).await;
+        state.rooms = Arc::new(Rooms::with_timing(HEARTBEAT, window));
+        let rooms = Arc::clone(&state.rooms);
+        let (base, server) = serve_state(state).await;
+        (base, server, rooms)
+    }
+
+    async fn wait_for_parked(rooms: &Rooms) {
+        let parked = async {
+            while !rooms.holds_parked_take(1) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        };
+        timeout(Duration::from_secs(5), parked)
+            .await
+            .expect("the host should park the take of the dropped socket");
+    }
+
+    async fn expect_committed(socket: &mut ClientSocket, session_id: &str) {
+        assert_eq!(
+            receive_json(socket).await,
+            json!({ "type": "recording.finished", "sessionId": session_id })
+        );
+        assert_eq!(
+            receive_json(socket).await,
+            json!({ "type": "recording.changed", "recordingId": 1 })
+        );
+        assert_eq!(receive_json(socket).await["type"], "recording.list");
+    }
+
     #[tokio::test]
-    async fn ends_the_take_of_a_member_that_leaves_for_the_others() {
+    async fn commits_a_dropped_take_with_what_arrived_when_its_window_ends() {
         let workspace = Workspace::new();
         workspace.seed(PROJECT);
-        let (base, _server) = start_server(&workspace, workspace.create_storage()).await;
-        let (owner, mut listener) = start_recording_room(&base).await;
+        let storage = workspace.create_storage();
+        let (base, _server, rooms) =
+            serve_parking(&workspace, Arc::clone(&storage), SHORT_WINDOW).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, 0, &[0.5; 4]).await;
 
         drop(owner);
+        wait_for_parked(&rooms).await;
+        expect_silence(&mut listener).await;
+
+        timeout(
+            Duration::from_secs(5),
+            expect_committed(&mut listener, OWNER_TAKE),
+        )
+        .await
+        .expect("the host should commit the take once its window ends");
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [piece(RecordingLayer::Fresh, 0, 4)]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [HALF, HALF, HALF, HALF, 0, 0, 0, 0]
+        );
+    }
+
+    #[tokio::test]
+    async fn stores_every_frame_once_across_a_drop_and_a_resume() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server, rooms) =
+            serve_parking(&workspace, Arc::clone(&storage), LONG_WINDOW).await;
+        let mut dropped = connect(&base).await;
+        restart_take(&mut dropped, OWNER_TAKE).await;
+        sing(&mut dropped, 0, &[0.25; 4]).await;
+
+        drop(dropped);
+        wait_for_parked(&rooms).await;
+        let mut resumed = connect(&base).await;
+        send_json(
+            &mut resumed,
+            json!({ "type": "recording.resume", "sessionId": OWNER_TAKE }),
+        )
+        .await;
 
         assert_eq!(
-            receive_json(&mut listener).await,
-            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
+            receive_json(&mut resumed).await,
+            json!({
+                "type": "recording.resumed",
+                "sessionId": OWNER_TAKE,
+                "recordingId": 1,
+                "runs": [{ "startFrame": 0, "frameCount": 4 }],
+            })
         );
+        sing_packet(&mut resumed, chunk_at(0, 2, &[0.25; 2])).await;
+        sing_packet(&mut resumed, chunk_at(0, 4, &[0.5; 4])).await;
+        send_json(&mut resumed, json!({ "type": "recording.finish" })).await;
+        expect_committed(&mut resumed, OWNER_TAKE).await;
+        let pieces = stored_pieces(&storage);
+        assert_eq!(layout(&pieces), [piece(RecordingLayer::Fresh, 0, 8)]);
+        assert_eq!(
+            read_samples(&storage, &pieces[0].blob_id),
+            [QUARTER, QUARTER, QUARTER, QUARTER, HALF, HALF, HALF, HALF]
+        );
+    }
+
+    #[tokio::test]
+    async fn commits_a_parked_take_before_a_new_one_and_keeps_both() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let (base, _server, rooms) =
+            serve_parking(&workspace, Arc::clone(&storage), LONG_WINDOW).await;
+        let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
+        sing(&mut owner, 0, &[0.25; 2]).await;
+
+        drop(owner);
+        wait_for_parked(&rooms).await;
+        send_json(
+            &mut listener,
+            start_message(LISTENER_TAKE, SONG_FRAME_COUNT),
+        )
+        .await;
+
+        expect_committed(&mut listener, OWNER_TAKE).await;
+        assert_eq!(
+            receive_json(&mut listener).await,
+            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
+        );
+        sing(&mut listener, 4, &[0.5; 2]).await;
+        send_json(&mut listener, json!({ "type": "recording.finish" })).await;
+        expect_committed(&mut listener, LISTENER_TAKE).await;
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Base, 0, 2),
+                piece(RecordingLayer::Fresh, 4, 2),
+            ]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [QUARTER, QUARTER, 0, 0, HALF, HALF, 0, 0]
+        );
+    }
+
+    #[tokio::test]
+    async fn recovers_a_take_staged_before_a_crash_when_the_host_starts() {
+        let workspace = Workspace::new();
+        workspace.seed(PROJECT);
+        let storage = workspace.create_storage();
+        let format = TakeFormat {
+            sample_rate: 48000,
+            frame_count: 8,
+            tempo: 1.0,
+            transpose: 0,
+            octave: 0,
+        };
+        let mut crashed = Session::create(&storage, (1, 1), format, Some(OWNER_TAKE.to_owned()))
+            .await
+            .expect("the take should open");
+        for (start_frame, offset, samples) in
+            [(0, 0, [0.25; 2]), (4, 0, [0.5; 2]), (4, 2, [0.5; 2])]
+        {
+            crashed
+                .write_chunk(start_frame, offset, &samples)
+                .await
+                .expect("the chunk should reach the disk");
+        }
+        drop(crashed);
+
+        recover_takes(&storage).await;
+
+        assert_eq!(
+            layout(&stored_pieces(&storage)),
+            [
+                piece(RecordingLayer::Fresh, 0, 2),
+                piece(RecordingLayer::Fresh, 4, 4),
+            ]
+        );
+        assert_eq!(
+            composite(&storage).await,
+            [QUARTER, QUARTER, 0, 0, HALF, HALF, HALF, HALF]
+        );
+        assert!(!recording_area(&storage.work_path, 1).exists());
     }
 
     #[tokio::test]
@@ -878,37 +1165,6 @@ mod tests {
         assert_eq!(
             receive_json(&mut owner).await,
             json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
-        );
-    }
-
-    async fn wait_for_saving(rooms: &Rooms) {
-        while rooms.holds_unsaved_session(1) {
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    }
-
-    #[tokio::test]
-    async fn starts_a_new_take_once_the_previous_one_is_saved() {
-        let workspace = Workspace::new();
-        workspace.seed(PROJECT);
-        let state = create_route_state(&workspace, workspace.create_storage()).await;
-        let rooms = Arc::clone(&state.rooms);
-        let (base, _server) = serve_state(state).await;
-        let (owner, mut listener) = start_recording_room_for(&base, LONG_TAKE).await;
-
-        drop(owner);
-        timeout(Duration::from_secs(5), wait_for_saving(&rooms))
-            .await
-            .expect("the host should start saving the take of the member that left");
-        send_json(&mut listener, start_message(LISTENER_TAKE, FRAME_COUNT)).await;
-
-        assert_eq!(
-            receive_json(&mut listener).await,
-            json!({ "type": "recording.finished", "sessionId": OWNER_TAKE })
-        );
-        assert_eq!(
-            receive_json(&mut listener).await,
-            json!({ "type": "recording.started", "sessionId": LISTENER_TAKE, "recordingId": 1, "tempo": 1.0, "transpose": 0, "octave": 0 })
         );
     }
 
@@ -1544,10 +1800,13 @@ mod tests {
         workspace.seed(PROJECT);
         let storage = workspace.create_storage();
         let mut state = create_route_state(&workspace, Arc::clone(&storage)).await;
-        state.rooms = Arc::new(Rooms::with_heartbeat(Heartbeat {
-            interval: Duration::from_millis(100),
-            silence: Duration::from_secs(1),
-        }));
+        state.rooms = Arc::new(Rooms::with_timing(
+            Heartbeat {
+                interval: Duration::from_millis(100),
+                silence: Duration::from_secs(1),
+            },
+            SHORT_WINDOW,
+        ));
         let (base, _server) = serve_state(state).await;
         let (mut owner, mut listener) = start_recording_room_for(&base, SONG_FRAME_COUNT).await;
         sing(&mut owner, 0, &[0.5; 4]).await;

@@ -9,7 +9,10 @@ use tokio::fs::{create_dir_all, read as read_file, rename, try_exists, write as 
 use crate::{
     blobs::{StagedBlob, stage_blob},
     publish::publish,
-    recording::plan::{PlannedPiece, base_pieces, fresh_pieces, keep_base, merge_fresh, plan_take},
+    recording::{
+        manifest::{TakeManifest, write_manifest},
+        plan::{PlannedPiece, base_pieces, fresh_pieces, keep_base, merge_fresh, plan_take},
+    },
     storage::{Storage, read_database, write_database},
     wav::{HEADER_BYTE_LENGTH, create_header},
 };
@@ -41,6 +44,7 @@ pub(crate) struct TakeRun {
 pub(crate) struct FinishedTake<'area> {
     pub(crate) area: &'area Path,
     pub(crate) runs: Vec<TakeRun>,
+    pub(crate) manifest: Option<TakeManifest>,
 }
 
 pub(crate) struct Sounding {
@@ -533,8 +537,9 @@ async fn assemble_take(
 pub(crate) async fn commit_take(
     storage: &Arc<Storage>,
     recording_id: i64,
-    take: FinishedTake<'_>,
+    mut take: FinishedTake<'_>,
 ) -> Result<History, BoxedError> {
+    let manifest = take.manifest.take();
     let (recording, stored) = read_state(storage, recording_id)
         .await?
         .ok_or(MISSING_RECORDING)?;
@@ -581,6 +586,13 @@ pub(crate) async fn commit_take(
         });
     }
     let (take_blobs, take_pieces) = assemble_take(storage, take, sample_rate).await?;
+    if let Some(mut published) = manifest {
+        published.published = take_pieces
+            .iter()
+            .map(|piece| piece.blob_id.clone())
+            .collect();
+        write_manifest(area, &published).await?;
+    }
     next.extend(take_pieces);
     staged.extend(take_blobs);
     let committed: Vec<&StagedBlob> = staged.iter().collect();

@@ -13,7 +13,9 @@ use crate::{
     blobs::upload_area,
     failure::{Failure, finish, invalid_number},
     form::{Field, Form, UploadTarget, read_form},
-    realtime::{InsertedTake, TakeInsert, announce_recordings, insert_take, recording_item},
+    realtime::{
+        InsertedTake, TakeInsert, announce_recordings, begin_edit, insert_take, recording_item,
+    },
     recording::{TakeFormat, read_recordings},
     routes::{
         RouteState,
@@ -106,7 +108,7 @@ async fn locked<Value>(
 where
     Value: Send + 'static,
 {
-    let Some(editor) = state.rooms.begin_edit(project_id) else {
+    let Some(editor) = begin_edit(&state.rooms, &state.storage, project_id).await else {
         return Err(Failure::Conflict(BUSY.to_owned()));
     };
     let written = write(&state.storage, change).await;

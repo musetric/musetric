@@ -29,6 +29,7 @@ use crate::{
     garbage::spawn_collector,
     publish::Publication,
     realtime::Rooms,
+    recording::recover_takes,
     router::{RouterOptions, create_router},
     storage::Storage,
 };
@@ -242,6 +243,7 @@ struct CreatedApp {
 
 async fn create_app(options: AppOptions) -> Result<CreatedApp, BoxedError> {
     let storage = options.storage;
+    recover_takes(&storage).await;
     let host = ExecutorHost::start(options.browser_bundle).await?;
     let pins = Arc::new(ModelPins::read()?);
     let runner = AnalysisRunner::create(AnalysisContext {

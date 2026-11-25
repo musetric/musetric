@@ -4,21 +4,31 @@ use std::{
         Mutex,
         atomic::{AtomicU64, Ordering},
     },
+    time::Duration,
 };
 
 use axum::extract::ws::Message;
 use serde_json::Value;
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
-    watch,
+    oneshot, watch,
 };
 
 use crate::realtime::{
+    Take,
     channel::{HEARTBEAT, Heartbeat},
     events,
 };
 
 pub(crate) type MemberId = u64;
+
+const PARKING_WINDOW: Duration = Duration::from_mins(1);
+
+struct Parked {
+    take: Take,
+    member: MemberId,
+    released: oneshot::Sender<()>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Begin {
@@ -31,6 +41,7 @@ struct Room {
     members: HashMap<MemberId, UnboundedSender<Message>>,
     session_owner: Option<MemberId>,
     saving: bool,
+    parked: Option<Parked>,
 }
 
 impl Room {
@@ -39,7 +50,14 @@ impl Room {
             members: HashMap::new(),
             session_owner: None,
             saving: false,
+            parked: None,
         }
+    }
+
+    fn release(&mut self, matches: impl FnOnce(&Parked) -> bool) -> Option<(MemberId, Take)> {
+        let parked = self.parked.take_if(|parked| matches(parked))?;
+        drop(parked.released);
+        Some((parked.member, parked.take))
     }
 
     fn send_to(&self, member: MemberId, event: &Value) {
@@ -68,6 +86,7 @@ pub(crate) struct Rooms {
     closing: watch::Sender<bool>,
     live: watch::Sender<usize>,
     heartbeat: Heartbeat,
+    parking_window: Duration,
 }
 
 pub(crate) struct Live<'rooms>(&'rooms watch::Sender<usize>);
@@ -80,21 +99,26 @@ impl Drop for Live<'_> {
 
 impl Rooms {
     pub(crate) fn create() -> Self {
-        Self::with_heartbeat(HEARTBEAT)
+        Self::with_timing(HEARTBEAT, PARKING_WINDOW)
     }
 
-    pub(crate) fn with_heartbeat(heartbeat: Heartbeat) -> Self {
+    pub(crate) fn with_timing(heartbeat: Heartbeat, parking_window: Duration) -> Self {
         Self {
             projects: Mutex::new(HashMap::new()),
             next_member: AtomicU64::new(0),
             closing: watch::Sender::new(false),
             live: watch::Sender::new(0),
             heartbeat,
+            parking_window,
         }
     }
 
     pub(crate) const fn heartbeat(&self) -> Heartbeat {
         self.heartbeat
+    }
+
+    pub(crate) const fn parking_window(&self) -> Duration {
+        self.parking_window
     }
 
     pub(crate) fn enter(&self) -> Live<'_> {
@@ -193,12 +217,55 @@ impl Rooms {
         forget_idle_room(&mut projects, project_id);
     }
 
-    #[cfg(test)]
-    pub(crate) fn holds_unsaved_session(&self, project_id: i64) -> bool {
+    pub(super) fn park(
+        &self,
+        project_id: i64,
+        member: MemberId,
+        take: Take,
+    ) -> oneshot::Receiver<()> {
+        let (released, receiver) = oneshot::channel();
+        self.lock()
+            .entry(project_id)
+            .or_insert_with(Room::create)
+            .parked = Some(Parked {
+            take,
+            member,
+            released,
+        });
+        receiver
+    }
+
+    pub(super) fn resume(
+        &self,
+        project_id: i64,
+        session_id: &str,
+        member: MemberId,
+    ) -> Option<Take> {
         self.with_room(project_id, |room| {
-            room.session_owner.is_some() && !room.saving
+            let (_, take) = room.release(|parked| parked.take.id == session_id)?;
+            room.session_owner = Some(member);
+            Some(take)
         })
-        .unwrap_or(false)
+        .flatten()
+    }
+
+    pub(super) fn claim_parked(&self, project_id: i64) -> Option<(MemberId, Take)> {
+        self.with_room(project_id, |room| room.release(|_| true))
+            .flatten()
+    }
+
+    pub(super) fn unpark(&self, project_id: i64, member: MemberId) -> Option<Take> {
+        self.with_room(project_id, |room| {
+            room.release(|parked| parked.member == member)
+        })
+        .flatten()
+        .map(|(_, take)| take)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn holds_parked_take(&self, project_id: i64) -> bool {
+        self.with_room(project_id, |room| room.parked.is_some())
+            .unwrap_or(false)
     }
 
     fn with_room<Value>(

@@ -28,6 +28,7 @@ use crate::{
     failure::{Failure, finish, invalid_number},
     form::{Field, Form, UploadTarget, read_form},
     mixdown::{MixdownFile, MixdownState, Removal},
+    realtime::begin_edit,
     recording::{Sounding, read_sounding},
     routes::{
         RouteState,
@@ -297,7 +298,7 @@ async fn read_settled_sounding(
 ) -> Result<Option<Sounding>, Failure> {
     let waited = Instant::now();
     let editor = loop {
-        if let Some(editor) = state.rooms.begin_edit(project_id) {
+        if let Some(editor) = begin_edit(&state.rooms, &state.storage, project_id).await {
             break editor;
         }
         if waited.elapsed() >= TAKE_WAIT {
