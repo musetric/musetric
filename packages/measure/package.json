@@ -8,12 +8,12 @@
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
     "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "measure:timing": "node ./scripts/measure.ts timing",
-    "measure:delay": "node ./scripts/measure.ts delay",
-    "measure:sound": "node ./scripts/measure.ts sound",
-    "measure:cursor": "node ./scripts/measure.ts cursor",
-    "measure:failure": "node ./scripts/measure.ts failure",
-    "measure:seek": "node ./scripts/measure.ts seek"
+    "measure:timing": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts timing",
+    "measure:delay": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts delay",
+    "measure:sound": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts sound",
+    "measure:cursor": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts cursor",
+    "measure:failure": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts failure",
+    "measure:seek": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts seek"
   },
   "devDependencies": {
     "@musetric/api": "workspace:*",
