@@ -194,13 +194,9 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       ...[...state.asked].sort(byPlayDistance(state.layout, window)),
     ];
     for (const index of queue) {
-      const overtaken = missing.includes(index)
-        ? [...state.reading.keys()].filter((other) => !missing.includes(other))
-            .length
-        : 0;
       if (
-        state.reading.size - overtaken >= readsPerStem ||
-        state.reading.has(index)
+        state.reading.has(index) ||
+        (!missing.includes(index) && state.reading.size >= readsPerStem)
       ) {
         continue;
       }
