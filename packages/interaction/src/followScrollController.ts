@@ -51,7 +51,7 @@ export const createFollowScrollController = (
     }
   });
   const unsubscribeSeek = subscribeSeek(() => {
-    place('smooth');
+    place('instant');
   });
   for (const type of ['pointerdown', 'touchmove', 'wheel', 'keydown']) {
     element.addEventListener(
