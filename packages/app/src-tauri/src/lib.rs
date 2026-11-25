@@ -186,15 +186,17 @@ fn create_main_window<R: tauri::Runtime>(
 fn finish_main_window<R: tauri::Runtime, M: Manager<R>>(
     builder: WebviewWindowBuilder<'_, R, M>,
 ) -> tauri::Result<()> {
-    builder
+    let window = builder
         .on_download(|webview, event| download::handle(&webview, event))
         .on_permission_request(|webview, kind| permission::handle(&webview, kind))
         .on_navigation(settings::allow_navigation)
         .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .background_color(tauri::webview::Color(18, 18, 18, 255))
         .visible(false)
-        .build()?
-        .show()?;
+        .build()?;
+    #[cfg(target_os = "windows")]
+    permission::grant_microphone(&window);
+    window.show()?;
     Ok(())
 }
 

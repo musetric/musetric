@@ -101,6 +101,12 @@ is checked quickest in a browser, with [`pnpm dev`](../../readme.md#development)
   captures through `getUserMedia`. A system joins by implementing
   `CaptureSystem` of `src-tauri/src/capture/system.rs`, whose timestamps share
   the clock of the `clock` command.
+- On Windows the app grants the microphone to the embedded host's origin in
+  the WebView2 profile when the main window opens
+  (`src-tauri/src/permission.rs`), so the page names its devices even though
+  the native capture never calls `getUserMedia`. Its module `grant` is the only
+  unsafe code of the workspace, which denies it everywhere else: WebView2 sets
+  a permission ahead of a request only through its COM interface.
 - Each identity has its own port of the embedded host, so that its page keeps
   one origin and with it its local storage: Musetric listens on 47206, Musetric
   Dev, a desktop debug build included, on 47205. `src-tauri/build.rs` sets the

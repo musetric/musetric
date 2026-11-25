@@ -2981,6 +2981,8 @@ dependencies = [
  "tauri-utils",
  "tokio",
  "wasapi",
+ "webview2-com",
+ "windows",
 ]
 
 [[package]]
