@@ -15,6 +15,7 @@ const behindSeconds = 4;
 const aheadSeconds = 8;
 const keepSeconds = 4;
 const loopPinSeconds = 4;
+const crossfadeFrameCount = 1488;
 const readsPerStem = 2;
 
 type FrameSpan = {
@@ -241,7 +242,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
         ...(loop
           ? [
               {
-                from: loop.fromFrame,
+                from: loop.fromFrame - crossfadeFrameCount,
                 to: Math.min(
                   loop.toFrame,
                   loop.fromFrame + loopPinSeconds * sampleRate,

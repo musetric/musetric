@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use musetric_dsp::page_mix::{LoopRange, MixRequest, PageMixer, PageShape};
+    use std::f64::consts::FRAC_PI_2;
+
+    use musetric_dsp::page_mix::{CROSSFADE_FRAMES, LoopRange, MixRequest, PageMixer, PageShape};
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
@@ -61,15 +63,25 @@ mod tests {
         }
     }
 
+    #[expect(clippy::cast_possible_truncation, reason = "a gain is an f32")]
     fn add_looped(sums: &mut [f32], channels: &[Vec<f32>], volume: f32, frames: (i64, &LoopRange)) {
         let (first, range) = frames;
         let count = sums.len() / 2;
+        let length = usize::try_from(range.to - range.from).expect("fits");
+        let tail = usize::try_from(range.to - CROSSFADE_FRAMES).expect("fits");
+        let crossfade = f64::from(u32::try_from(CROSSFADE_FRAMES).expect("fits"));
         for offset in 0..count {
             let song_frame = range.song_frame(first + i64::try_from(offset).expect("fits"));
             let at = usize::try_from(song_frame).expect("fits");
-            let gain = range.gain(song_frame);
+            let (out, into) = if at < tail {
+                (1.0, 0.0)
+            } else {
+                let t = (f64::from(u32::try_from(at - tail).expect("fits")) + 0.5) / crossfade;
+                ((t * FRAC_PI_2).cos() as f32, (t * FRAC_PI_2).sin() as f32)
+            };
             for (channel, sum) in sums.iter_mut().skip(offset).step_by(count).enumerate() {
-                *sum += channels[channel.min(channels.len() - 1)][at] * volume * gain;
+                let samples = &channels[channel.min(channels.len() - 1)];
+                *sum += samples[at] * volume * out + samples[at - length] * volume * into;
             }
         }
     }
@@ -135,10 +147,10 @@ mod tests {
     }
 
     #[test]
-    fn mixes_a_loop_with_its_fades_as_each_sample_asks() {
+    fn crosses_the_turn_of_a_loop_over_the_audio_before_its_start() {
         let stems = stems();
         let range = LoopRange {
-            from: 60_000,
+            from: 72_500,
             to: 100_000,
             end: 100_000,
             cycle: true,
@@ -147,7 +159,7 @@ mod tests {
         load(&mut mixer, &stems, &STARTS, &[]);
         mixer.set_range(Some(range));
 
-        let (first, count) = (99_000, 4_000);
+        let (first, count) = (98_000, 5_000);
         let actual = mixed(&mut mixer, first, count);
 
         let mut sums = vec![0.0_f32; count * 2];

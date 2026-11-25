@@ -1,8 +1,9 @@
-use std::ops::Range;
+use std::{f64::consts::FRAC_PI_2, ops::Range};
 
 use crate::{BoxedError, mix::add_gained};
 
 pub const FADE_FRAMES: i64 = 256;
+pub const CROSSFADE_FRAMES: i64 = 1_488;
 pub const READY_MARGIN_FRAMES: i64 = 16_384;
 pub const READY_STEP_FRAMES: i64 = 4_096;
 pub const OUTPUT_RESERVE_FRAMES: usize = 65_536;
@@ -29,16 +30,30 @@ impl LoopRange {
         self.from + (frame - self.from).rem_euclid(self.to - self.from)
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a crossfade is 1488 frames, far below the precision of f64"
+    )]
+    fn turn_angle(&self, song_frame: i64) -> Option<f64> {
+        let into = song_frame - (self.to - CROSSFADE_FRAMES);
+        (self.cycle && into >= 0 && song_frame < self.to)
+            .then(|| (into as f64 + 0.5) / CROSSFADE_FRAMES as f64 * FRAC_PI_2)
+    }
+
     #[must_use]
     #[expect(
         clippy::cast_precision_loss,
-        reason = "a fade is 256 frames, far below the precision of f32"
+        clippy::cast_possible_truncation,
+        reason = "a fade is 256 frames, far below the precision of f32, and a gain is an f32"
     )]
     pub fn gain(&self, song_frame: i64) -> f32 {
+        if let Some(angle) = self.turn_angle(song_frame) {
+            return angle.cos() as f32;
+        }
         if song_frame >= self.end {
             return 0.0;
         }
-        if song_frame < self.from {
+        if self.cycle || song_frame < self.from {
             return 1.0;
         }
         let ramp = |distance: i64| {
@@ -49,6 +64,13 @@ impl LoopRange {
             }
         };
         ramp(song_frame - self.from).min(ramp(self.end - song_frame))
+    }
+
+    #[must_use]
+    #[expect(clippy::cast_possible_truncation, reason = "a gain is an f32")]
+    pub fn lead_in(&self, song_frame: i64) -> Option<(i64, f32)> {
+        self.turn_angle(song_frame)
+            .map(|angle| (song_frame - (self.to - self.from), angle.sin() as f32))
     }
 }
 
@@ -91,6 +113,15 @@ impl Stem {
                 .partition_point(|start| *start <= frame)
                 .saturating_sub(1),
         )
+    }
+
+    fn resident_at(&self, frame: i64) -> Option<(Resident, usize)> {
+        let index = self.page_of(frame)?;
+        let page = self.pages[index]?;
+        Some((
+            page,
+            usize::try_from(frame - self.page_starts[index]).unwrap_or(0),
+        ))
     }
 
     fn page_end(&self, index: usize) -> i64 {
@@ -161,6 +192,10 @@ fn page_channel(slots: &Slots, page: Resident, channel: usize) -> &[f32] {
     &slots.slot(page.slot)[source * page.frames..(source + 1) * page.frames]
 }
 
+fn page_sample(slots: &Slots, place: Option<(Resident, usize)>, channel: usize) -> f32 {
+    place.map_or(0.0, |(page, at)| page_channel(slots, page, channel)[at])
+}
+
 #[derive(Clone, Copy)]
 struct StemMix<'mixed> {
     stem: &'mixed Stem,
@@ -222,17 +257,15 @@ impl Output<'_> {
         for offset in 0..request.count {
             let frame = request.first + i64::try_from(offset).unwrap_or(0);
             let song_frame = range.song_frame(frame);
-            let Some((index, page)) = stem
-                .page_of(song_frame)
-                .and_then(|index| stem.pages[index].map(|page| (index, page)))
-            else {
-                continue;
-            };
-            let at = usize::try_from(song_frame - stem.page_starts[index]).unwrap_or(0);
+            let here = stem.resident_at(song_frame);
             let gain = range.gain(song_frame);
+            let (before, lead_gain) = range
+                .lead_in(song_frame)
+                .map_or((None, 0.0), |(at, fade)| (stem.resident_at(at), fade));
             for channel in 0..self.channels {
-                let sample = page_channel(self.slots, page, channel)[at];
-                self.samples[channel * stride + offset] += sample * volume * gain;
+                let sample = page_sample(self.slots, here, channel) * volume * gain;
+                let lead = page_sample(self.slots, before, channel) * volume * lead_gain;
+                self.samples[channel * stride + offset] += sample + lead;
             }
         }
     }
@@ -339,25 +372,32 @@ impl PageMixer {
         self.range = range;
     }
 
+    fn resident(&self, song_frame: i64) -> bool {
+        self.stems.iter().all(|stem| {
+            stem.page_of(song_frame)
+                .is_none_or(|index| stem.pages[index].is_some())
+        })
+    }
+
     #[must_use]
     pub fn ready(&self, frame: i64, behind: bool) -> bool {
+        let last = frame + READY_MARGIN_FRAMES;
         let mut at = if behind {
             frame - READY_MARGIN_FRAMES
         } else {
             frame
         };
-        while at <= frame + READY_MARGIN_FRAMES {
-            let song_frame = self.range.map_or(at, |range| range.song_frame(at));
-            let resident = self.stems.iter().all(|stem| {
-                stem.page_of(song_frame)
-                    .is_none_or(|index| stem.pages[index].is_some())
-            });
-            if !resident {
+        while at <= last {
+            if !self.resident(self.range.map_or(at, |range| range.song_frame(at))) {
                 return false;
             }
             at += READY_STEP_FRAMES;
         }
-        true
+        self.range
+            .filter(|range| range.cycle && last >= range.to - CROSSFADE_FRAMES)
+            .is_none_or(|range| {
+                self.resident(range.from - CROSSFADE_FRAMES) && self.resident(range.from - 1)
+            })
     }
 
     pub fn mix(&mut self, request: MixRequest, volumes: &[f32]) -> &[f32] {
