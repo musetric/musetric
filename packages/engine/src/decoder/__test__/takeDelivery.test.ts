@@ -249,21 +249,29 @@ describe('take delivery', () => {
   });
 });
 
+const seedGroups = Array.from({ length: 12 }, (_, index) => [
+  index * 10 + 1,
+  index * 10 + 10,
+]);
+
 describe('take orders', () => {
-  it('lands every frame once in the take of its id', async () => {
-    for (let seed = 1; seed <= 120; seed += 1) {
-      const { host, taken } = await playOrders(seed, ['first', 'second']);
-      for (const takeId of taken) {
-        expect(host.stored.get(takeId), `seed ${seed}, ${takeId}`).toEqual(
-          host.sung(takeId),
-        );
+  it.each(seedGroups)(
+    'lands every frame once in the take of its id, seeds %i to %i',
+    async (firstSeed, lastSeed) => {
+      for (let seed = firstSeed; seed <= lastSeed; seed += 1) {
+        const { host, taken } = await playOrders(seed, ['first', 'second']);
+        for (const takeId of taken) {
+          expect(host.stored.get(takeId), `seed ${seed}, ${takeId}`).toEqual(
+            host.sung(takeId),
+          );
+        }
+        expect(finishedTakes(host), `seed ${seed}`).toHaveLength(taken.length);
+        expect(finishedTakes(host)).toEqual(expect.arrayContaining(taken));
+        expect(host.faults, `seed ${seed}`).toEqual([]);
+        expect(refusals(host), `seed ${seed}`).toEqual([]);
+        await host.close();
+        vi.unstubAllGlobals();
       }
-      expect(finishedTakes(host), `seed ${seed}`).toHaveLength(taken.length);
-      expect(finishedTakes(host)).toEqual(expect.arrayContaining(taken));
-      expect(host.faults, `seed ${seed}`).toEqual([]);
-      expect(refusals(host), `seed ${seed}`).toEqual([]);
-      await host.close();
-      vi.unstubAllGlobals();
-    }
-  });
+    },
+  );
 });
