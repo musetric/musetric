@@ -55,7 +55,7 @@ export const createRecorderHarness = (
     startRecordingStream: () => {
       started += 1;
     },
-    finishRecordingStream: async (sequence: number) => {
+    finishRecordingStream: async (_takeId: string, sequence: number) => {
       finished.push(sequence);
       return Promise.resolve();
     },

@@ -30,6 +30,7 @@ export type CreateEnginePlayerLoopOptions = {
   getEngineRecorder: () => EngineRecorder;
   recordTake: (
     projectId: number,
+    takeId: string,
     startPlayback: boolean,
     pass: boolean,
   ) => Promise<boolean>;
@@ -107,7 +108,7 @@ export const createEnginePlayerLoop = (
           draft.rangeStopFrame = undefined;
           draft.loopTryPhase = 'armed';
         });
-        session.beginTake();
+        const takeId = session.beginTake();
         const failTry = () => {
           store.update((draft) => {
             draft.loopTryPhase = undefined;
@@ -115,7 +116,7 @@ export const createEnginePlayerLoop = (
           session.failTake(playing);
         };
         try {
-          if (await recordTake(projectId, !playing, true)) {
+          if (await recordTake(projectId, takeId, !playing, true)) {
             session.settleTake();
           } else {
             failTry();

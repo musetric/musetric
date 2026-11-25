@@ -8,7 +8,7 @@ export type EngineSessionMachine = {
   failPlay: () => void;
   beginStop: () => void;
   settleStop: () => void;
-  beginTake: () => void;
+  beginTake: () => string;
   settleTake: () => void;
   failTake: (wasPlaying: boolean) => void;
   beginDrain: () => void;
@@ -59,7 +59,9 @@ export const createEngineSessionMachine = (
       update((state) => {
         state.session = 'taking';
         state.take = 'arming';
+        state.takeRefusal = undefined;
       });
+      return crypto.randomUUID();
     },
     settleTake: () => {
       update((state) => {

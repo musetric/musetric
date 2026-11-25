@@ -150,6 +150,7 @@ export const createEnginePlayer = (
 
   const recordTake = async (
     projectId: number,
+    takeId: string,
     startPlayback: boolean,
     pass: boolean,
   ) => {
@@ -157,7 +158,12 @@ export const createEnginePlayer = (
     return (
       (await revive()) &&
       stops === armingStops &&
-      (await getEngineRecorder().record(projectId, startPlayback, pass))
+      (await getEngineRecorder().record({
+        projectId,
+        takeId,
+        startPlayback,
+        pass,
+      }))
     );
   };
 
@@ -235,9 +241,9 @@ export const createEnginePlayer = (
         }
 
         const playing = isPlaying(currentState);
-        session.beginTake();
+        const takeId = session.beginTake();
         try {
-          if (await recordTake(projectId, !playing, false)) {
+          if (await recordTake(projectId, takeId, !playing, false)) {
             session.settleTake();
           } else {
             session.failTake(playing);

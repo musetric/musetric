@@ -2,6 +2,8 @@ import { type api } from '@musetric/api';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type PlayerWindow } from '../player/protocol.cross.js';
 
+export type TakeRefusal = 'busy' | 'failed' | 'ended';
+
 export type SettledLoopTry = {
   id: string;
   startFrame: number;
@@ -16,6 +18,7 @@ export type EngineDecoderOutboundMethods = {
   reconnectRealtime: () => void;
   requestTarget: (message: PlayerWindow) => void;
   startRecordingStream: (message: {
+    takeId: string;
     projectId: number;
     sampleRate: number;
     frameCount: number;
@@ -26,7 +29,10 @@ export type EngineDecoderOutboundMethods = {
     draft: boolean;
     port: MessagePort;
   }) => void;
-  finishRecordingStream: (message: { sequence: number }) => void;
+  finishRecordingStream: (message: {
+    takeId: string;
+    sequence: number;
+  }) => void;
   settleLoopTry: (message: { keep: boolean }) => void;
   selectLoopTry: (message: { tryId?: string }) => void;
   deleteLoopTry: (message: { tryId: string }) => void;
@@ -48,8 +54,8 @@ export type EngineDecoderInboundMethods = {
   setRealtimeState: (message: { status: 'success' | 'error' }) => void;
   mounted: (message: { frameCount: number }) => void;
   unmounted: () => void;
-  recordingStreamFinished: () => void;
-  recordingStreamFailed: (message: { error: string }) => void;
+  recordingStreamFinished: (message: { takeId: string }) => void;
+  takeRefused: (message: { takeId: string; reason: TakeRefusal }) => void;
   recordingPeaksChanged: (message: {
     recordingId: number;
     startPeakIndex: number;
@@ -74,7 +80,7 @@ export const engineDecoderChannel = createMessageChannel<
       'mounted',
       'unmounted',
       'recordingStreamFinished',
-      'recordingStreamFailed',
+      'takeRefused',
       'recordingPeaksChanged',
       'recordingsChanged',
       'recordingContentChanged',

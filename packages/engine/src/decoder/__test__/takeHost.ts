@@ -1,12 +1,19 @@
+import { vi } from 'vitest';
 import { recordingStreamChannel } from '../../player/recordingStream.cross.js';
 import { spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
 import { engineDecoderChannel } from '../protocol.cross.js';
-import { readRecordingPacket } from '../recordingStream.worker.js';
 import { createDecoderWorkerRuntime } from '../runtime.worker.js';
-import { type FakeSocket, stubSockets } from './fakeSocket.js';
+import { stubSockets } from './fakeSocket.js';
+import {
+  createScriptedHost,
+  readMessageType,
+  type TakeRun,
+} from './scriptedHost.js';
 
-export const takeRate = 48000;
-const chunkFrameCount = 480;
+export const takeRate = 1000;
+const chunkFrameCount = 16;
+const reconnectWaitMs = 10_000;
+const settleRounds = 100;
 
 export const activeRecording = {
   id: 1,
@@ -31,30 +38,68 @@ export const flushPorts = async (): Promise<void> => {
   }
 };
 
-const sample = (frame: number) => frame / takeRate;
-
-type SentMessage = {
-  type: string;
-  sessionId?: string;
+type Singer = {
+  takeId: string;
+  index: number;
+  worklet: ReturnType<typeof recordingStreamChannel.inbound<MessagePort>>;
+  sequence: number;
+  runs: TakeRun[];
+  nextStart: number | undefined;
 };
 
-const readSent = (message: string | ArrayBuffer): SentMessage => {
-  if (typeof message !== 'string') {
-    return { type: 'packet' };
+const currentRun = (singer: Singer): TakeRun => {
+  const last = singer.runs.at(-1);
+  if (last && singer.nextStart === undefined) {
+    return last;
   }
-  const parsed: SentMessage = JSON.parse(message);
-  return parsed;
+  const run = { startFrame: singer.nextStart ?? 0, samples: [] };
+  singer.runs.push(run);
+  singer.nextStart = undefined;
+  return run;
+};
+
+const singChunk = (singer: Singer, frameCount: number) => {
+  const run = currentRun(singer);
+  const offset = run.samples.length;
+  const runIndex = singer.runs.indexOf(run);
+  const samples = Array.from(
+    { length: frameCount },
+    (_, index) => singer.index * 1_000_000 + runIndex * 10_000 + offset + index,
+  );
+  run.samples.push(...samples);
+  singer.sequence += 1;
+  singer.worklet.methods.chunk({
+    sequence: singer.sequence,
+    startFrame: run.startFrame,
+    offset,
+    samples: Float32Array.from(samples),
+  });
+};
+
+export type EngineMessage = {
+  type: string;
+  payload?: { takeId?: string; reason?: string };
 };
 
 export type TakeHost = {
-  socket: () => FakeSocket;
-  received: string[];
-  record: () => Promise<string>;
-  sing: (offset: number, length: number) => void;
+  received: EngineMessage[];
+  stored: ReadonlyMap<string, TakeRun[]>;
+  faults: string[];
+  record: (takeId: string) => Promise<void>;
+  sing: (frameCount: number) => void;
+  seek: (startFrame: number) => void;
   stop: () => Promise<void>;
   finish: () => Promise<void>;
+  serve: (count?: number) => void;
+  answer: (count?: number) => Promise<void>;
+  settle: () => Promise<void>;
+  drop: (expire?: boolean) => Promise<void>;
+  reconnect: () => Promise<void>;
+  connected: () => boolean;
+  close: () => Promise<void>;
+  refuseNextStart: () => void;
   sent: () => string[];
-  delivered: () => number;
+  sung: (takeId: string) => TakeRun[];
 };
 
 export const createTakeHost = async (): Promise<TakeHost> => {
@@ -66,38 +111,53 @@ export const createTakeHost = async (): Promise<TakeHost> => {
     port: engineDecoderChannel.inbound(control.port1),
     spectrogramPort: spectrogramDataChannel.outbound(spectrogram.port1),
   });
-  const received: string[] = [];
-  control.port2.onmessage = (event: MessageEvent<{ type: string }>) => {
-    received.push(event.data.type);
+  const received: EngineMessage[] = [];
+  control.port2.onmessage = (event: MessageEvent<EngineMessage>) => {
+    received.push(event.data);
   };
   const engine = engineDecoderChannel.outbound(control.port2);
   engine.methods.connectPlayer({ playerPort: player.port1 });
   engine.methods.mount({ projectId: 1, sampleRate: takeRate });
   await flushPorts();
-  sockets[0].open();
+  const [first] = sockets;
+  const host = createScriptedHost(first);
+  first.open();
 
-  let worklet:
-    ReturnType<typeof recordingStreamChannel.inbound<MessagePort>> | undefined =
-    undefined;
-  let sequence = 0;
-  const sent = () => sockets.flatMap((socket) => socket.sent).map(readSent);
-  const packets = () =>
-    sockets
-      .flatMap((socket) => socket.sent)
-      .filter((message) => typeof message !== 'string')
-      .map(readRecordingPacket);
+  const sung = new Map<string, TakeRun[]>();
+  let singer: Singer | undefined = undefined;
+
+  const answer = async (count?: number) => {
+    host.answer(count);
+    await flushPorts();
+  };
+
+  const endSinging = () => {
+    const current = singer;
+    singer = undefined;
+    return current;
+  };
 
   return {
-    socket: () => sockets[sockets.length - 1],
     received,
-    record: async () => {
+    stored: host.stored,
+    faults: host.faults,
+    record: async (takeId) => {
       const stream = new MessageChannel();
-      worklet = recordingStreamChannel.inbound(stream.port2);
-      sequence = 0;
+      const runs: TakeRun[] = [];
+      sung.set(takeId, runs);
+      singer = {
+        takeId,
+        index: sung.size,
+        worklet: recordingStreamChannel.inbound(stream.port2),
+        sequence: 0,
+        runs,
+        nextStart: 0,
+      };
       engine.methods.startRecordingStream({
+        takeId,
         projectId: 1,
         sampleRate: takeRate,
-        frameCount: takeRate * 60,
+        frameCount: takeRate * 600,
         latencyFrameCount: 0,
         tempo: 1,
         transpose: 0,
@@ -106,49 +166,76 @@ export const createTakeHost = async (): Promise<TakeHost> => {
         port: stream.port1,
       });
       await flushPorts();
-      const starts = sent().filter(
-        (message) => message.type === 'recording.start',
-      );
-      return starts[starts.length - 1].sessionId ?? '';
     },
-    sing: (offset, length) => {
-      for (let at = offset; at < offset + length; at += chunkFrameCount) {
-        sequence += 1;
-        worklet?.methods.chunk({
-          sequence,
-          startFrame: 0,
-          offset: at,
-          samples: Float32Array.from(
-            { length: Math.min(chunkFrameCount, offset + length - at) },
-            (_, index) => sample(at + index),
-          ),
-        });
+    sing: (frameCount) => {
+      for (let at = 0; singer && at < frameCount; at += chunkFrameCount) {
+        singChunk(singer, Math.min(chunkFrameCount, frameCount - at));
+      }
+    },
+    seek: (startFrame) => {
+      if (singer) {
+        singer.nextStart = startFrame;
       }
     },
     stop: async () => {
-      sequence += 1;
-      worklet?.methods.flush({ sequence });
-      engine.methods.finishRecordingStream({ sequence });
+      const current = endSinging();
+      if (!current) {
+        return;
+      }
+      current.sequence += 1;
+      current.worklet.methods.flush({ sequence: current.sequence });
+      engine.methods.finishRecordingStream({
+        takeId: current.takeId,
+        sequence: current.sequence,
+      });
       await flushPorts();
     },
     finish: async () => {
-      engine.methods.finishRecordingStream({ sequence: 0 });
+      const current = endSinging();
+      if (!current) {
+        return;
+      }
+      engine.methods.finishRecordingStream({
+        takeId: current.takeId,
+        sequence: 0,
+      });
       await flushPorts();
     },
-    sent: () => sent().map((message) => message.type),
-    delivered: () => {
-      let frames = 0;
-      for (const packet of packets()) {
-        if (packet.offset !== frames) {
-          return frames;
+    serve: host.serve,
+    answer,
+    settle: async () => {
+      for (let round = 0; round < settleRounds; round += 1) {
+        host.serve();
+        if (host.idle()) {
+          return;
         }
-        const last = packet.samples.length - 1;
-        if (packet.samples[last] !== Math.fround(sample(frames + last))) {
-          return frames;
-        }
-        frames += packet.samples.length;
+        await answer();
       }
-      return frames;
+      host.faults.push('the host and the page never settled');
     },
+    drop: async (expire = false) => {
+      host.drop(expire);
+      await flushPorts();
+    },
+    reconnect: async () => {
+      await vi.advanceTimersByTimeAsync(reconnectWaitMs);
+      const socket = sockets[sockets.length - 1];
+      host.attach(socket);
+      socket.open();
+      await flushPorts();
+    },
+    connected: () => sockets[sockets.length - 1].readyState === WebSocket.OPEN,
+    close: async () => {
+      engine.methods.unmount();
+      await flushPorts();
+    },
+    refuseNextStart: host.refuseNextStart,
+    sent: () =>
+      sockets
+        .flatMap((socket) => socket.sent)
+        .map((message) =>
+          typeof message === 'string' ? readMessageType(message) : 'packet',
+        ),
+    sung: (takeId) => sung.get(takeId) ?? [],
   };
 };

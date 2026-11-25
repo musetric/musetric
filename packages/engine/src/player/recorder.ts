@@ -27,10 +27,14 @@ import { type EnginePosition } from './position.js';
 
 const recordingFlushTimeoutMs = 2000;
 
-type RecordingSession = {
+type TakeRequest = {
   projectId: number;
+  takeId: string;
   startPlayback: boolean;
-  pass: boolean;
+  pass?: boolean;
+};
+
+type RecordingSession = Required<TakeRequest> & {
   passComplete: boolean;
   tempoRatio: number;
   initializePromise: Promise<void>;
@@ -46,11 +50,7 @@ type RecordingSession = {
 };
 
 export type EngineRecorder = {
-  record: (
-    projectId: number,
-    startPlayback: boolean,
-    pass?: boolean,
-  ) => Promise<boolean>;
+  record: (request: TakeRequest) => Promise<boolean>;
   cancel: () => void;
   stop: () => Promise<void>;
   finish: () => Promise<void>;
@@ -118,7 +118,7 @@ export const createEngineRecorder = (
           recordingFlushTimeoutMs,
         )) ?? 0)
       : 0;
-    await getDecoder().finishRecordingStream(sequence);
+    await getDecoder().finishRecordingStream(session.takeId, sequence);
   };
 
   const failSession = (session: RecordingSession) => {
@@ -253,6 +253,7 @@ export const createEngineRecorder = (
       const latencyFrameCount = getRecordingLatencyFrameCount(store.get());
       const inputLatencyFrameCount = getInputShareFrameCount(store.get());
       getDecoder().startRecordingStream({
+        takeId: session.takeId,
         projectId: session.projectId,
         sampleRate: context.sampleRate,
         frameCount,
@@ -298,14 +299,9 @@ export const createEngineRecorder = (
     }
   };
 
-  const createSession = (
-    projectId: number,
-    startPlayback: boolean,
-    pass: boolean,
-  ): RecordingSession => ({
-    projectId,
-    startPlayback,
-    pass,
+  const createSession = (request: TakeRequest): RecordingSession => ({
+    ...request,
+    pass: request.pass === true,
     passComplete: false,
     tempoRatio: store.get().tempoRatio,
     initializePromise: Promise.resolve(),
@@ -316,13 +312,13 @@ export const createEngineRecorder = (
   });
 
   const ref: EngineRecorder = {
-    record: async (projectId, startPlayback, pass) => {
+    record: async (request) => {
       if (currentSession) {
         const running = currentSession;
         await running.initializePromise;
         return running.playerStreamStarted;
       }
-      const session = createSession(projectId, startPlayback, pass === true);
+      const session = createSession(request);
       currentSession = session;
       session.initializePromise = initializeSession(session);
 

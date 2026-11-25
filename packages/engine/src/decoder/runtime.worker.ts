@@ -1,18 +1,11 @@
-import { type api } from '@musetric/api';
-import { assertNever } from '@musetric/utils';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
 import { playerDataChannel } from '../player/protocol.cross.js';
-import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
 import { createAudioDecode } from './audioDecode.worker.js';
 import { createLoopTries } from './loopTries.worker.js';
 import { type engineDecoderChannel } from './protocol.cross.js';
-import {
-  createProjectRealtime,
-  type ProjectRealtime,
-} from './realtime.worker.js';
-import { createRecordingBatch } from './recordingBatch.worker.js';
+import { createProjectRealtime } from './realtime.worker.js';
 import {
   createRecordingController,
   type RecordingController,
@@ -21,17 +14,9 @@ import {
   createRecordingList,
   isRecordingListEvent,
 } from './recordingList.worker.js';
-import {
-  createRecordingStream,
-  type RecordingStream,
-} from './recordingStream.worker.js';
+import { type RecordingStream } from './recordingStream.worker.js';
 
 const measure = import.meta.env.frontendMeasure === 'true';
-
-type TakeEvent = Extract<
-  api.project.realtime.Event,
-  { type: 'recording.started' | 'recording.finished' }
->;
 
 export type CreateDecoderWorkerRuntimeOptions = {
   port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
@@ -51,13 +36,10 @@ export const createDecoderWorkerRuntime = (
 
   const loopTries = createLoopTries({ audioDecode });
 
-  let recordingStream: RecordingStream | undefined = undefined;
-  let draftStream = false;
-  let recordingSessionId: string | undefined = undefined;
-  let recordingReady = false;
+  let draft: RecordingStream | undefined = undefined;
   let finishedTakeId: string | undefined = undefined;
 
-  let recordingController: RecordingController | undefined = undefined;
+  let takes: RecordingController | undefined = undefined;
 
   let mountedProjectId: number | undefined = undefined;
 
@@ -68,29 +50,7 @@ export const createDecoderWorkerRuntime = (
     }
   };
 
-  const applyTakeEvent = (event: TakeEvent, connection: ProjectRealtime) => {
-    const own = event.sessionId === recordingSessionId;
-    if (event.type === 'recording.finished') {
-      finishedTakeId = event.sessionId;
-      audioDecode.reloadRecording(event.sessionId).catch((error: unknown) => {
-        console.error('Failed to reload the recording', error);
-      });
-      if (own) {
-        recordingReady = false;
-        recordingStream?.notifyFinished();
-      }
-      return;
-    }
-    if (!own) {
-      return;
-    }
-    recordingReady = true;
-    recordingStream?.notifyStarted();
-    connection.flush();
-  };
-
   const realtime = createProjectRealtime({
-    isRecordingReady: () => recordingReady,
     onOpen: (projectId, reopened) => {
       port.methods.setRealtimeState({ status: 'success' });
       if (reopened) {
@@ -98,34 +58,37 @@ export const createDecoderWorkerRuntime = (
           console.error('Failed to read the recordings again', error);
         });
       }
+      takes?.connect();
     },
     onEvent: (event) => {
       if (isRecordingListEvent(event)) {
         recordingList.applyEvent(event, finishedTakeId);
         return;
       }
-      if (
-        event.type === 'recording.started' ||
-        event.type === 'recording.finished'
-      ) {
-        applyTakeEvent(event, realtime);
-        return;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (event.type === 'error') {
-        recordingController?.failRecordingStream(event.error);
-        return;
+        console.error('The host reported an error', event.error);
       }
-      assertNever(event, 'Unhandled project realtime event');
+      if (event.type === 'recording.finished') {
+        finishedTakeId = event.sessionId;
+        audioDecode.reloadRecording(event.sessionId).catch((error: unknown) => {
+          console.error('Failed to reload the recording', error);
+        });
+      }
+      takes?.apply(event);
     },
     onClose: (error) => {
       port.methods.setRealtimeState({ status: 'error' });
       console.error('Project realtime socket failed', error);
-      if (recordingStream && !draftStream) {
-        recordingController?.failRecordingStream(error);
-      }
+      takes?.disconnect();
     },
   });
+
+  takes = createRecordingController({ realtime, port });
+
+  const closeDraft = () => {
+    draft?.close();
+    draft = undefined;
+  };
 
   if (measure) {
     // eslint-disable-next-line musetric/no-global-state -- the measure build gives the external driver one entry point
@@ -133,19 +96,6 @@ export const createDecoderWorkerRuntime = (
       musetricMeasureHooks: { dropRealtime: realtime.drop },
     });
   }
-
-  recordingController = createRecordingController({
-    getRecordingStream: () => recordingStream,
-    setRecordingStream: (stream) => {
-      recordingStream = stream;
-    },
-    getRecordingReady: () => recordingReady,
-    setRecordingReady: (ready) => {
-      recordingReady = ready;
-    },
-    realtime,
-    port,
-  });
 
   port.bindHandlers({
     connectPlayer: (message) => {
@@ -170,7 +120,8 @@ export const createDecoderWorkerRuntime = (
     unmount: () => {
       loopTries.clear();
       recordingList.clear();
-      recordingController.clearRecordingStream();
+      closeDraft();
+      takes.clear();
       mountedProjectId = undefined;
       realtime.close();
       audioDecode.unmount();
@@ -183,72 +134,49 @@ export const createDecoderWorkerRuntime = (
       audioDecode.requestTarget(message);
     },
     startRecordingStream: (message) => {
-      draftStream = message.draft;
+      closeDraft();
       if (message.draft) {
-        recordingController.clearRecordingStream();
-        recordingStream = loopTries.openDraft(message);
+        draft = loopTries.openDraft(message);
         return;
       }
       realtime.open(message.projectId);
-      recordingController.clearRecordingStream();
       const recordingId = recordingList.getActiveId();
       if (recordingId === undefined) {
-        port.methods.recordingStreamFailed({
-          error: 'The project has no active recording',
-        });
+        port.methods.takeRefused({ takeId: message.takeId, reason: 'failed' });
         return;
       }
-      recordingSessionId = crypto.randomUUID();
       audioDecode.beginLiveTake({
-        takeId: recordingSessionId,
+        takeId: message.takeId,
         tempo: message.tempo,
         transpose: message.transpose,
         octave: message.octave,
       });
-      const batch = createRecordingBatch({
-        sampleRate: message.sampleRate,
-        realtime,
-      });
-      recordingStream = createRecordingStream({
-        port: recordingStreamChannel.outbound(message.port),
-        onChunk: (chunk) => {
-          audioDecode.patchLiveTake(chunk);
-          batch.push(chunk);
+      takes.begin(
+        {
+          takeId: message.takeId,
+          recordingId,
+          sampleRate: message.sampleRate,
+          frameCount: message.frameCount,
+          latencyFrameCount: message.latencyFrameCount,
+          tempo: message.tempo,
+          transpose: message.transpose,
+          octave: message.octave,
+          port: message.port,
         },
-        onFlush: batch.flush,
-      });
-      realtime.sendJson({
-        type: 'recording.start',
-        recordingId,
-        sessionId: recordingSessionId,
-        sampleRate: message.sampleRate,
-        frameCount: message.frameCount,
-        latencyFrameCount: message.latencyFrameCount,
-        tempo: message.tempo,
-        transpose: message.transpose,
-        octave: message.octave,
-      });
+        (chunk) => {
+          audioDecode.patchLiveTake(chunk);
+        },
+      );
     },
-    finishRecordingStream: (message) => {
-      const stream = recordingStream;
-      if (!stream) {
-        port.methods.recordingStreamFinished();
-        return;
+    finishRecordingStream: async (message) => {
+      const { takeId, sequence } = message;
+      if (takes.holds(takeId)) {
+        await takes.finish(takeId, sequence);
+      } else {
+        await draft?.waitForFlush(sequence);
+        closeDraft();
       }
-      void stream
-        .waitForFlush(message.sequence)
-        .then(async () =>
-          draftStream
-            ? undefined
-            : recordingController.finishCurrentRecordingStream(stream),
-        )
-        .then(() => {
-          if (recordingStream === stream) {
-            recordingController.clearRecordingStream();
-          }
-          port.methods.recordingStreamFinished();
-        })
-        .catch(recordingController.failRecordingStream);
+      port.methods.recordingStreamFinished({ takeId });
     },
     settleLoopTry: (message) => {
       port.methods.loopTrySettled({ loopTry: loopTries.settle(message.keep) });

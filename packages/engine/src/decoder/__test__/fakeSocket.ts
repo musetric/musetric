@@ -10,6 +10,7 @@ export type FakeSocket = {
   send: (message: string | ArrayBuffer) => void;
   close: () => void;
   open: () => void;
+  hangUp: () => void;
   receive: (event: object) => void;
 };
 
@@ -36,6 +37,10 @@ const createFakeSocket = (): FakeSocket => {
     open: () => {
       socket.readyState = WebSocket.OPEN;
       emit('open', {});
+    },
+    hangUp: () => {
+      socket.readyState = WebSocket.CLOSED;
+      emit('close', {});
     },
     receive: (event) => {
       emit('message', { data: JSON.stringify(event) });
