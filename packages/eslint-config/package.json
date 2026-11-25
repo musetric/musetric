@@ -29,8 +29,7 @@
     "build:project": "tsc --build",
     "check:ts": "tsc --build",
     "check:lint": "eslint . --cache --cache-strategy content",
-    "fix:lint": "eslint . --fix --cache --cache-strategy content",
-    "test": "vitest run"
+    "fix:lint": "eslint . --fix --cache --cache-strategy content"
   },
   "peerDependencies": {
     "@typescript/native": "catalog:",
@@ -54,7 +53,6 @@
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "eslint": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

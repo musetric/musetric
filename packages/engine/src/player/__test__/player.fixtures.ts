@@ -196,7 +196,6 @@ export type Harness = TakeStream & {
 
 export const createHarness = async (
   recording: PlayerRecordingPiece[],
-  playheadPorts: MessagePort[] = [],
 ): Promise<Harness> => {
   const control = new MessageChannel();
   let contextFrame = 0;
@@ -204,7 +203,7 @@ export const createHarness = async (
   const runtime = createPlayerRuntime({
     port: playerChannel.inbound(control.port1),
     dataPort: playerDataChannel.inbound(data.port1),
-    playheadPorts,
+    playheadPorts: [],
     sampleRate: rate,
     stretch: loadStretch(),
     getCurrentFrame: () => contextFrame,

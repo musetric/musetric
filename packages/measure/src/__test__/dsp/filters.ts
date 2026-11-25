@@ -108,26 +108,3 @@ export const filterSections = (
   }
   return output;
 };
-
-export const getSectionsResponse = (
-  sections: readonly SecondOrderSection[],
-  frequency: number,
-  sampleRate: number,
-): number => {
-  const angle = (2 * Math.PI * frequency) / sampleRate;
-  const inverse = { re: Math.cos(angle), im: -Math.sin(angle) };
-  const inverseSquared = multiply(inverse, inverse);
-  let response = real(1);
-  for (const section of sections) {
-    const numerator = add(
-      add(real(section.b0), multiply(real(section.b1), inverse)),
-      multiply(real(section.b2), inverseSquared),
-    );
-    const denominator = add(
-      add(real(1), multiply(real(section.a1), inverse)),
-      multiply(real(section.a2), inverseSquared),
-    );
-    response = multiply(response, divide(numerator, denominator));
-  }
-  return Math.hypot(response.re, response.im);
-};

@@ -83,21 +83,6 @@ export const submitFourierBatch = async (
   await device.queue.onSubmittedWorkDone();
 };
 
-export const expectDispatchThrows = (
-  fourier: Fourier,
-  range: FourierBatchRange,
-): void => {
-  const encoder = device.createCommandEncoder();
-  const pass = encoder.beginComputePass();
-  try {
-    expect(() => {
-      fourier.dispatch(pass, range);
-    }).toThrow(RangeError);
-  } finally {
-    pass.end();
-  }
-};
-
 export const targetedBatches = (
   ranges: readonly FourierBatchRange[],
 ): Set<number> => {

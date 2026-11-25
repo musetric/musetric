@@ -47,92 +47,23 @@ export type HostCommand = z.infer<typeof hostCommandSchema>;
 export const readHostCommand = (text: string): HostCommand =>
   hostCommandSchema.parse(JSON.parse(text));
 
-const readySchema = z.object({
-  type: z.literal('ready'),
-  adapter: z.boolean(),
-  shaderF16: z.boolean(),
-});
+export type ExecutorLogLevel = 'error' | 'warn';
 
-const aliveSchema = z.object({ type: z.literal('pong') });
-
-const logLevelSchema = z.enum(['error', 'warn']);
-
-const logSchema = z.object({
-  type: z.literal('log'),
-  level: logLevelSchema,
-  message: z.string(),
-});
-
-const loadingSchema = z.object({
-  type: z.literal('loading'),
-  jobId,
-  loaded: z.number(),
-  total: z.number(),
-});
-
-const buildingSchema = z.object({ type: z.literal('building'), jobId });
-
-const loadedSchema = z.object({ type: z.literal('loaded'), jobId });
-
-const runningSchema = z.object({
-  type: z.literal('running'),
-  jobId,
-  pass: z.enum(['decode', 'repair']),
-  unit: z.number(),
-  unitCount: z.number(),
-});
-
-const resultSchema = z.object({
-  type: z.literal('result'),
-  jobId,
-  result: z.optional(z.unknown()),
-});
-
-const failureSchema = z.object({
-  type: z.literal('failed'),
-  jobId,
-  error: z.string(),
-});
-
-const unitOpenedSchema = z.object({
-  type: z.literal('unitOpened'),
-  jobId,
-  attemptId,
-});
-
-const unitDoneSchema = z.object({
-  type: z.literal('unitDone'),
-  jobId,
-  attemptId,
-  unit: z.number(),
-});
-
-const executorMessageSchema = z.discriminatedUnion('type', [
-  readySchema,
-  aliveSchema,
-  logSchema,
-  loadingSchema,
-  buildingSchema,
-  loadedSchema,
-  runningSchema,
-  resultSchema,
-  failureSchema,
-  unitOpenedSchema,
-  unitDoneSchema,
-]);
-
-export type ExecutorReady = z.infer<typeof readySchema>;
-export type ExecutorLogLevel = z.infer<typeof logLevelSchema>;
-export type ExecutorJobMessage =
-  | z.infer<typeof loadingSchema>
-  | z.infer<typeof buildingSchema>
-  | z.infer<typeof loadedSchema>
-  | z.infer<typeof runningSchema>
-  | z.infer<typeof resultSchema>
-  | z.infer<typeof failureSchema>
-  | z.infer<typeof unitOpenedSchema>
-  | z.infer<typeof unitDoneSchema>;
-export type ExecutorMessage = z.infer<typeof executorMessageSchema>;
-
-export const readExecutorMessage = (text: string): ExecutorMessage =>
-  executorMessageSchema.parse(JSON.parse(text));
+export type ExecutorMessage =
+  | { type: 'ready'; adapter: boolean; shaderF16: boolean }
+  | { type: 'pong' }
+  | { type: 'log'; level: ExecutorLogLevel; message: string }
+  | { type: 'loading'; jobId: string; loaded: number; total: number }
+  | { type: 'building'; jobId: string }
+  | { type: 'loaded'; jobId: string }
+  | {
+      type: 'running';
+      jobId: string;
+      pass: 'decode' | 'repair';
+      unit: number;
+      unitCount: number;
+    }
+  | { type: 'result'; jobId: string; result?: unknown }
+  | { type: 'failed'; jobId: string; error: string }
+  | { type: 'unitOpened'; jobId: string; attemptId: string }
+  | { type: 'unitDone'; jobId: string; attemptId: string; unit: number };

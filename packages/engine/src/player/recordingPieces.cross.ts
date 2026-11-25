@@ -46,20 +46,3 @@ export const toRecordingSegments = (
   }
   return segments;
 };
-
-export const firstSegmentEndingAfter = (
-  segments: readonly RecordingSegment[],
-  songFrame: number,
-): number => {
-  let low = 0;
-  let high = segments.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (segments[middle].songEndFrame <= songFrame) {
-      low = middle + 1;
-    } else {
-      high = middle;
-    }
-  }
-  return low;
-};

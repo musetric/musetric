@@ -11,8 +11,6 @@ pipelines (`pipeline.ts`), each with an explicit bind group layout built from
 the `kinds` of its spec by `computeBufferEntries`.
 
 - A binding added to a shader is added to its `kinds` too.
-- `__test__/shaders.test.ts` compiles the pitch shaders and fails on a compiler
-  error.
 
 ## Measuring the pitch line
 

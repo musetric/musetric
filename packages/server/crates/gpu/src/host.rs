@@ -491,14 +491,6 @@ impl ExecutorHost {
         &self.base_url
     }
 
-    #[must_use]
-    pub fn socket_url(&self) -> String {
-        format!(
-            "{}{JOB_SOCKET_PATH}",
-            self.base_url.replace("http://", "ws://")
-        )
-    }
-
     pub async fn revive(&self) -> std::io::Result<()> {
         self.reviver.revive().await
     }

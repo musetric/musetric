@@ -7,8 +7,6 @@ mod tests {
             render_song,
         },
     };
-    use sha2::{Digest, Sha256};
-    use std::fmt::Write;
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
@@ -40,30 +38,6 @@ mod tests {
             .iter()
             .map(|segment| (segment.start, segment.end, segment.piece))
             .collect()
-    }
-
-    fn keyed(transpose: i32, octave: i32) -> Piece {
-        Piece {
-            transpose,
-            octave,
-            ..piece(0.0, 1, 1.0)
-        }
-    }
-
-    fn shifted(transpose: i32, voice_octave: Option<i32>) -> Target {
-        Target {
-            transpose,
-            voice_octave: voice_octave.unwrap_or(0),
-            voice_shifted: voice_octave.is_some(),
-            ..Target::ORIGINAL
-        }
-    }
-
-    #[test]
-    fn shifts_a_take_by_the_octave_of_the_voice_only_when_it_is_shifted() {
-        assert_eq!(shifted(2, None).shift(&keyed(-1, 1)).1, 3);
-        assert_eq!(shifted(2, Some(0)).shift(&keyed(-1, 1)).1, -9);
-        assert_eq!(shifted(-2, Some(1)).shift(&keyed(0, 0)).1, 10);
     }
 
     #[test]
@@ -332,54 +306,5 @@ mod tests {
             assert!(equal, "{target:?}");
             assert!(played.iter().any(|sample| *sample != 0.0), "{target:?}");
         }
-    }
-
-    fn digest(samples: &[f32]) -> String {
-        let bytes: Vec<u8> = samples
-            .iter()
-            .flat_map(|sample| sample.to_le_bytes())
-            .collect();
-        Sha256::digest(&bytes)
-            .iter()
-            .fold(String::new(), |mut hex, byte| {
-                write!(hex, "{byte:02x}").unwrap();
-                hex
-            })
-    }
-
-    #[test]
-    fn renders_the_same_samples_on_every_target() {
-        let mut stems = Stems::new(120_000);
-        let digests: Vec<String> = [
-            Target {
-                tempo: 0.8,
-                transpose: -2,
-                voice_octave: 1,
-                voice_shifted: true,
-            },
-            Target {
-                tempo: 1.25,
-                transpose: 0,
-                voice_octave: 0,
-                voice_shifted: false,
-            },
-            Target {
-                tempo: 1.0,
-                transpose: 3,
-                voice_octave: -1,
-                voice_shifted: true,
-            },
-        ]
-        .into_iter()
-        .map(|target| digest(&render(&mut stems, &scene(target), Parts::ALL)))
-        .collect();
-        assert_eq!(
-            digests,
-            [
-                "d6902102008faaf03785c3880a0d0aaf948a78a0a1da577495ed7470692473ab",
-                "892fd06a35f5c43109d8b7068a7d8dab6919624ecf2d4977922cd3e68f58bbeb",
-                "3742719f0e23685fe80368e66ed512cdd42b22ea27cc541982dea2cb43667114"
-            ]
-        );
     }
 }

@@ -57,8 +57,6 @@
     "english": {
       "except": [
         "packages/ai/src/transcription/hallucinationFilter.ts",
-        "packages/ai/src/transcription/__test__/filters.test.ts",
-        "packages/ai/src/transcription/__test__/wordPieces.test.ts",
         "packages/server/src/cached_file.rs",
         "packages/*/notices/*"
       ]

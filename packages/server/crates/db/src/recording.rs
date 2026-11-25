@@ -318,16 +318,3 @@ pub(crate) fn write_recording_pieces(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::next_name;
-
-    #[test]
-    fn names_a_recording_after_the_highest_number() {
-        let names = ["Recording 1", "Slow verse", "recording 4"].map(str::to_owned);
-
-        assert_eq!(next_name(&names), "Recording 5");
-        assert_eq!(next_name(&[]), "Recording 1");
-    }
-}

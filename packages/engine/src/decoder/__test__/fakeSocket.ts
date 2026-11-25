@@ -11,7 +11,6 @@ export type FakeSocket = {
   close: () => void;
   open: () => void;
   receive: (event: object) => void;
-  drop: () => void;
 };
 
 const createFakeSocket = (): FakeSocket => {
@@ -40,10 +39,6 @@ const createFakeSocket = (): FakeSocket => {
     },
     receive: (event) => {
       emit('message', { data: JSON.stringify(event) });
-    },
-    drop: () => {
-      socket.readyState = WebSocket.CLOSED;
-      emit('close', {});
     },
   };
   return socket;

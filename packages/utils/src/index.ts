@@ -12,5 +12,4 @@ export * from './objectKeys.js';
 export * from './patchConfig.js';
 export * from './resourceCell.js';
 export * from './sampleRate.js';
-export * from './singletonManager.js';
 export * from './viewSize.js';

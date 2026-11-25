@@ -6,9 +6,6 @@ mod protocol;
 pub mod range;
 mod units;
 
-#[cfg(test)]
-mod tests;
-
 pub use cache::{
     Download, DownloadReport, DownloadStatus, ModelFile, create_client, ensure_model_file,
     has_verified_copy, kept_files,

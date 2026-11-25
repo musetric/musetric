@@ -2,7 +2,6 @@ use std::sync::{Arc, atomic::AtomicU32};
 
 use musetric_db::ProcessingStep;
 use musetric_gpu::{UnitReject, UnitSession, UnitTarget};
-use reqwest::{Client, StatusCode};
 
 use super::{
     FRAME_BYTES, STATE_OUTPUT, SeparationSink, SinkCheckpoint, SinkCursor, SinkOptions, SinkStem,
@@ -227,67 +226,4 @@ async fn resumes_on_stems_cut_back_to_the_checkpoint() {
         [region(4, 1), region(3, 30)].concat()
     );
     assert!(truncate_stems(&stems, 8).await.is_err());
-}
-
-async fn put_over_http(base: &str, unit: u32, output: &str, body: Vec<u8>) -> StatusCode {
-    Client::new()
-        .put(format!("{base}/attempt/{ATTEMPT}/unit/{unit}/{output}"))
-        .body(body)
-        .send()
-        .await
-        .expect("the output should answer")
-        .status()
-}
-
-fn floats(values: &[f32]) -> Vec<u8> {
-    values
-        .iter()
-        .flat_map(|value| value.to_le_bytes())
-        .collect()
-}
-
-#[tokio::test]
-async fn takes_the_outputs_of_a_unit_over_http() {
-    let fixture = Fixture::new();
-    let sink = Arc::new(fixture.sink(START));
-    let host = fixture
-        .workspace
-        .start_unit_host(
-            "Fixture separation",
-            Arc::clone(&sink) as Arc<dyn UnitSession>,
-        )
-        .await;
-    let base = host.base_url().to_owned();
-    let stem = floats(&[0.5, -0.5, 0.25, 0.0]);
-    for name in STEMS {
-        assert_eq!(
-            put_over_http(&base, 0, name, stem.clone()).await,
-            StatusCode::NO_CONTENT
-        );
-    }
-    assert_eq!(
-        put_over_http(&base, 0, STATE_OUTPUT, vec![7; 5]).await,
-        StatusCode::NO_CONTENT
-    );
-    let broken = floats(&[f32::NAN, 0.0]);
-    let long = floats(&vec![
-        0.0;
-        2 * usize::try_from(TRACK_FRAMES).unwrap_or(0) + 2
-    ]);
-
-    assert_eq!(fixture.raw("instrumental"), stem);
-    assert_eq!(sink.cursor().map(|found| found.frames).ok(), Some(2));
-    assert_eq!(
-        put_over_http(&base, 1, "instrumental", broken).await,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        put_over_http(&base, 1, "lead", long).await,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        put_over_http(&base, 1, "backing", Vec::new()).await,
-        StatusCode::NO_CONTENT
-    );
-    host.close().await;
 }

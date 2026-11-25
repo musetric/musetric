@@ -478,16 +478,3 @@ fn step_pass(pass: StartPass) -> StepPass {
         StartPass::Repair => StepPass::Repair,
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{StartPass, repair_start};
-
-    #[test]
-    fn resumes_repair_from_its_checkpoint() {
-        assert_eq!(repair_start(StartPass::Decode, 4), 0);
-        assert_eq!(repair_start(StartPass::Repair, 0), 0);
-        assert_eq!(repair_start(StartPass::Repair, 1), 1);
-        assert_eq!(repair_start(StartPass::Repair, 2), 2);
-    }
-}

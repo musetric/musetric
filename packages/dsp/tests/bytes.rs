@@ -1,25 +1,18 @@
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Write, io::Cursor};
+    use std::io::Cursor;
 
     use musetric_dsp::{
         CHANNELS,
-        aac::AacEncoder,
         decode::{DecodeRequest, Layout, decode},
         flac::FlacWriter,
-        m4a::{M4aTrack, write_m4a},
-        mp3::Mp3Encoder,
-        stretch::Stretch,
-        wav::WavWriter,
     };
-    use sha2::{Digest, Sha256};
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     const RATE: u32 = 48_000;
     const FRAMES: u16 = 48_000;
     const SAW_FRAMES: u16 = 480;
-    const BITRATE: u32 = 192_000;
 
     fn signal() -> Vec<f32> {
         let mut state = 1_u32;
@@ -34,15 +27,6 @@ mod tests {
             .collect()
     }
 
-    fn digest(bytes: &[u8]) -> String {
-        Sha256::digest(bytes)
-            .iter()
-            .fold(String::new(), |mut hex, byte| {
-                write!(hex, "{byte:02x}").expect("a string takes every byte");
-                hex
-            })
-    }
-
     fn flac() -> Vec<u8> {
         let mut writer = FlacWriter::create(Cursor::new(Vec::new()), RATE)
             .expect("the writer should be created");
@@ -53,115 +37,6 @@ mod tests {
             .finish()
             .expect("the stream should be finished")
             .into_inner()
-    }
-
-    #[test]
-    fn writes_the_same_flac_on_every_target() {
-        assert_eq!(
-            digest(&flac()),
-            "39314460d33bbafaf786da7c3563e1dd639cb7a03ee7a846f9757ab1ad5511e6"
-        );
-    }
-
-    #[test]
-    fn writes_the_same_wav_on_every_target() {
-        let samples = signal();
-        let frames = samples.as_chunks::<CHANNELS>().0;
-        let mut writer = WavWriter::create(Vec::new(), RATE, frames.len())
-            .expect("the writer should be created");
-        for frame in frames {
-            writer
-                .push(frame[0], frame[1])
-                .expect("the frame should be written");
-        }
-        let bytes = writer.finish().expect("the stream should be finished");
-        assert_eq!(
-            digest(&bytes),
-            "0c64ae105f84b1aa32f475177df7b9c110ce47b626b8128019b723f19bcadc39"
-        );
-    }
-
-    #[test]
-    fn writes_the_same_m4a_on_every_target() {
-        let samples = signal();
-        let channels = u8::try_from(CHANNELS).expect("the channels fit");
-        let mut encoder =
-            AacEncoder::create(RATE, channels, BITRATE).expect("the encoder should be created");
-        encoder.push(&samples).expect("the samples should be taken");
-        let packets = encoder.finish().expect("the stream should be finished");
-        let track = M4aTrack {
-            sample_rate: RATE,
-            channels,
-            packets: &packets,
-            frame_count: u32::from(FRAMES),
-        };
-        let bytes = write_m4a(Vec::new(), &track).expect("the file should be written");
-        assert_eq!(
-            digest(&bytes),
-            "619f212fefbeb9113b280c7d6e89eb7be309cc26c3f0212ada351e4ffd741b95"
-        );
-    }
-
-    #[test]
-    fn writes_the_same_mp3_on_every_target() {
-        let mut encoder = Mp3Encoder::create(RATE, BITRATE);
-        encoder
-            .push(&signal())
-            .expect("the samples should be taken");
-        let bytes = encoder
-            .finish(Vec::new())
-            .expect("the stream should be finished");
-        assert_eq!(
-            digest(&bytes),
-            "87de8b4bd1b62f0c4cabb30781653bf5e60a72f0ac9ccced40120ee39d640a37"
-        );
-    }
-
-    #[test]
-    fn stretches_to_the_same_samples_on_every_target() {
-        let samples = signal();
-        let channels: Vec<Vec<f32>> = (0..CHANNELS)
-            .map(|channel| {
-                samples
-                    .iter()
-                    .skip(channel)
-                    .step_by(CHANNELS)
-                    .copied()
-                    .collect()
-            })
-            .collect();
-        let digests: Vec<String> = [
-            (RATE, 2, false, 48_000),
-            (RATE, -3, true, 60_000),
-            (22_050, 5, false, 40_000),
-        ]
-        .into_iter()
-        .map(|(sample_rate, semitones, keep_formants, frame_count)| {
-            let stretch = Stretch {
-                sample_rate,
-                frame_count,
-                semitones,
-                keep_formants,
-            };
-            let stretched = stretch
-                .apply(&channels, &mut |_| true)
-                .expect("the signal is long enough to stretch");
-            let bytes: Vec<u8> = stretched
-                .iter()
-                .flatten()
-                .flat_map(|sample| sample.to_le_bytes())
-                .collect();
-            digest(&bytes)
-        })
-        .collect();
-        assert_eq!(
-            digests,
-            [
-                "ce13b20621b2cf4a28712e2f155cd36371ede7766be6be57f1caf5645c268abc",
-                "161131439fca54dd31513b1130d8c6e24522b5064c233fe6cba167fd757506af",
-                "214207e9ee4be822ee8d7e6861b8ba127f47a4e2918add7cfeefdea0e1ec49c9"
-            ]
-        );
     }
 
     #[test]

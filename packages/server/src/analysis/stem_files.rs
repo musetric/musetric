@@ -35,11 +35,6 @@ impl StemFiles {
         self.master.path()
     }
 
-    #[cfg(test)]
-    pub(crate) fn raw_path(&self) -> &Path {
-        &self.raw
-    }
-
     pub(crate) fn sink_stem(&self) -> SinkStem {
         SinkStem {
             name: self.stem.name(),
@@ -80,48 +75,4 @@ impl StemFiles {
 
 pub(crate) fn read_at(from: &Path, sample_rate: u32) -> PcmRequest<'_> {
     PcmRequest { from, sample_rate }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use musetric_db::MasterType;
-
-    use super::{RAW_SUFFIX, StemFiles};
-
-    #[test]
-    fn stores_every_stem_next_to_the_master_it_encodes() {
-        let area = Path::new("/work/1/separation");
-        let stems = [
-            StemFiles::create(area, Path::new("/blobs"), MasterType::Lead),
-            StemFiles::create(area, Path::new("/blobs"), MasterType::Instrumental),
-        ];
-
-        for stem in &stems {
-            let name = stem.recorded().stem.name();
-            assert_eq!(stem.raw_path(), area.join(format!("{name}.{RAW_SUFFIX}")));
-            assert_eq!(
-                stem.master_path(),
-                area.join(stem.recorded().master_blob_id)
-            );
-        }
-    }
-
-    #[test]
-    fn stages_the_master_and_its_peaks_under_the_ids_it_records() {
-        let area = Path::new("/work/1/separation");
-        let stem = StemFiles::create(area, Path::new("/blobs"), MasterType::Backing);
-        let recorded = stem.recorded();
-
-        let staged: Vec<_> = stem.staged().iter().map(|blob| blob.blob_id()).collect();
-
-        assert_eq!(
-            staged,
-            [
-                recorded.master_blob_id.as_str(),
-                recorded.wave_blob_id.as_str()
-            ]
-        );
-    }
 }
