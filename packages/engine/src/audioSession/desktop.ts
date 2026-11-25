@@ -7,6 +7,11 @@ import {
 import { z } from 'zod';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import {
+  matchDesktopInputs,
+  toNativeInputId,
+  toPageInputId,
+} from './desktopInputs.js';
+import {
   type EngineAudioSession,
   microphoneAccessDenied,
 } from './engineAudioSession.js';
@@ -45,6 +50,19 @@ const request = async (command: DesktopMicrophoneCommand, args?: InvokeArgs) =>
 
 export const hasDesktopMicrophone = () => nativeMicrophone && isTauri();
 
+const readDevices = async () => {
+  const [reply, devices] = await Promise.all([
+    request('devices'),
+    navigator.mediaDevices.enumerateDevices(),
+  ]);
+  const { inputs, defaultInput } = devicesSchema.parse(reply);
+  return {
+    inputs: matchDesktopInputs(inputs, devices),
+    defaultInput,
+    outputs: devices.filter((device) => device.kind === 'audiooutput'),
+  };
+};
+
 const measureClockOffset = async () => {
   let bestSpan = Infinity;
   let offset = 0;
@@ -72,13 +90,18 @@ export const createDesktopAudioSession = (
     onCaptured,
     capture: {
       readClockOffset: measureClockOffset,
-      start: async (captureRequest, receive) =>
-        nativeStartSchema.parse(
+      start: async (captureRequest, receive) => {
+        const { deviceId, sampleRate } = captureRequest;
+        const { inputs } = await readDevices();
+        const reply = nativeStartSchema.parse(
           await request('start', {
-            ...captureRequest,
+            deviceId: toNativeInputId(inputs, deviceId),
+            sampleRate,
             onChunk: new Channel<ArrayBuffer>(receive),
           }),
-        ),
+        );
+        return { ...reply, deviceId: toPageInputId(inputs, reply.deviceId) };
+      },
       stop: async () => request('stop'),
     },
   });
@@ -94,14 +117,14 @@ export const createDesktopAudioSession = (
     openMicrophone: microphones.open,
     closeMicrophone: microphones.close,
     enumerateDevices: async () => {
-      const [reply, devices] = await Promise.all([
-        request('devices'),
-        navigator.mediaDevices.enumerateDevices(),
-      ]);
-      const { inputs, defaultInput } = devicesSchema.parse(reply);
+      const { inputs, defaultInput, outputs } = await readDevices();
       return [
-        ...toNativeDeviceInfos('audioinput', inputs, defaultInput),
-        ...devices.filter((device) => device.kind === 'audiooutput'),
+        ...toNativeDeviceInfos(
+          'audioinput',
+          inputs.map((input) => input.port),
+          defaultInput && toPageInputId(inputs, defaultInput),
+        ),
+        ...outputs,
       ];
     },
     subscribeDevices: deviceChanges.subscribe,

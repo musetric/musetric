@@ -25,7 +25,9 @@ export const nativeStartSchema = z.object({
   chunkSeconds: z.number(),
 });
 
-type NativePort = z.infer<typeof nativePortSchema>;
+export type NativePort = z.infer<typeof nativePortSchema> & {
+  groupId?: string;
+};
 
 const toDeviceInfo = (
   kind: MediaDeviceKind,
@@ -34,7 +36,7 @@ const toDeviceInfo = (
 ): MediaDeviceInfo => {
   const info = {
     deviceId,
-    groupId: `${kind}-${port.id}`,
+    groupId: port.groupId ?? `${kind}-${port.id}`,
     kind,
     label: port.label,
   };
