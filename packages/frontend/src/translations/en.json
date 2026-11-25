@@ -250,7 +250,7 @@
   "pages.project.progress.trackTitle": "Processing",
   "pages.project.progress.waiting.absent": "Waiting for the GPU worker",
   "pages.project.progress.waiting.lost": "Reconnecting to the GPU worker",
-  "pages.project.realtime.error": "Unexpected realtime connection error. Reopen the project to continue.",
+  "pages.project.realtime.error": "Lost the connection to the host. Trying again every 10 seconds.",
   "pages.project.recording.choose": "Choose the recording to play, show and record into",
   "pages.project.recording.close": "Close",
   "pages.project.recording.create": "Create",
