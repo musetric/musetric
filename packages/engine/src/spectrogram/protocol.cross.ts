@@ -1,3 +1,4 @@
+import { type TimelineConfig } from '@musetric/audio/timeline';
 import { type SpectrogramConfig } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import {
@@ -14,6 +15,14 @@ export type SpectrogramViewWindow = {
   frameCount: number;
 };
 
+export type SpectrogramRulerSize = Pick<
+  TimelineConfig,
+  'width' | 'height' | 'pixelRatio'
+>;
+
+export type SpectrogramRulerMount = SpectrogramRulerSize &
+  Pick<TimelineConfig, 'canvas' | 'markerColor' | 'labelColor' | 'font'>;
+
 export type SpectrogramOutboundMethods = {
   boot: (message: {
     dataPort: MessagePort;
@@ -26,6 +35,9 @@ export type SpectrogramOutboundMethods = {
     trackProgress: number;
   }) => void;
   unmount: () => void;
+  mountRuler: (message: SpectrogramRulerMount) => void;
+  resizeRuler: (message: SpectrogramRulerSize) => void;
+  unmountRuler: () => void;
   setTrackProgress: (message: {
     trackProgress: number;
     revision: number;
@@ -55,6 +67,9 @@ export const spectrogramChannel = createMessageChannel<
       'connectPlayhead',
       'mount',
       'unmount',
+      'mountRuler',
+      'resizeRuler',
+      'unmountRuler',
       'setTrackProgress',
       'setFrameCount',
       'setPlaying',
@@ -68,6 +83,7 @@ export const spectrogramChannel = createMessageChannel<
       previewLiveTake: (message) => [message.samples.buffer],
       mount: (message) =>
         message.config.canvas ? [message.config.canvas] : [],
+      mountRuler: (message) => [message.canvas],
     },
   },
 });

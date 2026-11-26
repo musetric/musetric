@@ -1,24 +1,25 @@
+import { assertDefined } from '@musetric/utils';
 import { type TimelineConfig } from '../config.js';
-import { createCanvasCell, type TimelineCanvasState } from './canvas.js';
 import { getTimelineMarkers } from './markers.js';
 
 const labelOffset = 4;
 const maxLabelMetricsCacheSize = 4096;
 
 const resizeCanvas = (
-  canvas: HTMLCanvasElement,
-  state: TimelineCanvasState,
-  pixelRatio: number,
+  config: TimelineConfig,
+  width: number,
+  height: number,
 ) => {
-  const width = Math.max(1, Math.floor(state.width * pixelRatio));
-  const height = Math.max(1, Math.floor(state.height * pixelRatio));
+  const { canvas, pixelRatio } = config;
+  const canvasWidth = Math.max(1, Math.floor(width * pixelRatio));
+  const canvasHeight = Math.max(1, Math.floor(height * pixelRatio));
 
-  if (canvas.width === width && canvas.height === height) {
+  if (canvas.width === canvasWidth && canvas.height === canvasHeight) {
     return;
   }
 
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
 };
 
 const alignPixel = (value: number, pixelRatio: number) =>
@@ -38,14 +39,13 @@ export type TimelineDraw = {
 };
 
 export const createTimelineDraw = (): TimelineDraw => {
-  const canvasCell = createCanvasCell();
   const labelMetricsCache = new Map<
     string,
     Pick<TextMetrics, 'actualBoundingBoxDescent' | 'width'>
   >();
 
   const getLabelMetrics = (
-    context: CanvasRenderingContext2D,
+    context: OffscreenCanvasRenderingContext2D,
     font: string,
     label: string,
   ) => {
@@ -72,13 +72,14 @@ export const createTimelineDraw = (): TimelineDraw => {
 
   return {
     run: (config) => {
-      const { canvas } = config;
-      const canvasState = canvasCell.get(canvas);
-      const { context } = canvasState;
-      const pixelRatio = window.devicePixelRatio;
-      resizeCanvas(canvas, canvasState, pixelRatio);
-
-      const { width, height } = canvasState;
+      const { pixelRatio } = config;
+      const width = Math.max(1, config.width);
+      const height = Math.max(1, config.height);
+      resizeCanvas(config, width, height);
+      const context = assertDefined(
+        config.canvas.getContext('2d'),
+        'Context 2D not available on the timeline canvas',
+      );
       const markers = getTimelineMarkers(config, width);
 
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -126,7 +127,6 @@ export const createTimelineDraw = (): TimelineDraw => {
       }
     },
     dispose: () => {
-      canvasCell.dispose();
       labelMetricsCache.clear();
     },
   };

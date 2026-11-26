@@ -10,12 +10,21 @@ export type ViewWindowState = {
     window: SpectrogramViewWindow | undefined,
   ) => Partial<SpectrogramView> | undefined;
   view: (frameIndex: number) => SpectrogramView | undefined;
+  shown: (frameIndex: number) => SpectrogramView | undefined;
 };
 
 export const createViewWindowState = (): ViewWindowState => {
   let window: SpectrogramViewWindow | undefined = undefined;
   let sampleRate = 0;
   const ownView: Partial<SpectrogramView> = {};
+
+  const view = (frameIndex: number) =>
+    window && sampleRate > 0
+      ? {
+          visibleTime: window.frameCount / sampleRate,
+          playheadRatio: (frameIndex - window.startFrame) / window.frameCount,
+        }
+      : undefined;
 
   return {
     remember: (config) => {
@@ -42,12 +51,12 @@ export const createViewWindowState = (): ViewWindowState => {
       window = next;
       return next ? undefined : { ...ownView };
     },
-    view: (frameIndex) =>
-      window && sampleRate > 0
-        ? {
-            visibleTime: window.frameCount / sampleRate,
-            playheadRatio: (frameIndex - window.startFrame) / window.frameCount,
-          }
-        : undefined,
+    view,
+    shown: (frameIndex) => {
+      const { visibleTime, playheadRatio } = view(frameIndex) ?? ownView;
+      return visibleTime === undefined || playheadRatio === undefined
+        ? undefined
+        : { visibleTime, playheadRatio };
+    },
   };
 };

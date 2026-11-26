@@ -1,6 +1,5 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { createTimelineProcessor } from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import {
@@ -22,30 +21,15 @@ export const VisualizationTimeline: FC = () => {
       return;
     }
 
-    const processor = createTimelineProcessor({
-      config: {
-        canvas,
-        markerColor: theme.palette.default.main,
-        labelColor: theme.palette.default.main,
-        font: `11px ${theme.typography.fontFamily}`,
-      },
+    const unmountRuler = engine.spectrogram.mountRuler(canvas, {
+      markerColor: theme.palette.default.main,
+      labelColor: theme.palette.default.main,
+      font: `11px ${theme.typography.fontFamily}`,
     });
     let canvasWidth = canvas.getBoundingClientRect().width;
 
     const render = () => {
-      const { duration, frameCount } = engine.store.get();
-      const frameIndex = engine.position.read();
-      const { visibleTime, playheadRatio } = getVisualizationView();
-
-      processor.updateConfig({
-        duration,
-        frameIndex,
-        frameCount,
-        visibleTime,
-        playheadRatio,
-      });
-      processor.render();
-
+      const { playheadRatio } = getVisualizationView();
       const cursorX = alignPixel(
         playheadRatio * canvasWidth,
         window.devicePixelRatio,
@@ -65,13 +49,13 @@ export const VisualizationTimeline: FC = () => {
       resizeTarget: canvas,
       onResize: resize,
       render,
-      engineKeys: ['duration', 'frameCount', 'viewWindow'],
-      settingsKeys: ['visibleTime', 'playheadRatio'],
+      engineKeys: ['viewWindow'],
+      settingsKeys: ['playheadRatio'],
     });
 
     return () => {
       unsubscribe();
-      processor.dispose();
+      unmountRuler();
     };
   }, [theme]);
 
