@@ -5,9 +5,11 @@ import {
   measureFailure,
   measureRecovery,
 } from './failure.js';
+import { createFrameRuns } from './frame.js';
 import { type PageHooks } from './hooks.js';
 import { createInputBridge } from './input.js';
 import { calibrate, readMeasureLatency } from './latency.js';
+import { epochNow } from './samples.js';
 import { measureSeek, type SeekOptions } from './seek.js';
 import {
   type BrowserCaptureOptions,
@@ -22,6 +24,7 @@ declare const musetricMeasureHooks: PageHooks | undefined;
 const installMeasure = (hooks: PageHooks) => {
   const { engine } = hooks;
   const input = createInputBridge();
+  const frameRuns = createFrameRuns(hooks);
   let kept = '';
   // eslint-disable-next-line musetric/no-global-state -- the driver calls the injected procedures through one entry point
   Object.assign(globalThis, {
@@ -38,6 +41,10 @@ const installMeasure = (hooks: PageHooks) => {
         measureFailure(hooks, options),
       recovery: async () => measureRecovery(hooks),
       seek: async (options: SeekOptions) => measureSeek(hooks, options),
+      frameStart: frameRuns.start,
+      frameStop: frameRuns.stop,
+      frameShow: frameRuns.show,
+      now: () => epochNow(),
       browserCapture: async (options: BrowserCaptureOptions) =>
         captureBrowserMicrophone(engine, options),
       take: async (options: SoundTakeOptions) =>

@@ -2,6 +2,7 @@ import { inject, it } from 'vitest';
 import { runCursor } from './driver/measureCursor.js';
 import { runDelay } from './driver/measureDelay.js';
 import { runFailure } from './driver/measureFailure.js';
+import { runFrame } from './driver/measureFrame.js';
 import { runSeek } from './driver/measureSeek.js';
 import { runSound } from './driver/measureSound.js';
 import { runTiming } from './driver/measureTiming.js';
@@ -24,6 +25,7 @@ const commands: Record<
   cursor: runCursor,
   failure: runFailure,
   seek: runSeek,
+  frame: runFrame,
 };
 
 it('runs the measure command', async () => {

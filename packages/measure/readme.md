@@ -17,6 +17,7 @@ needs nothing built beforehand: each command first builds the WebAssembly of
 | `pnpm --filter @musetric/measure measure:cursor`  | The shown cursor through Play, Stop, seeks, a drag and a loop: steps back, stalls and jumps ([#1368](https://github.com/musetric/musetric/issues/1368))                     |
 | `pnpm --filter @musetric/measure measure:failure` | A fault thrown in the player during a take: the notice, the stop, the take on the host, and play after a reload ([#1365](https://github.com/musetric/musetric/issues/1365)) |
 | `pnpm --filter @musetric/measure measure:seek`    | Seeks to far frames while playing: the time to the first sound and the range requests of the stems ([#1364](https://github.com/musetric/musetric/issues/1364))              |
+| `pnpm --filter @musetric/measure measure:frame`   | The spectrogram's frames while playing and in a swipe of the progress bar, its screens against the ruler ([#1426](https://github.com/musetric/musetric/issues/1426))        |
 
 Every command first runs the app's calibration check and stops if it fails; a
 call it cannot parse prints its options. Open a project before running one.
@@ -25,6 +26,11 @@ tempo t lies on the song at the piece's start plus k × t, so at every tempo the
 take's distance from the beats is in milliseconds as heard, like the playhead's.
 `measure:delay` and `measure:sound` play their file from this computer with
 `ffplay`, which must be on `PATH`: put the speaker next to the microphone.
+`measure:frame` swipes the progress bar with `adb shell input swipe`, captures
+the screen during the swipe and then the stopped picture at each capture's
+place, and compares the shift of the picture with the shift of the ruler; the
+parts of a frame, each GPU pass and the work before the submit, come only from
+a build with `frontendSpectrogramProfiling=true` as well.
 
 ## Measure build
 

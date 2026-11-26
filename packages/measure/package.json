@@ -13,7 +13,8 @@
     "measure:sound": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts sound",
     "measure:cursor": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts cursor",
     "measure:failure": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts failure",
-    "measure:seek": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts seek"
+    "measure:seek": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts seek",
+    "measure:frame": "pnpm --filter @musetric/dsp build:app && node ./scripts/measure.ts frame"
   },
   "devDependencies": {
     "@musetric/api": "workspace:*",

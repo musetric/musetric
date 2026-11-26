@@ -1,4 +1,7 @@
-import { type SpectrogramProcessor } from '@musetric/spectrogram/gpu';
+import {
+  type SpectrogramProcessor,
+  type SpectrogramProcessorMetrics,
+} from '@musetric/spectrogram/gpu';
 import { defaultSampleRate } from '@musetric/utils';
 import { findDrawnEdges } from '../analysis/edges.js';
 
@@ -7,6 +10,8 @@ const energyFrequency = 1000;
 
 type RenderedFrame = {
   processor: SpectrogramProcessor;
+  device: GPUDevice;
+  metrics: SpectrogramProcessorMetrics | undefined;
   startedAt: number;
   playing: boolean;
   playheadFrame: number;
@@ -66,6 +71,19 @@ musetricMeasureHooks.setRenderListener(async (frame) => {
     frame.playheadFrame,
     frame.playing ? 1 : 0,
   );
+  const submittedAt = performance.timeOrigin + performance.now();
+  void frame.device.queue.onSubmittedWorkDone().then(() => {
+    console.info(
+      '[measure]',
+      'frame',
+      frame.startedAt,
+      submittedAt,
+      performance.timeOrigin + performance.now(),
+      frame.playing ? 1 : 0,
+      frame.playheadFrame,
+      JSON.stringify(frame.metrics ?? {}),
+    );
+  });
   const { writtenEnd } = frame;
   if (frame.playing && writtenEnd !== undefined) {
     await probeEdges({ ...frame, writtenEnd });
