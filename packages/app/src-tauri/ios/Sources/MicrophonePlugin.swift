@@ -48,6 +48,9 @@ class MicrophonePlugin: Plugin, WKScriptMessageHandlerWithReply {
     case "stop":
       capture.stop()
       replyHandler(true, nil)
+    case "release":
+      capture.deactivate()
+      replyHandler(true, nil)
     case "openSettings":
       if let settings = URL(string: UIApplication.openSettingsURLString) {
         UIApplication.shared.open(settings)
