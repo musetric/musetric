@@ -90,9 +90,9 @@ export const createTimelineDraw = (): TimelineDraw => {
     start: number,
     screens: number,
   ) => {
-    const { context } = (
-      canvas === config.canvas ? canvasCell : stripCell
-    ).get(canvas);
+    const { context } = (canvas === config.canvas ? canvasCell : stripCell).get(
+      canvas,
+    );
     const pixelRatio = window.devicePixelRatio;
     const { width, height } = canvasCell.get(config.canvas);
     resizeCanvas(canvas, { width, height }, pixelRatio, screens);
