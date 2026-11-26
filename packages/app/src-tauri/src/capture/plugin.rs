@@ -10,13 +10,14 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
 };
 
+#[cfg(target_os = "macos")]
+use super::macos::CoreAudio as System;
+#[cfg(target_os = "windows")]
+use super::windows::Wasapi as System;
 use super::{
     chunk::ChunkFramer,
-    system::{CaptureSystem, Inputs, OpenRequest, PacketSink, clock_ms},
-    windows::Wasapi,
+    system::{CaptureSystem, Devices, OpenRequest, PacketSink, SinkForRate, clock_ms},
 };
-
-type System = Wasapi;
 
 const PLUGIN_NAME: &str = "microphone";
 const CHUNKS_PER_SECOND: u32 = 50;
@@ -61,17 +62,24 @@ impl Microphone {
         session.stream = None;
         session.count = session.count.wrapping_add(1);
         let count = session.count;
-        let sample_rate = request.sample_rate;
-        let mut framer = ChunkFramer::new(
-            count,
-            sample_rate,
-            (sample_rate / CHUNKS_PER_SECOND) as usize,
-        );
-        let sink: PacketSink = Box::new(move |packet| {
-            framer.push(packet, &mut |bytes| send_chunk(&on_chunk, bytes));
+        let page_rate = request.sample_rate;
+        let sink: SinkForRate = Box::new(move |sample_rate| {
+            let mut framer = ChunkFramer::new(
+                count,
+                sample_rate,
+                (sample_rate / CHUNKS_PER_SECOND) as usize,
+            );
+            let packets: PacketSink = Box::new(move |packet| {
+                framer.push(packet, &mut |bytes| send_chunk(&on_chunk, bytes));
+            });
+            packets
         });
         let opened = System::open(request, sink)?;
-        log::info!("microphone opened: raw={}", opened.raw);
+        log::info!(
+            "microphone opened: raw={}, {} Hz for a page at {page_rate} Hz",
+            opened.raw,
+            opened.sample_rate
+        );
         session.stream = Some(opened.stream);
         Ok(Started {
             session: count,
@@ -112,8 +120,8 @@ fn clock() -> f64 {
 }
 
 #[tauri::command]
-async fn devices() -> Result<Inputs, String> {
-    blocking(System::inputs).await
+async fn devices() -> Result<Devices, String> {
+    blocking(System::devices).await
 }
 
 #[tauri::command]
