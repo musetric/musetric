@@ -107,6 +107,22 @@ export const createEnginePlayback = async (
   let recordingFlushPromise: ControlledPromise<number> | undefined = undefined;
   const unsubscribes: (() => void)[] = [];
 
+  const unlessHalted = async <Value>(promise: Promise<Value>) => {
+    const halted = createControlledPromise<undefined>();
+    const check = () => {
+      if (context.state !== 'running') {
+        halted.resolve(undefined);
+      }
+    };
+    context.addEventListener('statechange', check);
+    check();
+    try {
+      return await Promise.race([promise, halted.promise]);
+    } finally {
+      context.removeEventListener('statechange', check);
+    }
+  };
+
   const isCurrentRevision = (revision: number) =>
     store.get().seekEvent.revision === revision;
 
@@ -332,7 +348,14 @@ export const createEnginePlayback = async (
       const command = nextCommand();
       const playingPromise = createPlayingPromise(command);
       port.methods.stop({ command, revision, frameIndex });
-      return (await playingPromise).frameIndex;
+      const reply = await unlessHalted(playingPromise);
+      if (reply) {
+        return reply.frameIndex;
+      }
+      stopFrameIndexPump();
+      position.write(frameIndex);
+      options.applyMotion('stopped');
+      return frameIndex;
     },
     setFrozen: (frozen) => {
       store.update((state) => {
@@ -365,7 +388,7 @@ export const createEnginePlayback = async (
       recordingFlushPromise = createControlledPromise<number>();
       const currentPromise = recordingFlushPromise;
       port.methods.flushRecording();
-      return await currentPromise.promise;
+      return (await unlessHalted(currentPromise.promise)) ?? 0;
     },
   };
 
