@@ -47,20 +47,31 @@ export const PlayerProgress: FC = () => {
     const slider = sliderRef.current;
     const time = timeRef.current;
     if (!slider || !time) return;
+    let queued = false;
+    let position = -1;
     const write = () => {
+      queued = false;
       const frameIndex = engine.position.read();
       const state = engine.store.get();
-      writePosition(slider, getPosition(frameIndex, state));
-      time.textContent = getCurrentTime(frameIndex, state);
+      const next = getPosition(frameIndex, state);
+      if (next !== position) {
+        position = next;
+        writePosition(slider, position);
+      }
+      const text = getCurrentTime(frameIndex, state);
+      if (time.textContent !== text) {
+        time.textContent = text;
+      }
+    };
+    const queue = () => {
+      if (queued) return;
+      queued = true;
+      queueMicrotask(write);
     };
     write();
     const unsubscribes = [
-      subscribeEnginePosition(getPosition, (position) => {
-        writePosition(slider, position);
-      }),
-      subscribeEnginePosition(getCurrentTime, (text) => {
-        time.textContent = text;
-      }),
+      subscribeEnginePosition(getPosition, queue),
+      subscribeEnginePosition(getCurrentTime, queue),
     ];
     return () => {
       for (const unsubscribe of unsubscribes) {
