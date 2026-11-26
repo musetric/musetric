@@ -144,8 +144,8 @@ final class MicrophoneCapture: NSObject {
 
   private func configureCategory() throws {
     let audio = AVAudioSession.sharedInstance()
-    if audio.category != .playAndRecord || audio.mode != .measurement {
-      try audio.setCategory(.playAndRecord, mode: .measurement, options: sessionOptions)
+    if audio.category != .playAndRecord || audio.mode != .default {
+      try audio.setCategory(.playAndRecord, mode: .default, options: sessionOptions)
     }
   }
 
