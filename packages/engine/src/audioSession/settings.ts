@@ -1,4 +1,5 @@
 import { type MicrophoneDenial } from '../state.js';
+import { type DesktopSystem, readDesktopSystem } from './desktopSystem.js';
 
 const windowsSettings = 'ms-settings:privacy-microphone';
 const macSettings =
@@ -17,15 +18,14 @@ const readAndroidSettings = (): AndroidSettings | undefined => {
   return target.MusetricSettings;
 };
 
+const systemSettings: Record<DesktopSystem, string> = {
+  windows: windowsSettings,
+  macos: macSettings,
+};
+
 const readSystemSettings = (): string | undefined => {
-  const { userAgent, maxTouchPoints } = navigator;
-  if (userAgent.includes('Windows')) {
-    return windowsSettings;
-  }
-  if (userAgent.includes('Macintosh') && maxTouchPoints <= 1) {
-    return macSettings;
-  }
-  return undefined;
+  const system = readDesktopSystem();
+  return system && systemSettings[system];
 };
 
 export const readWebMicrophoneDenial = (

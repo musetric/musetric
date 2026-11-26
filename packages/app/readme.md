@@ -97,14 +97,13 @@ is checked quickest in a browser, with [`pnpm dev`](../../readme.md#development)
   the `microphone` plugin on Windows and macOS
   (`src-tauri/capabilities/microphone.json`).
 - On Windows and macOS the app captures the microphone natively
-  (`src-tauri/src/capture`) when the frontend is built with
-  `frontendNativeMicrophone=true`; otherwise the page captures through
-  `getUserMedia`. Windows captures through WASAPI in its raw mode where the
-  device offers it; macOS through an IO procedure of CoreAudio's HAL on the
-  device itself, with no voice processing, at the device's own sample rate,
-  which the page converts. A system joins by implementing `CaptureSystem` of
-  `src-tauri/src/capture/system.rs`, whose timestamps share the clock of the
-  `clock` command.
+  (`src-tauri/src/capture`); on Linux, which has no capture system, the page
+  captures through `getUserMedia`, as in a browser. Windows captures through
+  WASAPI in its raw mode where the device offers it; macOS through an IO
+  procedure of CoreAudio's HAL on the device itself, with no voice processing,
+  at the device's own sample rate, which the page converts. A system joins by
+  implementing `CaptureSystem` of `src-tauri/src/capture/system.rs`, whose
+  timestamps share the clock of the `clock` command.
 - On Windows the app grants the microphone to the embedded host's origin in
   the WebView2 profile when the main window opens
   (`src-tauri/src/permission.rs`), so the page names its devices and outputs
