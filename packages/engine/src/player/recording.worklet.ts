@@ -1,30 +1,22 @@
+import { type PortDispatch } from '@musetric/utils/cross/messagePort';
 import { type playerChannel, type PlayerRange } from './protocol.cross.js';
 import { recordingStreamChannel } from './recordingStream.cross.js';
 
 export const chunkFrameCount = 256;
 const renderQuantumFrameCount = 128;
 
-export type LatencyFrameCounts = {
-  latencyFrameCount: number;
-  inputLatencyFrameCount: number;
+const dispatchNow: PortDispatch = (handler, payload) => {
+  handler(payload);
 };
-
-export type StartRecordingMessage = {
-  frameIndex: number;
-  revision: number;
-  latencyFrameCount: number;
-  inputLatencyFrameCount: number;
-  notificationPort: MessagePort;
-  pass?: boolean;
-};
-
-export type RecordingStreamPort = ReturnType<
-  typeof recordingStreamChannel.inbound<MessagePort>
->;
 
 export type RecordingRuntimePort = ReturnType<
   typeof playerChannel.inbound<MessagePort>
 >;
+
+export type LatencyFrameCounts = {
+  latencyFrameCount: number;
+  inputLatencyFrameCount: number;
+};
 
 export type CreateRecordingRuntimeOptions = {
   port: RecordingRuntimePort;
@@ -37,6 +29,15 @@ export type CreateRecordingRuntimeOptions = {
   applyLatencyFrameCounts: (counts: LatencyFrameCounts) => void;
 };
 
+export type StartRecordingMessage = {
+  frameIndex: number;
+  revision: number;
+  latencyFrameCount: number;
+  inputLatencyFrameCount: number;
+  notificationPort: MessagePort;
+  pass?: boolean;
+};
+
 export type RecordingRuntime = {
   processInput: (inputs: (Float32Array[] | undefined)[]) => void;
   processDrain: (inputs: (Float32Array[] | undefined)[]) => void;
@@ -46,6 +47,10 @@ export type RecordingRuntime = {
   resetInputOffset: () => void;
   isActive: () => boolean;
 };
+
+export type RecordingStreamPort = ReturnType<
+  typeof recordingStreamChannel.inboundSync<MessagePort>
+>;
 
 export const createRecordingRuntime = (
   options: CreateRecordingRuntimeOptions,
@@ -61,7 +66,10 @@ export const createRecordingRuntime = (
     applyLatencyFrameCounts,
   } = options;
 
-  const chunkSamples = new Float32Array(chunkFrameCount);
+  const chunkPool: Float32Array<ArrayBuffer>[] = [];
+  const takeChunk = (): Float32Array<ArrayBuffer> =>
+    chunkPool.pop() ?? new Float32Array(chunkFrameCount);
+  let chunkSamples = takeChunk();
   let recordingOffset = 0;
   let runStartFrame = 0;
   let runWriteOffset = 0;
@@ -128,12 +136,18 @@ export const createRecordingRuntime = (
     }
 
     recordingSequence += 1;
-    recordingNotificationPort?.methods.chunk({
-      sequence: recordingSequence,
-      startFrame: runStartFrame - passShift,
-      offset: runChunkOffset,
-      samples: chunkSamples.slice(0, recordingOffset),
-    });
+    if (recordingNotificationPort) {
+      recordingNotificationPort.methods.chunk({
+        sequence: recordingSequence,
+        startFrame: runStartFrame - passShift,
+        offset: runChunkOffset,
+        samples:
+          recordingOffset === chunkFrameCount
+            ? chunkSamples
+            : chunkSamples.subarray(0, recordingOffset),
+      });
+      chunkSamples = takeChunk();
+    }
     recordingOffset = 0;
     runChunkOffset = runWriteOffset;
     return recordingSequence;
@@ -171,7 +185,7 @@ export const createRecordingRuntime = (
     runWriteOffset += 1;
 
     if (recordingOffset === chunkFrameCount) {
-      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a capture chunk every 256 frames, until stage 6 of #1201 moves recording
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a capture chunk every 256 frames, in a buffer of the pool the worker gives back
       flushRecordingBuffer();
     }
   };
@@ -250,9 +264,15 @@ export const createRecordingRuntime = (
         flush();
       }
       flushRecordingBuffer();
-      recordingNotificationPort = recordingStreamChannel.inbound(
+      recordingNotificationPort = recordingStreamChannel.inboundSync(
         message.notificationPort,
+        dispatchNow,
       );
+      recordingNotificationPort.bindHandlers({
+        returnChunk: (returned) => {
+          chunkPool.push(returned.samples);
+        },
+      });
       applyLatencyFrameCounts(message);
       recordingOffset = 0;
       recordingSequence = 0;

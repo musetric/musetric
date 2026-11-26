@@ -10,7 +10,7 @@ vi.mock('../../audioRequest/audioRequest.worker.js', () => ({
   getRecordingList: async () =>
     Promise.resolve({ recordings: [activeRecording] }),
   getRecordingPieces: async () => new Promise(() => undefined),
-  getRecordingPiece: async () => new Promise(() => undefined),
+  getRecordingPieceRange: async () => new Promise(() => undefined),
 }));
 
 const refusals = (host: TakeHost) =>

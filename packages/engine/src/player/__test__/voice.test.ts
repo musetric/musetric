@@ -276,44 +276,4 @@ describe('player voice', () => {
     expect(loudPeak).toBeGreaterThan(0.1);
     expect(stalePeak).toBeLessThan(1e-4);
   });
-
-  it('plays the run of a live take that was sung last', async () => {
-    const harness = await createHarness([]);
-    harness.player.methods.setTrackVolume({ stemType: 'lead', volume: 0 });
-    harness.data.methods.beginLiveTake({
-      takeId: 'take',
-      tempo: 1,
-      transpose: 0,
-      octave: 0,
-    });
-    harness.data.methods.appendLiveTake({
-      startFrame: rate,
-      offset: 0,
-      samples: noise(rate),
-    });
-    harness.data.methods.appendLiveTake({
-      startFrame: 1.25 * rate,
-      offset: 0,
-      samples: new Float32Array(rate / 4),
-    });
-    harness.player.methods.play({
-      command: 0,
-      revision: 1,
-      latencyFrameCount: 0,
-      inputLatencyFrameCount: 0,
-    });
-    const peakFrom = async (frameIndex: number, revision: number) => {
-      harness.player.methods.seek({ command: 0, frameIndex, revision });
-      await settle();
-      let peak = 0;
-      for (let block = 0; block < 50; block += 1) {
-        for (const value of harness.process(new Float32Array(blockSize))) {
-          peak = Math.max(peak, Math.abs(value));
-        }
-      }
-      return peak;
-    };
-    expect(await peakFrom(1.3 * rate, 2)).toBeLessThan(1e-4);
-    expect(await peakFrom(1.6 * rate, 3)).toBeGreaterThan(0.1);
-  });
 });

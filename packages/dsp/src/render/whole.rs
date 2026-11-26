@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use super::{CHANNELS, Parts, Piece, Quantum, Renderer, STEM_COUNT, Target};
+use super::{
+    CHANNELS, Parts, Piece, Quantum, Renderer, STEM_COUNT, Target,
+    time_pitch::{frame_to_f64, whole_to_i64},
+};
 use crate::{
     BoxedError,
     page_mix::{PageMixer, PageShape},
@@ -8,7 +11,7 @@ use crate::{
 
 pub const QUANTUM: usize = 128;
 const KEPT_SECONDS: i64 = 4;
-const WRONG_PAGE: &str = "A page of a stem holds another number of samples than its layout gives";
+const WRONG_PAGE: &str = "A page of a track holds another number of samples than its layout gives";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StemLayout {
@@ -34,9 +37,9 @@ impl StemLayout {
     }
 }
 
-pub trait StemPages {
-    fn layout(&self, stem: usize) -> StemLayout;
-    fn read(&mut self, stem: usize, index: usize) -> Result<Vec<f32>, BoxedError>;
+pub trait TrackPages {
+    fn layout(&self, track: usize) -> StemLayout;
+    fn read(&mut self, track: usize, index: usize) -> Result<Vec<f32>, BoxedError>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,77 +52,106 @@ pub struct Song {
     pub pieces: Vec<Piece>,
 }
 
+struct Paged {
+    track: usize,
+    layout: StemLayout,
+    song_start: f64,
+    tempo: f64,
+    resident: Range<usize>,
+}
+
+impl Paged {
+    fn wanted(&self, frame: i64, kept: i64) -> Range<usize> {
+        let into = |song_frame: i64| (frame_to_f64(song_frame) - self.song_start) / self.tempo;
+        self.layout.pages_over(
+            whole_to_i64(into(frame - kept).floor()),
+            whole_to_i64(into(frame + kept).ceil()),
+        )
+    }
+}
+
 struct Pager {
-    layouts: Vec<StemLayout>,
-    resident: Vec<Range<usize>>,
+    tracks: Vec<Paged>,
     kept: i64,
 }
 
 impl Pager {
     fn open(
-        stems: &dyn StemPages,
-        mixer: &mut PageMixer,
-        sample_rate: u32,
+        source: &dyn TrackPages,
+        renderer: &mut Renderer,
+        song: &Song,
+        parts: Parts,
     ) -> Result<Self, BoxedError> {
-        let layouts: Vec<StemLayout> = (0..STEM_COUNT).map(|stem| stems.layout(stem)).collect();
-        for (stem, layout) in layouts.iter().enumerate() {
-            mixer.set_stem(stem, layout.frame_count, &layout.page_starts)?;
+        let pieces = if parts.takes {
+            song.pieces.as_slice()
+        } else {
+            &[]
+        };
+        let stems = (0..STEM_COUNT).map(|stem| (stem, 0.0, 1.0));
+        let takes = pieces
+            .iter()
+            .map(|piece| (piece.track, piece.song_start, piece.tempo));
+        let mut tracks = Vec::with_capacity(STEM_COUNT + pieces.len());
+        for (track, song_start, tempo) in stems.chain(takes) {
+            let layout = source.layout(track);
+            renderer
+                .mixer()
+                .set_track(track, layout.frame_count, &layout.page_starts)?;
+            tracks.push(Paged {
+                track,
+                layout,
+                song_start,
+                tempo,
+                resident: 0..0,
+            });
         }
+        renderer.set_takes(pieces.to_vec())?;
         Ok(Self {
-            resident: vec![0..0; layouts.len()],
-            layouts,
-            kept: i64::from(sample_rate) * KEPT_SECONDS,
+            tracks,
+            kept: i64::from(song.sample_rate) * KEPT_SECONDS,
         })
     }
 
     fn feed(
         &mut self,
-        stems: &mut dyn StemPages,
+        source: &mut dyn TrackPages,
         mixer: &mut PageMixer,
         frame: i64,
     ) -> Result<(), BoxedError> {
-        for (stem, layout) in self.layouts.iter().enumerate() {
-            let wanted = layout.pages_over(frame - self.kept, frame + self.kept);
-            let held = self.resident[stem].clone();
+        for paged in &mut self.tracks {
+            let wanted = paged.wanted(frame, self.kept);
+            let held = paged.resident.clone();
             for index in held.start..wanted.start.min(held.end) {
-                mixer.drop_page(stem, index)?;
+                mixer.drop_page(paged.track, index)?;
             }
             for index in wanted.clone().filter(|index| !held.contains(index)) {
-                load_page(stems, mixer, layout, (stem, index))?;
+                load_page(source, mixer, &paged.layout, (paged.track, index))?;
             }
-            self.resident[stem] = wanted;
+            paged.resident = wanted;
         }
         Ok(())
     }
 }
 
 fn load_page(
-    stems: &mut dyn StemPages,
+    source: &mut dyn TrackPages,
     mixer: &mut PageMixer,
     layout: &StemLayout,
-    (stem, index): (usize, usize),
+    (track, index): (usize, usize),
 ) -> Result<(), BoxedError> {
-    let samples = stems.read(stem, index)?;
+    let samples = source.read(track, index)?;
     let frames = usize::try_from(layout.page_end(index) - layout.page_starts[index])?;
     if frames == 0 || !samples.len().is_multiple_of(frames) {
         return Err(WRONG_PAGE.into());
     }
     let shape = PageShape {
-        stem,
+        track,
         index,
         frames,
         channels: samples.len() / frames,
     };
     mixer.page_input(shape)?.copy_from_slice(&samples);
     Ok(())
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "a frame of a song is far below the f64 mantissa"
-)]
-const fn frame_to_f64(frame: i64) -> f64 {
-    frame as f64
 }
 
 fn prepare(song: &Song) -> Renderer {
@@ -129,18 +161,17 @@ fn prepare(song: &Song) -> Renderer {
     renderer.set_voice(song.target.voice_octave, song.target.voice_shifted);
     renderer.set_transpose(song.target.transpose);
     renderer.set_recording_volume(song.recording_volume);
-    renderer.takes().set_pieces(song.pieces.clone(), None, true);
     renderer
 }
 
 pub fn render_song(
-    stems: &mut dyn StemPages,
+    source: &mut dyn TrackPages,
     song: &Song,
     parts: Parts,
     go_on: &mut dyn FnMut(usize) -> bool,
 ) -> Result<Option<Vec<f32>>, BoxedError> {
     let mut renderer = prepare(song);
-    let mut pager = Pager::open(stems, renderer.mixer(), song.sample_rate)?;
+    let mut pager = Pager::open(source, &mut renderer, song, parts)?;
     let frames = song.frame_count;
     let channels = parts.channels();
     let mut output = vec![0.0; channels * frames];
@@ -151,7 +182,7 @@ pub fn render_song(
         if !go_on(written) {
             return Ok(None);
         }
-        pager.feed(stems, renderer.mixer(), frame)?;
+        pager.feed(source, renderer.mixer(), frame)?;
         let quantum = Quantum {
             frame,
             take_frame: Some(frame_to_f64(frame)),

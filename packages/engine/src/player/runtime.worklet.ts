@@ -180,10 +180,8 @@ export const createPlayerRuntime = (
       cuts.flush();
       glide.clear();
       frameCount = message.frameCount;
-      renderer.mount(message.layouts, message.residentPageLimit);
+      renderer.mount(message.layouts, message);
       renderer.refill();
-      renderer.clearTakes();
-      renderer.setPieces({ pieces: message.recording });
       position.begin(0);
       playing = false;
       recordingRuntime.resetInputOffset();
@@ -192,19 +190,16 @@ export const createPlayerRuntime = (
       renderer.requestWindow(0, true);
       port.methods.mounted();
     },
+    setTakes: renderer.setTakes,
     putPage: renderer.put,
     dropPages: (message) => {
       renderer.drop(message.pages);
     },
-    setRecordingPieces: renderer.setPieces,
-    beginLiveTake: renderer.beginLiveTake,
-    appendLiveTake: renderer.appendLiveTake,
     unmount: () => {
       cuts.flush();
       glide.clear();
       frameCount = 0;
       renderer.release();
-      renderer.clearTakes();
       position.begin(0);
       playing = false;
       recordingRuntime.resetInputOffset();

@@ -1,12 +1,23 @@
-import { type LiveTakeChunk } from '../player/protocol.cross.js';
+import {
+  type LiveTakeChunk,
+  type LiveTakeStart,
+} from '../player/protocol.cross.js';
 import { createRecordingPacket } from './recordingStream.worker.js';
 
 const pageSeconds = 2;
 const packetSeconds = 0.05;
 
+export const takePageFrameCount = (sampleRate: number): number =>
+  Math.round(sampleRate * pageSeconds);
+
 export type HeldRun = {
   startFrame: number;
   frameCount: number;
+};
+
+export type HeldTake = LiveTakeStart & {
+  runs: HeldRun[];
+  read: (run: number, from: number, to: number) => Float32Array<ArrayBuffer>;
 };
 
 type PagedRun = HeldRun & {
@@ -25,10 +36,12 @@ export type TakePages = {
   push: (chunk: LiveTakeChunk) => void;
   hold: (held: readonly HeldRun[]) => void;
   cut: (whole: boolean) => ArrayBuffer | undefined;
+  runs: () => HeldRun[];
+  read: (run: number, from: number, to: number) => Float32Array<ArrayBuffer>;
 };
 
 export const createTakePages = (sampleRate: number): TakePages => {
-  const pageFrameCount = Math.round(sampleRate * pageSeconds);
+  const pageFrameCount = takePageFrameCount(sampleRate);
   const packetFrameCount = Math.round(sampleRate * packetSeconds);
   const runs: PagedRun[] = [];
 
@@ -49,6 +62,14 @@ export const createTakePages = (sampleRate: number): TakePages => {
       span(run.pages[index], pageOffset, at, count);
       at += count;
     }
+  };
+
+  const copy = (run: PagedRun, offset: number, length: number) => {
+    const samples = new Float32Array(length);
+    walk(run, offset, length, (page, pageOffset, at, count) => {
+      samples.set(page.subarray(pageOffset, pageOffset + count), at);
+    });
+    return samples;
   };
 
   const findRun = (chunk: LiveTakeChunk): PagedRun => {
@@ -100,10 +121,7 @@ export const createTakePages = (sampleRate: number): TakePages => {
         return undefined;
       }
       const offset = run.sentFrameCount;
-      const samples = new Float32Array(Math.min(unsent, packetFrameCount));
-      walk(run, offset, samples.length, (page, pageOffset, at, count) => {
-        samples.set(page.subarray(pageOffset, pageOffset + count), at);
-      });
+      const samples = copy(run, offset, Math.min(unsent, packetFrameCount));
       run.sentFrameCount += samples.length;
       return createRecordingPacket({
         startFrame: run.startFrame,
@@ -111,5 +129,11 @@ export const createTakePages = (sampleRate: number): TakePages => {
         samples,
       });
     },
+    runs: () =>
+      runs.map((run) => ({
+        startFrame: run.startFrame,
+        frameCount: run.frameCount,
+      })),
+    read: (run, from, to) => copy(runs[run], from, to - from),
   };
 };

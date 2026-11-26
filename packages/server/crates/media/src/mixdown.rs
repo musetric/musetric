@@ -16,7 +16,8 @@ use musetric_dsp::{
     mono::Downmix,
     mp3::Mp3Encoder,
     render::{
-        LEAD, Parts, Piece, STEM_COUNT, Song, StemLayout, StemPages, Target, render_song, stretches,
+        LEAD, Parts, Piece, STEM_COUNT, Song, StemLayout, Target, TrackPages, render_song,
+        stretches,
     },
     wav::WavWriter,
 };
@@ -31,6 +32,7 @@ use crate::{
 const ORIGINAL_TEMPO_PERCENT: usize = 100;
 const STOPPED: &str = "The mixdown was stopped";
 const NO_STEM: &str = "The mixdown reads no such stem";
+const NO_TAKE: &str = "The mixdown reads no such take";
 const OUT_OF_ORDER: &str = "A stem is read page after page";
 const ENCODED_FRAMES: usize = 65_536;
 const PAGE_FRAMES: usize = 65_536;
@@ -221,13 +223,26 @@ impl StreamedStem {
     }
 }
 
+fn page_starts(frame_count: usize) -> Vec<i64> {
+    (0..frame_count)
+        .step_by(PAGE_FRAMES)
+        .map(|start| i64::try_from(start).unwrap_or(i64::MAX))
+        .collect()
+}
+
 struct Streams {
     frame_count: usize,
     stems: Vec<Option<StreamedStem>>,
+    takes: Vec<Vec<f32>>,
 }
 
 impl Streams {
-    fn open(source: &dyn PcmSource, mixdown: &Mixdown, mask: u32) -> Result<Self, BoxedError> {
+    fn open(
+        source: &dyn PcmSource,
+        mixdown: &Mixdown,
+        mask: u32,
+        takes: Vec<Vec<f32>>,
+    ) -> Result<Self, BoxedError> {
         let mut stems = Vec::with_capacity(STEM_COUNT);
         for (stem, track) in mixdown.stems.iter().enumerate() {
             let read = track.as_ref().filter(|_| mask & (1 << stem) != 0);
@@ -246,6 +261,7 @@ impl Streams {
         Ok(Self {
             frame_count: mixdown.frame_count,
             stems,
+            takes,
         })
     }
 
@@ -254,9 +270,18 @@ impl Streams {
     }
 }
 
-impl StemPages for Streams {
-    fn layout(&self, stem: usize) -> StemLayout {
-        if self.stems.get(stem).is_none_or(Option::is_none) {
+impl TrackPages for Streams {
+    fn layout(&self, track: usize) -> StemLayout {
+        if let Some(take) = track
+            .checked_sub(STEM_COUNT)
+            .and_then(|index| self.takes.get(index))
+        {
+            return StemLayout {
+                frame_count: i64::try_from(take.len()).unwrap_or(i64::MAX),
+                page_starts: page_starts(take.len()),
+            };
+        }
+        if self.stems.get(track).is_none_or(Option::is_none) {
             return StemLayout {
                 frame_count: 0,
                 page_starts: Vec::new(),
@@ -264,17 +289,20 @@ impl StemPages for Streams {
         }
         StemLayout {
             frame_count: i64::try_from(self.frame_count).unwrap_or(i64::MAX),
-            page_starts: (0..self.frame_count)
-                .step_by(PAGE_FRAMES)
-                .map(|start| i64::try_from(start).unwrap_or(i64::MAX))
-                .collect(),
+            page_starts: page_starts(self.frame_count),
         }
     }
 
-    fn read(&mut self, stem: usize, index: usize) -> Result<Vec<f32>, BoxedError> {
+    fn read(&mut self, track: usize, index: usize) -> Result<Vec<f32>, BoxedError> {
+        if let Some(take) = track.checked_sub(STEM_COUNT) {
+            let samples = self.takes.get(take).ok_or(NO_TAKE)?;
+            let start = index * PAGE_FRAMES;
+            let page = samples.get(start..samples.len().min(start + PAGE_FRAMES));
+            return Ok(page.ok_or(NO_TAKE)?.to_vec());
+        }
         let frames = self.page_frames(index);
         self.stems
-            .get_mut(stem)
+            .get_mut(track)
             .and_then(Option::as_mut)
             .ok_or(NO_STEM)?
             .page(index, frames)
@@ -351,8 +379,9 @@ async fn read_pieces(
     source: &dyn PcmSource,
     mixdown: &Mixdown,
     watch: &MixdownWatch,
-) -> Result<Vec<Piece>, BoxedError> {
+) -> Result<(Vec<Piece>, Vec<Vec<f32>>), BoxedError> {
     let mut pieces = Vec::with_capacity(mixdown.takes.len());
+    let mut takes = Vec::with_capacity(mixdown.takes.len());
     for take in &mixdown.takes {
         watch.check()?;
         let bytes = decode_mono_pcm(MonoRequest {
@@ -365,20 +394,23 @@ async fn read_pieces(
             decoded: &mut |_| {},
         })
         .await?;
+        let samples: Vec<f32> = bytes
+            .as_chunks::<{ size_of::<f32>() }>()
+            .0
+            .iter()
+            .map(|value| f32::from_le_bytes(*value))
+            .collect();
         pieces.push(Piece {
             song_start: song_frame(take, mixdown.sample_rate),
             tempo: take.tempo,
             transpose: take.transpose,
             octave: take.octave,
-            samples: bytes
-                .as_chunks::<{ size_of::<f32>() }>()
-                .0
-                .iter()
-                .map(|value| f32::from_le_bytes(*value))
-                .collect(),
+            track: STEM_COUNT + takes.len(),
+            frame_count: samples.len(),
         });
+        takes.push(samples);
     }
-    Ok(pieces)
+    Ok((pieces, takes))
 }
 
 fn add_part(
@@ -415,7 +447,7 @@ async fn mix(
     to: &Path,
     watch: &Arc<MixdownWatch>,
 ) -> Result<(), BoxedError> {
-    let pieces = read_pieces(source, &mixdown, watch).await?;
+    let (pieces, mut takes) = read_pieces(source, &mixdown, watch).await?;
     let target = mixdown.change.target();
     let frames = mixdown.change.frame_count(mixdown.frame_count);
     let stage = if stretches(target, &pieces) {
@@ -443,8 +475,13 @@ async fn mix(
         (Parts::LEAD, LEAD, lead_apart),
     ] {
         if used {
+            let recorded = if parts.takes {
+                std::mem::take(&mut takes)
+            } else {
+                Vec::new()
+            };
             let rendering = Rendering {
-                streams: Streams::open(source, &mixdown, stems)?,
+                streams: Streams::open(source, &mixdown, stems, recorded)?,
                 song: song.clone(),
                 parts,
                 reported: None,
@@ -453,7 +490,12 @@ async fn mix(
         }
     }
     let rendering = Rendering {
-        streams: Streams::open(source, &mixdown, if lead_apart { !LEAD } else { u32::MAX })?,
+        streams: Streams::open(
+            source,
+            &mixdown,
+            if lead_apart { !LEAD } else { u32::MAX },
+            Vec::new(),
+        )?,
         song,
         parts: Parts::SONG,
         reported: Some(stage),

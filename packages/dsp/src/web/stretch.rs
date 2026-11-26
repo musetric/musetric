@@ -4,12 +4,11 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     page_mix::{LoopRange, PageShape},
-    render::{CHANNELS, Piece, QUANTUM, Quantum, Renderer, TakeKey},
+    render::{CHANNELS, Piece, QUANTUM, Quantum, Renderer},
 };
 
 struct Player {
     renderer: Renderer,
-    staged: Vec<Piece>,
     output: Vec<f32>,
 }
 
@@ -37,15 +36,24 @@ const fn to_semitones(value: f64) -> i32 {
     value as i32
 }
 
-fn key_of(key: &[f64]) -> Option<TakeKey> {
-    let [tempo, transpose, octave] = key else {
-        return None;
-    };
-    Some(TakeKey {
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "a track or a frame count from JavaScript is a whole number that is not negative"
+)]
+const fn to_count(value: f64) -> usize {
+    value as usize
+}
+
+fn piece_of([track, song_start, tempo, transpose, octave, frame_count]: &[f64; 6]) -> Piece {
+    Piece {
+        song_start: *song_start,
         tempo: *tempo,
         transpose: to_semitones(*transpose),
         octave: to_semitones(*octave),
-    })
+        track: to_count(*track),
+        frame_count: to_count(*frame_count),
+    }
 }
 
 #[wasm_bindgen(js_name = openRenderer)]
@@ -54,18 +62,17 @@ pub fn open_renderer(sample_rate: u32) -> usize {
     PLAYERS.with_borrow_mut(|players| {
         players.push(Player {
             renderer: Renderer::new(sample_rate),
-            staged: Vec::new(),
             output: Vec::with_capacity(CHANNELS * QUANTUM),
         });
         players.len() - 1
     })
 }
 
-#[wasm_bindgen(js_name = setRendererStem)]
+#[wasm_bindgen(js_name = setRendererTrack)]
 #[must_use]
-pub fn set_renderer_stem(
+pub fn set_renderer_track(
     handle: usize,
-    stem: usize,
+    track: usize,
     frame_count: usize,
     page_starts: &[u32],
 ) -> bool {
@@ -77,24 +84,37 @@ pub fn set_renderer_stem(
         player
             .renderer
             .mixer()
-            .set_stem(stem, frames, &starts)
+            .set_track(track, frames, &starts)
             .is_ok()
     })
 }
 
+#[wasm_bindgen(js_name = setRendererTakes)]
+#[must_use]
+pub fn set_renderer_takes(handle: usize, fields: &[f64]) -> bool {
+    let (rows, rest) = fields.as_chunks::<6>();
+    let pieces = rows.iter().map(piece_of).collect();
+    rest.is_empty() && with_player(handle, |player| player.renderer.set_takes(pieces).is_ok())
+}
+
 #[wasm_bindgen(js_name = rendererPageInput)]
 #[must_use]
-pub fn renderer_page_input(handle: usize, stem: usize, index: usize, sample_count: usize) -> usize {
+pub fn renderer_page_input(
+    handle: usize,
+    track: usize,
+    index: usize,
+    sample_count: usize,
+) -> usize {
     with_player(handle, |player| {
         let mixer = player.renderer.mixer();
-        let Some(frames) = mixer.page_frames(stem, index) else {
+        let Some(frames) = mixer.page_frames(track, index) else {
             return 0;
         };
         if frames == 0 || !sample_count.is_multiple_of(frames) {
             return 0;
         }
         let shape = PageShape {
-            stem,
+            track,
             index,
             frames,
             channels: sample_count / frames,
@@ -113,9 +133,9 @@ pub fn reserve_renderer_pages(handle: usize, count: usize) {
 }
 
 #[wasm_bindgen(js_name = dropRendererPage)]
-pub fn drop_renderer_page(handle: usize, stem: usize, index: usize) {
+pub fn drop_renderer_page(handle: usize, track: usize, index: usize) {
     with_player(handle, |player| {
-        player.renderer.mixer().drop_page(stem, index).ok();
+        player.renderer.mixer().drop_page(track, index).ok();
     });
 }
 
@@ -174,58 +194,6 @@ pub fn reset_renderer(handle: usize) {
 #[wasm_bindgen(js_name = refillRenderer)]
 pub fn refill_renderer(handle: usize) {
     with_player(handle, |player| player.renderer.refill());
-}
-
-#[wasm_bindgen(js_name = stageRendererPiece)]
-pub fn stage_renderer_piece(handle: usize, song_start: f64, key: &[f64], samples: &[f32]) {
-    let Some(found) = key_of(key) else {
-        return;
-    };
-    with_player(handle, |player| {
-        player.staged.push(Piece {
-            song_start,
-            tempo: found.tempo,
-            transpose: found.transpose,
-            octave: found.octave,
-            samples: samples.to_vec(),
-        });
-    });
-}
-
-#[wasm_bindgen(js_name = setRendererPieces)]
-pub fn set_renderer_pieces(handle: usize, finished_take: Option<u32>, switched: bool) {
-    with_player(handle, |player| {
-        let pieces = std::mem::take(&mut player.staged);
-        player
-            .renderer
-            .takes()
-            .set_pieces(pieces, finished_take, switched);
-    });
-}
-
-#[wasm_bindgen(js_name = beginRendererLiveTake)]
-pub fn begin_renderer_live_take(handle: usize, take: u32, key: &[f64]) {
-    let Some(found) = key_of(key) else {
-        return;
-    };
-    with_player(handle, |player| {
-        player.renderer.takes().begin_live(take, found);
-    });
-}
-
-#[wasm_bindgen(js_name = appendRendererLiveTake)]
-pub fn append_renderer_live_take(handle: usize, start_frame: f64, offset: f64, samples: &[f32]) {
-    with_player(handle, |player| {
-        player
-            .renderer
-            .takes()
-            .append_live(start_frame, offset, samples);
-    });
-}
-
-#[wasm_bindgen(js_name = clearRendererTakes)]
-pub fn clear_renderer_takes(handle: usize) {
-    with_player(handle, |player| player.renderer.takes().clear());
 }
 
 #[wasm_bindgen(js_name = renderQuantum)]

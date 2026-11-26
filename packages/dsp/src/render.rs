@@ -2,11 +2,16 @@ mod takes;
 mod time_pitch;
 mod whole;
 
-pub use takes::{Piece, Segment, TakeKey, TakeMix, Takes, Target, lay_out, stretches};
+pub use takes::{Piece, Segment, TakeMix, Takes, Target, lay_out, stretches};
 pub use time_pitch::{Block, Fill, TimePitch, js_round};
-pub use whole::{QUANTUM, Song, StemLayout, StemPages, render_song};
+pub use whole::{QUANTUM, Song, StemLayout, TrackPages, render_song};
 
-use crate::page_mix::{LoopRange, MixRequest, PageMixer};
+use crate::{
+    BoxedError,
+    page_mix::{LoopRange, MixRequest, PageMixer},
+};
+
+const STEM_TRACK: &str = "A take cannot lie on the track of a stem";
 
 pub const CHANNELS: usize = 2;
 pub const STEM_COUNT: usize = 3;
@@ -125,12 +130,21 @@ impl Renderer {
 
     #[must_use]
     pub fn ready(&self, frame: i64) -> bool {
-        self.mixer
-            .ready(frame, !(self.song.bypassed() && self.lead.bypassed()))
+        let behind = !(self.song.bypassed() && self.lead.bypassed());
+        let takes_behind = behind || stretches(self.target, self.takes.pieces());
+        self.mixer.ready(frame, behind)
+            && self
+                .mixer
+                .probes(frame, takes_behind)
+                .all(|(song_frame, until)| self.takes.resident_near(&self.mixer, song_frame, until))
     }
 
-    pub const fn takes(&mut self) -> &mut Takes {
-        &mut self.takes
+    pub fn set_takes(&mut self, pieces: Vec<Piece>) -> Result<(), BoxedError> {
+        if pieces.iter().any(|piece| piece.track < STEM_COUNT) {
+            return Err(STEM_TRACK.into());
+        }
+        self.takes.set_pieces(pieces);
+        Ok(())
     }
 
     pub fn set_volumes(&mut self, volumes: &[f32]) {
@@ -236,9 +250,9 @@ impl Renderer {
                 volume: *recording_volume,
             };
             if parts.song {
-                takes.mix_into(output, mix);
+                takes.mix_into(mixer, output, mix);
             } else {
-                takes.write_into(output, mix);
+                takes.write_into(mixer, output, mix);
             }
             sung = true;
         }
