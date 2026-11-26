@@ -25,6 +25,7 @@ const sendAction = (detail: MediaAction) => {
 export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
   const silence = new Audio();
   let silenceUrl: string | undefined = undefined;
+  let presented = false;
 
   const setHandlers = () => {
     session.setActionHandler('play', () => {
@@ -41,9 +42,8 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
     });
   };
 
-  const start = (state: MediaState) => {
-    silenceUrl = createSilence(state.durationMs);
-    silence.src = silenceUrl;
+  const present = (state: MediaState) => {
+    presented = true;
     session.metadata = new MediaMetadata({
       title: state.title,
       artist,
@@ -55,12 +55,16 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
   return {
     update: (state) => {
       session.playbackState = state.playing ? 'playing' : 'paused';
+      if (!presented) {
+        present(state);
+      }
       if (state.recording) {
         silence.pause();
         return;
       }
       if (!silenceUrl) {
-        start(state);
+        silenceUrl = createSilence(state.durationMs);
+        silence.src = silenceUrl;
       }
       const position = state.positionMs / 1000;
       if (Math.abs(silence.currentTime - position) > positionToleranceSeconds) {
@@ -74,6 +78,7 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
       }
     },
     clear: () => {
+      presented = false;
       silence.pause();
       silence.removeAttribute('src');
       silence.load();
