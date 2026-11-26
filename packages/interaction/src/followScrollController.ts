@@ -33,7 +33,6 @@ export const createFollowScrollController = (
   let userScroll = false;
   let free: ReturnType<typeof setTimeout> | undefined = undefined;
   let placed: { index: number; scrolled: boolean } | undefined = undefined;
-  let queued: ScrollBehavior | undefined = undefined;
 
   const place = (behavior: ScrollBehavior) => {
     const index = getActiveIndex();
@@ -59,21 +58,6 @@ export const createFollowScrollController = (
     }
   };
 
-  const queuePlace = (behavior: ScrollBehavior) => {
-    if (queued === undefined) {
-      queueMicrotask(() => {
-        const next = queued;
-        queued = undefined;
-        if (next && !signal.aborted) {
-          place(next);
-        }
-      });
-    }
-    if (queued !== 'instant') {
-      queued = behavior;
-    }
-  };
-
   const resizes = new ResizeObserver(() => {
     placed = undefined;
   });
@@ -84,11 +68,11 @@ export const createFollowScrollController = (
 
   const unsubscribeActiveIndex = subscribeActiveIndex(() => {
     if (isMoving() && free === undefined) {
-      queuePlace('smooth');
+      place('smooth');
     }
   });
   const unsubscribeSeek = subscribeSeek(() => {
-    queuePlace('instant');
+    place('instant');
   });
   for (const type of ['pointerdown', 'touchmove', 'wheel', 'keydown']) {
     element.addEventListener(
@@ -110,7 +94,7 @@ export const createFollowScrollController = (
       free = setTimeout(() => {
         free = undefined;
         if (isMoving()) {
-          queuePlace('smooth');
+          place('smooth');
         }
       }, freeMs);
     },
@@ -119,12 +103,12 @@ export const createFollowScrollController = (
 
   return {
     reset: () => {
-      queuePlace('instant');
+      place('instant');
     },
     showActive: () => {
       clearTimeout(free);
       free = undefined;
-      queuePlace('smooth');
+      place('smooth');
     },
     dispose: () => {
       clearTimeout(free);
