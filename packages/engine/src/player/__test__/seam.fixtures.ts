@@ -160,6 +160,8 @@ export const createSeam = async (
       return contextFrame / rate;
     },
     state: 'running',
+    addEventListener: noop,
+    removeEventListener: noop,
     audioWorklet: { addModule: async () => Promise.resolve() },
     createGain: () => ({
       connect: noop,
