@@ -27,14 +27,11 @@ export const useSubtitleFollowScroll = (
       element,
       cursor: subtitleCursor,
       subscribeSeek: (callback) =>
-        engine.store.subscribe(
-          (state) => state.seekEvent,
-          (seekEvent) => {
-            if (seekEvent.origin !== 'playbackEnd' && !wordDrag.isActive()) {
-              callback();
-            }
-          },
-        ),
+        engine.seeks.subscribe((seekEvent) => {
+          if (seekEvent.origin !== 'playbackEnd' && !wordDrag.isActive()) {
+            callback();
+          }
+        }),
       isMoving: () => {
         const state = engine.store.get();
         return !wordDrag.isActive() && (isPlaying(state) || isRecording(state));
