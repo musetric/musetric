@@ -48,6 +48,7 @@ export const createRecorderHarness = (
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
+    setActive: noop,
     attach: noop,
   };
   const finished: number[] = [];

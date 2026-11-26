@@ -89,6 +89,10 @@ export const createEngine = (): Engine => {
     context,
     audioSession.routesOutputBySystem === true,
   );
+  const isClockNeeded = (state: EngineState) =>
+    state.session !== 'idle' || state.take !== 'none' || state.calibrating;
+  outputClock.setActive(isClockNeeded(store.get()));
+  store.subscribe(isClockNeeded, outputClock.setActive);
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);
     if (frameCount !== store.get().outputLatencyFrameCount) {
