@@ -2,34 +2,17 @@ import { createResourceCell } from '@musetric/utils';
 import { createDynamicUniformParams } from '../common/dynamicUniform.js';
 import { pitchLatticeCount, type PitchSettings } from './settings.es.js';
 
-export type PitchDispatchValues = {
-  slotCount: number;
-  trackFrames: number;
-  decodeFirst: number;
-  decodeCount: number;
-  smoothFirst: number;
-  smoothCount: number;
-  foldFirst: number;
-  foldCount: number;
-  baseColumn: number;
-  columnStep: number;
-  windowCount: number;
-  baseSlot: number;
-  shownFrames: number;
-};
-
-type PitchParamValues = PitchSettings &
-  PitchDispatchValues & { latticeCount: number };
+type PitchConstantValues = PitchSettings & { latticeCount: number };
 
 type ParamKind = 'f32' | 'u32' | 'i32';
 
 type NumericKey = {
-  [Key in keyof PitchParamValues]: PitchParamValues[Key] extends number
+  [Key in keyof PitchConstantValues]: PitchConstantValues[Key] extends number
     ? Key
     : never;
-}[keyof PitchParamValues];
+}[keyof PitchConstantValues];
 
-export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
+const constantFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['sampleRate', 'f32'],
   ['hop', 'u32'],
   ['windowSize', 'u32'],
@@ -100,6 +83,28 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['spikeMajorityFrames', 'u32'],
   ['ringFrames', 'u32'],
   ['latticeCount', 'u32'],
+];
+
+export type PitchDispatchValues = {
+  slotCount: number;
+  trackFrames: number;
+  decodeFirst: number;
+  decodeCount: number;
+  smoothFirst: number;
+  smoothCount: number;
+  foldFirst: number;
+  foldCount: number;
+  baseColumn: number;
+  columnStep: number;
+  windowCount: number;
+  baseSlot: number;
+  shownFrames: number;
+};
+
+const dispatchFields: readonly (readonly [
+  keyof PitchDispatchValues,
+  ParamKind,
+])[] = [
   ['slotCount', 'u32'],
   ['trackFrames', 'i32'],
   ['decodeFirst', 'i32'],
@@ -115,7 +120,8 @@ export const pitchParamFields: readonly (readonly [NumericKey, ParamKind])[] = [
   ['shownFrames', 'i32'],
 ];
 
-const paramsByteLength = pitchParamFields.length * 4;
+const dispatchByteOffset = constantFields.length * 4;
+const paramsByteLength = dispatchByteOffset + dispatchFields.length * 4;
 const paramsCapacity = 64;
 
 const writeField = (
@@ -149,20 +155,31 @@ export const createPitchParamsCell = (device: GPUDevice) =>
         byteLength: paramsByteLength,
         capacity: paramsCapacity,
       });
+      const constants: PitchConstantValues = {
+        ...settings,
+        latticeCount: pitchLatticeCount,
+      };
+      for (let slot = 0; slot < paramsCapacity; slot += 1) {
+        params.write((view) => {
+          constantFields.forEach((field, index) => {
+            writeField(view, index * 4, field[1], constants[field[0]]);
+          });
+        });
+      }
       return {
         buffer: params.buffer,
         byteLength: params.byteLength,
         write: (dispatchValues) =>
           params.write((view) => {
-            const values: PitchParamValues = {
-              ...settings,
-              ...dispatchValues,
-              latticeCount: pitchLatticeCount,
-            };
-            pitchParamFields.forEach((field, index) => {
-              writeField(view, index * 4, field[1], values[field[0]]);
+            dispatchFields.forEach((field, index) => {
+              writeField(
+                view,
+                dispatchByteOffset + index * 4,
+                field[1],
+                dispatchValues[field[0]],
+              );
             });
-          }),
+          }, dispatchByteOffset),
       };
     },
     dispose: (params) => {

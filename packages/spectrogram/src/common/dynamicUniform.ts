@@ -10,7 +10,7 @@ export type CreateDynamicParamsOptions = {
 export type DynamicParams = {
   buffer: GPUBuffer;
   byteLength: number;
-  write: (fill: (view: DataView) => void) => number;
+  write: (fill: (view: DataView) => void, from?: number) => number;
   destroy: () => void;
 };
 
@@ -34,11 +34,11 @@ const createDynamicParams = (
   return {
     buffer,
     byteLength: options.byteLength,
-    write: (fill) => {
+    write: (fill, from = 0) => {
       const byteOffset = cursor * stride;
       cursor = (cursor + 1) % capacity;
       fill(view);
-      device.queue.writeBuffer(buffer, byteOffset, scratch);
+      device.queue.writeBuffer(buffer, byteOffset + from, scratch, from);
       return byteOffset;
     },
     destroy: () => {

@@ -47,9 +47,21 @@ export const createColumnScaleCell = (device: GPUDevice) =>
           if (isWritten(written, next)) {
             return;
           }
+          const kept =
+            written !== undefined &&
+            isWritten({ ...written, baseColumn: next.baseColumn }, next)
+              ? written.baseColumn
+              : undefined;
           written = { ...next, length: next.source.length };
           for (let index = 0; index < windowCount; index += 1) {
             const column = next.baseColumn + index;
+            if (
+              kept !== undefined &&
+              column >= kept &&
+              column < kept + windowCount
+            ) {
+              continue;
+            }
             const shift =
               next.transposeSemitones -
               next.source.transposeAt(column * next.columnStep);
