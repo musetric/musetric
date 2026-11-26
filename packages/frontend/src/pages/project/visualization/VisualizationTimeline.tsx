@@ -1,6 +1,9 @@
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { createTimelineProcessor } from '@musetric/audio/timeline';
+import {
+  createTimelineProcessor,
+  timelineStripScreens,
+} from '@musetric/audio/timeline';
 import { type FC, useEffect, useRef } from 'react';
 import { engine } from '../../../engine/engine.js';
 import {
@@ -12,19 +15,22 @@ import { getVisualizationView } from './visualizationView.js';
 export const VisualizationTimeline: FC = () => {
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stripCanvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const stripCanvas = stripCanvasRef.current;
     const handle = handleRef.current;
 
-    if (!canvas || !handle) {
+    if (!canvas || !stripCanvas || !handle) {
       return;
     }
 
     const processor = createTimelineProcessor({
       config: {
         canvas,
+        stripCanvas,
         markerColor: theme.palette.default.main,
         labelColor: theme.palette.default.main,
         font: `11px ${theme.typography.fontFamily}`,
@@ -76,7 +82,14 @@ export const VisualizationTimeline: FC = () => {
   }, [theme]);
 
   return (
-    <Box sx={{ height: '16px', position: 'relative', flexShrink: 0 }}>
+    <Box
+      sx={{
+        height: '16px',
+        position: 'relative',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
       <Box
         component='canvas'
         ref={canvasRef}
@@ -84,6 +97,20 @@ export const VisualizationTimeline: FC = () => {
           display: 'block',
           width: '100%',
           height: '100%',
+        }}
+      />
+      <Box
+        component='canvas'
+        ref={stripCanvasRef}
+        sx={{
+          display: 'block',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: `${timelineStripScreens * 100}%`,
+          height: '100%',
+          visibility: 'hidden',
+          willChange: 'transform',
         }}
       />
       <Box

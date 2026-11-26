@@ -15,22 +15,8 @@ const getCurrentTime = (config: TimelineConfig) => {
   return (config.frameIndex / config.frameCount) * config.duration;
 };
 
-type TimelineWindow = {
-  start: number;
-  end: number;
-  duration: number;
-};
-
-const getTimelineWindow = (config: TimelineConfig): TimelineWindow => {
-  const currentTime = getCurrentTime(config);
-  const start = currentTime - config.visibleTime * config.playheadRatio;
-
-  return {
-    start,
-    end: start + config.visibleTime,
-    duration: config.visibleTime,
-  };
-};
+export const getTimelineWindowStart = (config: TimelineConfig): number =>
+  getCurrentTime(config) - config.visibleTime * config.playheadRatio;
 
 const getMajorStep = (duration: number, width: number) => {
   const targetMarkerCount = Math.max(1, Math.floor(width / targetLabelWidth));
@@ -54,18 +40,20 @@ export type TimelineMarker = {
 export const getTimelineMarkers = (
   config: TimelineConfig,
   width: number,
+  start: number,
+  screens: number,
 ): TimelineMarker[] => {
-  const timelineWindow = getTimelineWindow(config);
-  const majorStep = getMajorStep(timelineWindow.duration, width);
+  const { visibleTime } = config;
+  const majorStep = getMajorStep(visibleTime, width);
   const minorStep = majorStep / markerDivisionCount;
-  const start = Math.max(0, timelineWindow.start - majorStep);
-  const end = Math.min(config.duration, timelineWindow.end);
+  const from = Math.max(0, start - majorStep);
+  const end = Math.min(config.duration, start + visibleTime * screens);
 
-  if (timelineWindow.duration <= 0 || end < start) {
+  if (visibleTime <= 0 || end < from) {
     return [];
   }
 
-  const firstMarkerIndex = Math.ceil((start - timelinePrecision) / minorStep);
+  const firstMarkerIndex = Math.ceil((from - timelinePrecision) / minorStep);
   const lastMarkerIndex = Math.floor((end + timelinePrecision) / minorStep);
 
   return Array.from(
@@ -76,7 +64,7 @@ export const getTimelineMarkers = (
 
       return {
         time,
-        ratio: (time - timelineWindow.start) / timelineWindow.duration,
+        ratio: (time - start) / visibleTime,
         isMajor: markerIndex % markerDivisionCount === 0,
       };
     },

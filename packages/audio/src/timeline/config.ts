@@ -1,5 +1,6 @@
 const requiredTimelineConfigKeys = [
   'canvas',
+  'stripCanvas',
   'duration',
   'frameIndex',
   'visibleTime',
@@ -11,6 +12,7 @@ const requiredTimelineConfigKeys = [
 
 export type TimelineConfig = {
   canvas: HTMLCanvasElement;
+  stripCanvas: HTMLCanvasElement;
   duration: number;
   frameIndex: number;
   frameCount?: number;
