@@ -199,3 +199,53 @@ export const parseEdgeLog = (rawValues: readonly unknown[]): EdgeLog => {
     level,
   };
 };
+
+const screenBoxSchema = z.object({
+  left: z.number(),
+  top: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
+export const frameRunSchema = z.object({
+  view: z.enum(['notes', 'spectrum']),
+  cycle: z.number(),
+  sampleRate: z.number(),
+  frameCount: z.number(),
+  playedAt: z.number(),
+  swipeStartedAt: z.number(),
+  held: z.array(z.tuple([z.number(), z.number()])),
+  frames: z.array(
+    z.object({
+      startedAt: z.number(),
+      submittedAt: z.number(),
+      doneAt: z.number(),
+      playing: z.boolean(),
+      playheadFrame: z.number(),
+      metrics: z.record(z.string(), z.number()),
+    }),
+  ),
+  boxes: z.object({
+    spectrogram: screenBoxSchema,
+    ruler: screenBoxSchema,
+    rail: screenBoxSchema,
+  }),
+  screens: z.array(
+    z.object({
+      name: z.string(),
+      progress: z.number(),
+      reference: z.string(),
+      referenceFrame: z.number(),
+    }),
+  ),
+  control: z
+    .object({
+      base: z.string(),
+      baseFrame: z.number(),
+      reference: z.string(),
+      frame: z.number(),
+    })
+    .optional(),
+});
+
+export type FrameRun = z.infer<typeof frameRunSchema>;

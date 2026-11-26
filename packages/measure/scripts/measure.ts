@@ -8,7 +8,7 @@ import { startVitest } from 'vitest/node';
 type DeviceKind = 'android' | 'chrome' | 'desktop';
 
 type MeasureCommand =
-  'timing' | 'delay' | 'sound' | 'cursor' | 'failure' | 'seek';
+  'timing' | 'delay' | 'sound' | 'cursor' | 'failure' | 'seek' | 'frame';
 
 type MeasureRequest = {
   command: MeasureCommand;
@@ -36,7 +36,7 @@ declare module 'vitest' {
   }
 }
 
-const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|sound|cursor|failure|seek> [options]
+const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|sound|cursor|failure|seek|frame> [options]
 
   measure:timing   the playhead against the heard metronome click, and the take against the beats
   measure:delay    how far the voice line, the spectrogram and the newest audio trail the playhead
@@ -44,6 +44,7 @@ const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|soun
   measure:cursor   the shown cursor through Play, Stop, seeks, a drag and a loop: steps back, stalls and jumps
   measure:failure  a fault thrown in the player during a take: the notice, the stop and the take on the host
   measure:seek     seeks to far frames while playing: the time to the first sound and the range requests of the stems
+  measure:frame    the spectrogram's frames while playing and during a swipe of the progress bar, and the swipe's screens against the ruler
 
 options
   --device <android|chrome|desktop>  the page to drive (default: android)
@@ -54,8 +55,8 @@ options
   --keep-calibration                 measure with the stored calibration instead of calibrating first
   --seconds <n>                      take length for timing and delay, the time to the fault for failure (default: 20)
   --tempos <a,b>                     timing tempos (default: 1)
-  --start <seconds>                  where delay, sound and failure takes, the cursor events and the seeks start in the song (default: 30)
-  --cycles <n>                       cursor: how many times the events repeat (default: 3)
+  --start <seconds>                  where delay, sound and failure takes, the cursor events, the seeks and the frames start in the song (default: 30)
+  --cycles <n>                       cursor and frame: how many times the events repeat (default: 3)
   --seeks <n>                        seek: how many far seeks (default: 20)
   --seed <n>                         seek: the seed of the targets, the same seed seeks to the same frames (default: 1)
   --double <ms>                      seek: first seek to another far frame this many ms before each seek (default: 0, none)
@@ -71,6 +72,7 @@ const commands: readonly MeasureCommand[] = [
   'cursor',
   'failure',
   'seek',
+  'frame',
 ];
 const devices: readonly DeviceKind[] = ['android', 'chrome', 'desktop'];
 const defaultPorts: Record<DeviceKind, number> = {

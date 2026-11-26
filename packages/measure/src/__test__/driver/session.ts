@@ -25,7 +25,7 @@ export const createOutput = (outDir: string): MeasureOutput => {
 };
 
 export type MeasureCommand =
-  'timing' | 'delay' | 'sound' | 'cursor' | 'failure' | 'seek';
+  'timing' | 'delay' | 'sound' | 'cursor' | 'failure' | 'seek' | 'frame';
 
 export type MeasureRequest = {
   command: MeasureCommand;

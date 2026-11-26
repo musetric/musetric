@@ -1,7 +1,12 @@
-import { type SpectrogramProcessor } from '@musetric/spectrogram/gpu';
+import {
+  type SpectrogramProcessor,
+  type SpectrogramProcessorMetrics,
+} from '@musetric/spectrogram/gpu';
 
 export type RenderedFrame = {
   processor: SpectrogramProcessor;
+  device: GPUDevice;
+  metrics: SpectrogramProcessorMetrics | undefined;
   startedAt: number;
   playing: boolean;
   playheadFrame: number;

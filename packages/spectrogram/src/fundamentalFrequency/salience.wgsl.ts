@@ -123,7 +123,10 @@ fn salience(@builtin(global_invocation_id) id: vec3<u32>) {
   }
   let level = levels[slotIndex];
   let gate = clamp((level - params.levelFloorDb) / max(params.levelRangeDb, 0.001), 0.0, 1.0);
-  salienceValues[slotIndex * candidateCount + candidate] =
-    candidateSalience(slotIndex, frequencyAtCandidate(candidate), gate);
+  var value = 0.0;
+  if (gate > 0.0) {
+    value = candidateSalience(slotIndex, frequencyAtCandidate(candidate), gate);
+  }
+  salienceValues[slotIndex * candidateCount + candidate] = value;
 }
 `;

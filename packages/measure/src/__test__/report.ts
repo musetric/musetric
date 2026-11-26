@@ -1,6 +1,7 @@
 import { stemTypes } from '@musetric/audio/es';
 import { type CursorResult } from './analysis/cursor.js';
 import { type DelayResult } from './analysis/delay.js';
+import { type FramePartsResult, type ScreenResult } from './analysis/frame.js';
 import { type SeekResult } from './analysis/seek.js';
 import {
   bandCenters,
@@ -171,3 +172,45 @@ export const formatSoundReport = (sound: SoundResult) => {
 
 export const formatHoles = (holes: HoleResult, seconds: number) =>
   `Take with the song, ${seconds} s: ${holes.holeCount} gaps of exact zeros of 1 ms or longer, longest ${holes.longestMs.toFixed(2)} ms, level ${formatNumber(holes.rms, 1)} dBFS.`;
+
+const formatTimes = (spread: Spread) =>
+  spread.count === 0
+    ? '-'
+    : `${spread.median.toFixed(1)} / ${spread.p90.toFixed(1)} / ${spread.max.toFixed(1)}`;
+
+export type FrameScreens = {
+  view: string;
+  cycle: number;
+  result: ScreenResult | undefined;
+};
+
+const formatScreens = (screens: FrameScreens) => {
+  const { view, cycle, result } = screens;
+  const run = `- ${view} ${cycle + 1}`;
+  if (!result) {
+    return `${run}: no screen captures.`;
+  }
+  const offsets = result.offsets.map((offset) => formatSigned(offset, 2));
+  const control = `control ${result.control.seconds.toFixed(2)} s read ${result.control.picture.toFixed(2)} s by the picture, ${(result.secondsPerPixel * 1000).toFixed(2)} ms a pixel`;
+  return `${run}: ${result.off} of ${result.offsets.length} compared frames more than 0.05 s off the ruler, of ${result.matches.length} captured; the picture against the ruler ${offsets.join(', ')} s; ${control}.`;
+};
+
+export const formatFrameReport = (
+  parts: readonly FramePartsResult[],
+  screens: readonly FrameScreens[],
+) =>
+  [
+    `| Part, ms: median / p90 / max | ${parts.map((part) => [part.view, part.phase].join(', ')).join(' | ')} |`,
+    `| --- | ${parts.map(() => '---:').join(' | ')} |`,
+    `| Frames, a second | ${parts.map((part) => [part.count, part.perSecond.toFixed(0)].join(', ')).join(' | ')} |`,
+    `| The moment to the submit | ${parts.map((part) => formatTimes(part.toSubmit)).join(' | ')} |`,
+    `| The moment to the GPU's end | ${parts.map((part) => formatTimes(part.toGpuEnd)).join(' | ')} |`,
+    `| GPU passes | ${parts.map((part) => formatTimes(part.gpu)).join(' | ')} |`,
+    ...(parts.at(0)?.parts ?? []).map(
+      (part, index) =>
+        `| ${part.label} | ${parts.map((result) => formatTimes(result.parts[index].spread)).join(' | ')} |`,
+    ),
+    '',
+    'Screen captures of the swipe against the stopped picture at their ruler time:',
+    ...screens.map(formatScreens),
+  ].join('\n');

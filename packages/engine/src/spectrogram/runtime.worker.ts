@@ -49,6 +49,7 @@ export const createSpectrogramRuntime = async (
   const device = await getGpuDevice(profiling);
 
   const metricsBuffer: SpectrogramProcessorMetrics[] = [];
+  let lastMetrics: SpectrogramProcessorMetrics | undefined = undefined;
   const logMetrics = createThrottleTime(() => {
     console.table(averageMetrics(metricsBuffer.splice(0)));
   }, 500);
@@ -59,6 +60,7 @@ export const createSpectrogramRuntime = async (
       framesInFlight: 2,
       onMetrics: profiling
         ? (metrics) => {
+            lastMetrics = metrics;
             metricsBuffer.push(metrics);
             logMetrics();
           }
@@ -120,10 +122,13 @@ export const createSpectrogramRuntime = async (
       trackProgress = playheadTrackProgress();
       const startedAt = performance.timeOrigin + performance.now();
       const writtenEnd = recording.liveEnd();
+      lastMetrics = undefined;
       await render();
       if (onRendered) {
         await onRendered({
           processor,
+          device,
+          metrics: lastMetrics,
           startedAt,
           playing,
           playheadFrame: trackProgress * frameCount,
