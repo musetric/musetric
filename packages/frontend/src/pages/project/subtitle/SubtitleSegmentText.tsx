@@ -23,12 +23,12 @@ export const SubtitleSegmentText: FC<SubtitleSegmentTextProps> = (props) => {
         fontWeight: 'bold',
         lineHeight: 1.18,
         textAlign: 'center',
-        ':where([data-subtitle-segment-status="past"]) > &': {
+        '*:where([data-subtitle-segment-status="past"]) > &': {
           color: 'text.secondary',
           opacity: 0.5,
           transition: inactiveTransition,
         },
-        ':where([data-subtitle-segment-status="future"]) > &': {
+        '*:where([data-subtitle-segment-status="future"]) > &': {
           color: 'text.primary',
           opacity: 0.72,
           transition: inactiveTransition,
