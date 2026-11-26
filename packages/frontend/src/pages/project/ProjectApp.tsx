@@ -52,6 +52,8 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
 
   useEffect(() => engine.decoder.mount(project.id), [project.id]);
 
+  useEffect(() => engine.microphoneAccess.release, []);
+
   return (
     <ProjectLayout framed>
       <Stack sx={{ width: '100%', flexGrow: 1, minHeight: 0, gap: 2 }}>

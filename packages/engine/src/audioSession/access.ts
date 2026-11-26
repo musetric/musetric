@@ -35,6 +35,7 @@ export type EngineMicrophoneAccess = {
   openSettings: () => void;
   recheck: () => Promise<void>;
   dismiss: () => void;
+  release: () => void;
 };
 
 export type CreateEngineMicrophoneAccessOptions = {
@@ -75,6 +76,9 @@ export const createEngineMicrophoneAccess = (
       return (
         denial !== undefined && audioSession.canOpenMicrophoneSettings(denial)
       );
+    },
+    release: () => {
+      audioSession.releaseMicrophone?.();
     },
     openSettings: () => {
       const denial = store.get().microphoneDenial;

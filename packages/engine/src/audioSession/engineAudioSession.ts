@@ -19,6 +19,7 @@ export type EngineAudioSession = {
     request: EngineMicrophoneRequest,
   ) => Promise<EngineMicrophone>;
   closeMicrophone: (microphone: EngineMicrophone) => void;
+  releaseMicrophone?: () => void;
   enumerateDevices: () => Promise<MediaDeviceInfo[]>;
   subscribeDevices: (listener: () => void) => () => void;
   checkMicrophoneAccess?: () => Promise<boolean>;

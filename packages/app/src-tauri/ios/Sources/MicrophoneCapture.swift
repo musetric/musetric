@@ -33,6 +33,7 @@ final class MicrophoneCapture: NSObject {
   var onDeviceChange: (() -> Void)?
 
   private let engine = AVAudioEngine()
+  private let sessionQueue = DispatchQueue(label: "com.musetric.microphone.session")
   private let ring = SampleRing(capacity: ringCapacity)
   private var sink: AVAudioSinkNode?
   private var inputRate: Double?
@@ -60,6 +61,9 @@ final class MicrophoneCapture: NSObject {
     center.addObserver(
       self, selector: #selector(resume),
       name: UIApplication.willEnterForegroundNotification, object: nil)
+    center.addObserver(
+      self, selector: #selector(enteredBackground),
+      name: UIApplication.didEnterBackgroundNotification, object: nil)
   }
 
   func devices() -> [String: Any] {
@@ -94,11 +98,14 @@ final class MicrophoneCapture: NSObject {
         }
         self.deviceId = deviceId
         self.running = true
-        do {
-          try self.activate()
-          completion(.success(self.describeCapture()))
-        } catch {
-          self.halt()
+        self.activate { error in
+          guard let error else {
+            completion(.success(self.describeCapture()))
+            return
+          }
+          if (error as? MicrophoneError) != .cancelled {
+            self.halt()
+          }
           completion(.failure(error))
         }
       }
@@ -110,7 +117,30 @@ final class MicrophoneCapture: NSObject {
     halt()
   }
 
-  private func activate() throws {
+  private func activate(_ completion: @escaping (Error?) -> Void) {
+    let requested = generation
+    let deviceId = self.deviceId
+    sessionQueue.async {
+      let prepared = Result { try self.prepareSession(deviceId: deviceId) }
+      DispatchQueue.main.async {
+        guard requested == self.generation, self.running else {
+          completion(MicrophoneError.cancelled)
+          return
+        }
+        do {
+          try prepared.get()
+          self.silentTicks = 0
+          try self.startEngine()
+          self.startTimer()
+          completion(nil)
+        } catch {
+          completion(error)
+        }
+      }
+    }
+  }
+
+  private func prepareSession(deviceId: String?) throws {
     let audio = AVAudioSession.sharedInstance()
     try configureCategory()
     try? audio.setPreferredIOBufferDuration(ioBufferDuration)
@@ -124,9 +154,6 @@ final class MicrophoneCapture: NSObject {
     if audio.isInputGainSettable, audio.inputGain != inputGain {
       try? audio.setInputGain(inputGain)
     }
-    silentTicks = 0
-    try startEngine()
-    startTimer()
   }
 
   private func halt() {
@@ -139,7 +166,21 @@ final class MicrophoneCapture: NSObject {
     engine.stop()
     detachSink()
     inputRate = nil
-    try? AVAudioSession.sharedInstance().setActive(false)
+  }
+
+  @objc private func enteredBackground() {
+    deactivate()
+  }
+
+  func deactivate() {
+    DispatchQueue.main.async {
+      guard !self.running else {
+        return
+      }
+      self.sessionQueue.async {
+        try? AVAudioSession.sharedInstance().setActive(false)
+      }
+    }
   }
 
   private func configureCategory() throws {
@@ -263,10 +304,10 @@ final class MicrophoneCapture: NSObject {
       return
     }
     engine.stop()
-    do {
-      try activate()
-    } catch {
-      NSLog("Musetric microphone restart failed: \(error)")
+    activate { error in
+      if let error, (error as? MicrophoneError) != .cancelled {
+        NSLog("Musetric microphone restart failed: \(error)")
+      }
     }
   }
 

@@ -42,6 +42,7 @@ type NativeMicrophoneCommand =
   | { type: 'devices' }
   | { type: 'start'; deviceId?: string }
   | { type: 'stop' }
+  | { type: 'release' }
   | { type: 'openSettings' };
 
 export type NativeMicrophoneHandler = {
@@ -249,6 +250,14 @@ export const createNativeAudioSession = (
         opening -= 1;
         stopCapture();
       }
+    },
+    releaseMicrophone: () => {
+      if (sources.size > 0 || opening > 0) {
+        return;
+      }
+      void handler.postMessage({ type: 'release' }).catch((error: unknown) => {
+        console.error('Failed to release the native microphone', error);
+      });
     },
     closeMicrophone: (microphone) => {
       const created = sources.get(microphone);
