@@ -11,6 +11,7 @@ import {
   toNativeInputId,
   toPageInputId,
 } from './desktopInputs.js';
+import { readDesktopSystem } from './desktopSystem.js';
 import {
   type EngineAudioSession,
   microphoneAccessDenied,
@@ -28,7 +29,6 @@ import {
 } from './settings.js';
 import { type CapturedChunkListener } from './timedMicrophone.js';
 
-const nativeMicrophone = import.meta.env.frontendNativeMicrophone === 'true';
 const clockProbeCount = 9;
 
 const devicesSchema = z.object({
@@ -50,7 +50,8 @@ const request = async (command: DesktopMicrophoneCommand, args?: InvokeArgs) =>
     },
   );
 
-export const hasDesktopMicrophone = () => nativeMicrophone && isTauri();
+export const hasDesktopMicrophone = () =>
+  isTauri() && readDesktopSystem() !== undefined;
 
 const readDevices = async () => {
   const [reply, devices] = await Promise.all([
