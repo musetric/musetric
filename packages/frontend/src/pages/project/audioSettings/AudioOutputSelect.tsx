@@ -3,7 +3,6 @@ import HeadphonesIcon from '@mui/icons-material/Headphones';
 import SpeakerIcon from '@mui/icons-material/Speaker';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import {
-  Box,
   FormControl,
   InputLabel,
   ListItemIcon,
@@ -11,6 +10,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Typography,
 } from '@mui/material';
 import {
   type AudioOutputSourceKind,
@@ -32,12 +32,6 @@ const outputIconByKind: Record<AudioOutputSourceKind, ReactNode> = {
 };
 
 const defaultChoice = '';
-const valueTextSx = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
 
 export const AudioOutputSelect: FC = () => {
   const { t } = useTranslation();
@@ -103,11 +97,11 @@ export const AudioOutputSelect: FC = () => {
               sx={{ alignItems: 'center', gap: 1 }}
             >
               {outputIconByKind[classifyAudioOutputDevice(device)]}
-              <Box component='span' sx={valueTextSx}>
+              <Typography component='span' variant='inherit' noWrap>
                 {value === defaultChoice
                   ? nameDefault(device)
                   : nameOutput(device)}
-              </Box>
+              </Typography>
             </Stack>
           );
         }}

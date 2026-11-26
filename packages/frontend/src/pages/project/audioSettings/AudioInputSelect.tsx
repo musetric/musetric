@@ -2,7 +2,6 @@ import BluetoothIcon from '@mui/icons-material/Bluetooth';
 import HeadphonesIcon from '@mui/icons-material/Headphones';
 import MicIcon from '@mui/icons-material/Mic';
 import {
-  Box,
   FormControl,
   InputLabel,
   ListItemIcon,
@@ -10,6 +9,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Typography,
 } from '@mui/material';
 import {
   type AudioInputSourceKind,
@@ -31,12 +31,6 @@ const inputIconByKind: Record<AudioInputSourceKind, ReactNode> = {
 };
 
 const defaultChoice = '';
-const valueTextSx = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
 
 export const AudioInputSelect: FC = () => {
   const { t } = useTranslation();
@@ -91,11 +85,11 @@ export const AudioInputSelect: FC = () => {
               sx={{ alignItems: 'center', gap: 1 }}
             >
               {inputIconByKind[classifyAudioInputDevice(device)]}
-              <Box component='span' sx={valueTextSx}>
+              <Typography component='span' variant='inherit' noWrap>
                 {value === defaultChoice
                   ? nameDefault(device)
                   : nameInput(device)}
-              </Box>
+              </Typography>
             </Stack>
           );
         }}
