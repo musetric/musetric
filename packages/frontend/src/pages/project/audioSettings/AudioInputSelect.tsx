@@ -29,6 +29,8 @@ const inputIconByKind: Record<AudioInputSourceKind, ReactNode> = {
   unknown: <MicIcon fontSize='small' />,
 };
 
+const defaultChoice = '';
+
 export const AudioInputSelect: FC = () => {
   const { t } = useTranslation();
   const recording = useEngineStore(isRecording);
@@ -38,10 +40,18 @@ export const AudioInputSelect: FC = () => {
     (state) => state.microphoneDeviceId,
   );
   const inputDevices = getRealAudioInputDevices(audioDevices);
-  const resolvedInputDevice = resolveAudioInputDevice(audioDevices, {
-    explicitDeviceId: microphoneDeviceId,
-  });
-  const inputSelectValue = resolvedInputDevice?.deviceId ?? '';
+  const defaultInputDevice = resolveAudioInputDevice(audioDevices, {});
+  const chosenInputDevice = inputDevices.find(
+    (device) => device.deviceId === microphoneDeviceId,
+  );
+  const inputSelectValue = chosenInputDevice?.deviceId ?? defaultChoice;
+  const nameInput = (device: MediaDeviceInfo) =>
+    device.label ||
+    t('pages.project.audioSettings.inputFallback', {
+      value: inputDevices.indexOf(device) + 1,
+    });
+  const nameDefault = (device: MediaDeviceInfo) =>
+    t('pages.project.audioSettings.default', { name: nameInput(device) });
 
   return (
     <FormControl fullWidth disabled={recording || calibrating}>
@@ -52,12 +62,18 @@ export const AudioInputSelect: FC = () => {
         displayEmpty
         value={inputSelectValue}
         onChange={(event) => {
-          void engine.calibration.selectInputDevice(event.target.value);
+          const { value } = event.target;
+          void engine.calibration.selectInputDevice(
+            value === defaultChoice ? undefined : value,
+          );
         }}
         renderValue={(value) => {
-          const device = inputDevices.find(
-            (inputDevice) => inputDevice.deviceId === value,
-          );
+          const device =
+            value === defaultChoice
+              ? defaultInputDevice
+              : inputDevices.find(
+                  (inputDevice) => inputDevice.deviceId === value,
+                );
           if (!device) {
             return t('pages.project.audioSettings.inputPlaceholder');
           }
@@ -69,26 +85,28 @@ export const AudioInputSelect: FC = () => {
             >
               {inputIconByKind[classifyAudioInputDevice(device)]}
               <span>
-                {device.label ||
-                  t('pages.project.audioSettings.inputFallback', { value: 1 })}
+                {value === defaultChoice
+                  ? nameDefault(device)
+                  : nameInput(device)}
               </span>
             </Stack>
           );
         }}
       >
-        {inputDevices.map((device, index) => (
+        {defaultInputDevice && (
+          <MenuItem value={defaultChoice}>
+            <ListItemIcon>
+              {inputIconByKind[classifyAudioInputDevice(defaultInputDevice)]}
+            </ListItemIcon>
+            <ListItemText primary={nameDefault(defaultInputDevice)} />
+          </MenuItem>
+        )}
+        {inputDevices.map((device) => (
           <MenuItem key={device.deviceId} value={device.deviceId}>
             <ListItemIcon>
               {inputIconByKind[classifyAudioInputDevice(device)]}
             </ListItemIcon>
-            <ListItemText
-              primary={
-                device.label ||
-                t('pages.project.audioSettings.inputFallback', {
-                  value: index + 1,
-                })
-              }
-            />
+            <ListItemText primary={nameInput(device)} />
           </MenuItem>
         ))}
       </Select>

@@ -28,6 +28,7 @@
   "pages.processing.resumeQueue": "Resume all",
   "pages.processing.steps": "{{done}} of {{total}} steps done",
   "pages.processing.title": "Processing",
+  "pages.project.audioSettings.default": "Default ({{name}})",
   "pages.project.audioSettings.deviceLocked": "Stop recording to change audio devices.",
   "pages.project.audioSettings.gain": "Recording gain: {{value}}%",
   "pages.project.audioSettings.input": "Microphone",

@@ -89,8 +89,8 @@ const stopActivePlayback = async (
 };
 
 export type EngineCalibration = {
-  selectInputDevice: (deviceId: string) => Promise<void>;
-  selectOutputDevice: (deviceId: string) => Promise<void>;
+  selectInputDevice: (deviceId: string | undefined) => Promise<void>;
+  selectOutputDevice: (deviceId: string | undefined) => Promise<void>;
   setManualLatencyMs: (latencyMs: number) => void;
   calibrate: () => Promise<boolean>;
   skip: () => void;
@@ -307,7 +307,7 @@ export const createEngineCalibration = (
 
   return {
     selectInputDevice: async (deviceId) => {
-      if (!deviceId || store.get().microphoneDeviceId === deviceId) {
+      if (store.get().microphoneDeviceId === deviceId) {
         return;
       }
       store.update((draft) => {
@@ -320,7 +320,7 @@ export const createEngineCalibration = (
       restoreForCurrentDevices();
     },
     selectOutputDevice: async (deviceId) => {
-      if (!deviceId || store.get().audioOutputDeviceId === deviceId) {
+      if (store.get().audioOutputDeviceId === deviceId) {
         return;
       }
       store.update((draft) => {
