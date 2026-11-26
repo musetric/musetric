@@ -19,7 +19,10 @@ import {
   isPlaying,
   isRecording,
 } from '../state.js';
-import { spectrogramChannel } from './protocol.cross.js';
+import {
+  spectrogramChannel,
+  type SpectrogramRulerMount,
+} from './protocol.cross.js';
 import spectrogramWorkerUrl from './spectrogram.worker.ts?worker&url';
 
 type Unmount = () => void;
@@ -31,6 +34,10 @@ export type EngineSpectrogram = {
   mount: (
     canvas: HTMLCanvasElement,
     config: Partial<SpectrogramConfig>,
+  ) => Unmount;
+  mountRuler: (
+    canvas: HTMLCanvasElement,
+    style: Pick<SpectrogramRulerMount, 'markerColor' | 'labelColor' | 'font'>,
   ) => Unmount;
   setConfig: (patch: Partial<SpectrogramConfig>) => void;
   previewLiveTake: (chunk: CapturedChunk) => void;
@@ -203,6 +210,24 @@ export const createEngineSpectrogram = (
         store.update((state) => {
           state.statuses.spectrogram = 'pending';
         });
+      };
+    },
+    mountRuler: (canvas, style) => {
+      const getSize = () => {
+        const { width, height } = canvas.getBoundingClientRect();
+        return { width, height, pixelRatio: window.devicePixelRatio };
+      };
+      port.methods.mountRuler({
+        canvas: canvas.transferControlToOffscreen(),
+        ...style,
+        ...getSize(),
+      });
+      const unsubscribeResizeObserver = subscribeResizeObserver(canvas, () => {
+        port.methods.resizeRuler(getSize());
+      });
+      return () => {
+        unsubscribeResizeObserver();
+        port.methods.unmountRuler();
       };
     },
     setConfig: (patch) => {

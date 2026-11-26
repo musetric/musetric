@@ -33,6 +33,7 @@ port.bindBoot(async (message) => {
     port,
     dataPort: spectrogramDataChannel.inbound(message.dataPort),
     playhead: createPlayhead(message.sampleRate),
+    sampleRate: message.sampleRate,
     convertPreview: createLivePreview(
       loadCapture(message.captureModule),
       message.sampleRate,

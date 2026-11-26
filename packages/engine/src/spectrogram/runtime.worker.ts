@@ -18,6 +18,7 @@ import {
 } from './protocol.cross.js';
 import { createRecordingSource } from './recordingSource.worker.js';
 import { type RenderListener } from './renderHook.worker.js';
+import { createRuler } from './ruler.worker.js';
 import { createViewWindowState } from './viewWindow.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
@@ -26,6 +27,7 @@ export type CreateSpectrogramRuntimeOptions = {
   >;
   dataPort: ReturnType<typeof spectrogramDataChannel.inbound<MessagePort>>;
   playhead: Playhead;
+  sampleRate: number;
   convertPreview: (preview: CapturedPreview) => ContextPreview | undefined;
   profiling?: boolean;
   onRendered?: RenderListener;
@@ -34,8 +36,15 @@ export type CreateSpectrogramRuntimeOptions = {
 export const createSpectrogramRuntime = async (
   options: CreateSpectrogramRuntimeOptions,
 ) => {
-  const { port, dataPort, playhead, convertPreview, profiling, onRendered } =
-    options;
+  const {
+    port,
+    dataPort,
+    playhead,
+    sampleRate,
+    convertPreview,
+    profiling,
+    onRendered,
+  } = options;
 
   let lastStatus: 'pending' | 'error' | 'success' | undefined = undefined;
   const setStatus = (status: 'pending' | 'error' | 'success') => {
@@ -75,6 +84,7 @@ export const createSpectrogramRuntime = async (
   let playing = false;
   let rendering = false;
   const viewWindow = createViewWindowState();
+  const ruler = createRuler();
 
   const render = async () => {
     const samples = lead
@@ -83,9 +93,19 @@ export const createSpectrogramRuntime = async (
           recording: recording.get(lead.source.length),
         }
       : {};
-    const view = viewWindow.view(trackProgress * frameCount);
+    const frameIndex = trackProgress * frameCount;
+    const view = viewWindow.view(frameIndex);
     if (view) {
       processor.updateConfig(view);
+    }
+    const shown = viewWindow.shown(frameIndex);
+    if (shown) {
+      ruler.draw({
+        duration: frameCount / sampleRate,
+        frameIndex,
+        frameCount,
+        ...shown,
+      });
     }
     const liveEnd = recording.liveEnd();
     const ok = await processor.render(
@@ -228,6 +248,21 @@ export const createSpectrogramRuntime = async (
         console.error('Failed to render spectrogram', error);
         setStatus('error');
       }
+    },
+    mountRuler: (message) => {
+      ruler.mount(message);
+      if (!playing) {
+        renderPaused();
+      }
+    },
+    resizeRuler: (message) => {
+      ruler.resize(message);
+      if (!playing) {
+        renderPaused();
+      }
+    },
+    unmountRuler: () => {
+      ruler.unmount();
     },
     unmount: () => {
       renderLoop.stop();
