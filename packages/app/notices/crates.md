@@ -7460,7 +7460,10 @@ SOFTWARE.
 - `ndk-sys` 0.6.0+11769913
 - `ndk` 0.9.0
 - `objc2-app-kit` 0.3.2
+- `objc2-avf-audio` 0.3.2
 - `objc2-cloud-kit` 0.3.2
+- `objc2-core-audio-types` 0.3.2
+- `objc2-core-audio` 0.3.2
 - `objc2-core-data` 0.3.2
 - `objc2-core-foundation` 0.3.2
 - `objc2-core-graphics` 0.3.2

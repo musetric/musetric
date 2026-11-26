@@ -34,6 +34,8 @@ const clockProbeCount = 9;
 const devicesSchema = z.object({
   inputs: z.array(nativePortSchema),
   defaultInput: z.string().optional(),
+  outputs: z.array(nativePortSchema).optional(),
+  defaultOutput: z.string().optional(),
 });
 
 const clockSchema = z.number();
@@ -55,11 +57,14 @@ const readDevices = async () => {
     request('devices'),
     navigator.mediaDevices.enumerateDevices(),
   ]);
-  const { inputs, defaultInput } = devicesSchema.parse(reply);
+  const { inputs, defaultInput, outputs, defaultOutput } =
+    devicesSchema.parse(reply);
   return {
     inputs: matchDesktopInputs(inputs, devices),
     defaultInput,
-    outputs: devices.filter((device) => device.kind === 'audiooutput'),
+    outputs: outputs
+      ? toNativeDeviceInfos('audiooutput', outputs, defaultOutput)
+      : devices.filter((device) => device.kind === 'audiooutput'),
   };
 };
 

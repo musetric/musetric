@@ -18,8 +18,8 @@ use wasapi::{
 use super::{
     chunk::Packet,
     system::{
-        CaptureSystem, ChangeSink, Input, Inputs, MICROPHONE_ACCESS_DENIED, OpenRequest, Opened,
-        PacketSink, clock_ms,
+        CaptureSystem, ChangeSink, Devices, MICROPHONE_ACCESS_DENIED, OpenRequest, Opened,
+        PacketSink, Port, SinkForRate, clock_ms,
     },
 };
 
@@ -162,13 +162,13 @@ fn in_com<T>(work: impl FnOnce() -> T) -> T {
     result
 }
 
-fn read_inputs() -> Result<Inputs, Failure> {
+fn read_devices() -> Result<Devices, Failure> {
     let enumerator = DeviceEnumerator::new()?;
     let collection = enumerator.get_device_collection(Direction::Capture)?;
     let mut inputs = Vec::new();
     for listed in &collection {
         let device = listed?;
-        inputs.push(Input {
+        inputs.push(Port {
             id: device.get_id()?,
             label: device.get_friendlyname()?,
         });
@@ -177,9 +177,11 @@ fn read_inputs() -> Result<Inputs, Failure> {
         .get_default_device(Direction::Capture)
         .and_then(|device| device.get_id())
         .ok();
-    Ok(Inputs {
+    Ok(Devices {
         inputs,
         default_input,
+        outputs: None,
+        default_output: None,
     })
 }
 
@@ -358,17 +360,19 @@ impl CaptureSystem for Wasapi {
     type Stream = WasapiStream;
     type Watch = WasapiWatch;
 
-    fn inputs() -> Result<Inputs, String> {
-        in_com(read_inputs).map_err(|error| error.to_string())
+    fn devices() -> Result<Devices, String> {
+        in_com(read_devices).map_err(|error| error.to_string())
     }
 
-    fn open(request: OpenRequest, sink: PacketSink) -> Result<Opened<WasapiStream>, String> {
+    fn open(request: OpenRequest, sink: SinkForRate) -> Result<Opened<WasapiStream>, String> {
+        let sample_rate = request.sample_rate;
+        let packets = sink(sample_rate);
         let (ready_sender, ready) = mpsc::sync_channel(1);
         let running = Arc::new(AtomicBool::new(true));
         let thread_running = Arc::clone(&running);
         let thread = thread::Builder::new()
             .name(CAPTURE_THREAD.to_owned())
-            .spawn(move || in_com(|| capture(&request, sink, &thread_running, &ready_sender)))
+            .spawn(move || in_com(|| capture(&request, packets, &thread_running, &ready_sender)))
             .map_err(|error| error.to_string())?;
         let stream = WasapiStream {
             running,
@@ -378,6 +382,7 @@ impl CaptureSystem for Wasapi {
         Ok(Opened {
             stream,
             device_id: opened.id,
+            sample_rate,
             raw: opened.raw,
         })
     }

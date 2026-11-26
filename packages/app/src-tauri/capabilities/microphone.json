@@ -3,7 +3,7 @@
   "identifier": "microphone",
   "description": "The native microphone, for the page the embedded host serves",
   "windows": ["main"],
-  "platforms": ["windows"],
+  "platforms": ["windows", "macOS"],
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
