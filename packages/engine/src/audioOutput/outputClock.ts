@@ -26,10 +26,12 @@ const trimmedMean = (values: readonly number[]) => {
 };
 
 const readHeard = (context: AudioContext, nowMs: number) => {
+  const { currentTime } = context;
   const timestamp = context.getOutputTimestamp();
   const { contextTime = 0, performanceTime = 0 } = timestamp;
   if (
     contextTime > 0 &&
+    contextTime < currentTime &&
     performanceTime > 0 &&
     nowMs - performanceTime < staleTimestampMs
   ) {
