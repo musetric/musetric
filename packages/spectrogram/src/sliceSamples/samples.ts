@@ -40,7 +40,6 @@ export const writeColumnOffsets = (
 
 export type StateSamples = {
   buffer: GPUBuffer;
-  array: Float32Array;
 
   write: (options: {
     source: SpectrogramSource;
@@ -69,12 +68,37 @@ export const createStateSamplesCell = (device: GPUDevice) =>
   createResourceCell({
     create: (arg: StateSamplesArg): StateSamples => {
       const { ringLength } = arg;
-      const array = new Float32Array(ringLength);
+      const silence = new Float32Array(ringLength);
       const buffer = device.createBuffer({
         label: 'pipeline-samples-buffer',
-        size: array.byteLength,
+        size: silence.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
+      const writeSlots = (
+        data: Float32Array,
+        dataStart: number,
+        from: number,
+        count: number,
+      ): void => {
+        const startSlot = floorMod(from, ringLength);
+        const firstCount = Math.min(count, ringLength - startSlot);
+        device.queue.writeBuffer(
+          buffer,
+          startSlot * 4,
+          data,
+          dataStart,
+          firstCount,
+        );
+        if (count > firstCount) {
+          device.queue.writeBuffer(
+            buffer,
+            0,
+            data,
+            dataStart + firstCount,
+            count - firstCount,
+          );
+        }
+      };
 
       const resident: ResidentState = {
         valid: false,
@@ -86,7 +110,6 @@ export const createStateSamplesCell = (device: GPUDevice) =>
 
       return {
         buffer,
-        array,
         write: (options) => {
           const {
             source,
@@ -118,40 +141,31 @@ export const createStateSamplesCell = (device: GPUDevice) =>
               return;
             }
             const dataEnd = Math.min(source.length, windowStart + limit);
-            const inStart = Math.max(from, 0);
-            const inEnd = Math.min(from + count, dataEnd);
-            const localInStart = inStart - from;
-            const localInEnd = inEnd - from;
-            const reused = count === ringLength;
-            const scratch = reused ? array : new Float32Array(count);
-            if (reused) {
-              if (localInStart > 0) {
-                scratch.fill(0, 0, localInStart);
-              }
-              if (localInEnd < count) {
-                scratch.fill(0, localInEnd, count);
-              }
+            const inStart = Math.min(Math.max(from, 0), from + count);
+            const inEnd = Math.max(Math.min(from + count, dataEnd), inStart);
+            if (inStart > from) {
+              writeSlots(silence, 0, from, inStart - from);
             }
-            if (localInEnd > localInStart) {
-              source.read(scratch, localInStart, inStart, inEnd - inStart);
-            }
-            const startSlot = floorMod(from, ringLength);
-            const firstCount = Math.min(count, ringLength - startSlot);
-            device.queue.writeBuffer(
-              buffer,
-              startSlot * 4,
-              scratch,
-              0,
-              firstCount,
-            );
-            if (count > firstCount) {
-              device.queue.writeBuffer(
-                buffer,
-                0,
-                scratch,
-                firstCount,
-                count - firstCount,
+            if (inEnd > inStart) {
+              source.forEachRun(
+                inStart,
+                inEnd - inStart,
+                (samples, samplesStart, offset, runCount) => {
+                  if (samples) {
+                    writeSlots(
+                      samples,
+                      samplesStart,
+                      inStart + offset,
+                      runCount,
+                    );
+                  } else {
+                    writeSlots(silence, 0, inStart + offset, runCount);
+                  }
+                },
               );
+            }
+            if (from + count > inEnd) {
+              writeSlots(silence, 0, inEnd, from + count - inEnd);
             }
           };
 
