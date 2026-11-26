@@ -1,6 +1,7 @@
 import { Box, Stack } from '@mui/material';
 import { type api } from '@musetric/api';
-import { type FC, useRef } from 'react';
+import { type FC, useEffect, useRef } from 'react';
+import { engine } from '../../../engine/engine.js';
 import { SubtitleCurrentLineButton } from './SubtitleCurrentLineButton.js';
 import { SubtitleLoopHandles } from './SubtitleLoopHandles.js';
 import { SubtitleSegment } from './SubtitleSegment.js';
@@ -21,6 +22,17 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
     subtitleListRef,
   );
 
+  useEffect(
+    () =>
+      engine.store.subscribe(
+        (state) => state.frozen,
+        (frozen) => {
+          subtitleListRef.current?.toggleAttribute('data-held', frozen);
+        },
+      ),
+    [],
+  );
+
   return (
     <Box
       sx={{ position: 'relative', width: '100%', height: '100%', minHeight: 0 }}
@@ -37,6 +49,7 @@ export const SubtitleList: FC<SubtitleListProps> = (props) => {
           overflowX: 'hidden',
           overflowY: 'auto',
           scrollbarGutter: 'stable',
+          '&[data-held] *': { transition: 'none' },
         }}
       >
         <Box sx={{ height: 'calc(50% - 2em)', flexShrink: 0 }} />
