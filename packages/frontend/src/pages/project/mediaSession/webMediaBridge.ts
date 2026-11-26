@@ -54,6 +54,11 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
 
   return {
     update: (state) => {
+      session.playbackState = state.playing ? 'playing' : 'paused';
+      if (state.recording) {
+        silence.pause();
+        return;
+      }
       if (!silenceUrl) {
         start(state);
       }
@@ -62,8 +67,7 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
         silence.currentTime = position;
       }
       silence.playbackRate = state.speed;
-      session.playbackState = state.playing ? 'playing' : 'paused';
-      if (state.playing && !state.recording) {
+      if (state.playing) {
         silence.play().catch(noop);
       } else {
         silence.pause();
