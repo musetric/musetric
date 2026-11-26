@@ -107,6 +107,9 @@ export const createRecordingStream = (
         offset: message.offset,
         samples: message.samples,
       });
+      port.methods.returnChunk({
+        samples: new Float32Array(message.samples.buffer),
+      });
     },
   });
 

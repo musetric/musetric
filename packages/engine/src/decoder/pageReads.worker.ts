@@ -5,11 +5,22 @@ import {
   type PlayerPageKey,
   type PlayerRange,
   type PlayerStemLayout,
+  type PlayerTakes,
   type PlayerWindow,
+  stemTracks,
 } from '../player/protocol.cross.js';
 import { type SpectrogramLeadPage } from '../spectrogram/protocol.cross.js';
 import { type StemPageReaders } from './stemPageReaders.worker.js';
-import { type StemPageSamples } from './stemPages.cross.js';
+import { createTakeTracks, type TakeSource } from './takeTracks.worker.js';
+import {
+  abortReads,
+  byPlayDistance,
+  createTrackReads,
+  type FrameSpan,
+  pagesOf,
+  type TrackPage,
+  type TrackReads,
+} from './trackReads.worker.js';
 
 const behindSeconds = 4;
 const aheadSeconds = 8;
@@ -17,25 +28,6 @@ const keepSeconds = 4;
 const loopPinSeconds = 4;
 const crossfadeFrameCount = 1488;
 const readsPerStem = 2;
-
-type FrameSpan = {
-  from: number;
-  to: number;
-};
-
-const pagesOf = (layout: PlayerStemLayout, spans: FrameSpan[]): number[] => {
-  const found = new Set<number>();
-  for (const span of spans) {
-    const from = Math.max(0, span.from);
-    const to = Math.min(layout.frameCount, span.to);
-    for (let index = 0; index < layout.pageStarts.length; index += 1) {
-      if (layout.pageStarts[index] < to && pageEndFrame(layout, index) > from) {
-        found.add(index);
-      }
-    }
-  }
-  return [...found];
-};
 
 const spanPageCount = (layout: PlayerStemLayout, frameCount: number) => {
   let shortest = Infinity;
@@ -74,52 +66,21 @@ const aheadSpans = (
   ];
 };
 
-const playDistance = (
-  layout: PlayerStemLayout,
-  index: number,
-  window: PlayerWindow,
-): number => {
-  const { frameIndex, loop } = window;
-  const start = layout.pageStarts[index];
-  const end = pageEndFrame(layout, index);
-  const near = Math.max(0, start - frameIndex, frameIndex + 1 - end);
-  if (!loop || frameIndex >= loop.toFrame || end <= loop.fromFrame) {
-    return near;
-  }
-  return Math.min(
-    near,
-    loop.toFrame - frameIndex + Math.max(0, start - loop.fromFrame),
-  );
-};
-
-const byPlayDistance =
-  (layout: PlayerStemLayout, window: PlayerWindow) =>
-  (left: number, right: number) =>
-    playDistance(layout, left, window) - playDistance(layout, right, window) ||
-    left - right;
-
-type StemReads = {
-  layout: PlayerStemLayout;
-  mean: boolean;
-  wanted: number[];
-  resident: Set<number>;
-  reading: Map<number, AbortController>;
-  asked: Set<number>;
-  means: Map<number, Float32Array<ArrayBuffer>>;
-};
-
 export type PageReadsOptions = {
   readers: StemPageReaders;
   layouts: Record<StemType, PlayerStemLayout>;
+  takes: TakeSource[];
   sampleRate: number;
   putPage: (page: PlayerPage) => void;
   dropPages: (pages: PlayerPageKey[]) => void;
+  setTakes: (takes: PlayerTakes) => void;
   putLeadPage: (page: SpectrogramLeadPage) => void;
   failed: (error: unknown) => void;
 };
 
 export type PageReads = {
-  residentLimit: number;
+  takes: () => PlayerTakes;
+  setTakes: (sources: TakeSource[]) => void;
   requestWindow: (window: PlayerWindow) => void;
   requestTarget: (window: PlayerWindow) => void;
   requestLeadPages: (indices: number[]) => void;
@@ -129,45 +90,64 @@ export type PageReads = {
 
 export const createPageReads = (options: PageReadsOptions): PageReads => {
   const { readers, layouts, sampleRate } = options;
-  const stems: Record<StemType, StemReads> = {
-    lead: {
-      layout: layouts.lead,
-      mean: true,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
-    backing: {
-      layout: layouts.backing,
-      mean: false,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
-    instrumental: {
-      layout: layouts.instrumental,
-      mean: false,
-      wanted: [],
-      resident: new Set(),
-      reading: new Map(),
-      asked: new Set(),
-      means: new Map(),
-    },
-  };
+  const stems = stemTypes.map((stem) => ({
+    ...createTrackReads(
+      stemTracks[stem],
+      layouts[stem],
+      async (index, signal) =>
+        readers[stem].read(index, stem === 'lead', signal),
+    ),
+    setWanted: readers[stem].setWanted,
+  }));
+  const [lead] = stems;
+  const stemLimit = stemTypes.reduce(
+    (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
+    0,
+  );
+  const takes = createTakeTracks({
+    sources: options.takes,
+    sampleRate,
+    windowFrameCount:
+      (behindSeconds + 2 * aheadSeconds + 2 * keepSeconds + loopPinSeconds) *
+      sampleRate,
+  });
   let window: PlayerWindow = { frameIndex: 0 };
   let played = window;
 
-  const deliver = (stem: StemType, page: StemPageSamples) => {
-    const state = stems[stem];
+  const tracks = () => [...stems, ...takes.held()];
+
+  const takePlan = (): PlayerTakes => ({
+    takes: takes.layouts(),
+    residentPageLimit: stemLimit + takes.pageLimit(),
+  });
+
+  const relay = (dropped: TrackReads[]) => {
+    dropped.forEach(abortReads);
+    options.setTakes(takePlan());
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    reads.requestTarget(window);
+  };
+
+  const settle = () => {
+    const waiting = takes.waiting();
+    if (
+      waiting?.every(
+        (state) =>
+          state.failed ||
+          !state.wanted.some((index) => !state.resident.has(index)),
+      )
+    ) {
+      relay(takes.commit());
+    }
+  };
+
+  const deliver = (state: TrackReads, page: TrackPage) => {
     const { index } = page;
+    state.failed = false;
     if (state.wanted.includes(index) && !state.resident.has(index)) {
       state.resident.add(index);
       options.putPage({
-        stem,
+        track: state.track,
         index,
         frameCount: page.frameCount,
         channelCount: page.samples.length / page.frameCount,
@@ -188,12 +168,11 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
     }
   };
 
-  const pump = (stem: StemType) => {
-    const state = stems[stem];
+  const pump = (state: TrackReads) => {
     const missing = state.wanted.filter((index) => !state.resident.has(index));
     const queue = [
       ...missing,
-      ...[...state.asked].sort(byPlayDistance(state.layout, window)),
+      ...[...state.asked].sort(byPlayDistance(state, window)),
     ];
     for (const index of queue) {
       if (
@@ -204,31 +183,34 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       }
       const controller = new AbortController();
       state.reading.set(index, controller);
-      readers[stem]
-        .read(index, state.mean, controller.signal)
+      state
+        .read(index, controller.signal)
         .then((page) => {
           if (state.reading.get(index) !== controller) {
             return;
           }
           state.reading.delete(index);
-          deliver(stem, page);
-          pump(stem);
+          deliver(state, page);
+          pump(state);
+          settle();
         })
         .catch((error: unknown) => {
           if (state.reading.get(index) !== controller) {
             return;
           }
           state.reading.delete(index);
+          state.failed = true;
           options.failed(error);
+          settle();
         });
     }
   };
 
   const reads: PageReads = {
-    residentLimit: stemTypes.reduce(
-      (sum, stem) => sum + residentPageCount(layouts[stem], sampleRate),
-      0,
-    ),
+    takes: takePlan,
+    setTakes: (sources) => {
+      relay(takes.set(sources));
+    },
     requestWindow: (next) => {
       played = next;
       reads.requestTarget(next);
@@ -264,18 +246,17 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
         ),
       ];
       const dropped: PlayerPageKey[] = [];
-      for (const stem of stemTypes) {
-        const state = stems[stem];
-        const keep = new Set(pagesOf(state.layout, keepSpans));
+      for (const state of tracks()) {
+        const keep = new Set(pagesOf(state, keepSpans));
         for (const index of state.resident) {
           if (!keep.has(index)) {
             state.resident.delete(index);
             state.means.delete(index);
-            dropped.push({ stem, index });
+            dropped.push({ track: state.track, index });
           }
         }
-        state.wanted = pagesOf(state.layout, wantSpans).sort(
-          byPlayDistance(state.layout, next),
+        state.wanted = pagesOf(state, wantSpans).sort(
+          byPlayDistance(state, next),
         );
         for (const [index, controller] of state.reading) {
           if (!state.wanted.includes(index) && !state.asked.has(index)) {
@@ -283,19 +264,17 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
             state.reading.delete(index);
           }
         }
-        readers[stem].setWanted(
+        state.setWanted(
           state.wanted.filter((index) => !state.resident.has(index)),
         );
       }
       if (dropped.length > 0) {
         options.dropPages(dropped);
       }
-      for (const stem of stemTypes) {
-        pump(stem);
-      }
+      tracks().forEach(pump);
+      settle();
     },
     requestLeadPages: (indices) => {
-      const { lead } = stems;
       for (const index of indices) {
         const mean = lead.means.get(index);
         if (mean) {
@@ -309,21 +288,17 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
           lead.asked.add(index);
         }
       }
-      pump('lead');
+      pump(lead);
     },
     forgetPlayer: () => {
-      for (const stem of stemTypes) {
-        stems[stem].resident.clear();
-        stems[stem].means.clear();
+      takes.commit().forEach(abortReads);
+      for (const state of tracks()) {
+        state.resident.clear();
+        state.means.clear();
       }
     },
     close: () => {
-      for (const stem of stemTypes) {
-        for (const controller of stems[stem].reading.values()) {
-          controller.abort();
-        }
-        stems[stem].reading.clear();
-      }
+      tracks().forEach(abortReads);
     },
   };
   return reads;

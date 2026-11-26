@@ -39,13 +39,13 @@ mod tests {
         let frames = i64::try_from(FRAMES).expect("fits");
         for (index, channels) in stems.iter().enumerate() {
             mixer
-                .set_stem(index, frames, starts)
-                .expect("the stem should be set");
+                .set_track(index, frames, starts)
+                .expect("the track should be set");
             for page in (0..starts.len()).filter(|page| !skip.contains(page)) {
                 let from = usize::try_from(starts[page]).expect("fits");
                 let to = page_end(starts, page);
                 let shape = PageShape {
-                    stem: index,
+                    track: index,
                     index: page,
                     frames: to - from,
                     channels: channels.len(),
@@ -131,8 +131,8 @@ mod tests {
             let mut reserved = PageMixer::new(2, 3);
             for index in 0..stems.len() {
                 reserved
-                    .set_stem(index, frames, &STARTS)
-                    .expect("the stem should be set");
+                    .set_track(index, frames, &STARTS)
+                    .expect("the track should be set");
             }
             reserved.reserve_pages(reservation);
             load(&mut reserved, &stems, &STARTS, &[]);
