@@ -102,7 +102,10 @@ export const subscribeMediaSession = (
     }
     const { action, positionMs } = event.detail;
     if (action === 'play') {
-      if (canStartPlayback(engine.store.get())) {
+      if (
+        canStartPlayback(engine.store.get()) &&
+        engine.context.state === 'running'
+      ) {
         void engine.player.play();
       }
       return;
