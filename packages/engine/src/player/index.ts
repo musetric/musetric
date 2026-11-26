@@ -25,6 +25,8 @@ import {
 import { createStartPlayback } from './startPlayback.js';
 import { createEngineStubPlayback } from './stubPlayback.js';
 
+const heldRequestMs = 100;
+
 export type EnginePlayer = EnginePlayerLoop &
   EnginePlayerRange &
   EnginePlayerSettings & {
@@ -63,6 +65,7 @@ export const createEnginePlayer = (
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
+  let heldRequest: ReturnType<typeof setTimeout> | undefined = undefined;
   let armingStops = 0;
   let holds = 0;
   const session = createEngineSessionMachine(store);
@@ -174,8 +177,21 @@ export const createEnginePlayer = (
     getEnginePlayback: () => enginePlayback,
   });
 
+  const requestTarget = (frameIndex: number) => {
+    const { range, rangeRepeat } = store.get();
+    getDecoder().requestTarget({
+      frameIndex,
+      loop: rangeRepeat === 'cycle' ? range : undefined,
+    });
+  };
+
   const setFrozen = (frozen: boolean) => {
     if (!frozen && heldSeek !== undefined) {
+      if (heldRequest !== undefined) {
+        clearTimeout(heldRequest);
+        heldRequest = undefined;
+        requestTarget(heldSeek);
+      }
       enginePlayback.seek(heldSeek);
       heldSeek = undefined;
     }
@@ -196,7 +212,7 @@ export const createEnginePlayer = (
       }),
     stop,
     seek: (requestedFrameIndex, origin) => {
-      const { range, rangeRepeat } = store.get();
+      const { range } = store.get();
       const frameIndex = clampToRange(requestedFrameIndex, range);
       position.write(frameIndex);
       store.update((state) => {
@@ -206,14 +222,17 @@ export const createEnginePlayer = (
           origin,
         };
       });
-      getDecoder().requestTarget({
-        frameIndex,
-        loop: rangeRepeat === 'cycle' ? range : undefined,
-      });
+      clearTimeout(heldRequest);
+      heldRequest = undefined;
       if (store.get().frozen) {
         heldSeek = frameIndex;
+        heldRequest = setTimeout(() => {
+          heldRequest = undefined;
+          requestTarget(frameIndex);
+        }, heldRequestMs);
         return;
       }
+      requestTarget(frameIndex);
       enginePlayback.seek(frameIndex);
     },
     hold: () => {
