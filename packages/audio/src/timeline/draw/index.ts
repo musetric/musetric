@@ -1,3 +1,4 @@
+import { assertDefined } from '@musetric/utils';
 import { type TimelineConfig } from '../config.js';
 import { createCanvasCell, type TimelineCanvasState } from './canvas.js';
 import { getTimelineMarkers, getTimelineWindowStart } from './markers.js';
@@ -5,8 +6,7 @@ import { getTimelineMarkers, getTimelineWindowStart } from './markers.js';
 const labelOffset = 4;
 const maxLabelMetricsCacheSize = 4096;
 const settleMs = 100;
-
-export const timelineStripScreens = 3;
+const stripScreens = 3;
 
 const resizeCanvas = (
   canvas: HTMLCanvasElement,
@@ -48,14 +48,14 @@ export type TimelineDraw = {
 
 export const createTimelineDraw = (): TimelineDraw => {
   const canvasCell = createCanvasCell();
-  const stripCell = createCanvasCell();
   const labelMetricsCache = new Map<
     string,
     Pick<TextMetrics, 'actualBoundingBoxDescent' | 'width'>
   >();
   let settled: TimelinePainted | undefined = undefined;
   let strip: TimelinePainted | undefined = undefined;
-  let stripShown = false;
+  let stripCanvas: HTMLCanvasElement | undefined = undefined;
+  let moving = false;
   let settle: ReturnType<typeof setTimeout> | undefined = undefined;
 
   const getLabelMetrics = (
@@ -90,8 +90,9 @@ export const createTimelineDraw = (): TimelineDraw => {
     start: number,
     screens: number,
   ) => {
-    const { context } = (canvas === config.canvas ? canvasCell : stripCell).get(
-      canvas,
+    const context = assertDefined(
+      canvas.getContext('2d'),
+      'Context 2D not available on the timeline canvas',
     );
     const pixelRatio = window.devicePixelRatio;
     const { width, height } = canvasCell.get(config.canvas);
@@ -159,21 +160,38 @@ export const createTimelineDraw = (): TimelineDraw => {
     ].join('\n');
   };
 
-  const showStrip = (config: TimelineConfig, shown: boolean) => {
-    if (stripShown === shown) {
-      return;
-    }
-    stripShown = shown;
-    config.canvas.style.visibility = shown ? 'hidden' : '';
-    config.stripCanvas.style.visibility = shown ? 'visible' : 'hidden';
-  };
-
   const settleAt = (config: TimelineConfig) => {
-    const key = getKey(config);
     const start = getTimelineWindowStart(config);
     paint(config, config.canvas, start, 1);
-    settled = { key, start };
-    showStrip(config, false);
+    settled = { key: getKey(config), start };
+    moving = false;
+  };
+
+  const copyStrip = (
+    config: TimelineConfig,
+    from: HTMLCanvasElement,
+    offset: number,
+  ) => {
+    const { canvas } = config;
+    const context = assertDefined(
+      canvas.getContext('2d'),
+      'Context 2D not available on the timeline canvas',
+    );
+    const pixelRatio = window.devicePixelRatio;
+    resizeCanvas(canvas, canvasCell.get(canvas), pixelRatio, 1);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      from,
+      Math.round(offset * pixelRatio),
+      0,
+      canvas.width,
+      canvas.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
   };
 
   return {
@@ -186,22 +204,23 @@ export const createTimelineDraw = (): TimelineDraw => {
         settleAt(config);
         return;
       }
-      if (!stripShown && settled.start === start) {
+      if (!moving && settled.start === start) {
         return;
       }
       const { width } = canvasCell.get(config.canvas);
-      let shift =
+      stripCanvas ??= document.createElement('canvas');
+      let offset =
         strip?.key === key
-          ? ((strip.start - start) / config.visibleTime) * width
+          ? ((start - strip.start) / config.visibleTime) * width
           : Number.NaN;
-      if (!(shift <= 0 && shift >= -(timelineStripScreens - 1) * width)) {
+      if (!(offset >= 0 && offset <= (stripScreens - 1) * width)) {
         const middle = start - config.visibleTime;
-        paint(config, config.stripCanvas, middle, timelineStripScreens);
+        paint(config, stripCanvas, middle, stripScreens);
         strip = { key, start: middle };
-        shift = -width;
+        offset = width;
       }
-      config.stripCanvas.style.transform = `translateX(${alignPixel(shift, window.devicePixelRatio)}px)`;
-      showStrip(config, true);
+      copyStrip(config, stripCanvas, offset);
+      moving = true;
       settle = setTimeout(() => {
         settleAt(config);
       }, settleMs);
@@ -210,8 +229,8 @@ export const createTimelineDraw = (): TimelineDraw => {
       clearTimeout(settle);
       settled = undefined;
       strip = undefined;
+      stripCanvas = undefined;
       canvasCell.dispose();
-      stripCell.dispose();
       labelMetricsCache.clear();
     },
   };
