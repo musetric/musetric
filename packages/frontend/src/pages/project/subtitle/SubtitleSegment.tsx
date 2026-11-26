@@ -154,12 +154,26 @@ const useSubtitleSegmentStatus = (
 
     applyStatus();
 
+    let queued = false;
+    let disposed = false;
     const unsubscribeStatus = subtitleCursor.subscribeSegmentStatus(
       index,
-      applyStatus,
+      () => {
+        if (queued) {
+          return;
+        }
+        queued = true;
+        queueMicrotask(() => {
+          queued = false;
+          if (!disposed) {
+            applyStatus();
+          }
+        });
+      },
     );
 
     return () => {
+      disposed = true;
       unsubscribeStatus();
       if (unsubscribeColors) {
         stopColors();
