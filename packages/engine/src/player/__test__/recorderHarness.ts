@@ -4,8 +4,8 @@ import {
   type EngineMicrophone,
 } from '../../audioSession/engineAudioSession.js';
 import { createStore } from '../../common/store.js';
-import { type EngineDecoder } from '../../decoder/index.js';
 import { initialEngineState } from '../../ownState.js';
+import { type EngineProject } from '../../project/index.js';
 import { type EnginePlayback } from '../playback.js';
 import { createEnginePosition } from '../position.js';
 import { createEngineRecorder, type EngineRecorder } from '../recorder.js';
@@ -53,7 +53,7 @@ export const createRecorderHarness = (
   };
   const finished: number[] = [];
   let started = 0;
-  const decoder = fake<EngineDecoder>({
+  const project = fake<EngineProject>({
     startRecordingStream: () => {
       started += 1;
     },
@@ -78,7 +78,7 @@ export const createRecorderHarness = (
     position: createEnginePosition(),
     seeks: createEngineSeeks(),
     endTake: noop,
-    getDecoder: () => decoder,
+    getProject: () => project,
     getEnginePlayback: () => enginePlayback,
   });
   return { recorder, finished, started: () => started };

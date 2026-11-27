@@ -1,5 +1,5 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
-import { createRecordingStream } from '../../decoder/recordingStream.worker.js';
+import { createRecordingStream } from '../../project/recordingStream.worker.js';
 import { fadeFrameCount } from '../cutFade.worklet.js';
 import {
   type LiveTakeChunk,

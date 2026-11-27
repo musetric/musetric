@@ -10,7 +10,7 @@ import {
 } from '../audioSession/engineAudioSession.js';
 import { applyInputLatencyEstimate } from '../calibration/estimate.js';
 import { type Store } from '../common/store.js';
-import { type EngineDecoder } from '../decoder/index.js';
+import { type EngineProject } from '../project/index.js';
 import {
   type EngineState,
   getInputShareFrameCount,
@@ -41,8 +41,8 @@ type RecordingSession = Required<TakeRequest> & {
   initializePromise: Promise<void>;
   stopPromise?: Promise<void>;
   stopRequested: boolean;
-  decoderStreamStarted: boolean;
-  decoderStreamClosed: boolean;
+  projectStreamStarted: boolean;
+  projectStreamClosed: boolean;
   playerStreamStarted: boolean;
   microphone?: EngineMicrophone;
   disconnectPlayerInput?: () => void;
@@ -67,14 +67,14 @@ export type CreateEngineRecorderOptions = {
   position: EnginePosition;
   seeks: EngineSeeks;
   endTake: () => void;
-  getDecoder: () => EngineDecoder;
+  getProject: () => EngineProject;
   getEnginePlayback: () => EnginePlayback;
 };
 
 export const createEngineRecorder = (
   options: CreateEngineRecorderOptions,
 ): EngineRecorder => {
-  const { context, outputClock, audioSession, store, getDecoder } = options;
+  const { context, outputClock, audioSession, store, getProject } = options;
   const { getEnginePlayback, seeks } = options;
   let currentSession: RecordingSession | undefined = undefined;
 
@@ -86,8 +86,8 @@ export const createEngineRecorder = (
     }
     await settleLoopTry({
       store,
-      decoder: getDecoder(),
-      settled: session.decoderStreamStarted,
+      project: getProject(),
+      settled: session.projectStreamStarted,
       keep: session.passComplete,
       tempoRatio: session.tempoRatio,
     });
@@ -106,25 +106,25 @@ export const createEngineRecorder = (
     }
   };
 
-  const closeDecoderStream = async (session: RecordingSession) => {
-    if (!session.decoderStreamStarted) {
+  const closeProjectStream = async (session: RecordingSession) => {
+    if (!session.projectStreamStarted) {
       return;
     }
-    if (session.decoderStreamClosed) {
+    if (session.projectStreamClosed) {
       return;
     }
-    session.decoderStreamClosed = true;
+    session.projectStreamClosed = true;
     const sequence = session.playerStreamStarted
       ? ((await waitWithTimeout(
           getEnginePlayback().flushRecording(),
           recordingFlushTimeoutMs,
         )) ?? 0)
       : 0;
-    await getDecoder().finishRecordingStream(session.takeId, sequence);
+    await getProject().finishRecordingStream(session.takeId, sequence);
   };
 
   const failSession = (session: RecordingSession) => {
-    void closeDecoderStream(session).then(async () => settleTry(session));
+    void closeProjectStream(session).then(async () => settleTry(session));
     cleanupSession(session);
     if (currentSession === session) {
       currentSession = undefined;
@@ -137,26 +137,26 @@ export const createEngineRecorder = (
     keepPlaying: boolean,
   ) => {
     if (keepPlaying) {
-      await closeDecoderStream(session);
+      await closeProjectStream(session);
       return;
     }
 
     const frameIndex = await getEnginePlayback().stop();
     const { revision } = seeks.read();
 
-    if (!session.decoderStreamStarted) {
+    if (!session.projectStreamStarted) {
       return;
     }
 
     if (session.playerStreamStarted) {
-      await closeDecoderStream(session);
+      await closeProjectStream(session);
       if (seeks.read().revision === revision) {
         getEnginePlayback().seek(frameIndex);
       }
       return;
     }
 
-    await closeDecoderStream(session);
+    await closeProjectStream(session);
   };
 
   const stopSession = async (
@@ -254,7 +254,7 @@ export const createEngineRecorder = (
       const { tempoRatio, transposeSemitones, voiceOctave } = store.get();
       const latencyFrameCount = getRecordingLatencyFrameCount(store.get());
       const inputLatencyFrameCount = getInputShareFrameCount(store.get());
-      getDecoder().startRecordingStream({
+      getProject().startRecordingStream({
         takeId: session.takeId,
         projectId: session.projectId,
         sampleRate: context.sampleRate,
@@ -266,7 +266,7 @@ export const createEngineRecorder = (
         draft: session.pass,
         port: recordingStreamChannel.port1,
       });
-      session.decoderStreamStarted = true;
+      session.projectStreamStarted = true;
       getEnginePlayback().startRecording({
         frameIndex: startFrameIndex,
         revision: seeks.read().revision,
@@ -308,8 +308,8 @@ export const createEngineRecorder = (
     tempoRatio: store.get().tempoRatio,
     initializePromise: Promise.resolve(),
     stopRequested: false,
-    decoderStreamStarted: false,
-    decoderStreamClosed: false,
+    projectStreamStarted: false,
+    projectStreamClosed: false,
     playerStreamStarted: false,
   });
 

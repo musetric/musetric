@@ -27,7 +27,7 @@ export const RecordingHistoryButtons: FC = () => {
             aria-label={undoLabel}
             disabled={locked || !active?.canUndo}
             onClick={() => {
-              engine.decoder.sendRecordingUndo();
+              engine.project.sendRecordingUndo();
             }}
           >
             <UndoRoundedIcon />
@@ -40,7 +40,7 @@ export const RecordingHistoryButtons: FC = () => {
             aria-label={redoLabel}
             disabled={locked || !active?.canRedo}
             onClick={() => {
-              engine.decoder.sendRecordingRedo();
+              engine.project.sendRecordingRedo();
             }}
           >
             <RedoRoundedIcon />

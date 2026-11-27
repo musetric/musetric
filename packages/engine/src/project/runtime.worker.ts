@@ -2,44 +2,44 @@ import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { getRecordingList } from '../audioRequest/audioRequest.worker.js';
 import { playerDataChannel } from '../player/protocol.cross.js';
 import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
-import { createAudioDecode } from './audioDecode.worker.js';
+import { createProjectAudio } from './audio.worker.js';
 import { createLoopTries } from './loopTries.worker.js';
-import { type engineDecoderChannel } from './protocol.cross.js';
+import { type engineProjectChannel } from './protocol.cross.js';
 import { createProjectRealtime } from './realtime.worker.js';
-import {
-  createRecordingController,
-  type RecordingController,
-} from './recordingController.worker.js';
 import {
   createRecordingList,
   isRecordingListEvent,
 } from './recordingList.worker.js';
 import { type RecordingStream } from './recordingStream.worker.js';
+import {
+  createTakeDelivery,
+  type TakeDelivery,
+} from './takeDelivery.worker.js';
 
 const measure = import.meta.env.frontendMeasure === 'true';
 
-export type CreateDecoderWorkerRuntimeOptions = {
-  port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
+export type CreateProjectWorkerRuntimeOptions = {
+  port: ReturnType<typeof engineProjectChannel.inbound<MessagePortLike>>;
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
   >;
 };
 
-export const createDecoderWorkerRuntime = (
-  options: CreateDecoderWorkerRuntimeOptions,
+export const createProjectWorkerRuntime = (
+  options: CreateProjectWorkerRuntimeOptions,
 ): void => {
   const { port, spectrogramPort } = options;
 
-  const audioDecode = createAudioDecode({ spectrogramPort });
+  const audio = createProjectAudio({ spectrogramPort });
 
-  const recordingList = createRecordingList({ port, audioDecode });
+  const recordingList = createRecordingList({ port, audio });
 
-  const loopTries = createLoopTries({ audioDecode });
+  const loopTries = createLoopTries({ audio });
 
   let draft: RecordingStream | undefined = undefined;
   let finishedTakeId: string | undefined = undefined;
 
-  let takes: RecordingController | undefined = undefined;
+  let takes: TakeDelivery | undefined = undefined;
 
   let mountedProjectId: number | undefined = undefined;
 
@@ -70,7 +70,7 @@ export const createDecoderWorkerRuntime = (
       }
       if (event.type === 'recording.finished') {
         finishedTakeId = event.sessionId;
-        audioDecode.reloadRecording(event.sessionId).catch((error: unknown) => {
+        audio.reloadRecording(event.sessionId).catch((error: unknown) => {
           console.error('Failed to reload the recording', error);
         });
       }
@@ -83,7 +83,7 @@ export const createDecoderWorkerRuntime = (
     },
   });
 
-  takes = createRecordingController({ realtime, port });
+  takes = createTakeDelivery({ realtime, port });
 
   const closeDraft = () => {
     draft?.close();
@@ -100,7 +100,7 @@ export const createDecoderWorkerRuntime = (
   port.bindHandlers({
     connectPlayer: (message) => {
       port.methods.playerConnected({
-        mounted: audioDecode.connectPlayer(
+        mounted: audio.connectPlayer(
           playerDataChannel.outbound(message.playerPort),
         ),
       });
@@ -110,7 +110,7 @@ export const createDecoderWorkerRuntime = (
         mountedProjectId = message.projectId;
         realtime.open(message.projectId);
         await readRecordingList(message.projectId);
-        const mounted = await audioDecode.mount(message);
+        const mounted = await audio.mount(message);
         port.methods.mounted({ frameCount: mounted.frameCount });
       } catch (error) {
         console.error('Failed to load and decode project audio track', error);
@@ -124,14 +124,14 @@ export const createDecoderWorkerRuntime = (
       takes.clear();
       mountedProjectId = undefined;
       realtime.close();
-      audioDecode.unmount();
+      audio.unmount();
       port.methods.unmounted();
     },
     reconnectRealtime: () => {
       realtime.reconnect();
     },
     requestTarget: (message) => {
-      audioDecode.requestTarget(message);
+      audio.requestTarget(message);
     },
     startRecordingStream: (message) => {
       closeDraft();
@@ -158,7 +158,7 @@ export const createDecoderWorkerRuntime = (
           port: message.port,
         },
         (chunk, take) => {
-          audioDecode.patchLiveTake(chunk, take);
+          audio.patchLiveTake(chunk, take);
         },
       );
     },
@@ -167,7 +167,7 @@ export const createDecoderWorkerRuntime = (
       if (takes.holds(takeId)) {
         const held = await takes.finish(takeId, sequence);
         if (held) {
-          audioDecode.holdTake(held);
+          audio.holdTake(held);
         }
       } else {
         await draft?.waitForFlush(sequence);

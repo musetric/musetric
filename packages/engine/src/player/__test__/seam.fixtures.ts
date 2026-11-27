@@ -5,8 +5,8 @@ import { vi } from 'vitest';
 import { type EngineAudioOutput } from '../../audioOutput/index.js';
 import { type EngineOutputClock } from '../../audioOutput/outputClock.js';
 import { createStore, type Store } from '../../common/store.js';
-import { type EngineDecoder } from '../../decoder/index.js';
 import { type EngineStoreState, initialEngineState } from '../../ownState.js';
+import { type EngineProject } from '../../project/index.js';
 import {
   createGuardedPlayer,
   type GuardedPlayer,
@@ -187,7 +187,7 @@ export const createSeam = async (
     setActive: noop,
     attach: noop,
   };
-  const startRecordingStream: EngineDecoder['startRecordingStream'] = (
+  const startRecordingStream: EngineProject['startRecordingStream'] = (
     recording,
   ) => {
     host.push('recording.start');
@@ -198,7 +198,7 @@ export const createSeam = async (
       flush: noop,
     });
   };
-  const decoder = fake<EngineDecoder>({
+  const project = fake<EngineProject>({
     requestTarget: noop,
     startRecordingStream,
     finishRecordingStream: async () => {
@@ -207,7 +207,7 @@ export const createSeam = async (
     },
   });
   const microphone = createMicrophone();
-  const decoderPorts: MessagePort[] = [];
+  const projectPorts: MessagePort[] = [];
   const silence = new Float32Array(frameCount);
   let rebuilds = 0;
   const position = createEnginePosition();
@@ -218,13 +218,13 @@ export const createSeam = async (
     outputClock,
     audioSession: microphone.session,
     store,
-    getDecoder: () => decoder,
+    getProject: () => project,
     position,
     seeks,
     connect: async () => {
       const data = new MessageChannel();
       const playhead = new MessageChannel();
-      decoderPorts.push(data.port2, playhead.port2);
+      projectPorts.push(data.port2, playhead.port2);
       mountTracks(
         playerDataChannel.outbound(data.port2),
         frameCount,
@@ -342,7 +342,7 @@ export const createSeam = async (
       await flush();
     },
     close: () => {
-      for (const port of decoderPorts) {
+      for (const port of projectPorts) {
         port.close();
       }
       vi.unstubAllGlobals();

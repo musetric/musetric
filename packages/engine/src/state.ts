@@ -6,7 +6,7 @@ import {
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
 import { type EngineTransport } from '@musetric/transport';
-import { type TakeRefusal } from './decoder/protocol.cross.js';
+import { type TakeRefusal } from './project/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -34,7 +34,7 @@ export type WaveformStatuses = Record<StemType, PortStatus> & {
 };
 
 export type EngineStatuses = {
-  decoder: PortStatus;
+  project: PortStatus;
   realtime: PortStatus;
   player: PortStatus;
   spectrogram: PortStatus;
