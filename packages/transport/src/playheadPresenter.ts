@@ -1,4 +1,4 @@
-import { type PlayheadLoop, type PlayheadValue } from '@musetric/transport';
+import { type PlayheadLoop, type PlayheadValue } from './playhead.js';
 
 const maxExtrapolationSeconds = 0.25;
 

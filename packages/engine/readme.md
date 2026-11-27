@@ -48,7 +48,7 @@ the engine runs it on its threads.
   the only writer of the position. It publishes the playhead on every change of its
   line and in a pulse of 15 Hz to the main thread and the spectrogram worker
   (`player/playhead.worklet.ts`), and each of them shows it through one
-  presenter (`player/playheadPresenter.cross.ts`)
+  presenter (`playheadPresenter.ts`)
   ([#1369](https://github.com/musetric/musetric/issues/1369)).
 - The transport has one writer on each thread: the session machine
   (`session.ts` of `@musetric/transport`) holds what the user asked for, and
