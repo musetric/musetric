@@ -100,6 +100,7 @@ export const recordSoundTake = async (
     tempo: 1,
     songVolume: options.songVolume,
     metronome: false,
+    output: 'aloud',
   });
   return {
     sampleRate,

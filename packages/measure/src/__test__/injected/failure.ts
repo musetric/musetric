@@ -1,5 +1,6 @@
 import { type Engine, isPlaying, isRecording } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
+import { setOutput } from './output.js';
 import { epochNow, wait } from './samples.js';
 import { recordTemporaryTake } from './temporaryTake.js';
 
@@ -182,6 +183,7 @@ export const measureFailure = async (
       tempo: 1,
       songVolume,
       metronome: false,
+      output: 'silent',
     },
     () => {
       const timer = setTimeout(() => {
@@ -236,6 +238,7 @@ export const measureRecovery = async (
   const { engine } = hooks;
   await waitForPlayer(engine);
   const from = engine.position.read();
+  setOutput(engine, 'silent');
   await engine.player.play();
   await wait(playSeconds * 1000);
   const playedFrames = engine.position.read() - from;
