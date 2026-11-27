@@ -1,4 +1,5 @@
 import { type StemType } from '@musetric/audio/es';
+import { type PlayerMotion, type PlayerRangeRepeat } from '@musetric/transport';
 import { createSyncMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export const playerProcessorName = 'player-processor';
@@ -7,8 +8,6 @@ export type PlayerRange = {
   fromFrame: number;
   toFrame: number;
 };
-
-export type PlayerRangeRepeat = 'cycle' | 'once';
 
 export type PlayerOutboundMethods = {
   boot: (message: {
@@ -65,8 +64,6 @@ export type PlayerOutboundMethods = {
   }) => void;
   flushRecording: () => void;
 };
-
-export type PlayerMotion = 'stopped' | 'rolling' | 'held' | 'buffering';
 
 export type PlayerInboundMethods = {
   booted: () => void;
