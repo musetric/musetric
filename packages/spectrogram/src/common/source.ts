@@ -223,8 +223,8 @@ export const createMappedSource = (
           piece.forEachRun(
             region.rawStart + start - region.sourceStart,
             stop - start,
-            (samples, samplesStart, offset, count) => {
-              run(samples, samplesStart, start - from + offset, count);
+            (samples, samplesStart, offset, runCount) => {
+              run(samples, samplesStart, start - from + offset, runCount);
             },
           );
           cursor = stop;
