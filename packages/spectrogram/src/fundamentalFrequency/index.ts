@@ -18,7 +18,7 @@ import {
   createPitchBuffersCell,
   createPitchLineCell,
 } from './state.js';
-import { uploadSlots, uploadSpans } from './upload.js';
+import { createSpanUploader, uploadSlots } from './upload.js';
 
 const workgroupSize = 64;
 
@@ -121,6 +121,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
         },
       });
       const inverse = inverseCell.get(buffers, settings);
+      const uploadSpans = createSpanUploader(device, buffers.span);
 
       const dispatchValues = (
         state: Pending,
@@ -312,7 +313,7 @@ export const createSpectrogramFundamentalFrequencyCell = (
             reset,
             position: source.position,
           });
-          uploadSpans(device, buffers.span, {
+          uploadSpans({
             plan,
             source,
             availableSamples: Math.round(source.position(availableSamples)),
