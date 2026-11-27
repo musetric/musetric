@@ -13,7 +13,7 @@
 - `packages/frontend`: the main React application.
 - `packages/app`: the Tauri shell for desktop, Android and iOS; it links the Rust host and runs the frontend in a WebView. [Its commands](packages/app/readme.md#commands) build and start it on each platform.
 - `packages/engine`: the audio engine the frontend drives: decoding, playback, recording sessions, calibration and the spectrogram, orchestrated in one state.
-- `packages/transport`: the pure core of the engine's position and transport, the timeline map and the session and motion machines, with no DOM and no AudioWorklet in its TypeScript `lib`.
+- `packages/transport`: the pure core of the engine's position and transport, the timeline map, the presenter and the session and motion machines, with no DOM and no AudioWorklet in its TypeScript `lib`.
 - `packages/audio`: browser-side audio: decoding, recording, calibration, timeline and waveform, with workers and worklets.
 - `packages/ai`: AI/WebGPU runtime code for source-separation and model-backed audio processing.
 - `packages/dsp`: audio decoding, resampling, encoding, loudness, peaks, stretch and the renderer that plays and exports a song in Rust: a member of the host's Cargo workspace that the host links natively, built to WebAssembly as the npm package `@musetric/dsp`.

@@ -36,6 +36,7 @@ export const createHeardPosition = (
   let nextContextFrame = 0;
   const heard = { contextFrame: 0, rate: 1 };
   let outputLatencyFrameCount = 0;
+  let holding = false;
 
   const refresh = () => {
     heard.contextFrame = nextContextFrame - outputLatencyFrameCount;
@@ -83,14 +84,17 @@ export const createHeardPosition = (
       renderFrameIndex = nextFrameIndex;
       runStartFrameIndex = nextFrameIndex;
       runStartContextFrame = undefined;
+      holding = false;
       history.clear();
     },
     hold: (contextFrame, outputFrameCount) => {
+      holding = true;
       startQuantum(contextFrame, outputFrameCount);
       history.push(contextFrame, renderFrameIndex, 0);
       refresh();
     },
     advance: (contextFrame, outputFrameCount, processedFrameCount) => {
+      holding = false;
       startQuantum(contextFrame, outputFrameCount);
       history.push(
         contextFrame,
@@ -114,7 +118,11 @@ export const createHeardPosition = (
       value.startContextFrame = runStartContextFrame ?? heard.contextFrame;
       value.rate = heard.rate;
       value.clockOffset = clockOffset;
-      value.endFrame = range?.repeat === 'once' ? range.endFrame : frameCount;
+      const endFrame = range?.repeat === 'once' ? range.endFrame : frameCount;
+      value.endFrame =
+        holding && renderFrameIndex >= frameIndex
+          ? Math.min(endFrame, renderFrameIndex)
+          : endFrame;
       value.loop = range?.repeat === 'cycle' ? range.range : undefined;
     },
   };

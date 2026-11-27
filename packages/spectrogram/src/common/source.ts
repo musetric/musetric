@@ -81,7 +81,7 @@ export type SpectrogramSourcePiece = {
   rawStartFrame: number;
   tempo: number;
   transpose: number;
-  getSamples: () => Float32Array;
+  forEachRun: SpectrogramSource['forEachRun'];
 };
 
 type Region = {
@@ -220,14 +220,12 @@ export const createMappedSource = (
           if (start > cursor) {
             run(undefined, 0, cursor - from, start - cursor);
           }
-          visitSamples(
-            {
-              samples: piece.getSamples(),
-              samplesStart: region.rawStart + start - region.sourceStart,
-              offset: start - from,
-              count: stop - start,
+          piece.forEachRun(
+            region.rawStart + start - region.sourceStart,
+            stop - start,
+            (samples, samplesStart, offset, runCount) => {
+              run(samples, samplesStart, start - from + offset, runCount);
             },
-            run,
           );
           cursor = stop;
         }

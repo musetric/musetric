@@ -1,6 +1,5 @@
-import { type PlayheadValue } from '@musetric/transport';
+import { type PlayheadValue, sameLoop, wrapLoop } from '@musetric/transport';
 import { playheadChannel } from './playhead.cross.js';
-import { sameLoop, wrapLoop } from './playheadPresenter.cross.js';
 
 const pulseSeconds = 1 / 15;
 const lineToleranceFrames = 128;
