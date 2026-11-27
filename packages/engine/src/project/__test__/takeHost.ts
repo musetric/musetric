@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
 import { recordingStreamChannel } from '../../player/recordingStream.cross.js';
 import { spectrogramDataChannel } from '../../spectrogram/protocol.cross.js';
-import { engineDecoderChannel } from '../protocol.cross.js';
-import { createDecoderWorkerRuntime } from '../runtime.worker.js';
+import { engineProjectChannel } from '../protocol.cross.js';
+import { createProjectWorkerRuntime } from '../runtime.worker.js';
 import { stubSockets } from './fakeSocket.js';
 import {
   createScriptedHost,
@@ -107,15 +107,15 @@ export const createTakeHost = async (): Promise<TakeHost> => {
   const control = new MessageChannel();
   const player = new MessageChannel();
   const spectrogram = new MessageChannel();
-  createDecoderWorkerRuntime({
-    port: engineDecoderChannel.inbound(control.port1),
+  createProjectWorkerRuntime({
+    port: engineProjectChannel.inbound(control.port1),
     spectrogramPort: spectrogramDataChannel.outbound(spectrogram.port1),
   });
   const received: EngineMessage[] = [];
   control.port2.onmessage = (event: MessageEvent<EngineMessage>) => {
     received.push(event.data);
   };
-  const engine = engineDecoderChannel.outbound(control.port2);
+  const engine = engineProjectChannel.outbound(control.port2);
   engine.methods.connectPlayer({ playerPort: player.port1 });
   engine.methods.mount({ projectId: 1, sampleRate: takeRate });
   await flushPorts();

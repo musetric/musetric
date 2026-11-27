@@ -40,7 +40,7 @@ export type EngineSpectrogram = {
 export type CreateEngineSpectrogramOptions = {
   store: Store<EngineStoreState>;
   sampleRate: number;
-  decoderPort: MessagePort;
+  projectPort: MessagePort;
   position: EnginePosition;
   seeks: EngineSeeks;
 };
@@ -48,7 +48,7 @@ export type CreateEngineSpectrogramOptions = {
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, position, seeks } = options;
+  const { store, sampleRate, projectPort, position, seeks } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -117,7 +117,7 @@ export const createEngineSpectrogram = (
     port,
     boot: async () => {
       port.methods.boot({
-        dataPort: decoderPort,
+        dataPort: projectPort,
         sampleRate,
         captureModule: await compileCapture(),
       });

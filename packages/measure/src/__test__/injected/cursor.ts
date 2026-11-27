@@ -1,6 +1,7 @@
 import { isBuffering, isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
 import { type InputBridge } from './input.js';
+import { setOutput } from './output.js';
 import { epochNow, wait } from './samples.js';
 
 const playSeconds = 2.5;
@@ -138,11 +139,13 @@ export const measureCursor = async (
   };
 
   const play = async () => {
+    setOutput(engine, 'silent');
     mark('play', readPosition());
     await player.play();
   };
 
   const tapPlay = async () => {
+    setOutput(engine, 'silent');
     const button = findPlayButton();
     mark('play', readPosition());
     await input({
@@ -214,6 +217,7 @@ export const measureCursor = async (
         seek(startFrame);
         await wait(400);
         const target = startFrame + seconds(playSeekSeconds);
+        setOutput(engine, 'silent');
         const starting = player.play();
         await wait(delayMs);
         mark('playSeek', target);
@@ -232,6 +236,7 @@ export const measureCursor = async (
       await stop();
 
       player.setRange(loop);
+      setOutput(engine, 'silent');
       mark('loopStart', loop.fromFrame);
       await player.playRange('cycle');
       await wait(loopTurns * loopSeconds * 1000);

@@ -1,7 +1,7 @@
 import { type api } from '@musetric/api';
 import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
-import { type AudioDecode } from './audioDecode.worker.js';
-import { type engineDecoderChannel } from './protocol.cross.js';
+import { type ProjectAudio } from './audio.worker.js';
+import { type engineProjectChannel } from './protocol.cross.js';
 
 export type RecordingListEvent = Extract<
   api.project.realtime.Event,
@@ -26,20 +26,20 @@ export type RecordingList = {
 };
 
 export type CreateRecordingListOptions = {
-  port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
-  audioDecode: AudioDecode;
+  port: ReturnType<typeof engineProjectChannel.inbound<MessagePortLike>>;
+  audio: ProjectAudio;
 };
 
 export const createRecordingList = (
   options: CreateRecordingListOptions,
 ): RecordingList => {
-  const { port, audioDecode } = options;
+  const { port, audio } = options;
   let activeId: number | undefined = undefined;
 
   const apply = (recordings: api.recording.Item[]) => {
     port.methods.recordingsChanged({ recordings });
     activeId = recordings.find((recording) => recording.active)?.id;
-    audioDecode.setActiveRecording(activeId);
+    audio.setActiveRecording(activeId);
   };
 
   return {
@@ -62,7 +62,7 @@ export const createRecordingList = (
         return;
       }
       port.methods.recordingContentChanged({ recordingId: event.recordingId });
-      audioDecode.reloadRecording(finishedTakeId).catch((error: unknown) => {
+      audio.reloadRecording(finishedTakeId).catch((error: unknown) => {
         console.error('Failed to reload the recording', error);
       });
     },

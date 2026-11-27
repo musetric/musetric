@@ -1,7 +1,7 @@
 import { type EngineSessionMachine } from '@musetric/transport';
 import { type Store } from '../common/store.js';
-import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineStoreState } from '../ownState.js';
+import { type EngineProject } from '../project/index.js';
 import { type EngineRange, isPlaying, isRecording } from '../state.js';
 import { type EngineCommandQueue } from './commandQueue.js';
 import { type EngineRecorder } from './recorder.js';
@@ -22,7 +22,7 @@ export type CreateEnginePlayerLoopOptions = {
   store: Store<EngineStoreState>;
   session: EngineSessionMachine;
   queue: EngineCommandQueue;
-  getDecoder: () => EngineDecoder;
+  getProject: () => EngineProject;
   getEngineRecorder: () => EngineRecorder;
   recordTake: (
     projectId: number,
@@ -37,7 +37,7 @@ export type CreateEnginePlayerLoopOptions = {
 export const createEnginePlayerLoop = (
   options: CreateEnginePlayerLoopOptions,
 ): EnginePlayerLoop => {
-  const { store, session, queue, getDecoder, getEngineRecorder } = options;
+  const { store, session, queue, getProject, getEngineRecorder } = options;
   const { recordTake } = options;
   const { seek, setRange } = options;
 
@@ -46,7 +46,7 @@ export const createEnginePlayerLoop = (
       draft.loopTries = [];
       draft.loopSelectedTryId = undefined;
     });
-    getDecoder().discardLoopTries();
+    getProject().discardLoopTries();
   };
 
   const cancelTry = async () => {
@@ -127,7 +127,7 @@ export const createEnginePlayerLoop = (
       store.update((draft) => {
         draft.loopSelectedTryId = tryId;
       });
-      getDecoder().selectLoopTry(tryId);
+      getProject().selectLoopTry(tryId);
     },
     deleteTry: (tryId) => {
       store.update((draft) => {
@@ -136,10 +136,10 @@ export const createEnginePlayerLoop = (
           draft.loopSelectedTryId = undefined;
         }
       });
-      getDecoder().deleteLoopTry(tryId);
+      getProject().deleteLoopTry(tryId);
     },
     insertTry: async (projectId, tryId) => {
-      const inserted = await getDecoder().insertLoopTry(projectId, tryId);
+      const inserted = await getProject().insertLoopTry(projectId, tryId);
       if (inserted) {
         store.update((draft) => {
           draft.loopTries = draft.loopTries.filter((item) => item.id !== tryId);

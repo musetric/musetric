@@ -11,7 +11,7 @@ import { useSettingsStore } from '../settings/store.js';
 export const SpectrogramCanvas: FC = () => {
   const { t } = useTranslation();
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>();
-  const decoderStatus = useEngineStore((state) => state.statuses.decoder);
+  const projectStatus = useEngineStore((state) => state.statuses.project);
   const spectrogramStatus = useEngineStore(
     (state) => state.statuses.spectrogram,
   );
@@ -24,7 +24,7 @@ export const SpectrogramCanvas: FC = () => {
     );
   }, [canvas]);
 
-  if (decoderStatus === 'error' || spectrogramStatus === 'error') {
+  if (projectStatus === 'error' || spectrogramStatus === 'error') {
     return <ViewError message={t('pages.project.progress.error.audioTrack')} />;
   }
 
@@ -35,7 +35,7 @@ export const SpectrogramCanvas: FC = () => {
         ref={setCanvas}
         sx={{ width: '100%', height: '100%', display: 'block' }}
       />
-      {decoderStatus === 'pending' && (
+      {projectStatus === 'pending' && (
         <Box
           sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
         >

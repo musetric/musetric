@@ -12,7 +12,7 @@ from the frontend. What the player must do for the user is in headquarters'
 | Folder         | What it holds                                                                                                                                                                    |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `player`       | Play, Stop, seeks, holds, the range, the loop and its tries, takes, tempo, key and volumes: the commands on the main thread, and the worklet that renders and plays the song     |
-| `decoder`      | The worker of the open project: the pages of the stems and takes it reads from the host, the stream of a take to the host, the host's realtime socket, the recordings, the tries |
+| `project`      | The worker of the open project: the pages of the stems and takes it reads from the host, the stream of a take to the host, the host's realtime socket, the recordings, the tries |
 | `audioSession` | The microphone of each platform: `getUserMedia` in the browser, the native capture of the apps                                                                                   |
 | `audioOutput`  | The output device, and the output clock that reads how far the sound sent runs ahead of the sound heard                                                                          |
 | `calibration`  | The latency calibration by clicks, and the latency kept for each pair of devices                                                                                                 |
@@ -31,7 +31,7 @@ main thread and its worker or worklet.
 ## What the frontend uses
 
 - **Commands** are methods of `engine.player`, `engine.view`,
-  `engine.calibration`, `engine.microphoneAccess` and `engine.decoder`, which
+  `engine.calibration`, `engine.microphoneAccess` and `engine.project`, which
   mounts a project and undoes and redoes its recording; `engine.spectrogram`
   and `engine.waveform` mount their canvases.
 - **Readings**: the position from `engine.position`, a seek from
@@ -59,8 +59,8 @@ the engine runs it on its threads.
 
 ## Tests
 
-The tests run the worklet's runtime, the decoder and the capture in Node on
+The tests run the worklet's runtime, the project worker and the capture in Node on
 the WebAssembly of `@musetric/dsp`, which `pnpm --filter @musetric/dsp
 build:project` builds first. `player/__test__/seam.test.ts` is the oracle of
-the seam between the main thread, the decoder and the worklet
+the seam between the main thread, the project worker and the worklet
 ([#1368](https://github.com/musetric/musetric/issues/1368)).

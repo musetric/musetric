@@ -46,13 +46,15 @@ const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|soun
   measure:seek     seeks to far frames while playing: the time to the first sound and the range requests of the stems
   measure:frame    the spectrogram's frames while playing and during a swipe of the progress bar, and the swipe's screens against the ruler
 
+  timing, delay and sound play aloud; the others mute the page before every Play and take, and stop if it is not silent
+
 options
   --device <android|chrome|desktop>  the page to drive (default: android)
   --serial <serial>                  the phone, when adb sees several
   --port <n>                         the debugging port (default: 9333, 9334, 9335 by device)
   --out <dir>                        where runs and report.md go (default: tmp/measure/<command>)
   --reanalyze                        analyze the runs already in --out, without a device
-  --keep-calibration                 measure with the stored calibration instead of calibrating first
+  --calibrate                        timing, delay and sound: calibrate first, which plays aloud, instead of using the stored calibration
   --seconds <n>                      take length for timing and delay, the time to the fault for failure (default: 20)
   --tempos <a,b>                     timing tempos (default: 1)
   --start <seconds>                  where delay, sound and failure takes, the cursor events, the seeks and the frames start in the song (default: 30)
@@ -74,6 +76,7 @@ const commands: readonly MeasureCommand[] = [
   'seek',
   'frame',
 ];
+const aloud: readonly MeasureCommand[] = ['timing', 'delay', 'sound'];
 const devices: readonly DeviceKind[] = ['android', 'chrome', 'desktop'];
 const defaultPorts: Record<DeviceKind, number> = {
   android: 9333,
@@ -94,7 +97,7 @@ const parseOptions = (argv: string[]) => {
         port: { type: 'string' },
         out: { type: 'string' },
         reanalyze: { type: 'boolean', default: false },
-        'keep-calibration': { type: 'boolean', default: false },
+        calibrate: { type: 'boolean', default: false },
         'take-only': { type: 'boolean', default: false },
         seconds: { type: 'string', default: '20' },
         cycles: { type: 'string', default: '3' },
@@ -121,6 +124,11 @@ const readRequest = (argv: string[]): MeasureRequest => {
   if (!command || !kind) {
     throw new Error(usage);
   }
+  if (values.calibrate && !aloud.includes(command)) {
+    throw new Error(
+      `measure:${command} plays nothing aloud and uses no calibration: --calibrate is for timing, delay and sound`,
+    );
+  }
   return {
     command,
     device: {
@@ -130,7 +138,7 @@ const readRequest = (argv: string[]): MeasureRequest => {
     },
     outDir: resolve(values.out ?? resolve(packageRoot, 'tmp/measure', command)),
     reanalyze: values.reanalyze,
-    calibrate: !values['keep-calibration'],
+    calibrate: values.calibrate,
     takeOnly: values['take-only'],
     seconds: Number(values.seconds),
     cycles: Number(values.cycles),

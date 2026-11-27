@@ -3,7 +3,7 @@ import { type MessagePortLike } from '@musetric/utils/cross/messagePort';
 import { type LiveTakeChunk } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
 import {
-  type engineDecoderChannel,
+  type engineProjectChannel,
   type TakeRefusal,
 } from './protocol.cross.js';
 import { type ProjectRealtime } from './realtime.worker.js';
@@ -62,7 +62,7 @@ export type TakeEvent = Extract<
   }
 >;
 
-export type RecordingController = {
+export type TakeDelivery = {
   begin: (
     start: TakeStart,
     onChunk: (chunk: LiveTakeChunk, take: HeldTake) => void,
@@ -75,14 +75,14 @@ export type RecordingController = {
   clear: () => void;
 };
 
-export type RecordingControllerOptions = {
+export type TakeDeliveryOptions = {
   realtime: Pick<ProjectRealtime, 'isOpen' | 'sendJson' | 'sendBinary'>;
-  port: ReturnType<typeof engineDecoderChannel.inbound<MessagePortLike>>;
+  port: ReturnType<typeof engineProjectChannel.inbound<MessagePortLike>>;
 };
 
-export const createRecordingController = (
-  options: RecordingControllerOptions,
-): RecordingController => {
+export const createTakeDelivery = (
+  options: TakeDeliveryOptions,
+): TakeDelivery => {
   const { realtime, port } = options;
   let takes: Take[] = [];
 

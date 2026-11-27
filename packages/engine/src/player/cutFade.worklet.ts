@@ -1,4 +1,4 @@
-import { fadeFrameCount } from './playerRange.worklet.js';
+export const fadeFrameCount = 256;
 
 const createCutFade = () => {
   let level = 0;

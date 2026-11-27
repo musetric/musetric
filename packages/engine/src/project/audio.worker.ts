@@ -27,13 +27,13 @@ import { type TakeSource } from './takeTracks.worker.js';
 
 type PlayerPort = ReturnType<typeof playerDataChannel.outbound<MessagePort>>;
 
-export type CreateAudioDecodeOptions = {
+export type CreateProjectAudioOptions = {
   spectrogramPort: ReturnType<
     typeof spectrogramDataChannel.outbound<MessagePort>
   >;
 };
 
-export type AudioDecode = {
+export type ProjectAudio = {
   connectPlayer: (port: PlayerPort) => boolean;
   mount: (message: RecordingPlace) => Promise<{
     frameCount: number;
@@ -58,9 +58,9 @@ type Reload = {
   switched?: boolean;
 };
 
-export const createAudioDecode = (
-  options: CreateAudioDecodeOptions,
-): AudioDecode => {
+export const createProjectAudio = (
+  options: CreateProjectAudioOptions,
+): ProjectAudio => {
   const { spectrogramPort } = options;
   let playerPort: PlayerPort | undefined = undefined;
   let readers: StemPageReaders | undefined = undefined;

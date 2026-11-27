@@ -1,8 +1,8 @@
 import { spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
-import { engineDecoderChannel } from './protocol.cross.js';
-import { createDecoderWorkerRuntime } from './runtime.worker.js';
+import { engineProjectChannel } from './protocol.cross.js';
+import { createProjectWorkerRuntime } from './runtime.worker.js';
 
-const port = engineDecoderChannel.inbound(self);
+const port = engineProjectChannel.inbound(self);
 
 const reportError = () => {
   port.methods.setState({ status: 'error' });
@@ -12,7 +12,7 @@ self.addEventListener('unhandledrejection', reportError);
 self.addEventListener('messageerror', reportError);
 
 port.bindBoot((message) => {
-  createDecoderWorkerRuntime({
+  createProjectWorkerRuntime({
     port,
     spectrogramPort: spectrogramDataChannel.outbound(message.spectrogramPort),
   });
