@@ -4,6 +4,7 @@ import {
   defaultBenchStatsConfig,
   selectBenchRunsPerSample,
 } from '@musetric/utils';
+import { flushDynamicParams } from '../common/dynamicUniform.js';
 import { toSpectrogramSource } from '../common/source.js';
 import { createGpuTimer } from '../common/timer/gpu.js';
 import { defaultSpectrogramConfig } from '../defaultConfig.cross.js';
@@ -46,6 +47,7 @@ const runBatch = async (
     pass.end();
   }
   timer.resolve(encoder);
+  flushDynamicParams(device);
   device.queue.submit([encoder.finish()]);
   await device.queue.onSubmittedWorkDone();
   const durations = await timer.read();

@@ -1,5 +1,6 @@
 import { createCallLatest } from '@musetric/utils';
 import { createGpuBufferReader } from '@musetric/utils/gpu';
+import { flushDynamicParams } from './common/dynamicUniform.js';
 import {
   createSpectrogramProcessorTimer,
   type SpectrogramMarkers,
@@ -174,6 +175,7 @@ export const createSpectrogramProcessor = (
   const submittedWork: Promise<undefined>[] = [];
   const submitCommand = timer.markers.submitCommand(
     async (command: GPUCommandBuffer) => {
+      flushDynamicParams(device);
       device.queue.submit([command]);
       submittedWork.push(device.queue.onSubmittedWorkDone());
       while (submittedWork.length > framesInFlight) {
