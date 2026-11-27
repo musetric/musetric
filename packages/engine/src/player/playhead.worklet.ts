@@ -1,4 +1,9 @@
-import { type PlayheadValue, sameLoop, wrapLoop } from '@musetric/transport';
+import {
+  isStartHeard,
+  type PlayheadValue,
+  sameLoop,
+  wrapLoop,
+} from '@musetric/transport';
 import { playheadChannel } from './playhead.cross.js';
 
 const pulseSeconds = 1 / 15;
@@ -13,6 +18,7 @@ const onLine = (published: PlayheadValue, value: PlayheadValue) => {
     value.clockOffset !== published.clockOffset ||
     value.endFrame !== published.endFrame ||
     value.startContextFrame !== published.startContextFrame ||
+    isStartHeard(value) !== isStartHeard(published) ||
     !sameLoop(value.loop, published.loop)
   ) {
     return false;

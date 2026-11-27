@@ -14,6 +14,9 @@ export type PlayheadValue = {
   loop?: PlayheadLoop;
 };
 
+export const isStartHeard = (value: PlayheadValue) =>
+  value.contextFrame > value.startContextFrame;
+
 export const createHeldPlayheadValue = (
   frameIndex: number,
   revision: number,
