@@ -1,13 +1,11 @@
 import {
   createHeldPlayheadValue,
+  createPlayheadPresenter,
+  extrapolatePlayhead,
   type PlayheadValue,
 } from '@musetric/transport';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
-import {
-  createPlayheadPresenter,
-  extrapolatePlayhead,
-} from './playheadPresenter.cross.js';
 
 export type PlayheadMethods = {
   publish: (message: PlayheadValue) => void;
