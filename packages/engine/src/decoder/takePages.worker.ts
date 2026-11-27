@@ -134,6 +134,11 @@ export const createTakePages = (sampleRate: number): TakePages => {
         startFrame: run.startFrame,
         frameCount: run.frameCount,
       })),
-    read: (run, from, to) => copy(runs[run], from, to - from),
+    read: (run, from, to) =>
+      copy(
+        runs[run],
+        from,
+        Math.max(0, Math.min(to, runs[run].frameCount) - from),
+      ),
   };
 };

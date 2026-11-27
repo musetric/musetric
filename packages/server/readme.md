@@ -25,7 +25,7 @@ self-contained Cargo workspace with its own toolchain pin and lockfile.
   (`crates/db/src/schema.rs`); undo, redo and the next take are in
   `src/recording/store.rs` and `src/recording/plan.rs`.
 - The host (`write_chunk` in `src/realtime/session.rs`) and the engine
-  (`continuesRun` in `packages/engine/src/player/liveTake.cross.ts`) split a
+  (`findRun` in `packages/engine/src/decoder/takePages.worker.ts`) split a
   take into runs by the same rule: a change to one is a change to both.
 - It is the host of [the product](https://github.com/musetric/headquarters/blob/main/product.md#how-it-is-built): the units
   and checkpoints of a step are in `src/analysis/stage_attempt.rs`.

@@ -9,7 +9,7 @@ import {
   type PlayerWindow,
   stemTracks,
 } from '../player/protocol.cross.js';
-import { type SpectrogramLeadPage } from '../spectrogram/protocol.cross.js';
+import { type SpectrogramPage } from '../spectrogram/protocol.cross.js';
 import { type StemPageReaders } from './stemPageReaders.worker.js';
 import { createTakeTracks, type TakeSource } from './takeTracks.worker.js';
 import {
@@ -74,7 +74,7 @@ export type PageReadsOptions = {
   putPage: (page: PlayerPage) => void;
   dropPages: (pages: PlayerPageKey[]) => void;
   setTakes: (takes: PlayerTakes) => void;
-  putLeadPage: (page: SpectrogramLeadPage) => void;
+  putLeadPage: (page: Omit<SpectrogramPage, 'key'>) => void;
   failed: (error: unknown) => void;
 };
 
@@ -170,11 +170,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       return;
     }
     if (state.asked.delete(index)) {
-      options.putLeadPage({
-        index,
-        startFrame: page.startFrame,
-        samples: page.mean,
-      });
+      options.putLeadPage({ index, samples: page.mean });
     } else if (state.resident.has(index)) {
       state.means.set(index, page.mean);
     }
@@ -303,11 +299,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
         const mean = lead.means.get(index);
         if (mean) {
           lead.means.delete(index);
-          options.putLeadPage({
-            index,
-            startFrame: lead.layout.pageStarts[index],
-            samples: mean,
-          });
+          options.putLeadPage({ index, samples: mean });
         } else {
           lead.asked.add(index);
         }
