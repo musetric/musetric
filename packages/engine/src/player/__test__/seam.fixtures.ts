@@ -16,6 +16,7 @@ import { createEnginePlayer, type EnginePlayer } from '../index.js';
 import { createEnginePosition, type EnginePosition } from '../position.js';
 import { playerDataChannel } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
+import { createEngineSeeks, type EngineSeeks } from '../seeks.js';
 import { createMicrophone, type Microphone } from './microphone.fixtures.js';
 import { blockSize, mountTracks, rate } from './player.fixtures.js';
 import { isPortMessage, type PostHook, watchPosts } from './posts.fixtures.js';
@@ -41,6 +42,7 @@ export type Seam = {
   player: EnginePlayer;
   store: Store<EngineState>;
   position: EnginePosition;
+  seeks: EngineSeeks;
   host: string[];
   toWorklet: string[];
   fromWorklet: string[];
@@ -208,6 +210,7 @@ export const createSeam = async (
   const silence = new Float32Array(frameCount);
   let rebuilds = 0;
   const position = createEnginePosition();
+  const seeks = createEngineSeeks();
   const player = createEnginePlayer({
     getContext: () => context,
     audioOutput,
@@ -216,6 +219,7 @@ export const createSeam = async (
     store,
     getDecoder: () => decoder,
     position,
+    seeks,
     connect: async () => {
       const data = new MessageChannel();
       const playhead = new MessageChannel();
@@ -293,6 +297,7 @@ export const createSeam = async (
     },
     store,
     position,
+    seeks,
     host,
     toWorklet,
     fromWorklet,

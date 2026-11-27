@@ -1,4 +1,4 @@
-import { assertDefined, nextNumber } from '@musetric/utils';
+import { assertDefined } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
@@ -6,7 +6,6 @@ import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
 import {
   clampToRange,
-  type EngineSeekOrigin,
   type EngineState,
   isPlaying,
   isRecording,
@@ -17,6 +16,7 @@ import { createEnginePlayback, type EnginePlayback } from './playback.js';
 import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
+import { type EngineSeekOrigin, type EngineSeeksWriter } from './seeks.js';
 import { createEngineSessionMachine } from './session.js';
 import {
   createEnginePlayerSettings,
@@ -53,6 +53,7 @@ export type CreateEnginePlayerOptions = {
   store: Store<EngineState>;
   getDecoder: () => EngineDecoder;
   position: EnginePositionWriter;
+  seeks: EngineSeeksWriter;
   connect: () => Promise<EnginePlayerPorts>;
   rebuildOutput: () => Promise<void>;
 };
@@ -61,7 +62,7 @@ export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
   const { getContext, audioOutput, outputClock, store, getDecoder } = options;
-  const { position } = options;
+  const { position, seeks } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
@@ -103,6 +104,7 @@ export const createEnginePlayer = (
       outputClock,
       store,
       position,
+      seeks,
       applyMotion: session.applyMotion,
       onRecordingPassStarted: () => {
         engineRecorder?.handlePassStarted();
@@ -121,6 +123,7 @@ export const createEnginePlayer = (
       audioSession: options.audioSession,
       store,
       position,
+      seeks,
       endTake: session.endTake,
       getDecoder,
       getEnginePlayback: () => enginePlayback,
@@ -215,13 +218,7 @@ export const createEnginePlayer = (
       const { range } = store.get();
       const frameIndex = clampToRange(requestedFrameIndex, range);
       position.write(frameIndex);
-      store.update((state) => {
-        state.seekEvent = {
-          revision: nextNumber(state.seekEvent.revision),
-          frameIndex,
-          origin,
-        };
-      });
+      seeks.push(frameIndex, origin);
       clearTimeout(heldRequest);
       heldRequest = undefined;
       if (store.get().frozen) {
