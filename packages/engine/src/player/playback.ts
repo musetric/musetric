@@ -187,7 +187,7 @@ export const createEnginePlayback = async (
   };
 
   const followReply = (message: PlayingReply, currentRevision: boolean) => {
-    if (currentRevision && !message.glide) {
+    if (currentRevision && !message.playing && !message.glide) {
       position.write(message.frameIndex);
     }
     options.applyMotion(message.motion);
