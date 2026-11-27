@@ -1,6 +1,40 @@
-import { type Store } from '../common/store.js';
-import { type EngineStoreState, readTransport } from '../ownState.js';
-import { type PlayerMotion } from './protocol.cross.js';
+import { type PlayerMotion } from './motion.js';
+
+export type EngineSession =
+  'idle' | 'starting' | 'playing' | 'taking' | 'stopping';
+
+export type EngineTake = 'none' | 'arming' | 'recording' | 'draining';
+
+export type EngineTransport = {
+  playing: boolean;
+  recording: boolean;
+  busy: boolean;
+  buffering: boolean;
+};
+
+export type EngineSessionState = {
+  session: EngineSession;
+  take: EngineTake;
+  motion: PlayerMotion;
+  transport: EngineTransport;
+  takeRefusal?: unknown;
+};
+
+export const readTransport = (
+  state: Pick<EngineSessionState, 'session' | 'take' | 'motion'>,
+): EngineTransport => ({
+  playing:
+    state.session === 'starting' ||
+    state.session === 'playing' ||
+    state.session === 'taking',
+  recording: state.take !== 'none',
+  busy:
+    state.session === 'starting' ||
+    state.session === 'stopping' ||
+    state.take === 'arming' ||
+    state.take === 'draining',
+  buffering: state.motion === 'buffering',
+});
 
 export type EngineSessionMachine = {
   beginPlay: () => void;
@@ -17,10 +51,15 @@ export type EngineSessionMachine = {
   applyMotion: (motion: PlayerMotion) => void;
 };
 
+export type EngineSessionStore = {
+  update: (recipe: (state: EngineSessionState) => void) => void;
+};
+
 export const createEngineSessionMachine = (
-  store: Store<EngineStoreState>,
+  store: EngineSessionStore,
+  mintTakeId: () => string,
 ): EngineSessionMachine => {
-  const update = (recipe: (state: EngineStoreState) => void) => {
+  const update = (recipe: (state: EngineSessionState) => void) => {
     store.update((state) => {
       recipe(state);
       const transport = readTransport(state);
@@ -68,7 +107,7 @@ export const createEngineSessionMachine = (
         state.take = 'arming';
         state.takeRefusal = undefined;
       });
-      return crypto.randomUUID();
+      return mintTakeId();
     },
     settleTake: () => {
       update((state) => {

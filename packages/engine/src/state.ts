@@ -5,6 +5,7 @@ import {
   defaultSpectrogramConfig,
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
+import { type EngineTransport } from '@musetric/transport';
 import { type TakeRefusal } from './decoder/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
@@ -61,13 +62,6 @@ export type EngineRangePlay = {
 };
 
 export type EngineLoopStage = 'range' | 'sing';
-
-export type EngineTransport = {
-  playing: boolean;
-  recording: boolean;
-  busy: boolean;
-  buffering: boolean;
-};
 
 export type EngineViewWindow = {
   startFrame: number;

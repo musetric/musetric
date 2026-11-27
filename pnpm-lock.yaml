@@ -603,6 +603,9 @@ importers:
       '@musetric/spectrogram':
         specifier: workspace:*
         version: link:../spectrogram
+      '@musetric/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
@@ -784,6 +787,9 @@ importers:
       '@musetric/spectrogram':
         specifier: workspace:*
         version: link:../spectrogram
+      '@musetric/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
@@ -898,6 +904,9 @@ importers:
       '@musetric/spectrogram':
         specifier: workspace:*
         version: link:../spectrogram
+      '@musetric/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@musetric/utils':
         specifier: workspace:*
         version: link:../utils
@@ -1132,6 +1141,24 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(@vitest/browser-playwright@5.1.1)(@vitest/ui@5.1.1)(vite@8.3.8(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/transport:
+    devDependencies:
+      '@musetric/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      '@typescript/native':
+        specifier: 'catalog:'
+        version: typescript@7.1.0-beta
+      eslint:
+        specifier: 'catalog:'
+        version: 10.15.0(jiti@2.7.0)(supports-color@10.2.2)
+      typescript:
+        specifier: 'catalog:'
+        version: '@typescript/typescript6@6.0.2'
 
   packages/utils:
     devDependencies:

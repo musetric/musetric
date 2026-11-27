@@ -1,16 +1,16 @@
 import { type StemType } from '@musetric/audio/es';
 import { type InitOutput } from '@musetric/dsp/stretch';
-import { createCuts } from './cutFade.worklet.js';
-import { createHeardPosition } from './heardPosition.worklet.js';
-import { createWorkletLatency } from './latency.worklet.js';
-import { createMetronome } from './metronome.worklet.js';
-import { createMotion } from './motion.worklet.js';
 import {
+  createHeardPosition,
+  createHeldPlayheadValue,
+  createMotion,
   createRangeFrames,
   getTakeFrame,
   type RangeFrames,
-} from './playerRange.worklet.js';
-import { createHeldPlayheadValue } from './playhead.cross.js';
+} from '@musetric/transport';
+import { createCuts } from './cutFade.worklet.js';
+import { createWorkletLatency } from './latency.worklet.js';
+import { createMetronome } from './metronome.worklet.js';
 import {
   createPlayheadPublisher,
   type PlayheadPublisher,
@@ -87,7 +87,9 @@ export const createPlayerRuntime = (
       createHeldPlayheadValue(position.getFrameIndex(), revision),
     );
   };
-  const glide = createStopGlide(playhead, publishHeld);
+  const glide = createStopGlide(playhead, publishHeld, () => {
+    playhead.publish(readHeard());
+  });
 
   const motion = createMotion({
     isPlaying: () => playing,
@@ -122,6 +124,7 @@ export const createPlayerRuntime = (
   });
 
   const finishPlayback = (nextFrameIndex: number) => {
+    glide.clear();
     position.begin(nextFrameIndex);
     playing = false;
     cuts.fade.mute();
@@ -214,7 +217,6 @@ export const createPlayerRuntime = (
       cuts.after(() => {
         appliedCommand = message.command;
         revision = message.revision;
-        glide.clear();
         if (!renderer.mounted()) {
           setPlaying();
           return;
@@ -313,7 +315,7 @@ export const createPlayerRuntime = (
       if (frozen) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(readHeard());
+        glide.publishPlaying(contextFrame);
         return;
       }
 
@@ -322,12 +324,14 @@ export const createPlayerRuntime = (
       const ready =
         recordingRuntime.isActive() || renderer.ready(currentOutputFrameIndex);
       if (!ready && cuts.fade.silent()) {
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
         motion.moveTo('buffering', setPlaying);
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(readHeard());
+        glide.publishPlaying(contextFrame);
         return;
       }
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
       motion.moveTo('rolling', setPlaying);
       cuts.follow(ready);
 
@@ -368,7 +372,7 @@ export const createPlayerRuntime = (
         return;
       }
 
-      playhead.publish(readHeard());
+      glide.publishPlaying(contextFrame);
     },
   };
 };

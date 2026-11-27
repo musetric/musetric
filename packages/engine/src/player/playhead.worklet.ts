@@ -1,4 +1,5 @@
-import { playheadChannel, type PlayheadValue } from './playhead.cross.js';
+import { type PlayheadValue } from '@musetric/transport';
+import { playheadChannel } from './playhead.cross.js';
 import { sameLoop, wrapLoop } from './playheadPresenter.cross.js';
 
 const pulseSeconds = 1 / 15;
