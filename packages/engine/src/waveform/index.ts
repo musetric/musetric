@@ -10,7 +10,8 @@ import {
   subscribeResizeObserver,
 } from '@musetric/utils/dom';
 import { type Store } from '../common/store.js';
-import { type EngineState, getActiveRecording } from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { getActiveRecording } from '../state.js';
 import { waveformChannel } from './protocol.cross.js';
 import waveformWorkerUrl from './waveform.worker.ts?worker&url';
 
@@ -41,7 +42,7 @@ export type EngineWaveform = {
 };
 
 export const createEngineWaveform = (
-  store: Store<EngineState>,
+  store: Store<EngineStoreState>,
 ): EngineWaveform => {
   const worker = new Worker(waveformWorkerUrl, { type: 'module' });
   const port = waveformChannel.outbound(worker);

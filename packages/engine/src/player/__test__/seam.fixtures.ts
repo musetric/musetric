@@ -6,7 +6,7 @@ import { type EngineAudioOutput } from '../../audioOutput/index.js';
 import { type EngineOutputClock } from '../../audioOutput/outputClock.js';
 import { createStore, type Store } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
-import { type EngineState, initialEngineState } from '../../state.js';
+import { type EngineStoreState, initialEngineState } from '../../ownState.js';
 import {
   createGuardedPlayer,
   type GuardedPlayer,
@@ -40,7 +40,7 @@ const fake = <Type>(value: object): Type => value as Type;
 
 export type Seam = {
   player: EnginePlayer;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   position: EnginePosition;
   seeks: EngineSeeks;
   host: string[];
@@ -69,7 +69,7 @@ type FakeWorklet = {
 };
 
 export type CreateSeamOptions = {
-  before?: (store: Store<EngineState>) => void;
+  before?: (store: Store<EngineStoreState>) => void;
   bootFault?: true;
 };
 

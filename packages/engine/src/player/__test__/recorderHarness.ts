@@ -5,7 +5,7 @@ import {
 } from '../../audioSession/engineAudioSession.js';
 import { createStore } from '../../common/store.js';
 import { type EngineDecoder } from '../../decoder/index.js';
-import { initialEngineState } from '../../state.js';
+import { initialEngineState } from '../../ownState.js';
 import { type EnginePlayback } from '../playback.js';
 import { createEnginePosition } from '../position.js';
 import { createEngineRecorder, type EngineRecorder } from '../recorder.js';
