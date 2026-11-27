@@ -31,7 +31,7 @@ export type EngineStoreState = EngineState & EngineOwnState;
 
 export const initialEngineState: EngineStoreState = {
   statuses: {
-    decoder: 'pending',
+    project: 'pending',
     realtime: 'pending',
     player: 'pending',
     spectrogram: 'pending',

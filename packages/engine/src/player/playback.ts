@@ -1,4 +1,5 @@
 import stretchWasmUrl from '@musetric/dsp/stretch.wasm?url';
+import { type PlayerMotion } from '@musetric/transport';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -24,7 +25,6 @@ import { type EnginePositionWriter } from './position.js';
 import {
   playerChannel,
   type PlayerInboundMethods,
-  type PlayerMotion,
   playerProcessorName,
 } from './protocol.cross.js';
 import { type EngineSeeksWriter } from './seeks.js';

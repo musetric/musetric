@@ -4,8 +4,8 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
-import { type EngineDecoder } from '../decoder/index.js';
 import { type EngineStoreState } from '../ownState.js';
+import { type EngineProject } from '../project/index.js';
 import { clampToRange, isPlaying, isRecording } from '../state.js';
 import { createEngineCommandQueue } from './commandQueue.js';
 import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
@@ -47,7 +47,7 @@ export type CreateEnginePlayerOptions = {
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
   store: Store<EngineStoreState>;
-  getDecoder: () => EngineDecoder;
+  getProject: () => EngineProject;
   position: EnginePositionWriter;
   seeks: EngineSeeksWriter;
   connect: () => Promise<EnginePlayerPorts>;
@@ -57,7 +57,7 @@ export type CreateEnginePlayerOptions = {
 export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
-  const { getContext, audioOutput, outputClock, store, getDecoder } = options;
+  const { getContext, audioOutput, outputClock, store, getProject } = options;
   const { position, seeks } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
@@ -121,7 +121,7 @@ export const createEnginePlayer = (
       position,
       seeks,
       endTake: session.endTake,
-      getDecoder,
+      getProject,
       getEnginePlayback: () => enginePlayback,
     });
     return enginePlayback.boot();
@@ -178,7 +178,7 @@ export const createEnginePlayer = (
 
   const requestTarget = (frameIndex: number) => {
     const { range, rangeRepeat } = store.get();
-    getDecoder().requestTarget({
+    getProject().requestTarget({
       frameIndex,
       loop: rangeRepeat === 'cycle' ? range : undefined,
     });
@@ -295,7 +295,7 @@ export const createEnginePlayer = (
       store,
       session,
       queue,
-      getDecoder,
+      getProject,
       getEngineRecorder,
       recordTake,
       seek: (frameIndex) => {

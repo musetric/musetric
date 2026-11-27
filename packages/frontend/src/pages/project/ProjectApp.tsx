@@ -50,7 +50,7 @@ export const ProjectApp: FC<ProjectAppProps> = (props) => {
     );
   }, [project.audioAnalysis]);
 
-  useEffect(() => engine.decoder.mount(project.id), [project.id]);
+  useEffect(() => engine.project.mount(project.id), [project.id]);
 
   useEffect(() => engine.microphoneAccess.release, []);
 

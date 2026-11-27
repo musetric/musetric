@@ -6,7 +6,7 @@ import {
   type LiveTakeStart,
 } from '../player/protocol.cross.js';
 import { recordingStreamChannel } from '../player/recordingStream.cross.js';
-import { type AudioDecode } from './audioDecode.worker.js';
+import { type ProjectAudio } from './audio.worker.js';
 import { type SettledLoopTry } from './protocol.cross.js';
 import {
   createRecordingStream,
@@ -52,24 +52,24 @@ export type LoopTries = {
 };
 
 export type CreateLoopTriesOptions = {
-  audioDecode: AudioDecode;
+  audio: ProjectAudio;
 };
 
 export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
-  const { audioDecode } = options;
+  const { audio } = options;
   const kept = new Map<string, LoopTryDraft>();
   let pending: LoopTryDraft | undefined = undefined;
   let liveTryId: string | undefined = undefined;
 
   const hide = () => {
     if (liveTryId !== undefined) {
-      audioDecode.hideTake(liveTryId);
+      audio.hideTake(liveTryId);
       liveTryId = undefined;
     }
   };
 
   const show = (draft: LoopTryDraft) => {
-    audioDecode.holdTake(heldTry(draft));
+    audio.holdTake(heldTry(draft));
     liveTryId = draft.takeId;
   };
 
@@ -89,7 +89,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
     }
     draft.samples.set(chunk.samples, chunk.offset);
     draft.frameCount = Math.max(draft.frameCount, end);
-    audioDecode.patchLiveTake(chunk, heldTry(draft));
+    audio.patchLiveTake(chunk, heldTry(draft));
   };
 
   return {
@@ -120,7 +120,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
         return undefined;
       }
       kept.set(draft.takeId, draft);
-      audioDecode.holdTake(heldTry(draft));
+      audio.holdTake(heldTry(draft));
       return {
         id: draft.takeId,
         startFrame: draft.startFrame,
@@ -177,7 +177,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
       kept.delete(tryId);
       if (liveTryId === tryId) {
         liveTryId = undefined;
-        await audioDecode.reloadRecording(tryId);
+        await audio.reloadRecording(tryId);
       }
       return true;
     },

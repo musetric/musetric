@@ -10,7 +10,7 @@ export type SettledLoopTry = {
   frameCount: number;
 };
 
-export type EngineDecoderOutboundMethods = {
+export type EngineProjectOutboundMethods = {
   boot: (message: { spectrogramPort: MessagePort }) => void;
   connectPlayer: (message: { playerPort: MessagePort }) => void;
   mount: (message: { projectId: number; sampleRate: number }) => void;
@@ -47,7 +47,7 @@ export type EngineDecoderOutboundMethods = {
   sendRecordingRedo: () => void;
 };
 
-export type EngineDecoderInboundMethods = {
+export type EngineProjectInboundMethods = {
   booted: () => void;
   playerConnected: (message: { mounted: boolean }) => void;
   setState: (message: { status: 'error' }) => void;
@@ -67,9 +67,9 @@ export type EngineDecoderInboundMethods = {
   loopTryInserted: (message: { inserted: boolean }) => void;
 };
 
-export const engineDecoderChannel = createMessageChannel<
-  EngineDecoderInboundMethods,
-  EngineDecoderOutboundMethods
+export const engineProjectChannel = createMessageChannel<
+  EngineProjectInboundMethods,
+  EngineProjectOutboundMethods
 >({
   inbound: {
     keys: [

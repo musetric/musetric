@@ -7,9 +7,9 @@ import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
 import { type EngineStoreState } from '../ownState.js';
 import { type PlayerWindow } from '../player/protocol.cross.js';
-import decoderWorkerUrl from './decoder.worker.ts?worker&url';
+import projectWorkerUrl from './project.worker.ts?worker&url';
 import {
-  engineDecoderChannel,
+  engineProjectChannel,
   type SettledLoopTry,
   type TakeRefusal,
 } from './protocol.cross.js';
@@ -18,8 +18,8 @@ const realtimeStopDelayMs = 10_000;
 
 type Unmount = () => void;
 
-export type EngineDecoder = {
-  port: ReturnType<typeof engineDecoderChannel.outbound<Worker>>;
+export type EngineProject = {
+  port: ReturnType<typeof engineProjectChannel.outbound<Worker>>;
   boot: () => Promise<void>;
   connectPlayer: (playerPort: MessagePort) => Promise<boolean>;
   mount: (projectId: number) => Unmount;
@@ -46,7 +46,7 @@ export type EngineDecoder = {
   sendRecordingRedo: () => void;
 };
 
-export type CreateEngineDecoderOptions = {
+export type CreateEngineProjectOptions = {
   store: Store<EngineStoreState>;
   sampleRate: number;
   spectrogramPort: MessagePort;
@@ -61,9 +61,9 @@ export type CreateEngineDecoderOptions = {
   onRealtimeLost: () => void;
 };
 
-export const createEngineDecoder = (
-  options: CreateEngineDecoderOptions,
-): EngineDecoder => {
+export const createEngineProject = (
+  options: CreateEngineProjectOptions,
+): EngineProject => {
   const {
     store,
     spectrogramPort,
@@ -73,8 +73,8 @@ export const createEngineDecoder = (
     onTakeRefused,
     onRealtimeLost,
   } = options;
-  const worker = new Worker(decoderWorkerUrl, { type: 'module' });
-  const port = engineDecoderChannel.outbound(worker);
+  const worker = new Worker(projectWorkerUrl, { type: 'module' });
+  const port = engineProjectChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
   let playerPromise: ControlledPromise<boolean> | undefined = undefined;
   let mountPromise: ControlledPromise<void> | undefined = undefined;
@@ -115,7 +115,7 @@ export const createEngineDecoder = (
 
   port.instance.onerror = () => {
     store.update((state) => {
-      state.statuses.decoder = 'error';
+      state.statuses.project = 'error';
     });
   };
 
@@ -129,7 +129,7 @@ export const createEngineDecoder = (
     },
     setState: (message) => {
       store.update((state) => {
-        state.statuses.decoder = message.status;
+        state.statuses.project = message.status;
       });
       mountPromise?.resolve();
       mountPromise = undefined;
@@ -147,7 +147,7 @@ export const createEngineDecoder = (
     },
     mounted: (message) => {
       store.update((state) => {
-        state.statuses.decoder = 'success';
+        state.statuses.project = 'success';
         state.frameCount = message.frameCount;
         state.duration = message.frameCount / runtimeSampleRate;
       });
@@ -158,7 +158,7 @@ export const createEngineDecoder = (
       realtimeDropped = false;
       cancelRealtimeStop();
       store.update((state) => {
-        state.statuses.decoder = 'pending';
+        state.statuses.project = 'pending';
         state.statuses.realtime = 'pending';
         state.takeRefusal = undefined;
         state.frameCount = undefined;
