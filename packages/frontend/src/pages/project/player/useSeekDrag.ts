@@ -1,5 +1,6 @@
 import { type EngineSeekOrigin } from '@musetric/engine';
 import { createPointerDrag } from '@musetric/interaction';
+import { subscribeResizeObserver } from '@musetric/utils/dom';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
@@ -26,9 +27,12 @@ export const useSeekDrag = (
       const relative = press.pointerType === 'touch';
       let lockX: number | undefined = undefined;
       let pinned = false;
+      let { left, width } = element.getBoundingClientRect();
+      const unsubscribeResize = subscribeResizeObserver(element, () => {
+        ({ left, width } = element.getBoundingClientRect());
+      });
 
       const seekAt = (clientX: number) => {
-        const { left, width } = element.getBoundingClientRect();
         const frameIndex =
           lockX === undefined
             ? ((clientX - left) / width) * frameCount
@@ -58,8 +62,12 @@ export const useSeekDrag = (
           }
           seekAt(event.clientX);
         },
-        end: freeze.release,
+        end: () => {
+          unsubscribeResize();
+          freeze.release();
+        },
         cancel: () => {
+          unsubscribeResize();
           engine.player.seek(startFrame, origin);
           freeze.release();
         },

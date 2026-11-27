@@ -13,7 +13,6 @@ import {
 } from './subtitleLoopBands.js';
 import { getSubtitlePlaybackTime } from './subtitlePlayback.js';
 import { SubtitleSegmentText } from './SubtitleSegmentText.js';
-import { useSubtitleSegmentStatus } from './useSubtitleSegmentStatus.js';
 
 type TimedSubtitleElement = {
   element: HTMLElement;
@@ -79,17 +78,18 @@ const clearElementColor = (element: HTMLElement) => {
   element.style.color = '';
 };
 
-const useActiveSubtitleWordColors = (
+const useSubtitleSegmentStatus = (
   ref: RefObject<HTMLElement | null>,
+  index: number,
   segment: api.subtitle.Segment,
-  active: boolean,
+  subtitleCursor: SubtitleCursor,
 ) => {
   const theme = useTheme();
 
   useEffect(() => {
     const element = ref.current;
 
-    if (!element || !active) {
+    if (!element) {
       return;
     }
 
@@ -122,20 +122,64 @@ const useActiveSubtitleWordColors = (
       }
     };
 
-    update();
+    let unsubscribeColors: (() => void) | undefined = undefined;
 
-    const unsubscribe = subscribeEnginePosition(
-      getSubtitlePlaybackTime,
-      update,
-    );
-
-    return () => {
-      unsubscribe();
+    const stopColors = () => {
+      unsubscribeColors?.();
+      unsubscribeColors = undefined;
       for (const timedElement of timedElements) {
         clearElementColor(timedElement.element);
       }
     };
-  }, [ref, segment, active, theme]);
+
+    const applyStatus = () => {
+      const status = subtitleCursor.getSegmentStatus(index);
+      if (element.dataset.subtitleSegmentStatus !== status) {
+        element.dataset.subtitleSegmentStatus = status;
+      }
+      if (status !== 'active') {
+        if (unsubscribeColors) {
+          stopColors();
+        }
+        return;
+      }
+      if (!unsubscribeColors) {
+        update();
+        unsubscribeColors = subscribeEnginePosition(
+          getSubtitlePlaybackTime,
+          update,
+        );
+      }
+    };
+
+    applyStatus();
+
+    let queued = false;
+    let disposed = false;
+    const unsubscribeStatus = subtitleCursor.subscribeSegmentStatus(
+      index,
+      () => {
+        if (queued) {
+          return;
+        }
+        queued = true;
+        queueMicrotask(() => {
+          queued = false;
+          if (!disposed) {
+            applyStatus();
+          }
+        });
+      },
+    );
+
+    return () => {
+      disposed = true;
+      unsubscribeStatus();
+      if (unsubscribeColors) {
+        stopColors();
+      }
+    };
+  }, [ref, index, segment, subtitleCursor, theme]);
 };
 
 export type SubtitleSegmentProps = {
@@ -146,18 +190,18 @@ export type SubtitleSegmentProps = {
 
 export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
   const { index, segment, subtitleCursor } = props;
-  const status = useSubtitleSegmentStatus(index, subtitleCursor);
   const loopedKey = useEngineStore((state) =>
     getSubtitleLoopWordsKey(segment, state, engine.context.sampleRate),
   );
   const loopedWords = parseSubtitleLoopWordsKey(loopedKey);
   const ref = useRef<HTMLDivElement>(null);
-  useActiveSubtitleWordColors(ref, segment, status === 'active');
+  useSubtitleSegmentStatus(ref, index, segment, subtitleCursor);
 
   return (
     <Box
       ref={ref}
       data-subtitle-segment-index={index}
+      data-subtitle-segment-status={subtitleCursor.getSegmentStatus(index)}
       sx={(theme) => ({
         py: 1,
         px: 4,
@@ -174,7 +218,7 @@ export const SubtitleSegment: FC<SubtitleSegmentProps> = (props) => {
       })}
     >
       {loopedWords && <SubtitleLoopBand words={loopedWords} />}
-      <SubtitleSegmentText segment={segment} status={status} />
+      <SubtitleSegmentText segment={segment} />
     </Box>
   );
 };

@@ -42,21 +42,6 @@ export type EngineStatuses = {
   waveform: WaveformStatuses;
 };
 
-export type EngineSeekOrigin =
-  | 'playbackEnd'
-  | 'player'
-  | 'playerProgress'
-  | 'playhead'
-  | 'spectrogramVisualization'
-  | 'subtitle'
-  | 'tracksVisualization';
-
-export type EngineSeekEvent = {
-  revision: number;
-  frameIndex: number;
-  origin: EngineSeekOrigin;
-};
-
 export type RecordingLatencySource = 'estimated' | 'manual' | 'calibrated';
 
 export type SpectrogramViewMode = 'notes' | 'spectrum';
@@ -119,7 +104,6 @@ export type EngineState = {
   take: EngineTake;
   takeRefusal?: TakeRefusal;
   recordings: api.recording.Item[];
-  seekEvent: EngineSeekEvent;
   transposeSemitones: number;
   voiceOctave: VoiceOctave;
   singerVoice: SingerVoice;
@@ -317,11 +301,6 @@ export const initialEngineState: EngineState = {
   frozen: false,
   take: 'none',
   recordings: [],
-  seekEvent: {
-    revision: 0,
-    frameIndex: 0,
-    origin: 'player',
-  },
   transposeSemitones: 0,
   voiceOctave: 0,
   singerVoice: 'original',

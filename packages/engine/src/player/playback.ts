@@ -2,7 +2,6 @@ import stretchWasmUrl from '@musetric/dsp/stretch.wasm?url';
 import {
   type ControlledPromise,
   createControlledPromise,
-  nextNumber,
 } from '@musetric/utils';
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
@@ -24,9 +23,11 @@ import { createPlayhead } from './playhead.cross.js';
 import { type EnginePositionWriter } from './position.js';
 import {
   playerChannel,
+  type PlayerInboundMethods,
   type PlayerMotion,
   playerProcessorName,
 } from './protocol.cross.js';
+import { type EngineSeeksWriter } from './seeks.js';
 
 export type EnginePlayback = PlaybackSettings & {
   boot: () => Promise<boolean>;
@@ -55,6 +56,7 @@ export type CreateEnginePlaybackOptions = {
   playheadPort: MessagePort;
   mounted: boolean;
   position: EnginePositionWriter;
+  seeks: EngineSeeksWriter;
   onPlaybackEnded?: () => void;
   applyMotion: (motion: PlayerMotion) => void;
   onRecordingPassStarted?: () => void;
@@ -64,6 +66,8 @@ export type CreateEnginePlaybackOptions = {
 
 type PlayingAck = { frameIndex: number; playing: boolean };
 
+type PlayingReply = Parameters<PlayerInboundMethods['setPlaying']>[0];
+
 type PlayingWaiter = {
   command: number;
   resolve: (ack: PlayingAck) => void;
@@ -72,7 +76,7 @@ type PlayingWaiter = {
 export const createEnginePlayback = async (
   options: CreateEnginePlaybackOptions,
 ): Promise<EnginePlayback> => {
-  const { context, audioOutput, outputClock, store, position } = options;
+  const { context, audioOutput, outputClock, store, position, seeks } = options;
   const { onPlaybackEnded, onRecordingPassStarted, onRecordingPassEnded } =
     options;
   const playheadChannel = new MessageChannel();
@@ -124,7 +128,7 @@ export const createEnginePlayback = async (
   };
 
   const isCurrentRevision = (revision: number) =>
-    store.get().seekEvent.revision === revision;
+    seeks.read().revision === revision;
 
   let lastPumpedFrameIndex = -1;
 
@@ -175,14 +179,25 @@ export const createEnginePlayback = async (
     mountPromise.resolve();
     store.update((state) => {
       state.statuses.player = 'error';
-      state.seekEvent = {
-        revision: nextNumber(state.seekEvent.revision),
-        frameIndex,
-        origin: 'playbackEnd',
-      };
     });
+    seeks.push(frameIndex, 'playbackEnd');
     if (booted) {
       options.onFailed();
+    }
+  };
+
+  const followReply = (message: PlayingReply, currentRevision: boolean) => {
+    if (currentRevision && !message.glide) {
+      position.write(message.frameIndex);
+    }
+    options.applyMotion(message.motion);
+    if (currentRevision && message.positionJump) {
+      seeks.push(message.frameIndex, 'playbackEnd');
+    }
+    if (message.playing || message.glide) {
+      startFrameIndexPump();
+    } else {
+      stopFrameIndexPump();
     }
   };
 
@@ -217,24 +232,7 @@ export const createEnginePlayback = async (
     setPlaying: (message) => {
       const currentRevision = isCurrentRevision(message.revision);
       if (message.command === sentCommand) {
-        if (currentRevision && !message.glide) {
-          position.write(message.frameIndex);
-        }
-        options.applyMotion(message.motion);
-        store.update((state) => {
-          if (currentRevision && message.positionJump) {
-            state.seekEvent = {
-              revision: nextNumber(state.seekEvent.revision),
-              frameIndex: message.frameIndex,
-              origin: 'playbackEnd',
-            };
-          }
-        });
-        if (message.playing || message.glide) {
-          startFrameIndexPump();
-        } else {
-          stopFrameIndexPump();
-        }
+        followReply(message, currentRevision);
       }
       if (currentRevision && !message.playing && message.positionJump) {
         onPlaybackEnded?.();
@@ -331,7 +329,7 @@ export const createEnginePlayback = async (
       if (failed) {
         return false;
       }
-      const { revision } = store.get().seekEvent;
+      const { revision } = seeks.read();
       const command = nextCommand();
       const playingPromise = createPlayingPromise(command);
       port.methods.play({ command, revision, ...getLatencyFrameCounts() });
@@ -341,7 +339,7 @@ export const createEnginePlayback = async (
       if (failed) {
         return position.read();
       }
-      const { revision } = store.get().seekEvent;
+      const { revision } = seeks.read();
       const frameIndex = isCurrentRevision(playhead.read().revision)
         ? playhead.readFrameIndex()
         : position.read();
@@ -364,7 +362,7 @@ export const createEnginePlayback = async (
       port.methods.setFrozen({ command: nextCommand(), frozen });
     },
     seek: (nextFrameIndex) => {
-      const { revision } = store.get().seekEvent;
+      const { revision } = seeks.read();
       port.methods.seek({
         command: nextCommand(),
         frameIndex: nextFrameIndex,

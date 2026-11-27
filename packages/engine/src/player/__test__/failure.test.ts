@@ -300,7 +300,7 @@ describe('a failure of the player while a command waits for the worklet', () => 
         playing: true,
         motion: 'rolling',
         frameIndex: 0,
-        revision: seam.store.get().seekEvent.revision,
+        revision: seam.seeks.read().revision,
       },
     });
     expectFailed(seam);

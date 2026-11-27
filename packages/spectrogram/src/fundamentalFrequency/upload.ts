@@ -8,27 +8,52 @@ type SpanUpload = {
   availableSamples: number;
 };
 
-export const uploadSpans = (
-  device: GPUDevice,
-  target: GPUBuffer,
-  upload: SpanUpload,
-): void => {
-  const { plan, source, availableSamples } = upload;
-  const last = plan.spans.at(-1);
-  if (!last) {
-    return;
-  }
-  const staging = new Float32Array(last.spanOffset + last.length);
-  const end = Math.min(source.length, availableSamples);
-  for (const span of plan.spans) {
-    const count = Math.min(span.length, end - span.sampleStart);
-    if (count > 0) {
-      source.read(staging, span.spanOffset, span.sampleStart, count);
+export const createSpanUploader = (device: GPUDevice, target: GPUBuffer) => {
+  let silence = new Float32Array(0);
+  const write = (
+    data: Float32Array,
+    dataStart: number,
+    spanOffset: number,
+    count: number,
+  ) => {
+    device.queue.writeBuffer(target, spanOffset * 4, data, dataStart, count);
+  };
+  const writeSilence = (spanOffset: number, count: number) => {
+    if (silence.length < count) {
+      silence = new Float32Array(count);
     }
-  }
-  device.queue.writeBuffer(target, 0, staging);
-};
+    write(silence, 0, spanOffset, count);
+  };
 
+  return (upload: SpanUpload): void => {
+    const { plan, source, availableSamples } = upload;
+    const end = Math.min(source.length, availableSamples);
+    let written = 0;
+    for (const span of plan.spans) {
+      if (span.spanOffset > written) {
+        writeSilence(written, span.spanOffset - written);
+      }
+      const count = Math.max(0, Math.min(span.length, end - span.sampleStart));
+      if (count > 0) {
+        source.forEachRun(
+          span.sampleStart,
+          count,
+          (samples, samplesStart, offset, runCount) => {
+            if (samples) {
+              write(samples, samplesStart, span.spanOffset + offset, runCount);
+            } else {
+              writeSilence(span.spanOffset + offset, runCount);
+            }
+          },
+        );
+      }
+      if (span.length > count) {
+        writeSilence(span.spanOffset + count, span.length - count);
+      }
+      written = span.spanOffset + span.length;
+    }
+  };
+};
 export const uploadSlots = (
   device: GPUDevice,
   target: GPUBuffer,

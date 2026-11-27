@@ -32,18 +32,39 @@ export const createFollowScrollController = (
   const { signal } = listening;
   let userScroll = false;
   let free: ReturnType<typeof setTimeout> | undefined = undefined;
+  let placed: { index: number; scrolled: boolean } | undefined = undefined;
 
   const place = (behavior: ScrollBehavior) => {
-    const line = locateElement(getActiveIndex());
+    const index = getActiveIndex();
+    if (behavior === 'instant' && placed?.index === index) {
+      if (placed.scrolled) {
+        userScroll = false;
+      }
+      return;
+    }
+    placed = undefined;
+    const line = locateElement(index);
     if (!line) return;
     const view = element.getBoundingClientRect();
     const { top, height } = line.getBoundingClientRect();
     const offset = top + height / 2 - view.top;
-    if (offset < 0 || offset > view.height / 2) {
+    const scrolled = offset < 0 || offset > view.height / 2;
+    if (scrolled) {
       userScroll = false;
       line.scrollIntoView({ block: 'center', behavior });
     }
+    if (behavior === 'instant') {
+      placed = { index, scrolled };
+    }
   };
+
+  const resizes = new ResizeObserver(() => {
+    placed = undefined;
+  });
+  resizes.observe(element);
+  for (const child of element.children) {
+    resizes.observe(child);
+  }
 
   const unsubscribeActiveIndex = subscribeActiveIndex(() => {
     if (isMoving() && free === undefined) {
@@ -67,6 +88,7 @@ export const createFollowScrollController = (
   element.addEventListener(
     'scroll',
     () => {
+      placed = undefined;
       if (!userScroll) return;
       clearTimeout(free);
       free = setTimeout(() => {
@@ -90,6 +112,7 @@ export const createFollowScrollController = (
     },
     dispose: () => {
       clearTimeout(free);
+      resizes.disconnect();
       listening.abort();
       unsubscribeActiveIndex();
       unsubscribeSeek();

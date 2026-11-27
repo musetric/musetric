@@ -9,6 +9,7 @@ import { initialEngineState } from '../../state.js';
 import { type EnginePlayback } from '../playback.js';
 import { createEnginePosition } from '../position.js';
 import { createEngineRecorder, type EngineRecorder } from '../recorder.js';
+import { createEngineSeeks } from '../seeks.js';
 import { createEngineStubPlayback } from '../stubPlayback.js';
 
 const noop = (): void => undefined;
@@ -74,6 +75,7 @@ export const createRecorderHarness = (
     audioSession,
     store: createStore(initialEngineState),
     position: createEnginePosition(),
+    seeks: createEngineSeeks(),
     endTake: noop,
     getDecoder: () => decoder,
     getEnginePlayback: () => enginePlayback,

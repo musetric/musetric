@@ -1,4 +1,4 @@
-import { type SpectrogramSource } from '@musetric/spectrogram';
+import { type SpectrogramSource, visitSamples } from '@musetric/spectrogram';
 import { findPageIndex, pageEndFrame } from '../player/pageLayout.cross.js';
 import { type PlayerStemLayout } from '../player/protocol.cross.js';
 
@@ -43,10 +43,12 @@ export const createLeadPages = (layout: PlayerStemLayout): LeadPages => {
     reach: 1,
     position: (songFrame) => songFrame,
     transposeAt: () => 0,
-    read: (target, targetOffset, from, count) => {
-      target.fill(0, targetOffset, targetOffset + count);
+    forEachRun: (from, count, run) => {
       const end = Math.min(frameCount, from + count);
       let frame = Math.max(0, from);
+      if (frame > from) {
+        run(undefined, 0, 0, Math.min(frame, from + count) - from);
+      }
       while (frame < end) {
         const index = findPageIndex(layout, frame);
         const start = pageStarts[index];
@@ -54,15 +56,25 @@ export const createLeadPages = (layout: PlayerStemLayout): LeadPages => {
         touched[index] = render;
         const samples = pages[index];
         if (samples) {
-          target.set(
-            samples.subarray(frame - start, stop - start),
-            targetOffset + frame - from,
+          visitSamples(
+            {
+              samples,
+              samplesStart: frame - start,
+              offset: frame - from,
+              count: stop - frame,
+            },
+            run,
           );
         } else {
+          run(undefined, 0, frame - from, stop - frame);
           want(index);
         }
         want(index + 1);
         frame = stop;
+      }
+      const covered = Math.max(Math.max(0, from), end);
+      if (from + count > covered) {
+        run(undefined, 0, covered - from, from + count - covered);
       }
     },
   };

@@ -21,6 +21,7 @@ import {
   createEnginePosition,
   type EnginePosition,
 } from './player/position.js';
+import { createEngineSeeks, type EngineSeeks } from './player/seeks.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
@@ -55,6 +56,7 @@ export type Engine = {
   waveform: EngineWaveform;
   player: EnginePlayer;
   position: EnginePosition;
+  seeks: EngineSeeks;
   view: EngineView;
   boot: () => Promise<void>;
 };
@@ -65,12 +67,14 @@ export const createEngine = (): Engine => {
   const outputClock = createEngineOutputClock(context);
   const store = createStore(initialEngineState);
   const position = createEnginePosition();
+  const seeks = createEngineSeeks();
   const spectrogramChannel = new MessageChannel();
   const spectrogram = createEngineSpectrogram({
     store,
     sampleRate: context.sampleRate,
     decoderPort: spectrogramChannel.port2,
     position,
+    seeks,
   });
   const capturedTap = measure ? createCapturedTap() : undefined;
   const audioSession = createEngineAudioSession(
@@ -149,6 +153,7 @@ export const createEngine = (): Engine => {
       store,
       getDecoder: () => ref.decoder,
       position,
+      seeks,
       connect: async () => {
         const data = new MessageChannel();
         const playhead = new MessageChannel();
@@ -168,6 +173,7 @@ export const createEngine = (): Engine => {
       },
     }),
     position,
+    seeks,
     boot: async () => {
       await Promise.all([
         ref.player.boot(),

@@ -24,6 +24,7 @@ import {
 } from './microphone.js';
 import { type EnginePlayback } from './playback.js';
 import { type EnginePosition } from './position.js';
+import { type EngineSeeks } from './seeks.js';
 
 const recordingFlushTimeoutMs = 2000;
 
@@ -64,6 +65,7 @@ export type CreateEngineRecorderOptions = {
   audioSession: EngineAudioSession;
   store: Store<EngineState>;
   position: EnginePosition;
+  seeks: EngineSeeks;
   endTake: () => void;
   getDecoder: () => EngineDecoder;
   getEnginePlayback: () => EnginePlayback;
@@ -73,7 +75,7 @@ export const createEngineRecorder = (
   options: CreateEngineRecorderOptions,
 ): EngineRecorder => {
   const { context, outputClock, audioSession, store, getDecoder } = options;
-  const { getEnginePlayback } = options;
+  const { getEnginePlayback, seeks } = options;
   let currentSession: RecordingSession | undefined = undefined;
 
   const isStopRequested = (session: RecordingSession) => session.stopRequested;
@@ -140,7 +142,7 @@ export const createEngineRecorder = (
     }
 
     const frameIndex = await getEnginePlayback().stop();
-    const { revision } = store.get().seekEvent;
+    const { revision } = seeks.read();
 
     if (!session.decoderStreamStarted) {
       return;
@@ -148,7 +150,7 @@ export const createEngineRecorder = (
 
     if (session.playerStreamStarted) {
       await closeDecoderStream(session);
-      if (store.get().seekEvent.revision === revision) {
+      if (seeks.read().revision === revision) {
         getEnginePlayback().seek(frameIndex);
       }
       return;
@@ -267,7 +269,7 @@ export const createEngineRecorder = (
       session.decoderStreamStarted = true;
       getEnginePlayback().startRecording({
         frameIndex: startFrameIndex,
-        revision: store.get().seekEvent.revision,
+        revision: seeks.read().revision,
         latencyFrameCount,
         inputLatencyFrameCount,
         notificationPort: recordingStreamChannel.port2,

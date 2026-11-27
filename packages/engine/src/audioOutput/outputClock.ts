@@ -211,7 +211,9 @@ export const createEngineOutputClock = (
         await context.resume();
         return;
       }
-      if (!stall.isStalled(performance.now())) {
+      const nowMs = performance.now();
+      stall.observe(context.currentTime, nowMs);
+      if (!stall.isStalled(nowMs)) {
         return;
       }
       await context.suspend();

@@ -132,7 +132,7 @@ export const subscribeMediaSession = (
     engine.store.subscribe(isPlaying, publish),
     engine.store.subscribe(isRecording, publish),
     engine.store.subscribe((state) => state.tempoRatio, publish),
-    engine.store.subscribe((state) => state.seekEvent, publishPosition),
+    engine.seeks.subscribe(publishPosition),
     engine.store.subscribe((state) => state.frozen, publishPosition),
     engine.position.subscribe(follow),
   ];

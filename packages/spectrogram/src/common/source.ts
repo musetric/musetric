@@ -1,17 +1,32 @@
-type RangeCopy = {
-  source: Float32Array;
-  sourceStart: number;
-  target: Float32Array;
-  targetOffset: number;
+export type SpectrogramSourceRun = (
+  samples: Float32Array | undefined,
+  samplesStart: number,
+  offset: number,
+  count: number,
+) => void;
+
+export type SamplesSpan = {
+  samples: Float32Array;
+  samplesStart: number;
+  offset: number;
   count: number;
 };
 
-const copyRange = (copy: RangeCopy): void => {
-  const { source, sourceStart, target, targetOffset, count } = copy;
-  const from = Math.max(0, sourceStart);
-  const to = Math.min(source.length, sourceStart + count);
-  if (to > from) {
-    target.set(source.subarray(from, to), targetOffset + from - sourceStart);
+export const visitSamples = (
+  span: SamplesSpan,
+  run: SpectrogramSourceRun,
+): void => {
+  const { samples, samplesStart, offset, count } = span;
+  const start = Math.min(Math.max(0, samplesStart), samplesStart + count);
+  const end = Math.max(Math.min(samples.length, samplesStart + count), start);
+  if (start > samplesStart) {
+    run(undefined, 0, offset, start - samplesStart);
+  }
+  if (end > start) {
+    run(samples, start, offset + start - samplesStart, end - start);
+  }
+  if (samplesStart + count > end) {
+    run(undefined, 0, offset + end - samplesStart, samplesStart + count - end);
   }
 };
 
@@ -23,12 +38,7 @@ export type SpectrogramSource = {
   reach: number;
   position: (songFrame: number) => number;
   transposeAt: (songFrame: number) => number;
-  read: (
-    target: Float32Array,
-    targetOffset: number,
-    from: number,
-    count: number,
-  ) => void;
+  forEachRun: (from: number, count: number, run: SpectrogramSourceRun) => void;
 };
 
 export const createPlainSource = (
@@ -41,15 +51,8 @@ export const createPlainSource = (
   reach: 1,
   position: (songFrame) => songFrame,
   transposeAt: () => 0,
-  read: (target, targetOffset, from, count) => {
-    target.fill(0, targetOffset, targetOffset + count);
-    copyRange({
-      source: samples,
-      sourceStart: from,
-      target,
-      targetOffset,
-      count,
-    });
+  forEachRun: (from, count, run) => {
+    visitSamples({ samples, samplesStart: from, offset: 0, count }, run);
   },
 });
 
@@ -197,32 +200,40 @@ export const createMappedSource = (
         regions[findRegion(regions, songFrame, (item) => item.songStart)];
       return region.piece?.transpose ?? 0;
     },
-    read: (target, targetOffset, from, count) => {
-      target.fill(0, targetOffset, targetOffset + count);
-      if (regions.length === 0) {
-        return;
-      }
+    forEachRun: (from, count, run) => {
       const end = from + count;
-      let index = findRegion(regions, from, (item) => item.sourceStart);
-      for (; index < regions.length; index += 1) {
-        const region = regions[index];
-        if (region.sourceStart >= end) {
-          break;
+      let cursor = from;
+      if (regions.length > 0) {
+        let index = findRegion(regions, from, (item) => item.sourceStart);
+        for (; index < regions.length && cursor < end; index += 1) {
+          const region = regions[index];
+          if (region.sourceStart >= end) {
+            break;
+          }
+          const { piece } = region;
+          const regionEnd = region.sourceStart + region.sourceLength;
+          const start = Math.max(cursor, region.sourceStart);
+          const stop = Math.min(end, regionEnd);
+          if (!piece || stop <= start) {
+            continue;
+          }
+          if (start > cursor) {
+            run(undefined, 0, cursor - from, start - cursor);
+          }
+          visitSamples(
+            {
+              samples: piece.getSamples(),
+              samplesStart: region.rawStart + start - region.sourceStart,
+              offset: start - from,
+              count: stop - start,
+            },
+            run,
+          );
+          cursor = stop;
         }
-        const { piece } = region;
-        const regionEnd = region.sourceStart + region.sourceLength;
-        const start = Math.max(from, region.sourceStart);
-        const stop = Math.min(end, regionEnd);
-        if (!piece || stop <= start) {
-          continue;
-        }
-        copyRange({
-          source: piece.getSamples(),
-          sourceStart: region.rawStart + start - region.sourceStart,
-          target,
-          targetOffset: targetOffset + start - from,
-          count: stop - start,
-        });
+      }
+      if (end > cursor) {
+        run(undefined, 0, cursor - from, end - cursor);
       }
     },
   };

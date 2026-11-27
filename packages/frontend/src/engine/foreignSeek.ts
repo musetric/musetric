@@ -5,11 +5,7 @@ export const subscribeForeignSeek = (
   origin: EngineSeekOrigin,
   onForeignSeek: (seekEvent: EngineSeekEvent) => void,
 ) =>
-  engine.store.subscribe(
-    (state) => state.seekEvent.revision,
-    () => {
-      const { seekEvent } = engine.store.get();
-      if (seekEvent.origin === origin) return;
-      onForeignSeek(seekEvent);
-    },
-  );
+  engine.seeks.subscribe((seekEvent) => {
+    if (seekEvent.origin === origin) return;
+    onForeignSeek(seekEvent);
+  });
