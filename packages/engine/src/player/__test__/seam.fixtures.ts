@@ -184,6 +184,7 @@ export const createSeam = async (
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
+    setActive: noop,
     attach: noop,
   };
   const startRecordingStream: EngineDecoder['startRecordingStream'] = (
