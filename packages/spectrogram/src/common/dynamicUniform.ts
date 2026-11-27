@@ -1,6 +1,19 @@
 const alignTo = (value: number, alignment: number): number =>
   Math.ceil(value / alignment) * alignment;
 
+const unflushed = new WeakMap<GPUDevice, Set<() => void>>();
+
+export const flushDynamicParams = (device: GPUDevice): void => {
+  const flushes = unflushed.get(device);
+  if (!flushes) {
+    return;
+  }
+  for (const flush of flushes) {
+    flush();
+  }
+  flushes.clear();
+};
+
 export type CreateDynamicParamsOptions = {
   label: string;
   byteLength: number;
@@ -27,21 +40,46 @@ const createDynamicParams = (
     size: stride * capacity,
     usage: usage | GPUBufferUsage.COPY_DST,
   });
-  const scratch = new ArrayBuffer(options.byteLength);
-  const view = new DataView(scratch);
+  const staging = new ArrayBuffer(stride * capacity);
+  const views: DataView[] = [];
+  const runs: { from: number; to: number }[] = [];
   let cursor = 0;
+  const flush = () => {
+    for (const run of runs) {
+      device.queue.writeBuffer(
+        buffer,
+        run.from,
+        staging,
+        run.from,
+        run.to - run.from,
+      );
+    }
+    runs.length = 0;
+  };
+  const flushes = unflushed.get(device) ?? new Set<() => void>();
+  unflushed.set(device, flushes);
 
   return {
     buffer,
     byteLength: options.byteLength,
     write: (fill, from = 0) => {
       const byteOffset = cursor * stride;
+      views[cursor] ??= new DataView(staging, byteOffset, options.byteLength);
+      fill(views[cursor]);
       cursor = (cursor + 1) % capacity;
-      fill(view);
-      device.queue.writeBuffer(buffer, byteOffset + from, scratch, from);
+      const run = runs.at(-1);
+      const end = byteOffset + options.byteLength;
+      if (run && run.to <= byteOffset && byteOffset <= run.to + stride) {
+        run.to = end;
+      } else {
+        runs.push({ from: byteOffset + from, to: end });
+      }
+      flushes.add(flush);
       return byteOffset;
     },
     destroy: () => {
+      flushes.delete(flush);
+      runs.length = 0;
       buffer.destroy();
     },
   };
