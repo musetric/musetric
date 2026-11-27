@@ -27,6 +27,7 @@ export type EngineAudioOutput = {
 
 export const createEngineAudioOutput = (
   initialContext: AudioContext,
+  routedBySystem: boolean,
 ): EngineAudioOutput => {
   let context = initialContext;
   let deviceId: string | undefined = undefined;
@@ -42,7 +43,8 @@ export const createEngineAudioOutput = (
 
   return {
     getOutputNode: () => context.destination,
-    supportsDeviceSelection: getAudioContextSetSinkId(context) !== undefined,
+    supportsDeviceSelection:
+      !routedBySystem && getAudioContextSetSinkId(context) !== undefined,
     getDeviceId: () => deviceId,
     setDeviceId: applyDeviceId,
     play: async () => Promise.resolve(),
