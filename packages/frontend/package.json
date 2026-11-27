@@ -28,6 +28,7 @@
     "@musetric/script": "workspace:*",
     "@musetric/spa-router": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
+    "@musetric/transport": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tauri-apps/api": "catalog:",

@@ -1,6 +1,6 @@
-import { type RangeFrames } from './playerRange.worklet.js';
-import { type PlayheadValue } from './playhead.cross.js';
-import { createRenderHistory } from './renderHistory.worklet.js';
+import { type PlayheadValue } from './playhead.js';
+import { type RangeFrames } from './rangeFrames.js';
+import { createRenderHistory } from './renderHistory.js';
 
 const renderHistoryCapacity = 1024;
 

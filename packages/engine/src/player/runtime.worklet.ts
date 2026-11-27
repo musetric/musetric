@@ -1,16 +1,16 @@
 import { type StemType } from '@musetric/audio/es';
 import { type InitOutput } from '@musetric/dsp/stretch';
-import { createCuts } from './cutFade.worklet.js';
-import { createHeardPosition } from './heardPosition.worklet.js';
-import { createWorkletLatency } from './latency.worklet.js';
-import { createMetronome } from './metronome.worklet.js';
-import { createMotion } from './motion.worklet.js';
 import {
+  createHeardPosition,
+  createHeldPlayheadValue,
+  createMotion,
   createRangeFrames,
   getTakeFrame,
   type RangeFrames,
-} from './playerRange.worklet.js';
-import { createHeldPlayheadValue } from './playhead.cross.js';
+} from '@musetric/transport';
+import { createCuts } from './cutFade.worklet.js';
+import { createWorkletLatency } from './latency.worklet.js';
+import { createMetronome } from './metronome.worklet.js';
 import {
   createPlayheadPublisher,
   type PlayheadPublisher,

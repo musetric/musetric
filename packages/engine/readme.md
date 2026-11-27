@@ -9,17 +9,17 @@ from the frontend. What the player must do for the user is in headquarters'
 
 ## Parts
 
-| Folder         | What it holds                                                                                                                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `player`       | Play, Stop, seeks, holds, the range, the loop and its tries, takes, tempo, key and volumes: the session machine on the main thread, and the worklet that renders and plays the song |
-| `decoder`      | The worker of the open project: the pages of the stems and takes it reads from the host, the stream of a take to the host, the host's realtime socket, the recordings, the tries    |
-| `audioSession` | The microphone of each platform: `getUserMedia` in the browser, the native capture of the apps                                                                                      |
-| `audioOutput`  | The output device, and the output clock that reads how far the sound sent runs ahead of the sound heard                                                                             |
-| `calibration`  | The latency calibration by clicks, and the latency kept for each pair of devices                                                                                                    |
-| `spectrogram`  | The worker that draws the spectrogram of the song and the takes on WebGPU with `@musetric/spectrogram`                                                                              |
-| `waveform`     | The worker that draws the waves of the stems and the recording                                                                                                                      |
-| `audioRequest` | The workers' requests to the host's HTTP API                                                                                                                                        |
-| `measure`      | The tap of the measure build, behind `frontendMeasure`                                                                                                                              |
+| Folder         | What it holds                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `player`       | Play, Stop, seeks, holds, the range, the loop and its tries, takes, tempo, key and volumes: the commands on the main thread, and the worklet that renders and plays the song     |
+| `decoder`      | The worker of the open project: the pages of the stems and takes it reads from the host, the stream of a take to the host, the host's realtime socket, the recordings, the tries |
+| `audioSession` | The microphone of each platform: `getUserMedia` in the browser, the native capture of the apps                                                                                   |
+| `audioOutput`  | The output device, and the output clock that reads how far the sound sent runs ahead of the sound heard                                                                          |
+| `calibration`  | The latency calibration by clicks, and the latency kept for each pair of devices                                                                                                 |
+| `spectrogram`  | The worker that draws the spectrogram of the song and the takes on WebGPU with `@musetric/spectrogram`                                                                           |
+| `waveform`     | The worker that draws the waves of the stems and the recording                                                                                                                   |
+| `audioRequest` | The workers' requests to the host's HTTP API                                                                                                                                     |
+| `measure`      | The tap of the measure build, behind `frontendMeasure`                                                                                                                           |
 
 `engine.ts` builds the parts and connects their ports, and `view.ts` holds the
 commands of the picture. The store keeps two parts of one state: `state.ts`
@@ -41,15 +41,18 @@ main thread and its worker or worklet.
 
 ## Position and transport
 
-- The worklet's timeline map (`player/heardPosition.worklet.ts`) is the only
-  writer of the position. It publishes the playhead on every change of its
+Their pure core lies in [`@musetric/transport`](../transport/readme.md), and
+the engine runs it on its threads.
+
+- The worklet's timeline map (`heardPosition.ts` of `@musetric/transport`) is
+  the only writer of the position. It publishes the playhead on every change of its
   line and in a pulse of 15 Hz to the main thread and the spectrogram worker
   (`player/playhead.worklet.ts`), and each of them shows it through one
   presenter (`player/playheadPresenter.cross.ts`)
   ([#1369](https://github.com/musetric/musetric/issues/1369)).
 - The transport has one writer on each thread: the session machine
-  (`player/session.ts`) holds what the user asked for, and the worklet's
-  motion (`player/motion.worklet.ts`) what really sounds
+  (`session.ts` of `@musetric/transport`) holds what the user asked for, and
+  the worklet's motion (`motion.ts`) what really sounds
   ([#1371](https://github.com/musetric/musetric/issues/1371)). The session
   machine also writes `transport` of `EngineState`, the four readings above,
   with each of its transitions.

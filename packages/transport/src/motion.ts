@@ -1,4 +1,4 @@
-import { type PlayerMotion } from './protocol.cross.js';
+export type PlayerMotion = 'stopped' | 'rolling' | 'held' | 'buffering';
 
 export type CreateMotionOptions = {
   isPlaying: () => boolean;
