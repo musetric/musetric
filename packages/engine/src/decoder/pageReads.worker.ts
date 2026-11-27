@@ -95,7 +95,15 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       stemTracks[stem],
       layouts[stem],
       async (index, signal) =>
-        readers[stem].read(index, stem === 'lead', signal),
+        readers[stem].read(
+          index,
+          { samples: true, mean: stem === 'lead' },
+          signal,
+        ),
+      stem === 'lead'
+        ? async (index, signal) =>
+            readers[stem].read(index, { samples: false, mean: true }, signal)
+        : undefined,
     ),
     setWanted: readers[stem].setWanted,
   }));
@@ -144,7 +152,11 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
   const deliver = (state: TrackReads, page: TrackPage) => {
     const { index } = page;
     state.failed = false;
-    if (state.wanted.includes(index) && !state.resident.has(index)) {
+    if (
+      page.samples &&
+      state.wanted.includes(index) &&
+      !state.resident.has(index)
+    ) {
       state.resident.add(index);
       options.putPage({
         track: state.track,
@@ -170,6 +182,12 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
 
   const pump = (state: TrackReads) => {
     const missing = state.wanted.filter((index) => !state.resident.has(index));
+    for (const index of missing) {
+      if (state.meanOnly.delete(index)) {
+        state.reading.get(index)?.abort();
+        state.reading.delete(index);
+      }
+    }
     const queue = [
       ...missing,
       ...[...state.asked].sort(byPlayDistance(state, window)),
@@ -183,13 +201,17 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
       }
       const controller = new AbortController();
       state.reading.set(index, controller);
-      state
-        .read(index, controller.signal)
+      const meanOnly = !missing.includes(index) && state.readMean;
+      if (meanOnly) {
+        state.meanOnly.add(index);
+      }
+      (meanOnly || state.read)(index, controller.signal)
         .then((page) => {
           if (state.reading.get(index) !== controller) {
             return;
           }
           state.reading.delete(index);
+          state.meanOnly.delete(index);
           deliver(state, page);
           pump(state);
           settle();
@@ -199,6 +221,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
             return;
           }
           state.reading.delete(index);
+          state.meanOnly.delete(index);
           state.failed = true;
           options.failed(error);
           settle();
@@ -262,6 +285,7 @@ export const createPageReads = (options: PageReadsOptions): PageReads => {
           if (!state.wanted.includes(index) && !state.asked.has(index)) {
             controller.abort();
             state.reading.delete(index);
+            state.meanOnly.delete(index);
           }
         }
         state.setWanted(

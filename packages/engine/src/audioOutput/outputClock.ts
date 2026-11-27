@@ -1,6 +1,7 @@
 import { createClockStall } from './clockStall.cross.js';
 
 const sampleIntervalMs = 100;
+const restObserveMs = 500;
 const sampleWindow = 15;
 const contextOffsetWindow = 30;
 const startupSampleDelaysMs = [0, 20, 40, 60, 80];
@@ -60,6 +61,7 @@ export type EngineOutputClock = {
   subscribe: (listener: (reading: OutputClockReading) => void) => () => void;
   whenSettled: () => Promise<void>;
   wake: () => Promise<void>;
+  setActive: (active: boolean) => void;
   attach: (context: AudioContext) => void;
 };
 
@@ -78,6 +80,9 @@ export const createEngineOutputClock = (
   let held: HeldReading | undefined = undefined;
   let runningSinceMs =
     context.state === 'running' ? performance.now() : undefined;
+  let active = true;
+  let timer: ReturnType<typeof setInterval> | undefined = undefined;
+  let timerMs = 0;
   const stall = createClockStall(
     stallMs,
     context.currentTime,
@@ -157,6 +162,31 @@ export const createEngineOutputClock = (
     }
   };
 
+  const isResting = () => !active && renderAheads.length >= sampleWindow;
+
+  const observeStall = () => {
+    if (context.state === 'running') {
+      stall.observe(context.currentTime, performance.now());
+    }
+  };
+
+  const schedule = () => {
+    const ms = isResting() ? restObserveMs : sampleIntervalMs;
+    if (timer !== undefined && timerMs === ms) {
+      return;
+    }
+    clearInterval(timer);
+    timerMs = ms;
+    timer = setInterval(() => {
+      if (isResting()) {
+        observeStall();
+      } else {
+        sample();
+      }
+      schedule();
+    }, ms);
+  };
+
   const applyState = () => {
     const running = context.state === 'running';
     if (!running && !pausedReading && published && contextOffsets.length > 0) {
@@ -191,7 +221,7 @@ export const createEngineOutputClock = (
     });
   };
 
-  setInterval(sample, sampleIntervalMs);
+  schedule();
   listen(context);
 
   return {
@@ -218,6 +248,16 @@ export const createEngineOutputClock = (
       }
       await context.suspend();
       await context.resume();
+    },
+    setActive: (next) => {
+      if (active === next) {
+        return;
+      }
+      active = next;
+      if (active) {
+        sample();
+      }
+      schedule();
     },
     subscribe: (listener) => {
       listeners.add(listener);

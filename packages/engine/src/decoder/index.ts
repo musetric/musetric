@@ -5,8 +5,8 @@ import {
 } from '@musetric/utils';
 import { createLazyMount } from '@musetric/utils/cross/lazyMount';
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import { type PlayerWindow } from '../player/protocol.cross.js';
-import { type EngineState } from '../state.js';
 import decoderWorkerUrl from './decoder.worker.ts?worker&url';
 import {
   engineDecoderChannel,
@@ -47,7 +47,7 @@ export type EngineDecoder = {
 };
 
 export type CreateEngineDecoderOptions = {
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   sampleRate: number;
   spectrogramPort: MessagePort;
   onRecordingPeaksChanged: (message: {

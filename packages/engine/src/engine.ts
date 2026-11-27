@@ -13,9 +13,10 @@ import {
   createEngineCalibration,
   type EngineCalibration,
 } from './calibration/index.js';
-import { createStore, type Store } from './common/store.js';
+import { createStore, type ReadonlyStore } from './common/store.js';
 import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
 import { createCapturedTap } from './measure/capturedTap.js';
+import { type EngineStoreState, initialEngineState } from './ownState.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
   createEnginePosition,
@@ -26,11 +27,7 @@ import {
   createEngineSpectrogram,
   type EngineSpectrogram,
 } from './spectrogram/index.js';
-import {
-  type EngineState,
-  getActiveRecording,
-  initialEngineState,
-} from './state.js';
+import { type EngineState, getActiveRecording } from './state.js';
 import { createEngineView, type EngineView } from './view.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
@@ -48,7 +45,7 @@ const createAudioContext = () =>
 export type Engine = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
-  store: Store<EngineState>;
+  store: ReadonlyStore<EngineState>;
   calibration: EngineCalibration;
   microphoneAccess: EngineMicrophoneAccess;
   decoder: EngineDecoder;
@@ -89,6 +86,10 @@ export const createEngine = (): Engine => {
     context,
     audioSession.routesOutputBySystem === true,
   );
+  const isClockNeeded = (state: EngineStoreState) =>
+    state.session !== 'idle' || state.take !== 'none' || state.calibrating;
+  outputClock.setActive(isClockNeeded(store.get()));
+  store.subscribe(isClockNeeded, outputClock.setActive);
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);
     if (frameCount !== store.get().outputLatencyFrameCount) {

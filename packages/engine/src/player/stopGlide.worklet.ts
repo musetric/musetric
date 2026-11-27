@@ -1,4 +1,4 @@
-import { type PlayheadValue } from './playhead.cross.js';
+import { type PlayheadValue } from '@musetric/transport';
 import { type PlayheadPublisher } from './playhead.worklet.js';
 
 export type StopGlide = {

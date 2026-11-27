@@ -1,4 +1,4 @@
-import { type StemType } from '@musetric/audio/es';
+import { type MasterPageParts, type StemType } from '@musetric/audio/es';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export type StemPagesOpen = {
@@ -16,7 +16,7 @@ export type StemPagesInfo = {
 export type StemPageRequest = {
   id: number;
   index: number;
-  mean: boolean;
+  parts: MasterPageParts;
 };
 
 export type StemPageSamples = {
@@ -24,7 +24,7 @@ export type StemPageSamples = {
   index: number;
   startFrame: number;
   frameCount: number;
-  samples: Float32Array<ArrayBuffer>;
+  samples?: Float32Array<ArrayBuffer>;
   mean?: Float32Array<ArrayBuffer>;
 };
 
@@ -48,10 +48,10 @@ export const stemPagesChannel = createMessageChannel<
   inbound: {
     keys: ['opened', 'page', 'failed'],
     transfers: {
-      page: (message) =>
-        message.mean
-          ? [message.samples.buffer, message.mean.buffer]
-          : [message.samples.buffer],
+      page: (message) => [
+        ...(message.samples ? [message.samples.buffer] : []),
+        ...(message.mean ? [message.mean.buffer] : []),
+      ],
     },
   },
   outbound: {

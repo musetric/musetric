@@ -19,7 +19,7 @@ import {
   setRendererVoice,
   setRendererVolumes,
 } from '@musetric/dsp/stretch';
-import { type RangeFrames } from './playerRange.worklet.js';
+import { type RangeFrames } from '@musetric/transport';
 import {
   type playerDataChannel,
   type PlayerPage,

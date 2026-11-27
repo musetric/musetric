@@ -19,10 +19,13 @@ export type TrackReads = {
   songStartFrame: number;
   tempo: number;
   read: (index: number, signal: AbortSignal) => Promise<TrackPage>;
+  readMean:
+    ((index: number, signal: AbortSignal) => Promise<TrackPage>) | undefined;
   setWanted: (indices: number[]) => void;
   wanted: number[];
   resident: Set<number>;
   reading: Map<number, AbortController>;
+  meanOnly: Set<number>;
   asked: Set<number>;
   means: Map<number, Float32Array<ArrayBuffer>>;
   failed: boolean;
@@ -32,6 +35,7 @@ export const createTrackReads = (
   track: number,
   layout: PlayerStemLayout,
   read: TrackReads['read'],
+  readMean?: TrackReads['readMean'],
 ): TrackReads => ({
   track,
   layout,
@@ -39,10 +43,12 @@ export const createTrackReads = (
   songStartFrame: 0,
   tempo: 1,
   read,
+  readMean,
   setWanted: () => undefined,
   wanted: [],
   resident: new Set(),
   reading: new Map(),
+  meanOnly: new Set(),
   asked: new Set(),
   means: new Map(),
   failed: false,
@@ -53,6 +59,7 @@ export const abortReads = (state: TrackReads) => {
     controller.abort();
   }
   state.reading.clear();
+  state.meanOnly.clear();
 };
 
 const trackFrame = (state: TrackReads, songFrame: number) =>

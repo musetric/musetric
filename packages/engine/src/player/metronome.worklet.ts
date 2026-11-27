@@ -1,4 +1,4 @@
-import { type RangeFrames } from './playerRange.worklet.js';
+import { type RangeFrames } from '@musetric/transport';
 
 const regularFrequency = 880;
 const accentFrequency = 1320;

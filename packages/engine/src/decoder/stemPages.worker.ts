@@ -59,7 +59,7 @@ const serveStemPages = (): void => {
       }
     },
     read: (message) => {
-      const { id, index, mean } = message;
+      const { id, index, parts } = message;
       const pages = opened;
       if (!pages) {
         port.methods.failed({ id, reason: 'No master is open' });
@@ -72,13 +72,13 @@ const serveStemPages = (): void => {
           if (controller.signal.aborted) {
             return;
           }
-          const page = await pages.read(index, mean, controller.signal);
+          const page = await pages.read(index, parts, controller.signal);
           port.methods.page({
             id,
             index,
             startFrame: page.startFrame,
             frameCount: page.frameCount,
-            samples: page.samples,
+            ...(page.samples ? { samples: page.samples } : {}),
             ...(page.mean ? { mean: page.mean } : {}),
           });
         } catch (error) {
