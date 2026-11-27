@@ -13,24 +13,21 @@ import {
   createEngineCalibration,
   type EngineCalibration,
 } from './calibration/index.js';
-import { createStore, type Store } from './common/store.js';
-import { createEngineDecoder, type EngineDecoder } from './decoder/index.js';
+import { createStore, type ReadonlyStore } from './common/store.js';
 import { createCapturedTap } from './measure/capturedTap.js';
+import { type EngineStoreState, initialEngineState } from './ownState.js';
 import { createEnginePlayer, type EnginePlayer } from './player/index.js';
 import {
   createEnginePosition,
   type EnginePosition,
 } from './player/position.js';
 import { createEngineSeeks, type EngineSeeks } from './player/seeks.js';
+import { createEngineProject, type EngineProject } from './project/index.js';
 import {
   createEngineSpectrogram,
   type EngineSpectrogram,
 } from './spectrogram/index.js';
-import {
-  type EngineState,
-  getActiveRecording,
-  initialEngineState,
-} from './state.js';
+import { type EngineState, getActiveRecording } from './state.js';
 import { createEngineView, type EngineView } from './view.js';
 import { createEngineWaveform, type EngineWaveform } from './waveform/index.js';
 
@@ -48,10 +45,10 @@ const createAudioContext = () =>
 export type Engine = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
-  store: Store<EngineState>;
+  store: ReadonlyStore<EngineState>;
   calibration: EngineCalibration;
   microphoneAccess: EngineMicrophoneAccess;
-  decoder: EngineDecoder;
+  project: EngineProject;
   spectrogram: EngineSpectrogram;
   waveform: EngineWaveform;
   player: EnginePlayer;
@@ -72,7 +69,7 @@ export const createEngine = (): Engine => {
   const spectrogram = createEngineSpectrogram({
     store,
     sampleRate: context.sampleRate,
-    decoderPort: spectrogramChannel.port2,
+    projectPort: spectrogramChannel.port2,
     position,
     seeks,
   });
@@ -89,6 +86,10 @@ export const createEngine = (): Engine => {
     context,
     audioSession.routesOutputBySystem === true,
   );
+  const isClockNeeded = (state: EngineStoreState) =>
+    state.session !== 'idle' || state.take !== 'none' || state.calibrating;
+  outputClock.setActive(isClockNeeded(store.get()));
+  store.subscribe(isClockNeeded, outputClock.setActive);
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);
     if (frameCount !== store.get().outputLatencyFrameCount) {
@@ -116,7 +117,7 @@ export const createEngine = (): Engine => {
     spectrogram,
     waveform: createEngineWaveform(store),
     view: createEngineView(store),
-    decoder: createEngineDecoder({
+    project: createEngineProject({
       store,
       sampleRate: context.sampleRate,
       spectrogramPort: spectrogramChannel.port1,
@@ -151,7 +152,7 @@ export const createEngine = (): Engine => {
       outputClock,
       audioSession,
       store,
-      getDecoder: () => ref.decoder,
+      getProject: () => ref.project,
       position,
       seeks,
       connect: async () => {
@@ -161,7 +162,7 @@ export const createEngine = (): Engine => {
         return {
           dataPort: data.port2,
           playheadPort: playhead.port1,
-          mounted: await ref.decoder.connectPlayer(data.port1),
+          mounted: await ref.project.connectPlayer(data.port1),
         };
       },
       rebuildOutput: async () => {
@@ -177,7 +178,7 @@ export const createEngine = (): Engine => {
     boot: async () => {
       await Promise.all([
         ref.player.boot(),
-        ref.decoder.boot(),
+        ref.project.boot(),
         ref.spectrogram.boot(),
         ref.waveform.boot(),
       ]);

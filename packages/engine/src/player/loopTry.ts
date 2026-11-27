@@ -1,19 +1,19 @@
 import { type Store } from '../common/store.js';
-import { type EngineDecoder } from '../decoder/index.js';
+import { type EngineProject } from '../project/index.js';
 import { type EngineState } from '../state.js';
 
 export type SettleLoopTryOptions = {
   store: Store<EngineState>;
-  decoder: EngineDecoder;
+  project: EngineProject;
   settled: boolean;
   keep: boolean;
   tempoRatio: number;
 };
 
 export const settleLoopTry = async (options: SettleLoopTryOptions) => {
-  const { store, decoder, tempoRatio } = options;
+  const { store, project, tempoRatio } = options;
   const loopTry = options.settled
-    ? await decoder.settleLoopTry(options.keep)
+    ? await project.settleLoopTry(options.keep)
     : undefined;
   store.update((state) => {
     state.loopTryPhase = undefined;
@@ -30,5 +30,5 @@ export const settleLoopTry = async (options: SettleLoopTryOptions) => {
     state.loopSelectedTryId = loopTry.id;
   });
   const state = store.get();
-  decoder.selectLoopTry(state.loopSelectedTryId);
+  project.selectLoopTry(state.loopSelectedTryId);
 };

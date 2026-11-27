@@ -3,8 +3,8 @@ import {
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
 import { type Store } from './common/store.js';
+import { type EngineStoreState } from './ownState.js';
 import {
-  type EngineState,
   type EngineViewWindow,
   type FrequencyRange,
   type SpectrogramViewMode,
@@ -23,7 +23,9 @@ export type EngineView = {
   setLeadSpectrogramGainDb: (leadSpectrogramGainDb: number) => void;
 };
 
-export const createEngineView = (store: Store<EngineState>): EngineView => ({
+export const createEngineView = (
+  store: Store<EngineStoreState>,
+): EngineView => ({
   setColors: (colors) => {
     store.update((state) => {
       state.colors = colors;

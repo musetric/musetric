@@ -1,4 +1,5 @@
 import { type StemType } from '@musetric/audio/es';
+import { type PlayerMotion, type PlayerRangeRepeat } from '@musetric/transport';
 import { createSyncMessageChannel } from '@musetric/utils/cross/messageChannel';
 
 export const playerProcessorName = 'player-processor';
@@ -7,8 +8,6 @@ export type PlayerRange = {
   fromFrame: number;
   toFrame: number;
 };
-
-export type PlayerRangeRepeat = 'cycle' | 'once';
 
 export type PlayerOutboundMethods = {
   boot: (message: {
@@ -65,8 +64,6 @@ export type PlayerOutboundMethods = {
   }) => void;
   flushRecording: () => void;
 };
-
-export type PlayerMotion = 'stopped' | 'rolling' | 'held' | 'buffering';
 
 export type PlayerInboundMethods = {
   booted: () => void;
@@ -127,23 +124,6 @@ export const playerChannel = createSyncMessageChannel<
   },
 });
 
-export type PlayerRecordingPiece = {
-  songStartFrame: number;
-  tempo: number;
-  transpose: number;
-  octave: number;
-  samples: Float32Array<ArrayBuffer>;
-};
-
-export const pieceBuffers = (pieces: PlayerRecordingPiece[]) =>
-  pieces.map((piece) => piece.samples.buffer);
-
-export const recordingDataKeys = [
-  'setRecordingPieces',
-  'beginLiveTake',
-  'appendLiveTake',
-] as const;
-
 export const stemTracks: Record<StemType, number> = {
   lead: 0,
   backing: 1,
@@ -198,18 +178,6 @@ export type LiveTakeChunk = {
   startFrame: number;
   offset: number;
   samples: Float32Array<ArrayBuffer>;
-};
-
-export type RecordingPiecesUpdate = {
-  pieces: PlayerRecordingPiece[];
-  finishedTakeId?: string;
-  switched?: boolean;
-};
-
-export type RecordingDataMethods = {
-  setRecordingPieces: (message: RecordingPiecesUpdate) => void;
-  beginLiveTake: (message: LiveTakeStart) => void;
-  appendLiveTake: (message: LiveTakeChunk) => void;
 };
 
 export type PlayerStemLayouts = Record<StemType, PlayerStemLayout>;

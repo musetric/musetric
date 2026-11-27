@@ -1,5 +1,6 @@
 import { isPlaying, type SpectrogramViewMode } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
+import { setOutput } from './output.js';
 import { epochNow, wait } from './samples.js';
 
 const settleMs = 1000;
@@ -82,6 +83,7 @@ export const createFrameRuns = (hooks: PageHooks) => {
           held.push([epochNow(), frozen ? 1 : 0]);
         },
       );
+      setOutput(engine, 'silent');
       const playedAt = epochNow();
       await player.play();
       await wait(options.playSeconds * 1000);

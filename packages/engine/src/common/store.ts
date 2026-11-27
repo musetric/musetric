@@ -4,14 +4,17 @@ import * as zustand from 'zustand/vanilla';
 
 type Unmount = () => void;
 
-export type Store<State> = {
+export type ReadonlyStore<State> = {
   get: () => State;
-  update: (recipe: (state: State) => void) => void;
   subscribe: <Value>(
     selector: (state: State) => Value,
     callback: (value: Value) => void,
   ) => Unmount;
   subscribeState: (callback: (value: State) => void) => Unmount;
+};
+
+export type Store<State> = ReadonlyStore<State> & {
+  update: (recipe: (state: State) => void) => void;
 };
 
 export const createStore = <State>(initialState: State): Store<State> => {

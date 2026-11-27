@@ -1,5 +1,6 @@
 import { isBuffering, isPlaying } from '@musetric/engine';
 import { type PageHooks } from './hooks.js';
+import { setOutput } from './output.js';
 import { epochNow, wait } from './samples.js';
 
 const settleMs = 800;
@@ -84,6 +85,7 @@ export const measureSeek = async (
     }
     player.seek(Math.round(options.startSeconds * sampleRate), 'player');
     await wait(settleMs);
+    setOutput(engine, 'silent');
     await player.play();
     await wait(warmSeconds * 1000);
     for (let index = 0; index < options.seeks; index += 1) {

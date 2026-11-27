@@ -1,25 +1,11 @@
-import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
-import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 import {
+  createHeldPlayheadValue,
   createPlayheadPresenter,
   extrapolatePlayhead,
-} from './playheadPresenter.cross.js';
-
-export type PlayheadLoop = {
-  fromFrame: number;
-  toFrame: number;
-};
-
-export type PlayheadValue = {
-  frameIndex: number;
-  revision: number;
-  contextFrame: number;
-  startContextFrame: number;
-  rate: number;
-  clockOffset?: number;
-  endFrame: number;
-  loop?: PlayheadLoop;
-};
+  type PlayheadValue,
+} from '@musetric/transport';
+import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
+import { type EmptyPortMethods } from '@musetric/utils/cross/messagePort';
 
 export type PlayheadMethods = {
   publish: (message: PlayheadValue) => void;
@@ -35,18 +21,6 @@ export const playheadChannel = createMessageChannel<
   outbound: {
     keys: ['publish'],
   },
-});
-
-export const createHeldPlayheadValue = (
-  frameIndex: number,
-  revision: number,
-): PlayheadValue => ({
-  frameIndex,
-  revision,
-  contextFrame: 0,
-  startContextFrame: 0,
-  rate: 0,
-  endFrame: Number.POSITIVE_INFINITY,
 });
 
 export const readEpochMs = (): number =>

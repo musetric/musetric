@@ -1,4 +1,5 @@
 import stretchWasmUrl from '@musetric/dsp/stretch.wasm?url';
+import { type PlayerMotion } from '@musetric/transport';
 import {
   type ControlledPromise,
   createControlledPromise,
@@ -7,8 +8,8 @@ import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLo
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import {
-  type EngineState,
   getInputShareFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
@@ -24,7 +25,6 @@ import { type EnginePositionWriter } from './position.js';
 import {
   playerChannel,
   type PlayerInboundMethods,
-  type PlayerMotion,
   playerProcessorName,
 } from './protocol.cross.js';
 import { type EngineSeeksWriter } from './seeks.js';
@@ -51,7 +51,7 @@ export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   dataPort: MessagePort;
   playheadPort: MessagePort;
   mounted: boolean;
@@ -187,7 +187,7 @@ export const createEnginePlayback = async (
   };
 
   const followReply = (message: PlayingReply, currentRevision: boolean) => {
-    if (currentRevision && !message.glide) {
+    if (currentRevision && !message.playing && !message.glide) {
       position.write(message.frameIndex);
     }
     options.applyMotion(message.motion);

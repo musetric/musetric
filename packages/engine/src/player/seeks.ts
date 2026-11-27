@@ -1,6 +1,7 @@
 import { nextNumber } from '@musetric/utils';
 
 export type EngineSeekOrigin =
+  | 'hold'
   | 'playbackEnd'
   | 'player'
   | 'playerProgress'

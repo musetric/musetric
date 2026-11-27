@@ -1,4 +1,4 @@
-import { getFrequencyRange } from '@musetric/engine';
+import { getFrequencyRange, getNoteShiftSemitones } from '@musetric/engine';
 import { type RefObject, useEffect } from 'react';
 import { engine } from '../../../engine/engine.js';
 import { subscribeForeignSeek } from '../../../engine/foreignSeek.js';
@@ -87,7 +87,15 @@ export const useSpectrogramGesture = (
       },
     );
 
+    const unsubscribePitchAxis = engine.store.subscribe(
+      (state) => `${state.spectrogramView}:${getNoteShiftSemitones(state)}`,
+      () => {
+        gesture.endAxis('y');
+      },
+    );
+
     return () => {
+      unsubscribePitchAxis();
       unsubscribeSeek();
       gesture.dispose();
       freeze.release();

@@ -49,6 +49,7 @@ export const measureDelayTake = async (
       tempo: 1,
       songVolume: 0,
       metronome: false,
+      output: 'aloud',
       view: options.view,
     },
     () => {

@@ -1,15 +1,12 @@
+import { createEngineSessionMachine } from '@musetric/transport';
 import { assertDefined } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
-import { type EngineDecoder } from '../decoder/index.js';
-import {
-  clampToRange,
-  type EngineState,
-  isPlaying,
-  isRecording,
-} from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { type EngineProject } from '../project/index.js';
+import { clampToRange, isPlaying, isRecording } from '../state.js';
 import { createEngineCommandQueue } from './commandQueue.js';
 import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
 import { createEnginePlayback, type EnginePlayback } from './playback.js';
@@ -17,7 +14,6 @@ import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { type EngineSeekOrigin, type EngineSeeksWriter } from './seeks.js';
-import { createEngineSessionMachine } from './session.js';
 import {
   createEnginePlayerSettings,
   type EnginePlayerSettings,
@@ -50,8 +46,8 @@ export type CreateEnginePlayerOptions = {
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
-  store: Store<EngineState>;
-  getDecoder: () => EngineDecoder;
+  store: Store<EngineStoreState>;
+  getProject: () => EngineProject;
   position: EnginePositionWriter;
   seeks: EngineSeeksWriter;
   connect: () => Promise<EnginePlayerPorts>;
@@ -61,7 +57,7 @@ export type CreateEnginePlayerOptions = {
 export const createEnginePlayer = (
   options: CreateEnginePlayerOptions,
 ): EnginePlayer => {
-  const { getContext, audioOutput, outputClock, store, getDecoder } = options;
+  const { getContext, audioOutput, outputClock, store, getProject } = options;
   const { position, seeks } = options;
   let enginePlayback: EnginePlayback = createEngineStubPlayback();
   let engineRecorder: EngineRecorder | undefined = undefined;
@@ -69,7 +65,7 @@ export const createEnginePlayer = (
   let heldRequest: ReturnType<typeof setTimeout> | undefined = undefined;
   let armingStops = 0;
   let holds = 0;
-  const session = createEngineSessionMachine(store);
+  const session = createEngineSessionMachine(store, () => crypto.randomUUID());
   const queue = createEngineCommandQueue(store);
 
   const getEngineRecorder = () =>
@@ -125,7 +121,7 @@ export const createEnginePlayer = (
       position,
       seeks,
       endTake: session.endTake,
-      getDecoder,
+      getProject,
       getEnginePlayback: () => enginePlayback,
     });
     return enginePlayback.boot();
@@ -182,7 +178,7 @@ export const createEnginePlayer = (
 
   const requestTarget = (frameIndex: number) => {
     const { range, rangeRepeat } = store.get();
-    getDecoder().requestTarget({
+    getProject().requestTarget({
       frameIndex,
       loop: rangeRepeat === 'cycle' ? range : undefined,
     });
@@ -236,6 +232,10 @@ export const createEnginePlayer = (
       holds += 1;
       if (holds === 1) {
         setFrozen(true);
+        const state = store.get();
+        if (isPlaying(state) && !isRecording(state)) {
+          ref.seek(position.read(), 'hold');
+        }
       }
       let held = true;
       return () => {
@@ -299,7 +299,7 @@ export const createEnginePlayer = (
       store,
       session,
       queue,
-      getDecoder,
+      getProject,
       getEngineRecorder,
       recordTake,
       seek: (frameIndex) => {

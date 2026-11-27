@@ -6,6 +6,6 @@ export const subscribeForeignSeek = (
   onForeignSeek: (seekEvent: EngineSeekEvent) => void,
 ) =>
   engine.seeks.subscribe((seekEvent) => {
-    if (seekEvent.origin === origin) return;
+    if (seekEvent.origin === origin || seekEvent.origin === 'hold') return;
     onForeignSeek(seekEvent);
   });

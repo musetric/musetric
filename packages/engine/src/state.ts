@@ -3,11 +3,10 @@ import { type StemType } from '@musetric/audio';
 import { type RecordingLatencyCalibrationClickVerdict } from '@musetric/audio/es';
 import {
   defaultSpectrogramConfig,
-  type SpectrogramColors,
   type SpectrogramExpandedLane,
 } from '@musetric/spectrogram';
-import { type TakeRefusal } from './decoder/protocol.cross.js';
-import { type PlayerMotion } from './player/protocol.cross.js';
+import { type EngineTransport } from '@musetric/transport';
+import { type TakeRefusal } from './project/protocol.cross.js';
 
 export type PortStatus = 'pending' | 'success' | 'error';
 
@@ -35,7 +34,7 @@ export type WaveformStatuses = Record<StemType, PortStatus> & {
 };
 
 export type EngineStatuses = {
-  decoder: PortStatus;
+  project: PortStatus;
   realtime: PortStatus;
   player: PortStatus;
   spectrogram: PortStatus;
@@ -64,11 +63,6 @@ export type EngineRangePlay = {
 
 export type EngineLoopStage = 'range' | 'sing';
 
-export type EngineSession =
-  'idle' | 'starting' | 'playing' | 'taking' | 'stopping';
-
-export type EngineTake = 'none' | 'arming' | 'recording' | 'draining';
-
 export type EngineViewWindow = {
   startFrame: number;
   frameCount: number;
@@ -92,16 +86,13 @@ export type FrequencyRange = {
 export type EngineState = {
   statuses: EngineStatuses;
   frameCount?: number;
-  colors: SpectrogramColors;
   spectrogramView: SpectrogramViewMode;
   expandedSpectrumLane: SpectrogramExpandedLane;
   frequencyRanges: Record<SpectrogramViewMode, FrequencyRange>;
   viewWindow?: EngineViewWindow;
   duration: number;
-  session: EngineSession;
-  motion: PlayerMotion;
+  transport: EngineTransport;
   frozen: boolean;
-  take: EngineTake;
   takeRefusal?: TakeRefusal;
   recordings: api.recording.Item[];
   transposeSemitones: number;
@@ -115,7 +106,6 @@ export type EngineState = {
   outputLatencyFloorFrameCount: number;
   latencyCorrectionFrameCount: number;
   outputCorrectionFrameCount?: number;
-  correctedOutputLatencyFrameCount?: number;
   inputLatencyFrameCount: number;
   timedRoundTripFrameCount?: number;
   latencySource: RecordingLatencySource;
@@ -130,12 +120,7 @@ export type EngineState = {
   microphoneDenialOpen: boolean;
   inputLevel: number;
   recordingGain: number;
-  sourceGainDb: number;
-  leadSpectrogramGainDb: number;
   trackVolumes: Record<StemType, number> & {
-    recording: number;
-  };
-  audibleTrackVolumes: Record<StemType, number> & {
     recording: number;
   };
   metronomeEnabled: boolean;
@@ -143,8 +128,6 @@ export type EngineState = {
   metronomeBeats: number[];
   metronomeDownbeats: number[];
   range?: EngineRange;
-  rangeRepeat: EngineRangeRepeat;
-  rangeStopFrame?: number;
   loopStage?: EngineLoopStage;
   loopTries: LoopTry[];
   loopSelectedTryId?: string;
@@ -278,84 +261,15 @@ export const defaultFrequencyRanges: Record<
   },
 };
 
-export const initialEngineState: EngineState = {
-  statuses: {
-    decoder: 'pending',
-    realtime: 'pending',
-    player: 'pending',
-    spectrogram: 'pending',
-    waveform: {
-      lead: 'pending',
-      backing: 'pending',
-      instrumental: 'pending',
-      recording: 'pending',
-    },
-  },
-  colors: defaultSpectrogramConfig.colors,
-  spectrogramView: 'notes',
-  expandedSpectrumLane: 'none',
-  frequencyRanges: defaultFrequencyRanges,
-  duration: 0,
-  session: 'idle',
-  motion: 'stopped',
-  frozen: false,
-  take: 'none',
-  recordings: [],
-  transposeSemitones: 0,
-  voiceOctave: 0,
-  singerVoice: 'original',
-  tempoRatio: 1,
-  audioDevices: [],
-  outputLatencyFrameCount: 0,
-  outputLatencyFloorFrameCount: 0,
-  latencyCorrectionFrameCount: 0,
-  inputLatencyFrameCount: 0,
-  latencySource: 'estimated',
-  calibrating: false,
-  calibrationClicks: [],
-  calibrationClickIndex: -1,
-  calibrationLevel: 0,
-  calibrationSkippedPairKeys: [],
-  microphoneDenialOpen: false,
-  inputLevel: 0,
-  recordingGain: 1,
-  sourceGainDb: 0,
-  leadSpectrogramGainDb: defaultSpectrogramConfig.lanes.lead.gainDb,
-  trackVolumes: {
-    lead: 1,
-    backing: 1,
-    instrumental: 1,
-    recording: 1,
-  },
-  audibleTrackVolumes: {
-    lead: 1,
-    backing: 1,
-    instrumental: 1,
-    recording: 1,
-  },
-  metronomeEnabled: false,
-  metronomeVolume: 0.3,
-  metronomeBeats: [],
-  metronomeDownbeats: [],
-  rangeRepeat: 'cycle',
-  loopTries: [],
-};
+export const isPlaying = (state: Pick<EngineState, 'transport'>): boolean =>
+  state.transport.playing;
 
-export const isPlaying = (state: Pick<EngineState, 'session'>): boolean =>
-  state.session === 'starting' ||
-  state.session === 'playing' ||
-  state.session === 'taking';
-
-export const isRecording = (state: Pick<EngineState, 'take'>): boolean =>
-  state.take !== 'none';
+export const isRecording = (state: Pick<EngineState, 'transport'>): boolean =>
+  state.transport.recording;
 
 export const isTransportBusy = (
-  state: Pick<EngineState, 'session' | 'take'>,
-): boolean =>
-  state.session === 'starting' ||
-  state.session === 'stopping' ||
-  state.take === 'arming' ||
-  state.take === 'draining';
+  state: Pick<EngineState, 'transport'>,
+): boolean => state.transport.busy;
 
-export const isBuffering = (state: Pick<EngineState, 'motion'>): boolean =>
-  state.motion === 'buffering';
+export const isBuffering = (state: Pick<EngineState, 'transport'>): boolean =>
+  state.transport.buffering;

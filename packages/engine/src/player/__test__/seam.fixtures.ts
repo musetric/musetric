@@ -5,8 +5,8 @@ import { vi } from 'vitest';
 import { type EngineAudioOutput } from '../../audioOutput/index.js';
 import { type EngineOutputClock } from '../../audioOutput/outputClock.js';
 import { createStore, type Store } from '../../common/store.js';
-import { type EngineDecoder } from '../../decoder/index.js';
-import { type EngineState, initialEngineState } from '../../state.js';
+import { type EngineStoreState, initialEngineState } from '../../ownState.js';
+import { type EngineProject } from '../../project/index.js';
 import {
   createGuardedPlayer,
   type GuardedPlayer,
@@ -40,7 +40,7 @@ const fake = <Type>(value: object): Type => value as Type;
 
 export type Seam = {
   player: EnginePlayer;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   position: EnginePosition;
   seeks: EngineSeeks;
   host: string[];
@@ -69,7 +69,7 @@ type FakeWorklet = {
 };
 
 export type CreateSeamOptions = {
-  before?: (store: Store<EngineState>) => void;
+  before?: (store: Store<EngineStoreState>) => void;
   bootFault?: true;
 };
 
@@ -184,9 +184,10 @@ export const createSeam = async (
     subscribe: () => noop,
     whenSettled: async () => Promise.resolve(),
     wake: async () => Promise.resolve(),
+    setActive: noop,
     attach: noop,
   };
-  const startRecordingStream: EngineDecoder['startRecordingStream'] = (
+  const startRecordingStream: EngineProject['startRecordingStream'] = (
     recording,
   ) => {
     host.push('recording.start');
@@ -197,7 +198,7 @@ export const createSeam = async (
       flush: noop,
     });
   };
-  const decoder = fake<EngineDecoder>({
+  const project = fake<EngineProject>({
     requestTarget: noop,
     startRecordingStream,
     finishRecordingStream: async () => {
@@ -206,7 +207,7 @@ export const createSeam = async (
     },
   });
   const microphone = createMicrophone();
-  const decoderPorts: MessagePort[] = [];
+  const projectPorts: MessagePort[] = [];
   const silence = new Float32Array(frameCount);
   let rebuilds = 0;
   const position = createEnginePosition();
@@ -217,13 +218,13 @@ export const createSeam = async (
     outputClock,
     audioSession: microphone.session,
     store,
-    getDecoder: () => decoder,
+    getProject: () => project,
     position,
     seeks,
     connect: async () => {
       const data = new MessageChannel();
       const playhead = new MessageChannel();
-      decoderPorts.push(data.port2, playhead.port2);
+      projectPorts.push(data.port2, playhead.port2);
       mountTracks(
         playerDataChannel.outbound(data.port2),
         frameCount,
@@ -341,7 +342,7 @@ export const createSeam = async (
       await flush();
     },
     close: () => {
-      for (const port of decoderPorts) {
+      for (const port of projectPorts) {
         port.close();
       }
       vi.unstubAllGlobals();

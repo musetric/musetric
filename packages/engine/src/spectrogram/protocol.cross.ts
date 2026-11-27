@@ -1,11 +1,8 @@
 import { type SpectrogramConfig } from '@musetric/spectrogram';
 import { createMessageChannel } from '@musetric/utils/cross/messageChannel';
 import {
-  pieceBuffers,
-  type PlayerRecordingPiece,
   type PlayerStemLayout,
-  recordingDataKeys,
-  type RecordingDataMethods,
+  type PlayerTakeTrack,
 } from '../player/protocol.cross.js';
 import { type CapturedPreview } from './livePreview.cross.js';
 
@@ -72,23 +69,36 @@ export const spectrogramChannel = createMessageChannel<
   },
 });
 
-export type SpectrogramLeadPage = {
+export const spectrogramLeadKey = 'lead';
+
+export type SpectrogramTake = Omit<PlayerTakeTrack, 'track' | 'sounding'> & {
+  key: string;
+};
+
+export type SpectrogramTakes = {
+  takes: SpectrogramTake[];
+  live?: string;
+};
+
+export type SpectrogramPage = {
+  key: string;
   index: number;
-  startFrame: number;
   samples: Float32Array<ArrayBuffer>;
 };
 
-export type SpectrogramDataMethods = RecordingDataMethods & {
-  mount: (message: {
-    lead: PlayerStemLayout;
-    recording: PlayerRecordingPiece[];
+export type SpectrogramDataMethods = {
+  mount: (message: SpectrogramTakes & { lead: PlayerStemLayout }) => void;
+  setTakes: (message: SpectrogramTakes) => void;
+  putPage: (message: SpectrogramPage) => void;
+  writeLiveTake: (message: {
+    offset: number;
+    samples: Float32Array<ArrayBuffer>;
   }) => void;
-  putLeadPage: (message: SpectrogramLeadPage) => void;
   unmount: () => void;
 };
 
 export type SpectrogramDataInboundMethods = {
-  requestLeadPages: (message: { indices: number[] }) => void;
+  requestPages: (message: { key: string; indices: number[] }) => void;
 };
 
 export const spectrogramDataChannel = createMessageChannel<
@@ -96,15 +106,13 @@ export const spectrogramDataChannel = createMessageChannel<
   SpectrogramDataMethods
 >({
   inbound: {
-    keys: ['requestLeadPages'],
+    keys: ['requestPages'],
   },
   outbound: {
-    keys: ['mount', 'putLeadPage', 'unmount', ...recordingDataKeys],
+    keys: ['mount', 'setTakes', 'putPage', 'writeLiveTake', 'unmount'],
     transfers: {
-      mount: (message) => pieceBuffers(message.recording),
-      putLeadPage: (message) => [message.samples.buffer],
-      setRecordingPieces: (message) => pieceBuffers(message.pieces),
-      appendLiveTake: (message) => [message.samples.buffer],
+      putPage: (message) => [message.samples.buffer],
+      writeLiveTake: (message) => [message.samples.buffer],
     },
   },
 });

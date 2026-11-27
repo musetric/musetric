@@ -24,6 +24,7 @@
     "@musetric/eslint-config": "workspace:*",
     "@musetric/fft": "workspace:*",
     "@musetric/spectrogram": "workspace:*",
+    "@musetric/transport": "workspace:*",
     "@musetric/utils": "workspace:*",
     "@tauri-apps/api": "catalog:",
     "@types/node": "catalog:",

@@ -1,5 +1,6 @@
+import { type PlayerRangeRepeat } from '@musetric/transport';
 import { describe, expect, it } from 'vitest';
-import { type PlayerRange, type PlayerRangeRepeat } from '../protocol.cross.js';
+import { type PlayerRange } from '../protocol.cross.js';
 import {
   blockSize,
   burstCenters,

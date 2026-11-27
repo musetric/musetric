@@ -10,10 +10,10 @@ import { getCanvasSize, subscribeResizeObserver } from '@musetric/utils/dom';
 import { compileCapture } from '../audioSession/captureModule.js';
 import { type CapturedChunk } from '../audioSession/timedChunkPusher.cross.js';
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import { type EnginePosition } from '../player/position.js';
 import { type EngineSeeks } from '../player/seeks.js';
 import {
-  type EngineState,
   getFrequencyRange,
   getNoteShiftSemitones,
   getTrackProgress,
@@ -38,9 +38,9 @@ export type EngineSpectrogram = {
 };
 
 export type CreateEngineSpectrogramOptions = {
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   sampleRate: number;
-  decoderPort: MessagePort;
+  projectPort: MessagePort;
   position: EnginePosition;
   seeks: EngineSeeks;
 };
@@ -48,7 +48,7 @@ export type CreateEngineSpectrogramOptions = {
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, position, seeks } = options;
+  const { store, sampleRate, projectPort, position, seeks } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -117,7 +117,7 @@ export const createEngineSpectrogram = (
     port,
     boot: async () => {
       port.methods.boot({
-        dataPort: decoderPort,
+        dataPort: projectPort,
         sampleRate,
         captureModule: await compileCapture(),
       });
@@ -135,7 +135,7 @@ export const createEngineSpectrogram = (
       const offscreenCanvas = canvas.transferControlToOffscreen();
       const engineState = store.get();
 
-      const buildLanes = (state: EngineState) => {
+      const buildLanes = (state: EngineStoreState) => {
         const notes = state.spectrogramView === 'notes';
         return {
           lead: {
@@ -156,7 +156,7 @@ export const createEngineSpectrogram = (
           },
         };
       };
-      const buildStateView = (state: EngineState) => ({
+      const buildStateView = (state: EngineStoreState) => ({
         ...getFrequencyRange(state),
         lanes: buildLanes(state),
         expandedLane: state.expandedSpectrumLane,
