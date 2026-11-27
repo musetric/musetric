@@ -28,7 +28,11 @@ export const useSubtitleFollowScroll = (
       cursor: subtitleCursor,
       subscribeSeek: (callback) =>
         engine.seeks.subscribe((seekEvent) => {
-          if (seekEvent.origin !== 'playbackEnd' && !wordDrag.isActive()) {
+          if (
+            seekEvent.origin !== 'playbackEnd' &&
+            seekEvent.origin !== 'hold' &&
+            !wordDrag.isActive()
+          ) {
             callback();
           }
         }),
