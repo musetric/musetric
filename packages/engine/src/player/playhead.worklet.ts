@@ -10,6 +10,13 @@ const pulseSeconds = 1 / 15;
 const lineToleranceFrames = 128;
 const rateTolerance = 0.02;
 
+const lineAt = (published: PlayheadValue, contextFrame: number) =>
+  wrapLoop(
+    published.frameIndex +
+      (contextFrame - published.contextFrame) * published.rate,
+    published.loop,
+  );
+
 const onLine = (published: PlayheadValue, value: PlayheadValue) => {
   if (
     value.revision !== published.revision ||
@@ -18,17 +25,14 @@ const onLine = (published: PlayheadValue, value: PlayheadValue) => {
     value.clockOffset !== published.clockOffset ||
     value.endFrame !== published.endFrame ||
     value.startContextFrame !== published.startContextFrame ||
-    isStartHeard(value) !== isStartHeard(published) ||
     !sameLoop(value.loop, published.loop)
   ) {
     return false;
   }
-  const predicted = wrapLoop(
-    published.frameIndex +
-      (value.contextFrame - published.contextFrame) * published.rate,
-    published.loop,
+  return (
+    Math.abs(lineAt(published, value.contextFrame) - value.frameIndex) <=
+    lineToleranceFrames
   );
-  return Math.abs(predicted - value.frameIndex) <= lineToleranceFrames;
 };
 
 export type PlayheadPublisher = {
@@ -57,13 +61,22 @@ export const createPlayheadPublisher = (
 
   return {
     publish: (value) => {
-      if (
-        published &&
-        onLine(published, value) &&
-        (value.rate === 0 ||
-          getCurrentFrame() - publishedFrame < pulseFrameCount)
-      ) {
-        return;
+      if (published && onLine(published, value)) {
+        if (isStartHeard(value) !== isStartHeard(published)) {
+          // eslint-disable-next-line musetric/no-audio-thread-allocations -- once a run, when its start is heard
+          publishNow({
+            ...published,
+            contextFrame: value.contextFrame,
+            frameIndex: lineAt(published, value.contextFrame),
+          });
+          return;
+        }
+        if (
+          value.rate === 0 ||
+          getCurrentFrame() - publishedFrame < pulseFrameCount
+        ) {
+          return;
+        }
       }
       // eslint-disable-next-line musetric/no-audio-thread-allocations -- the playhead's 15 Hz pulse, or a change of its line
       publishNow(value);
