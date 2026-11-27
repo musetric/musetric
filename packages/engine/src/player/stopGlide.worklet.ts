@@ -8,6 +8,7 @@ export type StopGlide = {
     stopContextFrame: number,
   ) => number | undefined;
   advance: (contextFrame: number) => void;
+  publishPlaying: (contextFrame: number) => void;
   seek: (frameIndex: number, revision: number) => void;
   clear: () => void;
   active: () => boolean;
@@ -22,8 +23,29 @@ type Glide = {
 export const createStopGlide = (
   playhead: PlayheadPublisher,
   publishHeld: () => void,
+  publishHeard: () => void,
 ): StopGlide => {
   let glide: Glide | undefined = undefined;
+
+  const advance = (contextFrame: number) => {
+    if (!glide) {
+      return;
+    }
+    const { line, moving, stopContextFrame } = glide;
+    const heardContextFrame =
+      line.contextFrame + (contextFrame - stopContextFrame);
+    const frameIndex =
+      line.frameIndex + (heardContextFrame - line.contextFrame) * line.rate;
+    if (frameIndex >= line.endFrame) {
+      glide = undefined;
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the glide after Stop ends
+      publishHeld();
+      return;
+    }
+    moving.frameIndex = frameIndex;
+    moving.contextFrame = heardContextFrame;
+    playhead.publish(moving);
+  };
 
   return {
     start: (line, soundEndFrame, stopContextFrame) => {
@@ -40,24 +62,13 @@ export const createStopGlide = (
       playhead.publishNow(glide.line);
       return endFrame;
     },
-    advance: (contextFrame) => {
-      if (!glide) {
+    advance,
+    publishPlaying: (contextFrame) => {
+      if (glide) {
+        advance(contextFrame);
         return;
       }
-      const { line, moving, stopContextFrame } = glide;
-      const heardContextFrame =
-        line.contextFrame + (contextFrame - stopContextFrame);
-      const frameIndex =
-        line.frameIndex + (heardContextFrame - line.contextFrame) * line.rate;
-      if (frameIndex >= line.endFrame) {
-        glide = undefined;
-        // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the glide after Stop ends
-        publishHeld();
-        return;
-      }
-      moving.frameIndex = frameIndex;
-      moving.contextFrame = heardContextFrame;
-      playhead.publish(moving);
+      publishHeard();
     },
     seek: (frameIndex, revision) => {
       if (
