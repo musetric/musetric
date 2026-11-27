@@ -10,6 +10,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Typography,
 } from '@mui/material';
 import {
   type AudioOutputSourceKind,
@@ -30,6 +31,8 @@ const outputIconByKind: Record<AudioOutputSourceKind, ReactNode> = {
   unknown: <VolumeUpIcon fontSize='small' />,
 };
 
+const defaultChoice = '';
+
 export const AudioOutputSelect: FC = () => {
   const { t } = useTranslation();
   const recording = useEngineStore(isRecording);
@@ -39,18 +42,30 @@ export const AudioOutputSelect: FC = () => {
     (state) => state.audioOutputDeviceId,
   );
   const outputDevices = getRealAudioOutputDevices(audioDevices);
-  const resolvedOutputDevice = resolveAudioOutputDevice(audioDevices, {
-    explicitDeviceId: audioOutputDeviceId,
-  });
+  const defaultOutputDevice = resolveAudioOutputDevice(audioDevices, {});
+  const chosenOutputDevice = outputDevices.find(
+    (device) => device.deviceId === audioOutputDeviceId,
+  );
   const outputSelectionSupported =
     engine.calibration.isOutputSelectionSupported();
   const outputControlUnavailable =
     !outputSelectionSupported || outputDevices.length === 0;
   const outputSelectValue = outputControlUnavailable
-    ? ''
-    : (resolvedOutputDevice?.deviceId ?? '');
+    ? defaultChoice
+    : (chosenOutputDevice?.deviceId ?? defaultChoice);
   const outputSelectDisabled =
     outputControlUnavailable || recording || calibrating;
+  const nameOutput = (device: MediaDeviceInfo) =>
+    device.label ||
+    t('pages.project.audioSettings.outputFallback', {
+      value: outputDevices.indexOf(device) + 1,
+    });
+  const nameDefault = (device: MediaDeviceInfo) =>
+    t('pages.project.audioSettings.default', { name: nameOutput(device) });
+  const findOutput = (value: string) =>
+    value === defaultChoice
+      ? defaultOutputDevice
+      : outputDevices.find((device) => device.deviceId === value);
 
   return (
     <FormControl fullWidth disabled={outputSelectDisabled}>
@@ -61,12 +76,15 @@ export const AudioOutputSelect: FC = () => {
         displayEmpty
         value={outputSelectValue}
         onChange={(event) => {
-          void engine.calibration.selectOutputDevice(event.target.value);
+          const { value } = event.target;
+          void engine.calibration.selectOutputDevice(
+            value === defaultChoice ? undefined : value,
+          );
         }}
         renderValue={(value) => {
-          const device = outputDevices.find(
-            (outputDevice) => outputDevice.deviceId === value,
-          );
+          const device = outputControlUnavailable
+            ? undefined
+            : findOutput(value);
           if (!device) {
             return outputControlUnavailable
               ? t('pages.project.audioSettings.outputSystemControlled')
@@ -79,27 +97,29 @@ export const AudioOutputSelect: FC = () => {
               sx={{ alignItems: 'center', gap: 1 }}
             >
               {outputIconByKind[classifyAudioOutputDevice(device)]}
-              <span>
-                {device.label ||
-                  t('pages.project.audioSettings.outputFallback', { value: 1 })}
-              </span>
+              <Typography component='span' variant='inherit' noWrap>
+                {value === defaultChoice
+                  ? nameDefault(device)
+                  : nameOutput(device)}
+              </Typography>
             </Stack>
           );
         }}
       >
-        {outputDevices.map((device, index) => (
+        {defaultOutputDevice && (
+          <MenuItem value={defaultChoice}>
+            <ListItemIcon>
+              {outputIconByKind[classifyAudioOutputDevice(defaultOutputDevice)]}
+            </ListItemIcon>
+            <ListItemText primary={nameDefault(defaultOutputDevice)} />
+          </MenuItem>
+        )}
+        {outputDevices.map((device) => (
           <MenuItem key={device.deviceId} value={device.deviceId}>
             <ListItemIcon>
               {outputIconByKind[classifyAudioOutputDevice(device)]}
             </ListItemIcon>
-            <ListItemText
-              primary={
-                device.label ||
-                t('pages.project.audioSettings.outputFallback', {
-                  value: index + 1,
-                })
-              }
-            />
+            <ListItemText primary={nameOutput(device)} />
           </MenuItem>
         ))}
       </Select>

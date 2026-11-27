@@ -64,7 +64,6 @@ export type Engine = {
 export const createEngine = (): Engine => {
   let context = createAudioContext();
   const getContext = () => context;
-  const audioOutput = createEngineAudioOutput(context);
   const outputClock = createEngineOutputClock(context);
   const store = createStore(initialEngineState);
   const position = createEnginePosition();
@@ -85,6 +84,10 @@ export const createEngine = (): Engine => {
       spectrogram.previewLiveTake(chunk);
       capturedTap?.push(chunk);
     },
+  );
+  const audioOutput = createEngineAudioOutput(
+    context,
+    audioSession.routesOutputBySystem === true,
   );
   outputClock.subscribe((reading) => {
     const frameCount = Math.round(reading.renderAhead * context.sampleRate);

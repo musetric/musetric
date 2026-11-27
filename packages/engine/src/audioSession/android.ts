@@ -154,6 +154,7 @@ export const createAndroidAudioSession = (
   return {
     openMicrophone: microphones.open,
     closeMicrophone: microphones.close,
+    routesOutputBySystem: true,
     enumerateDevices: async () => {
       const reply = devicesSchema.parse(await request({ type: 'devices' }));
       return [

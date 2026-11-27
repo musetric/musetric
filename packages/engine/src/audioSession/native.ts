@@ -215,6 +215,7 @@ export const createNativeAudioSession = (
   };
 
   return {
+    routesOutputBySystem: true,
     openMicrophone: async (request) => {
       const { deviceId } = request;
       opening += 1;
