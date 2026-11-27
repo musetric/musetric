@@ -87,7 +87,9 @@ export const createPlayerRuntime = (
       createHeldPlayheadValue(position.getFrameIndex(), revision),
     );
   };
-  const glide = createStopGlide(playhead, publishHeld);
+  const glide = createStopGlide(playhead, publishHeld, () => {
+    playhead.publish(readHeard());
+  });
 
   const motion = createMotion({
     isPlaying: () => playing,
@@ -122,6 +124,7 @@ export const createPlayerRuntime = (
   });
 
   const finishPlayback = (nextFrameIndex: number) => {
+    glide.clear();
     position.begin(nextFrameIndex);
     playing = false;
     cuts.fade.mute();
@@ -214,7 +217,6 @@ export const createPlayerRuntime = (
       cuts.after(() => {
         appliedCommand = message.command;
         revision = message.revision;
-        glide.clear();
         if (!renderer.mounted()) {
           setPlaying();
           return;
@@ -313,7 +315,7 @@ export const createPlayerRuntime = (
       if (frozen) {
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(readHeard());
+        glide.publishPlaying(contextFrame);
         return;
       }
 
@@ -326,7 +328,7 @@ export const createPlayerRuntime = (
         motion.moveTo('buffering', setPlaying);
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
-        playhead.publish(readHeard());
+        glide.publishPlaying(contextFrame);
         return;
       }
       // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
@@ -370,7 +372,7 @@ export const createPlayerRuntime = (
         return;
       }
 
-      playhead.publish(readHeard());
+      glide.publishPlaying(contextFrame);
     },
   };
 };
