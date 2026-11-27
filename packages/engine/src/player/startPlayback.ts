@@ -1,7 +1,7 @@
+import { type EngineSessionMachine } from '@musetric/transport';
 import { type Store } from '../common/store.js';
 import { type EngineState, isPlaying } from '../state.js';
 import { type EnginePlayback } from './playback.js';
-import { type EngineSessionMachine } from './session.js';
 
 export type CreateStartPlaybackOptions = {
   store: Store<EngineState>;

@@ -1,3 +1,4 @@
+import { createEngineSessionMachine } from '@musetric/transport';
 import { assertDefined } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
@@ -13,7 +14,6 @@ import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { type EngineSeekOrigin, type EngineSeeksWriter } from './seeks.js';
-import { createEngineSessionMachine } from './session.js';
 import {
   createEnginePlayerSettings,
   type EnginePlayerSettings,
@@ -65,7 +65,7 @@ export const createEnginePlayer = (
   let heldRequest: ReturnType<typeof setTimeout> | undefined = undefined;
   let armingStops = 0;
   let holds = 0;
-  const session = createEngineSessionMachine(store);
+  const session = createEngineSessionMachine(store, () => crypto.randomUUID());
   const queue = createEngineCommandQueue(store);
 
   const getEngineRecorder = () =>

@@ -2,17 +2,17 @@ import {
   defaultSpectrogramConfig,
   type SpectrogramColors,
 } from '@musetric/spectrogram';
-import { type PlayerMotion } from './player/protocol.cross.js';
+import {
+  type EngineSession,
+  type EngineTake,
+  type PlayerMotion,
+  readTransport,
+} from '@musetric/transport';
 import {
   defaultFrequencyRanges,
   type EngineRangeRepeat,
   type EngineState,
-  type EngineTransport,
 } from './state.js';
-
-type EngineSession = 'idle' | 'starting' | 'playing' | 'taking' | 'stopping';
-
-type EngineTake = 'none' | 'arming' | 'recording' | 'draining';
 
 export type EngineOwnState = {
   colors: SpectrogramColors;
@@ -26,22 +26,6 @@ export type EngineOwnState = {
   rangeRepeat: EngineRangeRepeat;
   rangeStopFrame?: number;
 };
-
-export const readTransport = (
-  state: Pick<EngineOwnState, 'session' | 'take' | 'motion'>,
-): EngineTransport => ({
-  playing:
-    state.session === 'starting' ||
-    state.session === 'playing' ||
-    state.session === 'taking',
-  recording: state.take !== 'none',
-  busy:
-    state.session === 'starting' ||
-    state.session === 'stopping' ||
-    state.take === 'arming' ||
-    state.take === 'draining',
-  buffering: state.motion === 'buffering',
-});
 
 export type EngineStoreState = EngineState & EngineOwnState;
 
