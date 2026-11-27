@@ -191,6 +191,9 @@ export const createAudioDecode = (
         source
           .read(index, signal)
           .then((page) => {
+            if (!page.samples) {
+              throw new Error(`The page ${String(index)} of ${key} is empty`);
+            }
             spectrogramPort.methods.putPage({
               key,
               index,
