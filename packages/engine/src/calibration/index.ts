@@ -11,6 +11,7 @@ import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import { type EnginePlayer } from '../player/index.js';
 import {
   type EngineOutputVolume,
@@ -45,7 +46,7 @@ const isSameRoute = (
   Math.abs(state.outputLatencyFrameCount - outputLatencyFrameCount) <=
   routeToleranceSeconds * sampleRate;
 
-const clearCorrection = (state: EngineState) => {
+const clearCorrection = (state: EngineStoreState) => {
   state.latencyCorrectionFrameCount = 0;
   state.outputCorrectionFrameCount = undefined;
   state.correctedOutputLatencyFrameCount = undefined;
@@ -53,7 +54,7 @@ const clearCorrection = (state: EngineState) => {
 };
 
 const restoreLatencyState = (
-  store: Store<EngineState>,
+  store: Store<EngineStoreState>,
   latencyStore: CalibrationLatencyStore,
   devicePairKey: string,
 ) => {
@@ -80,7 +81,7 @@ const hasHiddenInputs = (devices: MediaDeviceInfo[]) =>
   );
 
 const stopActivePlayback = async (
-  store: Store<EngineState>,
+  store: Store<EngineStoreState>,
   player: EnginePlayer,
 ) => {
   if (isPlaying(store.get())) {
@@ -107,7 +108,7 @@ export type CreateEngineCalibrationOptions = {
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   getPlayer: () => EnginePlayer;
 };
 

@@ -1,15 +1,12 @@
+import { createEngineSessionMachine } from '@musetric/transport';
 import { assertDefined } from '@musetric/utils';
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import {
-  clampToRange,
-  type EngineState,
-  isPlaying,
-  isRecording,
-} from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { clampToRange, isPlaying, isRecording } from '../state.js';
 import { createEngineCommandQueue } from './commandQueue.js';
 import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
 import { createEnginePlayback, type EnginePlayback } from './playback.js';
@@ -17,7 +14,6 @@ import { type EnginePositionWriter } from './position.js';
 import { createEnginePlayerRange, type EnginePlayerRange } from './range.js';
 import { createEngineRecorder, type EngineRecorder } from './recorder.js';
 import { type EngineSeekOrigin, type EngineSeeksWriter } from './seeks.js';
-import { createEngineSessionMachine } from './session.js';
 import {
   createEnginePlayerSettings,
   type EnginePlayerSettings,
@@ -50,7 +46,7 @@ export type CreateEnginePlayerOptions = {
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   getDecoder: () => EngineDecoder;
   position: EnginePositionWriter;
   seeks: EngineSeeksWriter;
@@ -69,7 +65,7 @@ export const createEnginePlayer = (
   let heldRequest: ReturnType<typeof setTimeout> | undefined = undefined;
   let armingStops = 0;
   let holds = 0;
-  const session = createEngineSessionMachine(store);
+  const session = createEngineSessionMachine(store, () => crypto.randomUUID());
   const queue = createEngineCommandQueue(store);
 
   const getEngineRecorder = () =>

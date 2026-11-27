@@ -1,4 +1,4 @@
-import { type PlayheadLoop, type PlayheadValue } from './playhead.cross.js';
+import { type PlayheadLoop, type PlayheadValue } from '@musetric/transport';
 
 const maxExtrapolationSeconds = 0.25;
 
@@ -15,6 +15,10 @@ export const wrapLoop = (
 
 const isRolling = (value: PlayheadValue) =>
   value.rate !== 0 && value.clockOffset !== undefined;
+
+const isWaiting = (value: PlayheadValue, epochMs: number, sampleRate: number) =>
+  value.clockOffset !== undefined &&
+  (epochMs / 1000 + value.clockOffset) * sampleRate < value.startContextFrame;
 
 const readElapsed = (
   value: PlayheadValue,
@@ -122,6 +126,12 @@ export const createPlayheadPresenter = (
       const error = nearestTurn(target, predicted, value.loop) - predicted;
       if (Math.abs(error) > jumpSeconds * sampleRate) {
         return show(value, epochMs, target);
+      }
+      if (isWaiting(value, epochMs, sampleRate)) {
+        const walked =
+          shown.frameIndex +
+          ((epochMs - shown.epochMs) / 1000) * sampleRate * value.rate;
+        return show(value, epochMs, Math.min(predicted + error, walked));
       }
       const limit = correctionShare * step;
       const corrected = predicted + Math.max(-limit, Math.min(limit, error));

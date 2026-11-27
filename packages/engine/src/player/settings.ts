@@ -1,10 +1,7 @@
 import { type StemType } from '@musetric/audio';
 import { type Store } from '../common/store.js';
-import {
-  type EngineState,
-  type SingerVoice,
-  type VoiceOctave,
-} from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { type SingerVoice, type VoiceOctave } from '../state.js';
 import { type EnginePlayback } from './playback.js';
 
 export type EngineTrackKey = StemType | 'recording';
@@ -25,7 +22,7 @@ export type EnginePlayerSettings = {
 };
 
 export type CreateEnginePlayerSettingsOptions = {
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   getEnginePlayback: () => EnginePlayback;
 };
 

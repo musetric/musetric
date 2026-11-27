@@ -1,4 +1,4 @@
-import { type HeardPosition } from './heardPosition.worklet.js';
+import { type HeardPosition } from '@musetric/transport';
 import { type LatencyFrameCounts } from './recording.worklet.js';
 
 export type WorkletLatency = {
