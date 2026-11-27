@@ -27,7 +27,7 @@ export const createStopGlide = (
 ): StopGlide => {
   let glide: Glide | undefined = undefined;
 
-  const advance = (contextFrame: number) => {
+  const advance = (contextFrame: number, publishEnd: () => void) => {
     if (!glide) {
       return;
     }
@@ -39,7 +39,7 @@ export const createStopGlide = (
     if (frameIndex >= line.endFrame) {
       glide = undefined;
       // eslint-disable-next-line musetric/no-audio-thread-allocations -- once, when the glide after Stop ends
-      publishHeld();
+      publishEnd();
       return;
     }
     moving.frameIndex = frameIndex;
@@ -62,10 +62,12 @@ export const createStopGlide = (
       playhead.publishNow(glide.line);
       return endFrame;
     },
-    advance,
+    advance: (contextFrame) => {
+      advance(contextFrame, publishHeld);
+    },
     publishPlaying: (contextFrame) => {
       if (glide) {
-        advance(contextFrame);
+        advance(contextFrame, publishHeard);
         return;
       }
       publishHeard();
