@@ -1,4 +1,5 @@
 import init, { FlacPages } from '@musetric/dsp/decode';
+import { type MasterPageParts } from './pageParts.es.js';
 
 const headerChunkBytes = 64 * 1024;
 
@@ -37,7 +38,7 @@ export type MasterPage = {
   index: number;
   startFrame: number;
   frameCount: number;
-  samples: Float32Array<ArrayBuffer>;
+  samples?: Float32Array<ArrayBuffer>;
   mean?: Float32Array<ArrayBuffer>;
 };
 
@@ -48,7 +49,7 @@ export type MasterPages = {
   pageStarts: number[];
   read: (
     index: number,
-    mean: boolean,
+    parts: MasterPageParts,
     signal: AbortSignal,
   ) => Promise<MasterPage>;
   free: () => void;
@@ -69,7 +70,7 @@ export const openMasterPages = async (
     sampleRate: pages.sampleRate,
     channelCount,
     pageStarts,
-    read: async (index, mean, signal) => {
+    read: async (index, parts, signal) => {
       const from = pages.byteStart(index);
       const frameCount = pages.pageFrames(index);
       if (from === undefined || frameCount === undefined) {
@@ -82,8 +83,8 @@ export const openMasterPages = async (
         index,
         startFrame: pageStarts[index],
         frameCount,
-        samples: ownBuffer(pages.samples()),
-        ...(mean ? { mean: ownBuffer(pages.mean()) } : {}),
+        ...(parts.samples ? { samples: ownBuffer(pages.samples()) } : {}),
+        ...(parts.mean ? { mean: ownBuffer(pages.mean()) } : {}),
       };
     },
     free: () => {

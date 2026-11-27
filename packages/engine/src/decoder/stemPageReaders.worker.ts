@@ -1,4 +1,4 @@
-import { type StemType } from '@musetric/audio/es';
+import { type MasterPageParts, type StemType } from '@musetric/audio/es';
 import {
   type StemPageSamples,
   stemPagesChannel,
@@ -10,7 +10,7 @@ export type StemPageReader = {
   open: (projectId: number, sampleRate: number) => Promise<StemPagesInfo>;
   read: (
     index: number,
-    mean: boolean,
+    parts: MasterPageParts,
     signal: AbortSignal,
   ) => Promise<StemPageSamples>;
   setWanted: (indices: number[]) => void;
@@ -57,13 +57,13 @@ const createStemPageReader = (stem: StemType): StemPageReader => {
         opening = { resolve, reject };
         port.methods.open({ projectId, stem, sampleRate });
       }),
-    read: async (index, mean, signal) => {
+    read: async (index, parts, signal) => {
       signal.throwIfAborted();
       return new Promise<StemPageSamples>((resolve, reject) => {
         const id = nextId;
         nextId += 1;
         reads.set(id, { resolve, reject });
-        port.methods.read({ id, index, mean });
+        port.methods.read({ id, index, parts });
         signal.addEventListener(
           'abort',
           () => {
