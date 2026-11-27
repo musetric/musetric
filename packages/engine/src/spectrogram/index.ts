@@ -11,6 +11,7 @@ import { compileCapture } from '../audioSession/captureModule.js';
 import { type CapturedChunk } from '../audioSession/timedChunkPusher.cross.js';
 import { type Store } from '../common/store.js';
 import { type EnginePosition } from '../player/position.js';
+import { type EngineSeeks } from '../player/seeks.js';
 import {
   type EngineState,
   getFrequencyRange,
@@ -41,12 +42,13 @@ export type CreateEngineSpectrogramOptions = {
   sampleRate: number;
   decoderPort: MessagePort;
   position: EnginePosition;
+  seeks: EngineSeeks;
 };
 
 export const createEngineSpectrogram = (
   options: CreateEngineSpectrogramOptions,
 ): EngineSpectrogram => {
-  const { store, sampleRate, decoderPort, position } = options;
+  const { store, sampleRate, decoderPort, position, seeks } = options;
   const worker = new Worker(spectrogramWorkerUrl, { type: 'module' });
   const port = spectrogramChannel.outbound(worker);
   const bootPromise: ControlledPromise<void> = createControlledPromise<void>();
@@ -71,7 +73,7 @@ export const createEngineSpectrogram = (
     const state = store.get();
     port.methods.setTrackProgress({
       trackProgress: getTrackProgress(position.read(), state.frameCount),
-      revision: state.seekEvent.revision,
+      revision: seeks.read().revision,
     });
   };
   const sendStoppedTrackProgress = () => {
@@ -82,7 +84,7 @@ export const createEngineSpectrogram = (
   };
   position.subscribe(sendStoppedTrackProgress);
   store.subscribe((state) => state.frameCount, sendStoppedTrackProgress);
-  store.subscribe((state) => state.seekEvent.revision, sendTrackProgress);
+  seeks.subscribe(sendTrackProgress);
 
   store.subscribe(isPlaying, (playing) => {
     port.methods.setPlaying({ playing });
