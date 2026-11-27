@@ -9,6 +9,7 @@ import {
   getRecordingLatencyFrameCount,
   isPlaying,
 } from '@musetric/engine';
+import { setOutput } from './output.js';
 import { wait } from './samples.js';
 
 const previewSettleMs = 3000;
@@ -61,6 +62,7 @@ export const calibrate = async (
   if (isPlaying(engine.store.get())) {
     await engine.player.stop();
   }
+  setOutput(engine, 'aloud');
   const closePreview = engine.calibration.openPreview();
   try {
     await wait(previewSettleMs);

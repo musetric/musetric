@@ -63,6 +63,7 @@ export const measureTimingTake = async (
       tempo: options.tempo,
       songVolume: 0,
       metronome: true,
+      output: 'aloud',
     },
     () => {
       const unsubscribePlayhead = engine.position.subscribe((frameIndex) => {

@@ -1,3 +1,12 @@
+const measure = import.meta.env.frontendMeasure === 'true';
+
+const createMeasureGain = (context: AudioContext, value: number) => {
+  const node = context.createGain();
+  node.gain.value = value;
+  node.connect(context.destination);
+  return node;
+};
+
 type SetSinkId = (sinkId: string) => Promise<void>;
 
 type AudioContextWithSetSinkId = AudioContext & {
@@ -31,6 +40,7 @@ export const createEngineAudioOutput = (
 ): EngineAudioOutput => {
   let context = initialContext;
   let deviceId: string | undefined = undefined;
+  let measureGain = measure ? createMeasureGain(context, 1) : undefined;
 
   const applyDeviceId = async (nextDeviceId: string | undefined) => {
     const setSinkId = getAudioContextSetSinkId(context);
@@ -42,7 +52,7 @@ export const createEngineAudioOutput = (
   };
 
   return {
-    getOutputNode: () => context.destination,
+    getOutputNode: () => measureGain ?? context.destination,
     supportsDeviceSelection:
       !routedBySystem && getAudioContextSetSinkId(context) !== undefined,
     getDeviceId: () => deviceId,
@@ -50,6 +60,7 @@ export const createEngineAudioOutput = (
     play: async () => Promise.resolve(),
     attach: async (next) => {
       context = next;
+      measureGain &&= createMeasureGain(next, measureGain.gain.value);
       if (deviceId !== undefined) {
         await applyDeviceId(deviceId);
       }

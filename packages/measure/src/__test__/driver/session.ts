@@ -50,7 +50,9 @@ export const openCalibratedPage = async (request: MeasureRequest) => {
   const page = await openMeasurePage(request.device);
   try {
     if (request.calibrate) {
-      console.log('Calibrating the setup with the app check');
+      console.log(
+        'Calibrating the setup with the app check, which plays its clicks aloud',
+      );
       const calibration = calibrationSchema.parse(
         JSON.parse(await page.callText('calibrate', {})),
       );
@@ -67,7 +69,7 @@ export const openCalibratedPage = async (request: MeasureRequest) => {
     );
     if (latency.latencySource !== 'calibrated') {
       throw new Error(
-        'This setup is not calibrated: run the command without --keep-calibration',
+        'This setup has no stored calibration: run the command once with --calibrate, which plays aloud',
       );
     }
     console.log(formatLatency(latency));

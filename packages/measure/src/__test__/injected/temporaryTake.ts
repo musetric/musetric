@@ -11,6 +11,7 @@ import {
 } from '@musetric/engine';
 import axios from 'axios';
 import { createTakeWindow, layTakePiece, type TakeWindow } from '../take.js';
+import { type OutputMode, setOutput } from './output.js';
 import { epochNow, wait } from './samples.js';
 
 const activePollMs = 100;
@@ -112,6 +113,7 @@ export type TemporaryTakeSettings = {
   tempo: number;
   songVolume: number;
   metronome: boolean;
+  output: OutputMode;
   view?: SpectrogramViewMode;
 };
 
@@ -159,6 +161,7 @@ export const recordTemporaryTake = async (
     await wait(seekSettleMs);
     let stopProbe: (() => void) | undefined = undefined;
     try {
+      setOutput(engine, settings.output);
       await engine.player.record(projectId);
       console.info('[measure]', 'started', epochNow());
       stopProbe = probe?.();
