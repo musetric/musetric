@@ -87,7 +87,15 @@ export const useSpectrogramGesture = (
       },
     );
 
+    const unsubscribeView = engine.store.subscribe(
+      (state) => state.spectrogramView,
+      () => {
+        gesture.endAxis('y');
+      },
+    );
+
     return () => {
+      unsubscribeView();
       unsubscribeSeek();
       gesture.dispose();
       freeze.release();

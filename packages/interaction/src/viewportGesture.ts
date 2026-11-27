@@ -214,6 +214,7 @@ export const createViewportGesture = (
       return;
     }
 
+    if (mode === 'held') return;
     event.stop();
   };
 
@@ -344,8 +345,25 @@ export const createViewportGesture = (
     releaseFrozen();
   };
 
+  const endAxis = (axis: GestureAxis) => {
+    if (mode === 'pan-inertia' && activePan?.axis === axis) {
+      stopInertia();
+      releaseFrozen();
+      return;
+    }
+    if (
+      (mode === 'pan' && activePan?.axis === axis) ||
+      (mode === 'drag-zoom' && activeDragZoom?.axis === axis) ||
+      (mode === 'pinch-zoom' && activePinchZoom?.axis === axis)
+    ) {
+      clearActiveGesture();
+      mode = 'held';
+    }
+  };
+
   return {
     abort,
+    endAxis,
     dispose: () => {
       abort();
       axisSizes.dispose();
