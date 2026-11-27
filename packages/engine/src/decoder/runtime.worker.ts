@@ -145,12 +145,6 @@ export const createDecoderWorkerRuntime = (
         port.methods.takeRefused({ takeId: message.takeId, reason: 'failed' });
         return;
       }
-      audioDecode.beginLiveTake({
-        takeId: message.takeId,
-        tempo: message.tempo,
-        transpose: message.transpose,
-        octave: message.octave,
-      });
       takes.begin(
         {
           takeId: message.takeId,
@@ -163,8 +157,8 @@ export const createDecoderWorkerRuntime = (
           octave: message.octave,
           port: message.port,
         },
-        (chunk) => {
-          audioDecode.patchLiveTake(chunk);
+        (chunk, take) => {
+          audioDecode.patchLiveTake(chunk, take);
         },
       );
     },

@@ -5,7 +5,6 @@ import {
   type LiveTakeChunk,
   playerChannel,
   playerDataChannel,
-  type PlayerRecordingPiece,
   stemTracks,
 } from '../protocol.cross.js';
 import { recordingStreamChannel } from '../recordingStream.cross.js';
@@ -160,11 +159,19 @@ export const createTakeStream = (): TakeStream => {
   return { chunks, notification: stream.port1 };
 };
 
+export type RecordedPiece = {
+  songStartFrame: number;
+  tempo: number;
+  transpose: number;
+  octave: number;
+  samples: Float32Array<ArrayBuffer>;
+};
+
 export const mountTracks = (
   data: ReturnType<typeof playerDataChannel.outbound<MessagePort>>,
   frameCount: number,
   tracks: Record<StemType, Float32Array[]>,
-  recording: PlayerRecordingPiece[],
+  recording: RecordedPiece[],
 ): void => {
   const layout = { frameCount, pageStarts: [0] };
   const takes = recording.map((piece, index) => ({
@@ -215,7 +222,7 @@ export type Harness = TakeStream & {
 };
 
 export const createHarness = async (
-  recording: PlayerRecordingPiece[],
+  recording: RecordedPiece[],
 ): Promise<Harness> => {
   const control = new MessageChannel();
   let contextFrame = 0;

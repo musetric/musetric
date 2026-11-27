@@ -69,10 +69,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
   };
 
   const show = (draft: LoopTryDraft) => {
-    audioDecode.showTry(
-      heldTry(draft),
-      draft.samples.slice(0, draft.frameCount),
-    );
+    audioDecode.holdTake(heldTry(draft));
     liveTryId = draft.takeId;
   };
 
@@ -92,7 +89,7 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
     }
     draft.samples.set(chunk.samples, chunk.offset);
     draft.frameCount = Math.max(draft.frameCount, end);
-    audioDecode.patchLiveTake(chunk);
+    audioDecode.patchLiveTake(chunk, heldTry(draft));
   };
 
   return {
@@ -110,7 +107,6 @@ export const createLoopTries = (options: CreateLoopTriesOptions): LoopTries => {
         samples: new Float32Array(0),
         frameCount: 0,
       };
-      audioDecode.beginLiveTake(take);
       liveTryId = take.takeId;
       return createRecordingStream({
         port: recordingStreamChannel.outbound(start.port),

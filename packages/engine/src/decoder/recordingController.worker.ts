@@ -29,17 +29,6 @@ export type TakeStart = {
   port: MessagePort;
 };
 
-export type TakeEvent = Extract<
-  api.project.realtime.Event,
-  {
-    type:
-      | 'recording.started'
-      | 'recording.resumed'
-      | 'recording.finished'
-      | 'error';
-  }
->;
-
 type TakeLink = 'offline' | 'starting' | 'resuming' | 'ready' | 'closing';
 
 type Take = {
@@ -53,8 +42,31 @@ type Take = {
   asked: boolean;
 };
 
+const toHeldTake = (take: Pick<Take, 'start' | 'pages'>): HeldTake => ({
+  takeId: take.start.takeId,
+  tempo: take.start.tempo,
+  transpose: take.start.transpose,
+  octave: take.start.octave,
+  runs: take.pages.runs(),
+  read: take.pages.read,
+});
+
+export type TakeEvent = Extract<
+  api.project.realtime.Event,
+  {
+    type:
+      | 'recording.started'
+      | 'recording.resumed'
+      | 'recording.finished'
+      | 'error';
+  }
+>;
+
 export type RecordingController = {
-  begin: (start: TakeStart, onChunk: (chunk: LiveTakeChunk) => void) => void;
+  begin: (
+    start: TakeStart,
+    onChunk: (chunk: LiveTakeChunk, take: HeldTake) => void,
+  ) => void;
   holds: (takeId: string) => boolean;
   finish: (takeId: string, sequence: number) => Promise<HeldTake | undefined>;
   connect: () => void;
@@ -156,8 +168,8 @@ export const createRecordingController = (
         stream: createRecordingStream({
           port: recordingStreamChannel.outbound(streamPort),
           onChunk: (chunk) => {
-            onChunk(chunk);
             pages.push(chunk);
+            onChunk(chunk, toHeldTake({ start: format, pages }));
             pump();
           },
         }),
@@ -179,15 +191,7 @@ export const createRecordingController = (
       take.stream.close();
       take.finishing = true;
       pump();
-      const { pages, start } = take;
-      return {
-        takeId,
-        tempo: start.tempo,
-        transpose: start.transpose,
-        octave: start.octave,
-        runs: pages.runs(),
-        read: pages.read,
-      };
+      return toHeldTake(take);
     },
     connect: link,
     disconnect: () => {
