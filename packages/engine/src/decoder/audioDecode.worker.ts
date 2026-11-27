@@ -1,11 +1,14 @@
 import {
   type LiveTakeChunk,
-  type LiveTakeStart,
   type playerDataChannel,
   type PlayerStemLayouts,
   type PlayerWindow,
 } from '../player/protocol.cross.js';
-import { type spectrogramDataChannel } from '../spectrogram/protocol.cross.js';
+import {
+  type spectrogramDataChannel,
+  spectrogramLeadKey,
+  type SpectrogramTakes,
+} from '../spectrogram/protocol.cross.js';
 import { createPageReads, type PageReads } from './pageReads.worker.js';
 import {
   createStemPageReaders,
@@ -13,8 +16,8 @@ import {
 } from './stemPageReaders.worker.js';
 import { type HeldTake } from './takePages.worker.js';
 import {
-  createStoredWholes,
   heldSources,
+  liveSources,
   loadStored,
   type RecordingPlace,
   type StoredRecording,
@@ -36,10 +39,8 @@ export type AudioDecode = {
     frameCount: number;
   }>;
   setActiveRecording: (recordingId: number | undefined) => void;
-  beginLiveTake: (take: LiveTakeStart) => void;
-  patchLiveTake: (chunk: LiveTakeChunk) => void;
+  patchLiveTake: (chunk: LiveTakeChunk, take: HeldTake) => void;
   holdTake: (take: HeldTake) => void;
-  showTry: (take: HeldTake, samples: Float32Array<ArrayBuffer>) => void;
   hideTake: (takeId: string) => void;
   reloadRecording: (finishedTakeId?: string) => Promise<void>;
   requestTarget: (window: PlayerWindow) => void;
@@ -61,12 +62,14 @@ export const createAudioDecode = (
   options: CreateAudioDecodeOptions,
 ): AudioDecode => {
   const { spectrogramPort } = options;
-  const wholes = createStoredWholes();
   let playerPort: PlayerPort | undefined = undefined;
   let readers: StemPageReaders | undefined = undefined;
   let pageReads: PageReads | undefined = undefined;
   let mounted: MountedAudio | undefined = undefined;
   let held: HeldTake | undefined = undefined;
+  let live: HeldTake | undefined = undefined;
+  let spectrogramSources: TakeSource[] = [];
+  let spectrogramReads = new AbortController();
   let activeRecordingId: number | undefined = undefined;
   let reloading: Promise<void> = Promise.resolve();
   let reloadOnMount: Reload | undefined = undefined;
@@ -76,10 +79,34 @@ export const createAudioDecode = (
     ...(held ? heldSources(held, audio.sampleRate) : []),
   ];
 
+  const spectrogramTakes = (audio: MountedAudio): SpectrogramTakes => {
+    const liveRuns = live ? liveSources(live, audio) : [];
+    spectrogramSources = [...sources(audio), ...liveRuns];
+    return {
+      takes: spectrogramSources.map((source) => ({
+        key: source.key,
+        songStartFrame: source.songStartFrame,
+        tempo: source.tempo,
+        transpose: source.transpose,
+        octave: source.octave,
+        frameCount: source.frameCount,
+        pageStarts: source.pageStarts,
+      })),
+      live: liveRuns.at(-1)?.key,
+    };
+  };
+
+  const showSpectrogramTakes = () => {
+    if (mounted) {
+      spectrogramPort.methods.setTakes(spectrogramTakes(mounted));
+    }
+  };
+
   const showTakes = () => {
     if (mounted) {
       pageReads?.setTakes(sources(mounted));
     }
+    showSpectrogramTakes();
   };
 
   const reloadPieces = async (reload: Reload): Promise<void> => {
@@ -103,16 +130,10 @@ export const createAudioDecode = (
     if (switched || (held && held.takeId === reload.finishedTakeId)) {
       held = undefined;
     }
-    showTakes();
-    const pieces = await wholes.load(current);
-    if (mounted !== current) {
-      return;
+    if (switched || (live && live.takeId === reload.finishedTakeId)) {
+      live = undefined;
     }
-    spectrogramPort.methods.setRecordingPieces({
-      pieces,
-      finishedTakeId: reload.finishedTakeId,
-      switched,
-    });
+    showTakes();
   };
 
   const mountPlayer = (audio: MountedAudio, reads: PageReads) => {
@@ -147,7 +168,7 @@ export const createAudioDecode = (
         playerPort?.methods.setTakes(takes);
       },
       putLeadPage: (page) => {
-        spectrogramPort.methods.putLeadPage(page);
+        spectrogramPort.methods.putPage({ key: spectrogramLeadKey, ...page });
       },
       failed: (error) => {
         console.error('Failed to read a page of a track', error);
@@ -155,8 +176,33 @@ export const createAudioDecode = (
     });
 
   spectrogramPort.bindHandlers({
-    requestLeadPages: (message) => {
-      pageReads?.requestLeadPages(message.indices);
+    requestPages: (message) => {
+      const { key, indices } = message;
+      if (key === spectrogramLeadKey) {
+        pageReads?.requestLeadPages(indices);
+        return;
+      }
+      const source = spectrogramSources.find((item) => item.key === key);
+      if (!source) {
+        return;
+      }
+      const { signal } = spectrogramReads;
+      for (const index of indices) {
+        source
+          .read(index, signal)
+          .then((page) => {
+            spectrogramPort.methods.putPage({
+              key,
+              index,
+              samples: page.samples,
+            });
+          })
+          .catch((error: unknown) => {
+            if (!signal.aborted) {
+              console.error('Failed to read a page of a take', error);
+            }
+          });
+      }
     },
   });
 
@@ -212,12 +258,12 @@ export const createAudioDecode = (
         ...stored,
       };
       held = undefined;
-      const pieces = await wholes.load(audio);
+      live = undefined;
       mounted = audio;
       pageReads = createReads(audio, current);
       spectrogramPort.methods.mount({
         lead: audio.layouts.lead,
-        recording: pieces,
+        ...spectrogramTakes(audio),
       });
       mountPlayer(audio, pageReads);
       const pending = reloadOnMount;
@@ -241,44 +287,34 @@ export const createAudioDecode = (
         console.error('Failed to switch the recording', error);
       });
     },
-    beginLiveTake: (take) => {
-      spectrogramPort.methods.beginLiveTake(take);
-    },
-    patchLiveTake: (chunk) => {
-      spectrogramPort.methods.appendLiveTake({
-        ...chunk,
+    patchLiveTake: (chunk, take) => {
+      if (
+        live?.takeId !== take.takeId ||
+        live.runs.length !== take.runs.length
+      ) {
+        live = take;
+        showSpectrogramTakes();
+      }
+      spectrogramPort.methods.writeLiveTake({
+        offset: chunk.offset,
         samples: chunk.samples.slice(),
       });
     },
     holdTake: (take) => {
       held = take;
+      if (live?.takeId === take.takeId) {
+        live = undefined;
+      }
       showTakes();
-    },
-    showTry: (take, samples) => {
-      held = take;
-      showTakes();
-      spectrogramPort.methods.beginLiveTake({
-        takeId: take.takeId,
-        tempo: take.tempo,
-        transpose: take.transpose,
-        octave: take.octave,
-      });
-      spectrogramPort.methods.appendLiveTake({
-        startFrame: take.runs[0].startFrame,
-        offset: 0,
-        samples,
-      });
     },
     hideTake: (takeId) => {
       if (held?.takeId === takeId) {
         held = undefined;
         showTakes();
       }
-      if (mounted) {
-        spectrogramPort.methods.setRecordingPieces({
-          pieces: wholes.copy(mounted.pieces),
-          finishedTakeId: takeId,
-        });
+      if (live?.takeId === takeId) {
+        live = undefined;
+        showSpectrogramTakes();
       }
     },
     reloadRecording: async (finishedTakeId) => queueReload({ finishedTakeId }),
@@ -288,6 +324,10 @@ export const createAudioDecode = (
     unmount: () => {
       mounted = undefined;
       held = undefined;
+      live = undefined;
+      spectrogramSources = [];
+      spectrogramReads.abort();
+      spectrogramReads = new AbortController();
       pageReads?.close();
       pageReads = undefined;
       reloadOnMount = undefined;

@@ -3,7 +3,6 @@ import {
   getRecordingPieceRange,
   getRecordingPieces,
 } from '../audioRequest/audioRequest.worker.js';
-import { type PlayerRecordingPiece } from '../player/protocol.cross.js';
 import { type HeldTake, takePageFrameCount } from './takePages.worker.js';
 import { type TakeSource } from './takeTracks.worker.js';
 
@@ -140,36 +139,27 @@ export const heldSources = (take: HeldTake, sampleRate: number): TakeSource[] =>
     ),
   );
 
-export type StoredWholes = {
-  load: (place: StoredPlace) => Promise<PlayerRecordingPiece[]>;
-  copy: (pieces: readonly StoredPiece[]) => PlayerRecordingPiece[];
+type LivePlace = Pick<RecordingPlace, 'sampleRate'> & {
+  frameCount: number;
 };
 
-export const createStoredWholes = (): StoredWholes => {
-  let wholes = new Map<string, Float32Array<ArrayBuffer>>();
-  const copy: StoredWholes['copy'] = (pieces) =>
-    pieces.flatMap((piece) => {
-      const samples = wholes.get(piece.blobId);
-      return samples ? [{ ...piece, samples: samples.slice() }] : [];
-    });
-  return {
-    load: async (place) => {
-      const loaded = await Promise.all(
-        place.pieces.map(
-          async (piece) =>
-            wholes.get(piece.blobId) ??
-            (await readStored(place, piece, { from: 0, to: piece.frameCount })),
-        ),
-      );
-      wholes = new Map();
-      for (const [index, piece] of place.pieces.entries()) {
-        const samples = loaded[index];
-        if (samples) {
-          wholes.set(piece.blobId, samples);
-        }
-      }
-      return copy(place.pieces);
+export const liveSources = (take: HeldTake, place: LivePlace): TakeSource[] => {
+  const last = take.runs.length - 1;
+  return heldSources(
+    {
+      ...take,
+      runs: take.runs.map((run, index) =>
+        index === last
+          ? {
+              ...run,
+              frameCount: Math.max(
+                run.frameCount,
+                Math.ceil((place.frameCount - run.startFrame) / take.tempo),
+              ),
+            }
+          : run,
+      ),
     },
-    copy,
-  };
+    place.sampleRate,
+  );
 };

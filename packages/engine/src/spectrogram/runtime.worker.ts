@@ -1,3 +1,4 @@
+import { type SpectrogramSource } from '@musetric/spectrogram';
 import {
   averageMetrics,
   createSpectrogramProcessor,
@@ -7,7 +8,6 @@ import {
 import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLoop';
 import { createThrottleTime } from '@musetric/utils/cross/throttleTime';
 import { type Playhead } from '../player/playhead.cross.js';
-import { createLeadPages, type LeadPages } from './leadPages.worker.js';
 import {
   type CapturedPreview,
   type ContextPreview,
@@ -15,9 +15,15 @@ import {
 import {
   type spectrogramChannel,
   type spectrogramDataChannel,
+  spectrogramLeadKey,
 } from './protocol.cross.js';
 import { createRecordingSource } from './recordingSource.worker.js';
 import { type RenderListener } from './renderHook.worker.js';
+import {
+  createTrackPages,
+  toPlainSource,
+  type TrackPages,
+} from './trackPages.worker.js';
 import { createViewWindowState } from './viewWindow.worker.js';
 
 export type CreateSpectrogramRuntimeOptions = {
@@ -68,7 +74,8 @@ export const createSpectrogramRuntime = async (
     });
 
   let processor = createProcessor();
-  let lead: LeadPages | undefined = undefined;
+  let lead: { pages: TrackPages; source: SpectrogramSource } | undefined =
+    undefined;
   const recording = createRecordingSource();
   let trackProgress = 0;
   let frameCount = 0;
@@ -77,6 +84,9 @@ export const createSpectrogramRuntime = async (
   const viewWindow = createViewWindowState();
 
   const render = async () => {
+    if (lead) {
+      recording.prepare(viewWindow.span(trackProgress * frameCount));
+    }
     const samples = lead
       ? {
           lead: lead.source,
@@ -94,10 +104,16 @@ export const createSpectrogramRuntime = async (
       liveEnd === undefined ? {} : { recording: liveEnd },
     );
     if (lead) {
-      lead.sweep();
-      const indices = lead.takeWanted();
-      if (indices.length > 0) {
-        dataPort.methods.requestLeadPages({ indices });
+      lead.pages.sweep();
+      recording.sweep();
+      const requests = [
+        { key: spectrogramLeadKey, indices: lead.pages.takeWanted() },
+        ...recording.takeWanted(),
+      ];
+      for (const request of requests) {
+        if (request.indices.length > 0) {
+          dataPort.methods.requestPages(request);
+        }
       }
     }
     if (!ok || !lead) {
@@ -165,17 +181,22 @@ export const createSpectrogramRuntime = async (
 
   dataPort.bindHandlers({
     mount: async (message) => {
-      lead = createLeadPages(message.lead);
+      const pages = createTrackPages(message.lead);
+      lead = { pages, source: toPlainSource(message.lead.frameCount, pages) };
       recording.clear();
-      recording.setPieces({ pieces: message.recording });
+      recording.setTakes(message);
       await render();
     },
-    putLeadPage: (message) => {
-      const range = lead?.put(message.index, message.samples);
-      if (!range) {
-        return;
+    putPage: (message) => {
+      const { key, index, samples } = message;
+      const trackKey = key === spectrogramLeadKey ? 'lead' : 'recording';
+      const range =
+        trackKey === 'lead'
+          ? lead?.pages.put(index, samples)
+          : recording.put(key, index, samples);
+      if (range) {
+        processor.invalidateSamples([{ trackKey, ...range }]);
       }
-      processor.invalidateSamples([{ trackKey: 'lead', ...range }]);
       if (!playing) {
         renderPaused();
       }
@@ -186,17 +207,14 @@ export const createSpectrogramRuntime = async (
       setStatus('pending');
       await render();
     },
-    setRecordingPieces: (message) => {
-      recording.setPieces(message);
+    setTakes: (message) => {
+      recording.setTakes(message);
       if (!playing) {
         renderPaused();
       }
     },
-    beginLiveTake: (message) => {
-      recording.beginLiveTake(message);
-    },
-    appendLiveTake: (message) => {
-      const range = recording.appendLiveTake(message);
+    writeLiveTake: (message) => {
+      const range = recording.writeLiveTake(message.offset, message.samples);
       if (!range) {
         return;
       }
