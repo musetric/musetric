@@ -4,12 +4,8 @@ import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type EngineAudioSession } from '../audioSession/engineAudioSession.js';
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import {
-  clampToRange,
-  type EngineState,
-  isPlaying,
-  isRecording,
-} from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { clampToRange, isPlaying, isRecording } from '../state.js';
 import { createEngineCommandQueue } from './commandQueue.js';
 import { createEnginePlayerLoop, type EnginePlayerLoop } from './loop.js';
 import { createEnginePlayback, type EnginePlayback } from './playback.js';
@@ -50,7 +46,7 @@ export type CreateEnginePlayerOptions = {
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
   audioSession: EngineAudioSession;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   getDecoder: () => EngineDecoder;
   position: EnginePositionWriter;
   seeks: EngineSeeksWriter;

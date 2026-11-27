@@ -7,8 +7,8 @@ import { createAnimationFrameLoop } from '@musetric/utils/cross/animationFrameLo
 import { type EngineAudioOutput } from '../audioOutput/index.js';
 import { type EngineOutputClock } from '../audioOutput/outputClock.js';
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import {
-  type EngineState,
   getInputShareFrameCount,
   getOutputLatencyFrameCount,
   getRecordingLatencyFrameCount,
@@ -51,7 +51,7 @@ export type CreateEnginePlaybackOptions = {
   context: AudioContext;
   audioOutput: EngineAudioOutput;
   outputClock: EngineOutputClock;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   dataPort: MessagePort;
   playheadPort: MessagePort;
   mounted: boolean;

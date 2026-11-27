@@ -1,11 +1,7 @@
 import { type Store } from '../common/store.js';
 import { type EngineDecoder } from '../decoder/index.js';
-import {
-  type EngineRange,
-  type EngineState,
-  isPlaying,
-  isRecording,
-} from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
+import { type EngineRange, isPlaying, isRecording } from '../state.js';
 import { type EngineCommandQueue } from './commandQueue.js';
 import { type EngineRecorder } from './recorder.js';
 import { type EngineSessionMachine } from './session.js';
@@ -23,7 +19,7 @@ export type EnginePlayerLoop = {
 };
 
 export type CreateEnginePlayerLoopOptions = {
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   session: EngineSessionMachine;
   queue: EngineCommandQueue;
   getDecoder: () => EngineDecoder;

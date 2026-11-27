@@ -1,6 +1,6 @@
 import { type StemType, stemTypes } from '@musetric/audio/es';
 import { type Store } from '../common/store.js';
-import { type EngineState } from '../state.js';
+import { type EngineStoreState } from '../ownState.js';
 import { type playerChannel } from './protocol.cross.js';
 import { type EngineTrackKey } from './settings.js';
 
@@ -17,7 +17,7 @@ export type PlaybackSettings = {
 
 export type CreatePlaybackSettingsOptions = {
   port: ReturnType<typeof playerChannel.outbound<MessagePort>>;
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   sampleRate: number;
 };
 

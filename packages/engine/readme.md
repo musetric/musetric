@@ -21,9 +21,11 @@ from the frontend. What the player must do for the user is in headquarters'
 | `audioRequest` | The workers' requests to the host's HTTP API                                                                                                                                        |
 | `measure`      | The tap of the measure build, behind `frontendMeasure`                                                                                                                              |
 
-`engine.ts` builds the parts and connects their ports, `state.ts` holds the
-state and the readings derived from it, and `view.ts` the commands of the
-picture. The `protocol.cross.ts` of a folder types the messages between the
+`engine.ts` builds the parts and connects their ports, and `view.ts` holds the
+commands of the picture. The store keeps two parts of one state: `state.ts`
+holds `EngineState`, the part the frontend reads, with the readings derived
+from it, and `ownState.ts` the part only the engine reads, such as the states
+of the transport. The `protocol.cross.ts` of a folder types the messages between the
 main thread and its worker or worklet.
 
 ## What the frontend uses
@@ -34,8 +36,8 @@ main thread and its worker or worklet.
   and `engine.waveform` mount their canvases.
 - **Readings**: the position from `engine.position`, a seek from
   `engine.seeks`, the transport through `isPlaying`, `isRecording`,
-  `isTransportBusy` and `isBuffering`, and the rest of the state from
-  `engine.store`, which only the engine writes.
+  `isTransportBusy` and `isBuffering`, and the rest of `EngineState` from
+  `engine.store`, which the frontend can only read.
 
 ## Position and transport
 
@@ -48,7 +50,9 @@ main thread and its worker or worklet.
 - The transport has one writer on each thread: the session machine
   (`player/session.ts`) holds what the user asked for, and the worklet's
   motion (`player/motion.worklet.ts`) what really sounds
-  ([#1371](https://github.com/musetric/musetric/issues/1371)).
+  ([#1371](https://github.com/musetric/musetric/issues/1371)). The session
+  machine also writes `transport` of `EngineState`, the four readings above,
+  with each of its transitions.
 
 ## Tests
 

@@ -1,5 +1,5 @@
 import { type Store } from '../common/store.js';
-import { type EngineState } from '../state.js';
+import { type EngineStoreState, readTransport } from '../ownState.js';
 import { type PlayerMotion } from './protocol.cross.js';
 
 export type EngineSessionMachine = {
@@ -18,10 +18,17 @@ export type EngineSessionMachine = {
 };
 
 export const createEngineSessionMachine = (
-  store: Store<EngineState>,
+  store: Store<EngineStoreState>,
 ): EngineSessionMachine => {
-  const update = (recipe: (state: EngineState) => void) => {
-    store.update(recipe);
+  const update = (recipe: (state: EngineStoreState) => void) => {
+    store.update((state) => {
+      recipe(state);
+      const transport = readTransport(state);
+      state.transport.playing = transport.playing;
+      state.transport.recording = transport.recording;
+      state.transport.busy = transport.busy;
+      state.transport.buffering = transport.buffering;
+    });
   };
   return {
     beginPlay: () => {

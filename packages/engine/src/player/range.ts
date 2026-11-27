@@ -1,16 +1,16 @@
 import { type Store } from '../common/store.js';
+import { type EngineStoreState } from '../ownState.js';
 import {
   clampToRange,
   type EngineRange,
   type EngineRangePlay,
   type EngineRangeRepeat,
-  type EngineState,
   isPlaying,
 } from '../state.js';
 import { type EngineCommandQueue } from './commandQueue.js';
 
 export type CreateEnginePlayerRangeOptions = {
-  store: Store<EngineState>;
+  store: Store<EngineStoreState>;
   readPosition: () => number;
   seek: (frameIndex: number) => void;
   queue: EngineCommandQueue;
