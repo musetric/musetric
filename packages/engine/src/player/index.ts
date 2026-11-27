@@ -232,6 +232,10 @@ export const createEnginePlayer = (
       holds += 1;
       if (holds === 1) {
         setFrozen(true);
+        const state = store.get();
+        if (isPlaying(state) && !isRecording(state)) {
+          ref.seek(position.read(), 'hold');
+        }
       }
       let held = true;
       return () => {
