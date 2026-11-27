@@ -17,7 +17,7 @@ every frame and every callback.
 - **The motion machine** (`motion.ts`) holds what the worklet really plays.
 
 The timeline map and the motion machine run on the audio thread, and the
-engine's lint follows their calls there with `musetric/no-audio-thread-allocations`.
-A directive of that rule in this package is read when the engine is linted,
-so this package's own lint, which sees no audio thread, does not report it
-as unused (`eslint.config.ts`).
+engine's lint follows their calls there with
+`musetric/no-audio-thread-allocations`: nothing in this package allocates per
+quantum, and what the engine passes in to be called once per event is marked
+where the engine passes it.

@@ -322,12 +322,14 @@ export const createPlayerRuntime = (
       const ready =
         recordingRuntime.isActive() || renderer.ready(currentOutputFrameIndex);
       if (!ready && cuts.fade.silent()) {
+        // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
         motion.moveTo('buffering', setPlaying);
         recordingRuntime.processDrain(inputs);
         position.hold(contextFrame, outputFrameCount);
         playhead.publish(readHeard());
         return;
       }
+      // eslint-disable-next-line musetric/no-audio-thread-allocations -- a change of motion is reported once
       motion.moveTo('rolling', setPlaying);
       cuts.follow(ready);
 
