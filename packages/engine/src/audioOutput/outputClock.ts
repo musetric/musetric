@@ -43,6 +43,7 @@ const readHeard = (context: AudioContext, nowMs: number) => {
   if (
     contextTime > 0 &&
     contextTime < currentTime &&
+    contextTime + (nowMs - performanceTime) / 1000 < currentTime &&
     performanceTime > 0 &&
     nowMs - performanceTime < staleTimestampMs
   ) {
@@ -90,7 +91,8 @@ export const createEngineOutputClock = (
   let published: OutputClockReading | undefined = undefined;
   let refilling = false;
   let offsetHeardMs = 0;
-  let reported = true;
+  let offsetSettled = false;
+  let reported: boolean | undefined = undefined;
   let pausedReading: HeldReading | undefined = undefined;
   let held: HeldReading | undefined = undefined;
   let runningSinceMs =
@@ -118,14 +120,14 @@ export const createEngineOutputClock = (
 
   const pushClockOffset = (heard: ReturnType<typeof readHeard>) => {
     if (clockOffsets.length > 0 && heard.performanceMs === offsetHeardMs) {
-      return;
+      return offsetSettled;
     }
     const clockOffset = readClockOffset(heard);
-    if (
-      heard.reported &&
-      clockOffsets.length > 0 &&
-      Math.abs(clockOffset - median(clockOffsets)) > timestampMoveSeconds
-    ) {
+    offsetSettled =
+      !heard.reported ||
+      (clockOffsets.length > 0 &&
+        Math.abs(clockOffset - median(clockOffsets)) <= timestampMoveSeconds);
+    if (!offsetSettled && clockOffsets.length > 0) {
       clockOffsets.length = 0;
       refilling = true;
     }
@@ -134,6 +136,20 @@ export const createEngineOutputClock = (
     if (clockOffsets.length >= refillCount) {
       refilling = false;
     }
+    return offsetSettled;
+  };
+
+  const pushRenderAhead = (renderAhead: number, settled: boolean) => {
+    if (settled || held || !published) {
+      pushWithin(
+        renderAheads,
+        held ? held.renderAhead : renderAhead,
+        sampleWindow,
+      );
+    }
+    return renderAheads.length > 0
+      ? Math.max(0, median(renderAheads))
+      : published?.renderAhead;
   };
 
   const sample = () => {
@@ -149,8 +165,8 @@ export const createEngineOutputClock = (
     );
     const heard = readHeard(context, nowMs);
     if (heard.reported !== reported) {
+      refilling = reported !== undefined;
       reported = heard.reported;
-      refilling = reported;
       clearSamples();
     }
     const renderAhead =
@@ -166,14 +182,15 @@ export const createEngineOutputClock = (
         releaseHeld();
       }
     }
-    pushWithin(
-      renderAheads,
-      held ? held.renderAhead : renderAhead,
-      sampleWindow,
+    const delay = pushRenderAhead(
+      renderAhead,
+      pushClockOffset(heard) && !refilling,
     );
-    pushClockOffset(heard);
+    if (delay === undefined) {
+      return;
+    }
     const reading: OutputClockReading = {
-      renderAhead: Math.max(0, median(renderAheads)),
+      renderAhead: delay,
       clockOffset: held
         ? trimmedMean(contextOffsets) + held.heardShift
         : median(clockOffsets),
