@@ -29,6 +29,7 @@ export type EnginePlayer = EnginePlayerLoop &
     boot: () => Promise<void>;
     play: () => Promise<void>;
     stop: () => Promise<void>;
+    readHeardFrame: () => number;
     seek: (frameIndex: number, origin: EngineSeekOrigin) => void;
     hold: () => () => void;
     record: (projectId: number) => Promise<void>;
@@ -59,7 +60,7 @@ export const createEnginePlayer = (
 ): EnginePlayer => {
   const { getContext, audioOutput, outputClock, store, getProject } = options;
   const { position, seeks } = options;
-  let enginePlayback: EnginePlayback = createEngineStubPlayback();
+  let enginePlayback: EnginePlayback = createEngineStubPlayback(position);
   let engineRecorder: EngineRecorder | undefined = undefined;
   let heldSeek: number | undefined = undefined;
   let heldRequest: ReturnType<typeof setTimeout> | undefined = undefined;
@@ -210,6 +211,7 @@ export const createEnginePlayer = (
         await startPlayback();
       }),
     stop,
+    readHeardFrame: () => enginePlayback.readHeardFrame(),
     seek: (requestedFrameIndex, origin) => {
       const { range } = store.get();
       const frameIndex = clampToRange(requestedFrameIndex, range);

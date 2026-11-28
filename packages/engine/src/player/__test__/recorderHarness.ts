@@ -62,7 +62,11 @@ export const createRecorderHarness = (
       return Promise.resolve();
     },
   });
-  const enginePlayback = { ...createEngineStubPlayback(), ...playback };
+  const position = createEnginePosition();
+  const enginePlayback = {
+    ...createEngineStubPlayback(position),
+    ...playback,
+  };
   const recorder = createEngineRecorder({
     context: fake<AudioContext>({
       sampleRate: 48000,
@@ -75,7 +79,7 @@ export const createRecorderHarness = (
     outputClock,
     audioSession,
     store: createStore(initialEngineState),
-    position: createEnginePosition(),
+    position,
     seeks: createEngineSeeks(),
     endTake: noop,
     getProject: () => project,

@@ -1,11 +1,15 @@
 import { type EnginePlayback } from './playback.js';
+import { type EnginePosition } from './position.js';
 
 const noop = (): void => undefined;
 
-export const createEngineStubPlayback = (): EnginePlayback => ({
+export const createEngineStubPlayback = (
+  position: EnginePosition,
+): EnginePlayback => ({
   boot: async () => Promise.resolve(false),
   play: async () => Promise.resolve(false),
   stop: async () => Promise.resolve(0),
+  readHeardFrame: () => position.read(),
   setFrozen: noop,
   seek: noop,
   connectRecordingSource: () => noop,
