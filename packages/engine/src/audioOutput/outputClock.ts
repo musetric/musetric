@@ -1,10 +1,13 @@
 import { createClockStall } from './clockStall.cross.js';
 
 const sampleIntervalMs = 100;
+const refillIntervalMs = 20;
+const refillCount = 6;
 const restObserveMs = 500;
 const sampleWindow = 15;
 const contextOffsetWindow = 30;
 const startupSampleDelaysMs = [0, 20, 40, 60, 80];
+const timestampMoveSeconds = 0.005;
 const renderAheadStepSeconds = 0.001;
 const clockOffsetStepSeconds = 0.0005;
 const staleTimestampMs = 100;
@@ -40,6 +43,7 @@ const readHeard = (context: AudioContext, nowMs: number) => {
   if (
     contextTime > 0 &&
     contextTime < currentTime &&
+    contextTime + (nowMs - performanceTime) / 1000 < currentTime &&
     performanceTime > 0 &&
     nowMs - performanceTime < staleTimestampMs
   ) {
@@ -85,7 +89,10 @@ export const createEngineOutputClock = (
   const reportedWhileHeld: number[] = [];
   const listeners = new Set<(reading: OutputClockReading) => void>();
   let published: OutputClockReading | undefined = undefined;
-  let reported = true;
+  let refilling = false;
+  let offsetHeardMs = 0;
+  let offsetSettled = false;
+  let reported: boolean | undefined = undefined;
   let pausedReading: HeldReading | undefined = undefined;
   let held: HeldReading | undefined = undefined;
   let runningSinceMs =
@@ -106,8 +113,43 @@ export const createEngineOutputClock = (
 
   const releaseHeld = () => {
     held = undefined;
+    refilling = false;
     reportedWhileHeld.length = 0;
     clearSamples();
+  };
+
+  const pushClockOffset = (heard: ReturnType<typeof readHeard>) => {
+    if (clockOffsets.length > 0 && heard.performanceMs === offsetHeardMs) {
+      return offsetSettled;
+    }
+    const clockOffset = readClockOffset(heard);
+    offsetSettled =
+      !heard.reported ||
+      (clockOffsets.length > 0 &&
+        Math.abs(clockOffset - median(clockOffsets)) <= timestampMoveSeconds);
+    if (!offsetSettled && clockOffsets.length > 0) {
+      clockOffsets.length = 0;
+      refilling = true;
+    }
+    pushWithin(clockOffsets, clockOffset, sampleWindow);
+    offsetHeardMs = heard.performanceMs;
+    if (clockOffsets.length >= refillCount) {
+      refilling = false;
+    }
+    return offsetSettled;
+  };
+
+  const pushRenderAhead = (renderAhead: number, settled: boolean) => {
+    if (settled || held || !published) {
+      pushWithin(
+        renderAheads,
+        held ? held.renderAhead : renderAhead,
+        sampleWindow,
+      );
+    }
+    return renderAheads.length > 0
+      ? Math.max(0, median(renderAheads))
+      : published?.renderAhead;
   };
 
   const sample = () => {
@@ -123,13 +165,13 @@ export const createEngineOutputClock = (
     );
     const heard = readHeard(context, nowMs);
     if (heard.reported !== reported) {
+      refilling = reported !== undefined;
       reported = heard.reported;
       clearSamples();
     }
     const renderAhead =
       context.currentTime -
       (heard.contextTime + (nowMs - heard.performanceMs) / 1000);
-    const clockOffset = readClockOffset(heard);
     if (held) {
       pushWithin(reportedWhileHeld, renderAhead, heldAgreementWindow);
       if (
@@ -140,14 +182,15 @@ export const createEngineOutputClock = (
         releaseHeld();
       }
     }
-    pushWithin(
-      renderAheads,
-      held ? held.renderAhead : renderAhead,
-      sampleWindow,
+    const delay = pushRenderAhead(
+      renderAhead,
+      pushClockOffset(heard) && !refilling,
     );
-    pushWithin(clockOffsets, clockOffset, sampleWindow);
+    if (delay === undefined) {
+      return;
+    }
     const reading: OutputClockReading = {
-      renderAhead: Math.max(0, median(renderAheads)),
+      renderAhead: delay,
       clockOffset: held
         ? trimmedMean(contextOffsets) + held.heardShift
         : median(clockOffsets),
@@ -181,8 +224,15 @@ export const createEngineOutputClock = (
     }
   };
 
+  const readIntervalMs = () => {
+    if (isResting()) {
+      return restObserveMs;
+    }
+    return refilling && !held ? refillIntervalMs : sampleIntervalMs;
+  };
+
   const schedule = () => {
-    const ms = isResting() ? restObserveMs : sampleIntervalMs;
+    const ms = readIntervalMs();
     if (timer !== undefined && timerMs === ms) {
       return;
     }
