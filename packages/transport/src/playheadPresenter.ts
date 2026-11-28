@@ -1,4 +1,8 @@
-import { type PlayheadLoop, type PlayheadValue } from './playhead.js';
+import {
+  isStartHeard,
+  type PlayheadLoop,
+  type PlayheadValue,
+} from './playhead.js';
 
 const maxExtrapolationSeconds = 0.25;
 
@@ -16,16 +20,15 @@ export const wrapLoop = (
 const isRolling = (value: PlayheadValue) =>
   value.rate !== 0 && value.clockOffset !== undefined;
 
-const isWaiting = (value: PlayheadValue, epochMs: number, sampleRate: number) =>
-  value.clockOffset !== undefined &&
-  (epochMs / 1000 + value.clockOffset) * sampleRate < value.startContextFrame;
+const isWaiting = (value: PlayheadValue) =>
+  value.clockOffset !== undefined && !isStartHeard(value);
 
 const readElapsed = (
   value: PlayheadValue,
   epochMs: number,
   sampleRate: number,
 ) => {
-  if (value.clockOffset === undefined) {
+  if (value.clockOffset === undefined || !isStartHeard(value)) {
     return 0;
   }
   const heardContextFrame = (epochMs / 1000 + value.clockOffset) * sampleRate;
@@ -127,7 +130,7 @@ export const createPlayheadPresenter = (
       if (Math.abs(error) > jumpSeconds * sampleRate) {
         return show(value, epochMs, target);
       }
-      if (isWaiting(value, epochMs, sampleRate)) {
+      if (isWaiting(value)) {
         const walked =
           shown.frameIndex +
           ((epochMs - shown.epochMs) / 1000) * sampleRate * value.rate;
