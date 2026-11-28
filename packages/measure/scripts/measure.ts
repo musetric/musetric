@@ -46,7 +46,7 @@ const usage = `usage: pnpm --filter @musetric/measure measure:<timing|delay|soun
   measure:seek     seeks to far frames while playing: the time to the first sound and the range requests of the stems
   measure:frame    the spectrogram's frames while playing and during a swipe of the progress bar, and the swipe's screens against the ruler
 
-  timing, delay and sound play aloud; the others mute the page before every Play and take, and stop if it is not silent
+  timing, delay and sound play aloud; the others turn the page's output down to -120 dB, never 0, before every Play and take, and stop if it is not there
 
 options
   --device <android|chrome|desktop>  the page to drive (default: android)
