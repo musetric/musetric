@@ -20,7 +20,7 @@ import {
   type PlaybackSettings,
 } from './playbackSettings.js';
 import playerWorkletUrl from './player.worklet.ts?worker&url';
-import { createPlayhead } from './playhead.cross.js';
+import { createPlayhead, readEpochMs } from './playhead.cross.js';
 import { type EnginePositionWriter } from './position.js';
 import {
   playerChannel,
@@ -33,6 +33,7 @@ export type EnginePlayback = PlaybackSettings & {
   boot: () => Promise<boolean>;
   play: () => Promise<boolean>;
   stop: () => Promise<number>;
+  readHeardFrame: () => number;
   setFrozen: (frozen: boolean) => void;
   seek: (frameIndex: number) => void;
   connectRecordingSource: (source: AudioNode) => () => void;
@@ -355,6 +356,10 @@ export const createEnginePlayback = async (
       options.applyMotion('stopped');
       return frameIndex;
     },
+    readHeardFrame: () =>
+      !failed && isCurrentRevision(playhead.read().revision)
+        ? playhead.readFrameIndexAt(readEpochMs())
+        : position.read(),
     setFrozen: (frozen) => {
       store.update((state) => {
         state.frozen = frozen;

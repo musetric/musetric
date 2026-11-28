@@ -60,7 +60,7 @@ export const subscribeMediaSession = (
       return;
     }
     shown = true;
-    const positionMs = toMilliseconds(engine.position.read());
+    const positionMs = toMilliseconds(engine.player.readHeardFrame());
     published = {
       positionMs,
       at: performance.now(),
@@ -90,7 +90,7 @@ export const subscribeMediaSession = (
     const expected =
       published.positionMs +
       (performance.now() - published.at) * published.speed;
-    const actual = toMilliseconds(engine.position.read());
+    const actual = toMilliseconds(engine.player.readHeardFrame());
     if (Math.abs(actual - expected) > driftMilliseconds) {
       publish();
     }

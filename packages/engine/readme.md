@@ -34,7 +34,9 @@ main thread and its worker or worklet.
   `engine.calibration`, `engine.microphoneAccess` and `engine.project`, which
   mounts a project and undoes and redoes its recording; `engine.spectrogram`
   and `engine.waveform` mount their canvases.
-- **Readings**: the position from `engine.position`, a seek from
+- **Readings**: the position from `engine.position`, which the views draw
+  and which stands still while the page is hidden, the frame heard at any
+  moment from `engine.player.readHeardFrame`, a seek from
   `engine.seeks`, the transport through `isPlaying`, `isRecording`,
   `isTransportBusy` and `isBuffering`, and the rest of `EngineState` from
   `engine.store`, which the frontend can only read.
