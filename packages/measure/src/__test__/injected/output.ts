@@ -1,8 +1,13 @@
 import { type Engine } from '@musetric/engine';
 
+const playingBelowHearing = Math.fround(1e-6);
+
 export type OutputMode = 'silent' | 'aloud';
 
-const gains: Record<OutputMode, number> = { silent: 0, aloud: 1 };
+const gains: Record<OutputMode, number> = {
+  silent: playingBelowHearing,
+  aloud: 1,
+};
 
 export const setOutput = (engine: Engine, mode: OutputMode) => {
   const node = engine.audioOutput.getOutputNode();

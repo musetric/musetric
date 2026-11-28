@@ -22,10 +22,13 @@ needs nothing built beforehand: each command first builds the WebAssembly of
 A command that plays aloud measures with the calibration stored for the setup
 and stops before it plays when there is none; `--calibrate` runs the app's
 calibration first, which plays its clicks aloud. A silent command needs no
-calibration and refuses `--calibrate`: before every Play and take it mutes the
-output of the measure build, checks in the page that it is silent and stops if
-it is not, and the page stays muted until a command that plays aloud or a
-reload. A call it cannot parse prints its options. Open a project before
+calibration and refuses `--calibrate`: before every Play and take it turns the
+output gain of the measure build down to -120 dB, checks in the page that the
+gain holds that value and stops if it does not, and the page stays that quiet
+until a command that plays aloud or a reload. The gain is never 0: at 0 WebKit
+marks the output silent and no longer counts the page as playing audio, which
+changes its timing; at -120 dB the page plays as it does aloud, far below
+hearing. A call it cannot parse prints its options. Open a project before
 running one.
 A take is kept as it was recorded, never stretched: frame k of a piece sung at
 tempo t lies on the song at the piece's start plus k × t, so at every tempo the
