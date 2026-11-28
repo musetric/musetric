@@ -55,6 +55,11 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
   return {
     update: (state) => {
       session.playbackState = state.playing ? 'playing' : 'paused';
+      session.setPositionState({
+        duration: state.durationMs / 1000,
+        playbackRate: state.speed,
+        position: state.positionMs / 1000,
+      });
       if (!presented) {
         present(state);
       }
@@ -65,6 +70,8 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
       if (!silenceUrl) {
         silenceUrl = createSilence(state.durationMs);
         silence.src = silenceUrl;
+      } else if (silence.error) {
+        silence.load();
       }
       const position = state.positionMs / 1000;
       if (Math.abs(silence.currentTime - position) > positionToleranceSeconds) {
@@ -89,6 +96,7 @@ export const createWebMediaBridge = (session: MediaSession): MediaBridge => {
       // eslint-disable-next-line musetric/no-null-literal
       session.metadata = null;
       session.playbackState = 'none';
+      session.setPositionState();
       for (const action of ['play', 'pause', 'seekto'] as const) {
         // eslint-disable-next-line musetric/no-null-literal
         session.setActionHandler(action, null);
