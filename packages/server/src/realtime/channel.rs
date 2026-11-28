@@ -60,7 +60,9 @@ impl Channel {
                     return received.and_then(Result::ok);
                 }
                 queued = self.outgoing.recv() => queued?,
-                _ = self.beats.tick() => {
+                beat = self.beats.tick() => {
+                    let stalled = beat.elapsed();
+                    self.heard += stalled;
                     if self.heard.elapsed() >= self.silence {
                         return None;
                     }
