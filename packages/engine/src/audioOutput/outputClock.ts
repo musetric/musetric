@@ -1,10 +1,13 @@
 import { createClockStall } from './clockStall.cross.js';
 
 const sampleIntervalMs = 100;
+const refillIntervalMs = 20;
+const refillCount = 6;
 const restObserveMs = 500;
 const sampleWindow = 15;
 const contextOffsetWindow = 30;
 const startupSampleDelaysMs = [0, 20, 40, 60, 80];
+const timestampMoveSeconds = 0.005;
 const renderAheadStepSeconds = 0.001;
 const clockOffsetStepSeconds = 0.0005;
 const staleTimestampMs = 100;
@@ -85,6 +88,8 @@ export const createEngineOutputClock = (
   const reportedWhileHeld: number[] = [];
   const listeners = new Set<(reading: OutputClockReading) => void>();
   let published: OutputClockReading | undefined = undefined;
+  let refilling = false;
+  let offsetHeardMs = 0;
   let reported = true;
   let pausedReading: HeldReading | undefined = undefined;
   let held: HeldReading | undefined = undefined;
@@ -106,8 +111,29 @@ export const createEngineOutputClock = (
 
   const releaseHeld = () => {
     held = undefined;
+    refilling = false;
     reportedWhileHeld.length = 0;
     clearSamples();
+  };
+
+  const pushClockOffset = (heard: ReturnType<typeof readHeard>) => {
+    if (clockOffsets.length > 0 && heard.performanceMs === offsetHeardMs) {
+      return;
+    }
+    const clockOffset = readClockOffset(heard);
+    if (
+      heard.reported &&
+      clockOffsets.length > 0 &&
+      Math.abs(clockOffset - median(clockOffsets)) > timestampMoveSeconds
+    ) {
+      clockOffsets.length = 0;
+      refilling = true;
+    }
+    pushWithin(clockOffsets, clockOffset, sampleWindow);
+    offsetHeardMs = heard.performanceMs;
+    if (clockOffsets.length >= refillCount) {
+      refilling = false;
+    }
   };
 
   const sample = () => {
@@ -124,12 +150,12 @@ export const createEngineOutputClock = (
     const heard = readHeard(context, nowMs);
     if (heard.reported !== reported) {
       reported = heard.reported;
+      refilling = reported;
       clearSamples();
     }
     const renderAhead =
       context.currentTime -
       (heard.contextTime + (nowMs - heard.performanceMs) / 1000);
-    const clockOffset = readClockOffset(heard);
     if (held) {
       pushWithin(reportedWhileHeld, renderAhead, heldAgreementWindow);
       if (
@@ -145,7 +171,7 @@ export const createEngineOutputClock = (
       held ? held.renderAhead : renderAhead,
       sampleWindow,
     );
-    pushWithin(clockOffsets, clockOffset, sampleWindow);
+    pushClockOffset(heard);
     const reading: OutputClockReading = {
       renderAhead: Math.max(0, median(renderAheads)),
       clockOffset: held
@@ -181,8 +207,15 @@ export const createEngineOutputClock = (
     }
   };
 
+  const readIntervalMs = () => {
+    if (isResting()) {
+      return restObserveMs;
+    }
+    return refilling && !held ? refillIntervalMs : sampleIntervalMs;
+  };
+
   const schedule = () => {
-    const ms = isResting() ? restObserveMs : sampleIntervalMs;
+    const ms = readIntervalMs();
     if (timer !== undefined && timerMs === ms) {
       return;
     }
